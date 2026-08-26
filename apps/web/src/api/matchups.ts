@@ -191,8 +191,24 @@ export const matchupApi = {
    * Uses admin client server-side to bypass RLS for teams with no owner.
    */
   ensureRosters(matchupId: string) {
-    // NOT cached — must always run to ensure data exists
-    return apiClient.post(`/api/matchups/${matchupId}/ensure-rosters`);
+    // Short-lived rather than uncached (2026-08-26). The endpoint is idempotent
+    // — it creates the team_lineups / fantasy_daily_rosters rows only if they
+    // are missing — so a second call inside one page load accomplishes nothing
+    // the first did not, and it is among the slowest calls on the matchup path
+    // at ~1s a piece.
+    //
+    // Matchup.tsx guards two separate flows with it (around :312 and :4069) and
+    // both fire on an ordinary load. A network capture of one Matchup render
+    // showed it twice, 1.11s and 985ms — a full second of duplicated work.
+    //
+    // A 30s window collapses that without weakening the invariant: the first
+    // call still completes before any roster read, and a genuine revisit later
+    // re-runs it.
+    return cached(
+      `matchups:ensure-rosters:${matchupId}`,
+      () => apiClient.post(`/api/matchups/${matchupId}/ensure-rosters`),
+      CACHE_TTL.MEDIUM,
+    );
   },
 
   // ── Score updates & maintenance ────────────────────────────────────────

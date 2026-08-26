@@ -289,13 +289,26 @@ export function DropPlayerForAddDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Adding section */}
+        {/* Adding section.
+            *
+            * shrink-0 is load-bearing. DialogContent is `flex flex-col` with
+            * max-h-[90vh]; on a phone the description, filter chips, roster
+            * list and two buttons together exceed that, so flexbox shrinks
+            * whichever children let it — and this block did. Combined with
+            * overflow-hidden that sliced the added player's row in half, which
+            * is what it looked like on an iPhone 17: a header and the top of a
+            * row, and no way to see the rest.
+            *
+            * overflow-x-auto rather than hidden: the columns (POS / PLAYER /
+            * TEAM / GP / W) do not fit 390px, and clipping them left no way to
+            * reach the stats you are supposed to be comparing against.
+            */}
         {addPlayer && (
-          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 overflow-hidden">
+          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 shrink-0 overflow-x-auto">
             <div className="px-3 py-1.5 text-[11px] uppercase tracking-wide text-emerald-700 font-semibold">
               Adding
             </div>
-            <table className="w-full">
+            <table className="w-full min-w-[34rem]">
               <thead>{addingGoalie ? GoalieHeader : SkaterHeader}</thead>
               <tbody>
                 {addingGoalie
@@ -327,10 +340,15 @@ export function DropPlayerForAddDialog({
         </div>
 
         {/* Roster table */}
+        {/*
+          * Height was a flat 420px, which is most of an iPhone's usable height
+          * once the header, description and buttons are accounted for. Scaled
+          * to the viewport with the old value as the desktop ceiling.
+          */}
         <div className="rounded-md border flex-1 min-h-0 overflow-hidden">
-          <ScrollArea className="h-[420px]">
+          <ScrollArea className="h-[min(420px,42vh)]">
             {loadingRoster ? (
-              <div className="flex h-[420px] items-center justify-center text-muted-foreground">
+              <div className="flex h-[min(420px,42vh)] items-center justify-center text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading roster...
               </div>
             ) : filteredRoster.length === 0 ? (
@@ -338,7 +356,11 @@ export function DropPlayerForAddDialog({
                 No matching players on your roster.
               </div>
             ) : (
-              <table className="w-full">
+              // Horizontal scroll lives on this wrapper, not the ScrollArea:
+              // the ScrollArea owns the vertical axis and the sticky header,
+              // and nesting a second scroller on the same axis fights it.
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[34rem]">
                 <thead className="sticky top-0 bg-background z-10">
                   {posFilter === 'G' ? GoalieHeader : SkaterHeader}
                 </thead>
@@ -351,6 +373,7 @@ export function DropPlayerForAddDialog({
                   })}
                 </tbody>
               </table>
+              </div>
             )}
           </ScrollArea>
         </div>

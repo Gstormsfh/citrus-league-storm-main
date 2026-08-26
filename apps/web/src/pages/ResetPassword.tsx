@@ -22,24 +22,87 @@ const ResetPassword = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [hasToken, setHasToken] = useState(false);
+  const [checking, setChecking] = useState(true);
 
+  /*
+   * WHAT A RECOVERY LINK ACTUALLY DELIVERS (fixed 2026-08-26)
+   *
+   * The client is configured with `flowType: 'pkce'` and
+   * `detectSessionInUrl: true` (integrations/supabase/client.ts). Under PKCE,
+   * Supabase's recovery mail lands here with **`?code=`**, and supabase-js
+   * exchanges it automatically on load and then STRIPS it from the URL.
+   *
+   * This effect used to look for two things that PKCE never produces:
+   *   • `#access_token` + `type=recovery` — the implicit flow, dead since PKCE
+   *   • `?token=`                         — the older verify style, also dead
+   *
+   * So `hasToken` stayed false for everybody, the form below was gated behind
+   * it, and every single user who clicked a reset link was told the link was
+   * invalid — including the ones whose session had just been established
+   * successfully a few milliseconds earlier. Requesting a fresh link produced
+   * the identical dead end. There was no path through.
+   *
+   * AuthCallback.tsx, the sibling page, already had this right and says so in
+   * its header comment. This is the same approach: watch for the SESSION,
+   * which is the thing that actually proves the link was good, rather than for
+   * a URL parameter whose shape depends on the flow.
+   *
+   * Ordering matters. The listener is registered BEFORE getSession() because
+   * detectSessionInUrl's exchange can complete while we are awaiting, and the
+   * event would be missed by a listener attached afterwards.
+   */
   useEffect(() => {
-    // Check if we have a password reset token in the URL
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
-    const type = hashParams.get('type');
+    let accepted = false;
 
-    if (accessToken && type === 'recovery') {
+    const accept = () => {
+      accepted = true;
       setHasToken(true);
-    } else {
-      // Check query params as fallback
-      const token = searchParams.get('token');
-      if (token) {
-        setHasToken(true);
-      } else {
-        setError('Invalid or expired reset link. Please request a new password reset.');
+      setChecking(false);
+      setError(null);
+    };
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || (!!session && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION'))) {
+        accept();
       }
+    });
+
+    // Legacy link shapes. Kept because an email sent before PKCE was enabled
+    // may still be sitting in somebody's inbox, and honouring it costs nothing.
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    if (hashParams.get('access_token') && hashParams.get('type') === 'recovery') {
+      accept();
+    } else if (searchParams.get('token')) {
+      accept();
     }
+
+    // A session may already exist — either the exchange finished before this
+    // ran, or the user is signed in and came here to change their password
+    // deliberately, which is a legitimate way to reach this page.
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (session) accept();
+      })
+      .catch(() => {
+        /* fall through to the timeout below */
+      });
+
+    // Give the exchange room to finish before calling the link bad. accept()
+    // is still live after this fires, so a slow exchange corrects the message
+    // rather than being locked out by it.
+    const timer = setTimeout(() => {
+      if (accepted) return;
+      setChecking(false);
+      setError('Invalid or expired reset link. Please request a new password reset.');
+    }, 6000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timer);
+    };
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,6 +162,24 @@ const ResetPassword = () => {
               <Alert className="bg-pastel-sage/15 ring-1 ring-pastel-sage/40 border-0 text-pastel-sage-soft">
                 <AlertDescription>Redirecting to sign in…</AlertDescription>
               </Alert>
+            </CardContent>
+          </Card>
+        </main>
+      </DarkLayout>
+    );
+  }
+
+  if (checking && !hasToken) {
+    // The PKCE exchange is asynchronous. Rendering the failure card while it is
+    // still running is how a working link gets reported as broken.
+    return (
+      <DarkLayout>
+        <Navbar />
+        <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
+          <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
+            <CardContent className="flex items-center gap-3 py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-pastel-orange" aria-hidden="true" />
+              <span className="text-pastel-cream">Checking your reset link…</span>
             </CardContent>
           </Card>
         </main>

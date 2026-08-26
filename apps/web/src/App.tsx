@@ -15,6 +15,7 @@ import { LeagueLoadErrorBanner } from "./components/LeagueLoadErrorBanner";
 import { CookieConsent } from "./components/CookieConsent";
 import ScrollToTop from "./components/ScrollToTop";
 import PushDeepLink from "./components/PushDeepLink";
+import NativeAuthDeepLink from "./components/NativeAuthDeepLink";
 import LoadingScreen from "./components/LoadingScreen";
 import '@/integrations/firebase/config'; // Initialize Firebase
 import "./App.css";
@@ -177,6 +178,7 @@ const App = () => {
               <a href="#main-content" className="skip-to-content">Skip to content</a>
               <ScrollToTop />
               <PushDeepLink />
+              <NativeAuthDeepLink />
               <LeagueProvider>
                 {/* Consumes LeagueContext.error, which nothing rendered
                     until the 2026-08-18 audit — a failed league load
