@@ -39,8 +39,14 @@
  * loaded fixture list directly, which is strictly better; the browser cannot,
  * so it gets the table.
  */
+// 2025 opened 2025-10-07, which the month rule already resolves correctly, so
+// it is not needed by the derivation below. It is listed anyway because
+// getSeasonStartDate() answers from this map, and a season the map does not
+// know returns null rather than a date. Adding a past season is inert for the
+// derivation: the lookup below only ever reads key `byCalendar + 1`.
 const SEASON_START_DATES: Record<number, string> = {
   2026: '2026-09-29',
+  2025: '2025-10-07',
 };
 
 /** Local-calendar ISO date. Deliberately local, not UTC, to stay on the same
@@ -106,6 +112,15 @@ export function getProjectionsSeason(d: Date = new Date()): number {
   if (cur > byCalendar) return cur;
   // July (6) through September (8): projections describe next season.
   return d.getMonth() >= 6 && d.getMonth() <= 8 ? cur + 1 : cur;
+}
+
+/**
+ * The first regular-season game date for a given season, or null when the
+ * map does not carry that season. Companion to getUpcomingSeasonStartDate,
+ * which answers the same question from a date rather than a season number.
+ */
+export function getSeasonStartDate(season: number): string | null {
+  return SEASON_START_DATES[season] ?? null;
 }
 
 /**

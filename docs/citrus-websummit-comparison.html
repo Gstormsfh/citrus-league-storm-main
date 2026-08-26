@@ -1,0 +1,1629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Citrus Fantasy Sports &mdash; The Yahoo / ESPN / Sleeper / Citrus Head-to-Head &mdash; Web Summit 2026</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #0B0F14;
+    --bg-2: #0D1117;
+    --card: #141B23;
+    --card-2: #1A222C;
+    --border: #2A3340;
+    --border-soft: #1F2933;
+    --text: #E6EDF3;
+    --muted: #8B949E;
+    --dim: #5B6573;
+    --orange: #FF6B00;
+    --orange-soft: #FF8A3D;
+    --yellow: #FFB800;
+    --green: #00C853;
+    --blue: #58A6FF;
+    --purple: #BC8CFF;
+    --red: #FF5C5C;
+    --teal: #3FB9B0;
+    --pink: #F778BA;
+    --citrus-glow: rgba(255,107,0,0.14);
+    --ice: #DDF1FF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 15% 10%, rgba(255,107,0,0.10) 0%, transparent 45%),
+      radial-gradient(ellipse at 85% 30%, rgba(247,120,186,0.07) 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 90%, rgba(188,140,255,0.06) 0%, transparent 50%);
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 32px 32px;
+    z-index: 0;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 40px 30px 60px;
+  }
+
+  /* =================== TICKER =================== */
+  .ticker {
+    position: relative;
+    z-index: 2;
+    border-bottom: 1px solid var(--border-soft);
+    background: linear-gradient(180deg, rgba(255,107,0,0.04), transparent);
+    overflow: hidden;
+    margin-bottom: 0;
+  }
+  .ticker-inner {
+    display: flex;
+    gap: 48px;
+    padding: 10px 0;
+    white-space: nowrap;
+    animation: scroll 50s linear infinite;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+  }
+  .ticker-inner span { display: inline-flex; align-items: center; gap: 8px; }
+  .ticker-inner .dot { width: 6px; height: 6px; border-radius: 50%; }
+  @keyframes scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  /* =================== HEADER =================== */
+  .header {
+    text-align: center;
+    margin-bottom: 56px;
+    padding-top: 30px;
+  }
+  .header-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 18px;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, rgba(255,107,0,0.18), rgba(247,120,186,0.14), rgba(188,140,255,0.14));
+    border: 1px solid rgba(255,107,0,0.35);
+    color: var(--orange);
+    margin-bottom: 22px;
+  }
+  .header-badge .puck {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--orange);
+    box-shadow: 0 0 12px var(--orange);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .header h1 {
+    font-size: 64px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--orange) 0%, var(--pink) 50%, var(--purple) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.05;
+    letter-spacing: -1.5px;
+    margin-bottom: 18px;
+  }
+  .header .tagline {
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--muted);
+    max-width: 820px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+  .header .tagline strong { color: var(--text); font-weight: 600; }
+
+  .stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 56px;
+    margin-top: 40px;
+    flex-wrap: wrap;
+  }
+  .stat-item { text-align: center; }
+  .stat-item .number {
+    font-size: 38px;
+    font-weight: 900;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .stat-item .label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    margin-top: 8px;
+    font-weight: 600;
+  }
+
+  /* =================== SECTION =================== */
+  .section { margin-bottom: 60px; }
+  .section-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    padding-left: 2px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, currentColor, transparent);
+    opacity: 0.3;
+  }
+  .section-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    overflow: hidden;
+    transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
+  }
+  .section-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--border);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+  }
+  .section-header {
+    padding: 22px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .section-icon {
+    width: 52px; height: 52px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; flex-shrink: 0; font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .section-header-text h3 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  .section-header-text .subtitle { font-size: 13px; color: var(--muted); margin-top: 3px; }
+  .section-tag {
+    margin-left: auto; padding: 6px 16px; border-radius: 100px;
+    font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .section-body { padding: 26px 28px; }
+
+  /* =================== THEME COLORS =================== */
+  .t-orange .section-icon { background: rgba(255,107,0,0.15); color: var(--orange); }
+  .t-orange .section-header { background: rgba(255,107,0,0.04); }
+  .t-orange .section-tag { background: rgba(255,107,0,0.14); color: var(--orange); }
+  .t-orange .badge { background: rgba(255,107,0,0.12); color: var(--orange); }
+
+  .t-pink .section-icon { background: rgba(247,120,186,0.15); color: var(--pink); }
+  .t-pink .section-header { background: rgba(247,120,186,0.04); }
+  .t-pink .section-tag { background: rgba(247,120,186,0.14); color: var(--pink); }
+  .t-pink .badge { background: rgba(247,120,186,0.12); color: var(--pink); }
+
+  .t-green .section-icon { background: rgba(0,200,83,0.15); color: var(--green); }
+  .t-green .section-header { background: rgba(0,200,83,0.04); }
+  .t-green .section-tag { background: rgba(0,200,83,0.14); color: var(--green); }
+  .t-green .badge { background: rgba(0,200,83,0.12); color: var(--green); }
+
+  .t-blue .section-icon { background: rgba(88,166,255,0.15); color: var(--blue); }
+  .t-blue .section-header { background: rgba(88,166,255,0.04); }
+  .t-blue .section-tag { background: rgba(88,166,255,0.14); color: var(--blue); }
+  .t-blue .badge { background: rgba(88,166,255,0.12); color: var(--blue); }
+
+  .t-purple .section-icon { background: rgba(188,140,255,0.15); color: var(--purple); }
+  .t-purple .section-header { background: rgba(188,140,255,0.04); }
+  .t-purple .section-tag { background: rgba(188,140,255,0.14); color: var(--purple); }
+  .t-purple .badge { background: rgba(188,140,255,0.12); color: var(--purple); }
+
+  .t-teal .section-icon { background: rgba(63,185,176,0.15); color: var(--teal); }
+  .t-teal .section-header { background: rgba(63,185,176,0.04); }
+  .t-teal .section-tag { background: rgba(63,185,176,0.14); color: var(--teal); }
+  .t-teal .badge { background: rgba(63,185,176,0.12); color: var(--teal); }
+
+  .t-yellow .section-icon { background: rgba(255,184,0,0.15); color: var(--yellow); }
+  .t-yellow .section-header { background: rgba(255,184,0,0.04); }
+  .t-yellow .section-tag { background: rgba(255,184,0,0.14); color: var(--yellow); }
+  .t-yellow .badge { background: rgba(255,184,0,0.12); color: var(--yellow); }
+
+  .t-red .section-icon { background: rgba(255,92,92,0.15); color: var(--red); }
+  .t-red .section-header { background: rgba(255,92,92,0.04); }
+  .t-red .section-tag { background: rgba(255,92,92,0.14); color: var(--red); }
+  .t-red .badge { background: rgba(255,92,92,0.12); color: var(--red); }
+
+  /* =================== GRIDS =================== */
+  .grid { display: grid; gap: 14px; }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  .g4 { grid-template-columns: repeat(4, 1fr); }
+  .g5 { grid-template-columns: repeat(5, 1fr); }
+  @media (max-width: 1100px) { .g4, .g5 { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 900px) { .g3, .g4, .g5 { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .g2, .g3, .g4, .g5 { grid-template-columns: 1fr; } }
+
+  .card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 18px;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .card:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); }
+  .card .title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+  .card .desc { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
+  .card .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 6px;
+    font-size: 10px; font-weight: 700; margin-top: 10px;
+    text-transform: uppercase; letter-spacing: 0.6px;
+  }
+
+  /* =================== PEPSI CHALLENGE =================== */
+  .pepsi-frame {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-top: 8px;
+  }
+  @media (max-width: 1000px) { .pepsi-frame { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .pepsi-frame { grid-template-columns: 1fr; } }
+
+  .pepsi-col {
+    background: var(--card-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 480px;
+  }
+  .pepsi-col.citrus {
+    border-color: rgba(255,107,0,0.45);
+    box-shadow: 0 0 0 1px rgba(255,107,0,0.15), 0 12px 40px rgba(255,107,0,0.12);
+    background: linear-gradient(180deg, rgba(255,107,0,0.04), var(--card-2) 80%);
+  }
+  .pepsi-head {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .pepsi-head .logo {
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: -0.3px;
+  }
+  .pepsi-col.yahoo .logo { color: #7B61FF; }
+  .pepsi-col.espn  .logo { color: #D6202F; }
+  .pepsi-col.sleeper .logo { color: #FFA800; }
+  .pepsi-col.citrus .logo {
+    background: linear-gradient(135deg, var(--orange), var(--pink));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .pepsi-head .tagchip {
+    font-size: 9px; padding: 3px 8px; border-radius: 6px;
+    background: rgba(255,255,255,0.05);
+    color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.8px; font-weight: 700;
+  }
+  .pepsi-col.citrus .tagchip { background: rgba(255,107,0,0.15); color: var(--orange); }
+
+  .player-card {
+    padding: 18px 16px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .player-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .player-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, rgba(255,107,0,0.25), rgba(247,120,186,0.25));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 14px; color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .player-name {
+    font-size: 14px; font-weight: 700; line-height: 1.2;
+  }
+  .player-meta {
+    font-size: 11px; color: var(--muted); margin-top: 3px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .stat-block {
+    padding: 14px 16px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .stat-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 12px;
+  }
+  .stat-line .k {
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 10px;
+    font-weight: 600;
+  }
+  .stat-line .v {
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .stat-missing {
+    color: var(--dim);
+    font-style: italic;
+    font-size: 11px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+  }
+
+  .big-num {
+    font-size: 26px;
+    font-weight: 900;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: -0.5px;
+    line-height: 1;
+  }
+
+  .range-bar {
+    height: 6px;
+    border-radius: 100px;
+    background: rgba(255,255,255,0.05);
+    overflow: hidden;
+    position: relative;
+    margin-top: 4px;
+  }
+  .range-bar .fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--red), var(--yellow) 35%, var(--green) 70%);
+    border-radius: 100px;
+  }
+  .range-bar .marker {
+    position: absolute;
+    top: -2px;
+    width: 2px;
+    height: 10px;
+    background: var(--text);
+    border-radius: 1px;
+  }
+
+  .dist-bars {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+    height: 44px;
+    margin-top: 4px;
+  }
+  .dist-bars .b {
+    flex: 1;
+    background: linear-gradient(180deg, var(--orange), rgba(255,107,0,0.2));
+    border-radius: 2px 2px 0 0;
+    opacity: 0.85;
+  }
+
+  .footer-strip {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border-soft);
+    background: rgba(0,0,0,0.2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+  }
+  .footer-strip .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    display: inline-block; margin-right: 6px; vertical-align: middle;
+  }
+
+  /* =================== COMP TABLE =================== */
+  .comp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .comp-table th {
+    text-align: left; padding: 14px 16px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 2px solid var(--border);
+    font-weight: 800; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted);
+  }
+  .comp-table td {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    vertical-align: top;
+    line-height: 1.55;
+  }
+  .comp-table tr:last-child td { border-bottom: none; }
+  .comp-table .citrus-col { color: var(--orange); font-weight: 700; }
+  .comp-table .win { color: var(--green); font-weight: 600; }
+  .comp-table .lose { color: var(--red); }
+  .comp-table .neutral { color: var(--muted); }
+  .comp-table .row-label { font-weight: 700; color: var(--text); }
+
+  /* =================== SCORECARD =================== */
+  .scorecard {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    font-size: 13px;
+  }
+  .scorecard th {
+    text-align: center; padding: 16px 12px;
+    font-weight: 800; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted);
+    border-bottom: 2px solid var(--border);
+  }
+  .scorecard th:first-child { text-align: left; padding-left: 18px; }
+  .scorecard th.citrus-head {
+    color: var(--orange);
+    background: rgba(255,107,0,0.06);
+    border-bottom: 2px solid var(--orange);
+  }
+  .scorecard td {
+    padding: 14px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    text-align: center;
+    vertical-align: middle;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .scorecard td:first-child {
+    text-align: left;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    padding-left: 18px;
+  }
+  .scorecard td.citrus-cell {
+    background: rgba(255,107,0,0.04);
+    color: var(--orange);
+    font-weight: 800;
+  }
+  .scorecard tr:last-child td { border-bottom: none; }
+  .grade {
+    display: inline-flex;
+    align-items: center; justify-content: center;
+    min-width: 38px; padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 800; font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .grade-a { background: rgba(0,200,83,0.15); color: var(--green); }
+  .grade-b { background: rgba(255,184,0,0.15); color: var(--yellow); }
+  .grade-c { background: rgba(255,107,0,0.15); color: var(--orange-soft); }
+  .grade-f { background: rgba(255,92,92,0.15); color: var(--red); }
+  .grade-na { color: var(--dim); font-style: italic; }
+  .grade-citrus {
+    background: linear-gradient(135deg, rgba(255,107,0,0.25), rgba(247,120,186,0.25));
+    color: var(--orange);
+    font-weight: 900;
+  }
+
+  /* =================== MOAT =================== */
+  .moat-layer {
+    display: grid;
+    grid-template-columns: 200px 1fr 120px;
+    gap: 14px;
+    padding: 16px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px;
+    align-items: center;
+  }
+  @media (max-width: 900px) {
+    .moat-layer { grid-template-columns: 1fr; }
+  }
+  .moat-layer + .moat-layer { margin-top: 10px; }
+  .moat-layer .moat-label {
+    font-size: 12px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 1px;
+    color: var(--text);
+  }
+  .moat-layer .moat-label .sub {
+    display: block; font-weight: 500; font-size: 10px;
+    color: var(--muted); margin-top: 3px; letter-spacing: 0.5px;
+  }
+  .moat-layer .moat-desc {
+    font-size: 12.5px; color: var(--muted); line-height: 1.55;
+  }
+  .moat-layer .moat-desc strong { color: var(--text); }
+  .moat-layer .moat-time {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: 14px;
+    color: var(--orange);
+  }
+  .moat-layer .moat-time .label {
+    display: block;
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* =================== HIGHLIGHT =================== */
+  .highlight-box {
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-top: 18px;
+  }
+  .highlight-box .h-title {
+    font-weight: 800; font-size: 14px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+  }
+  .highlight-box .h-body {
+    font-size: 13px; color: var(--muted); line-height: 1.7;
+  }
+  .highlight-box .h-body strong { color: var(--text); font-weight: 600; }
+
+  /* =================== ECOSYSTEM 2D =================== */
+  .quadrant {
+    position: relative;
+    height: 460px;
+    background:
+      linear-gradient(135deg, rgba(0,200,83,0.04), transparent 60%),
+      var(--card-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 30px;
+    overflow: hidden;
+  }
+  .quadrant .axis-y, .quadrant .axis-x {
+    position: absolute;
+    background: var(--border);
+  }
+  .quadrant .axis-y {
+    left: 60px; top: 30px; bottom: 60px; width: 1px;
+  }
+  .quadrant .axis-x {
+    left: 60px; bottom: 60px; right: 30px; height: 1px;
+  }
+  .quadrant .axis-tick {
+    position: absolute;
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 600;
+  }
+  .quadrant .label-y {
+    transform: rotate(-90deg);
+    transform-origin: 0 0;
+    position: absolute;
+    left: 24px; top: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+  }
+  .quadrant .label-x {
+    position: absolute;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+  }
+  .qdot {
+    position: absolute;
+    transform: translate(-50%, 50%);
+  }
+  .qdot .pt {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--muted);
+    box-shadow: 0 0 0 3px rgba(139,148,158,0.15);
+  }
+  .qdot .lbl {
+    position: absolute;
+    left: 22px;
+    top: -8px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    color: var(--text);
+  }
+  .qdot.citrus .pt {
+    background: var(--orange);
+    box-shadow: 0 0 0 5px rgba(255,107,0,0.2), 0 0 20px rgba(255,107,0,0.6);
+    width: 18px; height: 18px;
+  }
+  .qdot.citrus .lbl { color: var(--orange); font-weight: 800; }
+
+  /* =================== FOOTER =================== */
+  .footer {
+    text-align: center;
+    margin-top: 60px;
+    padding: 36px 0 20px;
+    border-top: 1px solid var(--border);
+  }
+  .footer .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .footer .left, .footer .right { flex: 1; min-width: 260px; text-align: left; }
+  .footer .right { text-align: right; }
+  .footer .center { flex: 0 1 auto; }
+  .footer .brand-mark {
+    font-size: 20px; font-weight: 900; letter-spacing: -0.3px;
+    background: linear-gradient(135deg, var(--orange), var(--pink), var(--purple));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .footer p { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .footer .url { color: var(--orange); font-weight: 700; text-decoration: none; }
+  .footer .url:hover { text-decoration: underline; }
+
+  /* =================== UTILS =================== */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 20px 0;
+  }
+
+  /* =================== RESPONSIVE =================== */
+  @media (max-width: 900px) {
+    .header h1 { font-size: 44px; }
+    .header .tagline { font-size: 18px; }
+    .stats-bar { gap: 28px; }
+    .stat-item .number { font-size: 28px; }
+  }
+  @media (max-width: 600px) {
+    .header h1 { font-size: 32px; }
+    .container { padding: 20px 16px 40px; }
+    .section-header { flex-wrap: wrap; }
+    .section-tag { margin-left: 0; }
+  }
+  @media print {
+    body::before, body::after, .ticker { display: none; }
+    .section-card:hover { transform: none; box-shadow: none; }
+    body { background: white; color: black; }
+  }
+</style>
+</head>
+<body>
+
+<!-- =================== LIVE TICKER =================== -->
+<div class="ticker">
+  <div class="ticker-inner">
+    <span><span class="dot" style="background:var(--orange)"></span>WEB SUMMIT 2026</span>
+    <span><span class="dot" style="background:var(--green)"></span>xG MODEL &middot; 31 FEATURES &middot; AUC-ROC 0.817</span>
+    <span><span class="dot" style="background:var(--pink)"></span>MONTE CARLO &middot; 10,000 SIMS / MATCHUP</span>
+    <span><span class="dot" style="background:var(--purple)"></span>STUDENT-T COPULA &middot; &nu; = 5</span>
+    <span><span class="dot" style="background:var(--teal)"></span>BAYESIAN SHRINKAGE &middot; CONJUGATE PRIORS</span>
+    <span><span class="dot" style="background:var(--blue)"></span>DATA FRESHNESS &middot; 30s LIVE</span>
+    <span><span class="dot" style="background:var(--yellow)"></span>863K TRAINING SHOTS &middot; 7 SEASONS</span>
+    <span><span class="dot" style="background:var(--red)"></span>BRIER SCORE 0.054 &middot; CALIBRATED</span>
+    <!-- duplicate for seamless scroll -->
+    <span><span class="dot" style="background:var(--orange)"></span>WEB SUMMIT 2026</span>
+    <span><span class="dot" style="background:var(--green)"></span>xG MODEL &middot; 31 FEATURES &middot; AUC-ROC 0.817</span>
+    <span><span class="dot" style="background:var(--pink)"></span>MONTE CARLO &middot; 10,000 SIMS / MATCHUP</span>
+    <span><span class="dot" style="background:var(--purple)"></span>STUDENT-T COPULA &middot; &nu; = 5</span>
+    <span><span class="dot" style="background:var(--teal)"></span>BAYESIAN SHRINKAGE &middot; CONJUGATE PRIORS</span>
+    <span><span class="dot" style="background:var(--blue)"></span>DATA FRESHNESS &middot; 30s LIVE</span>
+    <span><span class="dot" style="background:var(--yellow)"></span>863K TRAINING SHOTS &middot; 7 SEASONS</span>
+    <span><span class="dot" style="background:var(--red)"></span>BRIER SCORE 0.054 &middot; CALIBRATED</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- =================== HEADER =================== -->
+  <div class="header">
+    <div class="header-badge">
+      <span class="puck"></span>
+      Web Summit 2026 &middot; Lisbon &middot; The Data Behind The Disruption
+    </div>
+    <h1>Fantasy hockey is broken.<br>We rebuilt it as a quant desk.</h1>
+    <div class="tagline">
+      Yahoo, ESPN, and Sleeper show you a single projected number. <strong>Citrus runs 10,000 Monte Carlo simulations per matchup, with Student-t copula correlations mined from real NHL shift data</strong> &mdash; the same techniques quant trading desks use for portfolio risk. This is the head-to-head.
+    </div>
+    <div class="stats-bar">
+      <div class="stat-item"><div class="number" style="color:var(--orange)">31</div><div class="label">xG Features</div></div>
+      <div class="stat-item"><div class="number" style="color:var(--pink)">10K</div><div class="label">MC Sims / Matchup</div></div>
+      <div class="stat-item"><div class="number" style="color:var(--purple)">0.817</div><div class="label">Model AUC-ROC</div></div>
+      <div class="stat-item"><div class="number" style="color:var(--teal)">863K</div><div class="label">Training Shots</div></div>
+      <div class="stat-item"><div class="number" style="color:var(--green)">30s</div><div class="label">Data Freshness</div></div>
+      <div class="stat-item"><div class="number" style="color:var(--blue)">0.054</div><div class="label">Brier Score</div></div>
+    </div>
+  </div>
+
+  <!-- =================== 1. PEPSI CHALLENGE =================== -->
+  <div class="section">
+    <div class="section-label" style="color:var(--orange);">Part 1 &middot; The 3-Second Test</div>
+    <div class="section-card t-orange">
+      <div class="section-header">
+        <div class="section-icon">VS</div>
+        <div class="section-header-text">
+          <h3>Same player. Same Tuesday night. Four platforms.</h3>
+          <div class="subtitle">What each app tells the user before they set their lineup &mdash; rendered as you&rsquo;d see it in-product</div>
+        </div>
+        <div class="section-tag">Head-to-Head</div>
+      </div>
+      <div class="section-body">
+        <div class="pepsi-frame">
+
+          <!-- ============ YAHOO ============ -->
+          <div class="pepsi-col yahoo">
+            <div class="pepsi-head">
+              <div class="logo">Yahoo Fantasy</div>
+              <div class="tagchip">Editorial</div>
+            </div>
+            <div class="player-card">
+              <div class="player-row">
+                <div class="player-avatar">F1</div>
+                <div>
+                  <div class="player-name">Forward A &middot; 1st Line C</div>
+                  <div class="player-meta">vs OPP &middot; Tue 7:00 PM</div>
+                </div>
+              </div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-line"><div class="k">Projection</div><div class="v">12.5 pts</div></div>
+              <div class="stat-line"><div class="k">Range</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Win Prob</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Upside</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Floor</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Confidence</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Opponent Adj.</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">B2B / Home Adj.</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Linemate Corr.</div><div class="v stat-missing">&mdash;</div></div>
+            </div>
+            <div class="footer-strip">
+              <span><span class="dot" style="background:var(--yellow)"></span>Updated weekly</span>
+              <span>1 number</span>
+            </div>
+          </div>
+
+          <!-- ============ ESPN ============ -->
+          <div class="pepsi-col espn">
+            <div class="pepsi-head">
+              <div class="logo">ESPN Fantasy</div>
+              <div class="tagchip">Algorithm + Edit</div>
+            </div>
+            <div class="player-card">
+              <div class="player-row">
+                <div class="player-avatar">F1</div>
+                <div>
+                  <div class="player-name">Forward A &middot; 1st Line C</div>
+                  <div class="player-meta">vs OPP &middot; Tue 7:00 PM</div>
+                </div>
+              </div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-line"><div class="k">Projection</div><div class="v">12.1 pts</div></div>
+              <div class="stat-line"><div class="k">Matchup Rating</div><div class="v">5 / 10</div></div>
+              <div class="stat-line"><div class="k">Range</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Win Prob</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Upside %</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Floor %</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Confidence</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Pass Quality xG</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Calibration</div><div class="v stat-missing">&mdash;</div></div>
+            </div>
+            <div class="footer-strip">
+              <span><span class="dot" style="background:var(--yellow)"></span>~5 min delay</span>
+              <span>1 number + chip</span>
+            </div>
+          </div>
+
+          <!-- ============ SLEEPER ============ -->
+          <div class="pepsi-col sleeper">
+            <div class="pepsi-head">
+              <div class="logo">Sleeper</div>
+              <div class="tagchip">No NHL Engine</div>
+            </div>
+            <div class="player-card">
+              <div class="player-row">
+                <div class="player-avatar">F1</div>
+                <div>
+                  <div class="player-name">Forward A &middot; 1st Line C</div>
+                  <div class="player-meta">vs OPP &middot; Tue 7:00 PM</div>
+                </div>
+              </div>
+            </div>
+            <div class="stat-block">
+              <div class="stat-line"><div class="k">Projection</div><div class="v stat-missing">No NHL projections</div></div>
+              <div class="stat-line"><div class="k">Range</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Win Prob</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Upside %</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Floor %</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Confidence</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Opponent Adj.</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Pass Quality xG</div><div class="v stat-missing">&mdash;</div></div>
+              <div class="stat-line"><div class="k">Linemate Corr.</div><div class="v stat-missing">&mdash;</div></div>
+            </div>
+            <div class="footer-strip">
+              <span><span class="dot" style="background:var(--red)"></span>NFL/NBA-only engine</span>
+              <span>No data</span>
+            </div>
+          </div>
+
+          <!-- ============ CITRUS ============ -->
+          <div class="pepsi-col citrus">
+            <div class="pepsi-head">
+              <div class="logo">Citrus</div>
+              <div class="tagchip">xG v3 + MC</div>
+            </div>
+            <div class="player-card">
+              <div class="player-row">
+                <div class="player-avatar" style="background:linear-gradient(135deg, var(--orange), var(--pink));">F1</div>
+                <div>
+                  <div class="player-name">Forward A &middot; 1st Line C</div>
+                  <div class="player-meta">vs OPP &middot; Tue 7:00 PM &middot; O/U 6.5</div>
+                </div>
+              </div>
+            </div>
+            <div class="stat-block">
+              <div>
+                <div class="stat-line"><div class="k">Projection (mean)</div><div class="big-num" style="color:var(--orange)">12.8</div></div>
+                <div class="stat-line"><div class="k" style="font-size:9px;">90% CI</div><div class="v" style="font-size:11px; color:var(--text);">8.1 &mdash; 18.4 pts</div></div>
+                <div class="range-bar">
+                  <div class="fill"></div>
+                  <div class="marker" style="left:46%"></div>
+                </div>
+              </div>
+              <div class="stat-line"><div class="k">Win Prob (matchup)</div><div class="v" style="color:var(--green)">73.4%</div></div>
+              <div class="stat-line"><div class="k">Upside (P &gt; 1.5x)</div><div class="v" style="color:var(--pink)">12.1%</div></div>
+              <div class="stat-line"><div class="k">Floor (P &lt; 0.5x)</div><div class="v" style="color:var(--blue)">8.7%</div></div>
+              <div class="stat-line"><div class="k">Confidence</div><div class="v" style="color:var(--green)">HIGH (0.78)</div></div>
+              <div class="stat-line"><div class="k">Opponent DDR</div><div class="v">1.14&times;</div></div>
+              <div class="stat-line"><div class="k">Vegas O/U Scale</div><div class="v">1.08&times;</div></div>
+              <div class="stat-line"><div class="k">Linemate &rho;</div><div class="v" style="color:var(--purple)">0.60 (shift+ast)</div></div>
+              <div>
+                <div class="stat-line"><div class="k">Outcome Distribution</div><div class="v stat-missing" style="font-size:9px;">10K sims</div></div>
+                <div class="dist-bars">
+                  <div class="b" style="height:8%"></div>
+                  <div class="b" style="height:14%"></div>
+                  <div class="b" style="height:24%"></div>
+                  <div class="b" style="height:42%"></div>
+                  <div class="b" style="height:68%"></div>
+                  <div class="b" style="height:92%"></div>
+                  <div class="b" style="height:88%"></div>
+                  <div class="b" style="height:74%"></div>
+                  <div class="b" style="height:54%"></div>
+                  <div class="b" style="height:36%"></div>
+                  <div class="b" style="height:22%"></div>
+                  <div class="b" style="height:12%"></div>
+                  <div class="b" style="height:6%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="footer-strip" style="background:rgba(255,107,0,0.06);">
+              <span><span class="dot" style="background:var(--green)"></span>30s live &middot; Brier 0.054</span>
+              <span style="color:var(--orange);">Full distribution</span>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="highlight-box" style="background:var(--citrus-glow); border:1px solid rgba(255,107,0,0.2);">
+          <div class="h-title" style="color:var(--orange);">Read it like an investor would</div>
+          <div class="h-body">
+            Yahoo and ESPN give you a <strong>point estimate</strong>. Sleeper gives you <strong>nothing</strong> for the NHL. Citrus gives you a <strong>full probability distribution</strong> &mdash; mean, 90% confidence interval, upside and floor probabilities, dynamic confidence, opponent and linemate adjustments, and a Vegas-calibrated scoring environment. <strong>This is the difference between a magazine and a Bloomberg terminal.</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== 2. THE SCORECARD =================== -->
+  <div class="section">
+    <div class="section-label" style="color:var(--green);">Part 2 &middot; The Scorecard</div>
+    <div class="section-card t-green">
+      <div class="section-header">
+        <div class="section-icon">A+</div>
+        <div class="section-header-text">
+          <h3>The grade on every dimension users feel</h3>
+          <div class="subtitle">Eight categories that decide who wins your league &mdash; graded across the five major platforms</div>
+        </div>
+        <div class="section-tag">Graded</div>
+      </div>
+      <div class="section-body" style="overflow-x:auto;">
+        <table class="scorecard">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th class="citrus-head">Citrus</th>
+              <th>Yahoo</th>
+              <th>ESPN</th>
+              <th>Sleeper</th>
+              <th>Fantrax</th>
+              <th>DraftKings</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Projection sophistication</td>
+              <td class="citrus-cell"><span class="grade grade-citrus">A+</span></td>
+              <td><span class="grade grade-b">B&minus;</span></td>
+              <td><span class="grade grade-b">B</span></td>
+              <td><span class="grade grade-na">N/A</span></td>
+              <td><span class="grade grade-b">B+</span></td>
+              <td><span class="grade grade-b">B</span></td>
+            </tr>
+            <tr>
+              <td>Uncertainty &amp; confidence intervals</td>
+              <td class="citrus-cell"><span class="grade grade-citrus">A+</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-c">C</span></td>
+              <td><span class="grade grade-c">C</span></td>
+            </tr>
+            <tr>
+              <td>Monte Carlo win probability</td>
+              <td class="citrus-cell"><span class="grade grade-citrus">A+</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+            </tr>
+            <tr>
+              <td>Linemate / player correlation</td>
+              <td class="citrus-cell"><span class="grade grade-citrus">A+</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-c">C</span></td>
+            </tr>
+            <tr>
+              <td>Calibration tracking (Brier)</td>
+              <td class="citrus-cell"><span class="grade grade-citrus">A+</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+            </tr>
+            <tr>
+              <td>Data freshness (live)</td>
+              <td class="citrus-cell"><span class="grade grade-citrus">A+ &middot; 30s</span></td>
+              <td><span class="grade grade-b">B &middot; 2&ndash;5m</span></td>
+              <td><span class="grade grade-b">B &middot; 2&ndash;5m</span></td>
+              <td><span class="grade grade-b">B &middot; 1&ndash;3m</span></td>
+              <td><span class="grade grade-b">B+ &middot; 1&ndash;3m</span></td>
+              <td><span class="grade grade-b">B</span></td>
+            </tr>
+            <tr>
+              <td>Goalie modeling (GSAx)</td>
+              <td class="citrus-cell"><span class="grade grade-citrus">A+</span></td>
+              <td><span class="grade grade-c">C</span></td>
+              <td><span class="grade grade-c">C</span></td>
+              <td><span class="grade grade-na">N/A</span></td>
+              <td><span class="grade grade-c">C</span></td>
+              <td><span class="grade grade-c">C+</span></td>
+            </tr>
+            <tr>
+              <td>Vegas market integration</td>
+              <td class="citrus-cell"><span class="grade grade-citrus">A</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-f">F</span></td>
+              <td><span class="grade grade-b">B</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="highlight-box" style="background:rgba(0,200,83,0.05); border:1px solid rgba(0,200,83,0.18); margin-top:22px;">
+          <div class="h-title" style="color:var(--green);">Eight categories. Five F&rsquo;s across the board for Yahoo &amp; ESPN.</div>
+          <div class="h-body">
+            The grades aren&rsquo;t marketing &mdash; they&rsquo;re what the platforms publicly ship. <strong>No major fantasy hockey provider exposes a probability distribution, a confidence interval, or a calibration score to the user.</strong> Citrus is the only one that does, and we expose all three on every player on every night.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== 3. xG MODEL =================== -->
+  <div class="section">
+    <div class="section-label" style="color:var(--purple);">Part 3 &middot; The xG Model Head-to-Head</div>
+    <div class="section-card t-purple">
+      <div class="section-header">
+        <div class="section-icon">xG</div>
+        <div class="section-header-text">
+          <h3>Citrus xG v3 vs. every public hockey analytics platform</h3>
+          <div class="subtitle">863K shots over 7 seasons &middot; 31 features &middot; XGBoost &middot; AUC-ROC 0.817 &middot; Brier 0.054</div>
+        </div>
+        <div class="section-tag">31 Features</div>
+      </div>
+      <div class="section-body" style="overflow-x:auto;">
+        <table class="comp-table">
+          <thead>
+            <tr>
+              <th style="width:18%">Dimension</th>
+              <th style="width:22%">Citrus xG v3</th>
+              <th>MoneyPuck</th>
+              <th>Natural Stat Trick</th>
+              <th>Evolving Hockey</th>
+              <th>NHL Edge</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="row-label">Total features</td>
+              <td class="citrus-col">31 features</td>
+              <td class="neutral">~20</td>
+              <td class="lose">~5</td>
+              <td class="neutral">~15</td>
+              <td class="neutral">~12</td>
+            </tr>
+            <tr>
+              <td class="row-label">Pass quality module</td>
+              <td class="win">10 features: cross-ice, royal road, one-timer, pass speed, goalie disruption, slot-to-slot</td>
+              <td class="neutral">Binary pass flag + zone</td>
+              <td class="lose">None</td>
+              <td class="neutral">Basic pass flag</td>
+              <td class="neutral">Puck tracking (limited)</td>
+            </tr>
+            <tr>
+              <td class="row-label">Sequence &amp; rebound</td>
+              <td class="win">6 features: rebound angle delta, rush flag, zone-entry time, sequence depth, traffic density</td>
+              <td class="neutral">Rebound flag + angle</td>
+              <td class="lose">Rebound flag only</td>
+              <td class="neutral">Rebound + rush</td>
+              <td class="neutral">Speed/tracking</td>
+            </tr>
+            <tr>
+              <td class="row-label">Training data</td>
+              <td class="citrus-col">863K shots, 7 seasons</td>
+              <td>~800K shots</td>
+              <td class="neutral">Unknown</td>
+              <td>~500K shots</td>
+              <td class="neutral">2022+ tracking-era only</td>
+            </tr>
+            <tr>
+              <td class="row-label">Model architecture</td>
+              <td class="citrus-col">XGBoost (gradient boosted)</td>
+              <td>Gradient boosted</td>
+              <td class="lose">Logistic regression</td>
+              <td>Gradient boosted</td>
+              <td>Neural network</td>
+            </tr>
+            <tr>
+              <td class="row-label">AUC-ROC</td>
+              <td class="win">0.817</td>
+              <td class="neutral">~0.79&ndash;0.82</td>
+              <td class="lose">~0.74&ndash;0.76</td>
+              <td class="neutral">~0.78&ndash;0.80</td>
+              <td class="neutral">Not published</td>
+            </tr>
+            <tr>
+              <td class="row-label">Used in fantasy product</td>
+              <td class="win">Native &mdash; powers projections, MC, draft, lineup tools</td>
+              <td class="lose">No fantasy product</td>
+              <td class="lose">No fantasy product</td>
+              <td class="lose">No fantasy product</td>
+              <td class="lose">No fantasy product</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="highlight-box" style="background:rgba(188,140,255,0.06); border:1px solid rgba(188,140,255,0.2);">
+          <div class="h-title" style="color:var(--purple);">The pass module is the MOAT</div>
+          <div class="h-body">
+            Cross-ice passes that disrupt goalie tracking increase xG by <strong>2&ndash;4&times;</strong> compared to same-side feeds. Our 10-feature pass module captures royal road crossings, one-timer probability, pass speed proxy, slot-to-slot transfers, and goalie lateral movement. MoneyPuck has a binary pass flag. Natural Stat Trick has nothing. <strong>This requires raw play-by-play parsing that nobody in fantasy invests in</strong> &mdash; and it&rsquo;s the difference between a model that knows where the shot was and a model that knows how it got there.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== 4. SIMULATION HEAD-TO-HEAD =================== -->
+  <div class="section">
+    <div class="section-label" style="color:var(--pink);">Part 4 &middot; The Monte Carlo Gap</div>
+    <div class="section-card t-pink">
+      <div class="section-header">
+        <div class="section-icon">MC</div>
+        <div class="section-header-text">
+          <h3>10,000 simulations per matchup. Nobody else runs one.</h3>
+          <div class="subtitle">The quant-desk techniques we ship to fantasy users &mdash; that no other platform exposes</div>
+        </div>
+        <div class="section-tag">10K Sims</div>
+      </div>
+      <div class="section-body" style="overflow-x:auto;">
+        <table class="comp-table">
+          <thead>
+            <tr>
+              <th style="width:18%">Capability</th>
+              <th style="width:22%">Citrus</th>
+              <th>Yahoo</th>
+              <th>ESPN</th>
+              <th>Sleeper</th>
+              <th>Fantrax</th>
+              <th>DraftKings DFS</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="row-label">Win probability method</td>
+              <td class="win">MC sim (10K runs, full distribution)</td>
+              <td class="lose">Sum of projections</td>
+              <td class="lose">Sum of projections</td>
+              <td class="lose">None</td>
+              <td class="lose">None</td>
+              <td class="lose">N/A (DFS optimizer)</td>
+            </tr>
+            <tr>
+              <td class="row-label">Correlation model</td>
+              <td class="win">Student-t copula (&nu;=5), tail-dependent</td>
+              <td class="lose">None</td>
+              <td class="lose">None</td>
+              <td class="lose">None</td>
+              <td class="lose">None</td>
+              <td class="neutral">Basic stacking</td>
+            </tr>
+            <tr>
+              <td class="row-label">Uncertainty output</td>
+              <td class="win">Mean, &sigma;, 90% CI, 50% CI, skewness, upside/floor</td>
+              <td class="lose">Point estimate</td>
+              <td class="lose">Point estimate</td>
+              <td class="lose">N/A</td>
+              <td class="neutral">Ceiling/floor (heuristic)</td>
+              <td class="neutral">Ceiling/floor (heuristic)</td>
+            </tr>
+            <tr>
+              <td class="row-label">Player distribution shape</td>
+              <td class="win">Gamma (counts) + Normal (continuous), empirical</td>
+              <td class="lose">Implicit Normal</td>
+              <td class="lose">Implicit Normal</td>
+              <td class="lose">N/A</td>
+              <td class="lose">N/A</td>
+              <td class="neutral">Proprietary, undisclosed</td>
+            </tr>
+            <tr>
+              <td class="row-label">Variance reduction</td>
+              <td class="win">Antithetic variates + stratified sampling</td>
+              <td class="lose">N/A</td>
+              <td class="lose">N/A</td>
+              <td class="lose">N/A</td>
+              <td class="lose">N/A</td>
+              <td class="lose">N/A</td>
+            </tr>
+            <tr>
+              <td class="row-label">Calibration tracking</td>
+              <td class="win">Brier score per league per week, bucketed curves</td>
+              <td class="lose">None</td>
+              <td class="lose">None</td>
+              <td class="lose">None</td>
+              <td class="lose">None</td>
+              <td class="lose">None</td>
+            </tr>
+            <tr>
+              <td class="row-label">Season simulation</td>
+              <td class="win">Playoff odds + championship probability (remaining sched MC)</td>
+              <td class="lose">None</td>
+              <td class="neutral">Manual Playoff Machine</td>
+              <td class="lose">None</td>
+              <td class="lose">None</td>
+              <td class="lose">N/A</td>
+            </tr>
+            <tr>
+              <td class="row-label">Vegas integration</td>
+              <td class="win">O/U scales scoring env [0.80&ndash;1.25]&times;</td>
+              <td class="lose">None</td>
+              <td class="lose">None</td>
+              <td class="lose">None</td>
+              <td class="lose">None</td>
+              <td class="neutral">Odds context (DFS)</td>
+            </tr>
+            <tr>
+              <td class="row-label">Goalie GSAx adj.</td>
+              <td class="win">Career GSAx adjusts SV/GA/W/SO &plusmn;15%</td>
+              <td class="lose">None</td>
+              <td class="lose">None</td>
+              <td class="lose">N/A</td>
+              <td class="lose">None</td>
+              <td class="lose">None</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="highlight-box" style="background:rgba(247,120,186,0.06); border:1px solid rgba(247,120,186,0.2);">
+          <div class="h-title" style="color:var(--pink);">No fantasy platform on earth ships this. We made it the default.</div>
+          <div class="h-body">
+            Every Citrus user, in every league, on every matchup, sees the output of a 10,000-run Monte Carlo with Student-t copula correlations, antithetic variates, and Bayesian-stabilized inputs. <strong>The same math that runs Goldman&rsquo;s risk books runs your Tuesday-night lineup decision.</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== 5. THE MATH =================== -->
+  <div class="section">
+    <div class="section-label" style="color:var(--blue);">Part 5 &middot; The Math Other Platforms Don&rsquo;t Have</div>
+    <div class="section-card t-blue">
+      <div class="section-header">
+        <div class="section-icon">&Sigma;</div>
+        <div class="section-header-text">
+          <h3>Six techniques borrowed from quant finance &mdash; in plain English</h3>
+          <div class="subtitle">Why these specific tools, and what they buy a fantasy user</div>
+        </div>
+        <div class="section-tag">Quant-Grade</div>
+      </div>
+      <div class="section-body">
+        <div class="grid g3">
+          <div class="card">
+            <div class="title" style="color:var(--blue)">Student-t Copula (&nu;=5)</div>
+            <div class="desc">
+              <strong style="color:var(--text)">What:</strong> Models joint player outcomes with <em>tail dependence</em>.<br><br>
+              <strong style="color:var(--text)">Why:</strong> A Gaussian copula treats &ldquo;both linemates exploded tonight&rdquo; as essentially impossible. Student-t with &nu;=5 gives ~18% probability of co-extreme outcomes &mdash; closer to reality.<br><br>
+              <strong style="color:var(--text)">What you see:</strong> When you start one Edmonton forward, the matchup win-probability properly accounts for the other one too.
+            </div>
+            <div class="badge">Tail-Aware</div>
+          </div>
+          <div class="card">
+            <div class="title" style="color:var(--blue)">Bayesian Conjugate Priors</div>
+            <div class="desc">
+              <strong style="color:var(--text)">What:</strong> Beta(&alpha;+goals, &beta;+shots&minus;goals) posterior over a player&rsquo;s true finishing talent, with NHL-mean prior.<br><br>
+              <strong style="color:var(--text)">Why:</strong> A callup with 3 goals on 10 shots isn&rsquo;t a 30% shooter. Our model shrinks to the league mean with proper uncertainty until the sample stabilizes.<br><br>
+              <strong style="color:var(--text)">What you see:</strong> No more roster-burned panic chasing fluky hot streaks.
+            </div>
+            <div class="badge">Bayesian</div>
+          </div>
+          <div class="card">
+            <div class="title" style="color:var(--blue)">Cholesky Decomposition</div>
+            <div class="desc">
+              <strong style="color:var(--text)">What:</strong> Factorizes the 8&times;8 stat-correlation matrix (L &times; L<sup>T</sup>) for efficient correlated sampling.<br><br>
+              <strong style="color:var(--text)">Why:</strong> Goals &harr; SOG correlate at &rho;=0.55. PPP &harr; Goals at &rho;=0.42. Sampling them independently massively understates fantasy-point variance.<br><br>
+              <strong style="color:var(--text)">What you see:</strong> Honest confidence intervals on your weekly score.
+            </div>
+            <div class="badge">Linear Algebra</div>
+          </div>
+          <div class="card">
+            <div class="title" style="color:var(--blue)">Antithetic Variates</div>
+            <div class="desc">
+              <strong style="color:var(--text)">What:</strong> For every uniform sample U, also use 1&minus;U. Same compute, ~2&times; effective samples.<br><br>
+              <strong style="color:var(--text)">Why:</strong> Cuts CI width on win probability by ~30% with zero added cost.<br><br>
+              <strong style="color:var(--text)">What you see:</strong> A win-probability number that doesn&rsquo;t wobble between refreshes.
+            </div>
+            <div class="badge">Variance Reduction</div>
+          </div>
+          <div class="card">
+            <div class="title" style="color:var(--blue)">Brier Calibration</div>
+            <div class="desc">
+              <strong style="color:var(--text)">What:</strong> BS = mean((p &minus; outcome)<sup>2</sup>). Tracks: did 70%-probability events actually happen 70% of the time?<br><br>
+              <strong style="color:var(--text)">Why:</strong> Without calibration tracking, &ldquo;73% win&rdquo; is just a vibe. With it, it&rsquo;s a number you can take to the bank.<br><br>
+              <strong style="color:var(--text)">What you see:</strong> A calibration badge on every matchup &mdash; we show our work.
+            </div>
+            <div class="badge">Calibration</div>
+          </div>
+          <div class="card">
+            <div class="title" style="color:var(--blue)">Kendall&rsquo;s &tau; &rarr; Pearson</div>
+            <div class="desc">
+              <strong style="color:var(--text)">What:</strong> Empirical rank correlation from game-by-game fantasy co-movement, converted via &rho; = sin(&pi;/2 &times; &tau;).<br><br>
+              <strong style="color:var(--text)">Why:</strong> Catches emergent correlations (goalie-defense synergies, system-driven duos) that structural shift data alone would miss. Robust to outliers.<br><br>
+              <strong style="color:var(--text)">What you see:</strong> Correlations that reflect how your team actually plays, not just who shares ice time.
+            </div>
+            <div class="badge">Nonparametric</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== 6. POSITIONING (2D QUADRANT) =================== -->
+  <div class="section">
+    <div class="section-label" style="color:var(--teal);">Part 6 &middot; Where We Sit In The Market</div>
+    <div class="section-card t-teal">
+      <div class="section-header">
+        <div class="section-icon">&loz;</div>
+        <div class="section-header-text">
+          <h3>Analytical depth &times; consumer-grade UX</h3>
+          <div class="subtitle">Hockey&rsquo;s analytics community is rich. Fantasy hockey&rsquo;s product layer is starved. Citrus is the bridge.</div>
+        </div>
+        <div class="section-tag">Positioning</div>
+      </div>
+      <div class="section-body">
+        <div class="quadrant">
+          <div class="axis-y"></div>
+          <div class="axis-x"></div>
+          <div class="label-y">Analytical Depth &rarr;</div>
+          <div class="label-x">Consumer-Grade UX &rarr;</div>
+
+          <!-- low UX, low depth -->
+          <div class="qdot" style="left:18%; bottom:30%">
+            <div class="pt"></div>
+            <div class="lbl">Natural Stat Trick</div>
+          </div>
+          <!-- mid UX, mid depth -->
+          <div class="qdot" style="left:30%; bottom:50%">
+            <div class="pt"></div>
+            <div class="lbl">MoneyPuck</div>
+          </div>
+          <div class="qdot" style="left:24%; bottom:60%">
+            <div class="pt"></div>
+            <div class="lbl">Evolving Hockey</div>
+          </div>
+          <!-- high UX, low depth -->
+          <div class="qdot" style="left:74%; bottom:18%">
+            <div class="pt"></div>
+            <div class="lbl">Yahoo Fantasy</div>
+          </div>
+          <div class="qdot" style="left:68%; bottom:22%">
+            <div class="pt"></div>
+            <div class="lbl">ESPN Fantasy</div>
+          </div>
+          <div class="qdot" style="left:82%; bottom:14%">
+            <div class="pt"></div>
+            <div class="lbl">Sleeper</div>
+          </div>
+          <div class="qdot" style="left:78%; bottom:35%">
+            <div class="pt"></div>
+            <div class="lbl">Fantrax</div>
+          </div>
+          <div class="qdot" style="left:60%; bottom:40%">
+            <div class="pt"></div>
+            <div class="lbl">DailyFaceoff</div>
+          </div>
+          <!-- CITRUS top-right -->
+          <div class="qdot citrus" style="left:82%; bottom:82%">
+            <div class="pt"></div>
+            <div class="lbl">CITRUS</div>
+          </div>
+        </div>
+
+        <div class="highlight-box" style="background:rgba(63,185,176,0.05); border:1px solid rgba(63,185,176,0.2);">
+          <div class="h-title" style="color:var(--teal);">Hockey has Bloomberg-grade data. Fantasy has none of it.</div>
+          <div class="h-body">
+            <strong>MoneyPuck, Evolving Hockey, Natural Stat Trick</strong> are analyst tools &mdash; CSV exports, scatter plots, no league play. <strong>Yahoo, ESPN, Sleeper</strong> are consumer products with editorial projections. <strong>Nobody owns the top-right quadrant.</strong> Citrus is the only product that takes the depth of the analytics community and ships it as a consumer-grade league experience.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== 7. THE MOAT =================== -->
+  <div class="section">
+    <div class="section-label" style="color:var(--red);">Part 7 &middot; Why This Can&rsquo;t Be Copied In Six Months</div>
+    <div class="section-card t-red">
+      <div class="section-header">
+        <div class="section-icon">&infin;</div>
+        <div class="section-header-text">
+          <h3>The infrastructure stack that compounds</h3>
+          <div class="subtitle">Each layer takes time to build, and they only work when stacked &mdash; every layer is a wall</div>
+        </div>
+        <div class="section-tag">Compounding</div>
+      </div>
+      <div class="section-body">
+
+        <div class="moat-layer">
+          <div class="moat-label">Layer 1<br><span class="sub">Raw play-by-play ingestion</span></div>
+          <div class="moat-desc">
+            <strong>863K shots across 7 NHL seasons</strong> stored shot-by-shot with coordinates, pass context, shifts, and zone entries. 100-IP proxy rotation, circuit breakers, and a 24/7 scraping service. Competitors use pre-aggregated NHL API box scores &mdash; <strong>they can&rsquo;t compute pass-context xG even if they wanted to</strong>.
+          </div>
+          <div class="moat-time">~18 mo<span class="label">To Replicate</span></div>
+        </div>
+
+        <div class="moat-layer">
+          <div class="moat-label">Layer 2<br><span class="sub">31-feature xG model</span></div>
+          <div class="moat-desc">
+            10-feature pass quality module (cross-ice, royal road, one-timer, slot-to-slot, goalie disruption). 6-feature rebound/sequence module. <strong>Requires Layer 1 to exist.</strong> Training, validation, and calibration takes months of iteration to push AUC-ROC past 0.81.
+          </div>
+          <div class="moat-time">~9 mo<span class="label">To Replicate</span></div>
+        </div>
+
+        <div class="moat-layer">
+          <div class="moat-label">Layer 3<br><span class="sub">Data-mined correlations</span></div>
+          <div class="moat-desc">
+            Shift-overlap mining from <code style="color:var(--red)">player_shifts_official</code>. Assist-chain mining from <code style="color:var(--red)">raw_shots</code>. Kendall&rsquo;s &tau; co-movement from game logs. <strong>Three independent correlation sources</strong> &mdash; each requires Layer 1 raw data plus a separate query pipeline.
+          </div>
+          <div class="moat-time">~6 mo<span class="label">To Replicate</span></div>
+        </div>
+
+        <div class="moat-layer">
+          <div class="moat-label">Layer 4<br><span class="sub">Monte Carlo engine</span></div>
+          <div class="moat-desc">
+            5-class architecture (PlayerDistribution, CorrelationEngine, MatchupSimulator, SeasonSimulator, BrierTracker). Student-t copula with tail dependence. Cholesky-factored 8&times;8 stat-correlation. Antithetic variates + stratified sampling. Vectorized fantasy scoring. <strong>Production-grade quant code, not a research notebook.</strong>
+          </div>
+          <div class="moat-time">~6 mo<span class="label">To Replicate</span></div>
+        </div>
+
+        <div class="moat-layer">
+          <div class="moat-label">Layer 5<br><span class="sub">Calibration + audit</span></div>
+          <div class="moat-desc">
+            Per-league per-week Brier score tracking. Bucketed calibration curves. Transaction ledger for every roster move. 45+ RLS policies, SECURITY DEFINER hardening, zero cross-league leakage. <strong>This is the layer that turns &ldquo;we have a model&rdquo; into &ldquo;we have a trustworthy product&rdquo;.</strong>
+          </div>
+          <div class="moat-time">~4 mo<span class="label">To Replicate</span></div>
+        </div>
+
+        <div class="moat-layer">
+          <div class="moat-label">Layer 6<br><span class="sub">Real-time draft engine</span></div>
+          <div class="moat-desc">
+            Persistent stateful WebSocket draft engine with sub-300ms pick fanout, sub-1s autopick latency. In-memory state per draft, event-log replay on restart. Competitive with Yahoo &amp; ESPN on the live draft experience &mdash; <strong>plus all of the above informing every pick.</strong>
+          </div>
+          <div class="moat-time">~6 mo<span class="label">To Replicate</span></div>
+        </div>
+
+        <div class="highlight-box" style="background:rgba(255,92,92,0.05); border:1px solid rgba(255,92,92,0.2);">
+          <div class="h-title" style="color:var(--red);">The layers don&rsquo;t work without each other</div>
+          <div class="h-body">
+            You can&rsquo;t build Layer 3 without Layer 1. You can&rsquo;t ship Layer 4 to users without Layer 5. <strong>That&rsquo;s ~4 years of work compressed into 18 months &mdash; and the timer doesn&rsquo;t start until somebody decides hockey is worth the investment.</strong> Yahoo and ESPN have spent two decades not making that decision.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== 8. WHY HOCKEY =================== -->
+  <div class="section">
+    <div class="section-label" style="color:var(--yellow);">Part 8 &middot; Why Fantasy Hockey Is The Wedge</div>
+    <div class="section-card t-yellow">
+      <div class="section-header">
+        <div class="section-icon">&star;</div>
+        <div class="section-header-text">
+          <h3>An underserved market in the most data-rich era of hockey ever</h3>
+          <div class="subtitle">The macro setup &mdash; for the investor / partner audience at the booth</div>
+        </div>
+        <div class="section-tag">Market</div>
+      </div>
+      <div class="section-body">
+        <div class="grid g3">
+          <div class="card">
+            <div class="title" style="color:var(--yellow)">NHL data quality has exploded</div>
+            <div class="desc">
+              Puck &amp; player tracking, public xG models, shot-by-shot APIs, official shift data. <strong>The raw material to build a great product exists for the first time</strong> &mdash; and Citrus is the first to ship it as a consumer experience.
+            </div>
+            <div class="badge">Tailwind</div>
+          </div>
+          <div class="card">
+            <div class="title" style="color:var(--yellow)">Incumbents are football-first</div>
+            <div class="desc">
+              Yahoo, ESPN, Sleeper, FantasyPros &mdash; every roadmap is NFL-dominated. Hockey gets editorial projections updated weekly. <strong>The big platforms are not coming for this category</strong> &mdash; they have bigger fish to fry.
+            </div>
+            <div class="badge">Structural</div>
+          </div>
+          <div class="card">
+            <div class="title" style="color:var(--yellow)">Hockey fans are the most engaged</div>
+            <div class="desc">
+              Highest per-fan media spend in major North American sports. Hardcore community on r/hockey, Twitter, Discord. <strong>Word-of-mouth distribution is real here</strong> &mdash; a better product spreads on its own.
+            </div>
+            <div class="badge">Distribution</div>
+          </div>
+          <div class="card">
+            <div class="title" style="color:var(--yellow)">Sports betting is legal &amp; growing</div>
+            <div class="desc">
+              Vegas O/U data is already in our pipeline. <strong>The same engine that powers fantasy projections produces probabilistic edges that DFS and sportsbook users will pay for</strong> &mdash; the platform is the wedge into a much bigger TAM.
+            </div>
+            <div class="badge">Adjacent Markets</div>
+          </div>
+          <div class="card">
+            <div class="title" style="color:var(--yellow)">DFS &amp; props are correlation-hungry</div>
+            <div class="desc">
+              Stacking, prop parlays, single-game contests &mdash; every DFS use case needs the correlation modeling Citrus already does. <strong>We built the hardest part first by accident.</strong>
+            </div>
+            <div class="badge">Optionality</div>
+          </div>
+          <div class="card">
+            <div class="title" style="color:var(--yellow)">B2B licensing is open</div>
+            <div class="desc">
+              Sportsbooks, media companies, prop providers, fantasy operators all need probability-grade NHL data. <strong>Our API is the same one our app calls.</strong> Inference is already running &mdash; selling access is incremental margin.
+            </div>
+            <div class="badge">Revenue Layers</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== 9. THE BOTTOM LINE =================== -->
+  <div class="section">
+    <div class="section-card" style="border:1px solid rgba(255,107,0,0.35); background:linear-gradient(135deg, rgba(255,107,0,0.05), rgba(247,120,186,0.04), rgba(188,140,255,0.05));">
+      <div class="section-body" style="padding:46px 28px; text-align:center;">
+        <div style="font-size:11px; font-weight:800; letter-spacing:3px; text-transform:uppercase; color:var(--muted); margin-bottom:18px;">
+          The Bottom Line
+        </div>
+        <div style="font-size:34px; font-weight:900; line-height:1.2; letter-spacing:-1px; max-width:1000px; margin:0 auto 18px;">
+          <span style="background:linear-gradient(135deg, var(--orange), var(--pink), var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;">
+            Citrus is the only fantasy hockey platform that ships an xG model, a Monte Carlo engine, and Bayesian uncertainty &mdash; together &mdash; to a consumer-grade league experience.
+          </span>
+        </div>
+        <div style="font-size:15px; color:var(--muted); max-width:760px; margin:0 auto; line-height:1.6;">
+          Yahoo and ESPN show one number. Sleeper doesn&rsquo;t serve the NHL. MoneyPuck is a research site. <strong style="color:var(--text)">We&rsquo;re the bridge from analyst-grade math to the lineup decision your buddy makes at 6:48 PM on a Tuesday</strong> &mdash; and we ship it in 30 seconds on mobile.
+        </div>
+
+        <div class="grid g4" style="margin-top:36px;">
+          <div style="text-align:center; padding:14px;">
+            <div style="font-size:32px; font-weight:900; color:var(--orange); font-family:'JetBrains Mono', monospace; letter-spacing:-1px;">10,000</div>
+            <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1.2px; font-weight:600; margin-top:6px;">MC Sims Per Matchup</div>
+          </div>
+          <div style="text-align:center; padding:14px;">
+            <div style="font-size:32px; font-weight:900; color:var(--pink); font-family:'JetBrains Mono', monospace; letter-spacing:-1px;">31</div>
+            <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1.2px; font-weight:600; margin-top:6px;">xG Features</div>
+          </div>
+          <div style="text-align:center; padding:14px;">
+            <div style="font-size:32px; font-weight:900; color:var(--purple); font-family:'JetBrains Mono', monospace; letter-spacing:-1px;">863K</div>
+            <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1.2px; font-weight:600; margin-top:6px;">Training Shots</div>
+          </div>
+          <div style="text-align:center; padding:14px;">
+            <div style="font-size:32px; font-weight:900; color:var(--green); font-family:'JetBrains Mono', monospace; letter-spacing:-1px;">0.054</div>
+            <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1.2px; font-weight:600; margin-top:6px;">Brier Score &middot; Calibrated</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== FOOTER =================== -->
+  <div class="footer">
+    <div class="row">
+      <div class="left">
+        <div class="brand-mark">Citrus Fantasy Sports</div>
+        <p>The most technically advanced fantasy hockey platform ever built.</p>
+      </div>
+      <div class="center">
+        <div style="font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); font-weight:700;">Web Summit 2026</div>
+        <div style="font-size:14px; color:var(--text); margin-top:4px; font-weight:600;">Lisbon &middot; Booth Visit</div>
+      </div>
+      <div class="right">
+        <a class="url" href="https://citrus-fantasy-sports.web.app">citrus-fantasy-sports.web.app</a>
+        <p>Data current &middot; March 2026</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

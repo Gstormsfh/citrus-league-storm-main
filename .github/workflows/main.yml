@@ -32,4 +32,9 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: python data-pipeline/projections/nightly_projection_batch.py --season 2025
+        # No --season flag on purpose. calculate_daily_projections resolves
+        # DEFAULT_SEASON from _current_season() (override with
+        # CITRUS_DEFAULT_SEASON), so the batch rolls over on its own at the
+        # season turn. The hardcoded --season 2025 that used to be here would
+        # have kept projecting last season from 2026-09-29 onward.
+        run: python data-pipeline/projections/nightly_projection_batch.py

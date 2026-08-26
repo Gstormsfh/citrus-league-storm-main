@@ -1,0 +1,104 @@
+name: Data Invariants (daily)
+
+# Correctness, not freshness. The two are different alarms and this repo
+# learned the difference the hard way.
+#
+# data-freshness-check.yml watches whether tables are RECENT. It has been
+# watching player_shifts since January and reporting warning every hour,
+# correctly, into a Slack webhook that was never configured. But freshness
+# could never have caught the actual fault, because player_shifts was fresh
+# and wrong from its very first row: 4% of player-games within thirty seconds
+# of the official game log, "shifts" of ten and a half minutes, league
+# penalty-kill time nearly double league power-play time when the two are the
+# same events counted from opposite benches. No timestamp sees any of that.
+#
+# These checks ask whether the numbers are TRUE. Each is a fact about hockey
+# or about arithmetic, checked against data already stored, and each would
+# have failed in 2017.
+#
+# WHY THIS ONE FAILS THE BUILD WHEN THE FRESHNESS ONE DOES NOT
+#   The offseason argument does not apply. A stale table in July is expected;
+#   a wrong number in July is still wrong. These cannot cry wolf, so a failure
+#   exits 2 and fails the workflow, which puts it in an inbox rather than in a
+#   Slack channel nothing is connected to.
+#
+# FOUR FAMILIES RUN
+#   citrus_data_invariants      shifts, time on ice, strength timeline
+#   citrus_model_invariants     shots, expected goals, on-ice attribution
+#   citrus_leakage_invariant    an xG column that reads the outcome
+#   citrus_disk_invariants      data + WAL + projected growth + bloat
+#   (plus the shape, provenance, GAR and season-type families added since)
+#
+# AND ONE CHECK THAT READS SOURCE, NOT DATA
+#   check_serving_path_provenance.py asks whether any live pipeline file still
+#   SELECTS a retired third-party column. The database-side separation check
+#   cannot see this: it walks views and SQL function bodies, while the
+#   projection scripts read columns straight over PostgREST. On 2026-08-26 the
+#   database was clean and calculate_daily_projections.py was still pulling
+#   xg_value -- AUC 0.936, it reads the outcome -- into the nightly numbers the
+#   product shows. It needs no credentials, so it runs first.
+#
+# The last one earned its place on 2026-08-26 at 01:00:24, when the database
+# filled mid-backfill and the way we found out was a write failing.
+
+on:
+  schedule:
+    - cron: '40 11 * * *'      # 11:40 UTC daily, after the nightly rebuild jobs
+  workflow_dispatch:
+    inputs:
+      ignore:
+        description: 'Comma-separated check names allowed to fail (e.g. during a backfill)'
+        required: false
+        default: ''
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'data-pipeline/**'
+      - 'scripts/utilities/**'
+
+concurrency:
+  group: data-invariants
+  cancel-in-progress: false
+
+jobs:
+  invariants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'data-pipeline/requirements.txt'
+
+      - run: pip install -r data-pipeline/requirements.txt
+
+      - name: Serving-path provenance (source, no credentials)
+        run: python data-pipeline/monitoring/check_serving_path_provenance.py
+
+      - name: Run correctness invariants
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CITRUS_ALERT_SLACK_WEBHOOK: ${{ secrets.CITRUS_ALERT_SLACK_WEBHOOK }}
+          CITRUS_ALERT_PAGERDUTY_KEY: ${{ secrets.CITRUS_ALERT_PAGERDUTY_KEY }}
+        shell: bash
+        run: |
+          # --ignore is passed through from workflow_dispatch and nowhere else.
+          # A scheduled run can never ignore anything: the only legitimate use
+          # is a human saying "there is a backfill running, coverage will be
+          # short until it lands", and a human has to type that.
+          #
+          # It never hides anything either. An ignored check still runs, still
+          # prints, still writes its row to integrity_check_results, and the run
+          # says out loud that it was told to look away.
+          IGNORE='${{ github.event.inputs.ignore }}'
+          if [ -n "$IGNORE" ]; then
+            echo "::warning::Running with --ignore $IGNORE"
+            python data-pipeline/monitoring/check_data_invariants.py --ignore "$IGNORE"
+          else
+            python data-pipeline/monitoring/check_data_invariants.py
+          fi

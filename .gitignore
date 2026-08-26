@@ -96,3 +96,14 @@ scripts/proof/results/
 *.local.mjs
 *.local.json
 supabase/.branches/
+
+# Python test/caches (a pytest run at the repo root leaves these; the new
+# CI pytest job makes that a routine occurrence)
+.pytest_cache/
+**/.pytest_cache/
+pytest-cache-files-*/
+pytest-cache-files-*
+__pycache__/
+**/__pycache__/
+*.pyc
+.claude/settings.local.json

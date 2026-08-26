@@ -11,7 +11,8 @@
 build_player_season_stats.py
 
 Rollup: aggregate public.player_game_stats into public.player_season_stats for fast UI loads.
-Optionally enrich with xG/xA totals from public.raw_shots (if available).
+Optionally enrich with xG totals from public.nhl_shots.xg_sql (the shipped model).
+x_assists is left at 0: expected assists are not derivable from the official feed.
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║ 🚨 CRITICAL WARNING - READ BEFORE MODIFYING 🚨                               ║
@@ -50,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 # Import CACHE_VERSION from the projection engine so season stats stay in sync
 # with the xG model version. When CACHE_VERSION is bumped, this script MUST be
-# re-run to recalculate x_goals from the updated raw_shots values.
+# re-run to recalculate x_goals from the updated nhl_shots.xg_sql values.
 try:
     from calculate_daily_projections import CACHE_VERSION as PROJECTION_CACHE_VERSION
 except ImportError:
@@ -105,9 +106,30 @@ def fetch_all_player_game_stats(db: SupabaseRest, season: int) -> List[dict]:
 
 def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, float]]:
   """
-  Returns player_id -> {x_goals, x_assists}
-  Best-effort: handles multiple column name variations in raw_shots with pagination.
-  Uses shooting_talent_adjusted_xg if available (preferred), otherwise falls back to xg_value.
+  Returns player_id -> {x_goals, x_assists}, reading public.nhl_shots.xg_sql.
+
+  This used to read public.raw_shots and prefer shooting_talent_adjusted_xg, which
+  was wrong twice over. raw_shots is the retired third-party import whose model
+  leaks the target (2025 goal/non-goal separation 22.42 against a real-world
+  3.09-3.61). And talent-adjusted xG already bakes in the shooter's finishing
+  history, so it is not the season xG total this column is meant to hold.
+
+  It mattered more than a dead script normally would. The nightly SQL job
+  rebuild_player_season_stats (cron 08:55) writes this same x_goals column from
+  nhl_shots, and this script upserts on (season, player_id) -- so running it would
+  have overwritten every player's season xG with the inflated leaked-model value
+  until the next nightly run. Measured on 2025: x_goals tracks nhl_shots.xg_sql to
+  a mean absolute difference of 0.55, versus 1.60 against raw_shots. And both
+  debug/fix_mcdavid_games.py and scoring/reconcile_player_stats.py tell an operator
+  to run exactly this script.
+
+  x_assists is deliberately left at 0.0. Expected assists are NOT derivable from
+  the official play-by-play: assist1_id/assist2_id are populated only on goals
+  (2025: 8,040 assisted rows, every one a goal, zero on non-goal shots). Summing
+  xg_sql over shots you assisted would describe goals that already happened, not
+  expected assists -- a real xA needs pass / pre-shot-possession data this feed does
+  not carry. The nightly SQL rebuild leaves x_assists at 0 for the same reason, and
+  nothing in the app reads the column.
   """
   import time
   try:
@@ -116,93 +138,55 @@ def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, fl
     offset = 0
     shot_count = 0
     last_progress_time = time.time()
-    use_talent_adjusted = False
-    
-    logger.info(f"[build_player_season_stats] Fetching xG/xA from raw_shots (CACHE_VERSION={PROJECTION_CACHE_VERSION})...")
-    # Live product path: filter raw_shots by the caller-supplied season.
-    # raw_shots is multi-season since phase 0c backfilled 2017-2024, so an
-    # unfiltered read would sum historical xG/xA into current-season totals.
+
+    logger.info(f"[build_player_season_stats] Fetching xG from nhl_shots.xg_sql (CACHE_VERSION={PROJECTION_CACHE_VERSION})...")
+    # nhl_shots is multi-season, so filter by the caller-supplied season or the
+    # totals would sum every season into one.
+    # NOTE: nhl_shots keys the shooter as shooter_id; raw_shots used player_id.
     season_filter = [("season", "eq", int(season))]
+    select_cols = "shooter_id,xg_sql"
 
-    # Try to determine which columns are available by testing first batch
-    try:
-      test_batch = db.select("raw_shots", select="player_id,shooting_talent_adjusted_xg,xg_value,xa_value", filters=season_filter, limit=1, offset=0)
-      if test_batch and len(test_batch) > 0:
-        if "shooting_talent_adjusted_xg" in test_batch[0]:
-          use_talent_adjusted = True
-          select_cols = "player_id,shooting_talent_adjusted_xg,xg_value,xa_value"
-        else:
-          select_cols = "player_id,xg_value,xa_value"
-      else:
-        select_cols = "player_id,xg_value,xa_value"
-    except Exception:
-      # Fallback to basic columns
-      try:
-        test_batch = db.select("raw_shots", select="player_id,xg_value,xa_value", filters=season_filter, limit=1, offset=0)
-        select_cols = "player_id,xg_value,xa_value"
-      except Exception:
-        # Last resort: try old column names
-        select_cols = "player_id,xg,xa"
-
-    # Fetch all rows with pagination
     while True:
       try:
-        rows = db.select("raw_shots", select=select_cols, filters=season_filter, limit=batch_size, offset=offset)
+        rows = db.select("nhl_shots", select=select_cols, filters=season_filter,
+                         limit=batch_size, offset=offset)
       except Exception as e:
-        logger.warning(f"[build_player_season_stats] Warning: Could not fetch xG/xA batch at offset {offset}: {e}")
+        logger.warning(f"[build_player_season_stats] Warning: could not fetch xG batch at offset {offset}: {e}")
         break
-      
+
       if not rows:
         break
-      
+
       for r in rows:
         shot_count += 1
-        pid = r.get("player_id")
+        pid = r.get("shooter_id")
         if pid is None:
           continue
         pid = int(pid)
         if pid not in out:
           out[pid] = {"x_goals": 0.0, "x_assists": 0.0}
-        
-        # Prefer shooting_talent_adjusted_xg if available, otherwise use xg_value or xg
-        xg_val = 0.0
-        if use_talent_adjusted and r.get("shooting_talent_adjusted_xg") is not None:
-          xg_val = float(r.get("shooting_talent_adjusted_xg") or 0.0)
-        elif r.get("xg_value") is not None:
-          xg_val = float(r.get("xg_value") or 0.0)
-        elif r.get("xg") is not None:
-          xg_val = float(r.get("xg") or 0.0)
-        
-        # xA: prefer xa_value, fallback to xa
-        xa_val = 0.0
-        if r.get("xa_value") is not None:
-          xa_val = float(r.get("xa_value") or 0.0)
-        elif r.get("xa") is not None:
-          xa_val = float(r.get("xa") or 0.0)
-        
-        out[pid]["x_goals"] += xg_val
-        out[pid]["x_assists"] += xa_val
-      
+        xg = r.get("xg_sql")
+        if xg is not None:
+          out[pid]["x_goals"] += float(xg)
+
       # Progress every 15 seconds
       current_time = time.time()
       if current_time - last_progress_time >= 15:
         logger.info(f"  [PROGRESS] Scanned {shot_count:,} shots, enriched {len(out)} players...")
         last_progress_time = current_time
-      
-      # Check if we got fewer rows than batch_size (last page)
+
       if len(rows) < batch_size:
         break
-      
+
       offset += batch_size
-    
-    logger.info(f"[build_player_season_stats] Enriched xG/xA for {len(out)} players from {shot_count:,} shots")
+
+    logger.info(f"[build_player_season_stats] Enriched xG for {len(out)} players from {shot_count:,} shots")
     return out
   except Exception as e:
-    logger.error(f"[build_player_season_stats] Warning: Error enriching xG/xA: {e}")
+    logger.error(f"[build_player_season_stats] Warning: error enriching xG: {e}")
     import traceback
     traceback.print_exc()
     return {}
-
 
 def upsert_player_season_stats(db: SupabaseRest, season_rows: List[dict]) -> None:
   if not season_rows:
@@ -223,7 +207,7 @@ def main() -> int:
   logger.info("")
   logger.info("NOTE: If the xG model was recently updated (CACHE_VERSION bumped),")
   logger.info("      run this script with no arguments to recalculate x_goals from")
-  logger.info("      the updated raw_shots.shooting_talent_adjusted_xg values.")
+  logger.info("      the updated nhl_shots.xg_sql values.")
   logger.info("")
   
   try:
@@ -394,7 +378,7 @@ def main() -> int:
 
   # xG enrich (optional)
   logger.info("")
-  logger.info("[build_player_season_stats] Enriching with xG/xA from raw_shots...")
+  logger.info("[build_player_season_stats] Enriching with xG from nhl_shots.xg_sql...")
   xg = try_fetch_xg_totals(db, season)
   if xg:
     enriched_count = 0

@@ -1,25 +1,35 @@
 #!/usr/bin/env python3
 # CITRUS-CLASSIFICATION ────────────────────────────────────────────────────────────
 # CATEGORY: ACTIVE
-# Purpose:     Centralized alert dispatch (Discord webhook + log)
+# Purpose:     Centralized alert dispatch (Slack + PagerDuty + log)
 # Last active: 2026-03-08
 # Invoked:     imported by check_data_freshness.py + verify_*.py
 # Reads:       (env vars — webhook URLs)
-# Writes:      Discord channel + stderr
+# Writes:      Slack channel / PagerDuty + stderr
 # ────────────────────────────────────────────────────────────
 """
 alerting.py — Alerting integration for the data pipeline.
 
-Sends alerts to configured channels (Slack, PagerDuty, email) when:
+Sends alerts to configured channels when:
   - Pipeline has consecutive failures (>3)
   - Data freshness SLA is breached (>15 min stale during game hours)
   - Proxy health drops below threshold (<50% healthy)
   - Model prediction accuracy drifts beyond acceptable range
 
-Configuration via environment variables:
+Configuration via environment variables. BOTH ARE OPTIONAL:
   CITRUS_ALERT_SLACK_WEBHOOK — Slack incoming webhook URL
-  CITRUS_ALERT_PAGERDUTY_KEY — PagerDuty integration key
-  CITRUS_ALERT_EMAIL — Email address for critical alerts (via SMTP)
+  CITRUS_ALERT_PAGERDUTY_KEY — PagerDuty integration key (critical only)
+
+There used to be a third, CITRUS_ALERT_EMAIL, documented here and read into
+self.alert_email in __init__. There was never an _send_email to go with it, so
+setting it did nothing at all. Removed 2026-08-26 rather than left advertising
+a channel that does not exist.
+
+WITH NEITHER SET, THIS CLASS IS NOT SILENT AND IS NOT USELESS. Every alert is
+still written to the log at its own severity, which means it lands in the
+GitHub Actions run output. The workflows that matter also exit non-zero on a
+real failure, and GitHub emails you when a workflow run fails -- so an unset
+webhook costs you the Slack channel, not the alarm.
 
 Usage:
     from data_pipeline.monitoring.alerting import AlertManager
@@ -50,9 +60,15 @@ class AlertManager:
     def __init__(self):
         self.slack_webhook = os.getenv("CITRUS_ALERT_SLACK_WEBHOOK")
         self.pagerduty_key = os.getenv("CITRUS_ALERT_PAGERDUTY_KEY")
-        self.alert_email = os.getenv("CITRUS_ALERT_EMAIL")
         self._last_alerts: dict[str, datetime] = {}
         self._consecutive_failures = 0
+        if not (self.slack_webhook or self.pagerduty_key):
+            # Say so once, at startup, instead of letting every send() look
+            # like it delivered something. The log path below still runs.
+            logger.info(
+                "AlertManager: no webhook configured -- alerts will be logged "
+                "only. Workflow exit codes remain the primary signal."
+            )
 
     def send(
         self,
