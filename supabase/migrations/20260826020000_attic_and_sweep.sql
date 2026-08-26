@@ -64,8 +64,14 @@ begin
   raise notice 'moved % tables to attic', moved;
 end $$;
 
-comment on table public.player_shifts is
-  'RETIRED AND WRONG. Inferred from event participation by calculate_player_toi.py, not from shift charts. Reconciles with player_game_stats.nhl_toi_seconds for 4.0% of player-games; contains 19,688 "shifts" over five minutes. Superseded by player_shifts_official. Its only writer is orphaned - nothing imports calculate_player_toi.py. Do not read this table.';
+do $mig$
+begin
+  if exists (select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+             where n.nspname = 'public' and c.relname = 'player_shifts') then
+    execute $c$comment on table public.player_shifts is
+  'RETIRED AND WRONG. Inferred from event participation by calculate_player_toi.py, not from shift charts. Reconciles with player_game_stats.nhl_toi_seconds for 4.0% of player-games; contains 19,688 "shifts" over five minutes. Superseded by player_shifts_official. Its only writer is orphaned - nothing imports calculate_player_toi.py. Do not read this table.'$c$;
+  end if;
+end $mig$;
 
 
 -- ─────────────────────────────────────────────────────────────────────────────

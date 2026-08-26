@@ -42,7 +42,13 @@
 --   -- and then ask why.
 -- ─────────────────────────────────────────────────────────────────────────────
 
-alter table public.player_shifts set schema attic;
+do $$
+begin
+  if exists (select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
+             where n.nspname = 'public' and c.relname = 'player_shifts' and c.relkind = 'r') then
+    execute 'alter table public.player_shifts set schema attic';
+  end if;
+end $$;
 
 comment on table attic.player_shifts is
   'RETIRED 2026-08-26. Event-participation inference, not shifts: 4.0% agreement '

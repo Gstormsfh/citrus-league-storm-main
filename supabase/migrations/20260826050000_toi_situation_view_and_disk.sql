@@ -32,7 +32,8 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 
 drop function if exists public.rebuild_toi_by_situation(integer[]);
-drop table if exists public.player_toi_by_situation;
+drop view  if exists public.player_toi_by_situation cascade;
+drop table if exists public.player_toi_by_situation cascade;
 
 create view public.player_toi_by_situation as
 select player_id, game_id, state as situation, toi_seconds::numeric as toi_seconds,
