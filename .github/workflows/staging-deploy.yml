@@ -88,7 +88,8 @@ jobs:
             echo "has_creds=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_creds=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping staging Cloud Run deploy — STAGING_GCP_SA_KEY not configured"
+            echo "::error::STAGING_GCP_SA_KEY is not configured, so the staging API was NOT deployed. The staging web bundle would have shipped against an API running older code. Set the secret, or disable this job deliberately."
+            exit 1
           fi
         env:
           GCP_SA_KEY: ${{ secrets.STAGING_GCP_SA_KEY }}
