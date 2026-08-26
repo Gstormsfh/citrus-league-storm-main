@@ -569,7 +569,7 @@ const TradeAnalyzer = () => {
                       </p>
                       <ul className="list-disc list-inside space-y-2 text-left max-w-md mx-auto text-white/70 text-sm marker:text-pastel-orange">
                         <li>Analyze trades with other teams</li>
-                        <li>Get AI-powered trade recommendations</li>
+                        <li>Get a verdict on value, depth and stat impact</li>
                         <li>View trade offers and proposals</li>
                       </ul>
                       {activeLeagueId && (
@@ -599,7 +599,11 @@ const TradeAnalyzer = () => {
               Architect the perfect deal.
             </h1>
             <p className="text-sm text-white/55 mt-2">
-              AI-powered analysis. Compare value, position depth, and stat impact.
+              {/* Was "AI-powered analysis". getTradeOpinion() is hand-written
+                  logic over real roster numbers — good logic, but not a model,
+                  and a capability claim is exactly the kind of thing a reviewer
+                  weighs differently from a number. */}
+              Compare value, position depth and stat impact across both sides.
             </p>
           </div>
         </div>
@@ -609,7 +613,7 @@ const TradeAnalyzer = () => {
           <div className="mb-6">
             <LeagueCreationCTA
               title="You're viewing demo trade analyzer"
-              description="Sign up to analyze trades with your actual team and get AI-powered trade recommendations."
+              description="Sign up to analyze trades against your actual roster."
               variant="compact"
             />
           </div>

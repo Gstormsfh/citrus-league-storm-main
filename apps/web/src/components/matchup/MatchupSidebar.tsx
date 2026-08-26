@@ -149,8 +149,12 @@ export const MatchupSidebar: React.FC<MatchupSidebarProps> = ({
         </CardContent>
       </Card>
 
-      {/* Premium Ad Space - Varsity Sponsor Patch */}
-      <AdSpace size="300x250" label="Featured Sponsor" />
+      {/* Labelled "Featured Sponsor" until 2026-08-26. There is no sponsor:
+          when AdSense is off — which is always in the native build, where it is
+          prohibited — the placeholder renders a Citrus house card under that
+          badge. Calling our own promo a sponsor is a small lie that costs
+          nothing to stop telling. */}
+      <AdSpace size="300x250" />
     </div>
   );
 };

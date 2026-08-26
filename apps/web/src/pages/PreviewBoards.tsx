@@ -111,28 +111,11 @@ export default function PreviewBoards() {
             </Link>
           </div>
 
-          {/* Social proof */}
-          <div className="mt-12 inline-flex items-center gap-3">
-            <div className="flex -space-x-2">
-              {['JK', 'AM', 'SD', 'TR', 'MV'].map((init, i) => (
-                <div
-                  key={init}
-                  className="w-9 h-9 rounded-full bg-pastel-sage/30 ring-2 ring-[#0F1F15] flex items-center justify-center font-jbmono text-[10px] font-bold text-pastel-cream"
-                  style={{ zIndex: 5 - i }}
-                >
-                  {init}
-                </div>
-              ))}
-            </div>
-            <div className="text-left">
-              <div className="font-jbmono text-[11px] tracking-wider uppercase text-pastel-cream font-bold">
-                47,000+ MANAGERS
-              </div>
-              <div className="font-jbmono text-[10px] text-white/55">
-                drafting on Citrus this season
-              </div>
-            </div>
-          </div>
+          {/* No social proof until there is proof. The invented
+                "47,000+ MANAGERS drafting on Citrus this season", with a row of
+                invented member avatars, was removed 2026-08-26 — these are
+                public, crawlable, unauthenticated routes, and a fabricated user
+                count is the single worst thing to have on one. */}
         </section>
       </div>
 
