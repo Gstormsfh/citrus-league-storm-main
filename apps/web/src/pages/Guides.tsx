@@ -52,8 +52,14 @@ const Guides = () => {
           <h1 className="font-sans font-black text-[2.5rem] md:text-[4rem] leading-[0.98] tracking-[-0.035em] text-pastel-cream mb-5">
             Strategy <span className="text-pastel-orange">guides</span>.
           </h1>
+          {/* Said "Comprehensive resources to help you dominate your league"
+              over eighteen titles, none of which were written and none of which
+              were clickable — each card ended in a "Read Guide →" affordance
+              that was a plain div. The list is a real plan; presenting a plan as
+              a library is the part that wasn't true. */}
           <p className="text-[16px] md:text-[18px] leading-relaxed text-white/65 max-w-xl mx-auto">
-            Comprehensive resources to help you dominate your league. From draft to playoffs.
+            What we're writing, from draft night to the playoffs. None of these
+            are published yet — this is the running order.
           </p>
         </section>
 
@@ -85,18 +91,24 @@ const Guides = () => {
               <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold relative z-10">
                 ✦ One-on-One
               </div>
+              {/* "Our fantasy sports experts are available for one-on-one
+                  coaching sessions" described a service that does not exist and
+                  a team that is not staffed. The link went to /contact, which is
+                  real — so keep the door, drop the claim about who is behind
+                  it. */}
               <h2 className="font-sans font-black text-[1.75rem] md:text-[2.25rem] tracking-[-0.025em] text-pastel-cream mb-3 relative z-10">
-                Need <span className="text-pastel-orange">personalized advice?</span>
+                Got a <span className="text-pastel-orange">question?</span>
               </h2>
               <p className="text-[15px] text-white/65 leading-relaxed mb-6 max-w-md mx-auto relative z-10">
-                Our fantasy sports experts are available for one-on-one coaching sessions tailored to your league and team needs.
+                About your league setup, the scoring, or how the projection model
+                works — ask and we'll answer.
               </p>
               <Link
                 to="/contact"
                 className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] font-bold px-6 rounded-md hover:bg-pastel-orange-soft hover:-translate-y-0.5 transition-all duration-200 active:scale-95 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)] relative z-10"
                 style={{ height: '48px' }}
               >
-                Book a Coaching Session <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
+                Get in touch <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
               </Link>
             </div>
           </GlowCard>
@@ -144,11 +156,8 @@ const GuideCard = ({
         <p className="text-[14px] text-white/65 leading-relaxed flex-1">
           {description}
         </p>
-        <div className={`mt-5 inline-flex items-center text-[13px] font-bold transition-colors group ${
-          accent === 'orange' ? 'text-pastel-orange-soft hover:text-pastel-orange' : 'text-pastel-sage-soft hover:text-pastel-sage'
-        }`}>
-          <span>Read Guide</span>
-          <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" strokeWidth={2.5} />
+        <div className="mt-5 inline-flex items-center gap-1.5 font-jbmono text-[10px] uppercase tracking-[0.18em] font-bold text-white/55">
+          Planned
         </div>
       </article>
     </GlowCard>

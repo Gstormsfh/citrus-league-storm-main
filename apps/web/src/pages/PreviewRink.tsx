@@ -3,11 +3,13 @@ import { ArrowRight, Activity, Zap, Trophy } from 'lucide-react';
 
 const NAV = ['Scores', 'Fantasy', 'Picks', 'AI'];
 
+// "47K+ Managers" sat here until 2026-08-26. The three that remain describe
+// the model, which is a thing we built and can point at; a user count is a
+// claim about the world, and ours was invented.
 const STATS = [
   { value: '31', label: 'Model features' },
   { value: '19K', label: 'Sims per slate' },
   { value: '2.4%', label: 'Mean error' },
-  { value: '47K+', label: 'Managers' },
 ];
 
 const LIVE_GAMES = [

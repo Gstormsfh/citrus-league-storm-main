@@ -13,7 +13,7 @@ const PRODUCT_CARDS = [
     label: 'Fantasy Hockey',
     headline: 'Snake, auction, salary cap.',
     body: 'Run any league format. Commish tools, custom scoring, draft rooms with live chat. The format your league wants, the polish your league deserves.',
-    stat: '47K+ leagues drafted',
+    stat: 'Snake, auction or salary cap',
     icon: Trophy,
     bg: 'bg-pastel-sage-soft',
   },
@@ -29,7 +29,7 @@ const PRODUCT_CARDS = [
     label: 'Saturday Slate',
     headline: 'Your week, finished by Saturday night.',
     body: 'Sunday-to-Saturday weeks mean every league goes the distance. The big slate is when the trophies are decided.',
-    stat: '7 games tonight',
+    stat: 'Weeks end Saturday night',
     icon: Zap,
     bg: 'bg-pastel-butter',
   },
@@ -133,28 +133,11 @@ export default function PreviewStadium() {
                 <span className="inline-block group-hover:translate-x-0.5 transition-transform">→</span>
               </a>
             </div>
-            {/* Social proof */}
-            <div className="flex items-center gap-3">
-              <div className="flex -space-x-2">
-                {['JK', 'AM', 'SD', 'TR', 'MV'].map((init, i) => (
-                  <div
-                    key={init}
-                    className="w-9 h-9 rounded-full bg-pastel-sage-soft ring-2 ring-white flex items-center justify-center font-jbmono text-[10px] font-semibold text-pastel-forest"
-                    style={{ zIndex: 5 - i }}
-                  >
-                    {init}
-                  </div>
-                ))}
-              </div>
-              <div>
-                <div className="font-jbmono text-[11px] tracking-wider uppercase text-pastel-forest font-semibold">
-                  47,000+ managers
-                </div>
-                <div className="font-jbmono text-[10px] text-pastel-forest-dim">
-                  drafting on Citrus this season
-                </div>
-              </div>
-            </div>
+            {/* No social proof until there is proof. The invented
+                "47,000+ managers drafting on Citrus this season", with a row of
+                invented member avatars, was removed 2026-08-26 — these are
+                public, crawlable, unauthenticated routes, and a fabricated user
+                count is the single worst thing to have on one. */}
           </div>
 
           {/* RIGHT — phone hero */}
@@ -303,7 +286,7 @@ export default function PreviewStadium() {
           {[
             { title: 'Play', links: ['Leagues', 'Mock Draft', 'Pickem', 'Survivor'] },
             { title: 'Tools', links: ['Projections', 'Live Scores', 'Stormy AI', 'Trade Analyzer'] },
-            { title: 'Citrus', links: ['About', 'Careers', 'Privacy', 'Terms'] },
+            { title: 'Citrus', links: ['About', 'Privacy', 'Terms'] },
           ].map((col) => (
             <div key={col.title}>
               <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-forest-soft mb-3">

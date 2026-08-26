@@ -93,7 +93,6 @@ const CreateLeague = lazyWithErrorHandling(() => import("./pages/CreateLeague"))
 const Features = lazyWithErrorHandling(() => import("./pages/Features"));
 const Pricing = lazyWithErrorHandling(() => import("./pages/Pricing"));
 const About = lazyWithErrorHandling(() => import("./pages/About"));
-const Careers = lazyWithErrorHandling(() => import("./pages/Careers"));
 const Privacy = lazyWithErrorHandling(() => import("./pages/Privacy"));
 const Terms = lazyWithErrorHandling(() => import("./pages/Terms"));
 const Settings = lazyWithErrorHandling(() => import("./pages/Settings"));
@@ -224,7 +223,6 @@ const App = () => {
                 <Route path="/features" element={<Features />} />
                 <Route path="/pricing" element={<Pricing />} />
                 <Route path="/about" element={<About />} />
-                <Route path="/careers" element={<Careers />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/settings" element={<ProtectedRoute><ErrorBoundary><Settings /></ErrorBoundary></ProtectedRoute>} />

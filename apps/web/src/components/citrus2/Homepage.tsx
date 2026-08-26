@@ -20,12 +20,7 @@ import {
   OnboardingCard,
   FeatureCard,
   MascotCard,
-  HeroCardStack,
   StormyChatTile,
-  StormyHeroTile,
-  PickemTile,
-  SurvivorTile,
-  BracketTile,
   MascotAvatar,
   // Real hockey iconography — replaces generic lucide
   CupIcon,
@@ -48,39 +43,12 @@ import {
 // HERO SLIDES — playoffs front and center, fantasy as off-season tease
 // =============================================================================
 
-const EAST_SERIES = [
-  { high: 'TOR', low: 'OTT', wins: [4, 1] as [number, number], winner: 'TOR' },
-  { high: 'BOS', low: 'TBL', wins: [2, 3] as [number, number], winner: null },
-  { high: 'NYR', low: 'WSH', wins: [4, 0] as [number, number], winner: 'NYR' },
-  { high: 'CAR', low: 'NJD', wins: [3, 2] as [number, number], winner: null },
-];
-
-const WEST_SERIES = [
-  { high: 'EDM', low: 'LAK', wins: [4, 2] as [number, number], winner: 'EDM' },
-  { high: 'COL', low: 'WPG', wins: [3, 3] as [number, number], winner: null },
-  { high: 'DAL', low: 'VGK', wins: [4, 3] as [number, number], winner: 'DAL' },
-  { high: 'VAN', low: 'NSH', wins: [4, 1] as [number, number], winner: 'VAN' },
-];
-
-const PICKEM_GAMES = [
-  { away: 'EDM', awayRec: '47-23-8', home: 'COL', homeRec: '49-22-7', picked: 'EDM' },
-  { away: 'TOR', awayRec: '46-25-7', home: 'MTL', homeRec: '32-38-8', picked: 'TOR' },
-  { away: 'BOS', awayRec: '44-26-8', home: 'NYR', homeRec: '45-24-9', picked: null },
-];
-
-const SURVIVOR_PICKS = [
-  { week: 1, pick: 'COL', status: 'win' as const },
-  { week: 2, pick: 'EDM', status: 'win' as const },
-  { week: 3, pick: 'TOR', status: 'win' as const },
-  { week: 4, pick: 'BOS', status: 'pending' as const },
-];
-
-const STORMY_EXCHANGE = {
-  question: 'Start Pettersson or Aho at C tonight?',
-  answer:
-    'Aho. xGF% 58.2% last 10, 2:30 PP1 time. Pettersson dropped to 18:45 TOI after the line shuffle. Easy call.',
-};
-
+// Five blocks of invented data lived here and none of them were rendered:
+// EAST_SERIES / WEST_SERIES (fabricated playoff results), PICKEM_GAMES (with
+// invented team records like 47-23-8), SURVIVOR_PICKS, and a canned
+// STORMY_EXCHANGE. Dead code is not harmless when it is fake data next to the
+// components that would display it — the whole set was one JSX line away from
+// being on the homepage. Removed 2026-08-26 with the imports that fed it.
 
 // Inline component to render a mascot action scene as a slide visual. Uses
 // the same scene assets that drive the GameModeCard hero zone — mascots
@@ -486,9 +454,12 @@ export function Homepage() {
       </section>
 
       {/* Final CTA */}
+      {/* The eyebrow read "7 Games Tonight · Puck drops 7pm ET" with the live
+          pulse — the app's own affordance for real-time data — as a static
+          string. Today is 34 days before the season opens. The trust strip
+          further up this file is commented "no fake numbers"; this was one.
+          Nothing replaces it: the CTA does not need a slate to work. */}
       <CtaBanner
-        eyebrow="7 Games Tonight · Puck drops 7pm ET"
-        eyebrowPulse
         title={
           <>
             Your league is <span className="text-pastel-orange">waiting</span>.

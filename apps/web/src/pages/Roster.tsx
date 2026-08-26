@@ -16,6 +16,14 @@ import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  SEASON_BASELINE,
+  pctOfPace,
+  calculateTeamGrades,
+  gradeTone,
+  type SkaterGroupStats,
+  type TeamCategoryStats,
+} from '@/utils/teamGrades';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
@@ -113,14 +121,20 @@ const getTeamAbbreviation = (team: string): string => {
   // Team stats will be calculated from real data
 
   // Analytics Helpers
-  const calculateTeamCategoryStats = (starters: HockeyPlayer[]) => {
+  const calculateTeamCategoryStats = (starters: HockeyPlayer[]): TeamCategoryStats => {
     // Breakdown by fantasy position
+    // `games` is PLAYER-GAMES: the sum of every contributing player's games
+    // played. sum(stat) / sum(games) is then the group's weighted average
+    // per-game rate, which is the only form that means the same thing in
+    // October as it does in April. Comparing a season-to-date total against a
+    // full-season baseline — what this did before — made every roster in the
+    // league look feeble until about February.
     const stats = {
-      C: { goals: 0, assists: 0, shots: 0, hits: 0, blocks: 0, ppp: 0, shp: 0 },
-      LW: { goals: 0, assists: 0, shots: 0, hits: 0, blocks: 0, ppp: 0, shp: 0 },
-      RW: { goals: 0, assists: 0, shots: 0, hits: 0, blocks: 0, ppp: 0, shp: 0 },
-      D: { goals: 0, assists: 0, shots: 0, hits: 0, blocks: 0, ppp: 0, shp: 0 },
-      G: { wins: 0, losses: 0, saves: 0, gaa: 0, sv: 0, count: 0 } // Different stats for goalies
+      C: { goals: 0, assists: 0, shots: 0, hits: 0, blocks: 0, ppp: 0, shp: 0, games: 0 },
+      LW: { goals: 0, assists: 0, shots: 0, hits: 0, blocks: 0, ppp: 0, shp: 0, games: 0 },
+      RW: { goals: 0, assists: 0, shots: 0, hits: 0, blocks: 0, ppp: 0, shp: 0, games: 0 },
+      D: { goals: 0, assists: 0, shots: 0, hits: 0, blocks: 0, ppp: 0, shp: 0, games: 0 },
+      G: { wins: 0, losses: 0, saves: 0, shutouts: 0, games: 0, count: 0 },
     };
     
     starters.forEach(p => {
@@ -148,9 +162,12 @@ const getTeamAbbreviation = (team: string): string => {
       if (realPos === 'G') {
         stats.G.wins += p.stats?.wins || 0;
         stats.G.losses += p.stats?.losses || 0;
+        stats.G.saves += (p.stats as { saves?: number } | undefined)?.saves || 0;
+        stats.G.shutouts += p.stats?.shutouts || 0;
+        stats.G.games += p.stats?.gamesPlayed || 0;
         stats.G.count++;
       } else if (stats[realPos as keyof typeof stats]) {
-        const target = stats[realPos as keyof typeof stats] as { goals: number; assists: number; shots: number; hits: number; blocks: number; ppp: number; shp: number };
+        const target = stats[realPos as keyof typeof stats] as { goals: number; assists: number; shots: number; hits: number; blocks: number; ppp: number; shp: number; games: number };
         if (p.stats) {
             target.goals += p.stats.goals || 0;
             target.assists += p.stats.assists || 0;
@@ -159,6 +176,7 @@ const getTeamAbbreviation = (team: string): string => {
             target.blocks += p.stats.blockedShots || 0;
             target.ppp += p.stats.powerPlayPoints || 0;
             target.shp += p.stats.shortHandedPoints || 0;
+            target.games += p.stats.gamesPlayed || 0;
         }
       }
     });
@@ -174,31 +192,18 @@ const safeValue = (val: number) => {
 
 // ... inside Roster component ...
 
-  const calculateRadarData = (stats: { goals: number; assists: number; shots: number; hits: number; blocks: number; ppp: number; shp?: number } | null, position: string) => {
-    // Baselines customized by position group (Per Player Season Avg * Num Slots)
-    // Approx baselines for a "Good" starter
-    const singlePlayerBaseline = {
-      C: { G: 25, A: 45, S: 200, H: 80, B: 40, PPP: 15 },
-      LW: { G: 25, A: 35, S: 200, H: 100, B: 40, PPP: 12 },
-      RW: { G: 25, A: 35, S: 200, H: 100, B: 40, PPP: 12 },
-      D: { G: 10, A: 35, S: 150, H: 120, B: 130, PPP: 10 },
-    };
-
-    const base = singlePlayerBaseline[position as keyof typeof singlePlayerBaseline] || singlePlayerBaseline.C;
-    
-    // Safety check for stats object
-    const s = stats || { goals: 0, assists: 0, shots: 0, hits: 0, blocks: 0, ppp: 0 };
-    
-    // Dynamic baseline based on roughly 2 players worth of stats for that position
-    const factor = 2.5; 
+  const calculateRadarData = (stats: SkaterGroupStats | null, position: string) => {
+    const base = SEASON_BASELINE[position as keyof typeof SEASON_BASELINE] || SEASON_BASELINE.C;
+    const s = stats || { goals: 0, assists: 0, shots: 0, hits: 0, blocks: 0, ppp: 0, games: 0 };
+    const g = s.games || 0;
 
     return [
-      { subject: 'Goals', A: safeValue((s.goals / (base.G * factor)) * 100), fullMark: 100 },
-      { subject: 'Assists', A: safeValue((s.assists / (base.A * factor)) * 100), fullMark: 100 },
-      { subject: 'Shots', A: safeValue((s.shots / (base.S * factor)) * 100), fullMark: 100 },
-      { subject: 'Hits', A: safeValue((s.hits / (base.H * factor)) * 100), fullMark: 100 },
-      { subject: 'Blocks', A: safeValue((s.blocks / (base.B * factor)) * 100), fullMark: 100 },
-      { subject: 'PPP', A: safeValue((s.ppp / (base.PPP * factor)) * 100), fullMark: 100 },
+      { subject: 'Goals',   A: safeValue(pctOfPace(s.goals,   g, base.goals)),   fullMark: 100 },
+      { subject: 'Assists', A: safeValue(pctOfPace(s.assists, g, base.assists)), fullMark: 100 },
+      { subject: 'Shots',   A: safeValue(pctOfPace(s.shots,   g, base.shots)),   fullMark: 100 },
+      { subject: 'Hits',    A: safeValue(pctOfPace(s.hits,    g, base.hits)),    fullMark: 100 },
+      { subject: 'Blocks',  A: safeValue(pctOfPace(s.blocks,  g, base.blocks)),  fullMark: 100 },
+      { subject: 'PPP',     A: safeValue(pctOfPace(s.ppp,     g, base.ppp)),     fullMark: 100 },
     ];
   };
 
@@ -295,7 +300,7 @@ const Roster = () => {
     rank: "-",
     totalPoints: 0,
     avgPoints: 0,
-    highScore: 0,
+    pointsAgainst: 0,
     waiverMoves: 0,
   });
 
@@ -346,6 +351,8 @@ const Roster = () => {
 
   // Calculate positional stats
   const posStats = useMemo(() => calculateTeamCategoryStats(roster.starters), [roster.starters]);
+  const benchStats = useMemo(() => calculateTeamCategoryStats(roster.bench), [roster.bench]);
+  const teamGrades = useMemo(() => calculateTeamGrades(posStats, benchStats), [posStats, benchStats]);
 
   // Calculate slots helper — respects F/D/G position type
   // Optional parameter: assignedSlots - Set of slot IDs already taken (to avoid conflicts)
@@ -1599,7 +1606,7 @@ const Roster = () => {
           rank: "-",
           totalPoints: 0,
           avgPoints: 0,
-          highScore: 0,
+          pointsAgainst: 0,
           waiverMoves: 0,
         });
         return;
@@ -1615,7 +1622,7 @@ const Roster = () => {
             rank: "-",
             totalPoints: 0,
             avgPoints: 0,
-            highScore: 0,
+            pointsAgainst: 0,
             waiverMoves: transactions.filter(t => t.type === 'claim' || t.type === 'drop').length,
           });
           return;
@@ -1635,7 +1642,7 @@ const Roster = () => {
             rank: "-",
             totalPoints: 0,
             avgPoints: 0,
-            highScore: 0,
+            pointsAgainst: 0,
             waiverMoves: transactions.filter(t => t.type === 'claim' || t.type === 'drop').length,
           });
           return;
@@ -1682,7 +1689,14 @@ const Roster = () => {
           rank,
           totalPoints: Math.round(userTeamStats.pointsFor),
           avgPoints: Math.round(avgPoints * 10) / 10,
-          highScore: Math.round(userTeamStats.pointsFor), // Placeholder - would need weekly data
+          // Was `highScore: Math.round(userTeamStats.pointsFor)` under a card
+          // headed "Highest Score / Best week so far" — the season total, byte
+          // for byte identical to the "Season Points" card beside it, with a
+          // "Placeholder" comment nobody was going to read. There is no
+          // per-week score in anything this page fetches, so rather than dress
+          // the season total up as a weekly best, show a number we actually
+          // have: what the league has scored against this team.
+          pointsAgainst: Math.round(userTeamStats.pointsAgainst || 0),
           waiverMoves,
         });
       } catch (error) {
@@ -1693,7 +1707,7 @@ const Roster = () => {
           rank: "-",
           totalPoints: 0,
           avgPoints: 0,
-          highScore: 0,
+          pointsAgainst: 0,
           waiverMoves: 0,
         });
       }
@@ -3115,28 +3129,36 @@ const Roster = () => {
             {/* Main Tabs — Citrus 2.0 dark */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
               <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
-                <TabsList className="w-full p-0 bg-transparent border-b border-white/10 rounded-none gap-0 h-auto">
+                {/*
+                  * The four labels do not fit a phone. "TRENDS & ANALYTICS" alone
+                  * needs ~150px at this letter-spacing, and four flex-1 triggers
+                  * split 361px into ~90px each — so the labels collapsed and
+                  * there was no scroller to reach the ones that got squeezed off.
+                  * Intrinsic widths plus a horizontal scroller on small screens;
+                  * the equal-width bar returns at sm, where it fits.
+                  */}
+                <TabsList className="w-full p-0 bg-transparent border-b border-white/10 rounded-none gap-0 h-auto justify-start overflow-x-auto sm:overflow-x-visible">
                 <TabsTrigger
                   value="roster"
-                  className="flex-1 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className="flex-none shrink-0 px-5 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
                   Roster
                 </TabsTrigger>
                 <TabsTrigger
                   value="stats"
-                  className="flex-1 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className="flex-none shrink-0 px-5 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
                   Team Stats
                 </TabsTrigger>
                 <TabsTrigger
                   value="trends"
-                  className="flex-1 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className="flex-none shrink-0 px-5 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
                   Trends &amp; Analytics
                 </TabsTrigger>
                 <TabsTrigger
                   value="transactions"
-                  className="flex-1 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className="flex-none shrink-0 px-5 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
                   Transactions
                 </TabsTrigger>
@@ -3413,21 +3435,25 @@ const Roster = () => {
                   <Card>
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-white/55">Avg. Weekly</span>
+                        {/* Labelled "Avg. Weekly / pts per week" until 2026-08-26.
+                            The divisor is the team's DRAFT PICK COUNT, not weeks
+                            elapsed — a real number under a heading describing a
+                            different quantity. Same number, honest name. */}
+                        <span className="text-sm text-white/55">Avg per Player</span>
                         <Activity className="h-4 w-4 text-blue-500" aria-hidden="true" />
                       </div>
                       <div className="text-2xl font-bold">{teamStats.avgPoints}</div>
-                      <p className="text-xs text-white/55 mt-1">pts / week</p>
+                      <p className="text-xs text-white/55 mt-1">pts / drafted player</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-white/55">Highest Score</span>
+                        <span className="text-sm text-white/55">Points Against</span>
                         <ArrowUpRight className="h-4 w-4 text-green-500" aria-hidden="true" />
                       </div>
-                      <div className="text-2xl font-bold">{teamStats.highScore}</div>
-                      <p className="text-xs text-white/55 mt-1">Week 2</p>
+                      <div className="text-2xl font-bold">{teamStats.pointsAgainst}</div>
+                      <p className="text-xs text-white/55 mt-1">scored on you</p>
                     </CardContent>
                   </Card>
                   <Card>
@@ -3488,8 +3514,8 @@ const Roster = () => {
                             </RadarChart>
                           </ResponsiveContainer>
                           <div className="absolute top-0 right-0 text-xs text-white/55 text-right hidden sm:block">
-                             <div className="mb-1">Chart shows % of Elite Baseline</div>
-                             <div>100% = Top Tier Production</div>
+                             <div className="mb-1">% of elite starter pace</div>
+                             <div>Per game, so it reads the same in October as in April</div>
                           </div>
                         </div>
                       </CardContent>
@@ -3500,28 +3526,42 @@ const Roster = () => {
                   <div className="space-y-6">
                     <Card>
                       <CardContent className="p-6">
-                         <div className="flex items-center gap-2 mb-4">
+                         <div className="flex items-center gap-2 mb-1">
                             <Zap className="h-5 w-5 text-yellow-500" aria-hidden="true" />
-                            <h3 className="font-bold text-lg">Power Rankings</h3>
+                            <h3 className="font-bold text-lg">Team Grades</h3>
                          </div>
+                         <p className="text-xs text-white/55 mb-4">
+                           Per-game production as a share of elite starter pace.
+                         </p>
+                         {/*
+                           * These four were hardcoded until 2026-08-26 — Offense A-,
+                           * Defense B, Goalie A, Depth C+, the same on every team in
+                           * every league. They are now computed from the roster
+                           * against SEASON_BASELINE, the same table the radar beside
+                           * them uses, so the chart and the letters cannot disagree.
+                           */}
                          <div className="space-y-3">
-                           <div className="flex justify-between items-center p-2 bg-white/5 ring-1 ring-white/10 rounded">
-                              <span className="text-sm font-medium">Offense</span>
-                              <Badge className="bg-green-500 hover:bg-green-600">A-</Badge>
-                           </div>
-                           <div className="flex justify-between items-center p-2 bg-white/5 ring-1 ring-white/10 rounded">
-                              <span className="text-sm font-medium">Defense</span>
-                              <Badge className="bg-yellow-500 hover:bg-yellow-600">B</Badge>
-                           </div>
-                           <div className="flex justify-between items-center p-2 bg-white/5 ring-1 ring-white/10 rounded">
-                              <span className="text-sm font-medium">Goalie</span>
-                              <Badge className="bg-blue-500 hover:bg-blue-600">A</Badge>
-                           </div>
-                            <div className="flex justify-between items-center p-2 bg-white/5 ring-1 ring-white/10 rounded">
-                              <span className="text-sm font-medium">Depth</span>
-                              <Badge className="bg-orange-500 hover:bg-orange-600">C+</Badge>
-                            </div>
+                           {teamGrades.map((g) => (
+                             <div key={g.label} className="flex justify-between items-center gap-2 p-2 bg-white/5 ring-1 ring-white/10 rounded">
+                               <div className="min-w-0">
+                                 <div className="text-sm font-medium">{g.label}</div>
+                                 <div className="text-[11px] text-white/55 truncate">{g.detail}</div>
+                               </div>
+                               <div className="flex items-center gap-2 shrink-0">
+                                 {g.pct !== null && (
+                                   <span className="text-[11px] text-white/55 tabular-nums">{Math.round(g.pct)}%</span>
+                                 )}
+                                 <Badge className={gradeTone(g.grade)}>{g.grade}</Badge>
+                               </div>
+                             </div>
+                           ))}
                          </div>
+                         {teamGrades.every((g) => g.pct === null) && (
+                           <p className="text-xs text-white/55 mt-3">
+                             No games played yet — grades appear once your players start
+                             logging games.
+                           </p>
+                         )}
                       </CardContent>
                     </Card>
                   </div>
@@ -3532,7 +3572,13 @@ const Roster = () => {
                    <CardContent className="p-6">
                       <div className="flex items-center gap-2 mb-4">
                          <BarChart3 className="h-5 w-5 text-white/55" aria-hidden="true" />
-                         <h3 className="font-bold text-lg">Projected Season Totals</h3>
+                         {/*
+                           * Was "Projected Season Totals". calculateTeamCategoryStats
+                           * sums ACTUAL season stats off the starters — nothing here
+                           * is a projection. In August that heading described a season
+                           * that has not been played.
+                           */}
+                         <h3 className="font-bold text-lg">Season Totals — Starters</h3>
                       </div>
                       
                       <div className="space-y-6">
