@@ -56,10 +56,17 @@ const BenchGrid = ({ players, onPlayerClick, onPlayerTap, className, lockedPlaye
           </div>
         )}
         {players.length > 0 ? (
-          /* Flexbox with fixed-width cards - centered when wrapping to new rows */
+          /* Flexbox with fixed-width cards - centered when wrapping to new rows.
+             168px, not 140px (2026-08-26): the card spends 8px + 44px headshot
+             + 8px gap + 36px position-patch clearance = 96px before a single
+             letter of the name is drawn. At 140px that left 44px, which is
+             narrower than "Shesterkin" or "MacKinnon" — surnames were being
+             clipped mid-glyph. 168px leaves 72px, which clears every surname
+             in the league at this weight. It wraps to fewer cards per row;
+             the row was already centred and wrapping, so nothing else moves. */
           <div className="flex flex-wrap justify-center gap-1.5">
             {players.map((player) => (
-              <div key={player.id} className="flex-shrink-0 w-[140px]">
+              <div key={player.id} className="flex-shrink-0 w-[168px]">
                 <HockeyPlayerCard
                   player={player}
                   isInSlot={false}

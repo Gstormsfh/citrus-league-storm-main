@@ -370,6 +370,11 @@ const HockeyPlayerCardContent = ({
   // wired the new prop yet still behaves like before.
   const handleCardTap = onSwapTap ?? onClick;
 
+  // Resolved once so the meta row can decide what it has room for: with an
+  // IR/GTD/SUSP/WVR badge alongside it, the jersey number is dropped rather
+  // than truncated mid-string into a dangling "COL • ".
+  const statusBadge = getStatusBadge();
+
   return (
     <Card
       className={cn(
@@ -402,7 +407,7 @@ const HockeyPlayerCardContent = ({
       )}
 
       {/* Surfer Varsity Header - MAXIMUM GREEN VIBES */}
-      <div className="relative p-2 bg-gradient-to-r from-pastel-sage/25 via-pastel-sage/15 to-pastel-sage/25 border-b-2 border-pastel-sage/50 flex items-center gap-2 min-h-[46px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-gradient-to-r before:from-pastel-sage before:via-[#7CB518] before:to-pastel-sage before:opacity-60">
+      <div className="relative p-2 pr-9 bg-gradient-to-r from-pastel-sage/25 via-pastel-sage/15 to-pastel-sage/25 border-b-2 border-pastel-sage/50 flex items-center gap-2 min-h-[46px] before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-1 before:bg-gradient-to-r before:from-pastel-sage before:via-[#7CB518] before:to-pastel-sage before:opacity-60">
         {/* Player headshot → team crest → Shield glyph */}
         <div className="w-11 h-11 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-pastel-sage/20 to-pastel-sage/10 rounded-xl shadow-varsity p-1 border-2 border-pastel-sage relative overflow-hidden before:content-[''] before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-br before:from-transparent before:to-pastel-sage/20 hover:border-[#7CB518] hover:shadow-[0_0_12px_rgba(124,181,24,0.5)] transition-all">
            {player.image && !headshotError ? (
@@ -429,24 +434,31 @@ const HockeyPlayerCardContent = ({
         </div>
 
         {/* Player Name and Team - Varsity Typography */}
-        <div className="flex-1 min-w-0 pr-5">
-          <div className="flex items-center gap-1">
-            <h3
-              className="font-display font-bold text-[11px] leading-tight line-clamp-2 cursor-pointer hover:text-pastel-sage transition-colors text-pastel-cream"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                onClick?.();
-              }}
-            >
-              {player.name}
-            </h3>
-            {getStatusBadge()}
-          </div>
-          <div className="flex items-center text-[9px] text-pastel-sage font-display font-bold mt-1 gap-1 uppercase tracking-wide">
-            <span>{teamAbbr}</span>
-            <span>•</span>
-            <span>#{player.number}</span>
+        <div className="flex-1 min-w-0">
+          {/* NAME OWNS ITS ROW (2026-08-26).
+              It used to share a flex row with the status badge, which is
+              flex-shrink-0 while the name — line-clamp-2, so overflow:hidden,
+              so automatic minimum size 0 — is infinitely shrinkable. On a
+              140px bench card that resolved to a 9px name box: "Cale Makar"
+              rendered as "C" over "M". The badge moved to the meta row below,
+              where the only thing it can crowd out is the jersey number.
+              break-words keeps a long surname wrapping instead of being
+              guillotined mid-glyph if a card is ever narrower than this. */}
+          <h3
+            className="font-display font-bold text-[11px] leading-tight line-clamp-2 break-words cursor-pointer hover:text-pastel-sage transition-colors text-pastel-cream"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick?.();
+            }}
+          >
+            {player.name}
+          </h3>
+          <div className="flex items-center gap-1.5 min-w-0 mt-1">
+            <span className="text-[9px] text-pastel-sage font-display font-bold uppercase tracking-wide min-w-0 truncate">
+              {statusBadge ? teamAbbr : `${teamAbbr} • #${player.number}`}
+            </span>
+            {statusBadge}
           </div>
         </div>
 
