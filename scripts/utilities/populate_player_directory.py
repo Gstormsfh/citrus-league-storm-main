@@ -100,6 +100,114 @@ def _safe_int(v, default=0) -> int:
     return default
 
 
+# player_directory.full_name is NOT NULL. Postgres validates NOT NULL
+# against the PROPOSED tuple, and it does so BEFORE the ON CONFLICT arbiter
+# runs — so a bulk body missing full_name is a 23502 even when every target
+# row already exists and the merge would never have touched the column.
+# That is the exact shape of the failure that killed this workflow on
+# 2026-08-26: `null value in column "full_name" ... [group of 45 rows,
+# keys=['jersey_number','player_id','position_code','season','team_abbrev',
+# 'updated_at']]`.
+DIRECTORY_REQUIRED_FIELDS = ("season", "player_id", "full_name")
+
+
+def _localized(value) -> str:
+  """NHL API strings arrive as {"default": "Leo"} — occasionally as a bare
+  string. Accept both, return "" for anything else."""
+  if isinstance(value, dict):
+    return str(value.get("default") or "").strip()
+  if isinstance(value, str):
+    return value.strip()
+  return ""
+
+
+def roster_full_name(roster_player: dict) -> str:
+  """Name from a /roster/{team}/current entry.
+
+  The roster payload already carries firstName/lastName in the same
+  localized shape the landing endpoint uses — sync_rosters.py and
+  populate_player_names_from_api.py both read it this way. Deriving the
+  name here costs ZERO extra API calls: the roster was already fetched.
+  """
+  first = _localized(roster_player.get("firstName"))
+  last = _localized(roster_player.get("lastName"))
+  return f"{first} {last}".strip()
+
+
+def normalize_position(raw) -> Optional[str]:
+  """NHL wing codes are L/R; ours are LW/RW."""
+  pos = _localized(raw) or None
+  if pos == "L":
+    return "LW"
+  if pos == "R":
+    return "RW"
+  return pos
+
+
+def build_roster_refresh_row(
+  roster_player: dict,
+  season: int,
+  team_abbrev: str,
+  now: Optional[str] = None,
+) -> Optional[dict]:
+  """Cheap-field refresh row for a player ALREADY in the directory.
+
+  Existing players skip the expensive per-player landing fetch (that is the
+  #290 fast lane), but we still refresh what the roster payload hands us for
+  free — otherwise an October trade leaves the display stuck on the player's
+  prior team all season.
+
+  Returns None when the payload cannot produce a legal row. A nameless entry
+  is dropped rather than sent: one stale jersey number is a far better
+  outcome than a 400 that aborts the whole daily run.
+
+  Optional keys stay ABSENT rather than None on purpose. This client upserts
+  with resolution=merge-duplicates, which compiles to ON CONFLICT DO UPDATE
+  over the columns present in the body, so a padded None is not "leave this
+  alone" — it is "overwrite the stored value with NULL". SupabaseRest splits
+  the mixed key sets into uniform groups (see _uniform_key_groups).
+  """
+  player_id = _safe_int(roster_player.get("id") or roster_player.get("playerId"), 0)
+  if not player_id:
+    return None
+
+  full_name = roster_full_name(roster_player)
+  if not full_name:
+    return None
+
+  stamp = now or _now_iso()
+  row = {
+    "season": season,
+    "player_id": player_id,
+    "full_name": full_name,
+    "team_abbrev": team_abbrev,
+    "updated_at": stamp,
+  }
+
+  position = normalize_position(
+    roster_player.get("positionCode") or roster_player.get("position")
+  )
+  if position:
+    row["position_code"] = position
+    # Derived from the same field, so it can never contradict position_code.
+    # Gated on `position` for that reason: with no position we must not
+    # assert is_goalie=False and silently demote a real goalie.
+    row["is_goalie"] = position == "G"
+
+  jersey = roster_player.get("sweaterNumber")
+  if jersey is not None and str(jersey).strip():
+    row["jersey_number"] = str(jersey)
+
+  # headshot IS in the roster payload (sync_rosters.py reads it there), so
+  # refreshing it is free and fixes portraits that go stale after a trade.
+  # Conditional: a missing headshot must never NULL out a good stored one.
+  headshot = roster_player.get("headshot")
+  if headshot:
+    row["headshot_url"] = headshot
+
+  return row
+
+
 def fetch_team_roster(team_abbrev: str) -> list:
   """Fetch team roster from NHL API."""
   try:
@@ -378,11 +486,25 @@ def _flush_batch(db: SupabaseRest, batch: Dict[int, dict], label: str) -> int:
   fail we want to surface, not swallow."""
   if not batch:
     return 0
-  rows = list(batch.values())
+
+  # Last line of defence. A row missing a NOT NULL column is rejected by
+  # Postgres for the WHOLE bulk body, so one malformed row takes down every
+  # good row travelling with it. Drop it here, loudly, with the player_id —
+  # a named local skip beats an anonymous 400 from PostgREST.
+  rows = []
+  for player_id, row in batch.items():
+    missing = [f for f in DIRECTORY_REQUIRED_FIELDS if row.get(f) in (None, "")]
+    if missing:
+      print(f"  [SKIP {label}] player_id={player_id} missing NOT NULL field(s) {missing} — row dropped")
+      continue
+    rows.append(row)
+  batch.clear()
+
+  if not rows:
+    return 0
   db.upsert("player_directory", rows, on_conflict="season,player_id")
   n = len(rows)
   print(f"  [FLUSH {label}] upserted {n} players")
-  batch.clear()
   return n
 
 
@@ -435,6 +557,7 @@ def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
   total_roster_players = 0
   roster_processed = 0
   roster_skipped_existing = 0
+  roster_refresh_unusable = 0
   last_progress_time = time.time()
   for team_idx, team_abbrev in enumerate(TEAMS, 1):
     roster = fetch_team_roster(team_abbrev)
@@ -447,32 +570,18 @@ def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
       if not player_id or player_id in seen:
         continue
       if player_id in existing_ids:
-        # Task E: existing players skip the EXPENSIVE per-player NHL API
-        # bio fetch (that's what the #290 fast lane closed), but we STILL
-        # refresh the CHEAP fields the roster payload already carries —
-        # team_abbrev, position_code, jersey_number, updated_at. Without
-        # this, an October trade leaves the display stuck on the player's
-        # prior team_abbrev all season. Zero extra API calls (the roster
-        # was already fetched). Fields NOT in the roster payload (bio,
-        # headshot, physical) come from the landing endpoint and are
-        # deliberately not refreshed here.
-        raw_pos = roster_player.get("positionCode") or roster_player.get("position") or None
-        position = raw_pos
-        if position == "L":
-          position = "LW"
-        elif position == "R":
-          position = "RW"
-        jersey = roster_player.get("sweaterNumber")
-        refresh_row = {
-          "season": season,
-          "player_id": player_id,
-          "team_abbrev": team_abbrev,
-          "updated_at": _now_iso(),
-        }
-        if position:
-          refresh_row["position_code"] = position
-        if jersey is not None:
-          refresh_row["jersey_number"] = str(jersey)
+        # Task E: existing players skip the EXPENSIVE per-player NHL API bio
+        # fetch (that's what the #290 fast lane closed), but we STILL refresh
+        # the cheap fields the roster payload already carries. Zero extra API
+        # calls — the roster was already fetched. Fields that only the landing
+        # endpoint has (physical, bio, shoots/catches) are not touched here.
+        #
+        # full_name is included even though this row's target already exists:
+        # see build_roster_refresh_row. Omitting it 400s the batch.
+        refresh_row = build_roster_refresh_row(roster_player, season, team_abbrev)
+        if refresh_row is None:
+          roster_refresh_unusable += 1
+          continue
         team_refresh_pending[player_id] = refresh_row
         seen[player_id] = refresh_row
         roster_skipped_existing += 1
@@ -494,6 +603,9 @@ def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
 
   print(f"[populate_player_directory][season={season}] Fetched {total_roster_players} roster players across {len(TEAMS)} teams "
         f"({roster_processed} new, {roster_skipped_existing} refreshed-existing)")
+  if roster_refresh_unusable:
+    print(f"[populate_player_directory][season={season}] WARNING: {roster_refresh_unusable} roster entries "
+          f"had no usable id/name and were skipped — their team/jersey stayed stale")
 
   if total_upserted:
     print(f"[populate_player_directory][season={season}] OK: total upserted this season = {total_upserted}")
