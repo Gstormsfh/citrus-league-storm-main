@@ -318,6 +318,33 @@ class SupabaseRest:
       )
     return rows
 
+  @staticmethod
+  def _uniform_key_groups(rows: List[dict]) -> List[List[dict]]:
+    """
+    Split a batch into groups that each share an identical key set.
+
+    PostgREST requires every object in a bulk body to carry exactly the same
+    keys and answers 400 PGRST102 "All object keys must match" otherwise. That
+    is what broke the daily Refresh Player Directory job every morning from
+    2026-08-14 to 2026-08-25: rows are built from the NHL API, which omits
+    fields it has nothing for, so one player carries `college_team` and the
+    next does not and the whole batch is rejected.
+
+    Grouping rather than padding the short rows with None, deliberately. This
+    client upserts with `resolution=merge-duplicates`, which compiles to
+    ON CONFLICT DO UPDATE over the columns actually present in the body — so a
+    padded None is not "no value", it is an instruction to overwrite whatever
+    is already stored with NULL. Padding would have turned a 400 into silent
+    data loss on every field the NHL API happened to omit that day, which is
+    strictly worse than the failure it replaces.
+
+    One request per distinct key signature. In practice that is a handful.
+    """
+    groups: Dict[frozenset, List[dict]] = {}
+    for row in rows:
+      groups.setdefault(frozenset(row.keys()), []).append(row)
+    return list(groups.values())
+
   def upsert(self, table: str, rows: Union[dict, List[dict]], on_conflict: str) -> None:
     """
     Upsert rows with merge-duplicates resolution.
@@ -337,18 +364,28 @@ class SupabaseRest:
       }
     )
     body = rows if isinstance(rows, list) else [rows]
-    r = self._request_with_retry("POST", url, headers=hdr, data=json.dumps(body), timeout=self.timeout_seconds)
-    if r.status_code >= 400:
-      raise RuntimeError(f"Supabase upsert failed ({table}): {r.status_code} {r.text}")
+    # See _uniform_key_groups: a bulk body with mixed keys is a 400 (PGRST102).
+    for group in self._uniform_key_groups(body):
+      r = self._request_with_retry("POST", url, headers=hdr, data=json.dumps(group), timeout=self.timeout_seconds)
+      if r.status_code >= 400:
+        raise RuntimeError(
+          f"Supabase upsert failed ({table}): {r.status_code} {r.text} "
+          f"[group of {len(group)} rows, keys={sorted(group[0].keys())}]"
+        )
 
   def insert(self, table: str, rows: Union[dict, List[dict]]) -> None:
     """Plain insert (no upsert). Fails if a row collides with a unique constraint."""
     url = f"{self.rest_base}/{table}"
     hdr = self._headers({"Prefer": "return=minimal"})
     body = rows if isinstance(rows, list) else [rows]
-    r = self._request_with_retry("POST", url, headers=hdr, data=json.dumps(body), timeout=self.timeout_seconds)
-    if r.status_code >= 400:
-      raise RuntimeError(f"Supabase insert failed ({table}): {r.status_code} {r.text}")
+    # Same PGRST102 constraint as upsert().
+    for group in self._uniform_key_groups(body):
+      r = self._request_with_retry("POST", url, headers=hdr, data=json.dumps(group), timeout=self.timeout_seconds)
+      if r.status_code >= 400:
+        raise RuntimeError(
+          f"Supabase insert failed ({table}): {r.status_code} {r.text} "
+          f"[group of {len(group)} rows, keys={sorted(group[0].keys())}]"
+        )
 
   def update(self, table: str, values: dict, filters: List[Filter]) -> None:
     qs = self._build_query(filters=filters)
