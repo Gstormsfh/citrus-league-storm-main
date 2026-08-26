@@ -113,6 +113,18 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # A production deploy that deploys nothing must not be green.
+      #
+      # This step used to emit a ::notice:: and set has_creds=false, which made
+      # every following step skip and the job report success. The whole point of
+      # the verification steps below — added after 2026-08-24, when Cloud Run
+      # served a stale revision for 12.6h behind a "successful" deploy — is that
+      # a deploy which did not take effect fails loudly. A missing credential is
+      # the same failure with a shorter path: master moves, the web bundle
+      # ships, the API does not, and nothing says so.
+      #
+      # has_creds is kept rather than deleted so the `if:` guards below still
+      # read correctly, but the false branch now stops the job.
       - name: Check GCP credentials
         id: check-gcp
         run: |
@@ -120,7 +132,8 @@ jobs:
             echo "has_creds=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_creds=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping Cloud Run deploy — GCP_SA_KEY not configured"
+            echo "::error::GCP_SA_KEY is not configured, so the API was NOT deployed. The web bundle would have shipped against an API running older code. Set the secret, or disable this job deliberately."
+            exit 1
           fi
         env:
           GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}

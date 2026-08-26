@@ -818,15 +818,16 @@ export const MatchupService = {
       let previousMatchupId: string | null = null;
       let nextMatchupId: string | null = null;
 
-      if (previousWeek) {
-        const { matchup: prevMatchup } = await this.getUserMatchup(leagueId, userId, previousWeek);
-        previousMatchupId = prevMatchup?.id || null;
-      }
-
-      if (nextWeek) {
-        const { matchup: nextMatchup } = await this.getUserMatchup(leagueId, userId, nextWeek);
-        nextMatchupId = nextMatchup?.id || null;
-      }
+      // These two only feed the previous/next arrows in the week switcher.
+      // They were awaited one after the other on the critical path — two round
+      // trips, ~700ms on the latency this page sees, to decide whether an arrow
+      // is enabled. At minimum they run together.
+      const [prevResult, nextResult] = await Promise.all([
+        previousWeek ? this.getUserMatchup(leagueId, userId, previousWeek) : Promise.resolve(null),
+        nextWeek ? this.getUserMatchup(leagueId, userId, nextWeek) : Promise.resolve(null),
+      ]);
+      previousMatchupId = prevResult?.matchup?.id || null;
+      nextMatchupId = nextResult?.matchup?.id || null;
 
       // Build response
       const response: MatchupDataResponse = {
@@ -1969,94 +1970,98 @@ export const MatchupService = {
         ...team2Roster.map(p => p.teamAbbreviation || p.team || '')
       ].filter(team => team !== '')));
 
-      // Fetch all games for all teams in one batch query (with timeout to prevent hang)
-      const { gamesByTeam } = await withTimeout(
-        ScheduleService.getGamesForTeams(allTeams, weekStart, weekEnd),
-        10000,
-        'getGamesForTeams timeout'
-      );
-
       // Collect all player IDs from both rosters
       const allPlayerIds = [
         ...team1Roster.map(p => typeof p.id === 'string' ? parseInt(p.id) || 0 : p.id || 0),
         ...team2Roster.map(p => typeof p.id === 'string' ? parseInt(p.id) || 0 : p.id || 0)
       ].filter(id => id > 0);
 
-      // NEW: Fetch pre-calculated matchup lines (with graceful degradation)
-      // Skip for demo league guests — requires auth, and page renders fine without lines
-      let matchupLines = new Map<number, MatchupLineRow>();
-      if (!(isDemoLeague && !userId)) {
-        try {
-          matchupLines = await this.getMatchupLines(matchup.id);
-        } catch (error: unknown) {
-          logger.warn('[MatchupService] Failed to fetch matchup lines, continuing with empty data:', error);
-          // Continue with empty Map - page should still load
+      const weekStartStr = weekStart.toISOString().split('T')[0];
+      const weekEndStr = weekEnd.toISOString().split('T')[0];
+      const todayMST = getTodayMST();
+      const skipAuthedReads = isDemoLeague && !userId;
+
+      /*
+       * THESE FOUR ARE INDEPENDENT. THEY USED TO RUN ONE AFTER ANOTHER.
+       *
+       * Schedule, matchup lines, week stats and today's projections each need
+       * only `allTeams` or `allPlayerIds`, both of which are known above — none
+       * of them reads another's result. Run serially they cost four round
+       * trips; on the ~350ms median this page sees, that is ~1.4s of the
+       * ten-second load, spent waiting rather than fetching.
+       *
+       * Each keeps its own catch so the graceful degradation is unchanged: a
+       * failure in any one still leaves an empty Map and a page that renders.
+       * Promise.all is safe here precisely because nothing can reject.
+       */
+      const [gamesResult, matchupLines, matchupStatsMap, dailyProjectionsMap] = await Promise.all([
+        withTimeout(
+          ScheduleService.getGamesForTeams(allTeams, weekStart, weekEnd),
+          10000,
+          'getGamesForTeams timeout'
+        ),
+
+        // Skip for demo league guests — requires auth, and the page renders
+        // fine without lines.
+        (async (): Promise<Map<number, MatchupLineRow>> => {
+          if (skipAuthedReads) return new Map<number, MatchupLineRow>();
+          try {
+            return await this.getMatchupLines(matchup.id);
+          } catch (error: unknown) {
+            logger.warn('[MatchupService] Failed to fetch matchup lines, continuing with empty data:', error);
+            return new Map<number, MatchupLineRow>();
+          }
+        })(),
+
+        (async () => {
+          try {
+            return await this.fetchMatchupStatsForPlayers(allPlayerIds, weekStart, weekEnd, skipAuthedReads);
+          } catch (error: unknown) {
+            logger.error('[MatchupService] ❌ Failed to fetch matchup stats:', error);
+            return new Map<number, {
+              goals: number; assists: number; sog: number; blocks: number; xGoals: number;
+              wins?: number; saves?: number; shutouts?: number; goals_against?: number;
+            }>();
+          }
+        })(),
+
+        // Today only on the initial roster load; per-date projections load on
+        // demand when the user picks a date in Matchup.tsx.
+        (async (): Promise<Map<number, DailyProjectionRow>> => {
+          if (skipAuthedReads) return new Map<number, DailyProjectionRow>();
+          try {
+            return await this.getDailyProjectionsForMatchup(allPlayerIds, todayMST);
+          } catch (error: unknown) {
+            logger.warn('[MatchupService] Failed to fetch daily projections, continuing without them:', error);
+            return new Map<number, DailyProjectionRow>();
+          }
+        })(),
+      ]);
+
+      const { gamesByTeam } = gamesResult;
+
+      // Sanity check on the week stats — a season-total-shaped number here
+      // means the RPC returned the wrong window.
+      if (matchupStatsMap.size > 0) {
+        const playersWithStats = Array.from(matchupStatsMap.entries()).slice(0, 3);
+        const highValuePlayers = playersWithStats.filter(([, stats]) => {
+          const highSkaterStats = stats.goals > 20 || stats.assists > 30 || stats.sog > 100;
+          const highGoalieStats = (stats.wins || 0) > 7 || (stats.saves || 0) > 300;
+          return highSkaterStats || highGoalieStats;
+        });
+        if (highValuePlayers.length > 0) {
+          logger.error(`  ❌ ${highValuePlayers.length} sample players have season-total-like numbers! RPC may be broken!`);
         }
+      } else {
+        logger.error('[MatchupService.getMatchupRosters] ❌ CRITICAL: Matchup stats map is EMPTY - no week data found!', {
+          weekStart: weekStartStr,
+          weekEnd: weekEndStr,
+          playerCount: allPlayerIds.length,
+          matchupId: matchup.id,
+          samplePlayerIds: allPlayerIds.slice(0, 5)
+        });
       }
 
-      // Fetch matchup stats for the week (with graceful degradation)
-      let matchupStatsMap = new Map<number, { 
-        goals: number; 
-        assists: number; 
-        sog: number; 
-        blocks: number; 
-        xGoals: number;
-        // Goalie stats
-        wins?: number;
-        saves?: number;
-        shutouts?: number;
-        goals_against?: number;
-      }>();
-      try {
-        const weekStartStr = weekStart.toISOString().split('T')[0];
-        const weekEndStr = weekEnd.toISOString().split('T')[0];
-        
-        matchupStatsMap = await this.fetchMatchupStatsForPlayers(allPlayerIds, weekStart, weekEnd, isDemoLeague && !userId);
-        
-        if (matchupStatsMap.size > 0) {
-          const sampleEntry = Array.from(matchupStatsMap.entries())[0];
-          const playersWithStats = Array.from(matchupStatsMap.entries()).slice(0, 3);
-          
-          // Check if sample players have season-total-like numbers (for both skaters and goalies)
-          const highValuePlayers = playersWithStats.filter(([id, stats]) => {
-            // Check skater stats
-            const highSkaterStats = stats.goals > 20 || stats.assists > 30 || stats.sog > 100;
-            // Check goalie stats (wins > 7 or saves > 300 for a week is unreasonable)
-            const highGoalieStats = (stats.wins || 0) > 7 || (stats.saves || 0) > 300;
-            return highSkaterStats || highGoalieStats;
-          });
-          
-          if (highValuePlayers.length > 0) {
-            logger.error(`  ❌ ${highValuePlayers.length} sample players have season-total-like numbers! RPC may be broken!`);
-          }
-        } else {
-          logger.error('[MatchupService.getMatchupRosters] ❌ CRITICAL: Matchup stats map is EMPTY - no week data found!', {
-            weekStart: weekStartStr,
-            weekEnd: weekEndStr,
-            playerCount: allPlayerIds.length,
-            matchupId: matchup.id,
-            samplePlayerIds: allPlayerIds.slice(0, 5)
-          });
-        }
-      } catch (error: unknown) {
-        logger.error('[MatchupService] ❌ Failed to fetch matchup stats:', error);
-        // Continue with empty Map - page should still load
-      }
-      
-      // Fetch daily projections for TODAY only (initial roster load)
-      // Per-date projections are loaded on-demand when user selects a date in Matchup.tsx
-      // This reduces API calls from 7 (one per weekday) to 1 per load
-      // Skip for demo league guests — requires auth, projections are supplementary
-      const todayMST = getTodayMST();
-      let dailyProjectionsMap = new Map<number, DailyProjectionRow>();
-      if (!(isDemoLeague && !userId)) {
-        try {
-          dailyProjectionsMap = await this.getDailyProjectionsForMatchup(allPlayerIds, todayMST);
-        } catch (error: unknown) {
-          logger.warn('[MatchupService] Failed to fetch daily projections, continuing without them:', error);
-        }
-      }
-      
       const garMap = new Map<number, number>();
 
       // Transform players with pre-fetched schedule data, matchup stats, GAR, and daily projections
