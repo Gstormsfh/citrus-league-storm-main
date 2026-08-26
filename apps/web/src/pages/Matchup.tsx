@@ -13,7 +13,6 @@ import { MatchupComparison } from "@/components/matchup/MatchupComparison";
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
 import { ScoreCard } from "@/components/matchup/ScoreCard";
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
-import { DailyRosters } from "@/components/matchup/DailyRosters";
 import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
 import { getCurrentSeason } from '@/utils/seasonConstants';
 import LeagueNotifications from "@/components/matchup/LeagueNotifications";
@@ -37,6 +36,7 @@ import { DataCacheService, TTL } from '@/services/DataCacheService';
 import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
 import { ScoringCalculator, DEFAULT_SCORING } from '@/utils/scoringUtils';
 import { logger } from '@/utils/logger';
+import { readUntilPresent } from '@/utils/readUntilPresent';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { usePlayoffChampion } from '@/hooks/usePlayoffChampion';
 import { Card, CardContent } from '@/components/ui/card';
@@ -315,51 +315,38 @@ const Matchup = () => {
         }
       }
 
-      // Step 1: Backfill missing daily roster records for both teams
-      // This ensures fantasy_daily_rosters has complete data
-      // SKIP for demo league - guests can't write
-      if (!isDemoLeague && currentMatchup.team1_id) {
+      // Step 1: Backfill missing daily roster records for both teams.
+      //
+      // team1 and team2 are independent writes against different team ids —
+      // they were awaited one after the other, so this cost two round trips
+      // where it needs one. On the ~350ms median this page sees, that is a
+      // third of a second on a path that runs before the score refresh below.
+      const backfillTeam = async (teamId: string | null | undefined, label: string) => {
+        if (isDemoLeague || !teamId) return;
         try {
-          log(' Running backfill for team1:', currentMatchup.team1_id);
+          log(` Running backfill for ${label}:`, teamId);
           const result = await LeagueService.backfillMissingDailyRosters(
-            currentMatchup.team1_id,
+            teamId,
             currentMatchup.league_id,
             currentMatchup.id
           );
-          log(' Backfill result for team1:', result);
           if (result.backfilledCount > 0) {
-            log(' Backfilled', result.backfilledCount, 'records for team1');
+            log(' Backfilled', result.backfilledCount, `records for ${label}`);
           } else if (result.error) {
-            logger.error('[Matchup] Backfill error for team1:', result.error);
+            logger.error(`[Matchup] Backfill error for ${label}:`, result.error);
           } else {
-            log(' No records to backfill for team1 (all exist)');
+            log(` No records to backfill for ${label} (all exist)`);
           }
         } catch (err) {
-          logger.error('[Matchup] Team1 backfill exception:', err);
+          logger.error(`[Matchup] ${label} backfill exception:`, err);
         }
-      }
-      
-      if (!isDemoLeague && currentMatchup.team2_id) {
-        try {
-          log(' Running backfill for team2:', currentMatchup.team2_id);
-          const result = await LeagueService.backfillMissingDailyRosters(
-            currentMatchup.team2_id,
-            currentMatchup.league_id,
-            currentMatchup.id
-          );
-          log(' Backfill result for team2:', result);
-          if (result.backfilledCount > 0) {
-            log(' Backfilled', result.backfilledCount, 'records for team2');
-          } else if (result.error) {
-            logger.error('[Matchup] Backfill error for team2:', result.error);
-          } else {
-            log(' No records to backfill for team2 (all exist)');
-          }
-        } catch (err) {
-          logger.error('[Matchup] Team2 backfill exception:', err);
-        }
-      }
-      
+      };
+
+      await Promise.all([
+        backfillTeam(currentMatchup.team1_id, 'team1'),
+        backfillTeam(currentMatchup.team2_id, 'team2'),
+      ]);
+
       // Step 2: Calculate and store matchup scores
       // SKIP for demo league - guests have no auth token, and score jobs are server-side
       if (!isDemoLeague && (currentMatchup.status === 'in_progress' || currentMatchup.status === 'scheduled')) {
@@ -587,12 +574,20 @@ const Matchup = () => {
       return;
     }
     
-    // Only run for guests or users with no league
+    // Only run for guests or users with no league.
+    //
+    // These four setters used to run unconditionally on the active-user path,
+    // handing React a FRESH `[]` and `{}` every time this effect fired. Those
+    // identities are in the dependency array of `fetchAllDailyStats`, so each
+    // pointless reset produced a new callback, which re-fired its effect (7
+    // getDailyGameStats requests, one per weekday) AND re-armed the live-refresh
+    // effect, whose body immediately fires 9 more. Clearing state that is
+    // already clear was costing double-digit requests per load.
     if (userLeagueState === 'active-user') {
-      setDemoMyTeam([]);
-      setDemoOpponentTeam([]);
-      setDemoMyTeamSlotAssignments({});
-      setDemoOpponentTeamSlotAssignments({});
+      setDemoMyTeam((prev) => (prev.length === 0 ? prev : []));
+      setDemoOpponentTeam((prev) => (prev.length === 0 ? prev : []));
+      setDemoMyTeamSlotAssignments((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+      setDemoOpponentTeamSlotAssignments((prev) => (Object.keys(prev).length === 0 ? prev : {}));
       // Don't touch loading state for active users
       return;
     }
@@ -1184,6 +1179,23 @@ const Matchup = () => {
   // Fetch stats for all 7 days of the matchup week (for WeeklySchedule day boxes)
   // CRITICAL: Also runs for guests/demo to use REAL NHL data
   // Extract to useCallback so it can be reused for live game refreshes
+  /*
+   * A dependency array compares IDENTITY, not value.
+   *
+   * `scoringSettings` is replaced with a fresh object literal on every load
+   * (Matchup.tsx sets it in four places), so `fetchAllDailyStats` got a new
+   * identity each time even when the league's scoring had not changed by a
+   * single point. That re-fired its own effect — 7 getDailyGameStats requests,
+   * one per weekday — and re-armed the live-refresh effect, which immediately
+   * fires 9 more. Serialising the value gives a dependency that changes when
+   * the scoring changes and not when the object does. The object is a handful
+   * of numeric weights; stringifying it is cheaper than one wasted request.
+   */
+  const scoringSignature = React.useMemo(
+    () => JSON.stringify(scoringSettings ?? null),
+    [scoringSettings],
+  );
+
   const fetchAllDailyStats = React.useCallback(async () => {
       // Prevent concurrent fetches that cause score flashing
       if (statsLoadingRef.current) return;
@@ -1407,7 +1419,15 @@ const Matchup = () => {
   // Player IDs are read from refs (myTeamPlayerIdsRef, opponentTeamPlayerIdsRef,
   // myStarterIdsRef, oppStarterIdsRef) which are stable references. demoMyTeam/demoOpponentTeam are
   // state arrays used for guest mode. playerIdsVersion was removed per ESLint (unnecessary dep).
-  }, [currentMatchup, userLeagueState, scoringSettings, demoMyTeam, demoOpponentTeam]);
+  //
+  // currentMatchup is narrowed to the two fields this callback actually reads —
+  // it is otherwise replaced wholesale on every score refresh
+  // (setCurrentMatchup(prev => ({...prev})) after the score job), and each of
+  // those replacements used to cost a 7-request burst here plus a 9-request
+  // burst from the live-refresh effect that depends on this callback.
+  // scoringSignature is the value of scoringSettings rather than its identity.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMatchup?.id, currentMatchup?.week_start_date, userLeagueState, scoringSignature, demoMyTeam, demoOpponentTeam]);
 
   // Initial fetch on mount and when dependencies change
   useEffect(() => {
@@ -3903,13 +3923,15 @@ const Matchup = () => {
           
           log(' Matchup generation completed successfully');
           
-          // Wait longer to ensure database commits complete
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Debug: Check what matchups actually exist via API
-          // Invalidate cache first since we just generated matchups
-          matchupApi.invalidate(`matchups:league:${currentLeague.id}`);
-          const weekMatchupsRes = await matchupApi.getLeagueMatchups(currentLeague.id, weekToShow);
+          // Read back what generation produced. Retries rather than sleeps —
+          // see utils/readUntilPresent.
+          const weekMatchupsRes = await readUntilPresent(
+            async () => {
+              matchupApi.invalidate(`matchups:league:${currentLeague.id}`);
+              return matchupApi.getLeagueMatchups(currentLeague.id, weekToShow);
+            },
+            (res) => ((res?.data as unknown[]) || []).length > 0,
+          );
           const allMatchups = (weekMatchupsRes?.data || []) as any[];
           log(' Debug - All matchups for week', weekToShow, ':', allMatchups);
 
@@ -3998,14 +4020,10 @@ const Matchup = () => {
                   return;
                 }
                 
-                // Wait for database commits
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-                // Verify again
-                const { matchup: finalMatchup } = await MatchupService.getUserMatchup(
-                  currentLeague.id,
-                  user.id,
-                  weekToShow
+                // Verify again — retrying rather than sleeping.
+                const { matchup: finalMatchup } = await readUntilPresent(
+                  () => MatchupService.getUserMatchup(currentLeague.id, user.id, weekToShow),
+                  (res) => Boolean(res?.matchup),
                 );
                 
                 if (!finalMatchup) {
@@ -4182,12 +4200,21 @@ const Matchup = () => {
         
         log(' STEP 11: Matchup data loaded successfully');
         
-        // Update cache with loaded data (include selectedMatchupId in cache key)
+        // Record the matchup that was ACTUALLY loaded, not the one that was
+        // selected when the load started.
+        //
+        // On a first visit `selectedMatchupId` is null while this effect runs,
+        // so the cache entry was stamped `matchupId: null`. A few lines below,
+        // the effect then sets selectedMatchupId to the matchup it just
+        // loaded — which re-runs the effect, finds `null !== <id>`, and both
+        // fails the cache-key comparison AND trips the explicit
+        // "selectedMatchupId changed → bypass cache" branch. The whole
+        // ~20-request load ran a second time on every cold visit to this page.
         if (targetLeagueId && weekToShow) {
           loadedMatchupDataRef.current = {
             leagueId: targetLeagueId,
             weekId: String(weekToShow),
-            matchupId: selectedMatchupId,
+            matchupId: matchupData.matchup?.id ?? selectedMatchupId,
             timestamp: Date.now()
           };
         }
@@ -4263,8 +4290,15 @@ const Matchup = () => {
           setDailyStatsMap(new Map());
         }
         
-        // Set selected matchup ID if not already set
+        // Set selected matchup ID if not already set.
+        //
+        // Sync prevSelectedMatchupIdRef in the same breath. That ref is how the
+        // effect distinguishes "the user picked a different matchup" (reload,
+        // bypass cache) from "we just told ourselves which matchup we loaded"
+        // (nothing to do — the data is already in hand). Without the sync the
+        // second case looked exactly like the first.
         if (!selectedMatchupId && matchupData.matchup) {
+          prevSelectedMatchupIdRef.current = matchupData.matchup.id;
           setSelectedMatchupId(matchupData.matchup.id);
         }
         
