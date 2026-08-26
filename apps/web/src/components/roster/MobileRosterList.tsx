@@ -150,12 +150,18 @@ const formatStatLine = (player: HockeyPlayer): { text: string; isActual: boolean
 };
 
 // ─── Game status badge ──────────────────────────────────────────────
+// whitespace-nowrap + flex-shrink-0 (2026-08-26): this chip sits in a
+// `flex items-center gap-1 overflow-hidden` row where every other child is
+// already shrink-0. Being the one shrinkable item, it absorbed the whole
+// squeeze and wrapped — "FINAL 4-2" rendered as "FINAL 4-" over "2", which
+// doubled the row height and broke the list's rhythm. A status chip is
+// atomic: it is either shown whole or the row truncates something else.
 const GameStatusBadge = ({ status, score }: { status?: string; score?: string }) => {
   if (!status || status === 'scheduled') return null;
 
   if (status === 'final') {
     return (
-      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-white/10 text-white/70 uppercase">
+      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-white/10 text-white/70 uppercase whitespace-nowrap flex-shrink-0">
         Final{score ? ` ${score}` : ''}
       </span>
     );
@@ -163,7 +169,7 @@ const GameStatusBadge = ({ status, score }: { status?: string; score?: string })
 
   if (status === 'live' || status === 'intermission') {
     return (
-      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-red-500/15 text-red-400 uppercase animate-pulse">
+      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-red-500/15 text-red-400 uppercase animate-pulse whitespace-nowrap flex-shrink-0">
         {status === 'intermission' ? 'INT' : 'LIVE'}{score ? ` ${score}` : ''}
       </span>
     );
