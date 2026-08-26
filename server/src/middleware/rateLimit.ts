@@ -111,6 +111,32 @@ function checkLimit(
 }
 
 interface RateLimitOptions {
+  /**
+   * Namespace for this limiter's counters. REQUIRED in spirit — every limiter
+   * must have its own, or it shares a budget with the others.
+   *
+   * THE BUG THIS EXISTS TO PREVENT (2026-08-26). The buckets are module-level
+   * and were keyed on the IP alone, so every limiter incremented and read the
+   * SAME counter while checking it against its own, different ceiling:
+   *
+   *   app.use('/api/*',         standardRateLimit)  // 600/min
+   *   app.use('/api/stormy/*',  aiRateLimit)        // 30/min
+   *   app.use('/api/auth/signup', authRateLimit)    // 5/min
+   *
+   * standardRateLimit runs on every API call, so ordinary browsing filled the
+   * shared counter. A single Matchup render issues ~102 requests (measured in
+   * a device capture). After that, within the same 60s window:
+   *
+   *   • Stormy compared 103 against 30  -> 429
+   *   • Sign-up compared 103 against 5  -> 429
+   *
+   * The second one is the serious one: anyone who used the app for a few
+   * seconds and then tried to create an account was told "Too many requests"
+   * with no way through but to wait a minute without touching anything.
+   *
+   * Namespacing makes each limiter's budget its own.
+   */
+  name?: string;
   /** Max requests per window (default: 100) */
   maxRequests?: number;
   /** Window duration in milliseconds (default: 60000 = 1 minute) */
@@ -129,16 +155,21 @@ interface RateLimitOptions {
  */
 export function rateLimitMiddleware(options: RateLimitOptions = {}) {
   const {
+    name,
     maxRequests = 100,
     windowMs = 60_000,
     perUser = true,
     maxUserRequests = maxRequests * 2,
   } = options;
 
+  // Falls back to the limiter's own settings so an unnamed limiter still gets
+  // a distinct namespace rather than silently joining someone else's budget.
+  const scope = name ?? `anon-${maxRequests}-${windowMs}-${perUser}`;
+
   return async (c: Context, next: Next) => {
     const ip = getClientIp(c);
 
-    const ipResult = checkLimit(ipBuckets, ip, maxRequests, windowMs);
+    const ipResult = checkLimit(ipBuckets, `${scope}|ip|${ip}`, maxRequests, windowMs);
 
     c.header('X-RateLimit-Limit', String(maxRequests));
     c.header('X-RateLimit-Remaining', String(Math.max(0, ipResult.remaining)));
@@ -151,7 +182,7 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
     if (perUser) {
       const userId = (c as any).get?.('userId');
       if (userId) {
-        const userResult = checkLimit(userBuckets, userId, maxUserRequests, windowMs);
+        const userResult = checkLimit(userBuckets, `${scope}|user|${userId}`, maxUserRequests, windowMs);
         if (!userResult.allowed) {
           return c.json({ error: { code: 'RATE_LIMITED', message: 'Too many requests. Please try again later.' } }, 429);
         }
@@ -163,7 +194,7 @@ export function rateLimitMiddleware(options: RateLimitOptions = {}) {
 }
 
 /** Strict rate limit for sensitive operations — 10 req/min per IP */
-export const strictRateLimit = rateLimitMiddleware({ maxRequests: 10, windowMs: 60_000 });
+export const strictRateLimit = rateLimitMiddleware({ name: 'strict', maxRequests: 10, windowMs: 60_000 });
 
 /**
  * AI assistant rate limit — 30 req/min per IP, 20 per user.
@@ -179,10 +210,10 @@ export const strictRateLimit = rateLimitMiddleware({ maxRequests: 10, windowMs: 
  * the user-visible failure the moment the client was repointed there
  * (2026-08-25). This is a burst guard only.
  */
-export const aiRateLimit = rateLimitMiddleware({ maxRequests: 30, maxUserRequests: 20, windowMs: 60_000 });
+export const aiRateLimit = rateLimitMiddleware({ name: 'ai', maxRequests: 30, maxUserRequests: 20, windowMs: 60_000 });
 
 /** Auth rate limit — 5 req/min per IP (brute force protection) */
-export const authRateLimit = rateLimitMiddleware({ maxRequests: 5, windowMs: 60_000, perUser: false });
+export const authRateLimit = rateLimitMiddleware({ name: 'auth', maxRequests: 5, windowMs: 60_000, perUser: false });
 
 /** Standard API rate limit — 600 req/min per IP, 1200 per user
  *  Bumped from 300 because users with multiple tabs open (common on
@@ -190,4 +221,4 @@ export const authRateLimit = rateLimitMiddleware({ maxRequests: 5, windowMs: 60_
  *  subscriptions + react-query refetches can legitimately push past
  *  300 in a burst. This is per-IP so shared-household cases (family
  *  on same router) also benefit. */
-export const standardRateLimit = rateLimitMiddleware({ maxRequests: 600, maxUserRequests: 1200 });
+export const standardRateLimit = rateLimitMiddleware({ name: 'standard', maxRequests: 600, maxUserRequests: 1200 });
