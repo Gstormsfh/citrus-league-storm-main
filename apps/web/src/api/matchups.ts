@@ -123,6 +123,27 @@ export const matchupApi = {
     );
   },
 
+  // ── Player game log ────────────────────────────────────────────────────
+
+  /**
+   * One player's whole season — per-game actuals AND per-date projections — in
+   * a single request.
+   *
+   * The Player Stats modal used to assemble this itself: one /daily-game-stats
+   * call per PAST game date, in serial batches of ten, plus one
+   * /projections/daily call per FUTURE date. Up to 82 requests either side of
+   * today to open one modal. On a phone that is why "Game Log takes a long ass
+   * time to open".
+   */
+  getPlayerGameLog(playerId: number, startDate: string, endDate: string) {
+    const key = `matchups:game-log:${playerId}:${startDate}:${endDate}`;
+    return cached(
+      key,
+      () => apiClient.post('/api/matchups/player-game-log', { playerId, startDate, endDate }),
+      CACHE_TTL.MEDIUM,
+    );
+  },
+
   // ── Weekly matchup stats ───────────────────────────────────────────────
 
   /** Get weekly matchup stats for players (summed over date range) */
