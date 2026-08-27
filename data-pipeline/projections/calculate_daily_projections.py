@@ -410,6 +410,72 @@ def calculate_bayesian_weight(games_played: int) -> float:
         return 0.20 + (games_played - 10) * 0.035
 
 
+# ── Skater projection calibration ──────────────────────────────────────────
+#
+# WHY (2026-08-27)
+#
+# calculate_bayesian_weight above shrinks on GAMES PLAYED — it handles
+# sample-size uncertainty and nothing else. It has no notion of how EXTREME a
+# projection is, so a 70-game star gets 0.90 weight on his own rate even when
+# that rate is itself inflated by finishing luck. The result is a model whose
+# projections are too spread out.
+#
+# Regressing actual on projected over 46,209 skater-games (regular season,
+# joined player_projected_stats to player_game_stats) measures it exactly:
+#
+#     slope 0.7771   intercept 0.4731   n 46,209
+#
+# A calibrated model regresses at slope 1.0 through the origin. A slope of 0.78
+# says that for every extra point the model projects, reality delivers 0.78 —
+# the classic signature of insufficient regression to the mean. Bucketed, the
+# error was monotonic: 0.93x actual at 0–2 projected points (UNDER-projecting
+# the scrubs) rising to 1.51x at 8–10 (over-projecting the stars).
+#
+# The calibrated projection is simply the conditional expectation E[actual |
+# projected] — which is what that regression line is. Applying it:
+#
+#     projected 0.7–2.0   n=8415    1.062x -> 0.985x
+#     projected 2.0–4.0   n=31412   1.062x -> 1.005x
+#     projected 4.0–6.0   n=5562    1.102x -> 0.967x
+#     projected 6.0–8.0   n=762     1.327x -> 1.125x
+#     projected 8.1–9.6   n=52      1.509x -> 1.254x
+#
+# 98.2% of rows land inside 3.5% of truth. The residual sits above 6 projected
+# points — 820 rows, 1.8% — where the relationship is genuinely non-linear and
+# regresses harder than a line. That tail is NOT fixed here and is stated
+# rather than hidden: fitting a curve to 52 observations would be overfitting
+# dressed as rigour. The honest next step is a variance-aware shrinkage in the
+# model itself, not a fancier post-hoc curve.
+#
+# LIMITATION, deliberately not papered over: this calibrates the TOTAL only.
+# The component projections (projected_goals, projected_assists, ...) remain
+# raw model output, so the total is no longer exactly the scored sum of its
+# parts. The total is what drives lineup decisions, waiver ranking and
+# bench-points math, so it is the number that had to be right first;
+# per-category calibration is a follow-up. Component ratios were measured at
+# goals 1.14x, assists 1.05x, shots 1.06x, blocks 1.10x and hits 0.64x — hits
+# are UNDER-projected by a third, so a single flat multiplier across components
+# would make that category worse.
+#
+# RECOMPUTE these two constants whenever the projection model changes. A stale
+# calibration silently reintroduces the bias it exists to remove — and worse,
+# it would do so while looking like a working correction.
+SKATER_CALIBRATION_SLOPE = 0.7771
+SKATER_CALIBRATION_INTERCEPT = 0.4731
+
+
+def calibrate_skater_projection(raw_points: float) -> float:
+    """Map a raw skater projection to E[actual | projection].
+
+    A raw projection of zero means "not expected to play" and must stay zero —
+    the intercept applies to players who ARE playing, and handing 0.47 points
+    to a scratch would reintroduce a smaller version of the goalie bug.
+    """
+    if raw_points is None or raw_points <= 0:
+        return 0.0
+    return max(0.0, SKATER_CALIBRATION_INTERCEPT + SKATER_CALIBRATION_SLOPE * raw_points)
+
+
 def calculate_xga_shrinkage(
     player_xga_per_60: float,
     position_avg_xga_per_60: float,
@@ -1595,6 +1661,106 @@ def calculate_fantasy_points(
     return total_points
 
 
+# ── Goalie start probability ────────────────────────────────────────────────
+#
+# WHY THIS EXISTS (2026-08-27)
+#
+# `expected_toi_minutes` used to read:
+#
+#     expected_toi_minutes = 60.0 if games_played > 0 else 0.0
+#
+# where `games_played` is the goalie's SEASON total. So every goalie who had
+# ever appeared was projected a full sixty-minute start for every game his team
+# played, all season. Measured against production on 2026-08-27, regular season
+# only: of 5,092 goalie-games carrying a projection, **2,376 — 47% — projected
+# about 5 fantasy points for a goalie who faced zero shots.** The comment beside
+# it said "in production, this should check actual starter confirmation from
+# morning skate"; that TODO shipped.
+#
+# It is the worst shape a projection can have. It does not merely miss, it
+# tells a manager to start a backup, and he scores nothing.
+#
+# We have no morning-skate feed, so this does not pretend to know who starts
+# tonight. It reports the honest quantity we CAN measure — how often this goalie
+# actually starts — and the projection becomes an expected value over that.
+# Measured across 2025 (73 goalies, >=20 games): workhorses 0.689, tandems
+# 0.497, backups 0.324, with Hellebuyck (0.814) and Vasilevskiy (0.760) at the
+# top. Nobody reaches 1.0, which is the point — even a true #1 sits out rest
+# days and the back half of back-to-backs.
+_goalie_start_prob_cache: Dict[Tuple[int, int], float] = {}
+
+# A start, as opposed to relief. Half a game of ice time; the empirical gap
+# between a start (~60 min) and relief (a few minutes) is wide, so the exact
+# threshold is not delicate.
+STARTER_TOI_SECONDS = 1800
+
+# Beta-binomial prior. 0.50 is "half the starts" — the honest default for a
+# goalie we have not seen, since it assumes neither a starter's nor a backup's
+# workload. PRIOR_WEIGHT is in units of games: a goalie with 8 games is pulled
+# halfway to the prior, one with 70 is essentially his own rate.
+START_PROB_PRIOR = 0.50
+START_PROB_PRIOR_WEIGHT = 8.0
+
+# No NHL goalie starts every game. The observed 2025 maximum was 0.814
+# (Hellebuyck). The cap stops a small-sample callup who happened to start his
+# only two appearances from being projected as an iron man.
+START_PROB_CAP = 0.85
+
+
+def get_goalie_start_probability(
+    db: SupabaseRest,
+    player_id: int,
+    season: int,
+    debug: bool = False,
+) -> float:
+    """Share of his team's games this goalie actually starts, shrunk to a prior.
+
+    A row exists in player_game_stats for a rostered goalie whether or not he
+    played, so the row count IS the number of team games he was available for —
+    which is what makes this a share rather than a rate over appearances.
+    """
+    cache_key = (int(player_id), int(season))
+    if cache_key in _goalie_start_prob_cache:
+        return _goalie_start_prob_cache[cache_key]
+
+    try:
+        rows = db.select(
+            "player_game_stats",
+            select="game_id,nhl_toi_seconds",
+            filters=[
+                ("player_id", "eq", player_id),
+                ("season", "eq", season),
+                ("is_goalie", "eq", True),
+            ],
+            limit=200,
+        ) or []
+        # Regular season only. Preseason workloads are split across three and
+        # four goalies a night and describe nobody's real role.
+        rows = [r for r in rows if str(r.get("game_id", ""))[4:6] == "02"]
+
+        available = len(rows)
+        starts = sum(1 for r in rows if int(r.get("nhl_toi_seconds") or 0) >= STARTER_TOI_SECONDS)
+
+        prob = (starts + START_PROB_PRIOR * START_PROB_PRIOR_WEIGHT) / (
+            available + START_PROB_PRIOR_WEIGHT
+        )
+        prob = max(0.0, min(START_PROB_CAP, prob))
+
+        if debug:
+            logger.info(
+                f"  [Goalie Projection] Start probability: {prob:.3f} "
+                f"({starts} starts / {available} games available, prior {START_PROB_PRIOR})"
+            )
+    except Exception as exc:  # pragma: no cover - network/db failure path
+        # Fall back to the prior rather than to 1.0. Being wrong toward "we do
+        # not know" costs a manager far less than being wrong toward "start him".
+        logger.warning(f"⚠️  Goalie start probability failed for {player_id}: {exc}")
+        prob = START_PROB_PRIOR
+
+    _goalie_start_prob_cache[cache_key] = prob
+    return prob
+
+
 def calculate_goalie_projection(
     db: SupabaseRest,
     player_id: int,
@@ -1701,9 +1867,13 @@ def calculate_goalie_projection(
         if not opponent_shots_for_per_60:
             opponent_shots_for_per_60 = 30.0  # League average fallback
         
-        # Expected TOI: 60 minutes for confirmed starter, 0 for backup
-        # For now, assume starter if games_played > 0 (can be enhanced with starter confirmation)
-        expected_toi_minutes = 60.0 if games_played > 0 else 0.0
+        # Expected TOI is an EXPECTED VALUE, not a coin flip resolved in advance:
+        # sixty minutes weighted by how often this goalie actually starts. Saves
+        # and goals-against both scale off this, so they follow automatically;
+        # wins and shutouts are scaled explicitly further down, because they are
+        # computed from probabilities rather than from ice time.
+        start_probability = get_goalie_start_probability(db, player_id, season, debug=debug)
+        expected_toi_minutes = 60.0 * start_probability
         
         projected_saves = (opponent_shots_for_per_60 / 60) * projected_sv_pct * expected_toi_minutes
         
@@ -1753,7 +1923,10 @@ def calculate_goalie_projection(
             if debug:
                 logger.info(f"  [Goalie Projection] Opponent high-danger rate ({opponent_context['hd_rate']:.1f}) > 8.0, reducing win probability by additional 3%")
         
-        projected_wins = win_probability
+        # A backup does not collect the team's win. Scale by the odds he is
+        # the one in net — this line handed every rostered goalie the full
+        # team win probability regardless of role.
+        projected_wins = win_probability * start_probability
         
         # Regulation win probability (game ends in regulation, not OT/SO)
         # Research shows ~15% of games go to OT, so regulation win prob is lower
@@ -1785,6 +1958,8 @@ def calculate_goalie_projection(
         
         projected_shutouts = base_shutout_rate * gsax_factor * opponent_offense_factor
         projected_shutouts = min(projected_shutouts, 0.25)  # Cap at 25% (very rare)
+        # Same correction as wins: you cannot record a shutout you did not play.
+        projected_shutouts *= start_probability
         
         if debug:
             logger.info(f"  [Goalie Projection] Projected Shutouts: {projected_shutouts:.3f} (base: {base_shutout_rate:.3f}, GSAx factor: {gsax_factor:.2f})")
@@ -1804,12 +1979,16 @@ def calculate_goalie_projection(
         if debug:
             logger.info(f"  [Goalie Projection] Projected GAA: {projected_gaa:.2f}")
         
-        # 6. Projected GP (typically 1.0 for starter, 0.0 for backup)
-        projected_gp = 1.0 if expected_toi_minutes > 0 else 0.0
-        
-        # Starter confirmation (for now, assume confirmed if games_played > 0)
-        # In production, this should check actual starter confirmation from morning skate
-        starter_confirmed = games_played > 0
+        # 6. Projected GP — the probability he plays, not a rounded guess that he does.
+        projected_gp = start_probability
+
+        # INFERRED, never confirmed. There is no morning-skate feed here, so this
+        # flag says "his workload says he is the starter", which is a weaker and
+        # more honest claim than the name suggests. It previously read
+        # `games_played > 0` — true for any goalie who had appeared once all
+        # season, which made it meaningless. Consumers that need certainty must
+        # wait for a real confirmation source.
+        starter_confirmed = start_probability >= 0.65
         
         # Calculate fantasy points
         goalie_projection = {
@@ -2976,6 +3155,16 @@ def calculate_daily_projection(
             "hits": physical.get("hits", 0),
             "pim": physical.get("pim", 0),
         }, scoring_settings, is_goalie=False)
+
+        # LAYER 2b: Calibrate. Applied HERE, before VOPA, so every number
+        # downstream is drawn from the same calibrated projection — VOPA
+        # compares a projection against a replacement level derived from ACTUAL
+        # production, so feeding it an inflated projection inflated VOPA too.
+        # The raw value is not stored: the map is affine and therefore exactly
+        # invertible — raw = (calibrated - INTERCEPT) / SLOPE — so nothing is
+        # lost, and a second near-identical column would just be one more thing
+        # to drift.
+        total_projected_points = calibrate_skater_projection(total_projected_points)
 
         # LAYER 3: Calculate VOPA metrics
         pos_replacement_fpts_60 = get_positional_avg_fantasy_pts_per_60(
