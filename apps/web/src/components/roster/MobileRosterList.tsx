@@ -432,42 +432,28 @@ const MobileRosterList = ({
   const allPlayers = useMemo(() => [...starters, ...bench, ...ir], [starters, bench, ir]);
 
   /**
-   * SLOT MENU (2026-08-27)
+   * LINE CHANGE SHEET (2026-08-27)
    *
    * Reported as "it's still a bit complicated — we need to essentially click,
    * then open a mini menu of those available roster slots."
    *
    * Selecting a player used to light eligible slots up elsewhere on this list,
    * which on a phone is several screens long: you scroll hunting a highlight
-   * having lost sight of the player you picked. Anchoring the choice to the
-   * tapped row removes the hunt, and gives the menu room to name each slot's
-   * occupant so a swap's consequence is legible BEFORE the tap.
+   * having lost sight of the player you picked. The sheet anchors the choice
+   * to the bottom edge — the thumb's home — and names each destination's
+   * occupant with tonight's number, so a swap's consequence is legible BEFORE
+   * the tap.
    *
-   * Mounted only for the selected row. `open` is derived from
-   * `tapSelectedPlayerId` rather than held here, so the menu cannot disagree
+   * One instance, rendered at the list level (the sheet portals to body, so
+   * nothing needs per-row anchoring). `open` is derived from
+   * `tapSelectedPlayerId` rather than held here, so the sheet cannot disagree
    * with the highlight state underneath it — there is one selection, and both
    * read it.
    */
-  const withPicker = (key: string, player: HockeyPlayer, row: React.ReactNode) => (
-    <SlotPickerMenu
-      key={key}
-      player={player}
-      // Never recomputed here. `tapEligibleSlots` is Roster.tsx's, and it is
-      // the only place `is_ir_eligible` gates an IR slot.
-      eligibleSlots={tapEligibleSlots}
-      slotAssignments={slotAssignments}
-      allPlayers={allPlayers}
-      open
-      onOpenChange={(next) => { if (!next) onCancelSelection?.(); }}
-      onPick={(slotId) => onSlotTap?.(slotId)}
-    >
-      {row}
-    </SlotPickerMenu>
+  const selectedPlayer = useMemo(
+    () => allPlayers.find((p) => p.id === tapSelectedPlayerId) ?? null,
+    [allPlayers, tapSelectedPlayerId],
   );
-
-  /** Wrap a row in the menu when it is the selected player; otherwise leave it. */
-  const maybePicker = (key: string, player: HockeyPlayer | null, row: React.ReactNode) =>
-    player != null && player.id === tapSelectedPlayerId ? withPicker(key, player, row) : row;
 
   const handleRowTap = (player: HockeyPlayer | null, slotId: string) => {
     if (player && onPlayerTap) {
@@ -504,7 +490,7 @@ const MobileRosterList = ({
           onEmptySlotTap={() => onSlotTap?.(slotId)}
         />
       );
-      return maybePicker(slotId, player, row);
+      return row;
     });
 
   const benchIsTarget = tapSelectedPlayerId != null && tapEligibleSlots.has('bench-grid');
@@ -591,7 +577,7 @@ const MobileRosterList = ({
               onNameTap={() => onPlayerNameTap?.(player)}
             />
           );
-          return maybePicker(String(player.id), player, row);
+          return row;
         })}
       </div>
 
@@ -618,10 +604,24 @@ const MobileRosterList = ({
                 onNameTap={() => onPlayerNameTap?.(player)}
               />
             );
-            return maybePicker(String(player.id), player, row);
+            return row;
           })}
         </>
       )}
+
+      {/* The Line Change sheet — portals to body; scrim/✕ cancel the
+          selection, picking reports the slot id to the page's own handler. */}
+      <SlotPickerMenu
+        player={selectedPlayer}
+        // Never recomputed here. `tapEligibleSlots` is Roster.tsx's, and it is
+        // the only place `is_ir_eligible` gates an IR slot.
+        eligibleSlots={tapEligibleSlots}
+        slotAssignments={slotAssignments}
+        allPlayers={allPlayers}
+        open={selectedPlayer != null}
+        onOpenChange={(next) => { if (!next) onCancelSelection?.(); }}
+        onPick={(slotId) => onSlotTap?.(slotId)}
+      />
     </div>
   );
 };

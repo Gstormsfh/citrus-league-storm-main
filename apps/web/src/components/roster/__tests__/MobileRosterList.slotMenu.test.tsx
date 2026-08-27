@@ -10,11 +10,9 @@
 //   * a menu that offers slots the page did not judge legal — the IR gate
 //     lives in Roster.tsx's `tapEligibleSlots` and nowhere else.
 //
-// The interaction this design turns on — that a tap on a highlighted slot
-// UNDERNEATH an open menu still completes the move — is NOT provable here.
-// jsdom has no real pointer sequencing and Radix's dismissal path behaves
-// differently under it. That one is verified in a browser via
-// harness/slot.tsx; this file pins the prop contract that makes it possible.
+// The sheet portals to document.body, so screen queries still find it; the
+// browser-level behaviour (scrim tap cancels, sheet scroll, animation) is
+// verified via harness/slot.tsx.
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import MobileRosterList from '../MobileRosterList';
@@ -53,31 +51,17 @@ function renderList(over: Partial<React.ComponentProps<typeof MobileRosterList>>
   return { onSlotTap, onCancelSelection, ...utils };
 }
 
-/** The menu's own header — "MOVE" over the player's name. Absent = no menu. */
-const menuHeading = () => screen.queryByText('Move');
-
-/**
- * The popover body, so assertions can say "inside the menu" rather than
- * "somewhere on the page". Without this scoping the roster's OWN slot badges
- * answer the query: `queryByText('UTIL')` matches the page's empty UTIL row
- * whether or not the menu offers UTIL, and the test passes for the wrong
- * reason — or, as first written, fails for the wrong one.
- */
-const menu = () => {
-  const el = screen.getByText('Move').closest('div')!.parentElement!;
-  return within(el);
-};
-
-/** Just the menu's header block — "MOVE" over the name of the player being
- *  moved. Scoped separately because that player is frequently ALSO an
- *  occupant listed in the rows below, so a menu-wide `getByText` on his name
- *  matches twice and throws. */
-const menuHeader = () => within(screen.getByText('Move').closest('div')!);
+/** The sheet is a labelled dialog; absent = no menu. Scoping every content
+ *  assertion inside it matters because the roster's OWN rows answer bare
+ *  queries: `queryByText('UTIL')` matches the page's empty UTIL row whether
+ *  or not the sheet offers UTIL, and the test passes for the wrong reason. */
+const menuRoot = () => screen.queryByRole('dialog', { name: /line change/i });
+const menu = () => within(screen.getByRole('dialog', { name: /line change/i }));
 
 describe('MobileRosterList — when the menu appears', () => {
   it('renders no menu while nothing is selected', () => {
     renderList();
-    expect(menuHeading()).toBeNull();
+    expect(menuRoot()).toBeNull();
   });
 
   it('renders the menu for the selected player', () => {
@@ -85,8 +69,9 @@ describe('MobileRosterList — when the menu appears', () => {
       tapSelectedPlayerId: '1',
       tapEligibleSlots: new Set(['slot-C-1', 'slot-C-2', 'bench-grid']),
     });
-    expect(menuHeading()).toBeTruthy();
-    expect(menuHeader().getByText('Connor McDavid')).toBeTruthy();
+    expect(menuRoot()).toBeTruthy();
+    // Name shows in his row AND the sheet header — the header is the second.
+    expect(screen.getAllByText('Connor McDavid').length).toBeGreaterThan(1);
   });
 
   it('renders exactly one menu even though every row could host one', () => {
@@ -94,7 +79,7 @@ describe('MobileRosterList — when the menu appears', () => {
       tapSelectedPlayerId: '1',
       tapEligibleSlots: new Set(['slot-C-1', 'slot-C-2', 'bench-grid']),
     });
-    expect(screen.getAllByText('Move')).toHaveLength(1);
+    expect(screen.getAllByRole('dialog', { name: /line change/i })).toHaveLength(1);
   });
 
   it('opens for a bench player too — promoting is the common move', () => {
@@ -102,8 +87,8 @@ describe('MobileRosterList — when the menu appears', () => {
       tapSelectedPlayerId: '6',
       tapEligibleSlots: new Set(['slot-LW-1', 'bench-grid']),
     });
-    expect(menuHeading()).toBeTruthy();
-    expect(menuHeader().getByText('Artemi Panarin')).toBeTruthy();
+    expect(menuRoot()).toBeTruthy();
+    expect(screen.getAllByText('Artemi Panarin').length).toBeGreaterThan(1);
   });
 });
 
@@ -132,11 +117,22 @@ describe('MobileRosterList — what the menu reports', () => {
     expect(screen.getByText('UTIL')).toBeTruthy();
   });
 
-  it('names the occupant, so the swap is legible before the tap', () => {
+  it('names the occupant and the consequence, so the swap is legible before the tap', () => {
     renderList({
       tapSelectedPlayerId: '1',
       tapEligibleSlots: new Set(['slot-C-1', 'slot-C-2']),
     });
     expect(menu().getByText('Leon Draisaitl')).toBeTruthy();
+    expect(menu().getByText('Swaps to C1')).toBeTruthy();
+  });
+
+  it('scrim tap clears the selection through onCancelSelection', () => {
+    const { onCancelSelection } = renderList({
+      tapSelectedPlayerId: '1',
+      tapEligibleSlots: new Set(['slot-C-1', 'slot-C-2']),
+    });
+    const root = screen.getByTestId('slot-sheet-root');
+    fireEvent.click(root.firstElementChild!);
+    expect(onCancelSelection).toHaveBeenCalled();
   });
 });

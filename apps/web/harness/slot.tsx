@@ -20,24 +20,34 @@ declare global { interface Window { __log: string[] } }
 window.__log = [];
 const log = (s: string) => { window.__log.push(s); };
 
-const mk = (id: string, name: string, position: string, team = 'EDM'): HockeyPlayer =>
-  ({ id, name, position, number: 9, starter: true, team, teamAbbreviation: team, stats: {} }) as HockeyPlayer;
+const mk = (id: string, name: string, position: string, team = 'EDM', proj?: number): HockeyPlayer =>
+  ({
+    id, name, position, number: 9, starter: true, team, teamAbbreviation: team, stats: {},
+    nextGame: { opponent: 'vs TOR', isToday: true, gameTime: '7:30 PM', gameStatus: 'scheduled' },
+    ...(proj != null
+      ? position === 'G'
+        ? { goalieProjection: { total_projected_points: proj } }
+        : { daily_projection: { total_projected_points: proj } }
+      : {}),
+  }) as HockeyPlayer;
 
 const P = {
-  mcdavid: mk('1', 'Connor McDavid', 'C'),
-  draisaitl: mk('2', 'Leon Draisaitl', 'C'),
-  makar: mk('3', 'Cale Makar', 'D', 'COL'),
-  hughes: mk('4', 'Quinn Hughes', 'D', 'VAN'),
-  shesterkin: mk('5', 'Igor Shesterkin', 'G', 'NYR'),
-  panarin: mk('6', 'Artemi Panarin', 'LW', 'NYR'),
-  kaprizov: mk('7', 'Kirill Kaprizov', 'LW', 'MIN'),
+  mcdavid: mk('1', 'Connor McDavid', 'C', 'EDM', 5.2),
+  draisaitl: mk('2', 'Leon Draisaitl', 'C', 'EDM', 4.8),
+  makar: mk('3', 'Cale Makar', 'D', 'COL', 4.1),
+  hughes: mk('4', 'Quinn Hughes', 'D', 'VAN', 3.9),
+  shesterkin: mk('5', 'Igor Shesterkin', 'G', 'NYR', 6.0),
+  panarin: mk('6', 'Artemi Panarin', 'LW', 'NYR', 3.4),
+  kaprizov: mk('7', 'Kirill Kaprizov', 'LW', 'MIN', 4.5),
 };
 
 // slot-LW-1 and slot-D-2 are deliberately EMPTY: the highlighted-empty-slot tap
 // is the interaction this harness exists to prove.
+// PAGE SHAPE: bench players (6, 7) have NO entry at all — on the real page
+// the bench is an array, not an assignment. The sheet must count them anyway.
 const INITIAL: Record<string, string> = {
   '1': 'slot-C-1', '2': 'slot-C-2', '3': 'slot-D-1',
-  '5': 'slot-G-1', '6': 'bench-grid', '7': 'bench-grid',
+  '5': 'slot-G-1',
 };
 
 const ELIGIBLE_BY_POS: Record<string, string[]> = {
@@ -53,7 +63,7 @@ function App() {
 
   const all = Object.values(P);
   const starters = all.filter(p => (assign[p.id] || '').startsWith('slot-'));
-  const bench = all.filter(p => assign[p.id] === 'bench-grid');
+  const bench = all.filter(p => !assign[p.id] || assign[p.id] === 'bench-grid');
 
   // Stands in for Roster.tsx's tapEligibleSlots — same shape, same contract.
   const eligible = useMemo(() => {
@@ -66,9 +76,13 @@ function App() {
     setAssign(prev => {
       const next = { ...prev };
       const occupant = Object.keys(prev).find(k => prev[k] === slot && k !== playerId);
-      const from = prev[playerId];
-      next[playerId] = slot;
-      if (occupant && slot !== 'bench-grid') next[occupant] = from;  // swap back
+      const from = prev[playerId];  // undefined = came from bench
+      if (slot === 'bench-grid') delete next[playerId];
+      else next[playerId] = slot;
+      if (occupant && slot !== 'bench-grid') {
+        if (from) next[occupant] = from;
+        else delete next[occupant];    // swapped back to the bench
+      }
       return next;
     });
   };
