@@ -94,6 +94,25 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PYTHONUNBUFFERED: '1'
+          # PROXY ROTATION (2026-08-27)
+          #
+          # This workflow shipped without these three. citrus_request therefore
+          # ran in DIRECT mode from a GitHub Actions runner IP, and ESPN
+          # returned 403 in 120ms:
+          #
+          #   [ProxyManager] Proxy creds missing (CITRUS_PROXY_USERNAME/
+          #                  PASSWORD/API_URL) - running in direct mode.
+          #   [Citrus-IP-Rotator] HTTP error 403 (0.12s)
+          #
+          # The same request succeeds from other datacenter IPs, and
+          # citrus_request already sends a full realistic header set. So this is
+          # ESPN blocking GitHub's published runner ranges, not a User-Agent
+          # problem, and no amount of header tuning fixes it.
+          #
+          # Same three vars nhl-archive.yml and playoff-sync.yml pass.
+          CITRUS_PROXY_USERNAME: ${{ secrets.CITRUS_PROXY_USERNAME }}
+          CITRUS_PROXY_PASSWORD: ${{ secrets.CITRUS_PROXY_PASSWORD }}
+          CITRUS_PROXY_API_URL: ${{ secrets.CITRUS_PROXY_API_URL }}
         run: python -u data-pipeline/acquisition/fetch_injury_status.py
 
       # POST-RUN ASSERTION.
@@ -112,6 +131,13 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Carried for symmetry with the step above. This step reaches only
+          # Supabase via SupabaseRest, which does not route through
+          # ProxyManager, so it does not need them TODAY -- but a step that
+          # runs Python and omits them is exactly how the 403 above shipped.
+          CITRUS_PROXY_USERNAME: ${{ secrets.CITRUS_PROXY_USERNAME }}
+          CITRUS_PROXY_PASSWORD: ${{ secrets.CITRUS_PROXY_PASSWORD }}
+          CITRUS_PROXY_API_URL: ${{ secrets.CITRUS_PROXY_API_URL }}
         run: |
           python -u -c "
           import sys, os, datetime as dt
