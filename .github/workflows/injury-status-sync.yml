@@ -1,0 +1,125 @@
+name: Injury Status Sync
+
+# Populates player_talent_metrics.roster_status / is_ir_eligible, which drive
+# the IR slot (Roster.tsx gates every IR assignment on is_ir_eligible) and the
+# player news feed (usePlayerNews filters on roster_status).
+#
+# WHY THIS WORKFLOW EXISTS AT ALL
+# ────────────────────────────────
+# On 2026-08-26 roster_status was NULL for all 940 rows, so both features were
+# inert — built, wired, and silently never working since the column was added
+# in January.
+#
+# The obvious diagnosis was "nobody scheduled the populator", and it was wrong.
+# scripts/utilities/populate_gp_last_10_metric.py called
+# https://api-web.nhle.com/v1/roster/{team}/current and read
+# `status` / `rosterStatus` / `roster_status`. Verified against the live
+# endpoint: that payload carries none of those keys — it is biographical only
+# (id, headshot, names, sweaterNumber, positionCode, height, weight, birth).
+# /v1/player/{id}/landing carries `isActive`, which is career-active and not
+# injury. The NHL's public API publishes no injury or IR designation anywhere.
+#
+# Scheduling that script would have run 32 fetches a night, updated zero rows,
+# and reported success — a green job doing nothing, which is the failure mode
+# this repo has paid for more than once.
+#
+# So status comes from an external feed instead. See the module docstring in
+# fetch_injury_status.py for the source, its limits, and why licensing a
+# proper feed (SportsDataIO, Rotowire) is the durable answer.
+#
+# CADENCE
+# ───────
+# Every 6 hours. IR and LTIR designations move on a daily rhythm, not a
+# minute-by-minute one, so 6h bounds staleness well inside the window that
+# matters for setting a lineup. Load is one HTTP request per run.
+#
+# NOT covered by this cadence, and not covered by this feed: game-day
+# scratches and starting-goalie confirmations, which land 1-2 hours before
+# puck drop and are a separate source. Do not tighten this cron expecting to
+# catch them — it will not.
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: injury-status-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync injury / roster designations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'data-pipeline/requirements.txt'
+
+      - run: pip install -r data-pipeline/requirements.txt
+
+      # Season is derived from the date by the script, deliberately not set
+      # here. A CITRUS_DEFAULT_SEASON hardcode in a sibling workflow is what
+      # froze player_directory at 2025 while the SQL joins pivoted to 2026.
+      #
+      # PYTHONUNBUFFERED so a hang shows its last line rather than an empty
+      # log — the 2026-08-07 kill showed only "Script starting..." across
+      # 19m43s because Python block-buffers 8 KiB under Actions' log capture.
+      - name: Fetch and resolve injury designations
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PYTHONUNBUFFERED: '1'
+        run: python -u data-pipeline/acquisition/fetch_injury_status.py
+
+      # POST-RUN ASSERTION.
+      #
+      # Deliberately NOT a row count. "At least N players are injured" is not
+      # a property of a working sync — it is a property of the league being
+      # unlucky, and it passes trivially in a week with many injuries even if
+      # the writer is broken.
+      #
+      # What this job claims to do is WRITE. So the assertion checks that a
+      # write actually landed: the freshest roster_status_updated_at must be
+      # within the hour. That fails if the script no-ops, if the feed shape
+      # changes, if resolution collapses below the floor, or if the upsert
+      # silently writes nothing — none of which a count would catch.
+      - name: Assert a write actually landed
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python -u -c "
+          import sys, os, datetime as dt
+          sys.path.insert(0, 'data-pipeline')
+          import _bootstrap
+          from data_pipeline.utils.supabase_rest import SupabaseRest
+
+          db = SupabaseRest()
+          rows = db.select(
+              'player_talent_metrics',
+              select='roster_status_updated_at',
+              filters=[('roster_status_source', 'not.is', 'null')],
+              order='roster_status_updated_at.desc',
+              limit=1,
+          ) or []
+
+          if not rows:
+              print('FAIL: no row carries a roster_status_source — the sync wrote nothing')
+              sys.exit(1)
+
+          stamp = rows[0]['roster_status_updated_at']
+          written = dt.datetime.fromisoformat(stamp.replace('Z', '+00:00'))
+          age_min = (dt.datetime.now(dt.timezone.utc) - written).total_seconds() / 60
+
+          print(f'newest roster_status write: {stamp} ({age_min:.1f} min ago)')
+          if age_min > 60:
+              print('FAIL: newest write is over an hour old — this run did not persist')
+              sys.exit(1)
+          print('OK: a write from this run is present')
+          "
