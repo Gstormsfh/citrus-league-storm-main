@@ -698,7 +698,7 @@ const LeagueDashboard = () => {
             </CardContent>
           </Card>
         </main>
-        <HockeyFooter />
+        <HockeyFooter variant="app" />
       </div>
     );
   }
@@ -1940,7 +1940,7 @@ Your Commissioner`);
           </div>
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </div>
   );
 };

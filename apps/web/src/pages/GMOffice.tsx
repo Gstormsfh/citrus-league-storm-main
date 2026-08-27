@@ -407,7 +407,7 @@ const GMOffice = () => {
           </div>
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </div>
   );
 };

@@ -799,7 +799,7 @@ const TradeAnalyzer = () => {
                         them. One button, at the end of the flow. */}
                     <Button
                       size="sm"
-                      className="hidden lg:inline-flex bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50"
+                      className="hidden lg:inline-flex bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:bg-white/10 disabled:text-white/55 disabled:shadow-none disabled:opacity-100"
                       disabled={myAssets.length === 0 || theirAssets.length === 0 || !selectedPartnerTeam}
                       onClick={handleProposeTrade}
                     >
@@ -928,7 +928,7 @@ const TradeAnalyzer = () => {
                     onChange={(e) => setTradeMessage(e.target.value)}
                   />
                   <Button
-                    className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] mt-2 disabled:opacity-50"
+                    className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] mt-2 disabled:bg-white/10 disabled:text-white/55 disabled:shadow-none disabled:opacity-100"
                     disabled={myAssets.length === 0 || theirAssets.length === 0 || !selectedPartnerTeam}
                     onClick={handleProposeTrade}
                   >
@@ -1293,7 +1293,7 @@ const TradeAnalyzer = () => {
           </div>
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </div>
   );
 };

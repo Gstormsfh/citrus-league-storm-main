@@ -552,7 +552,7 @@ const PoolPickem = () => {
         )}
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </DarkLayout>
   );
 };

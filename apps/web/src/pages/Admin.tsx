@@ -290,7 +290,7 @@ const Admin = () => {
           </TabsContent>
         </Tabs>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </DarkLayout>
   );
 };

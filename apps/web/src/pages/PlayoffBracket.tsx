@@ -711,7 +711,7 @@ const PlayoffBracket = () => {
           </div>
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </div>
   );
 

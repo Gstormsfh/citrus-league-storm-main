@@ -1023,7 +1023,7 @@ const Profile = () => {
             </div>
           </div>
         </main>
-        <HockeyFooter />
+        <HockeyFooter variant="app" />
       </div>
     );
   }
@@ -1153,7 +1153,7 @@ const Profile = () => {
                                 className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 mt-1.5"
                               />
                             ) : (
-                              <p className="text-sm text-white/70 mt-1.5">{formData.firstName}</p>
+                              <p className="text-sm text-white/70 mt-1.5">{formData.firstName || <span className="italic text-white/55">Not set</span>}</p>
                             )}
                           </div>
                           <div>
@@ -1166,7 +1166,7 @@ const Profile = () => {
                                 className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 mt-1.5"
                               />
                             ) : (
-                              <p className="text-sm text-white/70 mt-1.5">{formData.lastName}</p>
+                              <p className="text-sm text-white/70 mt-1.5">{formData.lastName || <span className="italic text-white/55">Not set</span>}</p>
                             )}
                           </div>
                         </div>
@@ -1181,7 +1181,7 @@ const Profile = () => {
                                 className="h-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                               />
                             ) : (
-                              <span className="text-white/70">{formData.email}</span>
+                              <span className="text-white/70">{formData.email || <span className="italic text-white/55">Not set</span>}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 text-sm">
@@ -1193,7 +1193,7 @@ const Profile = () => {
                                 className="h-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                               />
                             ) : (
-                              <span className="text-white/70">{formData.phone}</span>
+                              <span className="text-white/70">{formData.phone || <span className="italic text-white/55">Not set</span>}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 text-sm">
@@ -1205,7 +1205,7 @@ const Profile = () => {
                                 className="h-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                               />
                             ) : (
-                              <span className="text-white/70">{formData.location}</span>
+                              <span className="text-white/70">{formData.location || <span className="italic text-white/55">Not set</span>}</span>
                             )}
                           </div>
                         </div>
@@ -1222,7 +1222,7 @@ const Profile = () => {
                               className="w-full min-h-[80px] mt-1.5 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
                             />
                           ) : (
-                            <p className="text-sm text-white/70 mt-1.5">{formData.bio}</p>
+                            <p className="text-sm text-white/70 mt-1.5">{formData.bio || <span className="italic text-white/55">Not set</span>}</p>
                           )}
                         </div>
 
@@ -1316,7 +1316,7 @@ const Profile = () => {
                         {formData.favoriteTeam && (
                           <div>
                             <Label className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Favorite NHL Team</Label>
-                            <p className="font-bold text-pastel-cream mt-1">{formData.favoriteTeam}</p>
+                            <p className="font-bold text-pastel-cream mt-1">{formData.favoriteTeam || <span className="italic text-white/55">Not set</span>}</p>
                           </div>
                         )}
                       </CardContent>
@@ -2339,7 +2339,7 @@ const Profile = () => {
           </div>
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </div>
   );
 };

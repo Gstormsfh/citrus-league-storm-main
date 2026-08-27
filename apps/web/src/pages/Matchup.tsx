@@ -5582,7 +5582,7 @@ const Matchup = () => {
       </main>
       {/* Footer - Hidden on mobile */}
       <div className="hidden lg:block">
-        <HockeyFooter />
+        <HockeyFooter variant="app" />
       </div>
     </div>
   );

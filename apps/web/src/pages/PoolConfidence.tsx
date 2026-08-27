@@ -457,7 +457,7 @@ const PoolConfidence = () => {
         )}
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </DarkLayout>
   );
 };
