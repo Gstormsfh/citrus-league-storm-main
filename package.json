@@ -23,7 +23,8 @@
     "firebase": "cd apps/web && npx firebase",
     "validate-migration": "ts-node scripts/validate-migration.ts",
     "validate-all-migrations": "ts-node scripts/validate-migration.ts",
-    "test-migrations": "ts-node scripts/test-migrations.ts"
+    "test-migrations": "ts-node scripts/test-migrations.ts",
+    "db:push": "node scripts/db-push.mjs"
   },
   "devDependencies": {
     "typescript": "^5.5.3"
