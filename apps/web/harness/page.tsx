@@ -1,6 +1,6 @@
 /** Renders one real page at a phone viewport. ?p=waivers|settings|contact */
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Suspense, lazy } from 'react';
 import '../src/index.css';
@@ -164,17 +164,35 @@ const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
 const which = new URLSearchParams(location.search).get('p') || 'waivers';
 const Page = lazy(PAGES[which] ?? PAGES.waivers);
 
+/**
+ * Pages that read a route param. LeagueDashboard reads :leagueId and bails with
+ * "Invalid league ID" without one, so under a bare router it rendered its error
+ * state and could not be reviewed at all. MemoryRouter lets the harness enter at
+ * a real path rather than at /harness/page.html.
+ */
+const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
+  league: { path: '/league/:leagueId', at: '/league/harness-league' },
+  matchup: { path: '/matchup/:leagueId?', at: '/matchup/harness-league' },
+};
+const routed = ROUTE_PATHS[which];
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
 });
 
 createRoot(document.getElementById('root')!).render(
   <QueryClientProvider client={queryClient}>
-  <BrowserRouter>
+  <MemoryRouter initialEntries={[routed?.at ?? '/']}>
     <Suspense fallback={<div style={{ padding: 24, color: '#fff' }}>loading…</div>}>
-      <Page />
+      {routed ? (
+        <Routes>
+          <Route path={routed.path} element={<Page />} />
+        </Routes>
+      ) : (
+        <Page />
+      )}
     </Suspense>
     <Toaster />
-  </BrowserRouter>
+  </MemoryRouter>
   </QueryClientProvider>,
 );
