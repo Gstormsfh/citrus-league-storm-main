@@ -14,11 +14,21 @@
  * projection model does not sit on top of reality — it runs hot, and the error
  * grows with the projection:
  *
- *     projected 0.7–2.0   n=8415    actual/proj  1.07  (model UNDER-projects)
- *     projected 2.0–4.0   n=31412                0.94
- *     projected 4.0–6.0   n=5562                 0.91
- *     projected 6.0–8.0   n=762                  0.75
- *     projected 8.1–9.6   n=52                   0.66
+ * BOTH DIRECTIONS ARE GIVEN, on purpose. Every constant in this file is
+ * actual/projected, because that is how they are used — multiply a projection
+ * by one and you get the expected actual. The pipeline's
+ * calibrate_skater_projection quotes the reciprocal, projected/actual, because
+ * it is describing how hot the model runs. Same measurement, and side by side
+ * they read as contradicting each other unless the direction is stated:
+ *
+ *                             actual/proj      proj/actual
+ *     projected 0.7–2.0   n=8415    1.07            0.93   (model UNDER-projects)
+ *     projected 2.0–4.0   n=31412   0.94            1.06
+ *     projected 4.0–6.0   n=5562    0.91            1.10
+ *     projected 6.0–8.0   n=762     0.75            1.33
+ *     projected 8.1–9.6   n=52      0.66            1.51
+ *
+ * The left column is the one this file's constants live in.
  *
  * Rostered players skew to the top of that range, so a naive actual/projected
  * would tell EVERY manager in EVERY league that they are underperforming by
@@ -136,8 +146,10 @@ export type PlayerDelta = {
   games: number;
 };
 
-/** Blended actual/projected across all categories, same measurement as
- *  CATEGORY_CALIBRATION. */
+/** Blended ACTUAL/PROJECTED across all categories, same direction and same
+ *  measurement as CATEGORY_CALIBRATION. Multiply a projection by this to get
+ *  the expected actual. (Its reciprocal, 1.07, is what the pipeline would
+ *  quote — see the direction table at the top of this file.) */
 const OVERALL_CALIBRATION = 0.93;
 
 /**

@@ -8,7 +8,12 @@
 //     about roster construction;
 //   * counting a player who has a projection but no season stats (or the
 //     reverse) as a measured zero, which reads as "he produced nothing";
-//   * scoring goalies with the skater weights.
+//   * scoring goalies with the skater weights;
+//   * scoring ANY league with the default weights. The service used to carry a
+//     comment saying a caller applied the league's override; no caller did, so
+//     every league silently got the defaults — and since weights move a
+//     hits-heavy player differently from a goals-heavy one, that could reorder
+//     the ranking away from what the league actually pays out.
 import { describe, it, expect, vi } from 'vitest';
 import { TeamAnalyticsService } from '../services/TeamAnalyticsService';
 
@@ -26,6 +31,10 @@ function fakeClient(tables: Record<string, Row[]>, errorOn?: string) {
       builder.select = chain;
       builder.eq = chain;
       builder.in = chain;
+      builder.maybeSingle = () => {
+        const rows = (result.data ?? []) as Row[];
+        return Promise.resolve({ data: rows[0] ?? null, error: result.error });
+      };
       builder.then = (resolve: (v: unknown) => unknown) => Promise.resolve(result).then(resolve);
       return builder;
     },
@@ -46,8 +55,11 @@ const skaterStat = (id: number, over: Row = {}): Row => ({
   nhl_goals_against: 0, nhl_shutouts: 0, ...over,
 });
 
+/** Every case gets a league row; default scoring unless a test supplies its own. */
 const svc = (tables: Record<string, Row[]>, errorOn?: string) =>
-  new TeamAnalyticsService(fakeClient(tables, errorOn));
+  new TeamAnalyticsService(
+    fakeClient({ leagues: [{ scoring_settings: null }], ...tables }, errorOn),
+  );
 
 const roster = (...ids: number[]) => ids.map((player_id) => ({ player_id }));
 
@@ -182,5 +194,86 @@ describe('TeamAnalyticsService — degenerate inputs', () => {
 
     expect(data!.totals.goals).toEqual({ projected: 0, actual: 0 });
     expect(Number.isFinite(data!.players[0].actualPoints)).toBe(true);
+  });
+});
+
+
+describe('TeamAnalyticsService — the league\'s scoring, not the defaults', () => {
+  // Defaults are goals 3 / hits 0.2. This league inverts which of those two
+  // matters, which is exactly the case that reorders a ranking.
+  const hitsLeague = [{
+    scoring_settings: {
+      skater: {
+        goals: 1, assists: 1, power_play_points: 0, short_handed_points: 0,
+        shots_on_goal: 0, blocks: 0, hits: 5, penalty_minutes: 0, plus_minus: 0,
+      },
+      goalie: { wins: 4, saves: 0.2, shutouts: 3, goals_against: -1 },
+    },
+  }];
+
+  it('scores actuals with the league weights', async () => {
+    const { data } = await svc({
+      leagues: hitsLeague,
+      roster_assignments: roster(1),
+      player_ros_projections: [skaterProj(1)],
+      player_season_stats: [skaterStat(1)],
+    }).getProjectedVsActual('L', 'T', 2026);
+
+    // 22 goals + 28 assists + 61 hits x 5 = 355
+    expect(data!.players[0].actualPoints).toBe(22 + 28 + 61 * 5);
+  });
+
+  it('scores PROJECTIONS with the league weights too, not the stored total', async () => {
+    // total_projected_points is 100, computed by the pipeline under DEFAULT
+    // scoring. Reading it here would compare two different scoring systems.
+    const { data } = await svc({
+      leagues: hitsLeague,
+      roster_assignments: roster(1),
+      player_ros_projections: [skaterProj(1)],
+      player_season_stats: [skaterStat(1)],
+    }).getProjectedVsActual('L', 'T', 2026);
+
+    // 20 goals + 30 assists + 50 hits x 5 = 300, not the stored 100.
+    expect(data!.players[0].projectedPoints).toBe(20 + 30 + 50 * 5);
+  });
+
+  it('a league that pays hits can rank a grinder above a sniper', async () => {
+    // The concrete harm of the old behaviour: under defaults the sniper wins,
+    // so the ordering shown did not match what the league actually paid.
+    const sniper = { ...skaterStat(1), nhl_goals: 50, nhl_hits: 5 };
+    const grinder = { ...skaterStat(2), nhl_goals: 5, nhl_hits: 200 };
+    const { data } = await svc({
+      leagues: hitsLeague,
+      roster_assignments: roster(1, 2),
+      player_ros_projections: [skaterProj(1), skaterProj(2)],
+      player_season_stats: [sniper, grinder],
+    }).getProjectedVsActual('L', 'T', 2026);
+
+    const byId = new Map(data!.players.map((p) => [p.id, p.actualPoints]));
+    expect(byId.get(2)!).toBeGreaterThan(byId.get(1)!);
+  });
+
+  it('falls back to default scoring when the league carries none', async () => {
+    const { data } = await svc({
+      roster_assignments: roster(1),
+      player_ros_projections: [skaterProj(1)],
+      player_season_stats: [skaterStat(1)],
+    }).getProjectedVsActual('L', 'T', 2026);
+
+    // 22*3 + 28*2 + 11*1 + 140*0.4 + 38*0.5 + 61*0.2 + 10*0.5
+    //  = 66 + 56 + 11 + 56 + 19 + 12.2 + 5 = 225.2
+    // (which also confirms ScoringCalculator's defaults are CLAUDE.md's.)
+    expect(data!.players[0].actualPoints).toBeCloseTo(225.2, 4);
+  });
+
+  it('surfaces a league lookup failure instead of silently scoring by default', async () => {
+    const { data, error } = await svc({
+      roster_assignments: roster(1),
+      player_ros_projections: [skaterProj(1)],
+      player_season_stats: [skaterStat(1)],
+    }, 'leagues').getProjectedVsActual('L', 'T', 2026);
+
+    expect(data).toBeNull();
+    expect(error).toBeTruthy();
   });
 });

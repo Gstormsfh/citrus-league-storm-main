@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { logger } from '@citrus/shared';
+import { logger, ScoringCalculator } from '@citrus/shared';
+import type { ScoringSettings } from '@citrus/shared';
 
 /**
  * TeamAnalyticsService — projected vs actual for one fantasy team.
@@ -44,9 +45,22 @@ export type TeamAnalyticsResult = {
   rosterSize: number;
 };
 
-/** Default Citrus scoring. A league override is applied by the caller when the
- *  league carries one; these are the documented defaults in CLAUDE.md. */
-const W = { goals: 3, assists: 2, ppp: 1, shp: 2, shots: 0.4, blocks: 0.5, hits: 0.2, pim: 0.5 };
+/**
+ * League save percentage, used to derive a goalie's projected goals-against.
+ *
+ * player_ros_projections carries projected wins, saves and shutouts but NOT
+ * goals-against, and goals-against is a scored category in essentially every
+ * league. Omitting it would overstate every goalie projection by exactly the
+ * amount the league penalises goals — so it is derived instead:
+ *
+ *     shots = saves / SV%      goals_against = shots - saves
+ *
+ * That is an ESTIMATE built on a league-average save percentage, not a
+ * projection of this goalie's own rate, and it is the weakest number this
+ * service produces. It is stated here rather than buried because the honest
+ * alternative — dropping the term — is silently worse.
+ */
+const LEAGUE_AVG_SV_PCT = 0.905;
 
 /**
  * Row shapes for the three tables this reads.
@@ -71,6 +85,11 @@ type ProjRow = {
   projected_sog: number | null;
   projected_blocks: number | null;
   projected_hits: number | null;
+  projected_shp: number | null;
+  projected_pim: number | null;
+  projected_wins_ros: number | null;
+  projected_saves_ros: number | null;
+  projected_shutouts_ros: number | null;
   games_played: number | null;
 };
 
@@ -108,6 +127,22 @@ export class TeamAnalyticsService {
     season: number,
   ): Promise<{ data: TeamAnalyticsResult | null; error: unknown }> {
     try {
+      // The league's own scoring, read HERE rather than accepted as a
+      // parameter. An earlier version left a comment saying "a league override
+      // is applied by the caller" — no caller applied one, so every league got
+      // the defaults. Reading it inside the service means the claim cannot
+      // drift from the behaviour again: there is no caller left to forget.
+      const { data: leagueRow, error: leagueErr } = await this.supabase
+        .from('leagues')
+        .select('scoring_settings')
+        .eq('id', leagueId)
+        .maybeSingle();
+      if (leagueErr) return { data: null, error: leagueErr };
+
+      const scorer = new ScoringCalculator(
+        (leagueRow?.scoring_settings ?? null) as ScoringSettings | null,
+      );
+
       const { data: roster, error: rosterErr } = await this.supabase
         .from('roster_assignments')
         .select('player_id')
@@ -132,8 +167,10 @@ export class TeamAnalyticsService {
           .from('player_ros_projections')
           .select(
             'player_id, player_name, position, is_goalie, total_projected_points, ' +
-              'projected_goals, projected_assists, projected_ppp, projected_sog, ' +
-              'projected_blocks, projected_hits, games_played',
+              'projected_goals, projected_assists, projected_ppp, projected_shp, ' +
+              'projected_sog, projected_blocks, projected_hits, projected_pim, ' +
+              'projected_wins_ros, projected_saves_ros, projected_shutouts_ros, ' +
+              'games_played',
           )
           .eq('season', season)
           .in('player_id', ids),
@@ -188,27 +225,69 @@ export class TeamAnalyticsService {
           totals.hits.actual += num(s.nhl_hits);
         }
 
-        const actualPoints = s.is_goalie
-          ? num(s.nhl_wins) * 4 +
-            num(s.nhl_shutouts) * 3 +
-            num(s.nhl_saves) * 0.2 -
-            num(s.nhl_goals_against)
-          : num(s.nhl_goals) * W.goals +
-            num(s.nhl_assists) * W.assists +
-            num(s.nhl_ppp) * W.ppp +
-            num(s.nhl_shp) * W.shp +
-            num(s.nhl_shots_on_goal) * W.shots +
-            num(s.nhl_blocks) * W.blocks +
-            num(s.nhl_hits) * W.hits +
-            num(s.nhl_pim) * W.pim;
+        // BOTH SIDES ARE SCORED BY THE LEAGUE'S OWN SETTINGS.
+        //
+        // The first version of this used hardcoded default weights for actuals
+        // and read `total_projected_points` straight from the projection row —
+        // which the pipeline computes under DEFAULT scoring. In a league with
+        // custom settings that compared two different scoring systems to each
+        // other, and because weights move a hits-heavy player differently from
+        // a goals-heavy one, it could reorder the ranking away from what the
+        // league actually pays out. Recomputing both from components is the
+        // only way the comparison means anything.
+        const isG = Boolean(s.is_goalie);
+        const actualPoints = scorer.calculatePoints(
+          isG
+            ? {
+                wins: num(s.nhl_wins),
+                saves: num(s.nhl_saves),
+                shutouts: num(s.nhl_shutouts),
+                goals_against: num(s.nhl_goals_against),
+              }
+            : {
+                goals: num(s.nhl_goals),
+                assists: num(s.nhl_assists),
+                ppp: num(s.nhl_ppp),
+                shp: num(s.nhl_shp),
+                sog: num(s.nhl_shots_on_goal),
+                blocks: num(s.nhl_blocks),
+                hits: num(s.nhl_hits),
+                pim: num(s.nhl_pim),
+              },
+          isG,
+        );
+
+        const projSaves = num(p.projected_saves_ros);
+        const projectedPoints = scorer.calculatePoints(
+          isG
+            ? {
+                wins: num(p.projected_wins_ros),
+                saves: projSaves,
+                shutouts: num(p.projected_shutouts_ros),
+                // Derived — see LEAGUE_AVG_SV_PCT above.
+                goals_against:
+                  projSaves > 0 ? projSaves / LEAGUE_AVG_SV_PCT - projSaves : 0,
+              }
+            : {
+                goals: num(p.projected_goals),
+                assists: num(p.projected_assists),
+                ppp: num(p.projected_ppp),
+                shp: num(p.projected_shp),
+                sog: num(p.projected_sog),
+                blocks: num(p.projected_blocks),
+                hits: num(p.projected_hits),
+                pim: num(p.projected_pim),
+              },
+          isG,
+        );
 
         players.push({
           id,
           name: String(p.player_name ?? ''),
           position: String(p.position ?? s.position_code ?? ''),
-          projectedPoints: num(p.total_projected_points),
+          projectedPoints,
           actualPoints,
-          games: s.is_goalie ? num(s.goalie_gp) : num(s.games_played),
+          games: isG ? num(s.goalie_gp) : num(s.games_played),
         });
       }
 
