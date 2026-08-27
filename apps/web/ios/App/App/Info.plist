@@ -74,9 +74,14 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<!-- ARCHITECTURE (2026-08-27). Was `armv7`, the Capacitor template's
+	     default. App Store Connect has enforced arm64 since 22 Feb 2018 and
+	     rejects an upload carrying armv7 with ITMS-90502 — that is an UPLOAD
+	     failure, not a review rejection, so the build never reaches a
+	     reviewer at all. 32-bit iOS apps have not been accepted for years. -->
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
