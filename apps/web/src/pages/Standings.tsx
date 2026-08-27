@@ -560,11 +560,17 @@ const Standings = () => {
             {/* MOBILE FIX (2026-08-23, found in the 390px sweep): this
                 toolbar is ~470px wide and its ancestor clips — on phones the
                 Season select was half-cut off the LEFT edge and Export was
-                unreachable off the RIGHT. flex-wrap lets the buttons drop to
-                a second row instead of clipping; gap replaces space-x so
-                wrapped rows keep vertical spacing too. */}
-            <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 animated-element animate">
-              <div className="w-40">
+                unreachable off the RIGHT. flex-wrap stopped the clipping.
+
+                2026-08-27: wrapping was the right call against clipping and
+                the wrong shape to leave. At 393px it broke 2+1 — Season and
+                Refresh on one row, Export alone and centred under them, which
+                reads as an orphaned control rather than a toolbar. The row now
+                FITS: a narrower select, and labels that appear at sm where
+                there is room for them. flex-wrap stays as the backstop for
+                anything under ~340px. */}
+            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 animated-element animate">
+              <div className="w-32 sm:w-40">
                 <Select defaultValue={season} onValueChange={setSeason}>
                   <SelectTrigger className="w-full bg-pastel-surface-tile rounded-full border-white/15 text-pastel-cream hover:border-pastel-orange/40 transition-colors">
                     <SelectValue placeholder="Select Season" />
@@ -603,15 +609,17 @@ const Standings = () => {
                   }}
                   disabled={loading}
                 >
-                  <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
-                  Refresh
+                  <RefreshCw className={`w-4 h-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
+                  <span className="hidden sm:inline">Refresh</span>
+                  <span className="sr-only sm:hidden">Refresh standings</span>
                 </Button>
               )}
               <Button variant="outline" size="sm" className="rounded-full border-white/15 bg-pastel-surface-tile text-pastel-cream hover:bg-pastel-orange/10 hover:border-pastel-orange/40 hover:text-pastel-orange-soft">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 sm:mr-2" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                 </svg>
-                Export
+                <span className="hidden sm:inline">Export</span>
+                <span className="sr-only sm:hidden">Export standings</span>
               </Button>
             </div>
           </div>
@@ -621,29 +629,29 @@ const Standings = () => {
               <Table style={{ visibility: 'visible', opacity: 1 }}>
                 <thead className="bg-black/20 border-b border-white/10">
                   <tr className="text-left">
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Rank</th>
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Team</th>
+                    <th className="px-2 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.08em] sm:tracking-[0.22em] text-pastel-orange-soft font-bold">Rank</th>
+                    <th className="px-2 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.08em] sm:tracking-[0.22em] text-pastel-orange-soft font-bold">Team</th>
                     {hasMatchups && (
                       <>
-                        <th className="px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-center">
+                        <th className="px-2 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.08em] sm:tracking-[0.22em] text-pastel-orange-soft font-bold text-center">
                           {isCategories ? 'Cat W-L-T' : 'Record'}
                         </th>
-                        <th className="px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-center">Win %</th>
+                        <th className="px-2 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.08em] sm:tracking-[0.22em] text-pastel-orange-soft font-bold text-center">Win %</th>
                       </>
                     )}
-                    <th className="px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-right">
+                    <th className="px-2 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.08em] sm:tracking-[0.22em] text-pastel-orange-soft font-bold text-right">
                       {isRoto ? 'Roto Pts' : isCategories ? 'Total PF' : 'PF'}
                     </th>
                     {hasMatchups && (
-                      <th className="px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-right">PA</th>
+                      <th className="px-2 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.08em] sm:tracking-[0.22em] text-pastel-orange-soft font-bold text-right">PA</th>
                     )}
                     {isSeasonPoints && (
-                      <th className="px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-right">PPG</th>
+                      <th className="px-2 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.08em] sm:tracking-[0.22em] text-pastel-orange-soft font-bold text-right">PPG</th>
                     )}
                     {hasMatchups && (
                       <>
-                        <th className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-center">Streak</th>
-                        <th className="hidden sm:table-cell px-3 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.22em] text-pastel-orange-soft font-bold text-center">Last 5</th>
+                        <th className="hidden sm:table-cell px-2 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.08em] sm:tracking-[0.22em] text-pastel-orange-soft font-bold text-center">Streak</th>
+                        <th className="hidden sm:table-cell px-2 sm:px-6 py-3 sm:py-4 font-jbmono text-[10px] uppercase tracking-[0.08em] sm:tracking-[0.22em] text-pastel-orange-soft font-bold text-center">Last 5</th>
                       </>
                     )}
                   </tr>
@@ -927,6 +935,17 @@ const Standings = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-6 bg-pastel-surface-tile">
+                {/* 2026-08-27 sweep: this body is a .map over `teams`, so before
+                    week 1 the card rendered its header, its icon and its border
+                    over nothing at all. An empty box under a heading reads as a
+                    component that failed to load, not as "the season has not
+                    started" — the same shape as the roster's "Bench - Empty".
+                    Say which it is. */}
+                {teams.length === 0 ? (
+                  <p className="py-4 text-center text-xs font-display text-white/55">
+                    No points scored yet — leaders appear after week 1.
+                  </p>
+                ) : (
                 <div className="space-y-3">
                   {[...teams].sort((a, b) => b.points - a.points).slice(0, 5).map((team) => (
                     <div key={team.id} className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] transition-colors ring-1 ring-transparent hover:ring-pastel-orange/30">
@@ -940,6 +959,7 @@ const Standings = () => {
                     </div>
                   ))}
                 </div>
+                )}
               </CardContent>
             </Card>
               </div>

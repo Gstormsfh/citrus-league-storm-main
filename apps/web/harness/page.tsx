@@ -156,6 +156,9 @@ const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
   profile: () => import('../src/pages/Profile'),
   freeagents: () => import('../src/pages/FreeAgents'),
   trade: () => import('../src/pages/TradeAnalyzer'),
+  matchup: () => import('../src/pages/Matchup'),
+  standings: () => import('../src/pages/Standings'),
+  league: () => import('../src/pages/LeagueDashboard'),
 };
 
 const which = new URLSearchParams(location.search).get('p') || 'waivers';
