@@ -3360,6 +3360,7 @@ const Roster = () => {
                         onPlayerNameTap={handlePlayerClick}
                         onSlotTap={handleMobileTapSlot}
                         onBenchTap={handleMobileTapBench}
+                        onCancelSelection={() => setTapSelectedPlayerId(null)}
                         positionType={leaguePositionType}
                       />
                     </div>

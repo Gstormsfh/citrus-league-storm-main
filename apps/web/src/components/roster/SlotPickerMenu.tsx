@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import * as PopoverPrimitive from '@radix-ui/react-popover';
+import { Popover, PopoverContent } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { ArrowRightLeft, Check } from 'lucide-react';
 import type { HockeyPlayer } from './HockeyPlayerCard';
@@ -122,10 +123,32 @@ export function SlotPickerMenu({
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>{children}</PopoverTrigger>
+      {/* ANCHOR, NOT TRIGGER.
+        *
+        * The row underneath already owns tap handling — it selects the
+        * player, and `open` is derived from that selection. A Trigger would
+        * add a SECOND source of open-state truth that toggles on the same
+        * tap, and the two would race. Anchor is pure positioning: it tells
+        * the popover where to point and handles nothing. */}
+      <PopoverPrimitive.Anchor>{children}</PopoverPrimitive.Anchor>
       <PopoverContent
         align="start"
         sideOffset={6}
+        // ADDITIVE, NOT REPLACING.
+        //
+        // The highlight-based flow underneath stays live. Radix's default is
+        // to dismiss on any outside pointer-down, which would clear the
+        // selection on the SAME tap that lands on a highlighted slot below —
+        // the move would then hit `if (!tapSelectedPlayerId) return` and
+        // silently do nothing. Preventing dismissal leaves that path intact.
+        //
+        // The event itself still reaches the element underneath (this popover
+        // is non-modal, so nothing blocks pointer events); only the automatic
+        // close is suppressed. So every route that worked before this menu
+        // existed still works, and a popover that somehow fails to position
+        // cannot strand a manager mid-move. Escape and picking a slot both
+        // still close it.
+        onInteractOutside={(e) => e.preventDefault()}
         className="w-64 p-0 bg-[#16281D] border-white/10 max-h-[60dvh] overflow-y-auto overscroll-contain"
       >
         <div className="px-3 py-2 border-b border-white/10 sticky top-0 bg-[#16281D] z-10">
