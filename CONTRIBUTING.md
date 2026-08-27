@@ -31,6 +31,23 @@ symlink at the repo root — do not rename or remove it (CI depends on it).
 
 ## Before every PR
 
+Run the check sequence: build first, then the suites, then types, then lint. The full
+version, and why the build leads, is in [`CLAUDE.md`](CLAUDE.md) under
+**"The check sequence"**.
+
+```bash
+npm run build --workspace=apps/web                    # vite build (~10s)
+npm run test --workspace=apps/web
+npm run test:server
+cd apps/web && npx tsc --noEmit -p tsconfig.app.json  # vs .typecheck-baseline
+cd server  && npx tsc --noEmit                        # must be clean
+cd apps/web && npx eslint src/
+```
+
+Run the whole sequence again after any rebase or conflict resolution. Vitest compiles
+only what a test imports, so a file that is broken but untested passes the suite; the
+build is what catches it, and it is the fastest check in the list.
+
 - Tests for new service methods and regression tests for bug fixes.
 - Run the Security Checklist in `CLAUDE.md` (RLS, `auth.uid()`, no secrets, no `SELECT *`).
 

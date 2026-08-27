@@ -320,6 +320,32 @@ These standards exist so multiple people and multiple AI agents can work in this
 - **Re-sync before merge.** If `master` moved while your branch was open, rebase onto `master` (preferred) before final review.
 - **Delete branches after merge**, local and remote. A merged branch left behind is noise.
 
+## The check sequence
+
+Run the five checks below before pushing, and run them again after every rebase or
+conflict resolution. A resolution is a code change and it earns the same checks the
+code got.
+
+0. **Resolve conflicts, then re-read every file you touched, end to end.** Resolving
+   marker by marker is not enough. A branch can apply content *outside* the conflict
+   regions, and choosing a side inside the markers leaves that content stranded in the
+   file.
+1. **Build** — `npm run build --workspace=apps/web` (`vite build`, ~10s)
+2. **Web suite** — `npm run test --workspace=apps/web`
+3. **Server suite** — `npm run test:server`
+4. **Types** — `cd apps/web && npx tsc --noEmit -p tsconfig.app.json`, compared against
+   `apps/web/.typecheck-baseline` (read that file's header before touching it), and
+   `cd server && npx tsc --noEmit`, which must stay clean
+5. **Lint** — `cd apps/web && npx eslint src/`
+
+**The build runs first because the suite cannot stand in for it.** Vitest compiles only
+what a test file imports; everything else is never parsed, including modules the running
+app depends on. On 2026-08-26 a conflict resolution left `CookieConsent.tsx` with a stray
+`</button>` closing a `<Button>` — a plain syntax error. The web suite ran 138 files /
+2108 tests green, because no test imports that component and only `App.tsx` does. The
+build is the one local check that walks the whole graph from `index.html`, and it is the
+cheapest of the five. A green suite is not evidence that the app compiles.
+
 ## Commit Messages
 
 Use Conventional Commits for every commit:
