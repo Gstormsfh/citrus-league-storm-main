@@ -17,6 +17,13 @@ import type { League, Team } from '@/services/LeagueService';
 const c = createApiCache();
 
 export const leagueApi = {
+  /** Projected vs actual for one team. Returns RAW totals; the calibration
+   *  that turns them into "% of expectation" lives in utils/teamAnalytics.ts. */
+  getTeamAnalytics(leagueId: string, teamId: string, season?: number) {
+    const qs = season ? `?season=${season}` : '';
+    return apiClient.get(`/api/leagues/${leagueId}/teams/${teamId}/analytics${qs}`);
+  },
+
   /** Get all leagues for the authenticated user */
   getUserLeagues() {
     return c.cached('leagues:user', () => apiClient.get<League[]>('/api/leagues'), CACHE_TTL.MEDIUM);

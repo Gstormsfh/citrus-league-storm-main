@@ -13,6 +13,8 @@ import { LeagueService } from '@/services/LeagueService';
 import { ScheduleService } from '@/services/ScheduleService';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
+import { ProjectedVsActual } from '@/components/analytics/ProjectedVsActual';
+import type { CategoryKey, CategoryPair } from '@/utils/teamAnalytics';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { logger } from '@/utils/logger';
 import { Navigate, Link } from 'react-router-dom';
@@ -41,6 +43,40 @@ const TeamAnalytics = () => {
   const { userLeagueState, activeLeagueId, isChangingLeague, activeLeagueFormat } = useLeague();
   const [freeAgentTargets, setFreeAgentTargets] = useState<FreeAgentRec[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Projected vs actual for the user's own team. Kept in its own request and
+  // its own state: it is the substance of this page, and it must not be held
+  // hostage by the free-agent lookup below, which talks to a different set of
+  // tables and fails independently.
+  const [analytics, setAnalytics] = useState<{
+    totals: Partial<Record<CategoryKey, CategoryPair>>;
+    players: Array<{
+      id: string | number; name: string; position: string;
+      projectedPoints: number; actualPoints: number; games: number;
+    }>;
+    measuredPlayers: number;
+    rosterSize: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (isGuestMode(userLeagueState) || !activeLeagueId || !user) {
+        setAnalytics(null);
+        return;
+      }
+      try {
+        const { team } = await LeagueService.getUserTeam(activeLeagueId, user.id);
+        if (!team?.id || cancelled) return;
+        const res = await leagueApi.getTeamAnalytics(activeLeagueId, String(team.id));
+        if (!cancelled && res?.data) setAnalytics(res.data as typeof analytics);
+      } catch (err) {
+        // Non-fatal: the rest of the page still has something to say.
+        logger.error('[TeamAnalytics] projected-vs-actual load failed:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, userLeagueState, activeLeagueId]);
 
   const loadScheduleMaximizers = useCallback(async () => {
     try {
@@ -210,11 +246,11 @@ const TeamAnalytics = () => {
                       actually does — and did honestly all along — is find free
                       agents whose teams play the most games this week. */}
                   <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-none mb-2">
-                    Waiver Wire &amp; Schedule
+                    Team Analytics
                   </h1>
                   <p className="text-sm text-white/55 flex items-center gap-2">
                     <Narwhal className="h-4 w-4 text-pastel-orange" />
-                    Free agents with the best week ahead
+                    How your roster is tracking, and who to add next
                   </p>
                 </div>
                 {/* A "Team Rating 92.4 / 100" card stood here — a literal, on every
@@ -237,6 +273,24 @@ const TeamAnalytics = () => {
                     against stated baselines — now lives on the Roster page and
                     is computed from the user's actual roster. */}
                 <div className="lg:col-span-2 space-y-4">
+                  {/* The page's actual substance. Where the fabricated
+                      "Positional Deep-Dive" used to be — four hardcoded letter
+                      grades identical for every team — and then, after that was
+                      removed, a card whose whole content was a link to a
+                      different page. This is computed from the user's own
+                      roster: its season projection against what it produced. */}
+                  {analytics && analytics.measuredPlayers > 0 && (
+                    <>
+                      <ProjectedVsActual
+                        totals={analytics.totals}
+                        players={analytics.players}
+                      />
+                      <p className="text-[10px] text-white/55 px-1">
+                        Measured across {analytics.measuredPlayers} of {analytics.rosterSize} rostered
+                        players — those with both a season projection and games played.
+                      </p>
+                    </>
+                  )}
                   <h2 className="font-calistoga text-2xl text-pastel-cream flex items-center gap-2">
                     <ScoreboardIcon className="h-5 w-5 text-pastel-orange" strokeWidth={2} />
                     Positional breakdown
