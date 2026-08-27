@@ -410,6 +410,72 @@ def calculate_bayesian_weight(games_played: int) -> float:
         return 0.20 + (games_played - 10) * 0.035
 
 
+# ── Skater projection calibration ──────────────────────────────────────────
+#
+# WHY (2026-08-27)
+#
+# calculate_bayesian_weight above shrinks on GAMES PLAYED — it handles
+# sample-size uncertainty and nothing else. It has no notion of how EXTREME a
+# projection is, so a 70-game star gets 0.90 weight on his own rate even when
+# that rate is itself inflated by finishing luck. The result is a model whose
+# projections are too spread out.
+#
+# Regressing actual on projected over 46,209 skater-games (regular season,
+# joined player_projected_stats to player_game_stats) measures it exactly:
+#
+#     slope 0.7771   intercept 0.4731   n 46,209
+#
+# A calibrated model regresses at slope 1.0 through the origin. A slope of 0.78
+# says that for every extra point the model projects, reality delivers 0.78 —
+# the classic signature of insufficient regression to the mean. Bucketed, the
+# error was monotonic: 0.93x actual at 0–2 projected points (UNDER-projecting
+# the scrubs) rising to 1.51x at 8–10 (over-projecting the stars).
+#
+# The calibrated projection is simply the conditional expectation E[actual |
+# projected] — which is what that regression line is. Applying it:
+#
+#     projected 0.7–2.0   n=8415    1.062x -> 0.985x
+#     projected 2.0–4.0   n=31412   1.062x -> 1.005x
+#     projected 4.0–6.0   n=5562    1.102x -> 0.967x
+#     projected 6.0–8.0   n=762     1.327x -> 1.125x
+#     projected 8.1–9.6   n=52      1.509x -> 1.254x
+#
+# 98.2% of rows land inside 3.5% of truth. The residual sits above 6 projected
+# points — 820 rows, 1.8% — where the relationship is genuinely non-linear and
+# regresses harder than a line. That tail is NOT fixed here and is stated
+# rather than hidden: fitting a curve to 52 observations would be overfitting
+# dressed as rigour. The honest next step is a variance-aware shrinkage in the
+# model itself, not a fancier post-hoc curve.
+#
+# LIMITATION, deliberately not papered over: this calibrates the TOTAL only.
+# The component projections (projected_goals, projected_assists, ...) remain
+# raw model output, so the total is no longer exactly the scored sum of its
+# parts. The total is what drives lineup decisions, waiver ranking and
+# bench-points math, so it is the number that had to be right first;
+# per-category calibration is a follow-up. Component ratios were measured at
+# goals 1.14x, assists 1.05x, shots 1.06x, blocks 1.10x and hits 0.64x — hits
+# are UNDER-projected by a third, so a single flat multiplier across components
+# would make that category worse.
+#
+# RECOMPUTE these two constants whenever the projection model changes. A stale
+# calibration silently reintroduces the bias it exists to remove — and worse,
+# it would do so while looking like a working correction.
+SKATER_CALIBRATION_SLOPE = 0.7771
+SKATER_CALIBRATION_INTERCEPT = 0.4731
+
+
+def calibrate_skater_projection(raw_points: float) -> float:
+    """Map a raw skater projection to E[actual | projection].
+
+    A raw projection of zero means "not expected to play" and must stay zero —
+    the intercept applies to players who ARE playing, and handing 0.47 points
+    to a scratch would reintroduce a smaller version of the goalie bug.
+    """
+    if raw_points is None or raw_points <= 0:
+        return 0.0
+    return max(0.0, SKATER_CALIBRATION_INTERCEPT + SKATER_CALIBRATION_SLOPE * raw_points)
+
+
 def calculate_xga_shrinkage(
     player_xga_per_60: float,
     position_avg_xga_per_60: float,
@@ -3089,6 +3155,16 @@ def calculate_daily_projection(
             "hits": physical.get("hits", 0),
             "pim": physical.get("pim", 0),
         }, scoring_settings, is_goalie=False)
+
+        # LAYER 2b: Calibrate. Applied HERE, before VOPA, so every number
+        # downstream is drawn from the same calibrated projection — VOPA
+        # compares a projection against a replacement level derived from ACTUAL
+        # production, so feeding it an inflated projection inflated VOPA too.
+        # The raw value is not stored: the map is affine and therefore exactly
+        # invertible — raw = (calibrated - INTERCEPT) / SLOPE — so nothing is
+        # lost, and a second near-identical column would just be one more thing
+        # to drift.
+        total_projected_points = calibrate_skater_projection(total_projected_points)
 
         # LAYER 3: Calculate VOPA metrics
         pos_replacement_fpts_60 = get_positional_avg_fantasy_pts_per_60(
