@@ -4,7 +4,8 @@ import { Lock, Shield, CalendarDays, Skull, AlertCircle } from "lucide-react";
 import { HockeyPlayer } from "./HockeyPlayerCard";
 import { CitrusSparkle, CitrusLeaf } from "@/components/icons/CitrusIcons";
 import { generatePlayerWriteup } from "@/utils/playerWriteup";
-import { useState } from "react";
+import { SlotPickerMenu } from "./SlotPickerMenu";
+import { useMemo, useState } from "react";
 
 // ─── Position helpers ────────────────────────────────────────────────
 const getPositionAbbr = (pos: string) => {
@@ -76,6 +77,8 @@ interface MobileRosterListProps {
   onPlayerNameTap?: (player: HockeyPlayer) => void;
   onSlotTap?: (slotId: string) => void;
   onBenchTap?: () => void;
+  /** Clear the tap selection. Fired when the slot menu is dismissed. */
+  onCancelSelection?: () => void;
   positionType?: PositionType;
   rosterSlots?: Record<string, number>;
 }
@@ -409,6 +412,7 @@ const MobileRosterList = ({
   onPlayerNameTap,
   onSlotTap,
   onBenchTap,
+  onCancelSelection,
   positionType = 'individual',
   rosterSlots,
 }: MobileRosterListProps) => {
@@ -423,6 +427,33 @@ const MobileRosterList = ({
     if (!playerId) return null;
     return starters.find(p => String(p.id) === String(playerId)) || null;
   };
+
+  // Everyone on the roster, so the menu can name who currently holds a slot.
+  const allPlayers = useMemo(() => [...starters, ...bench, ...ir], [starters, bench, ir]);
+
+  /**
+   * LINE CHANGE SHEET (2026-08-27)
+   *
+   * Reported as "it's still a bit complicated — we need to essentially click,
+   * then open a mini menu of those available roster slots."
+   *
+   * Selecting a player used to light eligible slots up elsewhere on this list,
+   * which on a phone is several screens long: you scroll hunting a highlight
+   * having lost sight of the player you picked. The sheet anchors the choice
+   * to the bottom edge — the thumb's home — and names each destination's
+   * occupant with tonight's number, so a swap's consequence is legible BEFORE
+   * the tap.
+   *
+   * One instance, rendered at the list level (the sheet portals to body, so
+   * nothing needs per-row anchoring). `open` is derived from
+   * `tapSelectedPlayerId` rather than held here, so the sheet cannot disagree
+   * with the highlight state underneath it — there is one selection, and both
+   * read it.
+   */
+  const selectedPlayer = useMemo(
+    () => allPlayers.find((p) => p.id === tapSelectedPlayerId) ?? null,
+    [allPlayers, tapSelectedPlayerId],
+  );
 
   const handleRowTap = (player: HockeyPlayer | null, slotId: string) => {
     if (player && onPlayerTap) {
@@ -442,7 +473,7 @@ const MobileRosterList = ({
       const isSelected = player != null && player.id === tapSelectedPlayerId;
       const isTarget = tapSelectedPlayerId != null && tapEligibleSlots.has(slotId) && !isSelected;
 
-      return (
+      const row = (
         <PlayerRow
           key={slotId}
           player={player}
@@ -459,6 +490,7 @@ const MobileRosterList = ({
           onEmptySlotTap={() => onSlotTap?.(slotId)}
         />
       );
+      return row;
     });
 
   const benchIsTarget = tapSelectedPlayerId != null && tapEligibleSlots.has('bench-grid');
@@ -532,7 +564,7 @@ const MobileRosterList = ({
         {bench.map(player => {
           const pos = getPositionAbbr(player.position);
           const isSelected = player.id === tapSelectedPlayerId;
-          return (
+          const row = (
             <PlayerRow
               key={player.id}
               player={player}
@@ -545,6 +577,7 @@ const MobileRosterList = ({
               onNameTap={() => onPlayerNameTap?.(player)}
             />
           );
+          return row;
         })}
       </div>
 
@@ -559,7 +592,7 @@ const MobileRosterList = ({
           {ir.map(player => {
             const pos = getPositionAbbr(player.position);
             const irSlot = slotAssignments[player.id] || 'ir-slot-1';
-            return (
+            const row = (
               <PlayerRow
                 key={player.id}
                 player={player}
@@ -571,9 +604,24 @@ const MobileRosterList = ({
                 onNameTap={() => onPlayerNameTap?.(player)}
               />
             );
+            return row;
           })}
         </>
       )}
+
+      {/* The Line Change sheet — portals to body; scrim/✕ cancel the
+          selection, picking reports the slot id to the page's own handler. */}
+      <SlotPickerMenu
+        player={selectedPlayer}
+        // Never recomputed here. `tapEligibleSlots` is Roster.tsx's, and it is
+        // the only place `is_ir_eligible` gates an IR slot.
+        eligibleSlots={tapEligibleSlots}
+        slotAssignments={slotAssignments}
+        allPlayers={allPlayers}
+        open={selectedPlayer != null}
+        onOpenChange={(next) => { if (!next) onCancelSelection?.(); }}
+        onPick={(slotId) => onSlotTap?.(slotId)}
+      />
     </div>
   );
 };
