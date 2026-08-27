@@ -108,6 +108,40 @@ const PRIORITY = Array.from({ length: 10 }, (_, i) => ({
 (PlayerService as any).getTrendingPlayers = async () => new Map();
 (PlayerService as any).getRosterAssignmentCount = async () => new Map();
 (PlayerService as any).recordPlayerTransaction = async () => ({ error: null });
+// TeamAnalytics gates its projected-vs-actual fetch on resolving the user's
+// team first, so without this the page's headline section silently never
+// renders — which is exactly how it looked in the 2026-08-27 sweep.
+(LeagueService as any).getUserTeam = async () => ({ team: { id: 't1' }, error: null });
+
+// Stubbed on leagueApi rather than on the apiClient stub: src/api/leagues.ts
+// imports './client' RELATIVELY, so the @/api/client alias in the harness vite
+// config never applies to it and a stub there sends a real HTTP request.
+//
+// Numbers exercise the honest cases — a category the model under-projects
+// (hits), one it over-projects (goals), and a roster where ratio and delta
+// disagree about who is carrying the team.
+(leagueApi as any).getTeamAnalytics = async () => ({
+  data: {
+    totals: {
+      goals:   { projected: 42.0, actual: 40.1 },
+      assists: { projected: 61.0, actual: 55.2 },
+      ppp:     { projected: 18.0, actual: 21.4 },
+      shots:   { projected: 305.0, actual: 291.0 },
+      blocks:  { projected: 96.0, actual: 74.5 },
+      hits:    { projected: 88.0, actual: 151.2 },
+    },
+    players: [
+      { id: 1, name: 'Connor McDavid',  position: 'C',  projectedPoints: 128.4, actualPoints: 141.2, games: 22 },
+      { id: 2, name: 'Cale Makar',      position: 'D',  projectedPoints: 96.1,  actualPoints: 112.8, games: 21 },
+      { id: 3, name: 'Kirill Kaprizov', position: 'LW', projectedPoints: 74.5,  actualPoints: 82.0,  games: 20 },
+      { id: 4, name: 'Jason Robertson', position: 'LW', projectedPoints: 81.0,  actualPoints: 62.3,  games: 22 },
+      { id: 5, name: 'Igor Shesterkin', position: 'G',  projectedPoints: 88.0,  actualPoints: 61.5,  games: 18 },
+      { id: 6, name: 'Quinn Hughes',    position: 'D',  projectedPoints: 70.2,  actualPoints: 48.9,  games: 19 },
+    ],
+    measuredPlayers: 6,
+    rosterSize: 8,
+  },
+});
 (LeagueService as any).getWatchlist = () => [];  // sync in the real service
 (LeagueService as any).addToWatchlist = async () => ({ error: null });
 (LeagueService as any).removeFromWatchlist = async () => ({ error: null });
