@@ -1595,6 +1595,106 @@ def calculate_fantasy_points(
     return total_points
 
 
+# ── Goalie start probability ────────────────────────────────────────────────
+#
+# WHY THIS EXISTS (2026-08-27)
+#
+# `expected_toi_minutes` used to read:
+#
+#     expected_toi_minutes = 60.0 if games_played > 0 else 0.0
+#
+# where `games_played` is the goalie's SEASON total. So every goalie who had
+# ever appeared was projected a full sixty-minute start for every game his team
+# played, all season. Measured against production on 2026-08-27, regular season
+# only: of 5,092 goalie-games carrying a projection, **2,376 — 47% — projected
+# about 5 fantasy points for a goalie who faced zero shots.** The comment beside
+# it said "in production, this should check actual starter confirmation from
+# morning skate"; that TODO shipped.
+#
+# It is the worst shape a projection can have. It does not merely miss, it
+# tells a manager to start a backup, and he scores nothing.
+#
+# We have no morning-skate feed, so this does not pretend to know who starts
+# tonight. It reports the honest quantity we CAN measure — how often this goalie
+# actually starts — and the projection becomes an expected value over that.
+# Measured across 2025 (73 goalies, >=20 games): workhorses 0.689, tandems
+# 0.497, backups 0.324, with Hellebuyck (0.814) and Vasilevskiy (0.760) at the
+# top. Nobody reaches 1.0, which is the point — even a true #1 sits out rest
+# days and the back half of back-to-backs.
+_goalie_start_prob_cache: Dict[Tuple[int, int], float] = {}
+
+# A start, as opposed to relief. Half a game of ice time; the empirical gap
+# between a start (~60 min) and relief (a few minutes) is wide, so the exact
+# threshold is not delicate.
+STARTER_TOI_SECONDS = 1800
+
+# Beta-binomial prior. 0.50 is "half the starts" — the honest default for a
+# goalie we have not seen, since it assumes neither a starter's nor a backup's
+# workload. PRIOR_WEIGHT is in units of games: a goalie with 8 games is pulled
+# halfway to the prior, one with 70 is essentially his own rate.
+START_PROB_PRIOR = 0.50
+START_PROB_PRIOR_WEIGHT = 8.0
+
+# No NHL goalie starts every game. The observed 2025 maximum was 0.814
+# (Hellebuyck). The cap stops a small-sample callup who happened to start his
+# only two appearances from being projected as an iron man.
+START_PROB_CAP = 0.85
+
+
+def get_goalie_start_probability(
+    db: SupabaseRest,
+    player_id: int,
+    season: int,
+    debug: bool = False,
+) -> float:
+    """Share of his team's games this goalie actually starts, shrunk to a prior.
+
+    A row exists in player_game_stats for a rostered goalie whether or not he
+    played, so the row count IS the number of team games he was available for —
+    which is what makes this a share rather than a rate over appearances.
+    """
+    cache_key = (int(player_id), int(season))
+    if cache_key in _goalie_start_prob_cache:
+        return _goalie_start_prob_cache[cache_key]
+
+    try:
+        rows = db.select(
+            "player_game_stats",
+            select="game_id,nhl_toi_seconds",
+            filters=[
+                ("player_id", "eq", player_id),
+                ("season", "eq", season),
+                ("is_goalie", "eq", True),
+            ],
+            limit=200,
+        ) or []
+        # Regular season only. Preseason workloads are split across three and
+        # four goalies a night and describe nobody's real role.
+        rows = [r for r in rows if str(r.get("game_id", ""))[4:6] == "02"]
+
+        available = len(rows)
+        starts = sum(1 for r in rows if int(r.get("nhl_toi_seconds") or 0) >= STARTER_TOI_SECONDS)
+
+        prob = (starts + START_PROB_PRIOR * START_PROB_PRIOR_WEIGHT) / (
+            available + START_PROB_PRIOR_WEIGHT
+        )
+        prob = max(0.0, min(START_PROB_CAP, prob))
+
+        if debug:
+            logger.info(
+                f"  [Goalie Projection] Start probability: {prob:.3f} "
+                f"({starts} starts / {available} games available, prior {START_PROB_PRIOR})"
+            )
+    except Exception as exc:  # pragma: no cover - network/db failure path
+        # Fall back to the prior rather than to 1.0. Being wrong toward "we do
+        # not know" costs a manager far less than being wrong toward "start him".
+        logger.warning(f"⚠️  Goalie start probability failed for {player_id}: {exc}")
+        prob = START_PROB_PRIOR
+
+    _goalie_start_prob_cache[cache_key] = prob
+    return prob
+
+
 def calculate_goalie_projection(
     db: SupabaseRest,
     player_id: int,
@@ -1701,9 +1801,13 @@ def calculate_goalie_projection(
         if not opponent_shots_for_per_60:
             opponent_shots_for_per_60 = 30.0  # League average fallback
         
-        # Expected TOI: 60 minutes for confirmed starter, 0 for backup
-        # For now, assume starter if games_played > 0 (can be enhanced with starter confirmation)
-        expected_toi_minutes = 60.0 if games_played > 0 else 0.0
+        # Expected TOI is an EXPECTED VALUE, not a coin flip resolved in advance:
+        # sixty minutes weighted by how often this goalie actually starts. Saves
+        # and goals-against both scale off this, so they follow automatically;
+        # wins and shutouts are scaled explicitly further down, because they are
+        # computed from probabilities rather than from ice time.
+        start_probability = get_goalie_start_probability(db, player_id, season, debug=debug)
+        expected_toi_minutes = 60.0 * start_probability
         
         projected_saves = (opponent_shots_for_per_60 / 60) * projected_sv_pct * expected_toi_minutes
         
@@ -1753,7 +1857,10 @@ def calculate_goalie_projection(
             if debug:
                 logger.info(f"  [Goalie Projection] Opponent high-danger rate ({opponent_context['hd_rate']:.1f}) > 8.0, reducing win probability by additional 3%")
         
-        projected_wins = win_probability
+        # A backup does not collect the team's win. Scale by the odds he is
+        # the one in net — this line handed every rostered goalie the full
+        # team win probability regardless of role.
+        projected_wins = win_probability * start_probability
         
         # Regulation win probability (game ends in regulation, not OT/SO)
         # Research shows ~15% of games go to OT, so regulation win prob is lower
@@ -1785,6 +1892,8 @@ def calculate_goalie_projection(
         
         projected_shutouts = base_shutout_rate * gsax_factor * opponent_offense_factor
         projected_shutouts = min(projected_shutouts, 0.25)  # Cap at 25% (very rare)
+        # Same correction as wins: you cannot record a shutout you did not play.
+        projected_shutouts *= start_probability
         
         if debug:
             logger.info(f"  [Goalie Projection] Projected Shutouts: {projected_shutouts:.3f} (base: {base_shutout_rate:.3f}, GSAx factor: {gsax_factor:.2f})")
@@ -1804,12 +1913,16 @@ def calculate_goalie_projection(
         if debug:
             logger.info(f"  [Goalie Projection] Projected GAA: {projected_gaa:.2f}")
         
-        # 6. Projected GP (typically 1.0 for starter, 0.0 for backup)
-        projected_gp = 1.0 if expected_toi_minutes > 0 else 0.0
-        
-        # Starter confirmation (for now, assume confirmed if games_played > 0)
-        # In production, this should check actual starter confirmation from morning skate
-        starter_confirmed = games_played > 0
+        # 6. Projected GP — the probability he plays, not a rounded guess that he does.
+        projected_gp = start_probability
+
+        # INFERRED, never confirmed. There is no morning-skate feed here, so this
+        # flag says "his workload says he is the starter", which is a weaker and
+        # more honest claim than the name suggests. It previously read
+        # `games_played > 0` — true for any goalie who had appeared once all
+        # season, which made it meaningless. Consumers that need certainty must
+        # wait for a real confirmation source.
+        starter_confirmed = start_probability >= 0.65
         
         # Calculate fantasy points
         goalie_projection = {
