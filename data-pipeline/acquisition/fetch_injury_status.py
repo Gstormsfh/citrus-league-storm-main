@@ -168,16 +168,38 @@ def map_status(fantasy_status: Optional[str], status: Optional[str]) -> Tuple[st
 _SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
 
 
+# Punctuation splits into two classes, and getting them the same way round is
+# the whole point. A period or apostrophe JOINS what it sits between —
+# "A.J." is one token, and so is "O'Reilly" — while a hyphen or slash
+# SEPARATES: "Pierre-Luc" is two. Substituting a space for both, which is the
+# obvious one-liner, silently makes "A.J. Greer" and "AJ Greer" different
+# players. Deleting both instead makes "Pierre-Luc Dubois" and
+# "Pierre Luc Dubois" different players. Neither is safe alone.
+#
+# U+2019 and U+02BC are here because a curly apostrophe survives NFKD intact —
+# folding accents does not fold quotation marks — and feeds mix the two
+# spellings freely.
+_JOINING_PUNCT = str.maketrans("", "", ".'\u2019\u02bc\u00b4`")
+
+
 def normalize_name(name: str) -> str:
-    """Fold accents, drop punctuation and generational suffixes, casefold.
+    """Fold accents, resolve punctuation, drop generational suffixes, casefold.
 
     "Tim Stützle" and "Tim Stutzle" are the same player; so are "A.J. Greer"
-    and "AJ Greer". Feeds disagree about all three.
+    and "AJ Greer", and "Ryan O'Reilly" and "Ryan OReilly". Feeds disagree
+    about all of them.
+
+    An unresolved name is NOT a loud failure — the player simply keeps whatever
+    roster_status he already had, which for the overwhelming majority is NULL,
+    and NULL reads as healthy in every consumer. So a normalisation miss
+    presents as a healthy injured player, which is the exact failure this
+    module exists to prevent.
     """
     if not name:
         return ""
     folded = unicodedata.normalize("NFKD", name)
     folded = "".join(c for c in folded if not unicodedata.combining(c))
+    folded = folded.translate(_JOINING_PUNCT)
     folded = re.sub(r"[^\w\s]", " ", folded)
     parts = [p for p in folded.lower().split() if p and p not in _SUFFIXES]
     return " ".join(parts)
@@ -345,8 +367,34 @@ def _clear_stale(db: SupabaseRest, season: int, keep_ids: List[int]) -> int:
     return len(stale)
 
 
+def _require_provenance_column(db: SupabaseRest) -> bool:
+    """Refuse to start if migration 20260827030000 has not been applied.
+
+    Both the clear-down and the upsert reference `roster_status_source`, so
+    without the column PostgREST rejects every write with a 400 whose body
+    mentions a column name and nothing about a migration. Naming the cause
+    here turns a cryptic failure into an actionable one, and — more to the
+    point — it fails BEFORE the feed is fetched and before anything is
+    written, so a half-synced season is not a reachable state.
+    """
+    try:
+        db.select("player_talent_metrics", select="roster_status_source", limit=1)
+        return True
+    except RuntimeError as exc:
+        if "roster_status_source" in str(exc):
+            logger.error(
+                "player_talent_metrics.roster_status_source does not exist. "
+                "Apply supabase/migrations/20260827030000_roster_status_provenance.sql "
+                "before running this sync."
+            )
+            return False
+        raise
+
+
 def run(season: int, dry_run: bool = False) -> int:
     db = SupabaseRest()
+    if not _require_provenance_column(db):
+        return 1
     entries = fetch_feed()
 
     if not entries:

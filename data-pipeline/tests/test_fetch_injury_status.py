@@ -33,8 +33,10 @@ from data_pipeline.acquisition.fetch_injury_status import (  # noqa: E402
         ("Connor McDavid", "connor mcdavid"),
         ("Tim Stützle", "tim stutzle"),          # feeds disagree on accents
         ("Tim Stutzle", "tim stutzle"),
-        ("A.J. Greer", "a j greer"),             # ...and on punctuation
+        ("A.J. Greer", "aj greer"),              # ...and on punctuation
         ("AJ Greer", "aj greer"),
+        ("Ryan O'Reilly", "ryan oreilly"),
+        ("Pierre-Luc Dubois", "pierre luc dubois"),  # hyphen still separates
         ("Zach Hyman Jr.", "zach hyman"),        # ...and on suffixes
         ("  Cale   Makar  ", "cale makar"),
         ("", ""),
@@ -44,8 +46,42 @@ def test_normalize_name(raw, expected):
     assert normalize_name(raw) == expected
 
 
-def test_accented_and_unaccented_spellings_collapse_together():
-    assert normalize_name("Tim Stützle") == normalize_name("Tim Stutzle")
+# The literal-output table above is the wrong shape for this class of bug and
+# on 2026-08-27 it proved it: it carried ("A.J. Greer", "a j greer") next to
+# ("AJ Greer", "aj greer") and passed green, pinning the divergence the
+# docstring claimed to fix. Two literals cannot assert that two spellings AGREE
+# — only comparing them to each other can. Everything below does that instead.
+
+@pytest.mark.parametrize(
+    "a,b",
+    [
+        ("Tim Stützle", "Tim Stutzle"),          # accents
+        ("A.J. Greer", "AJ Greer"),              # dotted initials
+        ("T.J. Oshie", "TJ Oshie"),
+        ("J.T. Miller", "JT Miller"),
+        ("Ryan O'Reilly", "Ryan OReilly"),       # apostrophes join
+        ("Ryan O\u2019Reilly", "Ryan O'Reilly"),  # ...curly or straight
+        ("K'Andre Miller", "KAndre Miller"),
+        ("Martin St. Louis", "Martin St Louis"),
+        ("Zach Hyman Jr.", "Zach Hyman"),        # suffixes
+    ],
+)
+def test_spellings_that_mean_the_same_player_collapse(a, b):
+    """A miss here does not raise — it leaves roster_status NULL, and NULL is
+    indistinguishable from healthy in every consumer downstream."""
+    assert normalize_name(a) == normalize_name(b)
+
+
+def test_a_real_spelling_difference_still_does_not_collapse():
+    """The fix must not be 'strip everything until names match'."""
+    assert normalize_name("Elias Pettersson") != normalize_name("Elias Petterson")
+
+
+def test_a_hyphen_separates_rather_than_joins():
+    """Deleting punctuation wholesale would make these two different players,
+    which is the mirror image of the bug above."""
+    assert normalize_name("Pierre-Luc Dubois") == normalize_name("Pierre Luc Dubois")
+    assert normalize_name("Jean-Gabriel Pageau") == "jean gabriel pageau"
 
 
 # ── map_status ────────────────────────────────────────────────────────────

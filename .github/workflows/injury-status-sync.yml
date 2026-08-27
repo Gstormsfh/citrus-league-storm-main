@@ -29,18 +29,37 @@ name: Injury Status Sync
 #
 # CADENCE
 # ───────
-# Every 6 hours. IR and LTIR designations move on a daily rhythm, not a
-# minute-by-minute one, so 6h bounds staleness well inside the window that
-# matters for setting a lineup. Load is one HTTP request per run.
+# Every 6 hours, ONCE ENABLED. IR and LTIR designations move on a daily
+# rhythm, not a minute-by-minute one, so 6h bounds staleness well inside the
+# window that matters for setting a lineup. Load is one HTTP request per run.
 #
 # NOT covered by this cadence, and not covered by this feed: game-day
 # scratches and starting-goalie confirmations, which land 1-2 hours before
 # puck drop and are a separate source. Do not tighten this cron expecting to
 # catch them — it will not.
+#
+# THE SCHEDULE IS DELIBERATELY OFF AT MERGE
+# ──────────────────────────────────────────
+# Every write in this job references player_talent_metrics.roster_status_source,
+# which migration 20260827030000 adds and which does NOT exist in production
+# yet — migrations are frozen pending the reconciliation (Track B). A cron
+# merged in this state fails every six hours from the moment it lands until
+# the migration is applied.
+#
+# That is not a cosmetic problem. A scheduled job that is permanently red
+# teaches everyone to ignore red, and this repo has already paid for that
+# once: the deploy that was green while deploying nothing went unnoticed
+# because nobody reads a wall of failures. Shipping the cron ahead of its
+# column would rebuild exactly that habit.
+#
+# TO ENABLE: apply 20260827030000, run this workflow once via the Actions tab
+# and confirm the assertion step passes, then uncomment the two `schedule`
+# lines below. The script itself refuses to start without the column and says
+# so by name, so a premature manual run is legible rather than cryptic.
 
 on:
-  schedule:
-    - cron: '0 */6 * * *'
+  # schedule:
+  #   - cron: '0 */6 * * *'
   workflow_dispatch:
 
 concurrency:
