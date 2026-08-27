@@ -7,12 +7,14 @@ import { Narwhal } from '@/components/icons/Narwhal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, AlertCircle } from 'lucide-react';
+import { ChevronRight, Shield } from 'lucide-react';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService } from '@/services/LeagueService';
 import { ScheduleService } from '@/services/ScheduleService';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
+import { ProjectedVsActual } from '@/components/analytics/ProjectedVsActual';
+import type { CategoryKey, CategoryPair } from '@/utils/teamAnalytics';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { logger } from '@/utils/logger';
 import { Navigate, Link } from 'react-router-dom';
@@ -41,6 +43,40 @@ const TeamAnalytics = () => {
   const { userLeagueState, activeLeagueId, isChangingLeague, activeLeagueFormat } = useLeague();
   const [freeAgentTargets, setFreeAgentTargets] = useState<FreeAgentRec[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Projected vs actual for the user's own team. Kept in its own request and
+  // its own state: it is the substance of this page, and it must not be held
+  // hostage by the free-agent lookup below, which talks to a different set of
+  // tables and fails independently.
+  const [analytics, setAnalytics] = useState<{
+    totals: Partial<Record<CategoryKey, CategoryPair>>;
+    players: Array<{
+      id: string | number; name: string; position: string;
+      projectedPoints: number; actualPoints: number; games: number;
+    }>;
+    measuredPlayers: number;
+    rosterSize: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (isGuestMode(userLeagueState) || !activeLeagueId || !user) {
+        setAnalytics(null);
+        return;
+      }
+      try {
+        const { team } = await LeagueService.getUserTeam(activeLeagueId, user.id);
+        if (!team?.id || cancelled) return;
+        const res = await leagueApi.getTeamAnalytics(activeLeagueId, String(team.id));
+        if (!cancelled && res?.data) setAnalytics(res.data as typeof analytics);
+      } catch (err) {
+        // Non-fatal: the rest of the page still has something to say.
+        logger.error('[TeamAnalytics] projected-vs-actual load failed:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, userLeagueState, activeLeagueId]);
 
   const loadScheduleMaximizers = useCallback(async () => {
     try {
@@ -210,11 +246,11 @@ const TeamAnalytics = () => {
                       actually does — and did honestly all along — is find free
                       agents whose teams play the most games this week. */}
                   <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-none mb-2">
-                    Waiver Wire &amp; Schedule
+                    Team Analytics
                   </h1>
                   <p className="text-sm text-white/55 flex items-center gap-2">
                     <Narwhal className="h-4 w-4 text-pastel-orange" />
-                    Free agents with the best week ahead
+                    How your roster is tracking, and who to add next
                   </p>
                 </div>
                 {/* A "Team Rating 92.4 / 100" card stood here — a literal, on every
@@ -237,27 +273,42 @@ const TeamAnalytics = () => {
                     against stated baselines — now lives on the Roster page and
                     is computed from the user's actual roster. */}
                 <div className="lg:col-span-2 space-y-4">
-                  <h2 className="font-calistoga text-2xl text-pastel-cream flex items-center gap-2">
-                    <ScoreboardIcon className="h-5 w-5 text-pastel-orange" strokeWidth={2} />
-                    Positional breakdown
-                  </h2>
-
-                  <Card className="border-0 bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
-                    <CardContent className="p-6">
-                      <p className="text-sm text-white/70 leading-relaxed mb-4">
-                        Your positional grades are computed on the Roster page, under
-                        Trends &amp; Analytics — offense, peripherals, goaltending and
-                        depth, each measured as a share of elite starter pace, per game,
-                        from the players you actually have.
+                  {/* The page's actual substance. Where the fabricated
+                      "Positional Deep-Dive" used to be — four hardcoded letter
+                      grades identical for every team — and then, after that was
+                      removed, a card whose whole content was a link to a
+                      different page. This is computed from the user's own
+                      roster: its season projection against what it produced. */}
+                  {analytics && analytics.measuredPlayers > 0 && (
+                    <>
+                      <ProjectedVsActual
+                        totals={analytics.totals}
+                        players={analytics.players}
+                      />
+                      <p className="text-[10px] text-white/55 px-1">
+                        Measured across {analytics.measuredPlayers} of {analytics.rosterSize} rostered
+                        players — those with both a season projection and games played.
                       </p>
-                      <Link
-                        to="/roster"
-                        className="inline-flex items-center gap-1.5 text-[13px] font-bold text-pastel-orange-soft hover:text-pastel-orange transition-colors"
-                      >
-                        Open Trends &amp; Analytics <ChevronRight className="w-4 h-4" strokeWidth={2.5} />
-                      </Link>
-                    </CardContent>
-                  </Card>
+                    </>
+                  )}
+                  {/* Was a section heading over a full-width card whose entire
+                      content was a paragraph explaining that the real thing is on
+                      another page. A signpost is not a section: it took the same
+                      visual weight as the projected-vs-actual chart above it while
+                      carrying none of the information, and on a phone it cost a
+                      whole thumb-swipe to say "look elsewhere". Demoted to the one
+                      line it always was. */}
+                  <Link
+                    to="/roster"
+                    className="flex items-center gap-2 rounded-xl bg-white/[0.03] px-4 py-3 ring-1 ring-white/10 transition-colors hover:bg-white/[0.06]"
+                  >
+                    <ScoreboardIcon className="h-4 w-4 shrink-0 text-pastel-orange" strokeWidth={2} />
+                    <span className="min-w-0 flex-1 text-[13px] text-white/70">
+                      Positional grades — offense, peripherals, goaltending and depth
+                      <span className="text-white/55"> · on the Roster page</span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-white/55" strokeWidth={2.5} />
+                  </Link>
                 </div>
 
                 {/* Right Column: AI Recommended Targets */}
@@ -267,16 +318,23 @@ const TeamAnalytics = () => {
                     Free agents worth a look
                   </h2>
 
-                  <Card className="bg-[#1A2A20] border-0 ring-1 ring-amber-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(251,191,36,0.15)] relative overflow-hidden">
-                    <div aria-hidden="true" className="absolute top-0 right-0 w-48 h-48 bg-amber-400/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+                  {/* 2026-08-27 sweep: this card wore ring-amber-400/30, an
+                      amber blur and an amber title — a fourth accent that exists
+                      nowhere in the Citrus palette, on a page whose every other
+                      surface is sage and orange on deep forest. Worse, amber is
+                      the STATUS vocabulary's caution colour; spending it on a
+                      routine list of available goalies means a real warning has
+                      nothing left to say. It is a list, so it looks like its
+                      sibling list. The blur went with it. */}
+                  <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
                     <CardHeader className="relative z-10">
                       {/* Headed "Urgent: Goaltending" with the line "Your goalie
                           grade is C-. Improving this position is the #1 priority to
                           increase win probability." — a personalised diagnosis of a
                           roster nothing on this page had looked at. The list below
                           it is real: available goalies, ranked. Removed 2026-08-26. */}
-                      <CardTitle className="font-calistoga text-lg text-amber-300 flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4" /> Goalies on the wire
+                      <CardTitle className="font-calistoga text-lg text-pastel-cream flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-pastel-sage" /> Goalies on the wire
                       </CardTitle>
                       <CardDescription className="text-white/55">
                         Available goalies, by points per game and games this week.
@@ -387,7 +445,7 @@ const TeamAnalytics = () => {
           </div>
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </div>
   );
 };

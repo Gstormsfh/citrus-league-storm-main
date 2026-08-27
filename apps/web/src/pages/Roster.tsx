@@ -3131,34 +3131,42 @@ const Roster = () => {
               <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                 {/*
                   * The four labels do not fit a phone. "TRENDS & ANALYTICS" alone
-                  * needs ~150px at this letter-spacing, and four flex-1 triggers
-                  * split 361px into ~90px each — so the labels collapsed and
-                  * there was no scroller to reach the ones that got squeezed off.
-                  * Intrinsic widths plus a horizontal scroller on small screens;
-                  * the equal-width bar returns at sm, where it fits.
+                  * needs ~150px at this letter-spacing. The first fix made the
+                  * row a scroller — functionally right, but the 2026-08-27 sweep
+                  * caught what it looks like at 393px: the viewport edge cuts
+                  * the third label to "TRENDS & ANAL" and nothing signals that
+                  * the row scrolls, so Transactions may never be discovered.
+                  *
+                  * A tab bar you have to scroll is a tab bar that failed to fit,
+                  * so on phones the labels shorten (Stats / Trends) until all
+                  * four fit 375-plus with room to spare; the full names return
+                  * at sm alongside the equal-width bar. The scroller stays only
+                  * as a net for sub-360px devices.
                   */}
                 <TabsList className="w-full p-0 bg-transparent border-b border-white/10 rounded-none gap-0 h-auto justify-start overflow-x-auto sm:overflow-x-visible">
                 <TabsTrigger
                   value="roster"
-                  className="flex-none shrink-0 px-5 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className="flex-none shrink-0 px-3 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.12em] sm:tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
                   Roster
                 </TabsTrigger>
                 <TabsTrigger
                   value="stats"
-                  className="flex-none shrink-0 px-5 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className="flex-none shrink-0 px-3 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.12em] sm:tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
-                  Team Stats
+                  <span className="sm:hidden">Stats</span>
+                  <span className="hidden sm:inline">Team Stats</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="trends"
-                  className="flex-none shrink-0 px-5 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className="flex-none shrink-0 px-3 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.12em] sm:tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
-                  Trends &amp; Analytics
+                  <span className="sm:hidden">Trends</span>
+                  <span className="hidden sm:inline">Trends &amp; Analytics</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="transactions"
-                  className="flex-none shrink-0 px-5 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className="flex-none shrink-0 px-3 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.12em] sm:tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
                 >
                   Transactions
                 </TabsTrigger>
@@ -4090,7 +4098,7 @@ const Roster = () => {
       
       {/* Footer - Hidden on mobile */}
       <div className="hidden lg:block">
-        <HockeyFooter />
+        <HockeyFooter variant="app" />
       </div>
     </div>
   );

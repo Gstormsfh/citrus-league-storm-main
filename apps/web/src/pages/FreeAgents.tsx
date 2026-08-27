@@ -11,7 +11,7 @@ import {
   ShiftIcon,
   MaskIcon,
   RangeIcon,
-  MascotPortrait,
+  MascotAvatar, MascotPortrait,
   StormyLoading,
 } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
@@ -2517,10 +2517,19 @@ const FreeAgents = () => {
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
                 <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
-                  <MascotPortrait id="stormy" />
+                  {/* 2026-08-27 sweep: on a phone this card stacks into the
+                      page flow, and a full-width aspect-square portrait is a
+                      361px-tall image costing a whole thumb-swipe before three
+                      lines of tips. Mobile gets the avatar inline with the
+                      eyebrow; the hero portrait returns on lg, where this card
+                      is a sticky sidebar with room to carry it. */}
+                  <div className="hidden lg:block"><MascotPortrait id="stormy" /></div>
                   <div className="p-5">
-                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
-                      ✦ Stormy says
+                    <div className="flex items-center gap-2.5 mb-1 lg:block">
+                      <MascotAvatar id="stormy" size="sm" className="lg:hidden" />
+                      <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">
+                        ✦ Stormy says
+                      </div>
                     </div>
                     <div className="font-calistoga text-xl text-pastel-cream mb-3">Pickup priority</div>
                     <ul className="text-[11px] text-white/70 space-y-1.5 leading-relaxed">
@@ -2553,7 +2562,7 @@ const FreeAgents = () => {
           </div>
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </div>
   );
 };

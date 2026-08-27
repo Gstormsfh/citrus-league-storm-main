@@ -1156,7 +1156,7 @@ const WaiverWire = () => {
           </div>
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </div>
   );
 };

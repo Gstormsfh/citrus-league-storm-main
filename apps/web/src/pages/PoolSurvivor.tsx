@@ -426,7 +426,7 @@ const PoolSurvivor = () => {
         )}
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </DarkLayout>
   );
 };

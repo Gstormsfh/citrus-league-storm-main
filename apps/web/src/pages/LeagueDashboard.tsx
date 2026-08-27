@@ -13,6 +13,7 @@ import {
   ShiftIcon,
   MaskIcon,
   RangeIcon,
+  MascotAvatar,
   MascotPortrait,
 } from '@/components/citrus2';
 import { StormyLoading } from '@/components/citrus2/StormyLoading';
@@ -698,7 +699,7 @@ const LeagueDashboard = () => {
             </CardContent>
           </Card>
         </main>
-        <HockeyFooter />
+        <HockeyFooter variant="app" />
       </div>
     );
   }
@@ -724,7 +725,13 @@ const LeagueDashboard = () => {
                   <CupIcon className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
                   ✦ League HQ
                 </div>
-                <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-none mb-3 truncate">{league.name}</h1>
+                {/* 2026-08-27 sweep: `truncate` in a min-w-0 column, sharing a
+                    row with a shrink-0 ~180px settings button. At 393px that
+                    leaves ~170px for 30px type — the league name rendered as
+                    "HARNE…", five characters of the page's own identity. Two
+                    lines on a phone, one at sm where the row has room; the
+                    button loses its label below sm (see there). */}
+                <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-tight sm:leading-none mb-3 line-clamp-2 sm:line-clamp-none sm:truncate break-words">{league.name}</h1>
                 <div className="flex items-center gap-2 flex-wrap">
                   {(() => {
                     const status = league.draft_status;
@@ -755,10 +762,11 @@ const LeagueDashboard = () => {
                     <DialogTrigger asChild>
                       <Button
                         variant="outline"
-                        className="bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold shrink-0"
+                        className="bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold shrink-0 px-3 sm:px-4"
                       >
-                        <Settings className="mr-2 h-4 w-4" aria-hidden="true" />
-                        League Settings
+                        <Settings className="h-4 w-4 sm:mr-2" aria-hidden="true" />
+                        <span className="hidden sm:inline">League Settings</span>
+                        <span className="sr-only sm:hidden">League Settings</span>
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 text-pastel-cream">
@@ -1890,10 +1898,19 @@ Your Commissioner`);
             <aside className="w-full lg:w-auto order-2 lg:order-1">
               <div className="lg:sticky lg:top-24 space-y-4 lg:space-y-4">
                 <div className="bg-[#1A2A20] ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
-                  <MascotPortrait id="stormy" />
+                  {/* Same shape already fixed on Free Agents: this card stacks
+                      into the page flow on a phone, where a full-width
+                      aspect-square portrait is ~360px of image — a whole
+                      thumb-swipe — ahead of three lines of text. Mobile gets
+                      the avatar inline with the eyebrow; the hero portrait
+                      returns at lg, where this is a sticky sidebar with room. */}
+                  <div className="hidden lg:block"><MascotPortrait id="stormy" /></div>
                   <div className="p-5">
-                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
-                      ✦ Stormy says
+                    <div className="flex items-center gap-2.5 mb-1 lg:block">
+                      <MascotAvatar id="stormy" size="sm" className="lg:hidden" />
+                      <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">
+                        ✦ Stormy says
+                      </div>
                     </div>
                     <div className="font-calistoga text-xl text-pastel-cream mb-2">League pulse</div>
                     <p className="text-xs text-white/70 leading-relaxed">
@@ -1940,7 +1957,7 @@ Your Commissioner`);
           </div>
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </div>
   );
 };

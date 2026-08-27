@@ -681,7 +681,7 @@ const OtherTeam = () => {
           </div>
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </div>
     </ErrorBoundary>
   );

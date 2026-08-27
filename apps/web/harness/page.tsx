@@ -1,6 +1,6 @@
 /** Renders one real page at a phone viewport. ?p=waivers|settings|contact */
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Suspense, lazy } from 'react';
 import '../src/index.css';
@@ -108,6 +108,40 @@ const PRIORITY = Array.from({ length: 10 }, (_, i) => ({
 (PlayerService as any).getTrendingPlayers = async () => new Map();
 (PlayerService as any).getRosterAssignmentCount = async () => new Map();
 (PlayerService as any).recordPlayerTransaction = async () => ({ error: null });
+// TeamAnalytics gates its projected-vs-actual fetch on resolving the user's
+// team first, so without this the page's headline section silently never
+// renders — which is exactly how it looked in the 2026-08-27 sweep.
+(LeagueService as any).getUserTeam = async () => ({ team: { id: 't1' }, error: null });
+
+// Stubbed on leagueApi rather than on the apiClient stub: src/api/leagues.ts
+// imports './client' RELATIVELY, so the @/api/client alias in the harness vite
+// config never applies to it and a stub there sends a real HTTP request.
+//
+// Numbers exercise the honest cases — a category the model under-projects
+// (hits), one it over-projects (goals), and a roster where ratio and delta
+// disagree about who is carrying the team.
+(leagueApi as any).getTeamAnalytics = async () => ({
+  data: {
+    totals: {
+      goals:   { projected: 42.0, actual: 40.1 },
+      assists: { projected: 61.0, actual: 55.2 },
+      ppp:     { projected: 18.0, actual: 21.4 },
+      shots:   { projected: 305.0, actual: 291.0 },
+      blocks:  { projected: 96.0, actual: 74.5 },
+      hits:    { projected: 88.0, actual: 151.2 },
+    },
+    players: [
+      { id: 1, name: 'Connor McDavid',  position: 'C',  projectedPoints: 128.4, actualPoints: 141.2, games: 22 },
+      { id: 2, name: 'Cale Makar',      position: 'D',  projectedPoints: 96.1,  actualPoints: 112.8, games: 21 },
+      { id: 3, name: 'Kirill Kaprizov', position: 'LW', projectedPoints: 74.5,  actualPoints: 82.0,  games: 20 },
+      { id: 4, name: 'Jason Robertson', position: 'LW', projectedPoints: 81.0,  actualPoints: 62.3,  games: 22 },
+      { id: 5, name: 'Igor Shesterkin', position: 'G',  projectedPoints: 88.0,  actualPoints: 61.5,  games: 18 },
+      { id: 6, name: 'Quinn Hughes',    position: 'D',  projectedPoints: 70.2,  actualPoints: 48.9,  games: 19 },
+    ],
+    measuredPlayers: 6,
+    rosterSize: 8,
+  },
+});
 (LeagueService as any).getWatchlist = () => [];  // sync in the real service
 (LeagueService as any).addToWatchlist = async () => ({ error: null });
 (LeagueService as any).removeFromWatchlist = async () => ({ error: null });
@@ -122,10 +156,25 @@ const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
   profile: () => import('../src/pages/Profile'),
   freeagents: () => import('../src/pages/FreeAgents'),
   trade: () => import('../src/pages/TradeAnalyzer'),
+  matchup: () => import('../src/pages/Matchup'),
+  standings: () => import('../src/pages/Standings'),
+  league: () => import('../src/pages/LeagueDashboard'),
 };
 
 const which = new URLSearchParams(location.search).get('p') || 'waivers';
 const Page = lazy(PAGES[which] ?? PAGES.waivers);
+
+/**
+ * Pages that read a route param. LeagueDashboard reads :leagueId and bails with
+ * "Invalid league ID" without one, so under a bare router it rendered its error
+ * state and could not be reviewed at all. MemoryRouter lets the harness enter at
+ * a real path rather than at /harness/page.html.
+ */
+const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
+  league: { path: '/league/:leagueId', at: '/league/harness-league' },
+  matchup: { path: '/matchup/:leagueId?', at: '/matchup/harness-league' },
+};
+const routed = ROUTE_PATHS[which];
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
@@ -133,11 +182,17 @@ const queryClient = new QueryClient({
 
 createRoot(document.getElementById('root')!).render(
   <QueryClientProvider client={queryClient}>
-  <BrowserRouter>
+  <MemoryRouter initialEntries={[routed?.at ?? '/']}>
     <Suspense fallback={<div style={{ padding: 24, color: '#fff' }}>loading…</div>}>
-      <Page />
+      {routed ? (
+        <Routes>
+          <Route path={routed.path} element={<Page />} />
+        </Routes>
+      ) : (
+        <Page />
+      )}
     </Suspense>
     <Toaster />
-  </BrowserRouter>
+  </MemoryRouter>
   </QueryClientProvider>,
 );

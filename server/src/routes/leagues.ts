@@ -7,9 +7,11 @@ import { validateBody, schemas, getValidatedBody } from '../middleware/validate'
 import { createUserClient, getSupabaseAdmin } from '../lib/supabase';
 import { LeagueService } from '../services/LeagueService';
 import { SeasonStateService } from '../services/SeasonStateService';
+import { TeamAnalyticsService } from '../services/TeamAnalyticsService';
 import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
+import { getCurrentSeason } from '@citrus/shared';
 
 const leagueRoutes = new Hono<Env>();
 
@@ -291,6 +293,32 @@ leagueRoutes.get('/:leagueId/teams', membershipMiddleware, async (c) => {
   const { teams, error } = await service.getLeagueTeams(leagueId);
   if (error) return handleError(c, error, 'Failed to fetch teams');
   return ok(c, teams);
+});
+
+// GET /api/leagues/:leagueId/teams/:teamId/analytics — projected vs actual
+//
+// Returns RAW projected and actual totals. The calibration that turns those
+// into "% of expectation" lives in apps/web/src/utils/teamAnalytics.ts and is
+// deliberately not duplicated here — the projection model runs hot, the
+// correction is a stated constant, and one place to state it beats two places
+// to let it drift.
+leagueRoutes.get('/:leagueId/teams/:teamId/analytics', membershipMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const teamId = c.req.param('teamId');
+  const seasonParam = c.req.query('season');
+  const season = seasonParam ? parseInt(seasonParam, 10) : getCurrentSeason();
+
+  if (!Number.isFinite(season)) {
+    return fail(c, AppError.badRequest('Invalid season'));
+  }
+
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new TeamAnalyticsService(supabase);
+
+  const { data, error } = await service.getProjectedVsActual(leagueId, teamId, season);
+  if (error) return handleError(c, error, 'Failed to fetch team analytics');
+
+  return ok(c, data);
 });
 
 // GET /api/leagues/:leagueId/standings — Get league standings

@@ -77,10 +77,21 @@ const SOCIAL_LINKS: Record<string, string> = {
 export function HockeyFooter({
   columns = DEFAULT_COLUMNS,
   socials = ['X', 'IG', 'YT', 'RD'],
+  variant = 'marketing',
 }: {
   columns?: FooterColumn[];
   socials?: string[];
+  /**
+   * 2026-08-27 sweep: every in-app page ended with the marketing footer —
+   * a "Create a league" CTA and an elevator pitch shown to someone who is
+   * already standing inside their league. Selling to the already-sold reads
+   * as template leakage (the Sleeper-case-study "different app" problem).
+   * `app` keeps what in-app users actually use — the logo, the link columns,
+   * the squad, the legal row — and drops the pitch.
+   */
+  variant?: 'marketing' | 'app';
 }) {
+  const isApp = variant === 'app';
   return (
     <footer className="relative border-t border-white/5 bg-black/30">
       <div className="max-w-[1280px] mx-auto px-6 py-12">
@@ -93,16 +104,20 @@ export function HockeyFooter({
               </span>
               <span className="block w-1.5 h-1.5 bg-pastel-orange rounded-full animate-pulse" />
             </Link>
-            <p className="text-white/55 text-[13px] leading-relaxed mb-5 max-w-xs">
-              A 31-feature xG model, live shift-level scoring, and an AI assistant GM who knows
-              your roster. Built by hockey heads, for hockey heads.
-            </p>
-            <Link
-              to="/create-league"
-              className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[13px] font-bold px-5 h-10 rounded-md hover:bg-pastel-orange-soft hover:-translate-y-0.5 transition-all duration-200 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)] active:scale-95"
-            >
-              Create a league <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
-            </Link>
+            {!isApp && (
+              <>
+                <p className="text-white/55 text-[13px] leading-relaxed mb-5 max-w-xs">
+                  A 31-feature xG model, live shift-level scoring, and an AI assistant GM who knows
+                  your roster. Built by hockey heads, for hockey heads.
+                </p>
+                <Link
+                  to="/create-league"
+                  className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[13px] font-bold px-5 h-10 rounded-md hover:bg-pastel-orange-soft hover:-translate-y-0.5 transition-all duration-200 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.5)] active:scale-95"
+                >
+                  Create a league <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+                </Link>
+              </>
+            )}
           </div>
           {columns.map((col) => (
             <div key={col.title}>

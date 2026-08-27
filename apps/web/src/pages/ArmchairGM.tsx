@@ -223,7 +223,7 @@ const ArmchairGM = () => {
         </div>
       </main>
 
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </div>
   );
 };

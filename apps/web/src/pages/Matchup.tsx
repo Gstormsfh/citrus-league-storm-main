@@ -37,6 +37,7 @@ import { DataCacheService, TTL } from '@/services/DataCacheService';
 import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
 import { ScoringCalculator, DEFAULT_SCORING } from '@/utils/scoringUtils';
 import { logger } from '@/utils/logger';
+import { useLoadCeiling } from '@/hooks/useLoadCeiling';
 import { readUntilPresent } from '@/utils/readUntilPresent';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { usePlayoffChampion } from '@/hooks/usePlayoffChampion';
@@ -47,6 +48,11 @@ import { leagueApi } from '@/api/leagues';
 import { playerApi } from '@/api/players';
 import { publicApi } from '@/api/public';
 import { syncLeagueFromUrl } from './matchupUrlSync';
+
+/** How long the FIRST matchup load may run before the page admits failure.
+ *  Above the 15s in-flight timeout below, so a load that is merely slow still
+ *  wins; this only catches the case where nothing resolves at all. */
+const MATCHUP_LOAD_CEILING_MS = 25000;
 
 // ============================================================
 // Local type definitions for data used throughout this file
@@ -5109,6 +5115,50 @@ const Matchup = () => {
     return false;
   }, [authLoading, leagueContextLoading, loading, userLeagueState, myTeam.length, opponentTeamPlayers.length, demoMyTeam.length, demoOpponentTeam.length, error]);
 
+  /**
+   * LOADING CEILING (2026-08-27)
+   *
+   * A failed FIRST load left this page on "Loading the matchup…" forever.
+   * Verified in a browser: still spinning at 24 seconds, with no error, no
+   * retry and no way out — on the page managers open most during a week.
+   *
+   * Both exits were closed, each by a reasonable-looking decision:
+   *
+   *   1. The initial-load catch deliberately does `setError(null)` and keeps
+   *      `loading` true, to stop a transient error flashing during a race. So
+   *      `actualLoading`'s `if (!hasData && !error) return true` never becomes
+   *      false — no data ever arrives, and the error that would release it has
+   *      just been cleared.
+   *   2. The error UI below is gated on `hasInitializedRef.current`, and that
+   *      same catch path deliberately does NOT set it. So even an error that
+   *      survived could not render.
+   *
+   * The 15s timeout further down does not cover this: it lives in a different
+   * load path from the one that fails first.
+   *
+   * Suppressing a TRANSIENT error during a race is right. Suppressing a
+   * TERMINAL one is how you ship an infinite spinner. This bounds it: if the
+   * first load has still not succeeded by the ceiling, say so and let the
+   * existing retry UI become reachable. A load that succeeds later still wins,
+   * because every success path sets `hasInitializedRef` and `actualLoading`
+   * returns false on it before anything else is considered.
+   *
+   * The timer itself lives in useLoadCeiling so it can be TESTED — this file
+   * is 5,600 lines with no page-level test, so inline it would have been a
+   * load-state fix with no coverage, which is how the original bug survived.
+   * See hooks/__tests__/useLoadCeiling.test.ts.
+   */
+  useLoadCeiling(
+    hasInitializedRef,
+    () => {
+      logger.error('[Matchup] initial load exceeded the ceiling — surfacing an error instead of spinning');
+      hasInitializedRef.current = true;
+      setLoading(false);
+      setError('We couldn\u2019t load this matchup. Check your connection and try again.');
+    },
+    MATCHUP_LOAD_CEILING_MS,
+  );
+
   // Apply minimum display time (1000ms) to prevent jarring flash effect
   // This ensures a single, smooth loading screen without cycling
   const shouldShowLoading = useMinimumLoadingTime(actualLoading, 1000);
@@ -5582,7 +5632,7 @@ const Matchup = () => {
       </main>
       {/* Footer - Hidden on mobile */}
       <div className="hidden lg:block">
-        <HockeyFooter />
+        <HockeyFooter variant="app" />
       </div>
     </div>
   );

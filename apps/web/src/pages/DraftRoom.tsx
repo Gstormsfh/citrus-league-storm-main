@@ -4855,7 +4855,7 @@ const DraftRoomInner = () => {
           </div>
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
       
       {/* Player Stats Modal */}
       <PlayerStatsModal
