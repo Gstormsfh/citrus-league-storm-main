@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from data_pipeline.acquisition.fetch_injury_status import (  # noqa: E402
     Resolver,
+    _fantasy_status_text,
     map_status,
     normalize_name,
 )
@@ -251,3 +252,69 @@ def test_empty_name_is_unresolved_not_crashing():
         {"player_id": 8478402, "full_name": "Connor McDavid", "team_abbrev": "EDM", "position_code": "C"},
     ])
     assert r.resolve("", "EDM") == (None, "empty-name")
+
+
+# ── details.fantasyStatus shape ───────────────────────────────────────────
+#
+# The first successfully-proxied run (2026-08-27) crashed on every entry with
+# AttributeError: 'dict' object has no attribute 'strip', wrote zero rows, and
+# only got that far because the proxy fix had just landed. The module docstring
+# had described this field as a bare string since the file was written; nothing
+# had ever exercised it against the real payload, because every prior run died
+# earlier on a 403.
+
+def test_fantasy_status_object_yields_the_long_form():
+    """description is preferred over abbreviation, deliberately.
+
+    STATUS_MAP is keyed mostly on long forms, so `description` resolves all
+    three live designations directly while `abbreviation` misses on SUSP.
+    """
+    assert _fantasy_status_text({"description": "Suspension", "abbreviation": "SUSP"}) == "Suspension"
+
+
+def test_fantasy_status_falls_back_to_abbreviation():
+    assert _fantasy_status_text({"abbreviation": "IR"}) == "IR"
+
+
+def test_fantasy_status_accepts_a_bare_string():
+    """The shape the docstring used to claim. Kept working, not assumed gone."""
+    assert _fantasy_status_text("OUT") == "OUT"
+
+
+@pytest.mark.parametrize("value", [None, {}, {"description": ""}, 42, [], {"description": None}])
+def test_fantasy_status_degrades_to_none_rather_than_raising(value):
+    """A surprise shape costs one field, never the run.
+
+    This is the regression guard for the zero-row failure: any unusable value
+    must route the entry to the `status` fallback instead of propagating a
+    type into map_status.
+    """
+    assert _fantasy_status_text(value) is None
+
+
+@pytest.mark.parametrize(
+    "fantasy_status_object,expected_code,expected_ir",
+    [
+        ({"description": "IR", "abbreviation": "IR"}, "IR", True),
+        ({"description": "OUT", "abbreviation": "OUT"}, "OUT", False),
+        ({"description": "Suspension", "abbreviation": "SUSP"}, "SUSP", False),
+    ],
+)
+def test_live_vocabulary_maps_end_to_end(fantasy_status_object, expected_code, expected_ir):
+    """Every distinct fantasyStatus in the 2026-08-27 99-entry payload."""
+    code, ir, recognised = map_status(_fantasy_status_text(fantasy_status_object), None)
+    assert (code, ir, recognised) == (expected_code, expected_ir, True)
+
+
+def test_abbreviation_susp_is_mappable_on_its_own():
+    """SUSP was absent from STATUS_MAP, so the abbreviation path only ever
+    resolved by accident via the `status` fallback."""
+    code, ir, recognised = map_status("SUSP", None)
+    assert (code, ir, recognised) == ("SUSP", False, True)
+
+
+def test_map_status_survives_a_raw_object():
+    """Defence in depth: even if a caller regresses and passes the object
+    through unextracted, the run degrades instead of dying."""
+    code, ir, recognised = map_status({"description": "IR"}, "Injured Reserve")
+    assert (code, ir, recognised) == ("IR", True, True)
