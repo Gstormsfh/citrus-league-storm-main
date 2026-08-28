@@ -267,7 +267,11 @@ def citrus_request(
         try:
             # Truncate URL for cleaner logs
             url_display = url if len(url) <= 60 else f"...{url[-57:]}"
-            logger.info(f"[Citrus-IP-Rotator] Requesting {url_display} via {proxy_ip}...")
+            # Pool position included deliberately. The masked IP alone cannot
+            # distinguish rotation from repetition within one /24.
+            pool_size = proxy_manager.get_proxy_count()
+            position = f" [{attempt + 1}/{retries} via pool of {pool_size}]" if pool_size else ""
+            logger.info(f"[Citrus-IP-Rotator] Requesting {url_display} via {proxy_ip}{position}...")
             
             # Make request using session for connection pooling
             response = session.request(
@@ -301,13 +305,41 @@ def citrus_request(
                 time.sleep(backoff_time)
                 continue
             
-            # Handle proxy authentication errors (403/407)
-            if response.status_code in (403, 407) and proxy_url:
+            # 407 PROXY AUTHENTICATION REQUIRED — the proxy rejected us.
+            # Refreshing the list is right: the credentials may have rotated.
+            if response.status_code == 407 and proxy_url:
                 logger.warning(
-                    f"[Citrus-IP-Rotator] Proxy auth error ({response.status_code}), refreshing proxy list..."
+                    "[Citrus-IP-Rotator] Proxy auth rejected (407), refreshing proxy list..."
                 )
                 proxy_manager.force_refresh()
                 _increment_circuit_breaker()
+                continue
+
+            # 403 FORBIDDEN — the DESTINATION refused this exit IP. A different
+            # condition entirely, and it needs the opposite response.
+            #
+            # These two were handled together, and force_refresh() rebuilds the
+            # pool AND resets itertools.cycle to index 0. So every retry after a
+            # 403 re-sent through proxy_list[0] — the one IP already known to be
+            # blocked. Five "attempts" were one proxy tried five times, out of a
+            # hundred available.
+            #
+            # It was invisible because _extract_ip_from_proxy masks the last
+            # octet: a hundred distinct proxies and one repeated proxy both log
+            # as `89.45.125.xxx`. On 2026-08-28 that read as "ESPN has blocked
+            # the whole Webshare range" and nearly bought a residential plan to
+            # solve a bug. The pool position in the request log below is there
+            # so the next occurrence is legible.
+            #
+            # Correct response to a destination 403 is to advance the rotation,
+            # which the loop does on its own. Do not refresh, and do not touch
+            # the circuit breaker: the pool is healthy, this exit IP is not.
+            if response.status_code == 403 and proxy_url:
+                logger.warning(
+                    "[Citrus-IP-Rotator] Destination refused this exit IP (403) "
+                    "via %s, rotating to the next proxy...",
+                    proxy_ip,
+                )
                 continue
             
             # Handle server errors (5xx)
