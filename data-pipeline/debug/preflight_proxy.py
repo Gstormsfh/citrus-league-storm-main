@@ -69,8 +69,22 @@ logging.basicConfig(level=logging.INFO, format="  %(levelname)s %(message)s")
 
 
 def rule(title: str) -> None:
+    """Print a section header.
+
+    This function prints ASCII only, and so does every message below it.
+
+    On Windows, Python encodes a redirected stdout with the locale codepage.
+    U+2500 (the box-drawing rule this used to print) does not exist in cp1252,
+    so the script died with UnicodeEncodeError on its first section header --
+    before running a single check, in the one environment it was written for.
+    CI never saw it: the runners are Linux and UTF-8.
+
+    sys.stdout.reconfigure() would also fix it, but it is absent when stdout
+    has been replaced by a capture object, which is exactly where redirected
+    output comes from. ASCII has no failure mode.
+    """
     print("\n" + title)
-    print("─" * max(len(title), 40))
+    print("-" * max(len(title), 40))
 
 
 def main() -> int:
@@ -100,7 +114,7 @@ def main() -> int:
 
     if not pm.is_enabled():
         print(
-            "\n  Disabled despite all three being set — check CITRUS_PROXY_ENABLED,\n"
+            "\n  Disabled despite all three being set -- check CITRUS_PROXY_ENABLED,\n"
             "  which defaults to true and can only turn things off."
         )
         return 1
@@ -127,7 +141,7 @@ def main() -> int:
 
     rule("3. ESPN injuries feed, through the proxy")
     print(f"  GET {ESPN_INJURIES_URL}")
-    print("  watch for `via <ip>` below — `via direct` means no proxy was used\n")
+    print("  watch for `via <ip>` below -- `via direct` means no proxy was used\n")
     try:
         resp = citrus_request(ESPN_INJURIES_URL, timeout=20)
     except Exception as exc:  # noqa: BLE001 - preflight reports, never raises
@@ -139,7 +153,7 @@ def main() -> int:
 
     if status == 403:
         print(
-            "\n  403 — this is the failure the proxy is meant to solve, so the proxy\n"
+            "\n  403 -- this is the failure the proxy is meant to solve, so the proxy\n"
             "  is not solving it. Most likely the exit IP is itself blocked. On the\n"
             "  free tier the IPs are shared between customers, which makes that\n"
             "  ordinary rather than surprising. Re-run to draw a different IP from\n"
@@ -165,7 +179,7 @@ def main() -> int:
 
     if not teams:
         print(
-            "\n  200 with an empty injuries[] — the request got through but the feed\n"
+            "\n  200 with an empty injuries[] -- the request got through but the feed\n"
             "  shape has moved. That is a fetch_injury_status.py problem, not a\n"
             "  proxy problem."
         )
