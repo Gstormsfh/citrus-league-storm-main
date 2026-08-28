@@ -35,9 +35,25 @@ def test_printable_source_is_ascii_only():
     )
 
 
-def test_printed_strings_encode_in_the_narrowest_windows_codepage():
-    """cp437, not cp1252. An em dash survives cp1252 and dies in cp437, so
-    testing the wider one would pass while the older console still broke."""
+def test_printed_strings_encode_in_cp437():
+    """A second Windows codepage, NOT a narrower one.
+
+    The original version of this docstring called cp437 "the narrowest"
+    codepage and justified the test on cp1252 being a superset of it. That is
+    wrong, and measurably so:
+
+        cp1252   U+2500 box-drawing  FAILS      U+2014 em dash  encodes
+        cp437    U+2500 box-drawing  encodes    U+2014 em dash  FAILS
+
+    Neither contains the other. cp437 would have stayed green on the exact
+    character that caused the original crash, because U+2500 is a DOS
+    box-drawing glyph and cp437 is the DOS codepage.
+
+    So this test is not the safety net — test_printable_source_is_ascii_only
+    is, and it subsumes every codepage. This one exists only to catch a
+    regression that reintroduces a cp1252-safe character such as an em dash,
+    which the ASCII test would also catch but names less specifically.
+    """
     src = _executable_source(open(MODULE, encoding="utf-8").read())
     for literal in re.findall(r'"((?:[^"\\]|\\.)*)"', src):
         literal.encode("cp437")
