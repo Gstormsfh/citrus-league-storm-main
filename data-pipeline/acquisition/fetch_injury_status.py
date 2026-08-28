@@ -43,7 +43,9 @@ WHAT THE FEED GIVES
 ───────────────────
   injuries[] (per team) -> injuries[] (per player)
       status                 "Out" | "Suspension" | "Injured Reserve" | ...
-      details.fantasyStatus  "OUT" | "IR" | ...      <- fantasy-purposed
+      details.fantasyStatus  OBJECT, not a string    <- fantasy-purposed
+                             {"description": "Suspension",
+                              "abbreviation": "SUSP"}
       details.type           body part, e.g. "Knee"
       details.detail         e.g. "Surgery"
       details.returnDate
@@ -118,8 +120,14 @@ signal.signal(signal.SIGTERM, _handle_signal)
 
 # ── Status mapping ────────────────────────────────────────────────────────
 #
-# DELIBERATELY OPEN. Observed on 2026-08-26 (off-season, 9 entries):
-# status "Out" | "Suspension" | "Injured Reserve"; fantasyStatus "OUT" | "IR".
+# DELIBERATELY OPEN. Re-observed 2026-08-27 on a 99-entry payload (the
+# 2026-08-26 reading saw only 9, because that request went out unproxied and
+# ESPN served a stub). The complete distinct vocabulary at that size:
+#
+#   status                     Out | Suspension | Injured Reserve
+#   fantasyStatus.description  OUT | IR | Suspension
+#   fantasyStatus.abbreviation OUT | IR | SUSP
+#
 # In season this will carry more — "Day-To-Day" at minimum. An unrecognised
 # value is stored verbatim and logged, never silently dropped to NULL, because
 # NULL is indistinguishable from healthy everywhere downstream.
@@ -132,6 +140,7 @@ STATUS_MAP: Dict[str, Tuple[str, bool]] = {
     "OUT": ("OUT", False),
     "DTD": ("GTD", False),
     "GTD": ("GTD", False),
+    "SUSP": ("SUSP", False),
     "SUSPENSION": ("SUSP", False),
     # status (fallback when fantasyStatus is absent)
     "INJURED RESERVE": ("IR", True),
@@ -151,7 +160,15 @@ def map_status(fantasy_status: Optional[str], status: Optional[str]) -> Tuple[st
     raw string is still stored — an unknown designation is information, and
     dropping it to NULL would render the player healthy in every consumer.
     """
-    for raw in (fantasy_status, status):
+    # Coerce defensively. fetch_feed is supposed to hand this function
+    # strings, and on 2026-08-27 it did not — details.fantasyStatus arrived as
+    # an object and `.strip()` raised AttributeError on every entry, so the run
+    # wrote zero rows. Degrading a surprise type to None costs one unrecognised
+    # entry, which the post-run assertion already measures; raising costs the
+    # entire sync.
+    candidates = [v if isinstance(v, str) else None for v in (fantasy_status, status)]
+
+    for raw in candidates:
         if not raw:
             continue
         key = raw.strip().upper()
@@ -159,7 +176,7 @@ def map_status(fantasy_status: Optional[str], status: Optional[str]) -> Tuple[st
             code, ir = STATUS_MAP[key]
             return code, ir, True
 
-    raw = (fantasy_status or status or "").strip()
+    raw = (candidates[0] or candidates[1] or "").strip()
     return (raw.upper()[:32] or "OUT"), False, False
 
 
@@ -289,6 +306,51 @@ class Resolver:
 
 # ── Feed ──────────────────────────────────────────────────────────────────
 
+def _fantasy_status_text(value) -> Optional[str]:
+    """Pull a mappable string out of details.fantasyStatus.
+
+    The module docstring below documented this field as a bare string
+    ("OUT" | "IR" | ...) and it is not one — verified against the live feed on
+    2026-08-27, it is an object:
+
+        {"description": "Suspension", "abbreviation": "SUSP"}
+
+    Passing that through raw is what made the first proxied run crash in
+    map_status with AttributeError on every entry.
+
+    `description` is preferred over `abbreviation`, which is the opposite of
+    the obvious choice and the reason this is a function rather than an
+    inline .get(). Across the three designations the feed currently emits:
+
+        abbreviation   OUT | IR | SUSP
+        description    OUT | IR | Suspension
+
+    STATUS_MAP is keyed mostly on long forms, so `description` resolves all
+    three directly while `abbreviation` misses on SUSP and only lands via the
+    `status` fallback. Preferring the long form keeps the field the docstring
+    calls "the field to trust" actually doing the work. SUSP is added to
+    STATUS_MAP regardless, so the abbreviation path resolves too if
+    `description` ever disappears.
+
+    An unexpected type degrades to None and warns, which routes the entry to
+    the `status` fallback. The feed is undocumented and carries no SLA; a
+    shape change should cost one field, not the run.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value or None
+    if isinstance(value, dict):
+        for key in ("description", "abbreviation"):
+            candidate = value.get(key)
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate
+        logger.warning("fantasyStatus object carried no usable text: keys=%s", sorted(value))
+        return None
+    logger.warning("fantasyStatus had unexpected type %s", type(value).__name__)
+    return None
+
+
 def fetch_feed() -> List[dict]:
     """Flatten ESPN's team -> players nesting into one list of entries."""
     logger.info("Fetching %s", ESPN_INJURIES_URL)
@@ -313,7 +375,7 @@ def fetch_feed() -> List[dict]:
                     "team": (athlete.get("team") or {}).get("abbreviation") or team_abbrev,
                     "team_name": team_name,
                     "status": item.get("status"),
-                    "fantasy_status": details.get("fantasyStatus"),
+                    "fantasy_status": _fantasy_status_text(details.get("fantasyStatus")),
                     "comment": item.get("shortComment") or item.get("longComment"),
                     "return_date": details.get("returnDate"),
                 }
