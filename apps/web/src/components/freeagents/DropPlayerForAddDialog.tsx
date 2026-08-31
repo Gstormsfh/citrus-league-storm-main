@@ -249,8 +249,24 @@ export function DropPlayerForAddDialog({
       className={rowClass(opts)}
     >
       <td className="px-2 py-2 sm:px-3"><Badge variant="secondary" className="w-8 justify-center">{p.position}</Badge></td>
-      <td className="px-2 py-2 sm:px-3 font-medium">
-        <span className="block truncate max-w-[7.5rem] sm:max-w-[11rem]">{p.full_name}</span>
+      {/*
+        * THE NAME COLUMN TAKES EVERY SPARE PIXEL, THEN ELLIPSIZES.
+        *
+        * This was a fixed cap: max-w-[7.5rem] on the phone, 120px, chosen so
+        * `truncate` had a width to resolve against inside an auto-layout
+        * table. It cut "Alexander Ovechkin" to "Alexander Ov..." with half
+        * the row sitting empty next to it, because a hardcoded cap cannot
+        * know how much room the visible stat columns actually left over.
+        *
+        * w-full + max-w-0 on the cell is the table idiom that does know:
+        * w-full makes this the greedy column (it receives all width the
+        * content-sized stat columns do not claim), and max-w-0 gives the
+        * overflow machinery a resolvable bound so truncate still works.
+        * No magic number, every viewport, and a long name can never force
+        * the row wider than the dialog.
+        */}
+      <td className="px-2 py-2 sm:px-3 font-medium w-full max-w-0">
+        <span className="block truncate">{p.full_name}</span>
       </td>
       <td className={`px-2 py-2 sm:px-3 text-muted-foreground ${HIDE_SM}`}>{p.team}</td>
       <td className="px-2 py-2 sm:px-3 text-right tabular-nums">{num(p.games_played)}</td>
@@ -271,8 +287,24 @@ export function DropPlayerForAddDialog({
       className={rowClass(opts)}
     >
       <td className="px-2 py-2 sm:px-3"><Badge variant="secondary" className="w-8 justify-center">G</Badge></td>
-      <td className="px-2 py-2 sm:px-3 font-medium">
-        <span className="block truncate max-w-[7.5rem] sm:max-w-[11rem]">{p.full_name}</span>
+      {/*
+        * THE NAME COLUMN TAKES EVERY SPARE PIXEL, THEN ELLIPSIZES.
+        *
+        * This was a fixed cap: max-w-[7.5rem] on the phone, 120px, chosen so
+        * `truncate` had a width to resolve against inside an auto-layout
+        * table. It cut "Alexander Ovechkin" to "Alexander Ov..." with half
+        * the row sitting empty next to it, because a hardcoded cap cannot
+        * know how much room the visible stat columns actually left over.
+        *
+        * w-full + max-w-0 on the cell is the table idiom that does know:
+        * w-full makes this the greedy column (it receives all width the
+        * content-sized stat columns do not claim), and max-w-0 gives the
+        * overflow machinery a resolvable bound so truncate still works.
+        * No magic number, every viewport, and a long name can never force
+        * the row wider than the dialog.
+        */}
+      <td className="px-2 py-2 sm:px-3 font-medium w-full max-w-0">
+        <span className="block truncate">{p.full_name}</span>
       </td>
       <td className={`px-2 py-2 sm:px-3 text-muted-foreground ${HIDE_SM}`}>{p.team}</td>
       <td className="px-2 py-2 sm:px-3 text-right tabular-nums">{num(p.goalie_gp ?? 0)}</td>
