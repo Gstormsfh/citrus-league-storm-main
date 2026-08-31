@@ -544,7 +544,7 @@ const Standings = () => {
           <div className="flex flex-col md:flex-row items-center justify-between max-w-5xl mx-auto mb-8">
             <div className="mb-4 md:mb-0 animated-element animate">
               <h2 className="text-2xl font-bold text-pastel-cream">
-                {userLeagueState === 'active-user' && selectedLeague ? selectedLeague.name : 'CitrusSports League'}
+                {userLeagueState === 'active-user' && selectedLeague ? selectedLeague.name : 'Citrus League'}
               </h2>
               <p className="text-white/55">
                 {leagueFormat.scoringFormat !== 'h2h-points' && (
