@@ -22,7 +22,7 @@ const DEFAULT_COLUMNS: FooterColumn[] = [
       { label: 'Survivor', to: '/pool/survivor' },
       { label: 'Confidence Pool', to: '/pool/confidence' },
       { label: 'Stanley Cup Brackets', to: '/nhl/playoffs' },
-      { label: 'Mock Draft', to: '/draft' },
+      { label: 'Mock Draft', to: '/armchair-gm?tab=mockdraft' },
     ],
   },
   {

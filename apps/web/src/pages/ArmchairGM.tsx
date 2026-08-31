@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
 import { HockeyFooter } from '@/components/citrus2';
@@ -30,8 +31,22 @@ const TABS: { id: GMTab; label: string; shortLabel: string; icon: React.ReactNod
   { id: 'mockdraft', label: 'Mock Draft', shortLabel: 'Draft', icon: <Trophy className="w-4 h-4" />, description: 'Practice your draft strategy' },
 ];
 
+const GM_TAB_IDS: GMTab[] = ['tracker', 'trade', 'signing', 'buyout', 'projection', 'mockdraft'];
+
 const ArmchairGM = () => {
-  const [activeTab, setActiveTab] = useState<GMTab>('tracker');
+  /*
+   * THE TAB IS LINKABLE, NOT JUST CLICKABLE.
+   *
+   * Every "Mock Draft" entry in the app's navigation used to point at
+   * /draft — the retired v1 league draft room, behind auth — while the
+   * actual mock draft simulator lived here, under a tab nothing could
+   * deep-link to. ?tab=mockdraft is what lets navigation reach it.
+   */
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab') as GMTab | null;
+  const [activeTab, setActiveTab] = useState<GMTab>(
+    requestedTab && GM_TAB_IDS.includes(requestedTab) ? requestedTab : 'tracker'
+  );
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const [showTeamSelector, setShowTeamSelector] = useState(true);
 
