@@ -226,3 +226,43 @@ describe('DropPlayerForAddDialog — the scrolling contract', () => {
     expect(SOURCE).toMatch(/overscroll-contain/);
   });
 });
+
+describe('DropPlayerForAddDialog — the name column contract', () => {
+  // Reported from the Capacitor build (2026-08-28): "adding/dropping a player
+  // their name gets cut off in the player menu." The name span carried a fixed
+  // cap — max-w-[7.5rem] on the phone, 120 CSS pixels — chosen so `truncate`
+  // had a bound to resolve against inside an auto-layout table. It cut
+  // "Alexander Ovechkin" to a stub while the row had empty width to spare,
+  // because a hardcoded cap cannot know how much room the visible stat
+  // columns actually left.
+  //
+  // The idiom that does know is on the CELL, not the span: w-full makes the
+  // name column the greedy one (it receives every pixel the content-sized
+  // stat columns do not claim) and max-w-0 gives the overflow machinery a
+  // resolvable bound so truncate still works. jsdom has no layout engine, so
+  // these are source contracts — the classes ARE the behavior.
+
+  it('never caps the name span at a fixed width again', () => {
+    const nameSpans = SOURCE.match(/<span[^>]*>\{p\.full_name\}<\/span>/g) ?? [];
+    expect(nameSpans.length).toBeGreaterThanOrEqual(2);
+    for (const span of nameSpans) {
+      expect(span).not.toMatch(/max-w-\[[\d.]+rem\]/);
+    }
+  });
+
+  it('makes the name cell the greedy column with a resolvable overflow bound', () => {
+    const nameCells = SOURCE.match(/<td[^>]*>\s*<span[^>]*>\{p\.full_name\}/g) ?? [];
+    expect(nameCells.length).toBeGreaterThanOrEqual(2);
+    for (const cell of nameCells) {
+      expect(cell).toMatch(/w-full/);
+      expect(cell).toMatch(/max-w-0/);
+    }
+  });
+
+  it('still ellipsizes rather than letting a long name widen the row', () => {
+    const nameSpans = SOURCE.match(/<span[^>]*>\{p\.full_name\}<\/span>/g) ?? [];
+    for (const span of nameSpans) {
+      expect(span).toMatch(/truncate/);
+    }
+  });
+});
