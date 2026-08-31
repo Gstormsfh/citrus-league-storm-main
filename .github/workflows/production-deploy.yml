@@ -191,12 +191,38 @@ jobs:
           # Anthropic key has to reach Cloud Run. Setting it here keeps it
           # reproducible from the repo; the deploy uses --update-env-vars,
           # so it merges rather than replacing the service environment.
+          #
+          # Chunk: APNs. PushService.loadApnsConfigFromEnv() returns null
+          # unless APNS_KEY_ID, APNS_TEAM_ID and APNS_PRIVATE_KEY are all
+          # present, and a null config leaves the service dormant — draft
+          # "on the clock" pushes silently never send and nothing errors.
+          # So the three have to reach Cloud Run, not just exist as repo
+          # secrets.
+          #
+          # Safe to merge before the secrets exist. An unset secret
+          # interpolates to an empty string, `KEY=` sets an empty value
+          # rather than unsetting (that is what --remove-env-vars is for),
+          # and loadApnsConfigFromEnv treats empty as absent and returns
+          # null. Same dormant state as today, no startup failure.
+          #
+          # APNS_PRODUCTION=true selects api.push.apple.com. TestFlight and
+          # App Store builds carry production device tokens; a build
+          # installed straight from Xcode carries a sandbox token, which
+          # production APNs rejects and PushService.pruneToken then deletes
+          # from device_tokens. Test on TestFlight, not a debug install.
+          #
+          # These comments are deliberately ABOVE `env_vars: |` and not
+          # inside it. See the 2026-08-24 note below.
           env_vars: |
             NODE_ENV=production
             SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
             SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
             SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
             ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+            APNS_KEY_ID=${{ secrets.APNS_KEY_ID }}
+            APNS_TEAM_ID=${{ secrets.APNS_TEAM_ID }}
+            APNS_PRIVATE_KEY=${{ secrets.APNS_PRIVATE_KEY }}
+            APNS_PRODUCTION=true
           # ── Cloud Run scaling config ────────────────────────────────
           # These flags MUST stay in sync with ops/cloudrun/service.yaml.
           # The April 10 disaster (LIVE_DRAFT_DISASTER_POSTMORTEM.md §3)
