@@ -74,7 +74,7 @@ function getHeroSlides(): HeroSlide[] {
       headline: { lead: 'Fantasy Hockey', accent: '2026' },
       sub: 'A 31-feature xG model. Live shift-level scoring. Snake, auction, or salary-cap drafts. Built by hockey heads, for hockey heads. Lock in founders pricing now.',
       primary: { label: 'Drop the Puck', to: '/create-league' },
-      secondary: { label: 'Try a mock draft →', to: '/draft' },
+      secondary: { label: 'Try a mock draft →', to: '/armchair-gm?tab=mockdraft' },
       visual: <SceneVisual src="/mascots/scene-squad.webp" alt="The Citrus Squad on the bench" />,
     },
     {
@@ -183,7 +183,7 @@ const GAME_MODES: Array<{
     badge: 'Anytime',
     accent: 'sage',
     icon: DraftIcon,
-    to: '/draft',
+    to: '/armchair-gm?tab=mockdraft',
   },
 ];
 
@@ -211,7 +211,7 @@ const ONBOARDING_CARDS: Array<{
     cta: 'Mock now',
     icon: DraftIcon,
     accent: 'sage',
-    to: '/draft',
+    to: '/armchair-gm?tab=mockdraft',
     mascotPeek: 'kiwi',
   },
   {
