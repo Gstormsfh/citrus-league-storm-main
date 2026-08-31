@@ -1,6 +1,6 @@
 {
   "appId": "com.citrussports.app",
-  "appName": "CitrusSports",
+  "appName": "Citrus",
   "webDir": "dist",
   "ios": {
     "contentInset": "automatic"
