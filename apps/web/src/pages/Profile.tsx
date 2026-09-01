@@ -996,8 +996,21 @@ const Profile = () => {
   if (!user) {
     return (
       <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
-        <Navbar />
-        <main className="pt-16 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
+        {/* MOBILE CHROME (2026-09-01): Profile was the last core page on the
+            old shell — global fixed Navbar + a hard pt-16. The fixed bar
+            grows by env(safe-area-inset-top) on notched phones while pt-16
+            doesn't, so in the native app the page's first ~50px rendered
+            UNDERNEATH the translucent bar ("settings page appears to be
+            desktop version"). Every other core page hides the Navbar below
+            lg and renders its own sticky safe-area header (see
+            LeagueDashboard); Profile now matches. */}
+        <div className="hidden lg:block"><Navbar /></div>
+        <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+          <div className="flex items-center justify-center h-12 px-4">
+            <h1 className="text-lg font-bold text-pastel-cream">Profile</h1>
+          </div>
+        </div>
+        <main className="w-full pt-6 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
           <div className="container mx-auto px-3 sm:px-4">
             <div className="max-w-2xl mx-auto">
               <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_24px_60px_-16px_rgba(255,168,87,0.25)] relative overflow-hidden">
@@ -1030,8 +1043,16 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
-      <Navbar />
-      <main className="pt-16 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
+      {/* MOBILE CHROME (2026-09-01) — same pattern as the signed-out branch
+          above and every other core page: Navbar is desktop-only, phones get
+          the sticky safe-area header + bottom nav. */}
+      <div className="hidden lg:block"><Navbar /></div>
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+        <div className="flex items-center justify-center h-12 px-4">
+          <h1 className="text-lg font-bold text-pastel-cream">Profile</h1>
+        </div>
+      </div>
+      <main className="w-full pt-6 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
         <div className="container mx-auto px-3 sm:px-4">
           <div className="max-w-6xl mx-auto">
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6 lg:space-y-8">
@@ -1111,10 +1132,10 @@ const Profile = () => {
                 </div>
 
                 <TabsList className="animated-element w-full lg:w-auto grid grid-cols-4 lg:flex bg-[#1A2A20] ring-1 ring-white/10 p-1 rounded-xl">
-                  <TabsTrigger value="overview" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Overview</TabsTrigger>
-                  <TabsTrigger value="stats" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Statistics</TabsTrigger>
-                  <TabsTrigger value="achievements" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Trophies</TabsTrigger>
-                  <TabsTrigger value="settings" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Settings</TabsTrigger>
+                  <TabsTrigger value="overview" className="px-1.5 sm:px-3 text-xs sm:text-sm text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Overview</TabsTrigger>
+                  <TabsTrigger value="stats" className="px-1.5 sm:px-3 text-xs sm:text-sm text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Statistics</TabsTrigger>
+                  <TabsTrigger value="achievements" className="px-1.5 sm:px-3 text-xs sm:text-sm text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Trophies</TabsTrigger>
+                  <TabsTrigger value="settings" className="px-1.5 sm:px-3 text-xs sm:text-sm text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Settings</TabsTrigger>
                 </TabsList>
               </div>
 
@@ -1724,10 +1745,10 @@ const Profile = () => {
                         ) : selectedSettingsLeagueId && selectedLeagueData ? (
                           <Tabs value={commSettingsTab} onValueChange={setCommSettingsTab} className="w-full">
                             <TabsList className="grid w-full grid-cols-4 bg-[#0F1F15] ring-1 ring-white/10 p-1 rounded-xl">
-                              <TabsTrigger value="waivers" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Waivers</TabsTrigger>
-                              <TabsTrigger value="scoring" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Scoring</TabsTrigger>
-                              <TabsTrigger value="draft" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Draft</TabsTrigger>
-                              <TabsTrigger value="rosters" className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Rosters</TabsTrigger>
+                              <TabsTrigger value="waivers" className="px-1.5 sm:px-3 text-xs sm:text-sm text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Waivers</TabsTrigger>
+                              <TabsTrigger value="scoring" className="px-1.5 sm:px-3 text-xs sm:text-sm text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Scoring</TabsTrigger>
+                              <TabsTrigger value="draft" className="px-1.5 sm:px-3 text-xs sm:text-sm text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Draft</TabsTrigger>
+                              <TabsTrigger value="rosters" className="px-1.5 sm:px-3 text-xs sm:text-sm text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">Rosters</TabsTrigger>
                             </TabsList>
 
                             {/* Waiver Settings Tab */}
