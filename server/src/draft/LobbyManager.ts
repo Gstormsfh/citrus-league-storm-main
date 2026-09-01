@@ -4520,6 +4520,20 @@ export class LobbyManager {
    * notify and send nothing anyway.
    */
   private armPickDeadline(rpcDeadline: Date): void {
+    // AUCTION INCIDENT (2026-09-01, league a1a125c8 seq 4): the
+    // draft_started apply path armed this snake/linear pick clock in
+    // an AUCTION lobby (the start RPC stamps first_pick_deadline for
+    // every format), and 90s later the snake autopick fired into a
+    // live auction. This wrapper is the enforced single entry point
+    // for the pick clock (E113), so the format fence lives here:
+    // auction lobbies keep time exclusively through the bid-window
+    // and nomination-window timers.
+    if (this.format === 'auction') {
+      structuredLogger.warn(
+        `[lobby] armPickDeadline suppressed for auction lobby lobbyId=${this.lobbyId}`,
+      );
+      return;
+    }
     this.setPickDeadline(
       this.computeArmDeadlineForOnClockTeam(rpcDeadline),
       'pick',
@@ -5114,6 +5128,39 @@ export class LobbyManager {
    * client-facing `close_nomination` action that needs to be
    * idempotency-cached or auth-checked.
    */
+  /**
+   * WEDGE-PROOFING (2026-09-01): one transient RPC failure at lot
+   * close used to clear the engine's nomination silently — no durable
+   * event, so every connected client kept rendering the lot frozen at
+   * 0s (the a1a125c8 incident's visible symptom). One short retry
+   * absorbs the transient class; the idempotency key makes the retry
+   * safe if the first attempt actually committed.
+   */
+  private async closeNominationWithRetry(
+    nominationId: string,
+  ): Promise<Awaited<ReturnType<DraftServiceV2['closeNomination']>>> {
+    const call = () =>
+      this.draftService.closeNomination({
+        leagueId: this.leagueId,
+        nominationId,
+        idempotencyKey: `close-${nominationId}`,
+        actor: {
+          kind: 'autopick',
+          id: 'auction-engine',
+          session_id: randomUUID(),
+        },
+      });
+    try {
+      return await call();
+    } catch (firstErr) {
+      structuredLogger.warn(
+        `[lobby] closeNomination first attempt threw — retrying once lobbyId=${this.lobbyId} nominationId=${nominationId} error=${firstErr instanceof Error ? firstErr.message : String(firstErr)}`,
+      );
+      await new Promise((r) => setTimeout(r, 400));
+      return await call();
+    }
+  }
+
   private async handleNominationTimeout(): Promise<void> {
     if (this.currentNomination === null) {
       structuredLogger.warn(
@@ -5125,16 +5172,7 @@ export class LobbyManager {
 
     let result: Awaited<ReturnType<DraftServiceV2['closeNomination']>>;
     try {
-      result = await this.draftService.closeNomination({
-        leagueId: this.leagueId,
-        nominationId: nomination.nominationId,
-        idempotencyKey: `close-${nomination.nominationId}`,
-        actor: {
-          kind: 'autopick',
-          id: 'auction-engine',
-          session_id: randomUUID(),
-        },
-      });
+      result = await this.closeNominationWithRetry(nomination.nominationId);
     } catch (err) {
       structuredLogger.error(
         `[lobby] closeNomination RPC threw lobbyId=${this.lobbyId} nominationId=${nomination.nominationId}`,
