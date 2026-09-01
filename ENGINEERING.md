@@ -344,7 +344,7 @@ Service Layer
 
 ## 10. Key Business Logic
 
-1. **ScoringCalculator** (`packages/shared/src/utils/scoring.ts`) — Single source of truth for converting NHL stats into fantasy points. Supports league-specific scoring overrides. Default: G=3, A=2, PPP=1, SHP=2, SOG=0.4, BLK=0.5, HIT=0.2, PIM=0.5, W=4, SO=3, SV=0.2, GA=-1.
+1. **ScoringCalculator** (`packages/shared/src/utils/scoring.ts`) — Single source of truth for converting NHL stats into fantasy points. Supports league-specific scoring overrides. Default (industry-standard, Yahoo-aligned since 2026-09-01): G=6, A=4, PPP=2, SOG=0.9, BLK=1, W=5, SO=5, SV=0.6, GA=-3; SHP/HIT/PIM/+/- are opt-in at 0.
 
 2. **MatchupService** (`server/src/services/MatchupService.ts`) — Calculates weekly head-to-head matchup scores by aggregating daily player stats against league scoring settings. Powers the core fantasy experience.
 

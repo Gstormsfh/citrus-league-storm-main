@@ -41,16 +41,17 @@ describe('reweightProjections — happy path', () => {
       shots_on_goal: 300, blocks: 40, hits: 50, penalty_minutes: 20,
     });
     const [out] = reweightProjections([proj], DEFAULT_SCORING);
-    // 40*3 + 60*2 + 30*1 + 5*2 + 300*0.4 + 40*0.5 + 50*0.2 + 20*0.5
-    // = 120 + 120 + 30 + 10 + 120 + 20 + 10 + 10 = 440
-    expect(out.projectedPoints).toBeCloseTo(440, 5);
+    // Industry-standard defaults (2026-09-01):
+    // 40*6 + 60*4 + 30*2 + 5*0 + 300*0.9 + 40*1 + 50*0 + 20*0
+    // = 240 + 240 + 60 + 0 + 270 + 40 + 0 + 0 = 850
+    expect(out.projectedPoints).toBeCloseTo(850, 5);
   });
 
   it('computes goalie points using default scoring', () => {
     const proj = mkGoalie(2, 'Goalie', { wins: 35, shutouts: 5, saves: 1500, goals_against: 100 });
     const [out] = reweightProjections([proj], DEFAULT_SCORING);
-    // 35*4 + 5*3 + 1500*0.2 + 100*(-1) = 140 + 15 + 300 - 100 = 355
-    expect(out.projectedPoints).toBeCloseTo(355, 5);
+    // 35*5 + 5*5 + 1500*0.6 + 100*(-3) = 175 + 25 + 900 - 300 = 800
+    expect(out.projectedPoints).toBeCloseTo(800, 5);
   });
 
   it('assigns 1-indexed rank in DESC point order', () => {
@@ -108,10 +109,10 @@ describe('reweightProjections — settings edge cases', () => {
       mkGoalie(2, 'Good', { wins: 30, shutouts: 3, saves: 1000, goals_against: 80 }),
     ];
     const out = reweightProjections(rows, DEFAULT_SCORING);
-    // Bad: 0*4 + 0*3 + 100*0.2 + 200*-1 = 20 - 200 = -180
-    // Good: 30*4 + 3*3 + 1000*0.2 + 80*-1 = 120 + 9 + 200 - 80 = 249
+    // Bad: 0*5 + 0*5 + 100*0.6 + 200*-3 = 60 - 600 = -540
+    // Good: 30*5 + 3*5 + 1000*0.6 + 80*-3 = 150 + 15 + 600 - 240 = 525
     expect(out[0].playerName).toBe('Good');
-    expect(out[1].projectedPoints).toBe(-180);
+    expect(out[1].projectedPoints).toBe(-540);
   });
 
   it('empty projections list → returns []', () => {

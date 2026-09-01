@@ -149,8 +149,9 @@ describe('TeamAnalyticsService — scoring', () => {
       player_season_stats: [skaterStat(1)],
     }).getProjectedVsActual('L', 'T', 2026);
 
-    // 22*3 + 28*2 + 11*1 + 0*2 + 140*.4 + 38*.5 + 61*.2 + 10*.5
-    expect(data!.players[0].actualPoints).toBeCloseTo(66 + 56 + 11 + 56 + 19 + 12.2 + 5, 4);
+    // Industry-standard defaults (2026-09-01):
+    // 22*6 + 28*4 + 11*2 + 0*0 + 140*.9 + 38*1 + 61*0 + 10*0
+    expect(data!.players[0].actualPoints).toBeCloseTo(132 + 112 + 22 + 126 + 38, 4);
   });
 
   it('scores a goalie on the GOALIE weights, not the skater ones', async () => {
@@ -163,8 +164,8 @@ describe('TeamAnalyticsService — scoring', () => {
       })],
     }).getProjectedVsActual('L', 'T', 2026);
 
-    // 25*4 + 3*3 + 1100*.2 - 100
-    expect(data!.players[0].actualPoints).toBeCloseTo(100 + 9 + 220 - 100, 4);
+    // 25*5 + 3*5 + 1100*.6 - 100*3
+    expect(data!.players[0].actualPoints).toBeCloseTo(125 + 15 + 660 - 300, 4);
     expect(data!.players[0].games).toBe(40);
   });
 });
@@ -260,10 +261,10 @@ describe('TeamAnalyticsService — the league\'s scoring, not the defaults', () 
       player_season_stats: [skaterStat(1)],
     }).getProjectedVsActual('L', 'T', 2026);
 
-    // 22*3 + 28*2 + 11*1 + 140*0.4 + 38*0.5 + 61*0.2 + 10*0.5
-    //  = 66 + 56 + 11 + 56 + 19 + 12.2 + 5 = 225.2
+    // 22*6 + 28*4 + 11*2 + 140*0.9 + 38*1 + 61*0 + 10*0
+    //  = 132 + 112 + 22 + 126 + 38 = 430
     // (which also confirms ScoringCalculator's defaults are CLAUDE.md's.)
-    expect(data!.players[0].actualPoints).toBeCloseTo(225.2, 4);
+    expect(data!.players[0].actualPoints).toBeCloseTo(430, 4);
   });
 
   it('surfaces a league lookup failure instead of silently scoring by default', async () => {

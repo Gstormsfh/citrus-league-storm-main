@@ -69,15 +69,16 @@ from scipy import stats as scipy_stats
 # CONFIGURATION — fantasy scoring weights (matches ScoringCalculator default)
 # ============================================================================
 
+# INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned; SHP/hits/PIM opt-in.
 SCORING = {
-    "goals": 3.0,
-    "assists": 2.0,
-    "ppp": 1.0,
-    "shp": 2.0,
-    "sog": 0.4,
-    "blocks": 0.5,
-    "hits": 0.2,
-    "pim": 0.5,
+    "goals": 6.0,
+    "assists": 4.0,
+    "ppp": 2.0,
+    "shp": 0.0,
+    "sog": 0.9,
+    "blocks": 1.0,
+    "hits": 0.0,
+    "pim": 0.0,
 }
 
 # Realistic NHL player archetypes — per-game averages from 2024-25 NHL data
@@ -361,7 +362,7 @@ def print_report(results: Dict[str, AccuracyMetrics], n: int, seed: int):
     print("=" * 78)
     print(f"  Player-games audited: {n:,}")
     print(f"  Random seed: {seed} (reproducible)")
-    print(f"  Fantasy scoring: G=3, A=2, PPP=1, SHP=2, SOG=0.4, BLK=0.5, HIT=0.2, PIM=0.5")
+    print(f"  Fantasy scoring: G={SCORING['goals']:g}, A={SCORING['assists']:g}, PPP={SCORING['ppp']:g}, SHP={SCORING['shp']:g}, SOG={SCORING['sog']:g}, BLK={SCORING['blocks']:g}, HIT={SCORING['hits']:g}, PIM={SCORING['pim']:g}")
     print()
     print("  Per Yahoo Sports (Aug 11, 2025): BLITZ uses 'statistical regression")
     print("  and machine learning' on recent stats. Yahoo, ESPN, Sleeper, FantasyPros")

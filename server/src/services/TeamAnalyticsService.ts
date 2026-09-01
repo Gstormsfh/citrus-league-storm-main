@@ -59,6 +59,11 @@ export type TeamAnalyticsResult = {
  * projection of this goalie's own rate, and it is the weakest number this
  * service produces. It is stated here rather than buried because the honest
  * alternative — dropping the term — is silently worse.
+ *
+ * INDUSTRY-STANDARD SCORING (2026-09-01): player_ros_projections now carries
+ * projected_ga_ros (this goalie's own smoothed GA rate × remaining starts).
+ * It is preferred whenever present; the SV% derivation remains only as the
+ * fallback for rows written before the column existed.
  */
 const LEAGUE_AVG_SV_PCT = 0.905;
 
@@ -90,6 +95,7 @@ type ProjRow = {
   projected_wins_ros: number | null;
   projected_saves_ros: number | null;
   projected_shutouts_ros: number | null;
+  projected_ga_ros?: number | null;
   games_played: number | null;
 };
 
@@ -170,7 +176,7 @@ export class TeamAnalyticsService {
               'projected_goals, projected_assists, projected_ppp, projected_shp, ' +
               'projected_sog, projected_blocks, projected_hits, projected_pim, ' +
               'projected_wins_ros, projected_saves_ros, projected_shutouts_ros, ' +
-              'games_played',
+              'projected_ga_ros, games_played',
           )
           .eq('season', season)
           .in('player_id', ids),
@@ -264,9 +270,12 @@ export class TeamAnalyticsService {
                 wins: num(p.projected_wins_ros),
                 saves: projSaves,
                 shutouts: num(p.projected_shutouts_ros),
-                // Derived — see LEAGUE_AVG_SV_PCT above.
+                // The goalie's own projected GA when the row carries it;
+                // otherwise derived — see LEAGUE_AVG_SV_PCT above.
                 goals_against:
-                  projSaves > 0 ? projSaves / LEAGUE_AVG_SV_PCT - projSaves : 0,
+                  num(p.projected_ga_ros) > 0
+                    ? num(p.projected_ga_ros)
+                    : projSaves > 0 ? projSaves / LEAGUE_AVG_SV_PCT - projSaves : 0,
               }
             : {
                 goals: num(p.projected_goals),

@@ -440,26 +440,30 @@ class TestCalculateFantasyPoints:
     """Tests for fantasy point calculations (mirrors scoringUtils.ts)."""
 
     def test_skater_default_scoring(self):
-        """Default skater scoring should match TypeScript ScoringCalculator."""
+        """Default skater scoring should match the shared ScoringCalculator.
+
+        INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned;
+        SHP/hits/PIM zero-weighted by default.
+        """
         stats = {
             "goals": 2, "assists": 1, "ppp": 1, "shp": 0,
             "sog": 5, "blocks": 2, "hits": 3, "pim": 4,
         }
         points = calculate_fantasy_points(stats, is_goalie=False)
 
-        # Manual: 2*3 + 1*2 + 1*1 + 0*2 + 5*0.4 + 2*0.5 + 3*0.2 + 4*0.5
-        #       = 6 + 2 + 1 + 0 + 2 + 1 + 0.6 + 2 = 14.6
-        assert points == pytest.approx(14.6)
+        # Manual: 2*6 + 1*4 + 1*2 + 0*0 + 5*0.9 + 2*1 + 3*0 + 4*0
+        #       = 12 + 4 + 2 + 0 + 4.5 + 2 + 0 + 0 = 24.5
+        assert points == pytest.approx(24.5)
 
     def test_goalie_default_scoring(self):
-        """Default goalie scoring should match TypeScript ScoringCalculator."""
+        """Default goalie scoring should match the shared ScoringCalculator."""
         stats = {
             "wins": 1, "saves": 30, "shutouts": 0, "goals_against": 2,
         }
         points = calculate_fantasy_points(stats, is_goalie=True)
 
-        # Manual: 1*4 + 30*0.2 + 0*3 + 2*(-1) = 4 + 6 + 0 - 2 = 8.0
-        assert points == pytest.approx(8.0)
+        # Manual: 1*5 + 30*0.6 + 0*5 + 2*(-3) = 5 + 18 + 0 - 6 = 17.0
+        assert points == pytest.approx(17.0)
 
     def test_shutout_bonus(self):
         """Shutout goalie performance should include shutout bonus."""
@@ -468,8 +472,8 @@ class TestCalculateFantasyPoints:
         }
         points = calculate_fantasy_points(stats, is_goalie=True)
 
-        # Manual: 1*4 + 35*0.2 + 1*3 + 0*(-1) = 4 + 7 + 3 + 0 = 14.0
-        assert points == pytest.approx(14.0)
+        # Manual: 1*5 + 35*0.6 + 1*5 + 0*(-3) = 5 + 21 + 5 + 0 = 31.0
+        assert points == pytest.approx(31.0)
 
     def test_zero_stats(self):
         """Zero stats should produce zero points."""

@@ -33,47 +33,47 @@ describe('ScoringCalculator', () => {
 
   it('calculates correct skater points for a single goal', () => {
     const stats = { goals: 1 };
-    // 1 goal × 3 = 3
-    expect(scorer.calculatePoints(stats, false)).toBe(3);
+    // Industry-standard defaults (2026-09-01): 1 goal × 6 = 6
+    expect(scorer.calculatePoints(stats, false)).toBe(6);
   });
 
   it('calculates correct skater points for a multi-stat line', () => {
     // Classic stat line: 2G, 1A, 1PPP, 4SOG, 2H, 1BLK, 2PIM
     const stats = { goals: 2, assists: 1, ppp: 1, sog: 4, hits: 2, blocks: 1, pim: 2 };
-    // 2×3 + 1×2 + 1×1 + 4×0.4 + 2×0.2 + 1×0.5 + 2×0.5 = 6+2+1+1.6+0.4+0.5+1 = 12.5
-    expect(scorer.calculatePoints(stats, false)).toBeCloseTo(12.5);
+    // 2×6 + 1×4 + 1×2 + 4×0.9 + 2×0 + 1×1 + 2×0 = 12+4+2+3.6+0+1+0 = 22.6
+    expect(scorer.calculatePoints(stats, false)).toBeCloseTo(22.6);
   });
 
-  it('calculates correct skater points with shorthanded points', () => {
+  it('shorthanded points are zero-weighted by default (opt-in category)', () => {
     const stats = { goals: 1, shp: 1 };
-    // 1×3 + 1×2 = 5
-    expect(scorer.calculatePoints(stats, false)).toBe(5);
+    // 1×6 + 1×0 = 6
+    expect(scorer.calculatePoints(stats, false)).toBe(6);
   });
 
   it('handles alternative field names (shots_on_goal, power_play_points)', () => {
     const stats = { goals: 1, power_play_points: 1, shots_on_goal: 3 };
-    // 1×3 + 1×1 + 3×0.4 = 3+1+1.2 = 5.2
-    expect(scorer.calculatePoints(stats, false)).toBeCloseTo(5.2);
+    // 1×6 + 1×2 + 3×0.9 = 6+2+2.7 = 10.7
+    expect(scorer.calculatePoints(stats, false)).toBeCloseTo(10.7);
   });
 
   // --- Goalie scoring ---
 
   it('calculates correct goalie points for a win with saves', () => {
     const stats = { wins: 1, saves: 30, goals_against: 2 };
-    // 1×4 + 30×0.2 + 2×(-1) = 4+6-2 = 8
-    expect(scorer.calculatePoints(stats, true)).toBeCloseTo(8);
+    // 1×5 + 30×0.6 + 2×(-3) = 5+18-6 = 17
+    expect(scorer.calculatePoints(stats, true)).toBeCloseTo(17);
   });
 
   it('calculates correct goalie points for a shutout', () => {
     const stats = { wins: 1, saves: 35, shutouts: 1, goals_against: 0 };
-    // 1×4 + 35×0.2 + 1×3 + 0×(-1) = 4+7+3 = 14
-    expect(scorer.calculatePoints(stats, true)).toBeCloseTo(14);
+    // 1×5 + 35×0.6 + 1×5 + 0×(-3) = 5+21+5 = 31
+    expect(scorer.calculatePoints(stats, true)).toBeCloseTo(31);
   });
 
   it('calculates negative goalie points for a blowout loss', () => {
     const stats = { wins: 0, saves: 20, shutouts: 0, goals_against: 6 };
-    // 0×4 + 20×0.2 + 0×3 + 6×(-1) = 0+4+0-6 = -2
-    expect(scorer.calculatePoints(stats, true)).toBeCloseTo(-2);
+    // 0×5 + 20×0.6 + 0×5 + 6×(-3) = 0+12+0-18 = -6
+    expect(scorer.calculatePoints(stats, true)).toBeCloseTo(-6);
   });
 
   // --- Custom scoring weights ---
@@ -128,10 +128,10 @@ describe('ScoringCalculator', () => {
   // --- getWeight ---
 
   it('returns correct weight for known stats', () => {
-    expect(scorer.getWeight('goals', false)).toBe(3);
-    expect(scorer.getWeight('assists', false)).toBe(2);
-    expect(scorer.getWeight('wins', true)).toBe(4);
-    expect(scorer.getWeight('goals_against', true)).toBe(-1);
+    expect(scorer.getWeight('goals', false)).toBe(6);
+    expect(scorer.getWeight('assists', false)).toBe(4);
+    expect(scorer.getWeight('wins', true)).toBe(5);
+    expect(scorer.getWeight('goals_against', true)).toBe(-3);
   });
 
   it('returns 0 for unknown stat names', () => {

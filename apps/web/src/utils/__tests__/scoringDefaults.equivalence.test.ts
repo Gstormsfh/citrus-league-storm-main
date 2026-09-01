@@ -17,13 +17,14 @@
 import { describe, it, expect } from 'vitest';
 import { ScoringCalculator, DEFAULT_SCORING } from '../scoringUtils';
 
-// The leagues.scoring_settings column default, verbatim from the live
-// schema (information_schema, 2026-08-16).
+// The leagues.scoring_settings column default, verbatim from the
+// industry-standard-defaults migration (2026-09-01) that rewrites it.
 const DB_DEFAULT = {
-  goalie: { wins: 4, saves: 0.2, shutouts: 3, goals_against: -1 },
+  goalie: { wins: 5, saves: 0.6, shutouts: 5, goals_against: -3 },
   skater: {
-    hits: 0.2, goals: 3, blocks: 0.5, assists: 2, shots_on_goal: 0.4,
-    penalty_minutes: 0.5, power_play_points: 1, short_handed_points: 2,
+    hits: 0, goals: 6, blocks: 1, assists: 4, plus_minus: 0,
+    shots_on_goal: 0.9, penalty_minutes: 0, power_play_points: 2,
+    short_handed_points: 0,
   },
   advanced: {
     assist_per_goal_ratio: 0.0, use_fractional_scoring: false,

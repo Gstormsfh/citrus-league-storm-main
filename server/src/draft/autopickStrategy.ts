@@ -515,7 +515,7 @@ export const projectionsStrategy: AutopickStrategy = async ({
   // Field evidence, first live engine draft (league "Launch Dry Run"):
   // the autopick board drained THE ENTIRE GOALIE POOL in the opening
   // rounds. Not a mechanics bug — the value model's honest output.
-  // Under this scoring (W 4 / SO 3 / SV 0.2) a workhorse starter
+  // Under the scoring of the day (W 4 / SO 3 / SV 0.2) a workhorse starter
   // projects 450–530 season points, right beside the elite centers,
   // so "best available by season value" IS a goalie run until every
   // team hits its G cap. E117 fixed per-game-rate inflation; this

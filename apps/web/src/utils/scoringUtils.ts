@@ -41,28 +41,30 @@ export interface ScoringSettings {
  * These are the standard fantasy hockey point values
  */
 export const DEFAULT_SCORING: ScoringSettings = {
+  // INDUSTRY-STANDARD DEFAULTS (2026-09-01) — Yahoo-aligned; the full
+  // rationale lives on packages/shared/src/utils/scoring.ts (this file
+  // is its verbatim mirror until the migration to @citrus/shared lands).
   skater: {
-    goals: 3,
-    assists: 2,
-    power_play_points: 1,
-    short_handed_points: 2,
-    shots_on_goal: 0.4,
-    blocks: 0.5,
-    hits: 0.2,
-    penalty_minutes: 0.5,
-    // 0, not 0.5. These constants must equal the database global default row in
-    // league_scoring_rules (league_id 000...0), which is what the scoring engine
-    // actually applies. plus_minus is one of the 23 categories that became
-    // scoreable on 2026-08-11 and every one of them ships at 0 until a
-    // commissioner turns it on. A non-zero default here meant the client valued
-    // a category the engine scored at zero.
+    goals: 6,
+    assists: 4,
+    power_play_points: 2,
+    short_handed_points: 0,
+    shots_on_goal: 0.9,
+    blocks: 1,
+    hits: 0,
+    penalty_minutes: 0,
+    // 0, and it stays 0. These constants must equal the database global
+    // default rows, which is what the scoring engine actually applies.
+    // Yahoo defaults +/- to 2, but the projection engine cannot model
+    // plus/minus, so a non-zero default here would make every projected
+    // total quietly understate real scoring. Commissioners can enable it.
     plus_minus: 0
   },
   goalie: {
-    wins: 4,
-    shutouts: 3,
-    saves: 0.2,
-    goals_against: -1
+    wins: 5,
+    shutouts: 5,
+    saves: 0.6,
+    goals_against: -3
   }
 };
 

@@ -236,7 +236,7 @@ citrus-league-storm-main/
 ### Scoring
 - `ScoringCalculator` in `packages/shared/src/utils/scoring.ts` is the single source of truth
 - Also available in web at `apps/web/src/utils/scoringUtils.ts` (will be removed once migration is complete)
-- Default scoring: Goals 3, Assists 2, PPP 1, SHP 2, SOG 0.4, BLK 0.5, HIT 0.2, PIM 0.5, W 4, SO 3, SV 0.2, GA -1
+- Default scoring (industry-standard, Yahoo-aligned, since 2026-09-01): Goals 6, Assists 4, PPP 2, SOG 0.9, BLK 1, W 5, SO 5, SV 0.6, GA -3. SHP/HIT/PIM/+/- are opt-in categories, 0 by default (+/- stays 0 because projections cannot model it)
 - League-specific scoring is stored in `leagues.scoring_settings` JSONB
 - Never hardcode scoring values in components — always use `ScoringCalculator`
 

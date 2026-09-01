@@ -1270,22 +1270,23 @@ Locked players have a 🔒 icon and grayed-out appearance.
 ```json
 {
   "skater": {
-    "goals": 3,
-    "assists": 2,
-    "power_play_points": 1,
-    "shots_on_goal": 0.4,
-    "blocks": 0.5,
-    "hits": 0.2,
-    "penalty_minutes": 0.5
+    "goals": 6,
+    "assists": 4,
+    "power_play_points": 2,
+    "shots_on_goal": 0.9,
+    "blocks": 1,
+    "hits": 0,
+    "penalty_minutes": 0
   },
   "goalie": {
-    "wins": 4,
-    "saves": 0.2,
-    "shutouts": 3,
-    "goals_against": -1
+    "wins": 5,
+    "saves": 0.6,
+    "shutouts": 5,
+    "goals_against": -3
   }
 }
 ```
+*(Industry-standard defaults, Yahoo-aligned, since 2026-09-01. SHP, hits, PIM and +/- are opt-in categories, 0 by default.)*
 
 **Step 2: Get Active Players for Each Day**
 ```sql

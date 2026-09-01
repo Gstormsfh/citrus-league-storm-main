@@ -1920,14 +1920,14 @@ const Profile = () => {
                                   <h3 className="font-calistoga text-lg text-pastel-cream mb-3">Skater Scoring</h3>
                                   <div className="grid grid-cols-2 gap-4">
                                     {[
-                                      { key: 'goals', label: 'Goals', default: 3 },
-                                      { key: 'assists', label: 'Assists', default: 2 },
-                                      { key: 'power_play_points', label: 'Power Play Points', default: 1 },
-                                      { key: 'short_handed_points', label: 'Shorthanded Points', default: 2 },
-                                      { key: 'shots_on_goal', label: 'Shots on Goal', default: 0.4 },
-                                      { key: 'blocks', label: 'Blocks', default: 0.5 },
-                                      { key: 'hits', label: 'Hits', default: 0.2 },
-                                      { key: 'penalty_minutes', label: 'Penalty Minutes', default: 0.5 },
+                                      { key: 'goals', label: 'Goals', default: 6 },
+                                      { key: 'assists', label: 'Assists', default: 4 },
+                                      { key: 'power_play_points', label: 'Power Play Points', default: 2 },
+                                      { key: 'short_handed_points', label: 'Shorthanded Points', default: 0 },
+                                      { key: 'shots_on_goal', label: 'Shots on Goal', default: 0.9 },
+                                      { key: 'blocks', label: 'Blocks', default: 1 },
+                                      { key: 'hits', label: 'Hits', default: 0 },
+                                      { key: 'penalty_minutes', label: 'Penalty Minutes', default: 0 },
                                     ].map(stat => (
                                       <div key={stat.key} className="space-y-2">
                                         <Label className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">{stat.label}</Label>
@@ -1950,10 +1950,10 @@ const Profile = () => {
                                   <h3 className="font-calistoga text-lg text-pastel-cream mb-3">Goalie Scoring</h3>
                                   <div className="grid grid-cols-2 gap-4">
                                     {[
-                                      { key: 'wins', label: 'Wins', default: 4 },
-                                      { key: 'shutouts', label: 'Shutouts', default: 3 },
-                                      { key: 'saves', label: 'Saves', default: 0.2 },
-                                      { key: 'goals_against', label: 'Goals Against', default: -1 },
+                                      { key: 'wins', label: 'Wins', default: 5 },
+                                      { key: 'shutouts', label: 'Shutouts', default: 5 },
+                                      { key: 'saves', label: 'Saves', default: 0.6 },
+                                      { key: 'goals_against', label: 'Goals Against', default: -3 },
                                     ].map(stat => (
                                       <div key={stat.key} className="space-y-2">
                                         <Label className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">{stat.label}</Label>

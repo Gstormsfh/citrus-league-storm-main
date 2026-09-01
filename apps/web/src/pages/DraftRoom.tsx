@@ -861,6 +861,7 @@ const DraftRoomInner = () => {
         projected_blocks?: number; projected_ppp?: number; projected_shp?: number;
         projected_hits?: number; projected_pim?: number;
         projected_wins_ros?: number; projected_saves_ros?: number; projected_shutouts_ros?: number;
+        projected_ga_ros?: number;
         total_projected_points?: number; avg_points_per_game?: number;
       }
       const rosData = (rosProjectionsRes as { data?: RosRow[] }).data;
@@ -869,8 +870,12 @@ const DraftRoomInner = () => {
           const gr = p.games_remaining || 0;
           let total: number;
           if (p.is_goalie) {
+            // INDUSTRY-STANDARD SCORING (2026-09-01): goals against was
+            // hard-coded to 0 here, so the board overstated every goalie by
+            // |GA weight| × projected GA — under GA -3 that is ~480 pts on a
+            // 55-start starter, i.e. goalies above elite wingers.
             total = projScorer.calculatePoints(
-              { wins: p.projected_wins_ros || 0, saves: p.projected_saves_ros || 0, shutouts: p.projected_shutouts_ros || 0, goals_against: 0 },
+              { wins: p.projected_wins_ros || 0, saves: p.projected_saves_ros || 0, shutouts: p.projected_shutouts_ros || 0, goals_against: p.projected_ga_ros || 0 },
               true
             );
           } else {

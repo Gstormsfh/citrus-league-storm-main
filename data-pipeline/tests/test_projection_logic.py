@@ -160,41 +160,43 @@ class TestHomeAwayAdjustment:
 class TestFantasyPointsCalculation:
     """Tests for calculate_fantasy_points (skater + goalie scoring)."""
 
+    # INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned; SHP/hits/PIM
+    # opt-in at 0. Mirrors DEFAULT_SCORING in packages/shared.
     DEFAULT_SCORING = {
         "skater": {
-            "goals": 3,
-            "assists": 2,
-            "shots_on_goal": 0.4,
-            "blocks": 0.5,
-            "power_play_points": 1,
-            "short_handed_points": 2,
-            "hits": 0.2,
-            "penalty_minutes": 0.5,
+            "goals": 6,
+            "assists": 4,
+            "shots_on_goal": 0.9,
+            "blocks": 1.0,
+            "power_play_points": 2,
+            "short_handed_points": 0,
+            "hits": 0.0,
+            "penalty_minutes": 0.0,
         },
         "goalie": {
-            "wins": 4,
-            "saves": 0.2,
-            "shutouts": 3,
-            "goals_against": -1,
+            "wins": 5,
+            "saves": 0.6,
+            "shutouts": 5,
+            "goals_against": -3,
         },
     }
 
     def test_skater_basic_scoring(self):
-        """Basic skater line: 1G 1A = 5 points."""
+        """Basic skater line: 1G 1A = 10 points."""
         stats = {"goals": 1, "assists": 1, "sog": 0, "blocks": 0, "ppp": 0, "shp": 0, "hits": 0, "pim": 0}
         result = calculate_fantasy_points(stats, self.DEFAULT_SCORING, is_goalie=False)
-        assert abs(result - 5.0) < 0.01
+        assert abs(result - 10.0) < 0.01
 
     def test_skater_full_stat_line(self):
-        """Full stat line with all 8 categories."""
+        """Full stat line with all 8 categories (hits/PIM/SHP zero-weighted)."""
         stats = {
             "goals": 2, "assists": 1, "sog": 5, "blocks": 2,
             "ppp": 1, "shp": 0, "hits": 3, "pim": 2,
         }
-        # 2*3 + 1*2 + 5*0.4 + 2*0.5 + 1*1 + 0*2 + 3*0.2 + 2*0.5
-        # = 6 + 2 + 2 + 1 + 1 + 0 + 0.6 + 1 = 13.6
+        # 2*6 + 1*4 + 5*0.9 + 2*1 + 1*2 + 0*0 + 3*0 + 2*0
+        # = 12 + 4 + 4.5 + 2 + 2 + 0 + 0 + 0 = 24.5
         result = calculate_fantasy_points(stats, self.DEFAULT_SCORING, is_goalie=False)
-        assert abs(result - 13.6) < 0.01
+        assert abs(result - 24.5) < 0.01
 
     def test_skater_zero_stats(self):
         """Zero stats = zero points."""
@@ -206,29 +208,29 @@ class TestFantasyPointsCalculation:
         """Missing stats default to 0 via .get()."""
         stats = {"goals": 1}
         result = calculate_fantasy_points(stats, self.DEFAULT_SCORING, is_goalie=False)
-        assert abs(result - 3.0) < 0.01
+        assert abs(result - 6.0) < 0.01
 
     def test_goalie_win_scoring(self):
         """Goalie win with saves."""
         stats = {"wins": 1, "saves": 30, "shutouts": 0, "goals_against": 2}
-        # 1*4 + 30*0.2 + 0*3 + 2*(-1) = 4 + 6 + 0 - 2 = 8.0
+        # 1*5 + 30*0.6 + 0*5 + 2*(-3) = 5 + 18 + 0 - 6 = 17.0
         result = calculate_fantasy_points(stats, self.DEFAULT_SCORING, is_goalie=True)
-        assert abs(result - 8.0) < 0.01
+        assert abs(result - 17.0) < 0.01
 
     def test_goalie_shutout_scoring(self):
         """Goalie shutout win."""
         stats = {"wins": 1, "saves": 35, "shutouts": 1, "goals_against": 0}
-        # 1*4 + 35*0.2 + 1*3 + 0*(-1) = 4 + 7 + 3 + 0 = 14.0
+        # 1*5 + 35*0.6 + 1*5 + 0*(-3) = 5 + 21 + 5 + 0 = 31.0
         result = calculate_fantasy_points(stats, self.DEFAULT_SCORING, is_goalie=True)
-        assert abs(result - 14.0) < 0.01
+        assert abs(result - 31.0) < 0.01
 
     def test_custom_scoring_weights(self):
         """Custom league scoring settings override defaults."""
-        custom_scoring = {"skater": {"goals": 6, "assists": 4, "shots_on_goal": 0, "blocks": 0,
+        custom_scoring = {"skater": {"goals": 10, "assists": 1, "shots_on_goal": 0, "blocks": 0,
                                      "power_play_points": 0, "short_handed_points": 0, "hits": 0, "penalty_minutes": 0}}
         stats = {"goals": 1, "assists": 1}
         result = calculate_fantasy_points(stats, custom_scoring, is_goalie=False)
-        assert abs(result - 10.0) < 0.01
+        assert abs(result - 11.0) < 0.01
 
 
 # ── Cache Version Tests ───────────────────────────────────────────────
@@ -241,9 +243,9 @@ class TestCacheVersion:
         """CACHE_VERSION should be a string for Supabase text column compatibility."""
         assert isinstance(CACHE_VERSION, str)
 
-    def test_cache_version_is_3_0(self):
-        """Current cache version should be 3.0 (nhl_* columns era)."""
-        assert CACHE_VERSION == "3.0"
+    def test_cache_version_is_4_0(self):
+        """Current cache version should be 4.0 (industry-standard scoring era)."""
+        assert CACHE_VERSION == "4.0"
 
 
 if __name__ == "__main__":

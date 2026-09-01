@@ -123,7 +123,10 @@ playerRoutes.get('/ros-projections', authMiddleware, async (c) => {
 
   let query = supabase
     .from('player_ros_projections')
-    .select('player_id, player_name, position, team_abbrev, is_goalie, total_projected_points, avg_points_per_game, games_remaining, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins_ros, projected_saves_ros, projected_shutouts_ros')
+    // projected_ga_ros (2026-09-01): goalie goals-against over remaining
+    // starts — clients that rescore ROS rows under league settings must
+    // include it, or every goalie is overstated by |GA weight| × GA.
+    .select('player_id, player_name, position, team_abbrev, is_goalie, total_projected_points, avg_points_per_game, games_remaining, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins_ros, projected_saves_ros, projected_shutouts_ros, projected_ga_ros')
     // Projections are keyed to the season they DESCRIBE (offseason ⇒
     // upcoming season) — getCurrentSeason() here read zero rows all summer.
     .eq('season', getProjectionsSeason());
