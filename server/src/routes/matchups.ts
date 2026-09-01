@@ -264,13 +264,12 @@ matchupRoutes.get('/:matchupId/daily-scores', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
 
-  // Auto-ensure rosters for AI teams (owner_id = NULL, RLS-blocked)
-  try {
-    await service.ensureMatchupRosters(matchupId);
-  } catch (err) {
-    logger.debug('[matchups] ensureMatchupRosters non-fatal error:', err);
-  }
-
+  // PERF (2026-09-01): this route used to run ensureMatchupRosters here
+  // AND calculateDailyMatchupScores below — but the calculator already
+  // backfills fantasy_daily_rosters for both teams itself, so the ensure
+  // ran the whole lineup/roster existence dance twice per request (~9
+  // extra Supabase round trips). Measured at 834ms mean / 2.9s max on
+  // prod. One layer owns the backfill: the calculator.
   const { data, error } = await service.calculateDailyMatchupScores(matchupId);
   if (error) {
     return handleError(c, error, 'Failed to calculate scores');
