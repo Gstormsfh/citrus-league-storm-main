@@ -7,6 +7,15 @@ import type {
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
+/**
+ * TOAST AUTO-DISMISS (2026-09-01): the shadcn scaffold ships with the
+ * removal delay above but never STARTS a dismiss timer, so every toast
+ * sat on screen until tapped ("Lineup Optimized" never left). Toasts
+ * now dismiss themselves after this long; pass `duration` to override
+ * per toast. The remove delay stays huge on purpose — it only runs
+ * AFTER dismiss, keeping the element mounted through its exit animation.
+ */
+const TOAST_AUTO_DISMISS_MS = 4000
 
 type ToasterToast = ToastProps & {
   id: string
@@ -139,7 +148,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
-function toast({ ...props }: Toast) {
+function toast({ duration, ...props }: Toast) {
   const id = genId()
 
   const update = (props: ToasterToast) =>
@@ -160,6 +169,13 @@ function toast({ ...props }: Toast) {
       },
     },
   })
+
+  // Self-dismiss (see TOAST_AUTO_DISMISS_MS above). duration: Infinity
+  // opts a toast out for flows that genuinely need a decision.
+  const autoDismissMs = duration ?? TOAST_AUTO_DISMISS_MS
+  if (Number.isFinite(autoDismissMs)) {
+    setTimeout(dismiss, autoDismissMs)
+  }
 
   return {
     id: id,
