@@ -409,8 +409,13 @@ const TeamAnalytics = () => {
                               </div>
                             </div>
                           ))}
-                          <Button variant="ghost" className="w-full text-xs text-pastel-orange hover:text-pastel-orange-soft hover:bg-white/5 mt-2 font-jbmono uppercase tracking-[0.22em]" onClick={() => window.location.href = '/free-agents?tab=schedule'}>
-                            View All Schedule Trends <ChevronRight className="h-3 w-3 ml-1" />
+                          {/* SPA NAV (2026-09-01): was a full page reload —
+                              a several-second white flash in the iOS shell
+                              for an in-app route. Router link instead. */}
+                          <Button asChild variant="ghost" className="w-full text-xs text-pastel-orange hover:text-pastel-orange-soft hover:bg-white/5 mt-2 font-jbmono uppercase tracking-[0.22em]">
+                            <Link to="/free-agents?tab=schedule">
+                              View All Schedule Trends <ChevronRight className="h-3 w-3 ml-1" />
+                            </Link>
                           </Button>
                         </>
                       )}
