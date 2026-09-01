@@ -137,3 +137,19 @@ describe('the draft room opens the ONE shared player card', () => {
     expect(CARD).toContain('max-h-[55vh] overflow-y-auto');
   });
 });
+
+describe('the lobby makes inviting obvious while seats are open', () => {
+  // INVITE REACH (2026-09-01): "there's still no invite button or
+  // anything i can use in the draft room." The v2 lobby now renders an
+  // invite tile — join code tap-to-copy, OS share sheet first — for
+  // EVERY member whenever the room is not full.
+  it('DraftLobbyV2 renders the invite tile off the shared inviteShare utility', () => {
+    expect(ROOM).toContain('data-testid="draft-lobby-v2-invite"');
+    expect(ROOM).toContain("from '@/utils/inviteShare'");
+    expect(ROOM).toContain('Share Invite');
+    // Reachable by everyone, not commissioner-gated: the tile's own
+    // guard is join code + open seats only.
+    const tile = ROOM.slice(ROOM.indexOf('data-testid="draft-lobby-v2-invite"') - 400);
+    expect(tile.slice(0, 400)).toContain('league?.join_code && !roomFull');
+  });
+});
