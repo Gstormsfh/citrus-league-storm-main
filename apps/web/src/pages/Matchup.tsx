@@ -35,6 +35,7 @@ import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { MatchupScoreJobService } from '@/services/MatchupScoreJobService';
 import { DataCacheService, TTL } from '@/services/DataCacheService';
 import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
+import { collectRemainingGames, computeWinProbability, enumerateWeekDates } from '@/utils/winProbability';
 import { ScoringCalculator, DEFAULT_SCORING } from '@/utils/scoringUtils';
 import { logger } from '@/utils/logger';
 import { useLoadCeiling } from '@/hooks/useLoadCeiling';
@@ -152,6 +153,9 @@ interface DailyProjection {
   dynamic_confidence?: number;
   projection_mean?: number;
   projection_std_dev?: number;
+  /** Puck drop (TIMESTAMPTZ) from get_daily_projections — the win-chance
+   *  fallback for a starter whose schedule row is missing. */
+  game_start_time?: string | null;
 }
 
 /** A matchup row from a Supabase query with joined team names */
@@ -3427,6 +3431,105 @@ const Matchup = () => {
     return score;
   }, [currentMatchup, calculatedDailyTotals, dailyStatsByDate, opponentDailyPoints, opponentStarters]);
 
+  // ===========================================================================
+  // WIN CHANCE + PROJECTED FINALS (2026-09-01, Sleeper parity audit M1/M2)
+  //
+  // Expected final for each side = points banked so far + every remaining
+  // starter-game's projection for the rest of the week; win chance =
+  // Φ(margin / σ). See utils/winProbability.ts for the model.
+  //
+  // myTotalProjection / opponentTotalProjection above are TODAY's slice only
+  // (the starters on the selected date) — fine for the day strip, wrong as a
+  // final. projectionsByDate already holds all seven days (the fetch effect
+  // walks the whole week), so the rest of the week is summed here without a
+  // request. Starters per day follow the same precedence as the day strip:
+  // the saved per-date lineup when one exists, else the current lineup —
+  // and never the frozen roster of a PAST day the user is browsing, which is
+  // why this reads baseCurrentRoster rather than myStarters.
+  // ===========================================================================
+  const matchupOutlook = useMemo(() => {
+    if (!currentMatchup) return null;
+    const todayStr = getTodayMST();
+    const weekDates = enumerateWeekDates(currentMatchup.week_start_date, currentMatchup.week_end_date);
+    if (weekDates.length === 0) return null;
+
+    const baseMyRoster = userLeagueState === 'active-user'
+      ? (baseCurrentRoster?.myRoster || myTeam)
+      : demoMyTeam;
+    const baseOppRoster = userLeagueState === 'active-user'
+      ? (baseCurrentRoster?.oppRoster || opponentTeamPlayers)
+      : demoOpponentTeam;
+
+    // The live-refresh interval writes fresh game statuses (live / final,
+    // period, clock) into myTeam / opponentTeamPlayers only; the base and
+    // saved rosters keep their load-time copies. Read schedule status from
+    // the freshest object for each player so a game that just went final
+    // stops counting as "still to play" without waiting for a full reload.
+    const freshGamesById = new Map<number, MatchupPlayer['games']>();
+    for (const p of [...myTeam, ...opponentTeamPlayers]) {
+      if (p.games && p.games.length > 0) freshGamesById.set(Number(p.id), p.games);
+    }
+
+    const startersOn = (date: string, side: 'my' | 'opp') => {
+      const frozen = frozenRostersByDate.get(date);
+      const saved = side === 'my' ? frozen?.myRoster : frozen?.oppRoster;
+      const roster = saved && saved.length > 0 ? saved : (side === 'my' ? baseMyRoster : baseOppRoster);
+      return roster
+        .filter(p => p.isStarter)
+        .map(p => ({ id: p.id, games: freshGamesById.get(Number(p.id)) ?? p.games }));
+    };
+
+    const remainingDates = weekDates.filter(d => d >= todayStr);
+    const myDays = remainingDates.map(date => ({ date, starters: startersOn(date, 'my') }));
+    const oppDays = remainingDates.map(date => ({ date, starters: startersOn(date, 'opp') }));
+
+    // A side with no lineup at all (rosters not loaded yet, a bye week, an
+    // opponent whose roster the viewer cannot read) has no schedule to sum,
+    // which would read as "they can't score again" — a lie, not a 98%.
+    // While games remain, say nothing until both lineups are in hand.
+    const weekStillOpen = remainingDates.length > 0;
+    const haveBothLineups = myDays.some(d => d.starters.length > 0) && oppDays.some(d => d.starters.length > 0);
+    if (weekStillOpen && !haveBothLineups) return null;
+    // Likewise until every remaining day's projections have landed (they are
+    // requested together on load and resolve within a beat of each other):
+    // a half-loaded week would print finals missing whole days.
+    const projectionsReady = remainingDates.every(d => projectionsByDate.has(d));
+    if (weekStillOpen && !projectionsReady) return null;
+
+    const myRemaining = collectRemainingGames(myDays, projectionsByDate, todayStr);
+    const oppRemaining = collectRemainingGames(oppDays, projectionsByDate, todayStr);
+
+    return computeWinProbability(
+      { points: parseFloat(myTeamPoints) || 0, remaining: myRemaining },
+      { points: parseFloat(opponentTeamPoints) || 0, remaining: oppRemaining },
+    );
+  }, [
+    currentMatchup,
+    userLeagueState,
+    baseCurrentRoster,
+    myTeam,
+    opponentTeamPlayers,
+    demoMyTeam,
+    demoOpponentTeam,
+    frozenRostersByDate,
+    projectionsByDate,
+    myTeamPoints,
+    opponentTeamPoints,
+  ]);
+
+  // Stored simulation rows speak for team1; the bar speaks for the LEFT team.
+  const simulationPerspective: 'team1' | 'team2' =
+    currentMatchup && viewingTeamId && viewingTeamId === currentMatchup.team2_id ? 'team2' : 'team1';
+
+  // Projected finals are only interesting while something is left to play;
+  // once the week is decided they would just repeat the score.
+  const projectedFinals = matchupOutlook && !matchupOutlook.settled
+    ? { my: matchupOutlook.myExpectedFinal, opp: matchupOutlook.oppExpectedFinal }
+    : null;
+  const winChanceLabel = matchupOutlook
+    ? (matchupOutlook.settled ? 'Final' : `${Math.round(matchupOutlook.probability * 100)}% win`)
+    : '—';
+
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   
   // Calculate daily points - only if matchup has started and has scores
@@ -5250,28 +5353,45 @@ const Matchup = () => {
               have it backwards: the OPPONENT wore orange and the user wore
               cream, so the highlighted side was the one that wasn't yours. */}
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="text-lg font-calistoga font-black text-pastel-orange tabular-nums">
-              {parseFloat(myTeamPoints || '0').toFixed(1)}
-            </span>
+            <div className="flex flex-col items-start flex-shrink-0">
+              <span className="text-lg font-calistoga font-black text-pastel-orange tabular-nums leading-6">
+                {parseFloat(myTeamPoints || '0').toFixed(1)}
+              </span>
+              {projectedFinals && (
+                <span className="text-[10px] font-jbmono text-white/55 tabular-nums leading-none whitespace-nowrap">
+                  proj {projectedFinals.my.toFixed(1)}
+                </span>
+              )}
+            </div>
             <span className="text-xs font-jbmono font-semibold text-pastel-orange-soft truncate">
               {userLeagueState === 'active-user' ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
             </span>
           </div>
-          {/* Week badge */}
+          {/* Week badge + win chance for the LEFT team (was a literal "—").
+              Plain fan language, same number the ScoreCard's bar shows. */}
           <div className="flex flex-col items-center px-2 flex-shrink-0">
             <span className="text-[10px] font-jbmono font-bold text-white/55 uppercase tracking-wider">
               {currentMatchup ? `Wk ${selectedWeek}` : 'VS'}
             </span>
-            <span className="text-xs text-white/55 font-bold">—</span>
+            <span className="text-xs font-jbmono font-bold text-pastel-cream tabular-nums whitespace-nowrap">
+              {winChanceLabel}
+            </span>
           </div>
           {/* Opponent score + menu — deliberately the muted side. */}
           <div className="flex items-center gap-1 min-w-0 flex-1 justify-end">
             <span className="text-xs font-jbmono font-semibold text-pastel-cream/70 truncate text-right">
               {userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Opponent') : 'Thunder Titans'}
             </span>
-            <span className="text-lg font-calistoga font-black text-pastel-cream tabular-nums">
-              {parseFloat(opponentTeamPoints || '0').toFixed(1)}
-            </span>
+            <div className="flex flex-col items-end flex-shrink-0">
+              <span className="text-lg font-calistoga font-black text-pastel-cream tabular-nums leading-6">
+                {parseFloat(opponentTeamPoints || '0').toFixed(1)}
+              </span>
+              {projectedFinals && (
+                <span className="text-[10px] font-jbmono text-white/55 tabular-nums leading-none whitespace-nowrap">
+                  proj {projectedFinals.opp.toFixed(1)}
+                </span>
+              )}
+            </div>
             <MobileMenuButton />
           </div>
         </div>
@@ -5492,6 +5612,14 @@ const Matchup = () => {
             opponentTeamGamesRemaining={opponentTeamGamesRemaining}
             myTeamProjection={myTotalProjection}
             opponentTeamProjection={opponentTotalProjection}
+            myTeamExpectedFinal={projectedFinals?.my}
+            opponentTeamExpectedFinal={projectedFinals?.opp}
+            winProbability={matchupOutlook ? matchupOutlook.probability * 100 : undefined}
+            // A stored Monte Carlo row (matchup_simulations) overrides the
+            // formula when one exists and is fresh. Guests view a demo
+            // matchup through the public API, which has no simulation route.
+            matchupId={userLeagueState === 'active-user' ? currentMatchup.id : undefined}
+            simulationPerspective={simulationPerspective}
             isOwnTeam={isOwnTeamOnLeft}
           />
           
