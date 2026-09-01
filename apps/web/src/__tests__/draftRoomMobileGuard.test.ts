@@ -47,7 +47,9 @@ const BAR = read('../components/draft/v2/OnClockActionBar.tsx');
 const ROOM = read('../pages/DraftRoomV2.tsx');
 const STORMY = read('../components/StormyChatBubble.tsx');
 const POOL = read('../components/draft/PlayerPool.tsx');
-const CARD = read('../components/draft/PlayerCardDialog.tsx');
+// CARD UNIFICATION (2026-09-01): the draft room opens the same
+// PlayerStatsModal as Matchup / Roster / Free Agents.
+const CARD = read('../components/PlayerStatsModal.tsx');
 
 describe('the two draft countdowns render one clock', () => {
   it('DraftTimerV2 ceils the remaining seconds (never floors)', () => {
@@ -114,10 +116,16 @@ describe('players keep their names', () => {
   });
 });
 
-describe('the draft player card carries the write-up', () => {
-  it('PlayerCardDialog renders the deterministic Player Outlook', () => {
-    expect(CARD).toContain("import { generatePlayerWriteup");
-    expect(CARD).toContain('data-testid="player-card-writeup"');
+describe('the draft room opens the ONE shared player card', () => {
+  it('DraftRoomV2 renders PlayerStatsModal, not a draft-only card fork', () => {
+    expect(ROOM).toContain('<PlayerStatsModal');
+    expect(ROOM).not.toContain('PlayerCardDialog');
+    // The draft verb rides the shared card's footer action slot.
+    expect(ROOM).toContain("label: 'Draft Player'");
+  });
+
+  it('the shared card renders the deterministic Player Outlook', () => {
+    expect(CARD).toContain('generatePlayerWriteup');
     expect(CARD).toContain('Player Outlook');
     // Headline + summary + analysis + tags — the full block, not a stub.
     for (const field of ['writeup.headline', 'writeup.summary', 'writeup.analysis', 'writeup.tags']) {
@@ -125,7 +133,7 @@ describe('the draft player card carries the write-up', () => {
     }
   });
 
-  it('the dialog scrolls on phones instead of clipping the Draft button', () => {
-    expect(CARD).toContain('max-h-[85vh] overflow-y-auto');
+  it('the card body scrolls with the footer action outside it — the Draft button never clips', () => {
+    expect(CARD).toContain('max-h-[55vh] overflow-y-auto');
   });
 });

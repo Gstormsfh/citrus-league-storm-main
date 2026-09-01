@@ -29,8 +29,8 @@ interface PlayerPoolProps {
   onAddToQueue?: (playerId: string) => void;
   /**
    * V2-PARITY (2026-08-17): when provided, every row gets an info
-   * button that opens the player card (PlayerCardDialog in the v2
-   * room). Optional so existing v1 callers are untouched.
+   * button that opens the player card (the shared PlayerStatsModal in
+   * the v2 room). Optional so existing v1 callers are untouched.
    */
   onShowCard?: (player: Player) => void;
   onToggleWatchlist?: (playerId: string) => void;

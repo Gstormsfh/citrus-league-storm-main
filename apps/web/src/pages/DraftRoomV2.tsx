@@ -39,7 +39,12 @@ import { OfflineDraftRoom } from '@/components/draft/v2/OfflineDraftRoom';
 import { ManagerPresencePanel } from '@/components/draft/v2/ManagerPresencePanel';
 import { DraftBoard } from '@/components/draft/DraftBoard';
 import { PlayerPool } from '@/components/draft/PlayerPool';
-import { PlayerCardDialog } from '@/components/draft/PlayerCardDialog';
+// CARD UNIFICATION (2026-09-01): the draft room opens the SAME player
+// card as Matchup / Roster / Free Agents (PlayerStatsModal), with the
+// draft verb supplied through the card's footer action slot. The old
+// draft-only card fork is deleted.
+import PlayerStatsModal from '@/components/PlayerStatsModal';
+import { servicePlayerToHockeyPlayer } from '@/utils/playerStatsHelper';
 import { ScoringCalculator, type ScoringSettings } from '@citrus/shared';
 import { DraftHistory } from '@/components/draft/DraftHistory';
 import { TeamRosters } from '@/components/draft/TeamRosters';
@@ -1989,14 +1994,28 @@ function MainTabs({
         </TabsContent>
       </Tabs>
 
-      {/* V2-PARITY (2026-08-17) — the player card. Draftable straight
-          from the card when it's your turn. */}
-      <PlayerCardDialog
-        player={cardPlayer}
+      {/* V2-PARITY (2026-08-17) — draftable straight from the card when
+          it's your turn. CARD UNIFICATION (2026-09-01): this is the same
+          PlayerStatsModal every other surface opens; the draft verb rides
+          the card's footer action slot. */}
+      <PlayerStatsModal
+        player={cardPlayer ? servicePlayerToHockeyPlayer(cardPlayer) : null}
+        isOpen={cardPlayer !== null}
         onClose={() => setCardPlayer(null)}
-        onDraft={handleDraftFromPool}
-        canDraft={amIOnClock && isDraftActive && cardPlayer !== null && !draftedIds.includes(cardPlayer.id)}
-        isSubmitPending={isSubmitPending}
+        action={
+          amIOnClock && isDraftActive && cardPlayer !== null && !draftedIds.includes(cardPlayer.id)
+            ? {
+                label: 'Draft Player',
+                pending: isSubmitPending,
+                pendingLabel: 'Drafting…',
+                onClick: () => {
+                  const picked = cardPlayer;
+                  setCardPlayer(null);
+                  if (picked) void handleDraftFromPool(picked);
+                },
+              }
+            : undefined
+        }
       />
     </div>
   );
