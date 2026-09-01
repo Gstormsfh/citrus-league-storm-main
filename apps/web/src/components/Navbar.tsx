@@ -217,7 +217,16 @@ const Navbar = () => {
                   <DropdownMenuLabel className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">
                     My Leagues ({userLeagues.length})
                   </DropdownMenuLabel>
+                  {/* SWITCHER REACH (2026-09-01, iPhone sim): "the drop down is
+                      too long so I can't even reach the create league option."
+                      The action lives at the TOP now — always reachable no
+                      matter how many leagues — and the league list below is
+                      capped and scrolls on its own. */}
+                  <DropdownMenuItem onSelect={() => navigate('/create-league')} className="text-pastel-orange-soft font-bold focus:bg-pastel-orange/10 focus:text-pastel-orange">
+                    <UserPlus className="h-4 w-4 mr-2" /> Create / Join League
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-white/10" />
+                  <div className="max-h-[min(50vh,320px)] overflow-y-auto overscroll-contain">
                   {userLeagues.map((l) => {
                     const lType = getLeagueTypeFromSettings(l.settings as Record<string, unknown>);
                     return (
@@ -257,10 +266,7 @@ const Navbar = () => {
                       </div>
                     </DropdownMenuItem>
                   );})}
-                  <DropdownMenuSeparator className="bg-white/10" />
-                  <DropdownMenuItem onSelect={() => navigate('/create-league')} className="text-pastel-orange-soft font-bold focus:bg-pastel-orange/10 focus:text-pastel-orange">
-                    <UserPlus className="h-4 w-4 mr-2" /> Create / Join League
-                  </DropdownMenuItem>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -468,7 +474,14 @@ const Navbar = () => {
                     <DropdownMenuLabel className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">
                       My Leagues ({userLeagues.length})
                     </DropdownMenuLabel>
+                    {/* SWITCHER REACH (2026-09-01): action pinned on top,
+                        league list capped + scrollable — see the desktop
+                        variant above for the incident note. */}
+                    <DropdownMenuItem onSelect={() => { navigate('/create-league'); closeMobileMenu(); }} className="text-pastel-orange-soft font-bold focus:bg-pastel-orange/10 focus:text-pastel-orange">
+                      <UserPlus className="h-4 w-4 mr-2" /> Create / Join League
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator className="bg-white/10" />
+                    <div className="max-h-[min(50vh,320px)] overflow-y-auto overscroll-contain">
                     {userLeagues.map((l) => {
                       const lType = getLeagueTypeFromSettings(l.settings as Record<string, unknown>);
                       return (
@@ -507,10 +520,7 @@ const Navbar = () => {
                         </div>
                       </DropdownMenuItem>
                     );})}
-                    <DropdownMenuSeparator className="bg-white/10" />
-                    <DropdownMenuItem onSelect={() => { navigate('/create-league'); closeMobileMenu(); }} className="text-pastel-orange-soft font-bold focus:bg-pastel-orange/10 focus:text-pastel-orange">
-                      <UserPlus className="h-4 w-4 mr-2" /> Create / Join League
-                    </DropdownMenuItem>
+                    </div>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
