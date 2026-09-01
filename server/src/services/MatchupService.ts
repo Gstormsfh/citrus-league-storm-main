@@ -522,39 +522,30 @@ export class MatchupService {
     leagueId: string,
     weekStart: string,
     weekEnd: string,
+    /**
+     * PERF (2026-09-01): caller-provided lineup, when the caller has
+     * already read team_lineups for this team (ensureMatchupRosters
+     * does). Saves a duplicate read per team per request.
+     */
+    preloadedLineup?: {
+      starters?: Array<number | string> | null;
+      bench?: Array<number | string> | null;
+      ir?: Array<number | string> | null;
+      slot_assignments?: Record<string, string> | null;
+    } | null,
   ) {
     const admin = getSupabaseAdmin();
-
-    // Try team_lineups first
-    const { data: lineup } = await admin
-      .from('team_lineups')
-      .select('starters, bench, ir, slot_assignments')
-      .eq('team_id', teamId)
-      .eq('league_id', leagueId)
-      .maybeSingle();
-
-    // If no team_lineups entry, build one from roster_assignments
-    if (!lineup?.starters || lineup.starters.length === 0) {
-      const built = await this.buildAndSaveDefaultLineup(admin, teamId, leagueId);
-      if (!built) return;
-      // Re-read after save (trigger may have created some daily rosters)
-    }
-
-    // Re-read lineup (may have just been created above)
-    const { data: finalLineup } = await admin
-      .from('team_lineups')
-      .select('starters, bench, ir, slot_assignments')
-      .eq('team_id', teamId)
-      .eq('league_id', leagueId)
-      .maybeSingle();
-
-    if (!finalLineup?.starters || finalLineup.starters.length === 0) return;
 
     // Task 1B: refuse to fabricate rows for past dates. Historically this
     // path was called from ensureMatchupRosters on every Matchup-page view
     // and it happily materialised weeks of past dates from the CURRENT
     // team_lineups — the exact defect the 9,353-row 2026-04-04 burst
     // proved. Only today+future are eligible for backfill.
+    //
+    // PERF (2026-09-01): computed FIRST, because it is pure date math —
+    // when the week is entirely in the past there is nothing this method
+    // may ever write, and it used to spend three team_lineups reads and a
+    // fantasy_daily_rosters read discovering that on every call.
     const today = getTodayMST();
     const dates: string[] = [];
     const start = new Date(weekStart + 'T00:00:00');
@@ -564,6 +555,36 @@ export class MatchupService {
       if (iso < today) continue;
       dates.push(iso);
     }
+    if (dates.length === 0) return;
+
+    // One lineup read in the common case (zero when the caller already
+    // has it); a second only when a missing lineup was just built.
+    let finalLineup = preloadedLineup;
+    if (!finalLineup) {
+      const { data: lineup } = await admin
+        .from('team_lineups')
+        .select('starters, bench, ir, slot_assignments')
+        .eq('team_id', teamId)
+        .eq('league_id', leagueId)
+        .maybeSingle();
+      finalLineup = lineup;
+    }
+
+    // If no team_lineups entry, build one from roster_assignments, then
+    // re-read what the build produced.
+    if (!finalLineup?.starters || finalLineup.starters.length === 0) {
+      const built = await this.buildAndSaveDefaultLineup(admin, teamId, leagueId);
+      if (!built) return;
+      const { data: rebuilt } = await admin
+        .from('team_lineups')
+        .select('starters, bench, ir, slot_assignments')
+        .eq('team_id', teamId)
+        .eq('league_id', leagueId)
+        .maybeSingle();
+      finalLineup = rebuilt;
+    }
+
+    if (!finalLineup?.starters || finalLineup.starters.length === 0) return;
 
     // Check which (player_id, roster_date) combos already exist
     const { data: existingRecords } = await admin
@@ -592,7 +613,7 @@ export class MatchupService {
     }> = [];
     const slotAssignments = finalLineup.slot_assignments || {};
 
-    const addRows = (playerIds: number[] | string[], slotType: string, useSlot: boolean) => {
+    const addRows = (playerIds: Array<number | string>, slotType: string, useSlot: boolean) => {
       for (const pid of playerIds || []) {
         const playerId = typeof pid === 'string' ? parseInt(pid, 10) : pid;
         for (const date of dates) {
@@ -658,20 +679,26 @@ export class MatchupService {
     const teamIds = [matchup.team1_id, matchup.team2_id].filter(Boolean);
 
     for (const teamId of teamIds) {
-      // Check if team_lineups exists
+      // PERF (2026-09-01): read the FULL lineup once and hand it to the
+      // backfill — this method used to read `starters` here, then the
+      // backfill read the full lineup again, then a third time after a
+      // build. One read per team in the steady state.
       const { data: lineup } = await admin
         .from('team_lineups')
-        .select('starters')
+        .select('starters, bench, ir, slot_assignments')
         .eq('team_id', teamId)
         .eq('league_id', matchup.league_id)
         .maybeSingle();
 
+      let effectiveLineup = lineup;
       if (!lineup?.starters || (Array.isArray(lineup.starters) && lineup.starters.length === 0)) {
         logger.info('[ensureMatchupRosters] No lineup for team', teamId, '— building from roster_assignments');
         const created = await this.buildAndSaveDefaultLineup(admin, teamId, matchup.league_id);
         if (created) {
           initialized++;
           logger.info('[ensureMatchupRosters] Created lineup for team', teamId);
+          // Let the backfill re-read the freshly built lineup itself.
+          effectiveLineup = null;
         } else {
           logger.error('[ensureMatchupRosters] Failed to create lineup for team', teamId, '— no roster_assignments?');
         }
@@ -681,6 +708,7 @@ export class MatchupService {
       await this.backfillDailyRostersIfMissing(
         teamId, matchupId, matchup.league_id,
         matchup.week_start_date, matchup.week_end_date,
+        effectiveLineup,
       );
     }
 
