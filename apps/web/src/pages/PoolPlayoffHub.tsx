@@ -14,9 +14,10 @@ import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import {
   Trophy, Users, Clock, Copy, Check, Lock, ChevronRight, Crown, Target,
-  Mail, MessageSquare, Link as LinkIcon, Eye, Calendar,
+  Mail, MessageSquare, Link as LinkIcon, Eye, Calendar, Share2,
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { buildInviteLink, canSystemShare, emailInvite, isNativeApp, shareInvite, smsInvite } from '@/utils/inviteShare';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -384,39 +385,34 @@ export default function PoolPlayoffHub() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Shareable invite URL.
-  // /auth honors ?redirect= so if the invitee is signed out, they go through
-  // auth, then come back here and auto-join via the ?code= handler in CreateLeague.
-  const joinPath = `/create-league?tab=join&code=${league?.join_code || ''}`;
-  const shareUrl = `${window.location.origin}/auth?redirect=${encodeURIComponent(joinPath)}`;
-
-  // Invite template includes BOTH the tappable link AND the raw code as a
-  // fallback for mail clients that strip URLs.
-  const inviteText = league
-    ? `You're invited to join "${league.name}" on Citrus Fantasy Sports!\n\n` +
-      `Tap to join: ${shareUrl}\n\n` +
-      `Or enter this code manually at citrusfantasysports.com:\n` +
-      `${league.join_code}`
-    : '';
-
+  // INVITE SHARE (2026-09-01): link/text construction and send mechanics
+  // live in utils/inviteShare — links always point at the public origin
+  // (the in-app origin is unopenable off the device), and the OS share
+  // sheet leads wherever it exists.
   const copyShareLink = () => {
-    navigator.clipboard.writeText(shareUrl);
+    if (!league?.join_code) return;
+    navigator.clipboard.writeText(buildInviteLink(league.join_code));
     toast({ title: 'Link copied!', description: 'Paste it anywhere to invite friends.' });
   };
 
-  const emailInvite = () => {
-    if (!league) return;
-    const subject = encodeURIComponent(`Join ${league.name} on Citrus Fantasy Sports`);
-    const body = encodeURIComponent(inviteText);
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  const handleShareInvite = async () => {
+    if (!league?.join_code) return;
+    const result = await shareInvite(league.name, league.join_code);
+    if (result === 'copied') {
+      toast({ title: 'Invite copied!', description: 'Paste it anywhere to invite friends.' });
+    } else if (result === 'failed') {
+      toast({ title: 'Could not share', description: 'Use Copy Invite Link instead.' });
+    }
   };
 
-  const smsInvite = () => {
-    const body = encodeURIComponent(inviteText);
-    // iOS requires sms:&body= while Android uses sms:?body=
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const separator = isIOS ? '&' : '?';
-    window.location.href = `sms:${separator}body=${body}`;
+  const handleEmailInvite = () => {
+    if (!league?.join_code) return;
+    emailInvite(league.name, league.join_code);
+  };
+
+  const handleSmsInvite = () => {
+    if (!league?.join_code) return;
+    smsInvite(league.name, league.join_code);
   };
 
   if (loading) {
@@ -956,6 +952,17 @@ export default function PoolPlayoffHub() {
                   </button>
 
                   <div className="pt-2 grid grid-cols-1 gap-1.5">
+                    {canSystemShare() && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={handleShareInvite}
+                        className="w-full justify-start gap-2 text-xs h-8"
+                      >
+                        <Share2 className="h-3.5 w-3.5" />
+                        Share Invite
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -965,24 +972,28 @@ export default function PoolPlayoffHub() {
                       <LinkIcon className="h-3.5 w-3.5" />
                       Copy Invite Link
                     </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={emailInvite}
-                      className="w-full justify-start gap-2 text-xs h-8"
-                    >
-                      <Mail className="h-3.5 w-3.5" />
-                      Send via Email
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={smsInvite}
-                      className="w-full justify-start gap-2 text-xs h-8"
-                    >
-                      <MessageSquare className="h-3.5 w-3.5" />
-                      Send via Text
-                    </Button>
+                    {!isNativeApp() && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleEmailInvite}
+                        className="w-full justify-start gap-2 text-xs h-8"
+                      >
+                        <Mail className="h-3.5 w-3.5" />
+                        Send via Email
+                      </Button>
+                    )}
+                    {!isNativeApp() && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSmsInvite}
+                        className="w-full justify-start gap-2 text-xs h-8"
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        Send via Text
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
