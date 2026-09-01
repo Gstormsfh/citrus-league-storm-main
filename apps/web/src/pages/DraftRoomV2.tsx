@@ -1240,7 +1240,17 @@ function StickyHeader({ leagueId, onRetryNow, clockOffsetMs }: StickyHeaderProps
             className="min-w-0 flex-1 truncate text-right text-xs sm:text-sm text-muted-foreground tabular-nums"
             data-testid="draft-header-label"
           >
-            {derived.currentPickNumber !== null &&
+            {/* AUCTION CHROME (2026-09-01): an auction has lots sold,
+                not a round/pick position — and its clock lives on the
+                nomination card, so the snake pick timer stays hidden. */}
+            {snapshot.format === 'auction' ? (
+              <>
+                Auction · {derived.picksMade} / {derived.totalPicks} sold
+                <span className={statusVisibility}>
+                  {' '}· {describeStatus(derived.draftStatus, derived.picksMade)}
+                </span>
+              </>
+            ) : derived.currentPickNumber !== null &&
             derived.currentRoundNumber !== null ? (
               <>
                 Round {derived.currentRoundNumber} · Pick{' '}
@@ -1261,7 +1271,7 @@ function StickyHeader({ leagueId, onRetryNow, clockOffsetMs }: StickyHeaderProps
             Draft Room
           </div>
         )}
-        {snapshot !== null && derived !== null && (
+        {snapshot !== null && derived !== null && snapshot.format !== 'auction' && (
           <DraftTimerV2
             variant="compact"
             currentPickDeadline={snapshot.stateSnapshot.currentPickDeadline}
@@ -1561,8 +1571,16 @@ function MainTabs({
     return () => { cancelled = true; };
   }, [leagueId]);
 
+  // AUCTION CHROME (2026-09-01, a1a125c8 incident): an auction lobby
+  // has no "your pick" — rosters fill through nominations and bids in
+  // the AuctionPanel. Everything keyed on amIOnClock (the red action
+  // bar, the alarm, autodraft, pool Draft buttons, draft-from-card)
+  // is snake/linear machinery and must stay dark here.
+  const isAuctionRoom = snapshot?.format === 'auction';
+
   // Is it my turn? (computed early — feeds alarm + on-clock action bar.)
   const amIOnClock =
+    !isAuctionRoom &&
     derived !== null &&
     myTeamId !== null &&
     derived.onClockTeamId !== null &&
@@ -1909,19 +1927,21 @@ function MainTabs({
           edge belongs to the draft; the room container carries pb-28 so
           the list's last rows scroll clear of it. lg+ keeps it in-flow,
           sticky just below the compact header. */}
-      <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-16 lg:z-20">
-        <OnClockActionBar
-          amIOnClock={amIOnClock}
-          currentPickDeadline={snapshot?.stateSnapshot.currentPickDeadline ?? null}
-          clockOffsetMs={clockOffsetMs}
-          pickTimeLimitSec={pickTimeLimitSec}
-          selectedPlayer={selectedPlayer}
-          onDraft={handleDraftFromPool}
-          pickNumber={derived?.currentPickNumber ?? null}
-          roundNumber={derived?.currentRoundNumber ?? null}
-          isSubmitPending={isSubmitPending}
-        />
-      </div>
+      {!isAuctionRoom && (
+        <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-16 lg:z-20">
+          <OnClockActionBar
+            amIOnClock={amIOnClock}
+            currentPickDeadline={snapshot?.stateSnapshot.currentPickDeadline ?? null}
+            clockOffsetMs={clockOffsetMs}
+            pickTimeLimitSec={pickTimeLimitSec}
+            selectedPlayer={selectedPlayer}
+            onDraft={handleDraftFromPool}
+            pickNumber={derived?.currentPickNumber ?? null}
+            roundNumber={derived?.currentRoundNumber ?? null}
+            isSubmitPending={isSubmitPending}
+          />
+        </div>
+      )}
       {/* Toggles live in normal flow — set-and-forget controls don't earn
           a permanent slice of a phone screen the way the pick action does. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -1939,8 +1959,9 @@ function MainTabs({
           </button>
         )}
         {/* V2-PARITY (2026-08-17) — autodraft toggle, always visible so a
-            manager can arm it BEFORE their turn (that's the whole point). */}
-        {!isDraftComplete && (
+            manager can arm it BEFORE their turn (that's the whole point).
+            Snake/linear only — an auction has no turn to autodraft. */}
+        {!isDraftComplete && !isAuctionRoom && (
           <button
             type="button"
             onClick={toggleAutodraft}
