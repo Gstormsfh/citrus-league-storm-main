@@ -62,7 +62,7 @@ jobs:
           npx tsc --noEmit -p tsconfig.app.json 2>&1 | tee /tmp/tsc-web.log || true
           COUNT=$(grep -c "error TS" /tmp/tsc-web.log || true)
           COUNT=${COUNT:-0}
-          echo "type errors: $COUNT (baseline $BASELINE)"
+          echo "type errors: $COUNT (baseline $BASELINE)" | tee /tmp/tsc-web.summary
           if [ "$COUNT" -gt "$BASELINE" ]; then
             echo "::error::Web type errors rose from $BASELINE to $COUNT. New errors:"
             grep "error TS" /tmp/tsc-web.log | head -40
@@ -125,6 +125,20 @@ jobs:
           name: web-build
           path: apps/web/dist/
           retention-days: 7
+
+      # Every job ends with this step: one row in public.ops_ci_runs so Claude
+      # can read the deploy outcome through the Supabase MCP without a pasted
+      # log. Never fails the job (if: always() + continue-on-error + the
+      # action exits 0). See docs/RUNBOOKS/CI_TELEMETRY.md.
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          log-file: /tmp/tsc-web.summary
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   # ── Deploy API server to Cloud Run ──────────────────────────────────
   deploy-api:
@@ -332,7 +346,7 @@ jobs:
             echo "::error::Traffic is on image tag ${SERVING_IMAGE##*:}, expected ${{ github.sha }}. The deploy did not take effect."
             exit 1
           fi
-          echo "Serving revision $SERVING is running this build."
+          echo "Serving revision $SERVING is running this build." | tee /tmp/deploy-api.summary
 
       - name: API health check
         if: steps.check-gcp.outputs.has_creds == 'true'
@@ -348,6 +362,16 @@ jobs:
               echo "::warning::API health check returned HTTP $status"
             fi
           fi
+
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          log-file: /tmp/deploy-api.summary
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   # ── Deploy Supabase Edge Functions — REMOVED (chunk 11g.9) ─────────
   # This job deployed `stormy-chat` on every push to master. Stormy now
@@ -404,10 +428,21 @@ jobs:
           sleep 15
           status=$(curl -s -o /dev/null -w "%{http_code}" "https://citrusfantasysports.com/" --max-time 10) || true
           if [ "$status" = "200" ]; then
-            echo "Health check passed (HTTP $status)"
+            echo "Health check passed (HTTP $status)" | tee /tmp/deploy-web.summary
           else
             echo "::warning::Health check returned HTTP $status — verify manually"
+            echo "Health check returned HTTP $status" > /tmp/deploy-web.summary
           fi
+
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          log-file: /tmp/deploy-web.summary
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   # ── Notify team ───────────────────────────────────────────────────────
   notify:
@@ -423,3 +458,17 @@ jobs:
           else
             echo "::error::Production deploy failed — investigate immediately"
           fi
+
+      # This job is always green; the row carries the DEPLOY job's result so
+      # "did master ship?" is one query: workflow='Production Deploy', job='notify'.
+      - uses: actions/checkout@v5
+
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ needs.deploy.result }}
+          summary: production deploy ${{ needs.deploy.result }}
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

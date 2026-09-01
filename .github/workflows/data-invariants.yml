@@ -100,7 +100,21 @@ jobs:
           IGNORE='${{ github.event.inputs.ignore }}'
           if [ -n "$IGNORE" ]; then
             echo "::warning::Running with --ignore $IGNORE"
-            python data-pipeline/monitoring/check_data_invariants.py --ignore "$IGNORE"
+            python data-pipeline/monitoring/check_data_invariants.py --ignore "$IGNORE" 2>&1 | tee /tmp/invariants.log
           else
-            python data-pipeline/monitoring/check_data_invariants.py
+            python data-pipeline/monitoring/check_data_invariants.py 2>&1 | tee /tmp/invariants.log
           fi
+
+      # One row in public.ops_ci_runs (last line of the checker's output as the
+      # summary) so a failed invariant reaches Claude through the Supabase MCP
+      # and not only the GitHub inbox. Never fails the job.
+      # See docs/RUNBOOKS/CI_TELEMETRY.md.
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          log-file: /tmp/invariants.log
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

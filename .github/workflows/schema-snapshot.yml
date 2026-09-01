@@ -1,0 +1,140 @@
+name: Schema Snapshot
+
+# Weekly read-only snapshot of the production schema, opened as a PR when it
+# differs from the committed one. Prod drifts from supabase/migrations/ whenever
+# a function or a cron job is edited in place (2026-09-01: project_ros,
+# rebuild_player_projected_stats and backtest_inseason_weight existed only in
+# prod, and the one schema record was a hand-taken file 19 days old). With
+# this, drift is a diff somebody has to look at, not a discovery.
+#
+# What it touches: nothing in prod. `pg_dump --schema-only` plus one SELECT on
+# cron.job, through scripts/ops/dump-prod-schema.sh -- the same script Garrett
+# can run from Cloud Shell. Output: supabase/schema/prod_schema.sql and
+# supabase/schema/prod_cron.sql.
+#
+# Needs the repository secret PROD_DB_URL: the DIRECT connection string
+# (db.<ref>.supabase.co:5432), never the pooler (KI-E010; the script refuses
+# pooled patterns). Until the secret exists every run fails at the dump step
+# with a message naming it -- deliberately loud, not a silent skip.
+#
+# The PR is opened with GITHUB_TOKEN, so GitHub does not start CI on it. That
+# is fine for two generated files under supabase/schema/; push to the branch or
+# close/reopen the PR if a check is ever wanted. Review question for each hunk:
+# which migration file produces this? None = drift = write the migration
+# (docs/PROD_CHANGE_LEDGER.md Rule 1). Runbook: docs/RUNBOOKS/CI_TELEMETRY.md §2.
+
+on:
+  schedule:
+    - cron: '0 9 * * 0'   # Sundays 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: schema-snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    name: Prod schema snapshot
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      # Prod is Postgres 17 and pg_dump refuses servers newer than itself;
+      # ubuntu-latest ships client 16. The script checks this too.
+      - name: Install postgresql-client-17
+        run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Dump prod schema and cron manifest
+        shell: bash
+        env:
+          PROD_DB_URL: ${{ secrets.PROD_DB_URL }}
+        run: scripts/ops/dump-prod-schema.sh 2>&1 | tee /tmp/snapshot.log
+
+      - name: Open or update the snapshot PR when the snapshot changed
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          FILES="supabase/schema/prod_schema.sql supabase/schema/prod_cron.sql"
+          # Intent-to-add so a first-ever snapshot (untracked files) is a diff too.
+          git add --intent-to-add -- $FILES
+          if git diff --quiet -- $FILES; then
+            echo "summary=no drift" >> "$GITHUB_OUTPUT"
+            echo "Snapshot matches the committed one. No PR."
+            exit 0
+          fi
+
+          DATE=$(date -u +%F)
+          BRANCH="chore/schema-snapshot-$DATE"
+          TITLE="chore(schema): prod schema snapshot $DATE"
+          CHANGED=$(git diff --name-only -- $FILES | wc -l | tr -d ' ')
+          git diff --stat -- $FILES | tee /tmp/diffstat.txt
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q -b "$BRANCH"
+          git add -- $FILES
+          git commit -q -m "$TITLE"
+          # A second run on the same day replaces that day's snapshot commit.
+          git push --force -u origin "$BRANCH"
+
+          {
+            echo "## What"
+            echo "Weekly \`pg_dump --schema-only --no-owner --no-privileges\` of production (\`public\`) plus the \`cron.job\` manifest, taken $(date -u +'%Y-%m-%d %H:%MZ') by \`schema-snapshot.yml\` via \`scripts/ops/dump-prod-schema.sh\`."
+            echo
+            echo "## Why"
+            echo "The committed snapshot no longer matches prod. Every hunk below is either a migration that landed since the last snapshot (fine) or a change made in place on prod with no migration file (drift, \`docs/PROD_CHANGE_LEDGER.md\` Rule 1)."
+            echo
+            echo "## How"
+            echo "For each hunk, find the \`supabase/migrations/\` file that produces it. If there is none, write it (capture the live body with \`pg_get_functiondef\` first). Merge this PR either way: it records what prod is."
+            echo
+            echo '```'
+            cat /tmp/diffstat.txt
+            echo '```'
+            echo
+            echo "Opened with \`GITHUB_TOKEN\`, so CI does not run on this PR; push to the branch or close/reopen it if a check is wanted. Runbook: \`docs/RUNBOOKS/CI_TELEMETRY.md\` §2."
+          } > /tmp/pr-body.md
+
+          NUM=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$NUM" ]; then
+            gh pr edit "$NUM" --body-file /tmp/pr-body.md >/dev/null
+            URL=$(gh pr view "$NUM" --json url --jq .url)
+          else
+            URL=$(gh pr create --base master --head "$BRANCH" --title "$TITLE" --body-file /tmp/pr-body.md)
+            NUM=$(gh pr view "$BRANCH" --json number --jq .number)
+          fi
+          echo "PR: $URL"
+
+          # An older snapshot PR nobody merged is now stale: this one carries the
+          # cumulative diff. Close it so exactly one snapshot PR is ever open.
+          gh pr list --state open --limit 50 --json number,headRefName \
+            --jq '.[] | select(.headRefName | startswith("chore/schema-snapshot-")) | .number' \
+          | while read -r other; do
+              [ "$other" = "$NUM" ] && continue
+              gh pr close "$other" --delete-branch --comment "Superseded by $URL, which carries this diff and everything since." || true
+            done
+
+          echo "summary=drift: $CHANGED file(s) changed, PR #$NUM" >> "$GITHUB_OUTPUT"
+
+      # One row in public.ops_ci_runs so Claude can see whether this week's
+      # snapshot ran and whether it found drift, through the Supabase MCP.
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          summary: ${{ steps.pr.outputs.summary }}
+          log-file: /tmp/snapshot.log
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

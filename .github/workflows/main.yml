@@ -37,4 +37,18 @@ jobs:
         # CITRUS_DEFAULT_SEASON), so the batch rolls over on its own at the
         # season turn. The hardcoded --season 2025 that used to be here would
         # have kept projecting last season from 2026-09-29 onward.
-        run: python data-pipeline/projections/nightly_projection_batch.py
+        shell: bash
+        run: python data-pipeline/projections/nightly_projection_batch.py 2>&1 | tee /tmp/nightly.log
+
+      # One row in public.ops_ci_runs (last line of the batch output as the
+      # summary) so Claude can see whether last night's batch ran, through the
+      # Supabase MCP. Never fails the job. See docs/RUNBOOKS/CI_TELEMETRY.md.
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          log-file: /tmp/nightly.log
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
