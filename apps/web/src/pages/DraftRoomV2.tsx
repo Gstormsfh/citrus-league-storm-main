@@ -25,7 +25,7 @@
 // immediately with `#<id>` fallbacks and hydrates as names resolve.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { ConnectionBanner } from '@/components/draft/v2/ConnectionBanner';
 import { CompletionMomentBanner } from '@/components/draft/v2/CompletionMomentBanner';
@@ -485,6 +485,21 @@ export default function DraftRoomV2() {
   if (offlineMeta.kind === 'offline') {
     return (
       <div className="container mx-auto p-4" data-testid="draft-room-v2">
+      {/*
+        * NATIVE ESCAPE HATCH (2026-08-31) — reported from the iOS simulator
+        * as "I'm stuck, the menu has disappeared." The draft routes hide the
+        * app's global nav on purpose (MobileBottomNav hideRoutes), and the
+        * native shell has no browser chrome, so without this link the room
+        * is a dead end you can only leave by killing the app. Every draft
+        * surface carries its own way back.
+        */}
+      <Link
+        to={`/league/${leagueId}`}
+        data-testid="draft-room-exit"
+        className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        &larr; League HQ
+      </Link>
         <OfflineDraftRoom
           leagueId={leagueId}
           teams={teams}
@@ -504,6 +519,21 @@ export default function DraftRoomV2() {
 
   return (
     <div className="container mx-auto p-4" data-testid="draft-room-v2">
+      {/*
+        * NATIVE ESCAPE HATCH (2026-08-31) — reported from the iOS simulator
+        * as "I'm stuck, the menu has disappeared." The draft routes hide the
+        * app's global nav on purpose (MobileBottomNav hideRoutes), and the
+        * native shell has no browser chrome, so without this link the room
+        * is a dead end you can only leave by killing the app. Every draft
+        * surface carries its own way back.
+        */}
+      <Link
+        to={`/league/${leagueId}`}
+        data-testid="draft-room-exit"
+        className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+      >
+        &larr; League HQ
+      </Link>
       <StickyHeader
         onRetryNow={handleRetryNow}
         clockOffsetMs={clockOffsetMs}
