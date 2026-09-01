@@ -75,6 +75,18 @@ export const playerApi = {
     );
   },
 
+  /**
+   * GOALIE-PROJ SANITY (2026-09-01): one player's rest-of-season row —
+   * start-aware games_remaining + total for the card's goalie headline.
+   */
+  getRosProjectionForPlayer(playerId: string | number) {
+    return c.cached(
+      `players:ros-projection:${playerId}`,
+      () => apiClient.get(`/api/players/ros-projections?playerId=${playerId}`),
+      CACHE_TTL.LONG,
+    );
+  },
+
   /** Get a single player */
   getPlayer(playerId: string) {
     return c.cached(
