@@ -354,7 +354,13 @@ def _fantasy_status_text(value) -> Optional[str]:
 def fetch_feed() -> List[dict]:
     """Flatten ESPN's team -> players nesting into one list of entries."""
     logger.info("Fetching %s", ESPN_INJURIES_URL)
-    resp = citrus_request(ESPN_INJURIES_URL, timeout=20)
+    # max_retries=12 (2026-09-01): ESPN is the pickiest destination this
+    # pipeline talks to — it flags individual exit IPs, and the default
+    # budget of 5 gave a run only five draws from the pool before giving
+    # up. Twelve draws from the (now shuffled — see proxy_manager) pool
+    # makes a run survive even a burned dozen. One request per run, so
+    # the worst-case cost is a few extra seconds, not load.
+    resp = citrus_request(ESPN_INJURIES_URL, timeout=20, max_retries=12)
     if resp.status_code != 200:
         raise RuntimeError(f"injuries feed returned HTTP {resp.status_code}")
 

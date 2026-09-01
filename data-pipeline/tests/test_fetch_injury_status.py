@@ -318,3 +318,33 @@ def test_map_status_survives_a_raw_object():
     through unextracted, the run degrades instead of dying."""
     code, ir, recognised = map_status({"description": "IR"}, "Injured Reserve")
     assert (code, ir, recognised) == ("IR", True, True)
+
+
+def test_fetch_feed_carries_a_pool_sized_retry_budget(monkeypatch):
+    """ESPN flags individual exit IPs, and the default budget of 5 gave a run
+    only five draws from the hundred-IP pool before giving up (2026-08-28
+    incident: all five landed on flagged front-of-list IPs). fetch_feed must
+    ask citrus_request for a real walk of the shuffled pool."""
+    from data_pipeline.acquisition import fetch_injury_status as fis
+
+    captured = {}
+
+    class _Resp:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"injuries": []}
+
+    def fake_request(url, **kwargs):
+        captured["url"] = url
+        captured.update(kwargs)
+        return _Resp()
+
+    monkeypatch.setattr(fis, "citrus_request", fake_request)
+    assert fis.fetch_feed() == []
+    assert captured["url"] == fis.ESPN_INJURIES_URL
+    assert captured.get("max_retries", 0) >= 12, (
+        "fetch_feed fell back to the default retry budget — five draws from a "
+        "hundred-IP pool is how the 2026-08-28 outage happened"
+    )

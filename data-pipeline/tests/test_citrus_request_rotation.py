@@ -114,3 +114,37 @@ def test_proxy_auth_407_does_refresh(monkeypatch):
     the pool is the correct response and must not regress with the 403 fix."""
     pm, session = _run(monkeypatch, 407)
     assert pm.refreshes >= 1
+
+
+def test_pool_order_is_shuffled_per_process(monkeypatch):
+    """Second half of the 2026-08-28 postmortem: Webshare returns the pool in
+    a STABLE order and every short-lived pipeline process rebuilt its cycle
+    from index 0 — so across runs, the same front-of-list IPs carried every
+    request while the back ninety never got asked, and ESPN flagged exactly
+    the recurring leaders. A refresh must cache a shuffled permutation.
+
+    (Identity-order flake risk is 1 in 100!, i.e. none.)
+    """
+    from data_pipeline.utils import proxy_manager as pmod
+
+    monkeypatch.setenv("CITRUS_PROXY_ENABLED", "true")
+    monkeypatch.setenv("CITRUS_PROXY_USERNAME", "u")
+    monkeypatch.setenv("CITRUS_PROXY_PASSWORD", "p")
+    monkeypatch.setenv("CITRUS_PROXY_API_URL", "http://pool.invalid/list")
+
+    raw = [{"proxy_address": f"10.0.0.{i}", "port": str(1000 + i)} for i in range(100)]
+    monkeypatch.setattr(
+        pmod.ProxyManager, "_fetch_proxy_list_from_api", lambda self: list(raw)
+    )
+
+    manager = pmod.ProxyManager()
+    api_order = [f"http://u:p@10.0.0.{i}:{1000 + i}" for i in range(100)]
+
+    assert sorted(manager.proxy_list) == sorted(api_order), "pool contents must be unchanged"
+    assert manager.proxy_list != api_order, (
+        "pool kept the API's stable order — every process run would walk the "
+        "same IPs from index 0 again"
+    )
+    # Rotation within a run stays a strict no-repeat cycle over the whole pool.
+    seen = [manager.get_next_proxy() for _ in range(100)]
+    assert sorted(seen) == sorted(api_order)
