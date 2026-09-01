@@ -62,6 +62,35 @@ describe('League HQ composition', () => {
     expect(actions, 'actions must precede the stat tiles').toBeLessThan(infoTiles);
   });
 
+  // HQ PROFESSIONAL PASS (2026-09-01): league life before setup facts —
+  // timeline and teams render ABOVE the league-shape config tiles.
+  it('demotes the config tiles below the timeline and teams list', () => {
+    const timeline = SOURCE.indexOf('{/* T12 architect Entry 13');
+    const teams = SOURCE.indexOf('{/* Teams List */}');
+    const infoTiles = SOURCE.indexOf('{/* League Info Cards');
+    expect(timeline, 'timeline must precede the config tiles').toBeLessThan(infoTiles);
+    expect(teams, 'teams list must precede the config tiles').toBeLessThan(infoTiles);
+  });
+
+  it('the squad card carries state and sentence-case actions', () => {
+    const squad = SOURCE.slice(SOURCE.indexOf('✦ Your Squad'), SOURCE.indexOf('✦ Your Squad') + 4000);
+    // Data line, not filler copy, once the draft is done:
+    expect(squad).toContain('Roster set ·');
+    // Both actions override the varsity-caps button base:
+    const overrides = squad.match(/normal-case font-sans tracking-normal/g) ?? [];
+    expect(overrides.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('every member can invite from the top of HQ', () => {
+    const header = SOURCE.slice(0, SOURCE.indexOf('{/* Actions */}'));
+    expect(header).toContain('<InvitePlayersButton');
+    // Not commissioner-gated — the guard is the join code existing.
+    const inviteAt = header.indexOf('<InvitePlayersButton');
+    const gateWindow = header.slice(inviteAt - 200, inviteAt);
+    expect(gateWindow).toContain('league.join_code &&');
+    expect(gateWindow).not.toContain('isCommissioner &&');
+  });
+
   it('makes the draft CTA hot when the viewer can actually act', () => {
     expect(SOURCE).toMatch(
       /isCommissioner && league\.draft_status === 'not_started' && teams\.length >= \(league\.settings\?\.teamsCount \|\| 12\)/,
