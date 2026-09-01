@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,15 +42,61 @@ const Contact = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Build mailto link with form data and open it
+    const plainBody = `Name: ${formData.name}\nEmail: ${formData.email}\n\n${formData.message}`;
+
+    // NATIVE SCHEME FIX (2026-09-01): the iOS shell silently drops
+    // mailto: navigations, so the form's send button did nothing in the
+    // app. In the shell, hand the composed message to the OS share sheet
+    // (Mail is one tap away), with the clipboard as the fallback; the
+    // web keeps its mail-client handoff.
+    let isNativeShell = false;
+    try {
+      isNativeShell = Capacitor.isNativePlatform();
+    } catch {
+      isNativeShell = false;
+    }
+
+    if (isNativeShell) {
+      const shareText = `To: CitrusFantasySports@Gmail.com\nSubject: [Citrus Support] ${formData.subject}\n\n${plainBody}`;
+      let delivered = false;
+      if (typeof navigator.share === 'function') {
+        try {
+          await navigator.share({ title: '[Citrus Support] ' + formData.subject, text: shareText });
+          delivered = true;
+          toast({
+            title: 'Message ready to send',
+            description: 'Address it to CitrusFantasySports@Gmail.com',
+          });
+        } catch {
+          // Sheet dismissed or refused — fall through to the clipboard.
+        }
+      }
+      if (!delivered) {
+        try {
+          await navigator.clipboard.writeText(shareText);
+          toast({
+            title: 'Message copied',
+            description: 'Paste it into any email to CitrusFantasySports@Gmail.com',
+          });
+        } catch {
+          toast({
+            title: 'Email us directly',
+            description: 'CitrusFantasySports@Gmail.com',
+          });
+        }
+      }
+      setIsSubmitting(false);
+      setFormData({ name: '', email: '', subject: '', message: '' });
+      return;
+    }
+
+    // Web: build the mailto link with form data and open the mail client.
     const subject = encodeURIComponent(`[Citrus Support] ${formData.subject}`);
-    const body = encodeURIComponent(
-      `Name: ${formData.name}\nEmail: ${formData.email}\n\n${formData.message}`
-    );
+    const body = encodeURIComponent(plainBody);
     window.location.href = `mailto:CitrusFantasySports@Gmail.com?subject=${subject}&body=${body}`;
 
     setTimeout(() => {
