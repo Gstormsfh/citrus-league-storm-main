@@ -107,6 +107,80 @@ DEFAULT_SCORING_WEIGHTS = {
     "pim": 0.0,
 }
 
+# ── Dynamic-confidence calibration (2026-09-01, confidence-calibration.md) ──
+#
+# dynamic_confidence maps the coefficient of variation (CV = σ/μ) of the MC
+# fantasy-point distribution to a 0-1 score. The score is linear in ln(CV)
+# between two anchors, then clipped to [CONFIDENCE_FLOOR, CONFIDENCE_CEILING]:
+#
+#     confidence = 1 - (ln CV - ln CV_FULL_CONFIDENCE)
+#                      / (ln CV_NO_CONFIDENCE - ln CV_FULL_CONFIDENCE)
+#
+# Why log-linear: every variance lever in this engine is multiplicative —
+# the Bayesian-weight inflation (x2.24 below 10 GP), the static-confidence
+# inflation (x3.3 at 9 GP or fewer) and the 1/mean scaling of a fixed
+# per-game σ — so CV is log-normally spread across the league and a change
+# of x2 in CV means the same thing at CV 1 as at CV 4. A map linear in raw
+# CV either floors nearly everyone (the pre-2026-09-01 `1 - cv/1.0`
+# labelled 99% of skaters "Low", 90% at the 0.05 floor, once goals count 6)
+# or, anchored at the same percentiles, calls 71% of 11-30 GP players "High".
+#
+# Anchors = 5th / 95th percentile of CV measured on 2026-09-01 by running
+# this engine (n_samples=3000, DEFAULT_SCORING_WEIGHTS, the default per-game
+# σ below, static confidence = min(GP/30, 1) as calculate_daily_projections
+# computes it) on 304 real player_projected_stats skater rows (season 2026,
+# 45 / 49 / 210 players with ≤10 / 11-30 / 31+ GP). Measured CV percentiles
+# (p05 / p25 / p50 / p75 / p95):
+#     ≤10 GP  : 5.92 / 8.15 / 9.09 / 11.41 / 17.35
+#     11-30 GP: 1.38 / 2.25 / 3.23 /  5.38 /  8.15
+#     31+ GP  : 0.75 / 1.08 / 1.46 /  1.80 /  2.37
+#     all     : 0.80 / 1.21 / 1.71 /  3.04 / 10.21   → anchors 0.8 and 10.0
+# Under the map: 31+ GP → 92% "High" (median 0.76), ≤10 GP → 98% "Low"
+# (median 0.05), 11-30 GP → 22% / 47% / 31% High / Medium / Low, tracking
+# the GP gradient (median player: GP 12 → 0.24, GP 15 → 0.37, GP 20 → 0.54,
+# GP 25 → 0.66, GP 30 → 0.76). The label thresholds (0.60 / 0.35) are kept:
+# they sit at CV 2.2 and CV 4.1, which is where the veteran distribution
+# ends (p95 = 2.37) and the call-up distribution begins (p05 = 5.92).
+#
+# The anchors assume the default per-game σ table in _build_stat_marginals;
+# if league_averages.std_dev_*_per_game are ever populated again (they are
+# between-player spreads ~3x smaller), CVs drop ~3x and the calibration must
+# be re-run.
+CV_FULL_CONFIDENCE = 0.8     # measured p05 → CONFIDENCE_CEILING
+CV_NO_CONFIDENCE = 10.0      # measured p95 → CONFIDENCE_FLOOR
+CONFIDENCE_FLOOR = 0.05
+CONFIDENCE_CEILING = 0.99
+
+# Plain-English label thresholds shared by the MC and fallback paths
+# (apps/web PlayerCard / ProjectionTooltip compare the strings verbatim).
+CONFIDENCE_HIGH_THRESHOLD = 0.60
+CONFIDENCE_MEDIUM_THRESHOLD = 0.35
+
+
+def confidence_from_cv(cv: float) -> float:
+    """
+    Map a fantasy-point coefficient of variation to dynamic confidence in
+    [CONFIDENCE_FLOOR, CONFIDENCE_CEILING]. Monotonic decreasing in CV, linear
+    in ln(CV) between CV_FULL_CONFIDENCE and CV_NO_CONFIDENCE (see the
+    calibration note above).
+    """
+    if cv is None or np.isnan(cv):
+        return 0.10  # unknown width — same as the mean <= 0 branch
+    if cv <= 0:
+        return CONFIDENCE_CEILING  # degenerate (constant) distribution
+    span = np.log(CV_NO_CONFIDENCE) - np.log(CV_FULL_CONFIDENCE)
+    raw = 1.0 - (np.log(cv) - np.log(CV_FULL_CONFIDENCE)) / span
+    return float(np.clip(raw, CONFIDENCE_FLOOR, CONFIDENCE_CEILING))
+
+
+def confidence_label_for(confidence: float) -> str:
+    """Plain-English badge for the UI: 'High' / 'Medium' / 'Low'."""
+    if confidence >= CONFIDENCE_HIGH_THRESHOLD:
+        return "High"
+    if confidence >= CONFIDENCE_MEDIUM_THRESHOLD:
+        return "Medium"
+    return "Low"
+
 
 # ============================================================================
 # UNCERTAINTY ENGINE
@@ -499,12 +573,13 @@ class UncertaintyEngine:
         upside_prob = float(np.mean(fantasy_samples > upside_threshold))
         floor_prob = float(np.mean(fantasy_samples < floor_threshold))
 
-        # Dynamic confidence score from coefficient of variation
-        # CV < 0.3 → high confidence (narrow distribution relative to mean)
-        # CV > 0.8 → low confidence (very wide distribution)
+        # Dynamic confidence score from the coefficient of variation (σ/μ),
+        # log-linear between the calibrated anchors — see confidence_from_cv.
+        # Single-game NHL fantasy lines are inherently wide under goal-heavy
+        # weights: a 30+ GP regular sits near CV 1.5, a <10 GP call-up near 9.
         if mean > 0:
             cv = std_dev / mean
-            dynamic_confidence = float(np.clip(1.0 - (cv / 1.0), 0.05, 0.99))
+            dynamic_confidence = confidence_from_cv(cv)
         else:
             dynamic_confidence = 0.10
 
@@ -527,12 +602,7 @@ class UncertaintyEngine:
         likely_high = round(float(ci_75), 1)
 
         # Confidence label — plain English for the UI
-        if dynamic_confidence >= 0.60:
-            confidence_label = "High"
-        elif dynamic_confidence >= 0.35:
-            confidence_label = "Medium"
-        else:
-            confidence_label = "Low"
+        confidence_label = confidence_label_for(dynamic_confidence)
 
         return {
             # Core distribution metrics
@@ -601,12 +671,7 @@ class UncertaintyEngine:
         """Fallback result when MC propagation fails."""
         pts = float(projection.get("total_projected_points", 0.0))
         dyn_conf = float(projection.get("confidence_score", 0.5))
-        if dyn_conf >= 0.60:
-            conf_label = "High"
-        elif dyn_conf >= 0.35:
-            conf_label = "Medium"
-        else:
-            conf_label = "Low"
+        conf_label = confidence_label_for(dyn_conf)
         return {
             "point_estimate": round(pts, 3),
             "mean": round(pts, 3),
