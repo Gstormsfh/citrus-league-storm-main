@@ -22,6 +22,7 @@ npx vite --config harness/vite.config.ts
 | `/harness/tabs.html` | Roster tab bars |
 | `/harness/slot.html` | MobileRosterList + Line Change sheet, page-shaped wiring |
 | `/harness/today.html` | Today strip in every state, locked chips, empty rows, Fill sheet (`?fill=slot-LW-1` opens it), Auto Lineup preview (`?auto=1` opens it; the strip's link does too) |
+| `/harness/scoreboard.html` | League scoreboard strip (live / open / final / bye) and the desktop rail; `?n=10` for a 20-team league |
 
 `draft.html` accepts `?picks=N` to open the room N picks deep (default 5), and
 exposes `window.__harnessAdvance()` so a script can drive the draft forward one
