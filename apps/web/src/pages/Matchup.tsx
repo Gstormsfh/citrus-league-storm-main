@@ -185,6 +185,9 @@ const Matchup = () => {
   const { leagueId: urlLeagueId, weekId: urlWeekId } = useParams<{ leagueId?: string; weekId?: string }>();
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // In-place reload trigger for the main loader (2026-09-01): bumped by the
+  // visibility-change refresh instead of a full window.location reload.
+  const [matchupReloadNonce, setMatchupReloadNonce] = useState(0);
   const [dailyStatsMap, setDailyStatsMap] = useState<Map<number, DailyPlayerStats>>(new Map()); // For selected date (or today)
   const [dailyStatsByDate, setDailyStatsByDate] = useState<Map<string, Map<number, DailyPlayerStats>>>(new Map()); // For all 7 days
   const [projectionsByDate, setProjectionsByDate] = useState<Map<string, Map<number, DailyProjection>>>(new Map()); // Cache projections per date
@@ -205,7 +208,13 @@ const Matchup = () => {
   const [isSwitchingDate, setIsSwitchingDate] = useState(false);
   const loadingRef = useRef(false); // Prevent concurrent loads
   const previousRosterRef = useRef<{ myTeam: MatchupPlayer[]; oppTeam: MatchupPlayer[] } | null>(null);
-  const projectionsLoadingRef = useRef(false); // Prevent concurrent projection fetches
+  // WEEK PROJECTIONS (2026-09-01): per-DATE in-flight guard. The old single
+  // boolean meant that when the week's seven dates are requested together
+  // (see the fetch effect below), the first to start silently dropped the
+  // other six — which is how the day strip rendered projected scores for at
+  // most one day. A Set lets distinct dates load in parallel while still
+  // deduplicating repeat requests for the same date.
+  const projectionsLoadingRef = useRef<Set<string>>(new Set());
   const hasProcessedNoLeague = useRef(false); // Track if we've processed "no league" state
   const hasInitializedRef = useRef(false); // Track if we've completed initial load
   const statsLoadingRef = useRef(false); // Prevent concurrent stats fetches that cause score flashing
@@ -1491,8 +1500,9 @@ const Matchup = () => {
       return;
     }
 
-    // Prevent concurrent fetches
-    if (projectionsLoadingRef.current) {
+    // Prevent concurrent fetches FOR THE SAME DATE — different dates are
+    // allowed to load in parallel (the week strip needs all seven).
+    if (projectionsLoadingRef.current.has(date)) {
       return;
     }
 
@@ -1515,11 +1525,11 @@ const Matchup = () => {
       return;
     }
 
-    projectionsLoadingRef.current = true;
-    
+    projectionsLoadingRef.current.add(date);
+
     try {
       const projectionMap = await MatchupService.getDailyProjectionsForMatchup(allPlayerIds, date);
-      
+
       setProjectionsByDate(prev => {
         const newMap = new Map(prev);
         newMap.set(date, projectionMap);
@@ -1528,7 +1538,7 @@ const Matchup = () => {
     } catch (error) {
       // Don't cache errors - allow retry
     } finally {
-      projectionsLoadingRef.current = false;
+      projectionsLoadingRef.current.delete(date);
     }
   }, [projectionsByDate, currentMatchup, userLeagueState, demoMyTeam, demoOpponentTeam]);
 
@@ -1748,25 +1758,36 @@ const Matchup = () => {
       }
     };
 
-    // Fetch both stats and projections in parallel
+    // Fetch stats and projections in parallel.
+    //
+    // WEEK PROJECTIONS (2026-09-01, iPhone sim: "daily score projections do
+    // not show in any matchup tabs"): the day strip computes a projected
+    // score for EVERY day of the matchup week (see the weekly-schedule calc,
+    // which reads projectionsByDate.get(dateStr) per day) — but this effect
+    // only ever fetched the SELECTED day. Six of seven chips could never
+    // have data, and on a future week the default selected day is the week
+    // opener, which can be a no-games day — so the whole strip read blank.
+    // Fetch all seven days of the viewed week up front: each call is ~6ms
+    // server-side (get_daily_projections is date-bounded), they run in
+    // parallel, and fetchProjectionsForDate dedupes via cache + per-date
+    // in-flight guard, so revisits and date clicks stay free.
     const fetchData = async () => {
-      // Determine which date to fetch projections for
-      let dateToFetchProjections = selectedDate;
-      
-      // If no date selected, default to today if today is in the matchup week
-      if (!dateToFetchProjections && currentMatchup) {
-        const todayStr = getTodayMST();
-        const weekStart = currentMatchup.week_start_date;
-        const weekEnd = currentMatchup.week_end_date;
-        
-        if (todayStr >= weekStart && todayStr <= weekEnd) {
-          dateToFetchProjections = todayStr;
+      const weekDates: string[] = [];
+      if (currentMatchup?.week_start_date && currentMatchup?.week_end_date) {
+        // Date-only strings; walk at noon UTC so DST/timezone can't skip a day.
+        const cursor = new Date(`${currentMatchup.week_start_date}T12:00:00Z`);
+        const last = new Date(`${currentMatchup.week_end_date}T12:00:00Z`);
+        while (cursor <= last && weekDates.length < 10) {
+          weekDates.push(cursor.toISOString().split('T')[0]);
+          cursor.setUTCDate(cursor.getUTCDate() + 1);
         }
+      } else if (selectedDate) {
+        weekDates.push(selectedDate);
       }
 
       await Promise.all([
         fetchDailyStats(),
-        dateToFetchProjections ? fetchProjectionsForDate(dateToFetchProjections) : Promise.resolve()
+        ...weekDates.map(d => fetchProjectionsForDate(d)),
       ]);
     };
 
@@ -3723,19 +3744,21 @@ const Matchup = () => {
           return;
         }
 
-        // Update all matchup scores for this league to ensure they're current
-        // This uses the EXACT same calculation as the matchup tab (sum of 7 daily scores)
-        // Ensures all matchups (user teams AND AI teams) use identical calculation
-        try {
-          const { error: updateScoresError } = await MatchupService.updateMatchupScores(currentLeague.id);
+        // Recompute league matchup scores in the BACKGROUND (2026-09-01
+        // efficiency pass). This was awaited before anything rendered — a
+        // full network round trip plus, in season, a per-started-week score
+        // loop, spent before the user saw a single pixel. Yahoo/ESPN render
+        // the stored score immediately and let recomputes land quietly;
+        // stored scores here are at most one page-view stale for AI teams
+        // (user-team scores are also refreshed by the daily-stats path).
+        // Fire it, don't wait for it.
+        void MatchupService.updateMatchupScores(currentLeague.id).then(({ error: updateScoresError }) => {
           if (updateScoresError) {
-            log('WARN: Error updating matchup scores:', updateScoresError);
-            // Don't block matchup load if score update fails
+            log('WARN: Background matchup score update failed:', updateScoresError);
           }
-        } catch (error) {
-          log('WARN: Exception updating matchup scores:', error);
-          // Don't block matchup load if score update fails
-        }
+        }).catch((error) => {
+          log('WARN: Background matchup score update threw:', error);
+        });
 
         log(' Getting user team for league:', currentLeague.id);
         // Get user's team
@@ -3812,19 +3835,25 @@ const Matchup = () => {
           return weeks[0] || 1;
         };
 
+        // WEEK REDIRECT (2026-09-01 efficiency pass): these were
+        // window.location.href — a FULL app reload (re-download, re-parse,
+        // re-boot the SPA) on the most common entry into this page: tapping
+        // the Matchup tab with no week in the URL. On the native shell that
+        // doubled every first visit's cost. Client-side navigate keeps the
+        // booted app; the loader re-runs off the new URL alone.
         if (urlWeekId) {
           weekToShow = parseInt(urlWeekId);
           if (isNaN(weekToShow) || !weeks.includes(weekToShow)) {
             const currentWeek = getCurrentWeekNumber(firstWeek);
             weekToShow = pickFallbackWeek(currentWeek);
-            window.location.href = `/matchup/${targetLeagueId}/${weekToShow}`;
-            return;
+            navigate(`/matchup/${targetLeagueId}/${weekToShow}`, { replace: true });
+            return; // finally releases the lock; the URL change re-runs the loader
           }
         } else {
           const currentWeek = getCurrentWeekNumber(firstWeek);
           weekToShow = pickFallbackWeek(currentWeek);
-          window.location.href = `/matchup/${targetLeagueId}/${weekToShow}`;
-          return;
+          navigate(`/matchup/${targetLeagueId}/${weekToShow}`, { replace: true });
+          return; // finally releases the lock; the URL change re-runs the loader
         }
 
         setSelectedWeek(weekToShow);
@@ -4138,10 +4167,15 @@ const Matchup = () => {
           );
         }
         
+        // 12s, deliberately INSIDE the page's 15s overall budget (2026-09-01):
+        // this inner race used to fire at 20s, so the outer timer always won
+        // and the user got the generic "Loading took too long" instead of the
+        // specific "matchup data" failure. The specific error must be the one
+        // that surfaces.
         const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) => {
           setTimeout(() => {
-            resolve({ data: null, error: new Error('getMatchupData timed out after 20 seconds') });
-          }, 20000);
+            resolve({ data: null, error: new Error('getMatchupData timed out after 12 seconds') });
+          }, 12000);
         });
         
         const { data: matchupData, error: matchupError } = await Promise.race([
@@ -4659,7 +4693,7 @@ const Matchup = () => {
   // are narrowed to ?.id to prevent re-runs on score updates. Other deps (navigate, profile, etc.) are stable
   // or would cause unnecessary full reloads.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, userLeagueState, urlLeagueId, urlWeekId, selectedMatchupId, activeLeagueId]);
+  }, [user?.id, userLeagueState, urlLeagueId, urlWeekId, selectedMatchupId, activeLeagueId, matchupReloadNonce]);
 
   // ============================================================
   // DATE CHANGE HANDLER - Uses pre-loaded rosters for ALL dates
@@ -4840,11 +4874,13 @@ const Matchup = () => {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && !loadingRef.current) {
-        // Page became visible - clear cache and reload by triggering URL change
+        // Page became visible — refresh IN PLACE (2026-09-01 efficiency
+        // pass; was window.location.href, a full app reload every time the
+        // user returned to the tab). Same week, same matchup: clear the
+        // roster cache and re-run the loader via the nonce. No navigation.
         log(' Page visible, refreshing matchup data...');
         MatchupService.clearRosterCache(userTeam.id, league.id);
-        // Use window.location to avoid React Router navigation loops
-        window.location.href = `/matchup/${urlLeagueId}/${urlWeekId}`;
+        setMatchupReloadNonce(n => n + 1);
       }
     };
 
@@ -5050,28 +5086,35 @@ const Matchup = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [league?.id, currentMatchup?.id, currentMatchup?.week_start_date, currentMatchup?.week_end_date, currentMatchup?.status, userLeagueState, fetchAllDailyStats]);
 
-  // Handle week selection - updates URL which triggers data reload
-  // Works for both logged-in users and guests
+  // Handle week selection — client-side navigation (2026-09-01 efficiency
+  // pass). This was window.location.href: every tap of a week arrow
+  // re-downloaded, re-parsed and re-booted the ENTIRE app before the new
+  // week even started loading — the single biggest reason week browsing
+  // felt nothing like Yahoo/Sleeper. The "React Router navigation loops"
+  // the reload was avoiding were stale week-scoped state leaking into the
+  // next week's load; resetting that state here removes the hazard the
+  // honest way. urlWeekId is in the loader effect's deps, so the URL
+  // change re-runs exactly one load.
   const handleWeekChange = useCallback((weekNumber: number) => {
     // Determine league ID based on user state
     const leagueId = (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league')
       ? DEMO_LEAGUE_ID_FOR_GUESTS
       : league?.id;
-    
+
     if (!leagueId) return;
-    
-    // Use window.location to avoid React Router navigation loops
-    window.location.href = `/matchup/${leagueId}/${weekNumber}`;
-  }, [userLeagueState, league?.id]);
-  
-  // Refresh matchup data (useful after making lineup changes on roster page)
-  const refreshMatchup = useCallback(() => {
-    if (!league?.id || !userTeam?.id || !urlLeagueId || !urlWeekId) return;
-    // Clear all caches to force fresh data
-    MatchupService.clearRosterCache();
-    // Use window.location to avoid React Router navigation loops
-    window.location.href = `/matchup/${urlLeagueId}/${urlWeekId}`;
-  }, [league?.id, userTeam?.id, urlLeagueId, urlWeekId]);
+
+    // Week-scoped state must not survive into the next week's load:
+    // a stale selectedMatchupId would load LAST week's matchup, and a
+    // stale selectedDate would pin the day tabs outside the new week.
+    setSelectedMatchupId(null);
+    setSelectedDate(null);
+    setCurrentMatchup(null);
+    setDailyStatsByDate(new Map());
+    setDailyStatsMap(new Map());
+    setProjectionsByDate(new Map());
+
+    navigate(`/matchup/${leagueId}/${weekNumber}`);
+  }, [userLeagueState, league?.id, navigate]);
 
   // =============================================================================
   // SIMPLIFIED LOADING STATE - One-way gate prevents flash/cycling
