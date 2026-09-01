@@ -8,6 +8,7 @@ import { ProjectionTooltip } from "./ProjectionTooltip";
 import { GoalieProjectionTooltip } from "./GoalieProjectionTooltip";
 import { getTodayMST } from "@/utils/timezoneUtils";
 import { Badge } from "@/components/ui/badge";
+import { Mug } from "@/components/roster/Mug";
 
 interface PlayerCardProps {
   player: MatchupPlayer | null;
@@ -669,7 +670,29 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
           </div>
         )}
       </div>
-      
+
+      {/* Mobile-only headshot (2026-09-01, audit M4). A 28px mug on the
+          gutter side of the name block, between it and the score stack —
+          the same DOM order on both cards, so the stylesheet's row-reverse
+          mirrors it: `name · face · number | chip | number · face · name`.
+          Each number therefore carries the face it belongs to, and the two
+          faces meet across the slot chip the way the two numbers already
+          did. Headshot → crest → initials (Mug), never a broken image, and
+          a 14px crest badge names the team the way the roster rows do — on
+          the corner facing the gutter, so the mirror holds.
+
+          Mobile only. On desktop the card is already name + stats box +
+          seven-crest GameLogosBar + projection bar, and at the 1024px
+          breakpoint its name column is ~130px — a 36px mug there turns
+          "Auston Matthews" into an ellipsis on every row. */}
+      <Mug
+        p={player}
+        size="xs"
+        crest
+        crestSide={isUserTeam ? 'right' : 'left'}
+        className="player-mug lg:hidden"
+      />
+
       {/* Mobile-only score stack (2026-09-01) — sits at the gutter beside the
           slot chip on BOTH cards (the opponent card is mirrored by the
           stylesheet, so this block is the innermost element on each side).
@@ -679,7 +702,12 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
           game is live or final the actual sits over "proj 4.2" so the beat
           / miss reads at a glance. Bench rows carry cream — no state colour,
           because the number does not count. Tappable: the actual opens the
-          scoring breakdown, the projection opens the projection breakdown. */}
+          scoring breakdown, the projection opens the projection breakdown.
+
+          The stack is a fixed 38px column (index.css) so the mug beside it
+          lines up row after row; "proj" and its number therefore sit on two
+          lines rather than one — the width the one-liner needed is the
+          width the face now has. */}
       <div
         className={cn(
           'player-mobile-score lg:hidden flex flex-col justify-center leading-none',
@@ -689,7 +717,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
       >
         {!hasGameOnDate && !hasDailyStats ? (
           // No game on this date and nothing scored — say so, not "0.0".
-          <span className="player-score-none text-white/55 text-[10px] font-display italic leading-none">
+          <span className="player-score-none text-white/55 text-[10px] font-display italic leading-tight">
             No game
           </span>
         ) : shouldShowDailyPoints ? (
@@ -711,8 +739,12 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               </span>
             )}
             {hasProjection ? (
-              <span className="player-score-proj font-jbmono tabular-nums text-[10px] leading-none mt-1 text-white/55">
-                <span className="uppercase tracking-[0.22em]">proj</span> {projectedPoints.toFixed(1)}
+              // Label over number: two flex-column lines; the whitespace
+              // text node between them keeps the text "proj 4.2" for
+              // copy/paste and assistive tech while rendering nothing.
+              <span className="player-score-proj font-jbmono tabular-nums text-[10px] leading-tight mt-1 text-white/55 flex flex-col">
+                <span className="uppercase tracking-[0.22em]">proj</span>{' '}
+                <span>{projectedPoints.toFixed(1)}</span>
               </span>
             ) : (
               <span className="player-score-label font-jbmono uppercase tracking-[0.22em] text-[10px] leading-none mt-1 text-white/55">

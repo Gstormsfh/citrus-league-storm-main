@@ -8,8 +8,9 @@ import { SlotPickerMenu } from "./SlotPickerMenu";
 // Aliased: the list body already names its slot->position map `slotLabel`.
 import { slotLabel as labelForSlot } from "./slotLabel";
 import { LOCKED_CHIP } from "./slotChip";
+import { Mug } from "./Mug";
 import { useSwapHint } from "@/hooks/useSwapHint";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 // The chip (geometry, per-position colour + ring, raw-position -> key) lives
 // in its own module so the mobile Matchup rows wear the identical chip. The
 // contrast rationale for the colour pairs is documented there.
@@ -168,8 +169,6 @@ interface PlayerRowProps {
 }
 
 const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isEligibleTarget, onPositionTap, onNameTap, onEmptySlotTap }: PlayerRowProps) => {
-  const [imgErr, setImgErr] = useState(false);
-
   const isGoalie = player ? (player.position === 'Goalie' || player.position === 'G') : slotPosition === 'G';
   const gameStatus = player?.nextGame?.gameStatus;
   const isLiveOrFinal = gameStatus === 'live' || gameStatus === 'intermission' || gameStatus === 'final';
@@ -179,7 +178,6 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
   const projPts = dailyProj?.total_projected_points || 0;
   const displayPts = isLiveOrFinal ? actualPts : projPts;
   const teamAbbr = player?.teamAbbreviation || (player?.team?.split(' ').pop()?.substring(0, 3).toUpperCase()) || '';
-  const teamLogoUrl = player ? `https://assets.nhle.com/logos/nhl/svg/${player.teamAbbreviation || 'NHL'}_light.svg` : '';
   // Same one-liner the desktop card carries, so the roster reads identically
   // on both surfaces. Pure arithmetic over player.stats — no fetch.
   const writeup = player ? generatePlayerWriteup(player) : null;
@@ -251,19 +249,11 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
 
       {player ? (
         <>
-          {/* Team logo */}
-          <div className="w-7 h-7 flex-shrink-0 rounded-full overflow-hidden bg-pastel-sage/10 border border-pastel-sage/20 relative">
-            {!imgErr ? (
-              <img
-                src={teamLogoUrl}
-                alt={teamAbbr}
-                className="w-full h-full object-contain p-0.5"
-                onError={() => setImgErr(true)}
-              />
-            ) : (
-              <Shield className="w-4 h-4 text-pastel-sage absolute inset-0 m-auto" />
-            )}
-          </div>
+          {/* Headshot (2026-09-01, audit R3) — the face, where the team crest
+              used to be. The same 28px box, so nothing else on the row moved;
+              the crest survives as a 14px badge on the mug's shoulder. Falls
+              back crest → initials, never a broken image (see Mug). */}
+          <Mug p={player} size="xs" crest />
 
           {/* Player info — 2 lines max, tap to open card */}
           <div className="flex-1 min-w-0 cursor-pointer" onClick={(e) => { e.stopPropagation(); onNameTap?.(); }}>

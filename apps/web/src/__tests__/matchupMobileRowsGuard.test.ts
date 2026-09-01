@@ -137,6 +137,33 @@ describe('index.css mobile block — the opponent card is mirrored', () => {
   });
 });
 
+describe('index.css mobile block — the mug column (audit M4)', () => {
+  // The 28px mug sits between the name block and the score on both cards.
+  // For a straight column of faces down the page the score stack beside it
+  // must be the same width on every row, and nothing may let the mug
+  // shrink; the width both need comes out of the gutter padding and gaps,
+  // not the name block.
+  it('the score stack is a fixed 38px column, not a percentage', () => {
+    expect(declares('.player-card .player-mobile-score', 'width', /38px/)).toBe(true);
+    expect(declares('.player-card .player-mobile-score', 'flex', /0 0 38px/)).toBe(true);
+    expect(declares('.player-card .player-mobile-score', 'max-width', /45%/)).toBe(false);
+  });
+
+  it('the mug cannot shrink or stretch', () => {
+    expect(rulesFor('.player-card .player-mug').length).toBeGreaterThan(0);
+    expect(declares('.player-card .player-mug', 'flex', /0 0 auto/)).toBe(true);
+    expect(declares('.player-card .player-mug', 'align-self', /center/)).toBe(true);
+  });
+
+  it('the row gives the face its width from the gutter side, not the name', () => {
+    expect(declares('.player-card', 'gap', /6px/)).toBe(true);
+    expect(declares('.player-card.user-team', 'padding-right', /6px/)).toBe(true);
+    expect(declares('.player-card.opponent-team', 'padding-left', /6px/)).toBe(true);
+    // The screen-edge padding is untouched (the shorthand still says 8px).
+    expect(declares('.player-card', 'padding', /6px 8px/)).toBe(true);
+  });
+});
+
 describe('the row components carry no second palette', () => {
   const playerCard = code(readFileSync(resolve(SRC, 'components/matchup/PlayerCard.tsx'), 'utf8'));
 
@@ -151,5 +178,31 @@ describe('the row components carry no second palette', () => {
     expect(playerCard).not.toMatch(/BENCHED/);
     expect(playerCard).not.toMatch(/\bgrayscale\b/);
     expect(playerCard).not.toMatch(/opacity-40/);
+  });
+
+  // ONE face. Both mobile rows import the roster's Mug (headshot → crest →
+  // initials, fixed box, lazy) rather than growing a private <img> with its
+  // own fallback — a private copy is how the roster row ended up with a
+  // crest where the matchup row had nothing at all (audit M4 / R3).
+  it.each([
+    ['components/matchup/PlayerCard.tsx', /from ['"]@\/components\/roster\/Mug['"]/],
+    ['components/roster/MobileRosterList.tsx', /from ['"]\.\/Mug['"]/],
+  ])('%s draws the face with the shared Mug', (rel, importRe) => {
+    const src = code(readFileSync(resolve(SRC, rel), 'utf8'));
+    expect(src).toMatch(importRe);
+    expect(src).toMatch(/<Mug\b[^>]*size="xs"[^>]*crest/);
+    // No hand-rolled headshot <img> beside it.
+    expect(src).not.toMatch(/mugs\/nhl/);
+  });
+
+  it('PlayerCard renders the mug once, before the score stack, mobile only, badge to the gutter', () => {
+    const mug = playerCard.search(/<Mug\b/);
+    const stack = playerCard.indexOf('player-mobile-score');
+    expect(mug).toBeGreaterThan(-1);
+    expect(mug).toBeLessThan(stack);
+    const tag = playerCard.slice(mug, playerCard.indexOf('/>', mug));
+    expect(tag).toMatch(/lg:hidden/);
+    expect(tag).toMatch(/crestSide=\{isUserTeam \? 'right' : 'left'\}/);
+    expect((playerCard.match(/<Mug\b/g) || []).length).toBe(1);
   });
 });

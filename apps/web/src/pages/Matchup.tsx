@@ -1110,12 +1110,12 @@ const Matchup = () => {
       team: p.team,
       teamAbbreviation: p.team,
       status: null, // Game status not applicable here - use roster_status for IR/SUSP/GTD
-      // Mugshot: prefer whatever the payload carried; otherwise build the
-      // NHL CDN "latest" mug from the player id. PlayerStatsModal has an
-      // onError fallback chain (team logo → initials) if the URL 404s.
-      image: (p as unknown as { image?: string }).image
-        ?? (p as unknown as { headshot_url?: string }).headshot_url
-        ?? (p.id ? `https://assets.nhle.com/mugs/nhl/latest/${p.id}.png` : undefined),
+      // Mugshot: the row's own `image` (typed on MatchupPlayer since audit
+      // M4 — every producer sets it); otherwise build the NHL CDN "latest"
+      // mug from the player id. PlayerStatsModal has an onError fallback
+      // chain (team logo → initials) if the URL 404s.
+      image: p.image
+        || (p.id ? `https://assets.nhle.com/mugs/nhl/latest/${p.id}.png` : undefined),
       projectedPoints: 0
     };
   };
@@ -3679,7 +3679,7 @@ const Matchup = () => {
         teamAbbreviation: p.team_abbreviation || p.team || '',
         points: p.fantasy_points || 0,
         total_points: p.fantasy_points || 0,
-        headshot_url: p.headshot_url,
+        image: p.headshot_url || undefined,
         isStarter: isStarter,
         isOnIR: p.status === 'IR' || p.status === 'SUSP',
         stats: {
@@ -4587,7 +4587,7 @@ const Matchup = () => {
                   teamAbbreviation: p.team_abbreviation || p.team || '',
                   points: p.fantasy_points || 0,
                   total_points: p.fantasy_points || 0,
-                  headshot_url: p.headshot_url,
+                  image: p.headshot_url || undefined,
                   isStarter: false,
                   isOnIR: p.status === 'IR' || p.status === 'SUSP',
                   stats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
@@ -4666,7 +4666,7 @@ const Matchup = () => {
                     teamAbbreviation: entry.player_team_abbreviation || entry.player_team || '',
                     points: 0,
                     total_points: 0,
-                    headshot_url: entry.player_headshot_url || '',
+                    image: entry.player_headshot_url || undefined,
                     isStarter,
                     isOnIR: entry.player_status === 'IR' || entry.player_status === 'SUSP',
                     stats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
@@ -4721,7 +4721,7 @@ const Matchup = () => {
                     teamAbbreviation: entry.player_team_abbreviation || entry.player_team || '',
                     points: 0,
                     total_points: 0,
-                    headshot_url: entry.player_headshot_url || '',
+                    image: entry.player_headshot_url || undefined,
                     isStarter,
                     isOnIR: entry.player_status === 'IR' || entry.player_status === 'SUSP',
                     stats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
@@ -4924,7 +4924,7 @@ const Matchup = () => {
                 team: entry.player_team || '',
                 teamAbbreviation: entry.player_team_abbreviation || entry.player_team || '',
                 points: 0, total_points: 0,
-                headshot_url: entry.player_headshot_url || '',
+                image: entry.player_headshot_url || undefined,
                 isStarter,
                 isOnIR: false,
                 stats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },

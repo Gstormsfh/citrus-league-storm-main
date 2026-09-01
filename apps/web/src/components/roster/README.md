@@ -68,8 +68,8 @@ gates IR slots on `is_ir_eligible`, so only officially IR/LTIR players can
 be tapped into one.
 
 ### MobileRosterList (phones and portrait tablets, `< 1024px`)
-List rows: position chip · crest · name / team · opp · time / live line ·
-tonight's number. The **position chip is the swap trigger** (Sleeper,
+List rows: position chip · headshot (crest badge) · name / team · opp ·
+time / live line · tonight's number. The **position chip is the swap trigger** (Sleeper,
 Yahoo and ESPN use the same gesture) and wears a `⇄` glyph to say so; a
 locked player's chip goes neutral with a lock glyph (`LOCKED_CHIP` in
 `slotChip.ts`) while the rest of his row stays fully legible. An **empty
@@ -85,8 +85,9 @@ number shown per row). Fill is slot-first (tap an empty row, pick who steps
 in from the bench — games first, then projection; locked bench players
 listed but disabled). Neither recomputes eligibility: both take the set
 Roster.tsx judged legal (`tapEligibleSlots` / `fillCandidates`). Shared
-pieces: `Mug` (headshot with initials fallback), `tonight()` (live vs
-projected number), `chipClassFor()` / `slotLabel()`.
+pieces: `Mug` (headshot → crest → initials, fixed box, lazy; also every
+mobile roster and matchup row), `tonight()` (live vs projected number),
+`chipClassFor()` / `slotLabel()`.
 
 ### TodayStrip + `computeTodaySummary`
 The game-day readout beneath the day selector — `9/13 starters play · 2 on

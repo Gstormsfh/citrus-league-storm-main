@@ -1791,21 +1791,42 @@
     background: linear-gradient(135deg, #1A2A20 0%, #16241B 100%) !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
     overflow: hidden !important;
-    /* MIRRORED ROWS (2026-09-01). A row, not a column: [name block][score]
-       with the score at the gutter next to the slot chip. The opponent
-       card runs in reverse so ITS score is also at the gutter and its
-       names run out toward the screen edge — Sleeper's mirrored matchup
+    /* MIRRORED ROWS (2026-09-01). A row, not a column: [name block][mug]
+       [score] with the score at the gutter next to the slot chip. The
+       opponent card runs in reverse so ITS score is also at the gutter and
+       its names run out toward the screen edge — Sleeper's mirrored matchup
        row, where the two numbers you compare sit 36px apart instead of a
        full screen apart. Before this both cards pinned the score right:8px,
        so the left card's number sat at the gutter and the right card's at
-       the screen edge. */
+       the screen edge.
+
+       HEADSHOTS (2026-09-01, audit M4): the 28px mug sits between the name
+       block and the score, so the row runs name · face · number into the
+       chip on both sides. The width it needs comes from three places: the
+       gutter-side padding drops 8→6px (the chip already has 2px of its own
+       column on each side), the gaps drop 8→6px, and the score stack
+       becomes a fixed 38px column (below). At 393px that leaves the name
+       block ~86px — "C. McDavid" in 14px Montserrat Bold — where the
+       one-line "proj 12.3" stack left it ~92px before the mug existed. */
     flex-direction: row !important;
     align-items: center !important;
-    gap: 8px !important;
+    gap: 6px !important;
+  }
+
+  .player-card.user-team {
+    padding-right: 6px !important;
   }
 
   .player-card.opponent-team {
     flex-direction: row-reverse !important;
+    padding-left: 6px !important;
+  }
+
+  /* The mug is a fixed 28px flex item; nothing here may let it shrink or
+     stretch, or the straight column of faces down the page is lost. */
+  .player-card .player-mug {
+    flex: 0 0 auto !important;
+    align-self: center !important;
   }
 
   .player-card.opponent-team .player-card-content,
@@ -1876,15 +1897,22 @@
      only — the JSX owns colour and type (sage = live/final, orange =
      projected, cream on the bench). The rule this replaces forced
      color:#F9A436 !important over the component, which is how "projected"
-     and "actual" ended up the same orange on every phone. */
+     and "actual" ended up the same orange on every phone.
+
+     A FIXED 38px column (audit M4): "12.3" in 15px JetBrains Mono is 36px,
+     the tracked "PROJ" label 33px, and the proj line stacks its label over
+     its number rather than beside it. With the stack the same width on
+     every row, the mug beside it lands on the same x on every row — a
+     ragged column of faces is worse than none. "No game" wraps to two
+     quiet lines. */
   .player-card .player-mobile-score {
     display: flex !important;
     flex-direction: column !important;
     justify-content: center !important;
-    flex: 0 0 auto !important;
+    flex: 0 0 38px !important;
+    width: 38px !important;
     position: static !important;
     transform: none !important;
-    max-width: 45% !important;
   }
 
   .player-card.user-team .player-mobile-score {
