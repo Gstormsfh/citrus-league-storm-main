@@ -102,7 +102,18 @@ app.use('*', secureHeaders());
 app.use('*', cors({
   origin: corsOrigins,
   credentials: true,
-  allowHeaders: ['Content-Type', 'Authorization', 'x-client-info'],
+  // NATIVE DRAFT OUTAGE (2026-09-01). The draft mutation routes require
+  // X-Idempotency-Key (and accept X-Correlation-Id) — headers this list
+  // did not allow. On the website that never mattered: same origin, no
+  // preflight. The iOS shell is cross-origin (capacitor://localhost), so
+  // every pick/auction submit preflighted, the preflight came back
+  // WITHOUT these headers allowed, and WKWebView refused to send the
+  // real POST. Cloud Run's log for the first live engine draft shows the
+  // signature exactly: a stream of 204 OPTIONS and not one pick POST —
+  // every human pick timed out client-side ("we couldn't confirm your
+  // pick") and autopick took the slot. corsAllowHeaders.test.ts pins
+  // every custom header the web client sends into this list.
+  allowHeaders: ['Content-Type', 'Authorization', 'x-client-info', 'X-Idempotency-Key', 'X-Correlation-Id'],
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 }));
 
