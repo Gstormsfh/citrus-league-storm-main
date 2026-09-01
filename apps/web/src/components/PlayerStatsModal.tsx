@@ -156,6 +156,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   const [gameLog, setGameLog] = useState<GameLogEntry[]>([]);
   const [gameLogLoading, setGameLogLoading] = useState(false);
   const [totalProjected, setTotalProjected] = useState(0);
+  /** GOALIE-PROJ SANITY (2026-09-01): start-aware remaining games for goalies. */
+  const [goalieStartsRemaining, setGoalieStartsRemaining] = useState<number | null>(null);
   const [totalActual, setTotalActual] = useState(0);
   const fetchedForPlayerRef = useRef<string | null>(null);
   const todayGameRef = useRef<HTMLDivElement | null>(null);
@@ -180,6 +182,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         setGameLog([]);
         setTotalProjected(0);
         setTotalActual(0);
+        setGoalieStartsRemaining(null);
         fetchedForPlayerRef.current = null;
       }
       return;
@@ -314,8 +317,43 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
           });
         }
 
+        // GOALIE-PROJ SANITY (2026-09-01): a goalie's daily projection
+        // rows exist for every TEAM game (they are "if he starts"
+        // values), so summing them promised one netminder 84 starts and
+        // a 619-point season — which outranked every skater and fed the
+        // founder's "goalies drafted first overall" report. The
+        // rest-of-season table already carries start-aware numbers
+        // (Vasilevskiy 55 games, not 84); the headline total and games
+        // label read from it for goalies. Skater sums stay as-is —
+        // team games ≈ player games for them.
+        let goalieAwareTotal = projTotal;
+        if (playerIsGoalie) {
+          try {
+            const rosRes = await playerApi.getRosProjectionForPlayer(playerId);
+            const rosRows = (rosRes?.data ?? []) as Array<{
+              total_projected_points?: number | null;
+              games_remaining?: number | null;
+            }>;
+            const ros = Array.isArray(rosRows) ? rosRows[0] : null;
+            const rosTotal = Number(ros?.total_projected_points);
+            const rosGames = Number(ros?.games_remaining);
+            if (Number.isFinite(rosTotal) && rosTotal > 0) {
+              goalieAwareTotal = rosTotal;
+            }
+            setGoalieStartsRemaining(
+              Number.isFinite(rosGames) && rosGames > 0 ? Math.round(rosGames) : null,
+            );
+          } catch {
+            // ROS row unavailable — keep the summed value rather than
+            // showing nothing; the label falls back to team games.
+            setGoalieStartsRemaining(null);
+          }
+        } else {
+          setGoalieStartsRemaining(null);
+        }
+
         setGameLog(entries);
-        setTotalProjected(projTotal);
+        setTotalProjected(goalieAwareTotal);
         setTotalActual(actTotal);
       } catch (error) {
         logger.error('[PlayerStatsModal] Error fetching game log:', error);
@@ -459,7 +497,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                   <CalendarDays className="w-4 h-4 text-citrus-orange" />
                   <span className="text-white/80 text-sm font-display font-medium">
                     {heroGameCount > 0
-                      ? `${heroGameCount} upcoming game${heroGameCount !== 1 ? 's' : ''}`
+                      ? goalieStartsRemaining !== null
+                        ? `≈${goalieStartsRemaining} projected starts`
+                        : `${heroGameCount} upcoming game${heroGameCount !== 1 ? 's' : ''}`
                       : (player.nextGame?.opponent || 'Today')}
                   </span>
                 </>
@@ -769,7 +809,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                         {gameLog.length} Game{gameLog.length !== 1 ? 's' : ''}
                       </span>
                       <span className="text-xs text-pastel-cream/65 ml-2">
-                        {pastGames.length} played · {futureGames.length} remaining
+                        {pastGames.length} played · {goalieStartsRemaining !== null
+                          ? `≈${goalieStartsRemaining} projected starts of ${futureGames.length} team games`
+                          : `${futureGames.length} remaining`}
                       </span>
                     </div>
                     <div className="ml-auto text-right">

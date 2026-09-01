@@ -112,18 +112,27 @@ playerRoutes.get('/by-ids', authMiddleware, async (c) => {
 });
 
 // GET /api/players/ros-projections — Get rest-of-season projections (top unrostered)
+// GOALIE-PROJ SANITY (2026-09-01): also serves ?playerId= for a single
+// player's ROS row — the player card's goalie totals read start-aware
+// numbers from here instead of summing every TEAM game.
 playerRoutes.get('/ros-projections', authMiddleware, async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const limit = parseInt(c.req.query('limit') || '200', 10);
+  const playerIdRaw = c.req.query('playerId');
+  const playerId = playerIdRaw !== undefined ? parseInt(playerIdRaw, 10) : null;
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('player_ros_projections')
     .select('player_id, player_name, position, team_abbrev, is_goalie, total_projected_points, avg_points_per_game, games_remaining, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins_ros, projected_saves_ros, projected_shutouts_ros')
     // Projections are keyed to the season they DESCRIBE (offseason ⇒
     // upcoming season) — getCurrentSeason() here read zero rows all summer.
-    .eq('season', getProjectionsSeason())
+    .eq('season', getProjectionsSeason());
+  if (playerId !== null && Number.isFinite(playerId)) {
+    query = query.eq('player_id', playerId);
+  }
+  const { data, error } = await query
     .order('total_projected_points', { ascending: false })
-    .limit(Math.min(limit, 500));
+    .limit(playerId !== null && Number.isFinite(playerId) ? 1 : Math.min(limit, 500));
 
   if (error) {
     return handleError(c, error, 'Failed to fetch ROS projections');
