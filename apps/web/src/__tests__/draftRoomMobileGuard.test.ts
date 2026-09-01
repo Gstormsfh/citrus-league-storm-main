@@ -153,3 +153,26 @@ describe('the lobby makes inviting obvious while seats are open', () => {
     expect(tile.slice(0, 400)).toContain('league?.join_code && !roomFull');
   });
 });
+
+describe('auction rooms carry auction chrome, not snake chrome', () => {
+  // AUCTION INCIDENT (2026-09-01, league a1a125c8): the snake on-clock
+  // bar, DRAFT button, pick timer, and Round · Pick header all rendered
+  // inside a live auction — and the DRAFT press recorded a $0 snake
+  // pick that wedged the lot. Auction lobbies keep bids on the
+  // nomination card and hide every piece of snake machinery.
+  it('amIOnClock is force-false in an auction room', () => {
+    const at = ROOM.indexOf('const amIOnClock =');
+    const body = ROOM.slice(at, at + 300);
+    expect(body).toContain('!isAuctionRoom &&');
+  });
+
+  it('the on-clock bar and autodraft toggle stay dark in auctions', () => {
+    expect(ROOM).toContain('{!isAuctionRoom && (');
+    expect(ROOM).toContain('!isDraftComplete && !isAuctionRoom &&');
+  });
+
+  it('the header shows lots sold and hides the snake pick timer', () => {
+    expect(ROOM).toContain('Auction · {derived.picksMade} / {derived.totalPicks} sold');
+    expect(ROOM).toMatch(/snapshot\.format !== 'auction' && \(\s*<DraftTimerV2/);
+  });
+});
