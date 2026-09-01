@@ -38,6 +38,10 @@ import {
   runnerHandles,
 } from '@/lib/draftClient/__mocks__/mockRunner';
 
+// CARD UNIFICATION (2026-09-01): the room now renders the shared
+// PlayerStatsModal, whose real module pulls service singletons that
+// need env vars — stub it out; card behavior is tested elsewhere.
+vi.mock('@/components/PlayerStatsModal', () => ({ default: () => null }));
 vi.mock('@/lib/draftClient/runner', () => ({
   DraftClientRunner: MockDraftClientRunner,
 }));

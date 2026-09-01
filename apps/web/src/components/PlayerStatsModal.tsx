@@ -79,6 +79,18 @@ interface PlayerStatsModalProps {
   leagueId?: string | null;
   isOnRoster?: boolean;
   onPlayerDropped?: () => void;
+  /**
+   * CARD UNIFICATION (2026-09-01): optional primary footer action so
+   * contexts with a verb (the draft room's "Draft Player") can use THIS
+   * card instead of forking their own. One player card everywhere.
+   */
+  action?: {
+    label: string;
+    onClick: () => void;
+    disabled?: boolean;
+    pending?: boolean;
+    pendingLabel?: string;
+  };
 }
 
 // ─── Position color mapping ──────────────────────────────────────────
@@ -130,7 +142,7 @@ const StatCell = ({ label, value, highlight, sub }: { label: string; value: stri
 );
 
 // ─── Main Component ──────────────────────────────────────────────────
-const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = false, onPlayerDropped }: PlayerStatsModalProps) => {
+const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = false, onPlayerDropped, action }: PlayerStatsModalProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isDropping, setIsDropping] = useState(false);
@@ -955,6 +967,17 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         </div>
 
         {/* ═══ Footer Actions ═══ */}
+        {action && (
+          <div className="px-5 py-3 border-t border-citrus-sage/15 bg-white/[0.03] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <Button
+              onClick={action.onClick}
+              disabled={action.disabled || action.pending}
+              className="w-full h-11 font-bold rounded-xl bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50"
+            >
+              {action.pending ? (action.pendingLabel ?? 'Working…') : action.label}
+            </Button>
+          </div>
+        )}
         {leagueId && user && isOnRoster && (
           <div className="px-5 py-3 border-t border-citrus-sage/15 bg-white/[0.03]">
             <Button
