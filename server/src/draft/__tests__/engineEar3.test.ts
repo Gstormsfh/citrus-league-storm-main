@@ -709,10 +709,11 @@ describe('E113 armPickDeadline wrapper — single-entry-point regression lock', 
   it('armPickDeadline body invokes both computeArmDeadlineForOnClockTeam AND setPickDeadline(_, "pick")', () => {
     // Anchor to the wrapper's method body so a future refactor
     // that only calls setPickDeadline (skipping the helper) trips
-    // this lock. Multiline match covers the wrapper's typical
-    // formatting.
+    // this lock. Window widened 2026-09-01: the auction format fence
+    // (see auctionSnakeBleedGuard) now leads the body, so the match
+    // runs to the wrapper's final call instead of a 300-char cap.
     const wrapperBody = lobbyManagerSource.match(
-      /private armPickDeadline\(rpcDeadline: Date\): void \{[\s\S]{0,300}?\}/,
+      /private armPickDeadline\(rpcDeadline: Date\): void \{[\s\S]{0,1600}?notifyOnClockDevice\(rpcDeadline\);/,
     );
     expect(wrapperBody).not.toBeNull();
     if (!wrapperBody) return; // narrow for TS below
