@@ -5,7 +5,8 @@
 # Last active: 2026-03-03
 # Invoked:     .github/workflows/main.yml (cron 0 7 * * * — daily 7am UTC / 2am ET)
 # Reads:       raw_shots, player_season_stats, player_talent_metrics
-# Writes:      player_projected_stats, projection_cache
+# Writes:      player_projected_stats, projection_cache,
+#              player_ros_projections (through the rebuild_ros_projections RPC)
 # ────────────────────────────────────────────────────────────
 """
 CITRUS NIGHTLY PROJECTION BATCH
@@ -18,13 +19,14 @@ Target runtime: 15-30 minutes for ~15,000 projections
 
 Usage:
     python scripts/nightly_projection_batch.py [--season 2025] [--workers 16]
-    
+
 Architecture:
     Phase 1: Data Loading (single queries, cached in memory)
     Phase 2: Matchup Difficulty Calculation (32 teams)
     Phase 3: Per-Game Projections (parallel processing)
     Phase 4: Bulk Upsert (batched writes)
-    Phase 5: ROS Aggregates (sum projections by player)
+    Phase 5: ROS Projections (SQL rebuild_ros_projections RPC — the same
+             start-aware rebuild the 08:50 UTC pg_cron job runs)
     Phase 6: Matchup Difficulty Table Update
 """
 
@@ -540,122 +542,53 @@ def bulk_upsert_projections(db: SupabaseRest, projections: List[Dict]) -> int:
 
 
 # ============================================================================
-# PHASE 5: ROS AGGREGATES
+# PHASE 5: ROS PROJECTIONS
 # ============================================================================
 
-def calculate_ros_aggregates(projections: List[Dict], players: List[Dict]) -> List[Dict]:
-    """
-    Calculate Rest-of-Season aggregates from individual projections.
-    
-    Returns list of ROS projection dicts ready for upsert.
-    """
-    # Group projections by player
-    player_projections = defaultdict(list)
-    for proj in projections:
-        player_id = proj.get("player_id")
-        if player_id:
-            player_projections[player_id].append(proj)
-    
-    # Create player lookup
-    player_lookup = {p["player_id"]: p for p in players}
-    
-    ros_projections = []
-    
-    for player_id, projs in player_projections.items():
-        if not projs:
-            continue
-        
-        player_info = player_lookup.get(player_id, {})
-        is_goalie = player_info.get("position_code") == "G"
-        
-        ros = {
-            "player_id": player_id,
-            "season": projs[0].get("season", DEFAULT_SEASON),
-            "games_remaining": len(projs),
-            "player_name": player_info.get("full_name", ""),
-            "team_abbrev": player_info.get("team_abbrev", ""),
-            "position": player_info.get("position_code", ""),
-            "is_goalie": is_goalie,
-            
-            # Sum projections
-            "total_projected_points": round(sum(p.get("total_projected_points", 0) for p in projs), 2),
-            "projected_goals": round(sum(p.get("projected_goals", 0) for p in projs), 2),
-            "projected_assists": round(sum(p.get("projected_assists", 0) for p in projs), 2),
-            "projected_sog": round(sum(p.get("projected_sog", 0) for p in projs), 2),
-            "projected_blocks": round(sum(p.get("projected_blocks", 0) for p in projs), 2),
-            "projected_ppp": round(sum(p.get("projected_ppp", 0) for p in projs), 2),
-            "projected_shp": round(sum(p.get("projected_shp", 0) for p in projs), 2),
-            "projected_hits": round(sum(p.get("projected_hits", 0) for p in projs), 2),
-            "projected_pim": round(sum(p.get("projected_pim", 0) for p in projs), 2),
-        }
-        
-        # Calculate per-game averages
-        if ros["games_remaining"] > 0:
-            ros["avg_points_per_game"] = round(ros["total_projected_points"] / ros["games_remaining"], 2)
-            ros["avg_goals_per_game"] = round(ros["projected_goals"] / ros["games_remaining"], 3)
-            ros["avg_assists_per_game"] = round(ros["projected_assists"] / ros["games_remaining"], 3)
-        
-        # Goalie-specific
-        if is_goalie:
-            ros["projected_wins_ros"] = round(sum(p.get("projected_wins", 0) for p in projs), 2)
-            ros["projected_saves_ros"] = round(sum(p.get("projected_saves", 0) for p in projs), 2)
-            ros["projected_shutouts_ros"] = round(sum(p.get("projected_shutouts", 0) for p in projs), 2)
-        
-        ros_projections.append(ros)
-    
-    return ros_projections
+# SQL: public.rebuild_ros_projections(p_season integer)
+#   RETURNS TABLE(rows_written int, skaters int, goalies int, target_games int)
+# Defined in supabase/migrations/20260820151500_rebuild_ros_projections_directory_filter.sql
+# (and re-defined GA-aware by the 2026-09-01 industry-standard scoring migration).
+ROS_REBUILD_RPC = "rebuild_ros_projections"
+ROS_REBUILD_COUNT_KEYS = ("rows_written", "skaters", "goalies", "target_games")
 
 
-def bulk_upsert_ros(db: SupabaseRest, ros_projections: List[Dict]) -> int:
+def rebuild_ros_projections(db: SupabaseRest, season: int) -> Dict[str, int]:
     """
-    Bulk upsert ROS projections.
+    Rebuild player_ros_projections through the SQL RPC, the writer of record.
+
+    Until 2026-09-01 this phase summed the batch's own per-TEAM-game rows into
+    rest-of-season rows and upserted them. Each per-game goalie row is an "if
+    he starts" projection, so a goalie got games_remaining = every team game
+    (~82) with W/SV/SO summed over all of them — a 55-start goalie was written
+    as an ~82-start goalie, about 1.5x inflated — and projected_ga_ros was
+    never written at all. The 08:50 UTC pg_cron job runs this same RPC
+    (start-aware through project_ros.exp_starts, GA-aware) and overwrote those
+    rows every day, which left the table wrong from this run (~07:00 UTC)
+    until 08:50 UTC: every draft / autopick / free-agent view in that window
+    ranked goalies against inflated totals. One writer now, in both places.
+
+    Returns the RPC's counts (rows_written, skaters, goalies, target_games).
+    Raises RuntimeError when the RPC fails, answers with an unexpected shape,
+    or rebuilt the table to zero rows — the table is DELETE + INSERT, so a
+    zero-row "success" is an empty player pool.
     """
-    if not ros_projections:
-        return 0
-    
-    # Define all valid ROS columns
-    valid_ros_columns = {
-        'player_id', 'season', 'games_remaining', 'player_name', 'team_abbrev',
-        'position', 'is_goalie', 'total_projected_points', 'projected_goals',
-        'projected_assists', 'projected_sog', 'projected_blocks', 'projected_ppp',
-        'projected_shp', 'projected_hits', 'projected_pim', 'avg_points_per_game',
-        'avg_goals_per_game', 'avg_assists_per_game',
-        # Goalie-specific
-        'projected_wins_ros', 'projected_saves_ros', 'projected_shutouts_ros'
-    }
-    
-    total = 0
-    total_batches = (len(ros_projections) + UPSERT_BATCH_SIZE - 1) // UPSERT_BATCH_SIZE
-    
-    for batch_num, i in enumerate(range(0, len(ros_projections), UPSERT_BATCH_SIZE), 1):
-        batch = ros_projections[i:i + UPSERT_BATCH_SIZE]
-        
-        # CRITICAL: Normalize all records to have identical keys
-        normalized_batch = []
-        for ros in batch:
-            # Start with all columns set to None
-            normalized = {col: None for col in valid_ros_columns}
-            # Overwrite with actual values
-            for k, v in ros.items():
-                if k in valid_ros_columns:
-                    normalized[k] = v
-            normalized_batch.append(normalized)
-        
-        # Progress tracking
-        progress_pct = (batch_num / total_batches) * 100
-        logger.info(f"  [{progress_pct:.0f}%] ROS Batch {batch_num}/{total_batches} | {total} upserted")
-        
-        try:
-            db.upsert(
-                "player_ros_projections",
-                normalized_batch,
-                on_conflict="player_id"
-            )
-            total += len(normalized_batch)
-        except Exception as e:
-            logger.error(f"  ❌ ROS Batch {batch_num} failed: {e}")
-    
-    return total
+    result = db.rpc(ROS_REBUILD_RPC, {"p_season": int(season)})
+
+    # A RETURNS TABLE function comes back from PostgREST as a one-row JSON array.
+    row = result[0] if isinstance(result, list) and result else result
+    if not isinstance(row, dict) or "rows_written" not in row:
+        raise RuntimeError(
+            f"{ROS_REBUILD_RPC}({season}) returned an unexpected payload: {result!r}. "
+            "Are the migrations applied?"
+        )
+
+    counts = {key: int(row.get(key) or 0) for key in ROS_REBUILD_COUNT_KEYS}
+    if counts["rows_written"] <= 0:
+        raise RuntimeError(
+            f"{ROS_REBUILD_RPC}({season}) rebuilt player_ros_projections to 0 rows: {row!r}"
+        )
+    return counts
 
 
 # ============================================================================
@@ -990,18 +923,31 @@ def main():
     logger.info("")
     
     # ========================================================================
-    # PHASE 5: ROS AGGREGATES
+    # PHASE 5: ROS PROJECTIONS
     # ========================================================================
-    logger.info("PHASE 5: Calculating ROS Aggregates")
+    logger.info("PHASE 5: Rebuilding ROS Projections")
     logger.info("-" * 40)
-    
+
     phase5_start = time.time()
-    ros_projections = calculate_ros_aggregates(projections, players)
-    ros_upserted = bulk_upsert_ros(db, ros_projections)
+    try:
+        ros_counts = rebuild_ros_projections(db, args.season)
+    except Exception as e:
+        # Never swallow this: a failed rebuild must turn the workflow red.
+        # The table keeps its last good rows (the rebuild is one transaction),
+        # and the 08:50 UTC pg_cron job is the fallback writer.
+        logger.error(f"  ❌ ROS rebuild failed: {e}", exc_info=True)
+        logger.error(
+            "  player_ros_projections was not rewritten by this run; "
+            "exiting non-zero so the workflow surfaces it."
+        )
+        sys.exit(1)
     phase5_elapsed = time.time() - phase5_start
-    
-    logger.info(f"  Calculated {len(ros_projections)} ROS projections")
-    logger.info(f"  Upserted {ros_upserted} ROS records")
+
+    logger.info(
+        f"  Rebuilt {ros_counts['rows_written']} ROS projections "
+        f"({ros_counts['skaters']} skaters / {ros_counts['goalies']} goalies, "
+        f"{ros_counts['target_games']}-game season) via {ROS_REBUILD_RPC}"
+    )
     logger.info(f"  Phase 5 complete in {phase5_elapsed:.1f}s")
     logger.info("")
     
@@ -1029,7 +975,7 @@ def main():
     logger.info("=" * 80)
     logger.info(f"Total Time: {total_elapsed:.1f}s ({total_elapsed/60:.1f} minutes)")
     logger.info(f"Projections: {upserted}")
-    logger.info(f"ROS Aggregates: {ros_upserted}")
+    logger.info(f"ROS Projections: {ros_counts['rows_written']} (rebuilt via {ROS_REBUILD_RPC})")
     logger.info(f"Matchup Ratings: {matchup_upserted}")
     logger.info(f"Rate: {upserted / total_elapsed:.1f} projections/second")
     logger.info("=" * 80)
