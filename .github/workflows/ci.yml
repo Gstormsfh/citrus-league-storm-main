@@ -405,6 +405,28 @@ jobs:
       - name: Run script contract tests
         run: npm run test:scripts
 
+  # Added 2026-09-01. The six suites under packages/shared/src/**/__tests__
+  # were run by nothing: the package had no `test` script, the web and server
+  # vitest configs only include their own `src/**`, and no job here ran them.
+  # One of them (leagueTimeline.test.ts) had been failing since the 2026-08-24
+  # launch build and nobody saw it. Same shape as "Test (Web)" above.
+  test-shared:
+    name: Test (Shared)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run shared tests
+        run: npm run test --workspace=packages/shared
+
   validate-migrations:
     name: Validate Migrations
     runs-on: ubuntu-latest

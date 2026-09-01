@@ -112,6 +112,75 @@ describe('assembleLeagueTimeline — transactions', () => {
       sub: 'Roster move',
     });
   });
+
+  // 2026-08-24 polish: the sub line reads the ledger's `source` so a won
+  // waiver claim is not labeled as a free-agent pickup. Nothing pinned this
+  // until 2026-09-01 (the shared suite was not wired into any runner).
+  it('labels ADD/DROP rows with source "Waiver Processing" as waiver moves', () => {
+    const rows: TransactionInput[] = [
+      { type: 'ADD', playerName: 'A', teamName: 'X', createdAt: '2026-11-05T00:00:00.000Z', source: 'Waiver Processing' },
+      { type: 'DROP', playerName: 'B', teamName: 'X', createdAt: '2026-11-04T00:00:00.000Z', source: 'Waiver Processing' },
+    ];
+    const out = assembleLeagueTimeline({ ...EMPTY, transactions: rows });
+    expect(out.map((i) => i.sub)).toEqual(['Waiver claim', 'Dropped in waiver claim']);
+  });
+
+  it('keeps the generic ADD/DROP labels for non-waiver sources and absent source', () => {
+    const rows: TransactionInput[] = [
+      { type: 'ADD', playerName: 'A', teamName: 'X', createdAt: '2026-11-05T00:00:00.000Z', source: 'Roster Tab' },
+      { type: 'DROP', playerName: 'B', teamName: 'X', createdAt: '2026-11-04T00:00:00.000Z', source: null },
+    ];
+    const out = assembleLeagueTimeline({ ...EMPTY, transactions: rows });
+    expect(out.map((i) => i.sub)).toEqual(['Free agent pickup', 'Roster move']);
+  });
+});
+
+describe('assembleLeagueTimeline — trades (2026-08-24 launch build)', () => {
+  // TRADE became a first-class ledger type in the 2026-08-24 launch build
+  // (before that it fell through to the "silently ignored" branch). The
+  // trade RPC writes TWO ledger rows per player: 'Trade out' on the sending
+  // team and 'Trade in' on the receiving team. The feed renders the
+  // receiving side only — one item per player movement, not two.
+  it('emits one transaction_trade item for a "Trade in" row', () => {
+    const t: TransactionInput = {
+      type: 'TRADE',
+      playerName: 'Jack Hughes',
+      teamName: 'Team D',
+      createdAt: '2026-11-06T18:00:00.000Z',
+      source: 'Trade in',
+    };
+    const out = assembleLeagueTimeline({ ...EMPTY, transactions: [t] });
+    expect(out).toEqual([
+      {
+        kind: 'transaction_trade',
+        when: '2026-11-06T18:00:00.000Z',
+        headline: 'Team D acquired Jack Hughes',
+        sub: 'Trade',
+      },
+    ]);
+  });
+
+  it('suppresses the "Trade out" side so each player movement is one item', () => {
+    const rows: TransactionInput[] = [
+      { type: 'TRADE', playerName: 'Jack Hughes', teamName: 'Team C', createdAt: '2026-11-06T18:00:00.000Z', source: 'Trade out' },
+      { type: 'TRADE', playerName: 'Jack Hughes', teamName: 'Team D', createdAt: '2026-11-06T18:00:00.000Z', source: 'Trade in' },
+    ];
+    const out = assembleLeagueTimeline({ ...EMPTY, transactions: rows });
+    expect(out).toHaveLength(1);
+    expect(out[0].headline).toBe('Team D acquired Jack Hughes');
+  });
+
+  it('renders a TRADE row with no source (only "Trade out" is dropped)', () => {
+    const t: TransactionInput = {
+      type: 'TRADE',
+      playerName: 'Jack Hughes',
+      teamName: 'Team D',
+      createdAt: '2026-11-06T18:00:00.000Z',
+    };
+    const out = assembleLeagueTimeline({ ...EMPTY, transactions: [t] });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind).toBe('transaction_trade');
+  });
 });
 
 describe('assembleLeagueTimeline — matchup results', () => {
@@ -292,11 +361,22 @@ describe('assembleLeagueTimeline — null-safety + defense', () => {
     expect(assembleLeagueTimeline({ draft: null, transactions: [], matchups: [] })).toEqual([]);
   });
 
-  it('silently ignores non-ADD/DROP transaction types (future-safe)', () => {
+  it('silently ignores unrecognised transaction types (future-safe)', () => {
+    // STALE-TEST FIX (2026-09-01). This case used to feed a 'TRADE' row as
+    // its example of an unrecognised type, which was accurate when it was
+    // written (Entry 13: type was 'ADD' | 'DROP' and the implementation's
+    // own comment listed TRADE among the "explicit cases later"). The
+    // 2026-08-24 launch build made TRADE a first-class type that renders a
+    // `transaction_trade` item, so the row it expected to be dropped is now
+    // rendered on purpose — and because nothing ran this suite, the failure
+    // sat unseen for a week. The implementation is right; the example was
+    // stale. 'IR' is what the implementation comment still names as a
+    // future type, so it is the honest example of the ignore branch now.
+    // TRADE has its own describe block above.
     const rows = [
       { type: 'ADD' as const, playerName: 'A', teamName: 'X', createdAt: '2026-11-05T00:00:00.000Z' },
       // Cast: intentionally exercise the runtime ignore-branch.
-      { type: 'TRADE', playerName: 'B', teamName: 'X', createdAt: '2026-11-05T01:00:00.000Z' } as unknown as TransactionInput,
+      { type: 'IR', playerName: 'B', teamName: 'X', createdAt: '2026-11-05T01:00:00.000Z' } as unknown as TransactionInput,
     ];
     const out = assembleLeagueTimeline({ ...EMPTY, transactions: rows });
     expect(out).toHaveLength(1);
