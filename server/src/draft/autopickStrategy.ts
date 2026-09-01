@@ -60,6 +60,20 @@ const DEFAULT_POSITION_CAPS: Readonly<Record<string, number>> = {
  */
 const CAPPED_POSITIONS = Object.keys(DEFAULT_POSITION_CAPS);
 
+/**
+ * True STARTING slot counts per position (no flex headroom) — the
+ * replacement-level denominator for the VORP ranking below. Mirrors
+ * packages/shared DEFAULT_ROSTER_SLOTS starters. A league that
+ * configures `settings.rosterSlots` overrides these with its own.
+ */
+const DEFAULT_STARTING_SLOTS: Readonly<Record<string, number>> = {
+  C: 2,
+  LW: 2,
+  RW: 2,
+  D: 4,
+  G: 2,
+};
+
 /** Input to every autopick strategy. */
 export interface AutopickInput {
   leagueId: string;
@@ -316,6 +330,13 @@ export const projectionsStrategy: AutopickStrategy = async ({
   // A position with no entry in either is UNCAPPED — the guard can
   // shape a roster but must never be the reason a draft stalls.
   let positionCaps: Record<string, number> = { ...DEFAULT_POSITION_CAPS };
+  // VORP (2026-09-01): replacement level needs the league's true shape —
+  // how many teams draft, and how many STARTING slots each position has.
+  // Starting slots deliberately differ from positionCaps: caps carry flex
+  // headroom so the guard never stalls a draft; replacement level wants
+  // the real starter count (teams × starters = the last starter drafted).
+  let teamsCount = 12;
+  let startingSlots: Record<string, number> = { ...DEFAULT_STARTING_SLOTS };
   {
     const { data: leagueRow, error: leagueErr } = await supabase
       .from('leagues')
@@ -328,9 +349,16 @@ export const projectionsStrategy: AutopickStrategy = async ({
         message: leagueErr.message ?? null,
       });
     } else {
-      const configured = (
-        leagueRow as { settings?: { rosterSlots?: Record<string, number> } } | null
-      )?.settings?.rosterSlots;
+      const leagueSettings = (
+        leagueRow as {
+          settings?: { rosterSlots?: Record<string, number>; teamsCount?: number };
+        } | null
+      )?.settings;
+      const configuredTeams = Number(leagueSettings?.teamsCount);
+      if (Number.isFinite(configuredTeams) && configuredTeams >= 2) {
+        teamsCount = configuredTeams;
+      }
+      const configured = leagueSettings?.rosterSlots;
       if (configured && typeof configured === 'object') {
         const merged: Record<string, number> = {};
         for (const [slot, count] of Object.entries(configured)) {
@@ -344,6 +372,11 @@ export const projectionsStrategy: AutopickStrategy = async ({
           if (merged[slot] !== undefined) filtered[slot] = merged[slot];
         }
         if (Object.keys(filtered).length > 0) positionCaps = filtered;
+        // The same configured slots are the starting-slot truth for
+        // replacement level (they ARE the league's starter counts).
+        if (Object.keys(filtered).length > 0) {
+          startingSlots = { ...DEFAULT_STARTING_SLOTS, ...filtered };
+        }
       }
     }
   }
@@ -475,8 +508,75 @@ export const projectionsStrategy: AutopickStrategy = async ({
         ? ppg * expectedGames
         : Number(row.total_projected_points ?? 0);
       return { playerId: row.player_id, value };
-    })
-    .sort((a, b) => b.value - a.value);
+    });
+
+  // ── POSITIONAL VALUE ADJUSTMENT — VORP (2026-09-01) ────────────────
+  //
+  // Field evidence, first live engine draft (league "Launch Dry Run"):
+  // the autopick board drained THE ENTIRE GOALIE POOL in the opening
+  // rounds. Not a mechanics bug — the value model's honest output.
+  // Under this scoring (W 4 / SO 3 / SV 0.2) a workhorse starter
+  // projects 450–530 season points, right beside the elite centers,
+  // so "best available by season value" IS a goalie run until every
+  // team hits its G cap. E117 fixed per-game-rate inflation; this
+  // fixes the deeper flaw: raw season value ignores REPLACEMENT.
+  //
+  // What real drafters (and every serious platform's ranker) price is
+  // value OVER the best player you could get for free at that position
+  // once starters are gone: teams × starting slots deep. Two starting
+  // goalie slots × 8 teams = the 16th goalie is the waterline; elite
+  // G minus that waterline is a modest edge, while McDavid minus the
+  // 16th center is enormous. Rank by that edge and the board orders
+  // like a draft instead of a leaderboard.
+  //
+  // Mechanics:
+  //   replacement[pos] = value of the (teams × startingSlots[pos])-th
+  //     best at pos (clamped to the pool's tail when shallower).
+  //   adjusted = value − replacement[pos].
+  //   Unknown-position players use a GLOBAL waterline (the last
+  //   starter drafted overall) so they stay rankable — the guard
+  //   never blocks, and neither does the ranker.
+  //   Ties break by raw value, then player_id, for determinism.
+  {
+    const byPos = new Map<string, number[]>();
+    for (const entry of board) {
+      const pos = positionByPlayer.get(entry.playerId);
+      const key = pos && startingSlots[pos] !== undefined ? pos : null;
+      if (key) {
+        const arr = byPos.get(key) ?? [];
+        arr.push(entry.value);
+        byPos.set(key, arr);
+      }
+    }
+    const replacementFor = (pos: string): number => {
+      const values = (byPos.get(pos) ?? []).slice().sort((a, b) => b - a);
+      if (values.length === 0) return 0;
+      const idx = Math.min(teamsCount * (startingSlots[pos] ?? 0), values.length - 1);
+      return values[idx];
+    };
+    const replacementByPos = new Map<string, number>();
+    for (const pos of Object.keys(startingSlots)) {
+      replacementByPos.set(pos, replacementFor(pos));
+    }
+    const allValues = board.map((e) => e.value).sort((a, b) => b - a);
+    const totalStarters = Object.values(startingSlots).reduce((a, b) => a + b, 0);
+    const globalWaterline = allValues.length === 0
+      ? 0
+      : allValues[Math.min(teamsCount * totalStarters, allValues.length - 1)];
+    for (const entry of board as Array<{ playerId: number; value: number; adjusted?: number }>) {
+      const pos = positionByPlayer.get(entry.playerId);
+      const repl = pos !== undefined && replacementByPos.has(pos)
+        ? (replacementByPos.get(pos) as number)
+        : globalWaterline;
+      entry.adjusted = entry.value - repl;
+    }
+  }
+  (board as Array<{ playerId: number; value: number; adjusted?: number }>).sort(
+    (a, b) =>
+      (b.adjusted ?? b.value) - (a.adjusted ?? a.value) ||
+      b.value - a.value ||
+      a.playerId - b.playerId,
+  );
 
   // First pass: best available that ALSO fits the roster shape.
   let bestIgnoringShape: number | null = null;

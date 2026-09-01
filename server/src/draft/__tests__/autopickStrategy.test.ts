@@ -52,6 +52,8 @@ interface MockProjections {
   teamOwned?: number[];
   /** E118: league settings.rosterSlots override. */
   rosterSlots?: Record<string, number>;
+  /** VORP: league settings.teamsCount override (defaults to 12 in the strategy). */
+  teamsCount?: number;
 }
 
 function makeMockSupabase(opts: MockProjections): SupabaseClient {
@@ -87,9 +89,12 @@ function makeMockSupabase(opts: MockProjections): SupabaseClient {
       chain.eq = () => chain;
       chain.maybeSingle = () =>
         Promise.resolve({
-          data: opts.rosterSlots
-            ? { settings: { rosterSlots: opts.rosterSlots } }
-            : { settings: {} },
+          data: {
+            settings: {
+              ...(opts.rosterSlots ? { rosterSlots: opts.rosterSlots } : {}),
+              ...(opts.teamsCount !== undefined ? { teamsCount: opts.teamsCount } : {}),
+            },
+          },
           error: null,
         });
       return chain;
@@ -677,3 +682,88 @@ describe('projectionsStrategy (chunk 11g.4 step 6c)', () => {
     expect(result).toEqual({ ok: true, playerId: 800002, source: 'draft_value' });
   });
 });
+
+// ── VORP — positional value adjustment (2026-09-01) ─────────────────
+//
+// Field evidence, first live engine draft: the board drained the entire
+// goalie pool in the opening rounds. Raw season value ranks a workhorse
+// goalie beside the elite centers; what a draft actually prices is value
+// over the best free player at that position once starters are gone
+// (teams × starting slots deep). These tests pin that behavior.
+describe('projectionsStrategy — positional value (VORP)', () => {
+  it('does not open the draft with a goalie run when skaters carry the scarcer edge', async () => {
+    // 2 teams, 1 G slot, 1 C slot. Goalies out-earn centers in raw value
+    // (100/95/90 vs 98/60), but the goalie waterline (index 2 → 90) makes
+    // the elite G worth +10 while the elite C (waterline 60) is worth +38.
+    const supabase = makeMockSupabase({
+      drafted: [],
+      projections: [
+        { player_id: 1, total_projected_points: 100, avg_points_per_game: 0 },
+        { player_id: 2, total_projected_points: 95, avg_points_per_game: 0 },
+        { player_id: 3, total_projected_points: 90, avg_points_per_game: 0 },
+        { player_id: 4, total_projected_points: 98, avg_points_per_game: 0 },
+        { player_id: 5, total_projected_points: 60, avg_points_per_game: 0 },
+      ],
+      positions: { 1: 'G', 2: 'G', 3: 'G', 4: 'C', 5: 'C' },
+      rosterSlots: { C: 1, G: 1 },
+      teamsCount: 2,
+    });
+    const result = await projectionsStrategy({
+      leagueId: 'league-1',
+      teamId: 'team-1',
+      supabase,
+    });
+    expect(result).toEqual({ ok: true, playerId: 4, source: 'draft_value' });
+  });
+
+  it('honors the league shape — more teams push the waterline deeper and can flip the pick', async () => {
+    // Same pool, but with enough teams the positional waterlines both hit
+    // the tail of their pools; adjustment shrinks toward raw order and the
+    // top raw value (the goalie) is the pick again.
+    const supabase = makeMockSupabase({
+      drafted: [],
+      projections: [
+        { player_id: 1, total_projected_points: 100, avg_points_per_game: 0 },
+        { player_id: 2, total_projected_points: 95, avg_points_per_game: 0 },
+        { player_id: 3, total_projected_points: 90, avg_points_per_game: 0 },
+        { player_id: 4, total_projected_points: 98, avg_points_per_game: 0 },
+        { player_id: 5, total_projected_points: 60, avg_points_per_game: 0 },
+      ],
+      positions: { 1: 'G', 2: 'G', 3: 'G', 4: 'C', 5: 'C' },
+      rosterSlots: { C: 1, G: 1 },
+      teamsCount: 12,
+    });
+    const result = await projectionsStrategy({
+      leagueId: 'league-1',
+      teamId: 'team-1',
+      supabase,
+    });
+    // With 12 teams both waterline indices exceed their pools and clamp
+    // to each pool's tail (G→90, C→60) — same edges as the 2-team case,
+    // same winner. What this pins: deep-league clamping is safe — the
+    // index math can never run off the board or refuse to rank.
+    expect(result).toEqual({ ok: true, playerId: 4, source: 'draft_value' });
+  });
+
+  it('keeps unknown-position players rankable via the global waterline', async () => {
+    const supabase = makeMockSupabase({
+      drafted: [],
+      projections: [
+        { player_id: 7, total_projected_points: 80, avg_points_per_game: 0 },
+        { player_id: 8, total_projected_points: 50, avg_points_per_game: 0 },
+      ],
+      positions: {}, // directory knows neither player
+      rosterSlots: { C: 1 },
+      teamsCount: 2,
+    });
+    const result = await projectionsStrategy({
+      leagueId: 'league-1',
+      teamId: 'team-1',
+      supabase,
+    });
+    // Both unknown → both adjusted against the same global waterline →
+    // raw order preserved, highest value picked, nothing refuses.
+    expect(result).toEqual({ ok: true, playerId: 7, source: 'draft_value' });
+  });
+});
+
