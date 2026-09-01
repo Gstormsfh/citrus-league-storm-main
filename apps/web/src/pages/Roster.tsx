@@ -28,6 +28,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
 import MobileRosterList from '@/components/roster/MobileRosterList';
+import { FillSlotSheet } from '@/components/roster/FillSlotSheet';
+import { TodayStrip } from '@/components/roster/TodayStrip';
+import { computeTodaySummary } from '@/components/roster/todaySummary';
 import MobileMenuButton from '@/components/MobileMenuButton';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useToast } from '@/hooks/use-toast';
@@ -249,6 +252,8 @@ const Roster = () => {
   const [isDropDialogOpen, setIsDropDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("roster");
   const [tapSelectedPlayerId, setTapSelectedPlayerId] = useState<string | number | null>(null);
+  // The empty starter slot the Fill sheet is open for (phone list only).
+  const [fillSlotId, setFillSlotId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 1024);
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
@@ -2031,6 +2036,55 @@ const Roster = () => {
     [projectionsByDate, selectedDate],
   );
 
+  // ===========================================================================
+  // GAME-DAY STRIP (2026-09-01, Sleeper parity audit R1 + R5)
+  //
+  // One row under the day selector: starters with a game / starter slots,
+  // bench players with a game, projected total, locked count. Pure arithmetic
+  // over `displayRoster`, which has already decided who plays on the selected
+  // date, so the strip can never disagree with the rows beneath it.
+  // ===========================================================================
+  const isPastDate = !!selectedDate && selectedDate < getTodayMST();
+
+  // Same gate the render tree applies to tap-to-swap. Best Ball lineups are
+  // set by the system, so there is nothing for the manager to act on there.
+  const canEditLineup =
+    !(userLeagueState === 'guest' || (userTeam && isDemoLeague(userTeam.league_id))) && !bestBallEnabled;
+
+  const starterSlotCount = useMemo(
+    () => Object.values(POSITION_SLOTS).reduce((sum, s) => sum + (s.maxPlayers || 0), 0),
+    [POSITION_SLOTS],
+  );
+
+  const todaySummary = useMemo(
+    () =>
+      computeTodaySummary({
+        starters: displayRoster.starters,
+        bench: displayRoster.bench,
+        ir: displayRoster.ir,
+        starterSlots: starterSlotCount,
+        // A past date locks the whole roster and already wears a Read Only
+        // badge — "13 locked" on top of that is noise, not information.
+        lockedPlayerIds: isPastDate ? undefined : lockedPlayerIds,
+      }),
+    [displayRoster, starterSlotCount, lockedPlayerIds, isPastDate],
+  );
+
+  const stripDayLabel = useMemo(() => {
+    const today = getTodayMST();
+    const target = selectedDate || today;
+    if (target === today) return 'Today';
+    const [y, m, d] = target.split('-').map(Number);
+    return new Date(y, m - 1, d)
+      .toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+      .replace(',', '');
+  }, [selectedDate]);
+
+  const showTodayStrip =
+    !rosterDisplayLoading &&
+    userLeagueState !== 'logged-in-no-league' &&
+    (displayRoster.starters.length > 0 || displayRoster.bench.length > 0);
+
   // Load CitrusPuck Analytics
   useEffect(() => {
     // Only load if roster is loaded and not already loaded
@@ -2508,8 +2562,11 @@ const Roster = () => {
     };
   };
 
-  // Position validation — uses eligible_positions for multi-position support
-  const isPositionValid = (player: HockeyPlayer, targetSlot: string): boolean => {
+  // Position validation — uses eligible_positions for multi-position support.
+  // Stable per position type (useCallback) so the memos that feed the two
+  // sheets — `tapEligibleSlots` and `fillCandidates` — recompute on roster
+  // or selection changes, not on every render.
+  const isPositionValid = useCallback((player: HockeyPlayer, targetSlot: string): boolean => {
     if (targetSlot === 'bench-grid') return true;
 
     if (targetSlot.startsWith('ir-slot-')) {
@@ -2553,7 +2610,7 @@ const Roster = () => {
     }
 
     return eligiblePositions.includes(slotPosition);
-  };
+  }, [leaguePositionType]);
 
   // The move engine behind every lineup change on this page — used to be
   // reached only through a dnd-kit DragEndEvent (drag) or a fake one built
@@ -2999,6 +3056,47 @@ const Roster = () => {
     handleMobileTapSlot('bench-grid');
   };
 
+  // FILL AN EMPTY SPOT (2026-09-01, audit R2): an empty starter row tapped
+  // with nothing selected. Same read-only gates as a player tap, then the
+  // Fill sheet lists the bench players who can legally take the slot.
+  const handleFillSlot = (slotId: string) => {
+    if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+      toast({ title: "Demo League", description: "Sign up to create your own league and make lineup changes!", variant: "default" });
+      return;
+    }
+    if (userTeam && isDemoLeague(userTeam.league_id)) {
+      toast({ title: "Demo League - Read Only", description: "Sign up to create your own league and make changes!", variant: "default" });
+      return;
+    }
+    if (selectedDate && selectedDate < getTodayMST()) {
+      toast({ title: "Cannot Edit Past Dates", description: "Rosters for past dates are frozen and cannot be changed.", variant: "destructive" });
+      return;
+    }
+    setTapSelectedPlayerId(null);
+    setFillSlotId(slotId);
+  };
+
+  // Who may step into the open slot — the page's own eligibility rule, on the
+  // enriched view so the sheet can show tonight's number. Games first, then
+  // projection: the same order Auto Lineup uses. Locked bench players stay in
+  // the list (disabled) so their absence never reads as a bug.
+  const fillCandidates = useMemo(() => {
+    if (!fillSlotId) return [];
+    const plays = (p: HockeyPlayer) => p.nextGame?.isToday === true;
+    return displayRoster.bench
+      .filter((p) => isPositionValid(p, fillSlotId))
+      .sort((a, b) => {
+        if (plays(a) !== plays(b)) return plays(a) ? -1 : 1;
+        return (b.projectedPoints || 0) - (a.projectedPoints || 0);
+      });
+  }, [fillSlotId, displayRoster.bench, isPositionValid]);
+
+  const handleFillPick = (playerId: string | number) => {
+    if (!fillSlotId) return;
+    applyPlayerMove(playerId, fillSlotId);
+    setFillSlotId(null);
+  };
+
   // Determine if we should show a loading overlay (but don't unmount the component)
   const showLoadingOverlay = isChangingLeague || (leagueLoading && userLeagueState === 'active-user');
 
@@ -3245,19 +3343,20 @@ const Roster = () => {
                   </div>
                 )}
                 
-                {/* Locked players banner */}
-                {lockedPlayerIds.size > 0 && (userLeagueState === 'active-user' && !(userTeam && isDemoLeague(userTeam.league_id))) && (
-                  <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                    <div className="flex items-center gap-2 text-blue-400">
-                      <Lock className="w-4 h-4" aria-hidden="true" />
-                      <span className="text-sm font-medium">
-                        {lockedPlayerIds.size} player{lockedPlayerIds.size !== 1 ? 's' : ''} locked
-                      </span>
-                    </div>
-                    <p className="text-xs text-blue-400/80 mt-1">
-                      Players whose games have started cannot be moved. Locked players are marked with a lock icon.
-                    </p>
-                  </div>
+                {/* Game-day strip (audit R1 + R5). Replaces the blue "N players
+                    locked" banner: the locked count lives here now and the row
+                    chips carry the lock glyph, so the two-sentence banner had
+                    nothing left to say. */}
+                {showTodayStrip && (
+                  <TodayStrip
+                    className="mb-4"
+                    summary={todaySummary}
+                    dayLabel={stripDayLabel}
+                    tense={isPastDate ? 'past' : 'present'}
+                    pending={!projectionsReadyForSelectedDate}
+                    editable={canEditLineup && !isPastDate}
+                    onAutoLineup={handleAutoLineup}
+                  />
                 )}
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Lineup</h2>
@@ -3369,7 +3468,19 @@ const Roster = () => {
                         onSlotTap={handleMobileTapSlot}
                         onBenchTap={handleMobileTapBench}
                         onCancelSelection={() => setTapSelectedPlayerId(null)}
+                        onFillSlot={handleFillSlot}
+                        swapHint={canEdit}
                         positionType={leaguePositionType}
+                      />
+                      {/* Fill sheet — slot-first counterpart of the Line
+                          Change sheet; opens from an empty row (audit R2). */}
+                      <FillSlotSheet
+                        slotId={fillSlotId}
+                        candidates={fillCandidates}
+                        lockedPlayerIds={lockedPlayerIds}
+                        open={fillSlotId != null}
+                        onOpenChange={(next) => { if (!next) setFillSlotId(null); }}
+                        onPick={handleFillPick}
                       />
                     </div>
                   ) : (

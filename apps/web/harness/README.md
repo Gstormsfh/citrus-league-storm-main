@@ -20,6 +20,8 @@ npx vite --config harness/vite.config.ts
 | `/harness/cards.html` | HockeyPlayerCard gallery + MobileRosterList |
 | `/harness/draft.html` | DraftRoomV2, live clock, scripted picks |
 | `/harness/tabs.html` | Roster tab bars |
+| `/harness/slot.html` | MobileRosterList + Line Change sheet, page-shaped wiring |
+| `/harness/today.html` | Today strip in every state, locked chips, empty rows, Fill sheet (`?fill=slot-LW-1` opens it) |
 
 `draft.html` accepts `?picks=N` to open the room N picks deep (default 5), and
 exposes `window.__harnessAdvance()` so a script can drive the draft forward one

@@ -5,6 +5,10 @@ import { HockeyPlayer } from "./HockeyPlayerCard";
 import { CitrusSparkle, CitrusLeaf } from "@/components/icons/CitrusIcons";
 import { generatePlayerWriteup } from "@/utils/playerWriteup";
 import { SlotPickerMenu } from "./SlotPickerMenu";
+// Aliased: the list body already names its slot->position map `slotLabel`.
+import { slotLabel as labelForSlot } from "./slotLabel";
+import { LOCKED_CHIP } from "./slotChip";
+import { useSwapHint } from "@/hooks/useSwapHint";
 import { useMemo, useState } from "react";
 // The chip (geometry, per-position colour + ring, raw-position -> key) lives
 // in its own module so the mobile Matchup rows wear the identical chip. The
@@ -35,6 +39,19 @@ interface MobileRosterListProps {
   onBenchTap?: () => void;
   /** Clear the tap selection. Fired when the slot menu is dismissed. */
   onCancelSelection?: () => void;
+  /**
+   * An EMPTY starter row was tapped with nothing selected — the manager is
+   * standing on the hole and wants to fill it. The page opens the Fill
+   * sheet with the bench players who can legally take the slot. (With a
+   * player already selected the same tap is a move, via `onSlotTap`.)
+   */
+  onFillSlot?: (slotId: string) => void;
+  /**
+   * Show the one-time "Tap a position to swap" hint when this list is
+   * editable. Off by default so read-only surfaces (demo league, guests)
+   * never promise a gesture that only toasts "read only".
+   */
+  swapHint?: boolean;
   positionType?: PositionType;
   rosterSlots?: Record<string, number>;
 }
@@ -174,30 +191,62 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
     WVR: { label: 'WVR', cls: 'bg-blue-500 text-white' },
   }[player.status] : null;
 
+  // EMPTY ROW = ONE TARGET (2026-09-01, audit R2). The dashed box used to be
+  // the only tappable part of an empty row, and with nothing selected the
+  // tap did nothing at all. Now the whole row is the control: with a player
+  // selected it is the move target it always was; with nothing selected it
+  // opens the Fill sheet. The label says which.
+  const isEmpty = player == null;
+  const emptyLabel = isEligibleTarget
+    ? `Move here: ${labelForSlot(slotId)}`
+    : `Empty ${labelForSlot(slotId)} — tap to fill`;
+
   return (
     <div
       className={cn(
         "flex items-center gap-2.5 px-3 py-2 min-h-[52px] transition-all border-b border-pastel-sage/10",
         isSwapSelected && "!bg-pastel-orange/10 !border-pastel-orange/30",
         isEligibleTarget && !isSwapSelected && "!bg-pastel-sage/10 !border-pastel-sage/30",
-        isLocked && "opacity-60",
+        // LOCKED ROWS STAY LEGIBLE (audit R5): no row-level dimming. The
+        // players scoring RIGHT NOW were the hardest to read at 60%; the
+        // chip carries the lock instead (see below).
+        isEmpty && "cursor-pointer active:bg-white/5",
       )}
+      role={isEmpty ? 'button' : undefined}
+      aria-label={isEmpty ? emptyLabel : undefined}
+      onClick={isEmpty ? onEmptySlotTap : undefined}
     >
-      {/* Position badge — tap to swap */}
+      {/* Position badge — tap to swap. The ⇄ glyph (audit R2) says so; on a
+          locked player the lock takes its place (audit R5). Both live in
+          CHILD spans: the base class and the posColor/posRingColor maps are
+          pinned by MobileRosterList.positionRing.test.tsx and stay as they are. */}
       <div
         className={cn(
           // No `text-white` in the base — posColor owns the text colour so
           // it can never disagree with its own background (see positionChip).
           POSITION_CHIP_BASE,
-          "active:scale-95 transition-transform cursor-pointer",
-          posColor[slotPosition] || POSITION_CHIP_FALLBACK,
-          posRingColor[slotPosition] || POSITION_RING_FALLBACK,
+          // flex-col: the roster chip stacks the label over the swap/lock glyph.
+          "flex-col active:scale-95 transition-transform cursor-pointer",
+          // Locked players wear the neutral locked chip (audit R5); the
+          // fallback pair lives beside the maps in positionChip.
+          isLocked ? LOCKED_CHIP : (posColor[slotPosition] || POSITION_CHIP_FALLBACK),
+          !isLocked && (posRingColor[slotPosition] || POSITION_RING_FALLBACK),
           isEligibleTarget && !isSwapSelected && "!ring-pastel-sage !ring-2 animate-pulse",
           isSwapSelected && "!ring-pastel-orange !ring-2",
         )}
-        onClick={(e) => { e.stopPropagation(); onPositionTap?.(); }}
+        data-locked={isLocked ? 'true' : undefined}
+        onClick={(e) => { e.stopPropagation(); (isEmpty ? onEmptySlotTap : onPositionTap)?.(); }}
       >
-        {slotPosition}
+        <span className="leading-none">{slotPosition}</span>
+        {isLocked ? (
+          <span data-testid="chip-lock" className="mt-px flex items-center justify-center leading-none" aria-hidden="true">
+            <Lock className="w-2.5 h-2.5" />
+          </span>
+        ) : (
+          <span data-testid="chip-swap-glyph" className="-mt-px font-sans text-[10px] leading-none opacity-80" aria-hidden="true">
+            ⇄
+          </span>
+        )}
       </div>
 
       {player ? (
@@ -213,11 +262,6 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
               />
             ) : (
               <Shield className="w-4 h-4 text-pastel-sage absolute inset-0 m-auto" />
-            )}
-            {isLocked && (
-              <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
-                <Lock className="w-2.5 h-2.5 text-muted-foreground" />
-              </div>
             )}
           </div>
 
@@ -321,20 +365,22 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
           </div>
         </>
       ) : (
-        /* Empty slot */
+        /* Empty slot — the row itself is the target (see the wrapper). */
         <div
           className={cn(
             "flex-1 flex items-center justify-center py-1.5 rounded-md border border-dashed",
             isEligibleTarget ? "border-pastel-sage bg-pastel-sage/5" : "border-white/10 bg-white/[0.03]",
           )}
-          onClick={onEmptySlotTap}
         >
-          <span className={cn(
-            "text-xs font-display",
-            isEligibleTarget ? "text-pastel-sage font-bold" : "text-white/25",
-          )}>
-            {isEligibleTarget ? "Tap to move here" : "Empty"}
-          </span>
+          {isEligibleTarget ? (
+            <span className="text-xs font-display text-pastel-sage font-bold">Tap to move here</span>
+          ) : (
+            <span className="text-xs font-display text-white/55">
+              Empty
+              <span className="text-white/25" aria-hidden="true"> · </span>
+              <span className="text-pastel-sage font-semibold">tap to fill</span>
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -366,9 +412,15 @@ const MobileRosterList = ({
   onSlotTap,
   onBenchTap,
   onCancelSelection,
+  onFillSlot,
+  swapHint = false,
   positionType = 'individual',
   rosterSlots,
 }: MobileRosterListProps) => {
+
+  // First-visit hint (audit R2) — once, and only when there is a roster to
+  // swap within. The hook owns the storage flag and the toast.
+  useSwapHint(swapHint && starters.length + bench.length > 0);
 
   // Build dynamic slot config from position type
   const slotConfig = buildSlotConfig(positionType, rosterSlots);
@@ -426,6 +478,13 @@ const MobileRosterList = ({
       const isSelected = player != null && player.id === tapSelectedPlayerId;
       const isTarget = tapSelectedPlayerId != null && tapEligibleSlots.has(slotId) && !isSelected;
 
+      // An empty row is a MOVE target while a player is selected and a
+      // FILL trigger otherwise — one gesture, read against the page's state.
+      const fillOrMove = () => {
+        if (tapSelectedPlayerId != null) onSlotTap?.(slotId);
+        else onFillSlot?.(slotId);
+      };
+
       const row = (
         <PlayerRow
           key={slotId}
@@ -435,12 +494,9 @@ const MobileRosterList = ({
           isLocked={player ? lockedPlayerIds.has(String(player.id)) : false}
           isSwapSelected={isSelected}
           isEligibleTarget={isTarget}
-          onPositionTap={() => {
-            if (player && onPlayerTap) onPlayerTap(player);
-            else if (!player && onSlotTap) onSlotTap(slotId);
-          }}
+          onPositionTap={() => { if (player) onPlayerTap?.(player); }}
           onNameTap={() => player && onPlayerNameTap?.(player)}
-          onEmptySlotTap={() => onSlotTap?.(slotId)}
+          onEmptySlotTap={fillOrMove}
         />
       );
       return row;

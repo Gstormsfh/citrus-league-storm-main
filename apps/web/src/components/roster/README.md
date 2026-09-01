@@ -67,6 +67,34 @@ Three fixed IR slots. Tap-eligible like the others — `isPositionValid`
 gates IR slots on `is_ir_eligible`, so only officially IR/LTIR players can
 be tapped into one.
 
+### MobileRosterList (phones and portrait tablets, `< 1024px`)
+List rows: position chip · crest · name / team · opp · time / live line ·
+tonight's number. The **position chip is the swap trigger** (Sleeper,
+Yahoo and ESPN use the same gesture) and wears a `⇄` glyph to say so; a
+locked player's chip goes neutral with a lock glyph (`LOCKED_CHIP` in
+`slotChip.ts`) while the rest of his row stays fully legible. An **empty
+starter row is one tap target**: with a player selected it is the move
+target, with nothing selected it opens the Fill sheet. Pass `swapHint` on
+editable lists to show the one-time "Tap a position to swap" toast
+(`useSwapHint`, localStorage-backed, try/catch).
+
+### SlotPickerMenu ("Line change") and FillSlotSheet ("Fill a spot")
+Two directions of the same move, one bottom-sheet language. Line change is
+player-first (tap a player, pick a destination — occupant and tonight's
+number shown per row). Fill is slot-first (tap an empty row, pick who steps
+in from the bench — games first, then projection; locked bench players
+listed but disabled). Neither recomputes eligibility: both take the set
+Roster.tsx judged legal (`tapEligibleSlots` / `fillCandidates`). Shared
+pieces: `Mug` (headshot with initials fallback), `tonight()` (live vs
+projected number), `chipClassFor()` / `slotLabel()`.
+
+### TodayStrip + `computeTodaySummary`
+The game-day readout beneath the day selector — `9/13 starters play · 2 on
+bench with games · proj 41.6 · 3 locked`. Pure arithmetic over the page's
+enriched roster (`todaySummary.ts`, tested on its own). Amber only when a
+bench player has a game while a starter spot is empty or idle, and only on
+an editable day; in that state it carries the Auto Lineup action inline.
+
 ## Usage Example
 
 ```tsx
