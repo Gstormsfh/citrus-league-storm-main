@@ -496,7 +496,11 @@ export default function DraftRoomV2() {
       <Link
         to={`/league/${leagueId}`}
         data-testid="draft-room-exit"
-        className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        /* MOBILE PASS (2026-09-01): was muted grey — on this room's dark
+           surface that rendered near-invisible, which is how "I can't
+           back out of the draft room" got reported AFTER the exit
+           shipped. Brand orange, real touch target. */
+        className="mb-2 inline-flex min-h-[44px] items-center gap-1 rounded-md px-1.5 -ml-1.5 text-sm font-semibold text-pastel-orange transition-colors hover:text-pastel-orange/80 active:bg-white/5"
       >
         &larr; League HQ
       </Link>
@@ -518,23 +522,23 @@ export default function DraftRoomV2() {
   }
 
   return (
-    <div className="container mx-auto p-4" data-testid="draft-room-v2">
+    /* pb-28: clearance for the on-clock action bar, which is FIXED to the
+       bottom edge on phones (see MainTabs). lg+ restores the normal pad —
+       the bar is sticky-in-flow there. */
+    <div className="container mx-auto p-4 pb-28 lg:pb-4" data-testid="draft-room-v2">
       {/*
-        * NATIVE ESCAPE HATCH (2026-08-31) — reported from the iOS simulator
-        * as "I'm stuck, the menu has disappeared." The draft routes hide the
-        * app's global nav on purpose (MobileBottomNav hideRoutes), and the
-        * native shell has no browser chrome, so without this link the room
-        * is a dead end you can only leave by killing the app. Every draft
-        * surface carries its own way back.
+        * NATIVE ESCAPE HATCH (2026-08-31, moved into the sticky header
+        * 2026-09-01) — reported from the iOS simulator as "I'm stuck, the
+        * menu has disappeared." The draft routes hide the app's global nav
+        * on purpose (MobileBottomNav hideRoutes), and the native shell has
+        * no browser chrome, so without a visible exit the room is a dead
+        * end you can only leave by killing the app. The exit now lives
+        * INSIDE StickyHeader so it never scrolls away — the first fix put
+        * it above the header in muted grey, and it was reported unfindable
+        * a second time.
         */}
-      <Link
-        to={`/league/${leagueId}`}
-        data-testid="draft-room-exit"
-        className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        &larr; League HQ
-      </Link>
       <StickyHeader
+        leagueId={leagueId}
         onRetryNow={handleRetryNow}
         clockOffsetMs={clockOffsetMs}
       />
@@ -629,6 +633,8 @@ function IdentityFailureBanner() {
 // section. Selector granularity per architect ratification 5.
 
 interface StickyHeaderProps {
+  /** Exit-link target — the header owns the room's way back to League HQ. */
+  leagueId: string;
   onRetryNow: () => void;
   clockOffsetMs: number;
 }
@@ -1126,48 +1132,82 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
   );
 }
 
-function StickyHeader({ onRetryNow, clockOffsetMs }: StickyHeaderProps) {
+// MOBILE PASS (2026-09-01) — compact single-row header. The previous
+// stack (h1 + banner + a full timer Card + a status line) measured
+// ~150px of sticky chrome on an iPhone 17 Pro, screenshotted by the
+// founder as "dead space" burying the player list; it was also TALLER
+// than the on-clock bar's sticky offset, so the bar slid underneath it.
+// One row now carries the room's whole frame: exit (always visible —
+// the escape hatch that got reported unfindable when it scrolled away),
+// round/pick/status, and the countdown as a compact pill. The h1 stays
+// for screen readers and the page-heading test; sighted users don't
+// need a sign saying "Draft Room" — they need the clock and the way out.
+function StickyHeader({ leagueId, onRetryNow, clockOffsetMs }: StickyHeaderProps) {
   const connectionState = useDraftConnectionState();
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
   const pickTimeLimitSec = usePickTimeLimitSec();
   const wsOpen = connectionState.kind === 'connected';
 
+  // Status stays in the DOM in every state (the DR-4 honest-status
+  // contract and its tests read textContent), but while the draft is
+  // simply in_progress the words add nothing a phone can afford —
+  // they render from sm: up only. Any OTHER status (waiting, paused,
+  // completed) is load-bearing and shows at every width.
+  const statusVisibility =
+    derived !== null && derived.draftStatus === 'in_progress'
+      ? 'hidden sm:inline'
+      : '';
+
   return (
-    <div className="sticky top-0 z-30 bg-background border-b border-border pb-3 mb-4 pt-safe">
-      <h1 className="text-xl font-bold mb-2">Draft Room</h1>
-      <ConnectionBanner onRetryNow={onRetryNow} />
-      {snapshot !== null && derived !== null && (
-        <>
-          <div className="mt-2">
-            <DraftTimerV2
-              currentPickDeadline={snapshot.stateSnapshot.currentPickDeadline}
-              draftStatus={derived.draftStatus}
-              wsOpen={wsOpen}
-              clockOffsetMs={clockOffsetMs}
-              pickTimeLimitSec={pickTimeLimitSec}
-            />
-          </div>
+    <div className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border pb-2 mb-3 pt-safe">
+      <h1 className="sr-only">Draft Room</h1>
+      <div className="flex min-h-[44px] items-center justify-between gap-2">
+        <Link
+          to={`/league/${leagueId}`}
+          data-testid="draft-room-exit"
+          className="-ml-1.5 inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-sm font-semibold text-pastel-orange transition-colors hover:text-pastel-orange/80 active:bg-white/5"
+        >
+          &larr; League HQ
+        </Link>
+        {snapshot !== null && derived !== null ? (
           <div
-            className="mt-2 text-sm text-muted-foreground"
+            className="min-w-0 flex-1 truncate text-right text-xs sm:text-sm text-muted-foreground tabular-nums"
             data-testid="draft-header-label"
           >
             {derived.currentPickNumber !== null &&
             derived.currentRoundNumber !== null ? (
               <>
                 Round {derived.currentRoundNumber} · Pick{' '}
-                {derived.currentPickNumber} / {derived.totalPicks} ·{' '}
-                Status: {describeStatus(derived.draftStatus, derived.picksMade)}
+                {derived.currentPickNumber} / {derived.totalPicks}
+                <span className={statusVisibility}>
+                  {' '}· {describeStatus(derived.draftStatus, derived.picksMade)}
+                </span>
               </>
             ) : (
               <>
-                {derived.picksMade} / {derived.totalPicks} picks made ·{' '}
-                Status: {describeStatus(derived.draftStatus, derived.picksMade)}
+                {derived.picksMade} / {derived.totalPicks} picks ·{' '}
+                {describeStatus(derived.draftStatus, derived.picksMade)}
               </>
             )}
           </div>
-        </>
-      )}
+        ) : (
+          <div className="min-w-0 flex-1 truncate text-right text-sm font-semibold">
+            Draft Room
+          </div>
+        )}
+        {snapshot !== null && derived !== null && (
+          <DraftTimerV2
+            variant="compact"
+            currentPickDeadline={snapshot.stateSnapshot.currentPickDeadline}
+            draftStatus={derived.draftStatus}
+            wsOpen={wsOpen}
+            clockOffsetMs={clockOffsetMs}
+            pickTimeLimitSec={pickTimeLimitSec}
+          />
+        )}
+      </div>
+      <ConnectionBanner onRetryNow={onRetryNow} />
     </div>
   );
 }
@@ -1793,10 +1833,18 @@ function MainTabs({
         />
       )}
 
-      {/* DR-3.1 (2026-07-29) — F8 fix: sticky on-clock action bar
-          renders above the tabs so it's visible in every tab of the
-          room. Returns null when off-clock. */}
-      <div className="sticky top-24 z-20">
+      {/* DR-3.1 (2026-07-29) — F8 fix: on-clock action bar, visible in
+          every tab of the room. Returns null when off-clock.
+          MOBILE PASS (2026-09-01): on phones the bar is now FIXED to the
+          bottom edge — the thumb zone, the industry placement (Sleeper/
+          ESPN pin the pick action low), and the one spot the compact
+          sticky header can never overlap. (Its old `sticky top-24` sat
+          UNDERNEATH the taller pre-compaction header, z-20 vs z-30.)
+          The draft routes already hide MobileBottomNav, so the bottom
+          edge belongs to the draft; the room container carries pb-28 so
+          the list's last rows scroll clear of it. lg+ keeps it in-flow,
+          sticky just below the compact header. */}
+      <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-16 lg:z-20">
         <OnClockActionBar
           amIOnClock={amIOnClock}
           currentPickDeadline={snapshot?.stateSnapshot.currentPickDeadline ?? null}
@@ -1808,14 +1856,17 @@ function MainTabs({
           roundNumber={derived?.currentRoundNumber ?? null}
           isSubmitPending={isSubmitPending}
         />
-        {/* DR-4 (2026-07-30) — alarm mute toggle. Persistent, small,
-            always visible when on-clock. Beeping at a user who's
+      </div>
+      {/* Toggles live in normal flow — set-and-forget controls don't earn
+          a permanent slice of a phone screen the way the pick action does. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        {/* DR-4 (2026-07-30) — alarm mute toggle. Beeping at a user who's
             already looking is obnoxious; muting is one click. */}
         {amIOnClock && (
           <button
             type="button"
             onClick={() => alarm.setMuted(!alarm.muted)}
-            className="mt-1 text-xs text-muted-foreground hover:text-foreground underline"
+            className="text-xs text-muted-foreground hover:text-foreground underline"
             data-testid="alarm-mute-toggle"
             aria-pressed={alarm.muted}
           >
@@ -1830,8 +1881,8 @@ function MainTabs({
             onClick={toggleAutodraft}
             className={
               autodraftOn
-                ? 'mt-1 ml-3 text-xs underline text-fantasy-primary font-semibold'
-                : 'mt-1 ml-3 text-xs underline text-muted-foreground hover:text-foreground'
+                ? 'text-xs underline text-fantasy-primary font-semibold'
+                : 'text-xs underline text-muted-foreground hover:text-foreground'
             }
             data-testid="autodraft-toggle"
             aria-pressed={autodraftOn}

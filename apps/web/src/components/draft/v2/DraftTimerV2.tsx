@@ -86,6 +86,14 @@ interface DraftTimerV2Props {
    * larger value to reduce re-render churn.
    */
   tickMs?: number;
+  /**
+   * MOBILE PASS (2026-09-01): 'card' is the original standalone Card
+   * (label row + big number). 'compact' is a one-line pill for the
+   * sticky header — icon + mm:ss only — so the header fits a phone
+   * viewport without burying the player list under chrome. Same
+   * countdown math, same role="timer", same aria-label either way.
+   */
+  variant?: 'card' | 'compact';
 }
 
 export const DraftTimerV2 = memo(
@@ -96,6 +104,7 @@ export const DraftTimerV2 = memo(
     clockOffsetMs,
     pickTimeLimitSec = null,
     tickMs = 500,
+    variant = 'card',
   }: DraftTimerV2Props) => {
     const [now, setNow] = useState(() => Date.now());
     const rafRef = useRef<number | null>(null);
@@ -118,7 +127,17 @@ export const DraftTimerV2 = memo(
       const raw = adjustedDeadlineMs - now;
       // Clamp at 0 — never render a negative countdown. Autopick
       // frame arrives shortly after 0:00 hits.
-      const nonNegative = Math.max(0, Math.floor(raw / 1000));
+      //
+      // CEIL, not floor (2026-09-01, iPhone sim audit): this component
+      // floored while OnClockActionBar ceiled, so the two clocks on
+      // screen permanently disagreed by one second (header 00:19, bar
+      // 0:20 — screenshotted by the founder). Ceil is the correct
+      // countdown convention on top of that: a freshly armed 30s clock
+      // reads 00:30 (floor showed 00:29 the instant it armed), and
+      // 00:00 renders only once the deadline has truly passed instead
+      // of for the entire final second — which matters because 00:00
+      // is what triggers the "Awaiting server…" annotation.
+      const nonNegative = Math.max(0, Math.ceil(raw / 1000));
       // Entry 87 Fix C — clamp to pick_time_limit_seconds when known.
       // Server truth: a fresh pick's deadline is exactly N seconds
       // from arm, so remaining can never exceed N by construction.
@@ -155,6 +174,28 @@ export const DraftTimerV2 = memo(
         : remainingSec > 10
           ? 'text-orange-600'
           : 'text-red-600';
+
+    if (variant === 'compact') {
+      return (
+        <div
+          role="timer"
+          aria-label={`Draft timer: ${minutes} minutes ${seconds} seconds remaining${wsOpen ? '' : ' (connection lost)'}`}
+          className={cn(
+            'flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1',
+            !wsOpen && 'opacity-60',
+          )}
+        >
+          {wsOpen ? (
+            <Clock className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+          ) : (
+            <WifiOff className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+          )}
+          <span className={cn('text-base font-bold tabular-nums leading-none', colorClass)}>
+            {label}
+          </span>
+        </div>
+      );
+    }
 
     return (
       <Card

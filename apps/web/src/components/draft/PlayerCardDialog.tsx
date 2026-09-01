@@ -24,6 +24,18 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Player } from '@/services/PlayerService';
 import { ScoringCalculator, ScoringSettings } from '@citrus/shared';
+import { cn } from '@/lib/utils';
+import { generatePlayerWriteup, type WriteupTone } from '@/utils/playerWriteup';
+
+/** Scouting-tag palette — same trio PlayerStatsModal uses, so a tag
+ * reads identically on a roster card and in the draft room. Caution is
+ * amber (the injury-badge language), deliberately not orange — orange
+ * is the app's "this is you" signal. */
+const WRITEUP_TAG_STYLES: Record<WriteupTone, string> = {
+  positive: 'bg-pastel-sage/20 text-pastel-cream ring-pastel-sage/40',
+  neutral: 'bg-white/5 text-white/70 ring-white/15',
+  caution: 'bg-amber-500/15 text-amber-200 ring-amber-500/30',
+};
 
 interface PlayerCardDialogProps {
   player: Player | null;
@@ -77,6 +89,59 @@ export const PlayerCardDialog = ({
     );
   }, [player, scoringSettings]);
 
+  // DRAFT-ROOM WRITE-UPS (2026-09-01) — founder, mid-mock-draft: "don't
+  // have the player write ups, etc in the draft room player cards?? We
+  // need these all baked in." The roster and free-agent modals have
+  // carried the deterministic Player Outlook since 2026-08-25
+  // (utils/playerWriteup — prose derived from the same stat line the
+  // card shows, so it can never contradict the numbers and costs no
+  // network call, which is exactly the budget a live draft has). This
+  // adapts the pool's Player shape to the writeup engine's input.
+  const writeup = useMemo(() => {
+    if (!player) return null;
+    const gamesPlayed = player.games_played || 0;
+    const toiPerGame =
+      player.icetime_seconds && gamesPlayed
+        ? (() => {
+            const totalSec = Math.round(player.icetime_seconds / gamesPlayed);
+            const m = Math.floor(totalSec / 60);
+            const s = totalSec % 60;
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+          })()
+        : undefined;
+    return generatePlayerWriteup({
+      id: player.id,
+      name: player.full_name,
+      position: player.position,
+      eligible_positions: player.eligible_positions,
+      number: 0,
+      starter: false,
+      team: player.team,
+      stats: {
+        gamesPlayed,
+        goals: player.goals ?? 0,
+        assists: player.assists ?? 0,
+        points: player.points ?? 0,
+        plusMinus: player.plus_minus ?? 0,
+        shots: player.shots ?? 0,
+        hits: player.hits ?? 0,
+        blockedShots: player.blocks ?? 0,
+        powerPlayPoints: player.ppp ?? 0,
+        shortHandedPoints: player.shp ?? 0,
+        pim: player.pim ?? 0,
+        xGoals: player.xGoals ?? undefined,
+        toi: toiPerGame,
+        wins: player.wins ?? 0,
+        losses: player.losses ?? 0,
+        gaa: player.goals_against_average ?? undefined,
+        savePct: player.save_percentage ?? undefined,
+        shutouts: player.shutouts ?? 0,
+        saves: player.saves ?? 0,
+        goalsAgainst: player.goals_against ?? 0,
+      },
+    });
+  }, [player]);
+
   if (!player) return null;
 
   const isGoalie = player.position === 'G';
@@ -98,7 +163,10 @@ export const PlayerCardDialog = ({
   return (
     <Dialog open={player !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
-        className="max-w-md bg-pastel-surface border-white/10 text-pastel-cream"
+        /* max-h + scroll (2026-09-01): with the Outlook block the card can
+           outgrow a phone viewport; the dialog scrolls instead of clipping
+           the Draft button off-screen. */
+        className="max-w-md max-h-[85vh] overflow-y-auto bg-pastel-surface border-white/10 text-pastel-cream"
         data-testid="player-card-dialog"
       >
         <DialogHeader>
@@ -166,6 +234,51 @@ export const PlayerCardDialog = ({
             <div className="text-[10px] uppercase tracking-wide text-white/55">FPTS / GP</div>
           </div>
         </div>
+
+        {/* Player Outlook — same surface the roster modal leads with
+            (PlayerStatsModal), placed after the numbers here because a
+            manager on the clock scans the stat grid first and reads
+            prose second. */}
+        {writeup && (
+          <div
+            className="rounded-lg bg-white/5 ring-1 ring-white/10 px-3 py-2.5"
+            data-testid="player-card-writeup"
+          >
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className="text-[9px] uppercase tracking-[0.18em] text-white/55">
+                Player Outlook
+              </span>
+              <span className="flex-shrink-0 text-[9px] text-white/55">via Citrus</span>
+            </div>
+            <div className="text-sm font-bold leading-snug text-pastel-cream">
+              {writeup.headline}
+            </div>
+            <p className="mt-1 text-[13px] leading-relaxed text-white/70">
+              {writeup.summary}
+            </p>
+            {writeup.analysis && (
+              <p className="mt-1.5 text-[13px] leading-relaxed text-white/70">
+                <span className="font-bold text-pastel-cream">Analysis: </span>
+                {writeup.analysis}
+              </p>
+            )}
+            {writeup.tags.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {writeup.tags.map((tag) => (
+                  <span
+                    key={tag.label}
+                    className={cn(
+                      'inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ring-1',
+                      WRITEUP_TAG_STYLES[tag.tone],
+                    )}
+                  >
+                    {tag.label}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {onDraft && canDraft && (
           <Button

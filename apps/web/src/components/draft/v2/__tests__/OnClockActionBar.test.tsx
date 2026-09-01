@@ -88,7 +88,7 @@ describe('OnClockActionBar', () => {
     // Countdown rounds up to seconds — ~47s from now should read 0:47
     // (or 0:46 depending on tick timing; allow either).
     const countdown = screen.getByTestId('on-clock-countdown').textContent ?? '';
-    expect(countdown).toMatch(/^0:4[567]$/);
+    expect(countdown).toMatch(/^00:4[567]$/);
   });
 
   it('Draft button is DISABLED when no player is selected', () => {
@@ -142,7 +142,7 @@ describe('OnClockActionBar', () => {
     expect(onDraft).toHaveBeenCalledWith(p);
   });
 
-  it('countdown reads 0:00 when the deadline has passed', () => {
+  it('countdown reads 00:00 when the deadline has passed', () => {
     render(
       <OnClockActionBar
         amIOnClock={true}
@@ -153,7 +153,7 @@ describe('OnClockActionBar', () => {
         roundNumber={1}
       />,
     );
-    expect(screen.getByTestId('on-clock-countdown').textContent).toBe('0:00');
+    expect(screen.getByTestId('on-clock-countdown').textContent).toBe('00:00');
   });
 
   // DR-4 F11 fix (2026-07-30) — isSubmitPending guard.
@@ -212,7 +212,8 @@ describe('OnClockActionBar', () => {
     it('applies clockOffsetMs to deadline (mirrors DraftTimerV2 math)', () => {
       // Deadline is 30s from now. clockOffsetMs=+3000 means client
       // is 3s ahead of server → adjusted deadline is +3s further out
-      // in client time → 33s remaining. formatCountdown → '0:33'.
+      // in client time → 33s remaining. formatCountdown → '00:33'
+      // (mm:ss, minutes padded — unified with DraftTimerV2 2026-09-01).
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-08-10T12:00:00.000Z'));
       try {
@@ -227,7 +228,7 @@ describe('OnClockActionBar', () => {
             roundNumber={1}
           />,
         );
-        expect(screen.getByTestId('on-clock-countdown').textContent).toBe('0:33');
+        expect(screen.getByTestId('on-clock-countdown').textContent).toBe('00:33');
       } finally {
         vi.useRealTimers();
       }
@@ -235,7 +236,7 @@ describe('OnClockActionBar', () => {
 
     it('clamps rendered value to pickTimeLimitSec when raw exceeds it', () => {
       // Deadline is 45s from now (raw); pickTimeLimitSec=30 caps at
-      // 30s → '0:30'.
+      // 30s → '00:30'.
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-08-10T12:00:00.000Z'));
       try {
@@ -250,7 +251,7 @@ describe('OnClockActionBar', () => {
             roundNumber={1}
           />,
         );
-        expect(screen.getByTestId('on-clock-countdown').textContent).toBe('0:30');
+        expect(screen.getByTestId('on-clock-countdown').textContent).toBe('00:30');
       } finally {
         vi.useRealTimers();
       }
@@ -258,7 +259,7 @@ describe('OnClockActionBar', () => {
 
     it('agrees with DraftTimerV2 for the same (deadline, offset, cap) tuple', () => {
       // Same scenario tested in DraftTimerV2's discriminant lock:
-      // 35s deadline, 0 offset, 30s cap → 0:30. The two components
+      // 35s deadline, 0 offset, 30s cap → 00:30. The two components
       // must render the same value frame-for-frame or the header +
       // sticky bar will show conflicting countdowns.
       vi.useFakeTimers();
@@ -276,7 +277,7 @@ describe('OnClockActionBar', () => {
             roundNumber={1}
           />,
         );
-        expect(screen.getByTestId('on-clock-countdown').textContent).toBe('0:30');
+        expect(screen.getByTestId('on-clock-countdown').textContent).toBe('00:30');
       } finally {
         vi.useRealTimers();
       }
