@@ -18,6 +18,8 @@ import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
 import { getCurrentSeason } from '@/utils/seasonConstants';
 import LeagueNotifications from "@/components/matchup/LeagueNotifications";
 import { MatchupSidebar } from "@/components/matchup/MatchupSidebar";
+import { ScoreboardStrip } from "@/components/matchup/ScoreboardStrip";
+import { anyGameLive } from "@/components/matchup/scoreboard";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MatchupPlayer, StatBreakdown } from "@/components/matchup/types";
@@ -1135,7 +1137,27 @@ const Matchup = () => {
   };
 
   // Fetch daily stats when a date is selected, or default to today if in matchup week
-  // Fetch all matchups for the current week (for matchup viewer dropdown)
+  // Load every matchup of the viewed week — the scoreboard strip, the desktop
+  // rail and the "View Matchup" select all read allWeekMatchups. One request,
+  // joined team names copied up beside the ids. Returns the rows it stored
+  // (null when the request failed) so the live-refresh loop can call it too:
+  // the loop recomputes the league's scores every 120s but used to leave this
+  // list at its load-time values, which would make the ticker a lie.
+  const loadWeekMatchups = useCallback(async () => {
+    if (!league?.id || userLeagueState !== 'active-user' || !selectedWeek) return null;
+    const matchupsResp = await matchupApi.getLeagueMatchups(league.id, selectedWeek);
+    const matchups = matchupsResp.data as any[] | null;
+    if (!matchups) return null;
+    const matchupsWithNames = matchups.map((m: any) => ({
+      ...m,
+      team1_name: m.team1?.team_name || 'Unknown',
+      team2_name: m.team2?.team_name || (m.team2_id ? 'Unknown' : 'Bye Week'),
+    }));
+    setAllWeekMatchups(matchupsWithNames);
+    return matchupsWithNames;
+  }, [league?.id, selectedWeek, userLeagueState]);
+
+  // Fetch all matchups for the current week (for the scoreboard + matchup viewer)
   useEffect(() => {
     const fetchAllWeekMatchups = async () => {
       if (!league?.id || userLeagueState !== 'active-user' || !selectedWeek) {
@@ -1144,26 +1166,16 @@ const Matchup = () => {
       }
 
       try {
-        const matchupsResp = await matchupApi.getLeagueMatchups(league.id, selectedWeek);
-        const matchups = matchupsResp.data as any[] | null;
+        const matchups = await loadWeekMatchups();
 
         if (!matchups) {
           log('WARN: Error fetching all week matchups');
           return;
         }
 
-        if (matchups) {
-          const matchupsWithNames = (matchups as any[]).map((m: any) => ({
-            ...m,
-            team1_name: m.team1?.team_name || 'Unknown',
-            team2_name: m.team2?.team_name || (m.team2_id ? 'Unknown' : 'Bye Week'),
-          }));
-          setAllWeekMatchups(matchupsWithNames);
-          
-          // If no matchup is selected and user's matchup exists, select it
-          if (!selectedMatchupId && currentMatchup) {
-            setSelectedMatchupId(currentMatchup.id);
-          }
+        // If no matchup is selected and user's matchup exists, select it
+        if (!selectedMatchupId && currentMatchup) {
+          setSelectedMatchupId(currentMatchup.id);
         }
       } catch (error) {
         logger.error('[Matchup] Exception fetching all week matchups:', error);
@@ -1175,7 +1187,7 @@ const Matchup = () => {
   // Using full objects would cause unnecessary re-fetches when scores or other fields update.
   // selectedMatchupId is read inside to conditionally setSelectedMatchupId but should not trigger re-fetch.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [league?.id, selectedWeek, userLeagueState, currentMatchup?.id]);
+  }, [league?.id, selectedWeek, userLeagueState, currentMatchup?.id, loadWeekMatchups]);
 
   // Update player ID refs when teams change (stable references to break death loop)
   // This effect only updates refs and a version counter - it doesn't trigger other effects directly
@@ -5027,6 +5039,10 @@ const Matchup = () => {
       if (currentMatchup.status !== 'in_progress') return;
       try {
         await MatchupService.updateMatchupScores(league.id);
+        // The recompute wrote every matchup's score; re-read the week so the
+        // scoreboard strip ticks with the page (one small request, only
+        // while the week is in progress, only on this cadence).
+        await loadWeekMatchups();
       } catch (error) {
         // Non-blocking - don't stop refresh cycle
       }
@@ -5218,6 +5234,34 @@ const Matchup = () => {
 
     navigate(`/matchup/${leagueId}/${weekNumber}`);
   }, [userLeagueState, league?.id, navigate]);
+
+  // Switch the viewed matchup in place (2026-09-01, Sleeper parity audit M7).
+  // One handler for both the scoreboard strip and the "View Matchup" select:
+  // clear the roster cache marker and the matchup-scoped state, flag loading,
+  // and let the loader effect — which has selectedMatchupId in its deps —
+  // fetch the new one. No navigation, no reload; the strip stays on screen
+  // with the tapped chip already raised while the lineup below swaps.
+  const handleMatchupSwitch = useCallback((matchupId: string) => {
+    log(' Matchup switched to:', matchupId);
+    loadedMatchupDataRef.current = null;
+    setSelectedMatchupId(matchupId);
+    setSelectedDate(null);
+    setCurrentMatchup(null);
+    setCalculatedDailyTotals(new Map());
+    setMyTeam([]);
+    setOpponentTeamPlayers([]);
+    setLoading(true);
+  }, []);
+
+  // The strip's LIVE dot. The live-refresh interval writes fresh game
+  // statuses into these two rosters every 120s, and between them they cover
+  // most of the league's NHL teams on a game night — no extra request. It is
+  // a strip-level signal by design: nothing served says which OTHER lineups
+  // have a skater on the ice, so no chip guesses (see scoreboard.ts).
+  const scoreboardLive = useMemo(
+    () => anyGameLive([...myTeam, ...opponentTeamPlayers], getTodayMST()),
+    [myTeam, opponentTeamPlayers],
+  );
 
   // =============================================================================
   // SIMPLIFIED LOADING STATE - One-way gate prevents flash/cycling
@@ -5467,27 +5511,20 @@ const Matchup = () => {
                       firstWeekStart={firstWeekStart}
                     />
                   )}
-                  {/* Matchup Viewer Dropdown - Show all matchups for current week */}
+                  {/* Matchup Viewer Dropdown - Show all matchups for current week.
+                      Desktop only since the scoreboard strip (M7): on a phone the
+                      strip below is the scoreboard — every matchup is a tappable
+                      button one flick away, with the viewer's chip ringed — and
+                      this control was a third row of chrome above the first
+                      score. On desktop it stays as the compact keyboard path
+                      next to the week selector; the rail in the aside is the
+                      visual one. Both call handleMatchupSwitch. */}
                   {userLeagueState === 'active-user' && allWeekMatchups.length > 0 && (
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2">
+                    <div className="hidden lg:flex lg:flex-row lg:items-center gap-2">
                       <label className="text-xs sm:text-sm font-medium text-white/55">View Matchup:</label>
                       <Select
                         value={selectedMatchupId || currentMatchup?.id || ''}
-                        onValueChange={async (value) => {
-                          log(' Dropdown changed to:', value);
-                          // CRITICAL: Clear cache when dropdown changes to force fresh load
-                          loadedMatchupDataRef.current = null;
-                          setSelectedMatchupId(value);
-                          // Reset selected date when switching matchups
-                          setSelectedDate(null);
-                          // Force reload by clearing current matchup state
-                          setCurrentMatchup(null);
-                          setCalculatedDailyTotals(new Map()); // Clear calculated totals for new matchup
-                          setMyTeam([]);
-                          setOpponentTeamPlayers([]);
-                          setLoading(true);
-                          // The useEffect will pick up the selectedMatchupId change and reload
-                        }}
+                        onValueChange={handleMatchupSwitch}
                       >
                         <SelectTrigger className="w-full sm:w-[280px]">
                           <SelectValue placeholder="Select a matchup" />
@@ -5544,7 +5581,26 @@ const Matchup = () => {
                   )}
                 </div>
               </div>
-          
+
+              {/* MOBILE: League scoreboard strip (2026-09-01, audit M7). Sits above
+                  the ScoreCard and OUTSIDE the currentMatchup gate below, so a tap
+                  that swaps the viewed matchup leaves the ticker on screen with the
+                  tapped chip raised while the lineup reloads. Live scores only — the
+                  league endpoint serves no projections for other matchups. The
+                  desktop rail lives in the left aside. */}
+              {userLeagueState === 'active-user' && allWeekMatchups.length > 0 && (
+                <ScoreboardStrip
+                  className="lg:hidden mb-4"
+                  matchups={allWeekMatchups}
+                  ownMatchupId={userMatchupId}
+                  ownTeamId={userTeam?.id}
+                  viewedMatchupId={selectedMatchupId || currentMatchup?.id}
+                  onSelect={handleMatchupSwitch}
+                  week={selectedWeek}
+                  live={scoreboardLive}
+                />
+              )}
+
           {/* Error State - Show friendly message for demo/guest, retry for logged-in users */}
           {!loading && hasInitializedRef.current && !shouldShowLoading && error && (
             <div className="text-center py-12 max-w-lg mx-auto">
@@ -5774,7 +5830,21 @@ const Matchup = () => {
             </div>
             {/* Desktop: Sticky sidebar */}
             <aside className="hidden lg:block w-full lg:w-auto order-2 lg:order-1">
-              <div className="lg:sticky lg:top-24">
+              <div className="lg:sticky lg:top-24 space-y-4">
+                {/* DESKTOP: the league scoreboard as a rail beside the sidebar
+                    (audit M7) — same chips as the phone strip, stacked. */}
+                {userLeagueState === 'active-user' && allWeekMatchups.length > 0 && (
+                  <ScoreboardStrip
+                    layout="rail"
+                    matchups={allWeekMatchups}
+                    ownMatchupId={userMatchupId}
+                    ownTeamId={userTeam?.id}
+                    viewedMatchupId={selectedMatchupId || currentMatchup?.id}
+                    onSelect={handleMatchupSwitch}
+                    week={selectedWeek}
+                    live={scoreboardLive}
+                  />
+                )}
                 <MatchupSidebar
                   myStarters={weeklyMyStarters}
                   opponentStarters={weeklyOpponentStarters}
