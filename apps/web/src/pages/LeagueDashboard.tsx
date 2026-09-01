@@ -567,6 +567,14 @@ const LeagueDashboard = () => {
     : null;
   const isCategoryLeague =
     leagueScoringFormat === 'h2h-categories' || leagueScoringFormat === 'roto';
+  // SETTINGS SECTIONS (2026-09-01): one list drives BOTH the desktop tab
+  // strip and the mobile section dropdown — "hard to use and navigate on
+  // mobile... utilize drop down menus."
+  const settingsSections = isCategoryLeague
+    ? (['waivers', 'categories', 'draft', 'trades', 'keeper', 'rosterslots', 'playoffs', 'rosters'] as const)
+    : (['waivers', 'scoring', 'draft', 'trades', 'keeper', 'rosterslots', 'playoffs', 'rosters'] as const);
+  const settingsSectionLabel = (tab: string) =>
+    tab === 'rosterslots' ? 'Roster Slots' : tab === 'keeper' ? 'Keepers' : tab.charAt(0).toUpperCase() + tab.slice(1);
 
   // Process waivers manually (commissioner only)
   const handleProcessWaivers = async () => {
@@ -799,8 +807,11 @@ const LeagueDashboard = () => {
                         Pin it as a full-height bottom sheet instead — top edge
                         under the status bar, safe-area padding at the foot —
                         while sm+ keeps the desktop modal unchanged. */}
-                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 text-pastel-cream max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-[max(env(safe-area-inset-top),1rem)] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:left-0 max-sm:max-w-none max-sm:w-full max-sm:max-h-none max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:pb-[max(env(safe-area-inset-bottom),1.25rem)]">
-                      <DialogHeader>
+                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 text-pastel-cream max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-[max(env(safe-area-inset-top),1rem)] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:left-0 max-sm:max-w-none max-sm:w-full max-sm:max-h-none max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:p-4 max-sm:pb-[max(env(safe-area-inset-bottom),1.25rem)] max-sm:overflow-x-hidden">
+                      {/* text-left + pr-8: the sheet header wraps inside the
+                          viewport and clears the close button — the sim showed
+                          header text running past the right screen edge. */}
+                      <DialogHeader className="text-left pr-8 max-w-full">
                         <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
                           ✦ Commissioner
                         </div>
@@ -808,24 +819,40 @@ const LeagueDashboard = () => {
                           <Settings className="h-5 w-5 text-pastel-orange" aria-hidden="true" />
                           League Settings
                         </DialogTitle>
-                        <DialogDescription className="text-white/55">
+                        <DialogDescription className="text-white/55 text-sm">
                           Configure all league settings. Changes will notify all league members.
                         </DialogDescription>
                       </DialogHeader>
                       
                       <Tabs value={activeSettingsTab} onValueChange={setActiveSettingsTab} className="w-full">
-                        <div className="overflow-x-auto -mx-2 px-2">
+                        {/* MOBILE SECTION PICKER (2026-09-01): eight tabs in a
+                            horizontal scroll strip were unnavigable on a phone
+                            — half the sections hidden past the edge. One
+                            full-width dropdown replaces the strip below sm;
+                            the desktop tab strip returns at sm+. */}
+                        <div className="sm:hidden">
+                          <Select value={activeSettingsTab} onValueChange={setActiveSettingsTab}>
+                            <SelectTrigger className="w-full h-11 bg-[#0F1F15] ring-1 ring-white/10 border-0 rounded-xl font-bold text-pastel-cream">
+                              <SelectValue>{settingsSectionLabel(activeSettingsTab)} Settings</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {settingsSections.map((tab) => (
+                                <SelectItem key={tab} value={tab}>
+                                  {settingsSectionLabel(tab)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="hidden sm:block overflow-x-auto -mx-2 px-2">
                           <TabsList className="inline-flex w-auto min-w-full bg-[#0F1F15] ring-1 ring-white/10 p-1 rounded-xl">
-                            {(isCategoryLeague
-                              ? (['waivers','categories','draft','trades','keeper','rosterslots','playoffs','rosters'] as const)
-                              : (['waivers','scoring','draft','trades','keeper','rosterslots','playoffs','rosters'] as const)
-                            ).map((tab) => (
+                            {settingsSections.map((tab) => (
                               <TabsTrigger
                                 key={tab}
                                 value={tab}
                                 className="text-white/55 hover:text-pastel-cream font-bold data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] data-[state=active]:shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                               >
-                                {tab === 'rosterslots' ? 'Roster Slots' : tab === 'keeper' ? 'Keepers' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                                {settingsSectionLabel(tab)}
                               </TabsTrigger>
                             ))}
                           </TabsList>
