@@ -575,7 +575,7 @@ const TradeAnalyzer = () => {
                       {activeLeagueId && (
                         <div className="pt-4">
                           <Button asChild className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
-                            <a href={`/draft-room?league=${activeLeagueId}`}>
+                            <a href={`/draft-v2/${activeLeagueId}`}>
                               Go to Draft Room
                             </a>
                           </Button>

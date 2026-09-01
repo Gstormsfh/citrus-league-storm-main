@@ -1731,7 +1731,9 @@ Your Commissioner`);
                         });
                         return;
                       }
-                      navigate(`/draft-room?league=${leagueId}`);
+                      // DRAFT CUTOVER (2026-08-31): /draft-room is the RETIRED v1 room. The
+                      // live-engine room is /draft-v2/:leagueId — see leagueDraftEntryGuard.
+                      navigate(`/draft-v2/${leagueId}`);
                     }}
                     className={`w-full font-bold ${
                       league.draft_status === 'in_progress'
