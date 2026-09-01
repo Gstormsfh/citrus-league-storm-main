@@ -45,6 +45,7 @@ import { PlayerPool } from '@/components/draft/PlayerPool';
 // draft-only card fork is deleted.
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { servicePlayerToHockeyPlayer } from '@/utils/playerStatsHelper';
+import { buildInviteLink, canSystemShare, shareInvite } from '@/utils/inviteShare';
 import { ScoringCalculator, type ScoringSettings } from '@citrus/shared';
 import { DraftHistory } from '@/components/draft/DraftHistory';
 import { TeamRosters } from '@/components/draft/TeamRosters';
@@ -739,7 +740,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
   // AI-FILL (2026-08-23) — see the button's comment below.
   const [isFilling, setIsFilling] = useState(false);
   const [league, setLeague] = useState<
-    { commissioner_id: string; draft_rounds: number; league_size: number | null; settings: Record<string, unknown> | null } | null
+    { commissioner_id: string; draft_rounds: number; league_size: number | null; settings: Record<string, unknown> | null; name?: string; join_code?: string } | null
   >(null);
   // League-fetch failure is USER-VISIBLE. The original silent-null
   // catch produced the exact incident this lobby exists to prevent:
@@ -773,6 +774,8 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
           draft_rounds: number;
           league_size: number | null;
           settings: Record<string, unknown> | null;
+          name?: string;
+          join_code?: string;
         }>(path);
         if (cancelled) return;
         const payload =
@@ -782,6 +785,8 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
             draft_rounds: number;
             league_size: number | null;
             settings: Record<string, unknown> | null;
+            name?: string;
+            join_code?: string;
           });
         if (payload && typeof payload.commissioner_id === 'string') {
           setLeague(payload);
@@ -1045,6 +1050,61 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
               );
             })}
         </div>
+
+        {/* INVITE REACH (2026-09-01): "there's still no invite button or
+            anything i can use in the draft room." While seats are open,
+            inviting IS the lobby's job — for every member, not just the
+            commissioner. Join code front and center, OS share sheet
+            first, link copy beside it. Mechanics live in inviteShare. */}
+        {league?.join_code && !roomFull && (
+          <div
+            className="relative mt-5 rounded-xl bg-pastel-orange/[0.07] ring-1 ring-pastel-orange/35 p-4"
+            data-testid="draft-lobby-v2-invite"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-jbmono text-[10px] font-bold uppercase tracking-[0.32em] text-pastel-orange-soft">
+                  Invite managers
+                </div>
+                <button
+                  type="button"
+                  className="focus-citrus mt-1 font-mono text-2xl font-bold tracking-[0.2em] text-pastel-cream active:opacity-70"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(league.join_code as string);
+                    toast.success('Join code copied');
+                  }}
+                >
+                  {league.join_code}
+                </button>
+                <div className="text-xs text-white/55">Tap the code to copy it</div>
+              </div>
+              <div className="flex flex-col gap-1.5 w-full sm:w-auto">
+                {canSystemShare() && (
+                  <Button
+                    onClick={async () => {
+                      const result = await shareInvite(league.name || 'My League', league.join_code as string);
+                      if (result === 'copied') toast.success('Invite copied — paste it anywhere');
+                      if (result === 'failed') toast.error('Could not share — use Copy Link');
+                    }}
+                    className="rounded-full bg-pastel-orange text-[#2A0F00] hover:bg-pastel-orange-soft font-black px-6"
+                  >
+                    Share Invite
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(buildInviteLink(league.join_code as string));
+                    toast.success('Invite link copied');
+                  }}
+                  className="rounded-full border-white/20 bg-white/5 text-pastel-cream hover:bg-white/10"
+                >
+                  Copy Link
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       {leagueError && (
         <div
