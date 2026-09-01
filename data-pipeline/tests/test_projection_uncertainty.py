@@ -22,11 +22,19 @@ import _bootstrap  # noqa: F401
 from projection_uncertainty import (
     UncertaintyEngine,
     enrich_projection_with_uncertainty,
+    confidence_from_cv,
+    confidence_label_for,
     SKATER_STATS,
     SKATER_STAT_CORRELATION,
     DEFAULT_SCORING_WEIGHTS,
     FINISHING_PRIOR_ALPHA,
     FINISHING_PRIOR_BETA,
+    CV_FULL_CONFIDENCE,
+    CV_NO_CONFIDENCE,
+    CONFIDENCE_FLOOR,
+    CONFIDENCE_CEILING,
+    CONFIDENCE_HIGH_THRESHOLD,
+    CONFIDENCE_MEDIUM_THRESHOLD,
 )
 
 
@@ -34,13 +42,46 @@ from projection_uncertainty import (
 # FIXTURES
 # ============================================================================
 
+def fantasy_points(stats, weights=DEFAULT_SCORING_WEIGHTS):
+    """Score a stat line with the engine's scoring weights (single source of truth)."""
+    return sum(weights.get(stat, 0.0) * value for stat, value in stats.items())
+
+
+# The fixture skater's stat line, scored once here so every test that reads
+# total_projected_points sees the value the current DEFAULT_SCORING_WEIGHTS
+# produce (4.5 under the pre-2026-09-01 weights, 8.2 under Yahoo-aligned).
+FIXTURE_STATS = {
+    "goals": 0.35, "assists": 0.55, "sog": 3.0, "blocks": 0.8,
+    "ppp": 0.20, "shp": 0.02, "hits": 1.5, "pim": 0.5,
+}
+FIXTURE_TOTAL_PTS = fantasy_points(FIXTURE_STATS)
+
+
+def static_confidence_for_gp(games_played):
+    """
+    The static confidence_score calculate_daily_projections.py feeds the
+    engine for a same-day game against an average opponent:
+    min(GP/30, 1) x temporal(1.0) x opponent(1.0). The engine inflates every
+    stat's σ by 1/max(confidence, 0.3), so a fixture that claims 0.80 for an
+    8-GP call-up understates production uncertainty by ~2.7x.
+    """
+    return round(min(games_played / 30.0, 1.0), 2) if games_played > 0 else 0.1
+
+
 def make_projection(
     goals=0.35, assists=0.55, sog=3.0, blocks=0.8,
     ppp=0.20, shp=0.02, hits=1.5, pim=0.5,
-    total_pts=4.5, confidence=0.80, finishing_mult=1.0,
+    total_pts=None, confidence=0.80, finishing_mult=1.0,
     opponent_adj=1.0,
 ):
-    """Create a mock projection dict."""
+    """Create a mock projection dict. total_pts defaults to the stat line
+    scored with DEFAULT_SCORING_WEIGHTS, never a literal."""
+    stats = {
+        "goals": goals, "assists": assists, "sog": sog, "blocks": blocks,
+        "ppp": ppp, "shp": shp, "hits": hits, "pim": pim,
+    }
+    if total_pts is None:
+        total_pts = fantasy_points(stats)
     return {
         "player_id": 8478402,
         "game_id": 2025020001,
@@ -141,11 +182,14 @@ class TestDistributionProperties:
     def test_mean_near_point_estimate(self):
         """MC mean should be close to the point estimate (within reason)."""
         engine = UncertaintyEngine(n_samples=10000, seed=42)
-        proj = make_projection(total_pts=4.5)
+        proj = make_projection()
         ctx = make_context(games_played=50)
         result = engine.propagate_uncertainty(proj, ctx)
-        # MC mean should be within 30% of point estimate (distributions are non-linear)
-        assert abs(result["mean"] - 4.5) < 4.5 * 0.5
+        # The point estimate is the fixture stat line scored with the live
+        # weights; the MC mean should land within 50% of it (the finishing /
+        # opponent posteriors and Gamma marginals are non-linear).
+        assert proj["total_projected_points"] == pytest.approx(FIXTURE_TOTAL_PTS)
+        assert abs(result["mean"] - FIXTURE_TOTAL_PTS) < FIXTURE_TOTAL_PTS * 0.5
 
     def test_positive_std_dev(self):
         """Standard deviation should always be positive."""
@@ -169,11 +213,11 @@ class TestDistributionProperties:
     def test_90_ci_contains_point_estimate(self):
         """90% CI should typically contain the point estimate."""
         engine = UncertaintyEngine(n_samples=10000, seed=42)
-        proj = make_projection(total_pts=4.5)
+        proj = make_projection()
         ctx = make_context(games_played=50)
         result = engine.propagate_uncertainty(proj, ctx)
         # The 90% CI should be wide enough to contain the point estimate
-        assert result["ci_lower_90"] < 4.5 < result["ci_upper_90"]
+        assert result["ci_lower_90"] < FIXTURE_TOTAL_PTS < result["ci_upper_90"]
 
     def test_all_stat_samples_non_negative(self):
         """All stat samples should be non-negative (Gamma distribution)."""
@@ -364,7 +408,10 @@ class TestFantasyPointCalculation:
 
         points = engine._calculate_fantasy_points(samples, DEFAULT_SCORING_WEIGHTS)
 
-        expected = (1.0*3 + 1.0*2 + 3.0*0.4 + 1.0*0.5 + 0.5*1.0 + 0*2.0 + 2.0*0.2 + 1.0*0.5)
+        # Expected value comes from the live weights, not a hand-scored literal,
+        # so the test follows DEFAULT_SCORING_WEIGHTS when the defaults move.
+        expected = fantasy_points({stat: float(samples[stat][0]) for stat in samples})
+        assert expected > 0
         np.testing.assert_allclose(points, expected, atol=1e-6)
 
     def test_fantasy_points_non_negative(self):
@@ -414,6 +461,96 @@ class TestDynamicConfidence:
         # The confidence_score should now be dynamic, not the original 0.80
         assert enriched["confidence_score"] != 0.80
         assert 0.0 < enriched["confidence_score"] < 1.0
+
+
+# ============================================================================
+# TEST: CONFIDENCE CALIBRATION (2026-09-01, confidence-calibration.md)
+# ============================================================================
+
+class TestConfidenceCalibration:
+    """
+    Regression tests for the CV → confidence map. Under the industry-standard
+    weights (G6 A4 PPP2 SOG0.9 BLK1) a 30+ GP regular's single-game line has
+    CV ≈ 1-1.5 and a <10 GP call-up's CV ≈ 6-10; the map must place the first
+    in "High" and the second in "Low" instead of flooring both at 0.05.
+    """
+
+    @staticmethod
+    def _confidence_at(games_played, seed=42, n_samples=5000):
+        # A fresh engine per call = common random numbers across GP values, so
+        # differences are driven by games_played alone, not by MC noise.
+        engine = UncertaintyEngine(n_samples=n_samples, seed=seed)
+        proj = make_projection(confidence=static_confidence_for_gp(games_played))
+        ctx = make_context(games_played=games_played)
+        return engine.propagate_uncertainty(proj, ctx)
+
+    def test_map_hits_anchors_and_is_monotonic(self):
+        """confidence_from_cv: ceiling at the p05 anchor, floor at the p95 anchor,
+        strictly decreasing in between, and log-linear (equal ratios, equal steps)."""
+        assert confidence_from_cv(CV_FULL_CONFIDENCE) == pytest.approx(CONFIDENCE_CEILING)
+        assert confidence_from_cv(CV_NO_CONFIDENCE) == pytest.approx(CONFIDENCE_FLOOR)
+        assert confidence_from_cv(CV_FULL_CONFIDENCE / 2) == CONFIDENCE_CEILING
+        assert confidence_from_cv(CV_NO_CONFIDENCE * 3) == CONFIDENCE_FLOOR
+
+        # Non-increasing everywhere (including the clipped tails) ...
+        wide = np.geomspace(CV_FULL_CONFIDENCE / 4, CV_NO_CONFIDENCE * 4, 41)
+        wide_confs = [confidence_from_cv(cv) for cv in wide]
+        assert all(a >= b for a, b in zip(wide_confs, wide_confs[1:]))
+        # ... strictly decreasing with equal steps per equal CV ratio inside
+        # the anchors, where the clip is inactive (raw value within
+        # [floor, ceiling]: CV between 0.8 * 12.5^0.01 and 0.8 * 12.5^0.95).
+        inner = np.geomspace(CV_FULL_CONFIDENCE * 1.2, CV_NO_CONFIDENCE / 1.25, 25)
+        confs = [confidence_from_cv(cv) for cv in inner]
+        assert CONFIDENCE_FLOOR < min(confs) and max(confs) < CONFIDENCE_CEILING
+        assert all(a > b for a, b in zip(confs, confs[1:]))
+        steps = np.diff(confs)
+        np.testing.assert_allclose(steps, steps[0], rtol=1e-9)
+
+    def test_map_thresholds_split_veterans_from_call_ups(self):
+        """The label thresholds fall between the measured veteran (31+ GP, p95
+        CV 2.37) and call-up (≤10 GP, p05 CV 5.92) distributions."""
+        assert confidence_label_for(confidence_from_cv(1.46)) == "High"    # 31+ GP median
+        assert confidence_label_for(confidence_from_cv(2.37)) == "Medium"  # 31+ GP p95
+        assert confidence_label_for(confidence_from_cv(3.23)) == "Medium"  # 11-30 GP median
+        assert confidence_label_for(confidence_from_cv(5.92)) == "Low"     # ≤10 GP p05
+        assert confidence_label_for(confidence_from_cv(9.09)) == "Low"     # ≤10 GP median
+        assert confidence_label_for(CONFIDENCE_HIGH_THRESHOLD) == "High"
+        assert confidence_label_for(CONFIDENCE_MEDIUM_THRESHOLD) == "Medium"
+        assert confidence_label_for(CONFIDENCE_MEDIUM_THRESHOLD - 1e-9) == "Low"
+
+    def test_veteran_fixture_is_high_confidence(self):
+        """60 GP with the pipeline's static confidence → ≥ 0.60, 'High'."""
+        result = self._confidence_at(60)
+        assert result["dynamic_confidence"] >= CONFIDENCE_HIGH_THRESHOLD
+        assert result["confidence_label"] == "High"
+
+    def test_call_up_fixture_is_low_confidence(self):
+        """8 GP with the pipeline's static confidence (0.27) → ≤ 0.35, 'Low'."""
+        result = self._confidence_at(8)
+        assert result["dynamic_confidence"] <= CONFIDENCE_MEDIUM_THRESHOLD
+        assert result["confidence_label"] == "Low"
+
+    def test_confidence_monotonic_in_games_played(self):
+        """Confidence rises with GP through the shrinkage ramp (8 → 30) and
+        stays flat above it (the Bayesian weight and static confidence both
+        cap at 30 GP, so 30 and 60 GP share identical inputs)."""
+        gps = [8, 12, 15, 20, 25, 30, 60]
+        confs = {gp: self._confidence_at(gp)["dynamic_confidence"] for gp in gps}
+
+        assert confs[8] < confs[12] < confs[15] < confs[20] < confs[25] < confs[30]
+        assert confs[30] <= confs[60]
+        # The call-up / regular / veteran anchor cases
+        assert confs[8] < confs[30] <= confs[60]
+        assert confidence_label_for(confs[8]) == "Low"
+        assert confidence_label_for(confs[60]) == "High"
+
+    def test_no_longer_floors_at_the_minimum(self):
+        """The pre-calibration map read 0.05 for both cases; the calibrated
+        one must separate them by a wide margin."""
+        vet = self._confidence_at(60)["dynamic_confidence"]
+        rookie = self._confidence_at(8)["dynamic_confidence"]
+        assert vet - rookie > 0.5
+        assert vet > CONFIDENCE_FLOOR and rookie < CONFIDENCE_CEILING
 
 
 # ============================================================================
