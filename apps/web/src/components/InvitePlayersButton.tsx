@@ -1,12 +1,26 @@
 /**
- * InvitePlayersButton — share join code via copy, email, or SMS
- * Used on pool pages and league dashboards for commissioners.
+ * InvitePlayersButton — share join code via the OS share sheet, copy,
+ * email, or text. Used on pool pages and league dashboards.
+ *
+ * All link/text construction and send mechanics live in
+ * utils/inviteShare — this component only decides which affordances to
+ * show: Share leads wherever the OS share sheet exists, and the
+ * scheme-based Email / Text buttons are web-only (they are dead inside
+ * the native shell).
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Copy, Mail, MessageSquare, Share2, X, Smartphone } from 'lucide-react';
+import { Copy, Mail, MessageSquare, Share2, X } from 'lucide-react';
+import {
+  buildInviteLink,
+  canSystemShare,
+  emailInvite,
+  isNativeApp,
+  shareInvite,
+  smsInvite,
+} from '@/utils/inviteShare';
 
 interface InvitePlayersButtonProps {
   joinCode: string;
@@ -16,37 +30,9 @@ interface InvitePlayersButtonProps {
 export const InvitePlayersButton = ({ joinCode, leagueName }: InvitePlayersButtonProps) => {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
 
-  useEffect(() => {
-    // Detect mobile/tablet via touch support + screen width
-    const checkMobile = () => {
-      setIsMobile(
-        'ontouchstart' in window ||
-        navigator.maxTouchPoints > 0 ||
-        window.innerWidth < 768
-      );
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // Wrap in /auth?redirect= so signed-out invitees go through auth,
-  // then land back on the join page (with code pre-filled + auto-submit).
-  // Signed-in users skip the auth step entirely (Auth.tsx detects session
-  // and redirects immediately).
-  const joinPath = `/create-league?tab=join&code=${joinCode}`;
-  const inviteLink = `${window.location.origin}/auth?redirect=${encodeURIComponent(joinPath)}`;
-
-  // Template includes BOTH the clickable link (for anyone who can tap it)
-  // AND the raw join code as a fallback (for users whose mail client
-  // strips links, or who'd rather type the code manually).
-  const inviteText =
-    `You're invited to join "${leagueName}" on Citrus Fantasy Sports!\n\n` +
-    `Tap to join: ${inviteLink}\n\n` +
-    `Or enter this code manually at citrusfantasysports.com:\n` +
-    `${joinCode}`;
+  const showSystemShare = canSystemShare();
+  const showSchemeButtons = !isNativeApp();
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(joinCode);
@@ -54,34 +40,16 @@ export const InvitePlayersButton = ({ joinCode, leagueName }: InvitePlayersButto
   };
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(inviteLink);
+    navigator.clipboard.writeText(buildInviteLink(joinCode));
     toast({ title: 'Copied!', description: 'Invite link copied to clipboard' });
   };
 
-  const handleEmail = () => {
-    const subject = encodeURIComponent(`Join ${leagueName} on Citrus Fantasy Sports`);
-    const body = encodeURIComponent(inviteText);
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
-  };
-
-  const handleSMS = () => {
-    const body = encodeURIComponent(inviteText);
-    // iOS requires sms:&body= while Android uses sms:?body=
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const separator = isIOS ? '&' : '?';
-    window.location.href = `sms:${separator}body=${body}`;
-  };
-
-  const handleNativeShare = async () => {
-    try {
-      await navigator.share({
-        title: `Join ${leagueName} on Citrus Fantasy Sports`,
-        text: inviteText,
-        url: inviteLink,
-      });
-    } catch {
-      // User cancelled or share failed — fall back to copy
-      handleCopyLink();
+  const handleShare = async () => {
+    const result = await shareInvite(leagueName, joinCode);
+    if (result === 'copied') {
+      toast({ title: 'Invite copied!', description: 'Paste it anywhere to invite friends.' });
+    } else if (result === 'failed') {
+      toast({ title: 'Could not share', description: 'Use Copy Invite Link instead.' });
     }
   };
 
@@ -112,26 +80,28 @@ export const InvitePlayersButton = ({ joinCode, leagueName }: InvitePlayersButto
         </Button>
       </div>
 
-      {/* Actions */}
+      {/* Actions — Share leads wherever the OS sheet exists */}
       <div className="space-y-1.5">
+        {showSystemShare && (
+          <Button variant="default" size="sm" className="w-full justify-start gap-2 text-xs" onClick={handleShare}>
+            <Share2 className="w-3.5 h-3.5" />
+            Share Invite
+          </Button>
+        )}
         <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={handleCopyLink}>
           <Copy className="w-3.5 h-3.5" />
           Copy Invite Link
         </Button>
-        <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={handleEmail}>
-          <Mail className="w-3.5 h-3.5" />
-          Send via Email
-        </Button>
-        {isMobile && (
-          <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={handleSMS}>
-            <MessageSquare className="w-3.5 h-3.5" />
-            Send via SMS
+        {showSchemeButtons && (
+          <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => emailInvite(leagueName, joinCode)}>
+            <Mail className="w-3.5 h-3.5" />
+            Send via Email
           </Button>
         )}
-        {isMobile && typeof navigator.share === 'function' && (
-          <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={handleNativeShare}>
-            <Smartphone className="w-3.5 h-3.5" />
-            Share...
+        {showSchemeButtons && (
+          <Button variant="outline" size="sm" className="w-full justify-start gap-2 text-xs" onClick={() => smsInvite(leagueName, joinCode)}>
+            <MessageSquare className="w-3.5 h-3.5" />
+            Send via Text
           </Button>
         )}
       </div>

@@ -31,9 +31,11 @@ import {
   Mail,
   Link as LinkIcon,
   Calendar,
-  X
+  X,
+  Share2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { buildInviteLink, canSystemShare, emailInvite, shareInvite } from '@/utils/inviteShare';
 import { logger } from '@/utils/logger';
 
 interface Team {
@@ -820,46 +822,50 @@ export const DraftLobby = ({
                   </Button>
                 </div>
 
-                {/* Quick Actions - Compact Row */}
+                {/* Quick Actions - Compact Row.
+                    INVITE SHARE (2026-09-01): OS share sheet leads wherever it
+                    exists — the scheme-based send button did nothing inside the
+                    native shell, and links built on the in-app origin were
+                    unopenable. Mechanics live in utils/inviteShare. */}
                 <div className="flex gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => {
-                      if (joinCode) {
-                        const inviteLink = `${window.location.origin}/create-league?tab=join&code=${joinCode}`;
-                        const subject = encodeURIComponent(`Join my fantasy league: ${leagueName || 'My League'}`);
-                        const body = encodeURIComponent(`Hi!
-
-I'd like to invite you to join my fantasy hockey league on Citrus League Storm:
-
-League: ${leagueName || 'My League'}
-Join Code: ${joinCode}
-
-You can join in two ways:
-1. Click this link: ${inviteLink}
-2. Or enter the join code manually: ${joinCode}
-
-Looking forward to competing with you!
-
-Best,
-Your Commissioner`);
-                        window.location.href = `mailto:?subject=${subject}&body=${body}`;
-                      }
-                    }}
-                  >
-                    <Mail className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
-                    Email
-                  </Button>
+                  {canSystemShare() ? (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="flex-1"
+                      onClick={async () => {
+                        if (!joinCode) return;
+                        const result = await shareInvite(leagueName || 'My League', joinCode);
+                        if (result === 'copied') {
+                          toast({ title: 'Invite copied!', description: 'Paste it anywhere to invite friends.' });
+                        } else if (result === 'failed') {
+                          toast({ title: 'Could not share', description: 'Use the Link button instead.' });
+                        }
+                      }}
+                    >
+                      <Share2 className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
+                      Share
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => {
+                        if (joinCode) emailInvite(leagueName || 'My League', joinCode);
+                      }}
+                    >
+                      <Mail className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
+                      Email
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
                     className="flex-1"
                     onClick={() => {
                       if (joinCode) {
-                        const inviteLink = `${window.location.origin}/create-league?tab=join&code=${joinCode}`;
-                        navigator.clipboard.writeText(inviteLink);
+                        navigator.clipboard.writeText(buildInviteLink(joinCode));
                         setCopiedLink(true);
                         toast({
                           title: 'Link Copied!',
