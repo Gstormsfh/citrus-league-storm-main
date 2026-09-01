@@ -29,26 +29,21 @@ const formatTOIPerGame = (totalSeconds: number, gamesPlayed: number): string => 
  * @param playerId - Player ID (string or number)
  * @returns HockeyPlayer with season stats, or null if player not found
  */
-export async function getPlayerWithSeasonStats(
-  playerId: string | number
-): Promise<HockeyPlayer | null> {
-  try {
-    // Fetch fresh season stats from PlayerService (uses NHL.com official stats)
-    const players = await PlayerService.getPlayersByIds([String(playerId)]);
-    const player = players.find(p => Number(p.id) === Number(playerId));
-    
-    if (!player) {
-      logger.warn(`[playerStatsHelper] Player ${playerId} not found`);
-      return null;
-    }
+/**
+ * Pure mapper: service Player -> HockeyPlayer card shape. Extracted
+ * (2026-09-01) so pages can open a player card INSTANTLY with the row
+ * data they already hold, then refresh via getPlayerWithSeasonStats in
+ * the background — tapping a player used to await a network round trip
+ * before the modal appeared at all.
+ */
+export function servicePlayerToHockeyPlayer(player: Player): HockeyPlayer {
+  // Map Player type to HockeyPlayer format
+  // CRITICAL: Use NHL.com official stats exclusively (no PBP fallback)
+  // This ensures player cards match NHL.com exactly
 
-    // Map Player type to HockeyPlayer format
-    // CRITICAL: Use NHL.com official stats exclusively (no PBP fallback)
-    // This ensures player cards match NHL.com exactly
-    
-    // Handle PPP/SHP - check both powerPlayPoints/shortHandedPoints AND ppp/shp
-    const powerPlayPoints = player.ppp !== undefined && player.ppp !== null ? player.ppp : 0;
-    const shortHandedPoints = player.shp !== undefined && player.shp !== null ? player.shp : 0;
+  // Handle PPP/SHP - check both powerPlayPoints/shortHandedPoints AND ppp/shp
+  const powerPlayPoints = player.ppp !== undefined && player.ppp !== null ? player.ppp : 0;
+  const shortHandedPoints = player.shp !== undefined && player.shp !== null ? player.shp : 0;
 
     const hockeyPlayer: HockeyPlayer = {
       id: player.id,
@@ -104,7 +99,23 @@ export async function getPlayerWithSeasonStats(
         : 0
     };
 
-    return hockeyPlayer;
+  return hockeyPlayer;
+}
+
+export async function getPlayerWithSeasonStats(
+  playerId: string | number
+): Promise<HockeyPlayer | null> {
+  try {
+    // Fetch fresh season stats from PlayerService (uses NHL.com official stats)
+    const players = await PlayerService.getPlayersByIds([String(playerId)]);
+    const player = players.find(p => Number(p.id) === Number(playerId));
+
+    if (!player) {
+      logger.warn(`[playerStatsHelper] Player ${playerId} not found`);
+      return null;
+    }
+
+    return servicePlayerToHockeyPlayer(player);
   } catch (error) {
     logger.error(`[playerStatsHelper] Error fetching season stats for player ${playerId}:`, error);
     return null;
