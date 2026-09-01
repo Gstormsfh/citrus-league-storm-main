@@ -47,3 +47,28 @@ describe('the league settings dialog presents as a sheet on phones', () => {
     expect(cls).toContain('sm:max-w-[700px]');
   });
 });
+
+describe('settings navigate by dropdown on phones', () => {
+  // SETTINGS SECTIONS (2026-09-01): "hard to use and navigate on
+  // mobile... utilize drop down menus." One full-width Select replaces
+  // the eight-tab horizontal strip below sm; the strip returns at sm+.
+  it('the mobile section picker is a Select bound to the active section', () => {
+    const pickerAt = HQ.indexOf('MOBILE SECTION PICKER');
+    expect(pickerAt).toBeGreaterThan(-1);
+    const picker = HQ.slice(pickerAt, pickerAt + 1200);
+    expect(picker).toContain('<Select value={activeSettingsTab} onValueChange={setActiveSettingsTab}>');
+    expect(picker).toContain('settingsSections.map');
+  });
+
+  it('the tab strip is desktop-only; the dropdown is phone-only', () => {
+    const pickerAt = HQ.indexOf('MOBILE SECTION PICKER');
+    const region = HQ.slice(pickerAt, pickerAt + 2600);
+    expect(region).toContain('"sm:hidden"');
+    expect(region).toContain('hidden sm:block overflow-x-auto');
+  });
+
+  it('the sheet cannot scroll sideways and its header clears the close button', () => {
+    expect(HQ).toContain('max-sm:overflow-x-hidden');
+    expect(HQ).toContain('<DialogHeader className="text-left pr-8 max-w-full">');
+  });
+});
