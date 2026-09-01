@@ -103,6 +103,37 @@ draftV2PickRoutes.post(
       );
     }
 
+    // ── Format gate (2026-09-01) ────────────────────────────────────
+    // AUCTION INCIDENT (league a1a125c8, seq 2): the engine's WS path
+    // rejects picks in auction lobbies (wrong_format_for_action), but
+    // THIS HTTP path went straight to submit_pick_v2 with no format
+    // check — a Draft press in an auction room recorded a $0 snake
+    // pick, the auto-nominator then put the same player on the block,
+    // and the lot close failed against the duplicate. Manual snake
+    // picks are snake/linear-only; auction rosters fill exclusively
+    // through close_nomination_v2. (A matching guard inside the RPC
+    // itself is the follow-up ADR — the RPC surface is ADR-bound.)
+    {
+      const { data: leagueRow } = await supabaseAdmin
+        .from('leagues')
+        .select('settings')
+        .eq('id', leagueId)
+        .maybeSingle();
+      const draftType =
+        (leagueRow?.settings as Record<string, unknown> | null)?.draftType;
+      if (draftType === 'auction') {
+        return handleError(
+          c,
+          new AppError(
+            'wrong_format_for_action: auction rosters fill through bids, not picks',
+            409,
+            'CONFLICT',
+          ),
+          'Manual pick rejected for auction-format league',
+        );
+      }
+    }
+
     // ── Submit pick + post-commit broadcast ─────────────────────────
     // submitPick uses the user-scoped client (preserves the JWT for
     // auth.uid() inside the SECURITY DEFINER RPC). broadcastEvent uses
