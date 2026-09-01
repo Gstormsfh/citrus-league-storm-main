@@ -26,6 +26,7 @@ import { useLeague } from "@/contexts/LeagueContext";
 import { LeagueService } from "@/services/LeagueService";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
+import MobileMenuButton from "@/components/MobileMenuButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -810,8 +811,10 @@ const CreateLeague = () => {
 
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-center h-12 px-4">
+        <div className="flex items-center justify-between h-12 px-4">
+          <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Create League</h1>
+          <MobileMenuButton />
         </div>
       </div>
 
