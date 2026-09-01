@@ -1,7 +1,21 @@
+import { cn } from "@/lib/utils";
+import {
+  NEUTRAL_CHIP,
+  POSITION_CHIP_BASE,
+  positionChipClasses,
+  positionChipKey,
+} from "@/components/roster/positionChip";
+
 interface CenterColumnProps {
   position: string;
   userPlayer?: { projectedPoints?: number; position?: string } | null;
   opponentPlayer?: { projectedPoints?: number; position?: string } | null;
+  /**
+   * Bench rows carry a neutral "BN" chip instead of a position: a benched
+   * player's points do not count, and the chip is where the row says so
+   * (the full-card "BENCHED" overlay it replaces hid the player behind it).
+   */
+  isBench?: boolean;
 }
 
 // Get position color styles for center column - High-Contrast Citrus Palette
@@ -34,20 +48,36 @@ const getPositionStyles = (position: string): { bg: string; border: string; text
   return { bg: 'hsl(var(--muted) / 0.15)', border: 'hsl(var(--border) / 0.3)', text: 'hsl(var(--foreground))' };
 };
 
-export const CenterColumn = ({ position, userPlayer, opponentPlayer }: CenterColumnProps) => {
+// Bench: no position to claim, so no position tint on desktop either.
+const BENCH_STYLES = {
+  bg: 'hsl(var(--muted) / 0.15)',
+  border: 'hsl(var(--border) / 0.3)',
+  text: 'rgba(255, 248, 240, 0.55)',
+};
+
+export const CenterColumn = ({ position, userPlayer, opponentPlayer, isBench = false }: CenterColumnProps) => {
   // For UTIL slot, use player's actual position for color, but display "Util"
   const isUtilSlot = position?.toUpperCase() === 'UTIL' || position?.toUpperCase() === 'UTILITY';
-  const colorPosition = isUtilSlot && userPlayer?.position 
-    ? userPlayer.position 
-    : (isUtilSlot && opponentPlayer?.position 
-      ? opponentPlayer.position 
+  const colorPosition = isUtilSlot && userPlayer?.position
+    ? userPlayer.position
+    : (isUtilSlot && opponentPlayer?.position
+      ? opponentPlayer.position
       : position);
-  const displayPosition = isUtilSlot ? 'Util' : position;
-  
-  const positionStyles = getPositionStyles(colorPosition);
-  
+  const displayPosition = isBench ? 'BN' : isUtilSlot ? 'Util' : position;
+
+  const positionStyles = isBench ? BENCH_STYLES : getPositionStyles(colorPosition);
+
+  // Mobile (<1024px) renders the SAME 32px chip the roster list uses — one
+  // slot vocabulary across the two pages a manager flips between. The chip
+  // is labelled with the SLOT (UTIL, not the occupant's position) but
+  // coloured by the occupant, exactly like the desktop tint above.
+  const chipLabel = isBench ? 'BN' : isUtilSlot ? 'UTIL' : positionChipKey(position);
+  const chipClasses = isBench
+    ? cn(POSITION_CHIP_BASE, NEUTRAL_CHIP)
+    : positionChipClasses(positionChipKey(colorPosition));
+
   return (
-    <div 
+    <div
       className="matchup-center-column"
       style={{
         background: positionStyles.bg,
@@ -55,13 +85,19 @@ export const CenterColumn = ({ position, userPlayer, opponentPlayer }: CenterCol
         borderRightColor: positionStyles.border,
       }}
     >
-      <span 
+      <span
         className="position-label"
         style={{ color: positionStyles.text }}
       >
         {displayPosition}
       </span>
+      <span
+        className={cn('matchup-slot-chip lg:hidden', chipClasses)}
+        aria-label={isBench ? 'Bench' : `${chipLabel} slot`}
+        data-slot={chipLabel}
+      >
+        {chipLabel}
+      </span>
     </div>
   );
 };
-

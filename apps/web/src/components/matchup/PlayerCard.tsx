@@ -48,6 +48,9 @@ const getPositionColorClasses = (position: string): string => {
   return '';
 };
 
+/** The big number in the mobile score stack: 15px JetBrains Mono, tabular. */
+const SCORE_ACTUAL_CLASS = 'player-score-value font-jbmono tabular-nums text-[15px] font-bold leading-none';
+
 // Format name as "F. LastName" for mobile compactness
 const formatPlayerName = (name: string, compact: boolean = false): string => {
   if (!name) return '';
@@ -86,14 +89,17 @@ const calculatePercentages = (player: MatchupPlayer) => {
 
 export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerClick, selectedDate, dailyStatsMap }: PlayerCardProps) => {
   if (!player) {
+    // "Empty", not "Empty Slot": the centre column already says WHICH slot
+    // (the desktop label, the mobile chip), so the card only has to say
+    // that nobody is in it.
     return (
-      <div className={cn(`player-card player-card-empty ${isUserTeam ? 'user-team' : 'opponent-team'} opacity-50`)}>
+      <div className={cn('player-card player-card-empty', isUserTeam ? 'user-team' : 'opponent-team', 'opacity-50')}>
         <div className="player-card-content">
           <div className="player-card-header">
-            <div className="player-name">Empty Slot</div>
-          </div>
-          <div className="player-card-body">
-            <div className="text-muted-foreground/60 text-xs">No player assigned</div>
+            <div className="player-header-left">
+              <div className="player-name">Empty</div>
+              <div className="hidden lg:block text-white/55 text-xs">No player assigned</div>
+            </div>
           </div>
         </div>
       </div>
@@ -249,7 +255,10 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
         `player-card ${isUserTeam ? 'user-team' : 'opponent-team'} cursor-pointer relative`,
         !isBench && positionColors,
         player.isToday && !isBench && 'ring-2 ring-primary/30',
-        isBench && 'opacity-40 grayscale bg-muted/50 border-muted',
+        // Bench: subdued, still legible. The old opacity-40 + grayscale left
+        // a bench row at ~2:1 — a manager checking whether the guy on the
+        // bench is outscoring the guy in the lineup could not read either.
+        isBench && 'opacity-70 bg-muted/50 border-muted',
         player.wasDropped && !isBench && 'border-pastel-orange/30 bg-pastel-orange/5 opacity-95'
       )}
       onClick={() => onPlayerClick?.(player)}
@@ -284,8 +293,10 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                 </Badge>
               ) : null}
             </div>
-            {/* Team Name - Below player name */}
-            <div className="flex items-center gap-1">
+            {/* Team Name - Below player name. `player-meta-row` lets the
+                mobile stylesheet right-align this line on the opponent
+                (mirrored) card. */}
+            <div className="player-meta-row flex items-center gap-1">
               {player.team && (
                 <span className="player-team-name" title={player.team}>
                   {player.team}
@@ -659,75 +670,86 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
         )}
       </div>
       
-      {/* Benched Overlay - Show if player is on bench and has daily stats */}
-      {isBench && hasDailyStats && dailyTotalPoints > 0 && (
-        <div className="absolute inset-0 bg-muted/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg pointer-events-none">
-          <div className="text-center p-4">
-            <div className="text-sm font-bold text-muted-foreground mb-1">BENCHED</div>
-            <div className="text-xs text-muted-foreground">
-              {dailyTotalPoints.toFixed(1)} pts today
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              Points don't count toward total
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Mobile-only score stack (2026-09-01) — sits at the gutter beside the
+          slot chip on BOTH cards (the opponent card is mirrored by the
+          stylesheet, so this block is the innermost element on each side).
 
-      {/* Mobile-only score display - Show "No game" when no game, or daily points/weekly total */}
-      {/* Tappable: daily points open scoring breakdown, projected points open projection breakdown */}
-      <div className="player-mobile-score lg:hidden">
+          One colour pair, app-wide: sage = a number that has happened
+          (live/final), orange = a number that is still a forecast. Once a
+          game is live or final the actual sits over "proj 4.2" so the beat
+          / miss reads at a glance. Bench rows carry cream — no state colour,
+          because the number does not count. Tappable: the actual opens the
+          scoring breakdown, the projection opens the projection breakdown. */}
+      <div
+        className={cn(
+          'player-mobile-score lg:hidden flex flex-col justify-center leading-none',
+          isUserTeam ? 'items-end text-right' : 'items-start text-left',
+        )}
+        data-side={isUserTeam ? 'user' : 'opponent'}
+      >
         {!hasGameOnDate && !hasDailyStats ? (
-          // No game today and no daily stats - show "No game" instead of 0.0
-          <span className="text-white/50 text-[10px] font-semibold italic">
+          // No game on this date and nothing scored — say so, not "0.0".
+          <span className="player-score-none text-white/55 text-[10px] font-display italic leading-none">
             No game
           </span>
-        ) : shouldShowDailyPoints && dailyTotalPoints > 0 ? (
-          // Has game that's final/live with points - tappable daily points
-          <div className="flex flex-col items-end">
+        ) : shouldShowDailyPoints ? (
+          // Live / final / started: the actual number, tappable when a
+          // breakdown exists, over the projection it is measured against.
+          <>
             {player.daily_stats_breakdown && Object.keys(player.daily_stats_breakdown).length > 0 ? (
               <PointsTooltip
                 breakdown={player.daily_stats_breakdown}
                 totalPoints={dailyTotalPoints}
-              />
+              >
+                <span className={cn(SCORE_ACTUAL_CLASS, isBench ? 'text-pastel-cream' : 'text-pastel-sage', 'cursor-pointer')}>
+                  {dailyTotalPoints.toFixed(1)}
+                </span>
+              </PointsTooltip>
             ) : (
-              <span className="text-pastel-sage font-black text-xs">
+              <span className={cn(SCORE_ACTUAL_CLASS, isBench ? 'text-pastel-cream' : 'text-pastel-sage')}>
                 {dailyTotalPoints.toFixed(1)}
               </span>
             )}
-            <span className="text-[8px] text-pastel-sage/70 font-semibold">Daily</span>
-          </div>
-        ) : shouldShowDailyPoints ? (
-          // Has game that's final/live but 0 points
-          <div className="flex flex-col items-end">
-            <span className="text-white/60 font-bold text-xs">
-              0.0
-            </span>
-            <span className="text-[8px] text-white/55 font-medium">Daily</span>
-          </div>
+            {hasProjection ? (
+              <span className="player-score-proj font-jbmono tabular-nums text-[10px] leading-none mt-1 text-white/55">
+                <span className="uppercase tracking-[0.22em]">proj</span> {projectedPoints.toFixed(1)}
+              </span>
+            ) : (
+              <span className="player-score-label font-jbmono uppercase tracking-[0.22em] text-[10px] leading-none mt-1 text-white/55">
+                {isGameLive || (gameHasStarted && !isGameFinal) ? 'live' : 'final'}
+              </span>
+            )}
+          </>
         ) : hasProjection && projectedPoints > 0 ? (
-          // Has upcoming game with projection - tappable to see breakdown
-          <div className="flex flex-col items-end">
+          // Yet to play: the forecast, tappable for its breakdown.
+          <>
             {isGoalie ? (
               <GoalieProjectionTooltip projection={player.goalieProjection}>
-                <span className="text-pastel-orange font-black text-xs cursor-pointer">
+                <span className={cn(SCORE_ACTUAL_CLASS, isBench ? 'text-pastel-cream' : 'text-pastel-orange', 'cursor-pointer')}>
                   {projectedPoints.toFixed(1)}
                 </span>
               </GoalieProjectionTooltip>
             ) : (
               <ProjectionTooltip projection={player.daily_projection}>
-                <span className="text-pastel-orange font-black text-xs cursor-pointer">
+                <span className={cn(SCORE_ACTUAL_CLASS, isBench ? 'text-pastel-cream' : 'text-pastel-orange', 'cursor-pointer')}>
                   {projectedPoints.toFixed(1)}
                 </span>
               </ProjectionTooltip>
             )}
-            <span className="text-[8px] text-pastel-orange/70 font-semibold">Proj</span>
-          </div>
+            <span className="player-score-label font-jbmono uppercase tracking-[0.22em] text-[10px] leading-none mt-1 text-white/55">
+              proj
+            </span>
+          </>
         ) : (
-          // Has game but no projection yet (TBD)
-          <span className="text-pastel-cream/80 text-[10px] font-semibold">
-            TBD
-          </span>
+          // Has a game but no projection yet.
+          <>
+            <span className="player-score-tbd font-jbmono text-[13px] font-bold leading-none text-pastel-cream/80">
+              TBD
+            </span>
+            <span className="player-score-label font-jbmono uppercase tracking-[0.22em] text-[10px] leading-none mt-1 text-white/55">
+              proj
+            </span>
+          </>
         )}
       </div>
     </div>
