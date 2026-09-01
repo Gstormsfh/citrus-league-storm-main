@@ -14,6 +14,7 @@ import { LeagueService } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { WaiverService } from '@/services/WaiverService';
 import Navbar from '@/components/Navbar';
+import MobileMenuButton from '@/components/MobileMenuButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1006,8 +1007,10 @@ const Profile = () => {
             LeagueDashboard); Profile now matches. */}
         <div className="hidden lg:block"><Navbar /></div>
         <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-          <div className="flex items-center justify-center h-12 px-4">
+          <div className="flex items-center justify-between h-12 px-4">
+            <div className="w-10" />
             <h1 className="text-lg font-bold text-pastel-cream">Profile</h1>
+            <MobileMenuButton />
           </div>
         </div>
         <main className="w-full pt-6 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
@@ -1048,8 +1051,10 @@ const Profile = () => {
           the sticky safe-area header + bottom nav. */}
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-center h-12 px-4">
+        <div className="flex items-center justify-between h-12 px-4">
+          <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Profile</h1>
+          <MobileMenuButton />
         </div>
       </div>
       <main className="w-full pt-6 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
