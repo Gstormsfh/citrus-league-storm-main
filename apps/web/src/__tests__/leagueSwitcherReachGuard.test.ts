@@ -6,12 +6,18 @@
  * creation affordance off the bottom of the screen with no way to
  * scroll to it.
  *
- * The contract, for BOTH the desktop and mobile-menu variants:
+ * Three variants exist and ALL must hold the contract: the desktop rail
+ * and mobile-menu dropdowns in Navbar.tsx, plus the plain-button
+ * switcher inside the full-screen menu in MobileMenuButton.tsx (core
+ * pages hide the Navbar below lg, so the hamburger menu on iOS is
+ * MobileMenuButton — the variant the first fix missed).
+ *
+ * The contract, for EVERY variant:
  *   1. Create / Join League sits ABOVE the league list — reachable at
  *      any league count.
  *   2. The league list itself is height-capped and scrolls on its own.
  *
- * jsdom has no layout engine; these are source contracts on Navbar.tsx.
+ * jsdom has no layout engine; these are source contracts.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -19,45 +25,65 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const NAVBAR = readFileSync(resolve(here, '../components/Navbar.tsx'), 'utf-8');
 
-// Each switcher block runs from its "My Leagues" label to its closing
-// DropdownMenuContent. Two variants exist (desktop rail + mobile menu).
-function switcherBlocks(): string[] {
+const SOURCES = [
+  {
+    file: 'Navbar.tsx',
+    text: readFileSync(resolve(here, '../components/Navbar.tsx'), 'utf-8'),
+    // Radix dropdown variants close with DropdownMenuContent.
+    endMarker: '</DropdownMenuContent>',
+    minBlocks: 2, // desktop rail + mobile-menu overlay
+  },
+  {
+    file: 'MobileMenuButton.tsx',
+    text: readFileSync(resolve(here, '../components/MobileMenuButton.tsx'), 'utf-8'),
+    // Plain-button switcher ends where the nav-link section begins.
+    endMarker: 'Nav links',
+    minBlocks: 1, // full-screen menu switcher
+  },
+] as const;
+
+// Each switcher block runs from its "My Leagues" label to the variant's
+// end marker (or EOF — the reach assertions still bind on the slice).
+function switcherBlocks(text: string, endMarker: string): string[] {
   const blocks: string[] = [];
   let from = 0;
   for (;;) {
-    const start = NAVBAR.indexOf('My Leagues ({userLeagues.length})', from);
+    const start = text.indexOf('My Leagues ({userLeagues.length})', from);
     if (start === -1) break;
-    const end = NAVBAR.indexOf('</DropdownMenuContent>', start);
-    blocks.push(NAVBAR.slice(start, end === -1 ? undefined : end));
+    const end = text.indexOf(endMarker, start);
+    blocks.push(text.slice(start, end === -1 ? undefined : end));
     from = start + 1;
   }
   return blocks;
 }
 
 describe('the league switcher never buries Create / Join League', () => {
-  const blocks = switcherBlocks();
-
-  it('both switcher variants exist', () => {
-    expect(blocks.length, 'expected the desktop and mobile switchers').toBeGreaterThanOrEqual(2);
+  const labeled = SOURCES.flatMap(({ file, text, endMarker, minBlocks }) => {
+    const blocks = switcherBlocks(text, endMarker);
+    return { file, blocks, minBlocks };
   });
 
-  it.each(blocks.map((b, i) => [i, b] as const))(
-    'variant %i pins the action above the league list',
-    (_i, block) => {
-      const action = block.indexOf('Create / Join League');
-      const list = block.indexOf('{userLeagues.map(');
-      expect(action, 'Create / Join League missing from switcher').toBeGreaterThan(-1);
-      expect(list, 'league list missing from switcher').toBeGreaterThan(-1);
-      expect(action, 'the creation affordance must precede the league list').toBeLessThan(list);
+  it.each(labeled.map(({ file, blocks, minBlocks }) => [file, blocks.length, minBlocks] as const))(
+    '%s renders its switcher variant(s)',
+    (_file, count, minBlocks) => {
+      expect(count, 'expected every switcher variant to exist').toBeGreaterThanOrEqual(minBlocks);
     },
   );
 
-  it.each(blocks.map((b, i) => [i, b] as const))(
-    'variant %i caps and scrolls the league list',
-    (_i, block) => {
-      expect(block).toMatch(/max-h-\[min\(50vh,320px\)\] overflow-y-auto/);
-    },
+  const flat = labeled.flatMap(({ file, blocks }) =>
+    blocks.map((block, i) => [`${file} variant ${i}`, block] as const),
   );
+
+  it.each(flat)('%s pins the action above the league list', (_label, block) => {
+    const action = block.indexOf('Create / Join League');
+    const list = block.indexOf('{userLeagues.map(');
+    expect(action, 'Create / Join League missing from switcher').toBeGreaterThan(-1);
+    expect(list, 'league list missing from switcher').toBeGreaterThan(-1);
+    expect(action, 'the creation affordance must precede the league list').toBeLessThan(list);
+  });
+
+  it.each(flat)('%s caps and scrolls the league list', (_label, block) => {
+    expect(block).toMatch(/max-h-\[min\(50vh,320px\)\] overflow-y-auto/);
+  });
 });

@@ -199,6 +199,19 @@ const MobileMenuButton = () => {
                     <div className="px-3 py-2 text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold border-b border-white/10">
                       My Leagues ({userLeagues.length})
                     </div>
+                    {/* SWITCHER REACH (2026-09-01): the creation affordance is
+                        pinned directly under the label, before any league rows.
+                        It used to sit last — twelve leagues pushed it past the
+                        panel's clipped bottom edge with no way to reach it. The
+                        rows scroll inside their own capped box below. */}
+                    <button
+                      className="focus-citrus flex items-center gap-3 w-full px-3 py-3 text-left active:bg-white/[0.08] transition-colors text-pastel-orange-soft font-bold border-b border-white/10"
+                      onClick={() => { navigate('/create-league'); closeMenu(); }}
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      <span className="text-sm">Create / Join League</span>
+                    </button>
+                    <div className="max-h-[min(50vh,320px)] overflow-y-auto overscroll-contain">
                     {userLeagues.map((l) => {
                       const lType = getLeagueTypeFromSettings(l.settings as Record<string, unknown>);
                       const isActive = activeLeagueId === l.id;
@@ -242,13 +255,7 @@ const MobileMenuButton = () => {
                         </button>
                       );
                     })}
-                    <button
-                      className="focus-citrus flex items-center gap-3 w-full px-3 py-3 text-left active:bg-white/[0.08] transition-colors text-pastel-orange-soft font-bold"
-                      onClick={() => { navigate('/create-league'); closeMenu(); }}
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      <span className="text-sm">Create / Join League</span>
-                    </button>
+                    </div>
                   </div>
                 )}
               </div>
