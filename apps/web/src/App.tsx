@@ -11,6 +11,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { StormyChatBubble } from "./components/StormyChatBubble";
 import MobileBottomNav from "./components/MobileBottomNav";
+import NativeBootSplash from "./components/NativeBootSplash";
 import { LeagueLoadErrorBanner } from "./components/LeagueLoadErrorBanner";
 import { CookieConsent } from "./components/CookieConsent";
 import ScrollToTop from "./components/ScrollToTop";
@@ -169,6 +170,8 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
+        {/* App-open motion for the native shell only; browsers skip it. */}
+        <NativeBootSplash />
         <AuthProvider>
           <TooltipProvider>
             <Toaster />

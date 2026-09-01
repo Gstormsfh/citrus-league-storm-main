@@ -2097,3 +2097,32 @@ body {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* ═══ Native boot splash (2026-09-01) ══════════════════════════════
+   The app-open motion for the iOS/Android shell (NativeBootSplash).
+   Purposeful and short per HIG: the mark assembles, the wordmark
+   settles, the halo breathes once. Reduced-motion collapses all of it
+   to a plain crossfade. */
+@keyframes citrus-boot-mark-in {
+  0% { opacity: 0; transform: scale(0.82); }
+  60% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes citrus-boot-word-in {
+  0%, 35% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes citrus-boot-halo-breathe {
+  0% { opacity: 0; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.citrus-boot-mark { animation: citrus-boot-mark-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.citrus-boot-word { animation: citrus-boot-word-in 900ms ease-out both; }
+.citrus-boot-halo { animation: citrus-boot-halo-breathe 1100ms ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .citrus-boot-mark,
+  .citrus-boot-word,
+  .citrus-boot-halo {
+    animation: none;
+  }
+}
