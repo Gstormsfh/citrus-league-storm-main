@@ -27,10 +27,26 @@ const here = dirname(fileURLToPath(import.meta.url));
 const SOURCE = readFileSync(resolve(here, '../pages/LeagueDashboard.tsx'), 'utf-8');
 
 describe('League HQ composition', () => {
-  it('never truncates the league name — two-line clamp at every breakpoint', () => {
-    const h1 = SOURCE.match(/<h1[^>]*>\{league\.name\}<\/h1>/)?.[0] ?? '';
-    expect(h1).toContain('line-clamp-2');
-    expect(h1).not.toContain('truncate');
+  // HQ MOBILE COMPOSITION (2026-09-01): league.name renders twice — once
+  // in the phone chrome bar (single line, may truncate: it's a 48px bar,
+  // the Sleeper pattern) and once as the page identity at sm+ (two-line
+  // clamp, never truncated).
+  const H1S = [...SOURCE.matchAll(/<h1[^>]*>\{league\.name\}<\/h1>/g)].map((m) => m[0]);
+
+  it('the phone chrome bar carries the league name, not a generic label', () => {
+    expect(H1S.length, 'chrome-bar h1 + page h1').toBeGreaterThanOrEqual(2);
+    expect(SOURCE).not.toContain('>League</h1>');
+  });
+
+  it('the page-identity heading clamps at two lines and never truncates', () => {
+    const pageH1 = H1S.find((h) => h.includes('font-calistoga')) ?? '';
+    expect(pageH1).toContain('line-clamp-2');
+    expect(pageH1).not.toContain('truncate');
+  });
+
+  it('phones skip the duplicate mega header — identity lives in the chrome bar', () => {
+    const pageH1 = H1S.find((h) => h.includes('font-calistoga')) ?? '';
+    expect(pageH1).toContain('hidden sm:block');
   });
 
   it('renders the three league-shape tiles as one row at every width', () => {

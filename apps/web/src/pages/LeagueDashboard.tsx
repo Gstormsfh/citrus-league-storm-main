@@ -715,23 +715,27 @@ const LeagueDashboard = () => {
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col">
       <div className="hidden lg:block"><Navbar /></div>
+      {/* HQ MOBILE COMPOSITION (2026-09-01, Sleeper pattern): the chrome
+          bar carries the league's identity on phones — not a generic
+          "League" label — so the page below can skip the duplicate mega
+          header and put the draft CTA above the fold. */}
       <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">League</h1>
+          <h1 className="text-lg font-bold text-pastel-cream truncate px-1">{league.name}</h1>
           <MobileMenuButton />
         </div>
       </div>
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
-            <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
+            <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2 pt-3 sm:pt-0">
 
               {/* Header */}
-          <div className="mb-8">
+          <div className="mb-5 sm:mb-8">
             <div className="flex items-center justify-between mb-4 gap-3">
               <div className="min-w-0">
-                <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5 flex items-center gap-2">
+                <div className="hidden sm:flex font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5 items-center gap-2">
                   <CupIcon className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
                   ✦ League HQ
                 </div>
@@ -742,7 +746,9 @@ const LeagueDashboard = () => {
                     because the center column shares the row with the settings
                     button. A league's identity outranks a tidy single line:
                     clamp at two lines at every breakpoint. */}
-                <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-tight mb-3 line-clamp-2 break-words">{league.name}</h1>
+                {/* Phones read the name from the chrome bar; the page-level
+                    identity block returns at sm+ where there is no bar. */}
+                <h1 className="hidden sm:block font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-tight mb-3 line-clamp-2 break-words">{league.name}</h1>
                 <div className="flex items-center gap-2 flex-wrap">
                   {(() => {
                     const status = league.draft_status;
@@ -1637,7 +1643,7 @@ Your Commissioner`);
           </div>
 
           {/* Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5 sm:gap-4 sm:mb-8">
             {/* Draft Room - visible to ALL league members based on draft status */}
             {league.draft_status !== 'completed' && (
               <Card className={
