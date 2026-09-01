@@ -242,16 +242,23 @@ const LeagueDashboard = () => {
         setRosterSlotSettings(defaults);
       }
 
-      // Load teams
-      const { teams: teamsData, error: teamsError } = await LeagueService.getLeagueTeams(leagueId);
+      // Load the league's teams and the user's team in PARALLEL
+      // (2026-09-01 efficiency pass): both need only leagueId/user.id,
+      // which are already known — running them one after another put a
+      // full extra network round trip in front of first paint on the
+      // page the native app BOOTS into.
+      const [teamsResult, userTeamResult] = await Promise.all([
+        LeagueService.getLeagueTeams(leagueId),
+        LeagueService.getUserTeam(leagueId, user.id),
+      ]);
+      const { teams: teamsData, error: teamsError } = teamsResult;
       if (teamsError) {
         logger.error('Error loading teams:', teamsError);
         throw teamsError;
       }
       setTeams(teamsData || []);
 
-      // Load user's team
-      const { team: userTeamData } = await LeagueService.getUserTeam(leagueId, user.id);
+      const { team: userTeamData } = userTeamResult;
       setUserTeam(userTeamData);
 
       // One request, so the dashboard can tell "draft says complete AND a roster
