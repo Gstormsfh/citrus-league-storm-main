@@ -279,6 +279,25 @@ export const StormyChatBubble = () => {
     }
   }, [inputValue, isLoading, buildContext]);
 
+  // ── Draft rooms: stand down ────────────────────────────────────
+  //
+  // MOBILE PASS (2026-09-01, iPhone 17 Pro sim): the FAB is a fixed
+  // 56px circle at the bottom-LEFT (moved there 2026-08-23 because the
+  // right edge ate row actions) — and in the draft room the bottom-left
+  // is the player list. Screenshotted sitting directly on top of pool
+  // rows while the founder was trying to pick under a live clock.
+  //
+  // A draft is the one screen where a misclick has a shot clock, the
+  // screen real-estate budget is zero, and the on-clock action bar now
+  // owns the bottom edge (DraftRoomV2 MainTabs). Stormy stays reachable
+  // everywhere else; an in-room draft copilot is a designed surface for
+  // later (integrated panel, not a floating circle over the pool).
+  // Placed after every hook call — rules of hooks — and before either
+  // render branch so both the FAB and the open card stand down.
+  if (/^\/(draft|draft-v2|draft-room)(\/|$)/.test(location.pathname)) {
+    return null;
+  }
+
   // ── Closed State (FAB) ─────────────────────────────────────────
 
   if (!isOpen) {

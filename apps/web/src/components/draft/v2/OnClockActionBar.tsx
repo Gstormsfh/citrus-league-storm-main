@@ -69,11 +69,17 @@ export interface OnClockActionBarProps {
   isSubmitPending?: boolean;
 }
 
+// MOBILE PASS (2026-09-01): mm:ss, minutes padded — the SAME format
+// DraftTimerV2 renders. The two countdowns share every other display
+// decision (ceil rounding, offset correction, pickTimeLimitSec clamp);
+// the format was the last visible difference between them ("00:19" in
+// the header vs "0:20" in the bar reads as two different clocks even
+// when the value agrees).
 function formatCountdown(secondsRemaining: number): string {
-  if (secondsRemaining <= 0) return '0:00';
+  if (secondsRemaining <= 0) return '00:00';
   const m = Math.floor(secondsRemaining / 60);
   const s = secondsRemaining % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 export function OnClockActionBar({

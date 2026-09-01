@@ -70,14 +70,6 @@ const normalizePosition = (pos: string): string => {
   return upper;
 };
 
-/** "Nathan MacKinnon" -> "N. MacKinnon" — first initial + full last name
- * (multi-word surnames keep every word: "J. van Riemsdyk"). */
-const shortName = (full: string): string => {
-  const parts = (full || '').trim().split(/\s+/);
-  if (parts.length < 2) return full;
-  return `${parts[0][0]}. ${parts.slice(1).join(' ')}`;
-};
-
 export const PlayerPool = memo(({
   onPlayerSelect,
   onPlayerDraft,
@@ -348,7 +340,12 @@ export const PlayerPool = memo(({
             {isInQueue && (
               <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary" />
             )}
-            <span className="font-medium text-sm truncate max-w-[140px]">{shortName(player.full_name)}</span>
+            {/* FULL NAMES (2026-09-01): was an initial-plus-surname
+                abbreviation squeezed into a 140px box — "C. Mc…" in a
+                1400px-wide table. The sticky name column affords the
+                real name; 190px covers the longest names in the league
+                before truncation even starts. */}
+            <span className="font-medium text-sm truncate max-w-[190px]">{player.full_name}</span>
           </div>
         </td>
         <td className="px-2 py-1.5 text-pastel-cream">
@@ -629,19 +626,31 @@ export const PlayerPool = memo(({
                     onError={(e) => { e.currentTarget.style.display = 'none'; }}
                   />
                 )}
+                {/* FULL NAMES (2026-09-01, iPhone 17 Pro sim): the name
+                    line used to carry rank + star + an abbreviated name +
+                    position badge + team all at once, so "Connor McDavid"
+                    rendered as "C. Mc…" — an abbreviation of an
+                    abbreviation. The name now owns line one alone;
+                    position and team open the stat line, where they read
+                    as identity context instead of competing for the same
+                    pixels as the name. */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[9px] font-mono font-bold text-pastel-cream/40 flex-shrink-0">{index + 1}</span>
+                    <span className="w-4 flex-shrink-0 text-right text-[9px] font-mono font-bold text-pastel-cream/40">{index + 1}</span>
                     {isInQueue && <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary flex-shrink-0" />}
-                    <span className="font-semibold text-[13px] text-pastel-cream truncate">{shortName(player.full_name)}</span>
-                    <Badge variant="outline" className="text-[9px] px-1 py-0 flex-shrink-0">{normalizePosition(player.position)}</Badge>
-                    <span className="text-[10px] text-pastel-cream/55 flex-shrink-0 hidden min-[400px]:inline">{player.team}</span>
+                    <span className="min-w-0 truncate font-semibold text-[13px] text-pastel-cream">{player.full_name}</span>
                   </div>
-                  <div className="mt-0.5 text-[11px] text-pastel-cream/60 tabular-nums truncate">
+                  <div className="mt-0.5 pl-[22px] text-[11px] text-pastel-cream/60 tabular-nums truncate">
+                    <span className="font-semibold text-pastel-cream/80">
+                      {player.eligible_positions && player.eligible_positions.length > 1
+                        ? player.eligible_positions.join('/')
+                        : normalizePosition(player.position)}
+                    </span>
+                    {player.team ? ` · ${player.team}` : ''}
                     {player.position === 'G' ? (
-                      <>{player.wins || 0} W · {player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'} GAA · {player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'} SV% · {player.shutouts || 0} SO</>
+                      <> · {player.wins || 0} W · {player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'} GAA · {player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'} SV%</>
                     ) : (
-                      <>{player.goals} G · {player.assists} A · {player.points} PTS · {player.shots} SOG</>
+                      <> · {player.goals} G · {player.assists} A · {player.points} PTS</>
                     )}
                   </div>
                 </div>
@@ -727,7 +736,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'projRank' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th className="px-2 py-2 text-left font-semibold text-pastel-cream sticky left-[44px] bg-pastel-surface-high z-10 min-w-[160px]">Player</th>
+                <th className="px-2 py-2 text-left font-semibold text-pastel-cream sticky left-[44px] bg-pastel-surface-high z-10 min-w-[190px]">Player</th>
                 <th className="px-2 py-2 text-left font-semibold text-pastel-cream">Pos</th>
                 <th className="px-2 py-2 text-left font-semibold text-pastel-cream">Team</th>
                 <th className="px-2 py-2 text-center font-semibold text-pastel-cream">GP</th>
