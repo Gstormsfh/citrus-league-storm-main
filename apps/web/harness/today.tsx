@@ -8,6 +8,9 @@
  * Fill sheet with the bench players eligible for that slot.
  *
  * `?fill=slot-LW-1` opens the Fill sheet on load so a driver can screenshot it.
+ * `?auto=1` opens the Auto Lineup preview (audit R6) on load: the plan is
+ * computed by the real planner over this roster, with the Oilers locked, so
+ * the sheet shows locked players held in place and Apply moves the rows.
  * `window.__log` records every callback, in order.
  */
 import { createRoot } from 'react-dom/client';
@@ -15,6 +18,8 @@ import { useMemo, useState } from 'react';
 import '../src/index.css';
 import MobileRosterList from '../src/components/roster/MobileRosterList';
 import { FillSlotSheet } from '../src/components/roster/FillSlotSheet';
+import { AutoLineupSheet, type AutoLineupScope } from '../src/components/roster/AutoLineupSheet';
+import { planAutoLineup, BENCH } from '../src/components/roster/autoLineup';
 import { TodayStrip } from '../src/components/roster/TodayStrip';
 import { computeTodaySummary } from '../src/components/roster/todaySummary';
 import { Toaster } from '../src/components/ui/toaster';
@@ -80,6 +85,8 @@ function App() {
   const [assign, setAssign] = useState<Record<string, string>>(INITIAL);
   const [selected, setSelected] = useState<string | number | null>(null);
   const [fillSlotId, setFillSlotId] = useState<string | null>(new URLSearchParams(location.search).get('fill'));
+  const [autoOpen, setAutoOpen] = useState(new URLSearchParams(location.search).get('auto') === '1');
+  const [autoScope, setAutoScope] = useState<AutoLineupScope>('day');
 
   const all = Object.values(P);
   const starters = all.filter((p) => (assign[p.id] || '').startsWith('slot-'));
@@ -97,6 +104,15 @@ function App() {
     const slots = ['slot-C-1', 'slot-C-2', 'slot-LW-1', 'slot-LW-2', 'slot-RW-1', 'slot-RW-2', 'slot-D-1', 'slot-D-2', 'slot-D-3', 'slot-D-4', 'slot-G-1', 'slot-G-2', 'slot-UTIL', 'bench-grid'];
     return new Set(slots.filter((s) => eligibleFor(p, s)));
   }, [selected, all]);
+
+  const autoPlan = useMemo(
+    () =>
+      planAutoLineup(
+        { starters, bench, slotAssignments: assign },
+        { slotCounts: { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 }, positionType: 'individual', lockedPlayerIds: LOCKED },
+      ),
+    [starters, bench, assign],
+  );
 
   const fillCandidates = useMemo(() => {
     if (!fillSlotId) return [];
@@ -131,7 +147,7 @@ function App() {
         Today strip states @ 393
       </p>
       <div data-testid="strip-live">
-        <TodayStrip summary={summary} dayLabel="Today" editable onAutoLineup={() => log('autoLineup')} />
+        <TodayStrip summary={summary} dayLabel="Today" editable onAutoLineup={() => { log('autoLineup'); setAutoOpen(true); }} />
       </div>
       <div data-testid="strip-calm">
         <TodayStrip
@@ -189,6 +205,25 @@ function App() {
         open={fillSlotId != null}
         onOpenChange={(next) => { if (!next) { log('fillCancel'); setFillSlotId(null); } }}
         onPick={(id) => { if (fillSlotId) move(String(id), fillSlotId); setFillSlotId(null); }}
+      />
+      <AutoLineupSheet
+        open={autoOpen}
+        onOpenChange={(next) => { if (!next) { log('autoCancel'); setAutoOpen(false); } }}
+        scope={autoScope}
+        onScopeChange={setAutoScope}
+        dayLabel="Today"
+        day={autoPlan}
+        weekAvailable
+        week={autoScope === 'week' ? [{ date: '2026-10-14', label: 'Today', plan: autoPlan }] : null}
+        onApply={() => {
+          log(`autoApply:${autoPlan.moves.length}`);
+          setAssign(() => {
+            const next: Record<string, string> = {};
+            for (const [id, slot] of Object.entries(autoPlan.lineup.slotAssignments)) if (slot !== BENCH) next[id] = slot;
+            return next;
+          });
+          setAutoOpen(false);
+        }}
       />
     </div>
   );

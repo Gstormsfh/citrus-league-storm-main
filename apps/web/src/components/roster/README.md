@@ -89,6 +89,23 @@ pieces: `Mug` (headshot → crest → initials, fixed box, lazy; also every
 mobile roster and matchup row), `tonight()` (live vs projected number),
 `chipClassFor()` / `slotLabel()`.
 
+### AutoLineupSheet + `planAutoLineup`
+Auto Lineup previews before it saves (Yahoo's Start Active Players and
+ESPN's Quick Lineup both fire blind). `autoLineup.ts` is the pure planner:
+locked players are PINNED — a locked starter keeps his slot, a locked bench
+player stays benched — and the rest are matched to the open slots exactly
+(maximum-weight assignment: a game outranks no game, then projection, with
+small bonuses for filling a slot and for staying put so nothing shuffles for
++0.1 and slot numbers never change on their own). It returns the moves,
+the projected total before and after, and who was pinned. The sheet reads
+that: `3 moves · proj +2.4`, one row per move (`C1 → BN  Player  4.8`), a
+`Today` / `Rest of week` toggle, `Apply` / `Keep current`; zero moves is
+"Lineup already optimal". Rest of week plans each remaining day of the
+matchup week against that day's projections and that day's lineup on record
+and saves them one after another through `rosterApi.saveLineup`. The server
+refuses any save that moves a locked player (409, naming him) — see
+`server/src/services/LineupService.findLockedLineupChanges`.
+
 ### TodayStrip + `computeTodaySummary`
 The game-day readout beneath the day selector — `9/13 starters play · 2 on
 bench with games · proj 41.6 · 3 locked`. Pure arithmetic over the page's

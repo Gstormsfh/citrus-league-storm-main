@@ -31,6 +31,9 @@ import MobileRosterList from '@/components/roster/MobileRosterList';
 import { FillSlotSheet } from '@/components/roster/FillSlotSheet';
 import { TodayStrip } from '@/components/roster/TodayStrip';
 import { computeTodaySummary } from '@/components/roster/todaySummary';
+import { AutoLineupSheet, type AutoLineupDay, type AutoLineupScope } from '@/components/roster/AutoLineupSheet';
+import { planAutoLineup, type AutoLineupPlan } from '@/components/roster/autoLineup';
+import { ApiError } from '@/api/client';
 import MobileMenuButton from '@/components/MobileMenuButton';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useToast } from '@/hooks/use-toast';
@@ -238,6 +241,18 @@ interface RosterState {
   ir: HockeyPlayer[];
   slotAssignments: Record<string, string>; // Changed key to string to support UUIDs
 }
+
+/** One day of a rest-of-week Auto Lineup plan; IR rides along so the save is a whole lineup. */
+type WeekDayPlan = AutoLineupDay & { ir: HockeyPlayer[] };
+
+/** 'Today', or the day the way the strip and the sheet name it: 'Tue Oct 14'. */
+const dayLabelFor = (dateStr: string): string => {
+  if (dateStr === getTodayMST()) return 'Today';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d)
+    .toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    .replace(',', '');
+};
 
 const Roster = () => {
   const { user } = useAuth();
@@ -2070,15 +2085,7 @@ const Roster = () => {
     [displayRoster, starterSlotCount, lockedPlayerIds, isPastDate],
   );
 
-  const stripDayLabel = useMemo(() => {
-    const today = getTodayMST();
-    const target = selectedDate || today;
-    if (target === today) return 'Today';
-    const [y, m, d] = target.split('-').map(Number);
-    return new Date(y, m - 1, d)
-      .toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-      .replace(',', '');
-  }, [selectedDate]);
+  const stripDayLabel = useMemo(() => dayLabelFor(selectedDate || getTodayMST()), [selectedDate]);
 
   const showTodayStrip =
     !rosterDisplayLoading &&
@@ -2351,179 +2358,302 @@ const Roster = () => {
     }
   }, [searchParams, loading, userTeamId]);
 
+  // ===========================================================================
+  // AUTO LINEUP (2026-09-01, Sleeper parity audit R6)
+  //
+  // Used to be a blind write: rebuild every slot from [...starters, ...bench],
+  // save, toast "Lineup Optimized". It never consulted `lockedPlayerIds`, so
+  // it could bench a starter whose game had begun — the one move the tap
+  // handlers refuse — and it said nothing about what it had changed.
+  //
+  // Now the button opens a sheet. `planAutoLineup` (pure, tested) pins every
+  // locked player where he is and finds the best legal lineup for the rest,
+  // reading `displayRoster` — the enriched view that knows who plays on the
+  // selected date and for how much; `roster` state carries projectedPoints:
+  // 0 for everyone. The sheet lists the moves with the projected gain, and
+  // only Apply saves. "Rest of week" plans each remaining day of the matchup
+  // week against that day's projections and that day's lineup on record,
+  // then saves them one after another with a single summary toast.
+  // ===========================================================================
+  const [autoSheetOpen, setAutoSheetOpen] = useState(false);
+  const [autoScope, setAutoScope] = useState<AutoLineupScope>('day');
+  const [autoWeek, setAutoWeek] = useState<WeekDayPlan[] | null>(null);
+  const [autoWeekLoading, setAutoWeekLoading] = useState(false);
+  const [autoWeekError, setAutoWeekError] = useState<string | null>(null);
+  const [autoApplying, setAutoApplying] = useState(false);
+
+  /** Starter slots per position, UTIL included — the planner's view of POSITION_SLOTS. */
+  const slotCounts = useMemo(
+    () => Object.fromEntries(Object.entries(POSITION_SLOTS).map(([pos, s]) => [pos, s.maxPlayers ?? 0])) as Record<string, number>,
+    [POSITION_SLOTS],
+  );
+
+  /** The day the single-day plan (and the day strip) is about. */
+  const autoTargetDate = selectedDate || getTodayMST();
+
+  /** Today's plan, live: if a lock lands while the sheet is open, the preview follows. */
+  const dayPlan = useMemo<AutoLineupPlan | null>(() => {
+    if (!autoSheetOpen) return null;
+    return planAutoLineup(
+      { starters: displayRoster.starters, bench: displayRoster.bench, slotAssignments: displayRoster.slotAssignments },
+      { slotCounts, positionType: leaguePositionType, lockedPlayerIds: isPastDate ? undefined : lockedPlayerIds },
+    );
+  }, [autoSheetOpen, displayRoster, slotCounts, leaguePositionType, lockedPlayerIds, isPastDate]);
+
+  /** The matchup week's days that are still ahead — Rest of week's scope. */
+  const autoWeekDates = useMemo(() => {
+    const today = getTodayMST();
+    return matchupWeekDates.filter((d) => d >= today);
+  }, [matchupWeekDates]);
+  const autoWeekAvailable = !!currentMatchup && autoWeekDates.length > 0;
+
   const handleAutoLineup = () => {
-    // Refuse to run against unloaded projections rather than no-op silently.
+    // Same gates as a manual move — a preview nobody may apply is noise.
+    if (bestBallEnabled) {
+      toast({ title: 'Best Ball League', description: 'Lineups are automatically optimized each day. No manual changes needed!' });
+      return;
+    }
+    if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') {
+      toast({ title: 'Demo League', description: 'Sign up to create your own league and make lineup changes!' });
+      return;
+    }
+    if (userTeam && isDemoLeague(userTeam.league_id)) {
+      toast({ title: 'Demo League - Read Only', description: 'Sign up to create your own league and make changes!' });
+      return;
+    }
+    if (isPastDate) {
+      toast({ title: 'Cannot Edit Past Dates', description: 'Rosters for past dates are frozen and cannot be changed.', variant: 'destructive' });
+      return;
+    }
+    // Refuse to plan against unloaded projections rather than preview a
+    // lineup in which nobody has a game.
     if (!projectionsReadyForSelectedDate) {
       toast({
         title: 'Projections still loading',
-        description: "Give it a second — optimizing now would keep your current lineup.",
+        description: 'Give it a second — the plan needs to know who plays.',
       });
       return;
     }
+    setAutoScope('day');
+    setAutoWeek(null);
+    setAutoWeekError(null);
+    setAutoSheetOpen(true);
+  };
 
-    // THE ENRICHMENT LIVES IN `displayRoster`, NOT IN `roster` STATE.
-    //
-    // `roster` is the structural source of truth; `displayRoster` is a
-    // useMemo that layers on the selected date's projections and game info
-    // at render time and never writes back. So `prev.starters` / `prev.bench`
-    // carry `projectedPoints: 0` for EVERY player (set in loadRoster, never
-    // updated) and a `nextGame` that reflects page-load time rather than the
-    // selected date.
-    //
-    // Sorting `prev` therefore compared 0 against 0 on every pair, and the
-    // games-today check only worked by accident on the load date. Stable sort
-    // + all-equal comparator = the lineup never changed. That is the
-    // "center with a game stays benched" bug.
-    //
-    // Fix: read both sort keys off the enriched view, keyed by player id.
-    const enrichedById = new Map<string | number, HockeyPlayer>();
-    for (const p of [...displayRoster.starters, ...displayRoster.bench]) {
-      enrichedById.set(p.id, p);
-    }
-    const enriched = (p: HockeyPlayer): HockeyPlayer => enrichedById.get(p.id) ?? p;
+  /**
+   * Projected points + has-a-game for one date, the way `displayRoster` does
+   * it for the selected date: a projection row IS the game. Opponent and
+   * time are not known for other days, so the sheet says "Has a game".
+   */
+  type ProjectionRowLite = { total_projected_points?: number | string | null };
+  const enrichForDate = (p: HockeyPlayer, projections: Map<number, ProjectionRowLite> | undefined): HockeyPlayer => {
+    const pid = typeof p.id === 'string' ? parseInt(p.id) : p.id;
+    const projection = projections?.get(pid);
+    if (!projection) return { ...p, nextGame: undefined, projectedPoints: 0 };
+    return {
+      ...p,
+      projectedPoints: Number(projection.total_projected_points || 0),
+      nextGame: { opponent: 'Game', isToday: true },
+    };
+  };
 
-    /** Explicit boolean — `nextGame.isToday` is tri-state (true/false/undefined). */
-    const hasGameToday = (p: HockeyPlayer): boolean =>
-      enriched(p).nextGame?.isToday === true;
+  /**
+   * Plan every remaining day of the week. The page holds projections for
+   * the selected date only (the Matchup page is the one that fetches all
+   * seven), so the other days are fetched here — deduped and cached by
+   * MatchupService, and remembered in `projectionsByDate` so tapping that
+   * day afterwards is instant. Each day starts from ITS lineup on record
+   * (fantasy_daily_rosters, else the base lineup), because days are
+   * independent; only today can carry locks.
+   */
+  const computeWeekPlans = async () => {
+    if (!userTeamId || !userTeam?.league_id || !currentMatchup) return;
+    const teamId = String(userTeamId);
+    const leagueId = userTeam.league_id;
+    const matchupId = currentMatchup.id;
+    const today = getTodayMST();
+    const dates = autoWeekDates;
+    setAutoWeekLoading(true);
+    setAutoWeekError(null);
+    try {
+      const allPlayers = [...roster.starters, ...roster.bench, ...roster.ir];
+      const ids = allPlayers
+        .map((p) => (typeof p.id === 'string' ? parseInt(p.id) : p.id))
+        .filter((n) => Number.isFinite(n) && n > 0);
 
-    const projectedFor = (p: HockeyPlayer): number =>
-      enriched(p).projectedPoints || 0;
-
-    setRoster((prev) => {
-      // 1. Gather all active players (exclude IR)
-      const allActivePlayers = [...prev.starters, ...prev.bench];
-
-      // 2. Sort: a player with a game ALWAYS outranks one without, whatever
-      //    the projections say. Projections only break ties inside a group.
-      const sortBestPlayers = (players: HockeyPlayer[]) => {
-        return [...players].sort((a, b) => {
-          const aPlays = hasGameToday(a);
-          const bPlays = hasGameToday(b);
-          if (aPlays !== bPlays) return aPlays ? -1 : 1;
-          return projectedFor(b) - projectedFor(a);
-        });
-      };
-
-      // 3. Get slot caps from league settings (POSITION_SLOTS) instead of hardcoded values
-      const posKeys = Object.keys(POSITION_SLOTS).filter(k => k !== 'UTIL');
-      const slotCaps: Record<string, number> = {};
-      for (const pos of posKeys) {
-        slotCaps[pos] = POSITION_SLOTS[pos as keyof typeof POSITION_SLOTS]?.maxPlayers ?? 0;
-      }
-      const utilCount = POSITION_SLOTS['UTIL' as keyof typeof POSITION_SLOTS]?.maxPlayers ?? 1;
-
-      // 4. Get all eligible positions for each player
-      const getPlayerPositions = (p: HockeyPlayer): string[] => {
-        if (p.eligible_positions && p.eligible_positions.length > 0) {
-          return [...new Set(p.eligible_positions.map(ep => getFantasyPosition(ep, leaguePositionType)))];
-        }
-        return [getFantasyPosition(p.position, leaguePositionType)];
-      };
-
-      // 5. Group by fantasy position (players appear in ALL eligible groups)
-      const grouped: Record<string, HockeyPlayer[]> = {};
-      for (const k of posKeys) grouped[k] = [];
-
-      allActivePlayers.forEach(p => {
-        const positions = getPlayerPositions(p);
-        for (const pos of positions) {
-          if (pos !== 'UTIL' && grouped[pos]) {
-            grouped[pos].push(p);
-          }
-        }
-      });
-
-      // Sort each group by projected points
-      for (const key of Object.keys(grouped)) {
-        grouped[key] = sortBestPlayers(grouped[key]);
-      }
-
-      // 6. Assign slots using two-pass approach
-      const newAssignments: Record<string, string> = {};
-      const newStarters: HockeyPlayer[] = [];
-      const newBench: HockeyPlayer[] = [];
-      const assignedIds = new Set<string | number>();
-
-      const assignToSlots = (players: HockeyPlayer[], slotPrefix: string, count: number) => {
-        let filled = 0;
-        for (const p of players) {
-          if (filled >= count || assignedIds.has(p.id)) continue;
-          const slotId = `${slotPrefix}-${filled + 1}`;
-          newAssignments[p.id] = slotId;
-          newStarters.push({ ...p, starter: true });
-          assignedIds.add(p.id);
-          filled++;
-        }
-      };
-
-      // First pass: assign primary position players
-      for (const pos of posKeys) {
-        assignToSlots(grouped[pos], `slot-${pos}`, slotCaps[pos] || 0);
-      }
-
-      // Second pass: fill empty position slots with multi-position eligible players
-      for (const pos of posKeys) {
-        const filled = Object.values(newAssignments).filter(s => s.startsWith(`slot-${pos}-`)).length;
-        if (filled >= (slotCaps[pos] || 0)) continue;
-        const candidates = sortBestPlayers(allActivePlayers.filter(p => {
-          if (assignedIds.has(p.id)) return false;
-          return getPlayerPositions(p).includes(pos);
-        }));
-        let slotIdx = filled;
-        for (const p of candidates) {
-          if (slotIdx >= (slotCaps[pos] || 0)) break;
-          newAssignments[p.id] = `slot-${pos}-${slotIdx + 1}`;
-          newStarters.push({ ...p, starter: true });
-          assignedIds.add(p.id);
-          slotIdx++;
-        }
-      }
-
-      // 7. Handle UTIL Slots (support multiple UTIL slots from league settings)
-      const utilCandidates = sortBestPlayers(
-        allActivePlayers.filter(p => !assignedIds.has(p.id) && getFantasyPosition(p.position, leaguePositionType) !== 'G')
+      const fetched = await Promise.all(
+        dates.map(async (date) => {
+          const have = projectionsByDate.get(date);
+          return [date, have ?? (await MatchupService.getDailyProjectionsForMatchup(ids, date))] as const;
+        }),
       );
-      for (let i = 0; i < utilCount; i++) {
-        const utilPlayer = utilCandidates[i];
-        if (!utilPlayer) break;
-        const slotId = utilCount === 1 ? 'slot-UTIL' : `slot-UTIL-${i + 1}`;
-        newAssignments[utilPlayer.id] = slotId;
-        newStarters.push({ ...utilPlayer, starter: true });
-        assignedIds.add(utilPlayer.id);
-      }
-
-      // 8. Remaining go to Bench
-      allActivePlayers.filter(p => !assignedIds.has(p.id)).forEach(p => {
-        newBench.push({ ...p, starter: false });
+      const projections = new Map<string, Map<number, ProjectionRowLite>>(fetched);
+      setProjectionsByDate((prev) => {
+        const next = new Map(prev);
+        for (const [date, map] of fetched) if (!next.has(date)) next.set(date, map);
+        return next;
       });
 
-      const updatedRoster = {
-        ...prev,
-        starters: newStarters,
-        bench: newBench,
-        slotAssignments: newAssignments
-      };
-
-      // Save lineup to Supabase (only for logged-in users, not demo league)
-      if (userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
-        LeagueService.saveLineup(userTeamId, userTeam.league_id, {
-          starters: newStarters.map(p => String(p.id)),
-          bench: newBench.map(p => String(p.id)),
-          ir: prev.ir.map(p => String(p.id)),
-          slotAssignments: newAssignments
-        }, selectedDate || getTodayMST()).catch(err => {
-          logger.error('Failed to save auto lineup:', err);
-          toast({ title: 'Save Failed', description: 'Lineup optimized locally but failed to save. Try again.', variant: 'destructive' });
-        });
+      // Today is the only day that can have a lock. The page's set is for the
+      // selected date; when that is another day, ask for today's directly.
+      let todayLocks = new Set<string>();
+      if (dates.includes(today)) {
+        todayLocks =
+          autoTargetDate === today
+            ? lockedPlayerIds
+            : await GameLockService.getLockedPlayerIds(allPlayers, new Date(today + 'T00:00:00'));
       }
 
-      return updatedRoster;
-    });
+      const byId = new Map(allPlayers.map((p) => [String(p.id), p]));
+      let base: { starters: string[]; bench: string[]; ir: string[]; slotAssignments: Record<string, string> } | null | undefined;
+      const baseLineup = async () => {
+        if (base === undefined) base = await LeagueService.getLineup(teamId, leagueId);
+        return base ?? { starters: [], bench: [], ir: [], slotAssignments: {} };
+      };
+      const toPlayers = (idList: string[]) =>
+        [...new Set(idList.map(String))].map((id) => byId.get(id)).filter((p): p is HockeyPlayer => !!p);
 
-    toast({
-      title: 'Lineup Optimized',
-      description: "Players with games start first, ranked by projection.",
-    });
+      const days: WeekDayPlan[] = [];
+      for (const date of dates) {
+        let current: RosterState;
+        if (date === autoTargetDate) {
+          // The day on screen: its lineup is the page's own, already enriched.
+          current = {
+            starters: displayRoster.starters,
+            bench: displayRoster.bench,
+            ir: displayRoster.ir,
+            slotAssignments: displayRoster.slotAssignments,
+          };
+        } else {
+          const daily = await LeagueService.loadDailyRoster(teamId, matchupId, date, allPlayers, false);
+          let structural: RosterState;
+          if (daily) {
+            structural = { starters: daily.starters, bench: [...daily.bench], ir: daily.ir, slotAssignments: { ...daily.slotAssignments } };
+          } else {
+            const b = await baseLineup();
+            structural = { starters: toPlayers(b.starters), bench: toPlayers(b.bench), ir: toPlayers(b.ir), slotAssignments: { ...b.slotAssignments } };
+          }
+          // Anyone on the roster but missing from the day's record sits on the
+          // bench — the same recovery loadRoster applies.
+          const seen = new Set([...structural.starters, ...structural.bench, ...structural.ir].map((p) => String(p.id)));
+          for (const p of allPlayers) if (!seen.has(String(p.id))) structural.bench.push(p);
+          const proj = projections.get(date);
+          current = {
+            starters: structural.starters.map((p) => enrichForDate(p, proj)),
+            bench: structural.bench.map((p) => enrichForDate(p, proj)),
+            ir: structural.ir,
+            slotAssignments: structural.slotAssignments,
+          };
+        }
+        const plan = planAutoLineup(
+          { starters: current.starters, bench: current.bench, slotAssignments: current.slotAssignments },
+          { slotCounts, positionType: leaguePositionType, lockedPlayerIds: date === today ? todayLocks : undefined },
+        );
+        days.push({ date, label: dayLabelFor(date), plan, ir: current.ir });
+      }
+      setAutoWeek(days);
+    } catch (err) {
+      logger.error('[Roster] Auto lineup week plan failed:', err);
+      setAutoWeekError("Couldn't load every day's projections. Try again in a moment.");
+    } finally {
+      setAutoWeekLoading(false);
+    }
+  };
+
+  const handleAutoScopeChange = (scope: AutoLineupScope) => {
+    setAutoScope(scope);
+    if (scope === 'week' && autoWeek === null && !autoWeekLoading) computeWeekPlans();
+  };
+
+  /**
+   * Save the previewed lineup(s) — straight through rosterApi so a refusal
+   * reaches the manager. (LeagueService.saveLineup swallows API errors into
+   * a localStorage fallback, which would turn the server's 409 for a locked
+   * player into a "saved" that never happened.)
+   */
+  const applyAutoLineup = async () => {
+    if (!userTeamId || !userTeam?.league_id || !dayPlan) return;
+    const teamId = String(userTeamId);
+    const leagueId = userTeam.league_id;
+    const targets: { date: string; plan: AutoLineupPlan; ir: HockeyPlayer[] }[] =
+      autoScope === 'week'
+        ? (autoWeek ?? []).map((d) => ({ date: d.date, plan: d.plan, ir: d.ir }))
+        : [{ date: autoTargetDate, plan: dayPlan, ir: roster.ir }];
+    const pending = targets.filter((t) => t.plan.moves.length > 0);
+    if (pending.length === 0) {
+      setAutoSheetOpen(false);
+      return;
+    }
+
+    setAutoApplying(true);
+    let saved = 0;
+    let moves = 0;
+    let gain = 0;
+    try {
+      for (const t of pending) {
+        await rosterApi.saveLineup(leagueId, teamId, {
+          starters: t.plan.lineup.starters.map((p) => String(p.id)),
+          bench: t.plan.lineup.bench.map((p) => String(p.id)),
+          ir: t.ir.map((p) => String(p.id)),
+          slot_assignments: t.plan.lineup.slotAssignments,
+          target_date: t.date,
+        });
+        saved++;
+        moves += t.plan.moves.length;
+        gain += t.plan.after - t.plan.before;
+        if (t.date === autoTargetDate) {
+          // Reflect the saved day in place — structural objects, not the
+          // enriched copies; displayRoster re-enriches on render.
+          setRoster((prev) => {
+            const byId = new Map([...prev.starters, ...prev.bench].map((p) => [String(p.id), p]));
+            const pick = (p: HockeyPlayer, starter: boolean): HockeyPlayer => ({ ...(byId.get(String(p.id)) ?? p), starter });
+            return {
+              ...prev,
+              starters: t.plan.lineup.starters.map((p) => pick(p, true)),
+              bench: t.plan.lineup.bench.map((p) => pick(p, false)),
+              slotAssignments: t.plan.lineup.slotAssignments,
+            };
+          });
+        }
+      }
+      try {
+        localStorage.removeItem(`lineup_team_${teamId}`);
+      } catch {
+        /* best-effort */
+      }
+      clearRosterCaches(teamId, leagueId);
+      setAutoSheetOpen(false);
+      const signed = `${gain >= 0 ? '+' : ''}${gain.toFixed(1)}`;
+      toast({
+        title: 'Lineup set',
+        description:
+          autoScope === 'week'
+            ? `${saved} ${saved === 1 ? 'day' : 'days'} · ${moves} ${moves === 1 ? 'move' : 'moves'} · proj ${signed}`
+            : `${moves} ${moves === 1 ? 'move' : 'moves'} · proj ${signed}`,
+      });
+    } catch (err) {
+      const status = err instanceof ApiError ? err.status : 0;
+      const message = err instanceof Error ? err.message : '';
+      logger.error('[Roster] Auto lineup save failed:', err);
+      if (status === 409) {
+        // The server's lock check spoke: a game started while the sheet was
+        // open. Its message names the player.
+        toast({ title: 'Player Locked', description: message || 'A game started while this was open.', variant: 'destructive', duration: 6000 });
+      } else {
+        toast({
+          title: 'Save Failed',
+          description: saved > 0 ? `Saved ${saved} of ${pending.length} days. ${message}`.trim() : message || 'Try again.',
+          variant: 'destructive',
+        });
+      }
+      setAutoSheetOpen(false);
+      // Whatever the server holds now is the truth: reload it, re-check locks.
+      clearRosterCaches(teamId, leagueId);
+      loadRoster(true);
+      fetchLockedPlayerIds();
+    } finally {
+      setAutoApplying(false);
+    }
   };
 
   // INSTANT OPEN (2026-09-01 efficiency pass): tapping a player used to
@@ -2678,7 +2808,25 @@ const Roster = () => {
     }
 
     // Identify if dropping onto a player or an empty slot
-    const droppedOnPlayer = allPlayers.find(p => p.id === targetId); 
+    const droppedOnPlayer = allPlayers.find(p => p.id === targetId);
+
+    // The other half of a swap is a move too (2026-09-01, audit R6): landing
+    // on a locked player's slot would send HIM to the bench. tapEligibleSlots
+    // no longer offers such slots; this is the backstop for every other path.
+    const targetSlotForLockCheck = droppedOnPlayer
+      ? roster.slotAssignments[droppedOnPlayer.id]
+      : (targetId.startsWith('slot-') || targetId.startsWith('ir-slot-')) ? targetId : undefined;
+    const occupantOfTarget = targetSlotForLockCheck
+      ? allPlayers.find(p => roster.slotAssignments[p.id] === targetSlotForLockCheck)
+      : undefined;
+    if (occupantOfTarget && occupantOfTarget.id !== playerId && lockedPlayerIds.has(String(occupantOfTarget.id))) {
+      toast({
+        title: "Player Locked",
+        description: `${occupantOfTarget.name}'s game has started. Players cannot be moved once their game begins.`,
+        variant: "destructive",
+      });
+      return;
+    }
     
     let finalTargetSlotId = targetId;
 
@@ -2968,8 +3116,15 @@ const Roster = () => {
         eligible.add(irSlotId);
       }
     }
+    // A slot held by a locked player is not open either (2026-09-01, audit
+    // R6): swapping into it would bench the one player nobody may move. The
+    // server now refuses that save with a 409, so the sheet must not offer
+    // it — the row's lock chip already says why.
+    for (const [pid, slotId] of Object.entries(roster.slotAssignments)) {
+      if (lockedPlayerIds.has(String(pid))) eligible.delete(slotId);
+    }
     return eligible;
-  }, [tapSelectedPlayerId, roster, ALL_STARTER_SLOT_IDS, isPositionValid]);
+  }, [tapSelectedPlayerId, roster, ALL_STARTER_SLOT_IDS, isPositionValid, lockedPlayerIds]);
 
   // Tap-to-swap: player tapped (select for swap, or complete a swap against
   // the currently-selected player). Shared by mobile and desktop — the name
@@ -3208,11 +3363,13 @@ const Roster = () => {
                   <Button
                     onClick={handleAutoLineup}
                     variant="outline"
-                    disabled={!projectionsReadyForSelectedDate}
+                    disabled={!projectionsReadyForSelectedDate || isPastDate}
                     title={
-                      projectionsReadyForSelectedDate
-                        ? 'Set the best lineup for this date'
-                        : 'Loading projections for this date…'
+                      isPastDate
+                        ? 'Past days are frozen'
+                        : projectionsReadyForSelectedDate
+                          ? 'Preview the best lineup for this date'
+                          : 'Loading projections for this date…'
                     }
                     className="flex gap-2 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -4206,7 +4363,25 @@ const Roster = () => {
           </div>
         </div>
       </main>
-      
+
+      {/* Auto Lineup preview — the header button and the strip's inline link
+          both open this; nothing is saved until Apply. Portals to body, so
+          it serves the phone list and the desktop grid alike. */}
+      <AutoLineupSheet
+        open={autoSheetOpen}
+        onOpenChange={(next) => { if (!next && !autoApplying) setAutoSheetOpen(false); }}
+        scope={autoScope}
+        onScopeChange={handleAutoScopeChange}
+        dayLabel={stripDayLabel}
+        day={dayPlan}
+        weekAvailable={autoWeekAvailable}
+        week={autoWeek}
+        weekLoading={autoWeekLoading}
+        weekError={autoWeekError}
+        applying={autoApplying}
+        onApply={applyAutoLineup}
+      />
+
       {/* Footer - Hidden on mobile */}
       <div className="hidden lg:block">
         <HockeyFooter variant="app" />
