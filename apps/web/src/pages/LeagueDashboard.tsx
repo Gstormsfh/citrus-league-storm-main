@@ -725,13 +725,14 @@ const LeagueDashboard = () => {
                   <CupIcon className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
                   ✦ League HQ
                 </div>
-                {/* 2026-08-27 sweep: `truncate` in a min-w-0 column, sharing a
-                    row with a shrink-0 ~180px settings button. At 393px that
-                    leaves ~170px for 30px type — the league name rendered as
-                    "HARNE…", five characters of the page's own identity. Two
-                    lines on a phone, one at sm where the row has room; the
-                    button loses its label below sm (see there). */}
-                <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-tight sm:leading-none mb-3 line-clamp-2 sm:line-clamp-none sm:truncate break-words">{league.name}</h1>
+                {/* 2026-08-31 HQ composition pass: the page's own name never
+                    truncates. The 08-27 sweep allowed two lines on phones but
+                    kept one truncated line at sm+ — which still cut
+                    "LAUNCH DRY RUN" to "LAUNCH DRY R…" at desktop widths,
+                    because the center column shares the row with the settings
+                    button. A league's identity outranks a tidy single line:
+                    clamp at two lines at every breakpoint. */}
+                <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-tight mb-3 line-clamp-2 break-words">{league.name}</h1>
                 <div className="flex items-center gap-2 flex-wrap">
                   {(() => {
                     const status = league.draft_status;
@@ -1620,65 +1621,6 @@ Your Commissioner`);
             </div>
           </div>
 
-          {/* League Info Cards — three core league shape stats with custom hockey icons */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
-              <div aria-hidden="true" className="absolute -top-8 -right-8 w-32 h-32 bg-pastel-orange/10 rounded-full blur-3xl pointer-events-none" />
-              <CardHeader className="pb-2 relative z-10">
-                <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
-                  <CrossedSticksIcon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
-                  Teams
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="relative z-10">
-                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">
-                  {teams.length}
-                  <span className="text-white/55 mx-1.5 text-2xl md:text-3xl">/</span>
-                  <span className="text-pastel-orange">{league.settings?.teamsCount || 12}</span>
-                </div>
-                <p className="text-xs text-white/55 mt-2">Filled · max {league.settings?.teamsCount || 12}</p>
-                {/* Mini fill bar — actual visualization of how many slots are filled */}
-                <div className="mt-3 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-pastel-orange to-pastel-orange-soft transition-all"
-                    style={{ width: `${Math.min(100, (teams.length / (league.settings?.teamsCount || 12)) * 100)}%` }}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
-              <div aria-hidden="true" className="absolute -top-8 -right-8 w-32 h-32 bg-pastel-sage/10 rounded-full blur-3xl pointer-events-none" />
-              <CardHeader className="pb-2 relative z-10">
-                <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
-                  <ScoreboardIcon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
-                  Roster Size
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="relative z-10">
-                {/* An unset setting rendered as a confident "0" reads as a real
-                    configured value. Show an em dash so the tile says
-                    "not configured" rather than asserting zero. */}
-                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">{league.roster_size || '—'}</div>
-                <p className="text-xs text-white/55 mt-2">{league.roster_size ? 'Players per team' : 'Not configured'}</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
-              <div aria-hidden="true" className="absolute -top-8 -right-8 w-32 h-32 bg-pastel-orange/10 rounded-full blur-3xl pointer-events-none" />
-              <CardHeader className="pb-2 relative z-10">
-                <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
-                  <DraftIcon className="h-3.5 w-3.5" strokeWidth={2} />
-                  Draft Rounds
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="relative z-10">
-                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">{league.draft_rounds || '—'}</div>
-                <p className="text-xs text-white/55 mt-2">{league.draft_rounds ? 'Total draft rounds' : 'Not configured'}</p>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Actions */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             {/* Draft Room - visible to ALL league members based on draft status */}
@@ -1735,8 +1677,14 @@ Your Commissioner`);
                       // live-engine room is /draft-v2/:leagueId — see leagueDraftEntryGuard.
                       navigate(`/draft-v2/${leagueId}`);
                     }}
+                    // HQ composition pass (2026-08-31): the CTA is hot whenever
+                    // pressing it is the next real action — a live draft for
+                    // everyone, or a commissioner whose league is full and can
+                    // start. A ghost button on the page's #1 action read as
+                    // "nothing to do here."
                     className={`w-full font-bold ${
-                      league.draft_status === 'in_progress'
+                      league.draft_status === 'in_progress' ||
+                      (isCommissioner && league.draft_status === 'not_started' && teams.length >= (league.settings?.teamsCount || 12))
                         ? 'bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]'
                         : 'bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50'
                     } disabled:opacity-50`}
@@ -1790,6 +1738,65 @@ Your Commissioner`);
                 </CardContent>
               </Card>
             )}
+          </div>
+
+          {/* League Info Cards — three core league shape stats with custom hockey icons */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6 sm:mb-8">
+            <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+              <div aria-hidden="true" className="absolute -top-8 -right-8 w-32 h-32 bg-pastel-orange/10 rounded-full blur-3xl pointer-events-none" />
+              <CardHeader className="pb-1 sm:pb-2 px-3 pt-3 sm:px-6 sm:pt-6 relative z-10">
+                <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.18em] sm:tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
+                  <CrossedSticksIcon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+                  Teams
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="relative z-10">
+                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">
+                  {teams.length}
+                  <span className="text-white/55 mx-1.5 text-2xl md:text-3xl">/</span>
+                  <span className="text-pastel-orange">{league.settings?.teamsCount || 12}</span>
+                </div>
+                <p className="text-xs text-white/55 mt-2">Filled · max {league.settings?.teamsCount || 12}</p>
+                {/* Mini fill bar — actual visualization of how many slots are filled */}
+                <div className="mt-3 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-pastel-orange to-pastel-orange-soft transition-all"
+                    style={{ width: `${Math.min(100, (teams.length / (league.settings?.teamsCount || 12)) * 100)}%` }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+              <div aria-hidden="true" className="absolute -top-8 -right-8 w-32 h-32 bg-pastel-sage/10 rounded-full blur-3xl pointer-events-none" />
+              <CardHeader className="pb-2 relative z-10">
+                <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
+                  <ScoreboardIcon className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+                  Roster Size
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="relative z-10">
+                {/* An unset setting rendered as a confident "0" reads as a real
+                    configured value. Show an em dash so the tile says
+                    "not configured" rather than asserting zero. */}
+                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">{league.roster_size || '—'}</div>
+                <p className="text-xs text-white/55 mt-2">{league.roster_size ? 'Players per team' : 'Not configured'}</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] relative overflow-hidden">
+              <div aria-hidden="true" className="absolute -top-8 -right-8 w-32 h-32 bg-pastel-orange/10 rounded-full blur-3xl pointer-events-none" />
+              <CardHeader className="pb-2 relative z-10">
+                <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
+                  <DraftIcon className="h-3.5 w-3.5" strokeWidth={2} />
+                  Draft Rounds
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="relative z-10">
+                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">{league.draft_rounds || '—'}</div>
+                <p className="text-xs text-white/55 mt-2">{league.draft_rounds ? 'Total draft rounds' : 'Not configured'}</p>
+              </CardContent>
+            </Card>
           </div>
 
           {/* T12 architect Entry 13 (2026-08-09): league timeline —
