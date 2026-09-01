@@ -41,7 +41,7 @@ import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { isGuestMode, shouldBlockGuestOperation } from '@/utils/guestHelpers';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
-import { getPlayerWithSeasonStats } from '@/utils/playerStatsHelper';
+import { getPlayerWithSeasonStats, servicePlayerToHockeyPlayer } from '@/utils/playerStatsHelper';
 import { getTodayMST, formatWaiverProcessTime } from '@/utils/timezoneUtils';
 import { COLUMNS } from '@/utils/queryColumns';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
@@ -1214,18 +1214,19 @@ const FreeAgents = () => {
   );
   const hasMorePlayers = visibleCount < filteredPlayers.length;
 
+  // INSTANT OPEN (2026-09-01 efficiency pass): the card opens immediately
+  // from the row's own data (pure mapper, no network), then refreshes with
+  // NHL.com-fresh season stats in the background. Tapping used to await a
+  // round trip before anything appeared — and a failed fetch showed a
+  // destructive "Move Didn't Take" toast for a tap that moved nothing.
   const handlePlayerClick = async (player: Player) => {
-    // Fetch fresh season stats using unified helper (same as Matchup tab)
+    setSelectedPlayer(servicePlayerToHockeyPlayer(player));
+    setIsPlayerDialogOpen(true);
     const playerWithStats = await getPlayerWithSeasonStats(player.id);
     if (playerWithStats) {
-      setSelectedPlayer(playerWithStats);
-      setIsPlayerDialogOpen(true);
-    } else {
-      toast({
-        title: "Move Didn't Take",
-        description: "Could not load player stats. Please try again.",
-        variant: "destructive"
-      });
+      setSelectedPlayer(prev =>
+        prev && String(prev.id) === String(player.id) ? playerWithStats : prev,
+      );
     }
   };
 

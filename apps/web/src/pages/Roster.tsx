@@ -2472,23 +2472,23 @@ const Roster = () => {
     });
   };
 
+  // INSTANT OPEN (2026-09-01 efficiency pass): tapping a player used to
+  // AWAIT a network fetch before the dialog appeared at all — a full
+  // round trip of nothing happening ("the player cards take a while to
+  // load"). The row already holds a renderable player: open with it NOW,
+  // and swap in the fresh season stats when they land. If the refresh
+  // fails, the card simply keeps showing what the roster already showed —
+  // that's the normal offline behavior, not a warning.
   const handlePlayerClick = useCallback(async (player: HockeyPlayer) => {
-    // Fetch fresh season stats using unified helper (same as Matchup and FreeAgents tabs)
+    setSelectedPlayer(player);
+    setIsPlayerDialogOpen(true);
     const playerWithStats = await getPlayerWithSeasonStats(player.id);
     if (playerWithStats) {
-      setSelectedPlayer(playerWithStats);
-      setIsPlayerDialogOpen(true);
-    } else {
-      // Fallback to using the player data we already have
-      setSelectedPlayer(player);
-      setIsPlayerDialogOpen(true);
-      toast({
-        title: "Warning",
-        description: "Could not fetch updated stats. Showing cached data.",
-        variant: "default"
-      });
+      setSelectedPlayer(prev =>
+        prev && String(prev.id) === String(player.id) ? playerWithStats : prev,
+      );
     }
-  }, [toast]);
+  }, []);
 
   // Validate roster state - check if any player in IR slot has returned to ACT status
   const validateRosterState = (currentRoster: RosterState): { isValid: boolean; invalidPlayers: HockeyPlayer[] } => {

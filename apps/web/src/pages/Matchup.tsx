@@ -2458,6 +2458,11 @@ const Matchup = () => {
   ]);
 
   const handlePlayerClick = useCallback(async (player: MatchupPlayer) => {
+    // INSTANT OPEN (2026-09-01 efficiency pass): the card opens NOW from
+    // the matchup row's own data; season-long stats swap in when the
+    // fetch below lands. Tapping used to wait out the round trip first.
+    setSelectedPlayer(toHockeyPlayer(player));
+    setIsPlayerDialogOpen(true);
     try {
       // Fetch season-long stats for this player
       const seasonPlayers = await PlayerService.getPlayersByIds([player.id.toString()]);
@@ -2488,7 +2493,10 @@ const Matchup = () => {
           save_pct: seasonPlayer.save_percentage ?? 0,
           gaa: seasonPlayer.goals_against_average ?? 0
         };
-        setSelectedPlayer(toHockeyPlayer(player, seasonStats));
+        // Guard: only enrich if this card is still the one on screen.
+        setSelectedPlayer(prev =>
+          prev && String(prev.id) === String(player.id) ? toHockeyPlayer(player, seasonStats) : prev,
+        );
       } else {
         // Fallback: try to fetch directly via API
         const statsRes = await playerApi.getPlayerStats(String(player.id), getCurrentSeason());
@@ -2524,16 +2532,16 @@ const Matchup = () => {
               ? statsData.nhl_goals_against / statsData.goalie_gp 
               : 0)
           };
-          setSelectedPlayer(toHockeyPlayer(player, mappedStats));
-        } else {
-          setSelectedPlayer(toHockeyPlayer(player));
+          setSelectedPlayer(prev =>
+            prev && String(prev.id) === String(player.id) ? toHockeyPlayer(player, mappedStats) : prev,
+          );
         }
+        // No season data: the instant card already shows the row's stats.
       }
     } catch (error) {
-      setSelectedPlayer(toHockeyPlayer(player));
+      // Refresh failed: the instant card stays — same data the row showed.
+      void error;
     }
-    
-    setIsPlayerDialogOpen(true);
   // toHockeyPlayer is a plain function redefined each render (not wrapped in useCallback);
   // including it would cause unnecessary re-creation. Its logic is pure and has no stale closure risk.
   // eslint-disable-next-line react-hooks/exhaustive-deps
