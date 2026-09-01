@@ -5396,7 +5396,7 @@ const Matchup = () => {
                   <p className="text-sm text-white/55 mb-4">
                     Complete your league's draft to unlock weekly matchups and start competing.
                   </p>
-                  <Button onClick={() => navigate(`/draft-room?league=${activeLeagueId}`)}>
+                  <Button onClick={() => navigate(`/draft-v2/${activeLeagueId}`)}>
                     Go to Draft Room
                   </Button>
                 </div>

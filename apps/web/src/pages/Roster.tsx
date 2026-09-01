@@ -3311,7 +3311,7 @@ const Roster = () => {
                         </p>
                         {isPreDraft && (
                           <Button asChild className="mt-4">
-                            <a href={`/draft-room?league=${userTeam.league_id}`}>Go to Draft Room</a>
+                            <a href={`/draft-v2/${userTeam.league_id}`}>Go to Draft Room</a>
                           </Button>
                         )}
                       </div>
