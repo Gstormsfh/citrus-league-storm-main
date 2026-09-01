@@ -186,23 +186,28 @@ def load_league_scoring_settings(db: SupabaseRest, league_id: str) -> Dict[str, 
 
 
 def _get_default_scoring_settings() -> Dict[str, Any]:
-    """Returns default scoring settings structure."""
+    """Returns default scoring settings structure.
+
+    INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned
+    (help.yahoo.com/kb/SLN6815). SHP/hits/PIM are opt-in, 0 by default.
+    Must equal DEFAULT_SCORING in packages/shared.
+    """
     return {
         "skater": {
-            "goals": 3,
-            "assists": 2,
-            "power_play_points": 1,
-            "short_handed_points": 2,
-            "shots_on_goal": 0.4,
-            "blocks": 0.5,
-            "hits": 0.2,
-            "penalty_minutes": 0.5
+            "goals": 6,
+            "assists": 4,
+            "power_play_points": 2,
+            "short_handed_points": 0,
+            "shots_on_goal": 0.9,
+            "blocks": 1,
+            "hits": 0,
+            "penalty_minutes": 0
         },
         "goalie": {
-            "wins": 4,
-            "shutouts": 3,
-            "saves": 0.2,
-            "goals_against": -1
+            "wins": 5,
+            "shutouts": 5,
+            "saves": 0.6,
+            "goals_against": -3
         },
         "advanced": {
             "use_fractional_scoring": False,
@@ -403,10 +408,10 @@ def calculate_fantasy_points(
         breakdown["saves"] = saves
         breakdown["goals_against"] = goals_against
         
-        points_from_wins = Decimal(str(wins)) * Decimal(str(scoring.get("wins", 4)))
-        points_from_shutouts = Decimal(str(shutouts)) * Decimal(str(scoring.get("shutouts", 3)))
-        points_from_saves = Decimal(str(saves)) * Decimal(str(scoring.get("saves", 0.2)))
-        points_from_ga = Decimal(str(goals_against)) * Decimal(str(scoring.get("goals_against", -1)))
+        points_from_wins = Decimal(str(wins)) * Decimal(str(scoring.get("wins", 5)))
+        points_from_shutouts = Decimal(str(shutouts)) * Decimal(str(scoring.get("shutouts", 5)))
+        points_from_saves = Decimal(str(saves)) * Decimal(str(scoring.get("saves", 0.6)))
+        points_from_ga = Decimal(str(goals_against)) * Decimal(str(scoring.get("goals_against", -3)))
         
         points_by_category["wins"] = points_from_wins
         points_by_category["shutouts"] = points_from_shutouts
@@ -441,14 +446,14 @@ def calculate_fantasy_points(
         breakdown["hits"] = hits
         breakdown["penalty_minutes"] = pim
         
-        points_from_goals = Decimal(str(goals)) * Decimal(str(scoring.get("goals", 3)))
-        points_from_assists = Decimal(str(assists)) * Decimal(str(scoring.get("assists", 2)))
-        points_from_ppp = Decimal(str(ppp)) * Decimal(str(scoring.get("power_play_points", 1)))
-        points_from_shp = Decimal(str(shp)) * Decimal(str(scoring.get("short_handed_points", 2)))
-        points_from_sog = Decimal(str(sog)) * Decimal(str(scoring.get("shots_on_goal", 0.4)))
-        points_from_blocks = Decimal(str(blocks)) * Decimal(str(scoring.get("blocks", 0.5)))
-        points_from_hits = Decimal(str(hits)) * Decimal(str(scoring.get("hits", 0.2)))
-        points_from_pim = Decimal(str(pim)) * Decimal(str(scoring.get("penalty_minutes", 0.5)))
+        points_from_goals = Decimal(str(goals)) * Decimal(str(scoring.get("goals", 6)))
+        points_from_assists = Decimal(str(assists)) * Decimal(str(scoring.get("assists", 4)))
+        points_from_ppp = Decimal(str(ppp)) * Decimal(str(scoring.get("power_play_points", 2)))
+        points_from_shp = Decimal(str(shp)) * Decimal(str(scoring.get("short_handed_points", 0)))
+        points_from_sog = Decimal(str(sog)) * Decimal(str(scoring.get("shots_on_goal", 0.9)))
+        points_from_blocks = Decimal(str(blocks)) * Decimal(str(scoring.get("blocks", 1.0)))
+        points_from_hits = Decimal(str(hits)) * Decimal(str(scoring.get("hits", 0.0)))
+        points_from_pim = Decimal(str(pim)) * Decimal(str(scoring.get("penalty_minutes", 0.0)))
         
         points_by_category["goals"] = points_from_goals
         points_by_category["assists"] = points_from_assists

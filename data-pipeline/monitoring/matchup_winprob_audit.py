@@ -42,9 +42,10 @@ import numpy as np
 from scipy import stats as scipy_stats
 
 
+# INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned; SHP/hits/PIM opt-in.
 SCORING = {
-    "g": 3.0, "a": 2.0, "ppp": 1.0, "shp": 2.0,
-    "sog": 0.4, "blk": 0.5, "hit": 0.2, "pim": 0.5,
+    "g": 6.0, "a": 4.0, "ppp": 2.0, "shp": 0.0,
+    "sog": 0.9, "blk": 1.0, "hit": 0.0, "pim": 0.0,
 }
 
 ARCHETYPES = {

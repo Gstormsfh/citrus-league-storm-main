@@ -94,16 +94,17 @@ FINISHING_PRIOR_BETA = 90.0
 FINISHING_STABILIZATION_SHOTS = 50
 OPPONENT_STABILIZATION_GAMES = 10
 
-# Default scoring weights (mirrors scoringUtils.ts)
+# Default scoring weights (mirrors packages/shared DEFAULT_SCORING)
+# INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned; SHP/hits/PIM opt-in.
 DEFAULT_SCORING_WEIGHTS = {
-    "goals": 3.0,
-    "assists": 2.0,
-    "sog": 0.4,
-    "blocks": 0.5,
-    "ppp": 1.0,
-    "shp": 2.0,
-    "hits": 0.2,
-    "pim": 0.5,
+    "goals": 6.0,
+    "assists": 4.0,
+    "sog": 0.9,
+    "blocks": 1.0,
+    "ppp": 2.0,
+    "shp": 0.0,
+    "hits": 0.0,
+    "pim": 0.0,
 }
 
 

@@ -103,10 +103,11 @@ def generate_realistic_player(archetype="average", rng=None):
     noise = max(0.85, min(1.15, noise))
 
     # Calculate total_pts from scoring weights
+    # INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned; SHP/hits/PIM 0.
     total_pts = (
-        p["goals"] * 3.0 + p["assists"] * 2.0 + p["sog"] * 0.4 +
-        p["blocks"] * 0.5 + p["ppp"] * 1.0 + p["shp"] * 2.0 +
-        p["hits"] * 0.2 + p["pim"] * 0.5
+        p["goals"] * 6.0 + p["assists"] * 4.0 + p["sog"] * 0.9 +
+        p["blocks"] * 1.0 + p["ppp"] * 2.0 + p["shp"] * 0.0 +
+        p["hits"] * 0.0 + p["pim"] * 0.0
     ) * noise
 
     projection = {

@@ -122,8 +122,8 @@ When context is provided, you may see:
 - **CRITICAL:** When weekly projections (wkProj) are missing or seem low relative to a player's actual PPG, IGNORE the projection and use the actual season PPG × games this week as your estimate. The projection pipeline may lag behind real stats.
 
 ## Default Fantasy Scoring
-**Skaters:** Goals 3 | Assists 2 | PPP +1 | SHP +2 | SOG 0.4 | BLK 0.5 | HIT 0.2 | PIM 0.5
-**Goalies:** W 4 | SO 3 | SV 0.2 | GA −1
+**Skaters:** Goals 6 | Assists 4 | PPP +2 | SOG 0.9 | BLK 1 (SHP/HIT/PIM/+/- are opt-in, 0 by default)
+**Goalies:** W 5 | SO 5 | SV 0.6 | GA −3
 **IMPORTANT:** If the user's context includes league-specific scoring, USE THOSE instead. You already have them — don't ask.
 
 ## Current Season — 2025-2026

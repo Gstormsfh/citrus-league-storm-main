@@ -88,24 +88,26 @@ else:
 DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
 
 # ============================================================================
-# SCORING WEIGHTS (mirrors src/utils/scoringUtils.ts DEFAULT_SCORING)
+# SCORING WEIGHTS (mirrors packages/shared DEFAULT_SCORING)
+# INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned. SHP/hits/PIM are
+# opt-in categories, 0 by default.
 # ============================================================================
 DEFAULT_SKATER_SCORING = {
-    "goals": 3.0,
-    "assists": 2.0,
-    "ppp": 1.0,
-    "shp": 2.0,
-    "sog": 0.4,
-    "blocks": 0.5,
-    "hits": 0.2,
-    "pim": 0.5,
+    "goals": 6.0,
+    "assists": 4.0,
+    "ppp": 2.0,
+    "shp": 0.0,
+    "sog": 0.9,
+    "blocks": 1.0,
+    "hits": 0.0,
+    "pim": 0.0,
 }
 
 DEFAULT_GOALIE_SCORING = {
-    "wins": 4.0,
-    "shutouts": 3.0,
-    "saves": 0.2,
-    "goals_against": -1.0,
+    "wins": 5.0,
+    "shutouts": 5.0,
+    "saves": 0.6,
+    "goals_against": -3.0,
 }
 
 # Stat categories for skaters (order matters for correlation matrix)
@@ -687,22 +689,22 @@ def calculate_fantasy_points(
     if is_goalie:
         weights = scoring or DEFAULT_GOALIE_SCORING
         return (
-            stat_line.get("wins", 0) * weights.get("wins", 4.0) +
-            stat_line.get("saves", 0) * weights.get("saves", 0.2) +
-            stat_line.get("shutouts", 0) * weights.get("shutouts", 3.0) +
-            stat_line.get("goals_against", 0) * weights.get("goals_against", -1.0)
+            stat_line.get("wins", 0) * weights.get("wins", 5.0) +
+            stat_line.get("saves", 0) * weights.get("saves", 0.6) +
+            stat_line.get("shutouts", 0) * weights.get("shutouts", 5.0) +
+            stat_line.get("goals_against", 0) * weights.get("goals_against", -3.0)
         )
     else:
         weights = scoring or DEFAULT_SKATER_SCORING
         return (
-            stat_line.get("goals", 0) * weights.get("goals", 3.0) +
-            stat_line.get("assists", 0) * weights.get("assists", 2.0) +
-            stat_line.get("ppp", 0) * weights.get("ppp", 1.0) +
-            stat_line.get("shp", 0) * weights.get("shp", 2.0) +
-            stat_line.get("sog", 0) * weights.get("sog", 0.4) +
-            stat_line.get("blocks", 0) * weights.get("blocks", 0.5) +
-            stat_line.get("hits", 0) * weights.get("hits", 0.2) +
-            stat_line.get("pim", 0) * weights.get("pim", 0.5)
+            stat_line.get("goals", 0) * weights.get("goals", 6.0) +
+            stat_line.get("assists", 0) * weights.get("assists", 4.0) +
+            stat_line.get("ppp", 0) * weights.get("ppp", 2.0) +
+            stat_line.get("shp", 0) * weights.get("shp", 0.0) +
+            stat_line.get("sog", 0) * weights.get("sog", 0.9) +
+            stat_line.get("blocks", 0) * weights.get("blocks", 1.0) +
+            stat_line.get("hits", 0) * weights.get("hits", 0.0) +
+            stat_line.get("pim", 0) * weights.get("pim", 0.0)
         )
 
 

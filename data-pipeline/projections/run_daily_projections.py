@@ -88,24 +88,26 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
 
-# Single source of truth for fallback scoring — matches DEFAULT_SCORING in src/utils/scoringUtils.ts
+# Single source of truth for fallback scoring — matches DEFAULT_SCORING in packages/shared.
 # Used when a player has no league context (free agents) or when league settings can't be loaded.
+# INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned (help.yahoo.com/kb/SLN6815);
+# SHP/hits/PIM are opt-in categories, 0 by default.
 DEFAULT_FALLBACK_SCORING = {
     "skater": {
-        "goals": 3,
-        "assists": 2,
-        "power_play_points": 1,
-        "short_handed_points": 2,
-        "shots_on_goal": 0.4,
-        "blocks": 0.5,
-        "hits": 0.2,
-        "penalty_minutes": 0.5,
+        "goals": 6,
+        "assists": 4,
+        "power_play_points": 2,
+        "short_handed_points": 0,
+        "shots_on_goal": 0.9,
+        "blocks": 1.0,
+        "hits": 0.0,
+        "penalty_minutes": 0.0,
     },
     "goalie": {
-        "wins": 4,
-        "shutouts": 3,
-        "saves": 0.2,
-        "goals_against": -1,
+        "wins": 5,
+        "shutouts": 5,
+        "saves": 0.6,
+        "goals_against": -3,
     }
 }
 
@@ -1050,8 +1052,8 @@ def main():
                     for rejected in rejected_projections:
                         # Get scoring settings (use default for traceability - main goal is debugging)
                         default_scoring = {
-                            "skater": {"goals": 3, "assists": 2, "shots_on_goal": 0.4, "blocks": 0.5},
-                            "goalie": {"wins": 4, "shutouts": 3, "saves": 0.2, "goals_against": -1}
+                            "skater": {"goals": 6, "assists": 4, "shots_on_goal": 0.9, "blocks": 1.0},
+                            "goalie": {"wins": 5, "shutouts": 5, "saves": 0.6, "goals_against": -3}
                         }
                         traceability = generate_traceability_log_for_rejection(
                             db, rejected, args.season, default_scoring

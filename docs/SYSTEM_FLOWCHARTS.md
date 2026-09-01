@@ -281,13 +281,13 @@ START: fantasy_projection_pipeline.py (Daily at 6 AM MT)
   │         │    Example:
   │         │    {
   │         │      "skater": {
-  │         │        "goals": 3,
-  │         │        "assists": 2,
-  │         │        "power_play_points": 1,
-  │         │        "shots_on_goal": 0.4,
-  │         │        "blocks": 0.5,
-  │         │        "hits": 0.2,
-  │         │        "penalty_minutes": 0.5
+  │         │        "goals": 6,
+  │         │        "assists": 4,
+  │         │        "power_play_points": 2,
+  │         │        "shots_on_goal": 0.9,
+  │         │        "blocks": 1,
+  │         │        "hits": 0,
+  │         │        "penalty_minutes": 0
   │         │      }
   │         │    }
   │         │
@@ -358,20 +358,20 @@ TRIGGER: calculate_matchup_scores.py (Runs every night at 11 PM MT)
   │    │    └─► Parse JSONB:
   │    │         {
   │    │           "skater": {
-  │    │             "goals": 3,
-  │    │             "assists": 2,
-  │    │             "power_play_points": 1,
-  │    │             "short_handed_points": 2,
-  │    │             "shots_on_goal": 0.4,
-  │    │             "blocks": 0.5,
-  │    │             "hits": 0.2,
-  │    │             "penalty_minutes": 0.5
+  │    │             "goals": 6,
+  │    │             "assists": 4,
+  │    │             "power_play_points": 2,
+  │    │             "short_handed_points": 0,
+  │    │             "shots_on_goal": 0.9,
+  │    │             "blocks": 1,
+  │    │             "hits": 0,
+  │    │             "penalty_minutes": 0
   │    │           },
   │    │           "goalie": {
-  │    │             "wins": 4,
-  │    │             "shutouts": 3,
-  │    │             "saves": 0.2,
-  │    │             "goals_against": -1
+  │    │             "wins": 5,
+  │    │             "shutouts": 5,
+  │    │             "saves": 0.6,
+  │    │             "goals_against": -3
   │    │           }
   │    │         }
   │    │

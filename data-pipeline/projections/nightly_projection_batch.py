@@ -341,19 +341,21 @@ def fetch_scoring_settings(db: SupabaseRest) -> Dict[str, Any]:
             return settings["scoring"]
     
     # Default scoring settings
+    # INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned; SHP/hits/PIM
+    # opt-in at 0. (This legacy fallback kept its own key names.)
     return {
-        "goals": 3.0,
-        "assists": 2.0,
-        "shots_on_goal": 0.3,
-        "blocked_shots": 0.5,
-        "hits": 0.25,
-        "pim": 0.25,
-        "powerplay_points": 0.5,
-        "shorthanded_points": 1.0,
-        "wins": 4.0,
-        "saves": 0.2,
-        "goals_against": -1.0,
-        "shutouts": 3.0
+        "goals": 6.0,
+        "assists": 4.0,
+        "shots_on_goal": 0.9,
+        "blocked_shots": 1.0,
+        "hits": 0.0,
+        "pim": 0.0,
+        "powerplay_points": 2.0,
+        "shorthanded_points": 0.0,
+        "wins": 5.0,
+        "saves": 0.6,
+        "goals_against": -3.0,
+        "shutouts": 5.0
     }
 
 

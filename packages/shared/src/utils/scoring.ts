@@ -38,25 +38,43 @@ export interface ScoringSettings {
 
 /**
  * Default scoring settings matching database defaults
- * These are the standard fantasy hockey point values
+ *
+ * INDUSTRY-STANDARD DEFAULTS (2026-09-01). Aligned with Yahoo Fantasy
+ * Hockey's default points scoring (help.yahoo.com/kb/SLN6815): G 6,
+ * A 4, PPP 2, SOG 0.9, BLK 1; W 5, GA -3, SV 0.6, SO 5. The old Citrus
+ * defaults (G3/A2/.../W4/SV0.2/GA-1) undervalued goals vs peripherals
+ * and rewarded penalty minutes (+0.5/PIM — no major platform does that).
+ *
+ * One documented deviation: Yahoo also scores plus/minus at 2. Citrus
+ * ships +/- at 0 because the projection engine cannot model plus/minus,
+ * and a default category the projections ignore would make every
+ * projected total quietly wrong. Commissioners can still enable it.
+ *
+ * Hits / PIM / SHP default to 0 for the same reason Yahoo omits them
+ * from defaults — they are opt-in categories, not standard scoring.
+ *
+ * These constants MUST equal the DB homes (stat_catalog, the zero-UUID
+ * league_scoring_rules rows, the leagues.scoring_settings column
+ * default) and the data-pipeline defaults. scoringDefaultsAlignment
+ * guard tests pin the TS homes; the migration pins the DB.
  */
 export const DEFAULT_SCORING: ScoringSettings = {
   skater: {
-    goals: 3,
-    assists: 2,
-    power_play_points: 1,
-    short_handed_points: 2,
-    shots_on_goal: 0.4,
-    blocks: 0.5,
-    hits: 0.2,
-    penalty_minutes: 0.5,
+    goals: 6,
+    assists: 4,
+    power_play_points: 2,
+    short_handed_points: 0,
+    shots_on_goal: 0.9,
+    blocks: 1,
+    hits: 0,
+    penalty_minutes: 0,
     plus_minus: 0
   },
   goalie: {
-    wins: 4,
-    shutouts: 3,
-    saves: 0.2,
-    goals_against: -1
+    wins: 5,
+    shutouts: 5,
+    saves: 0.6,
+    goals_against: -3
   }
 };
 

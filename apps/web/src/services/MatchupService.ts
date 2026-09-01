@@ -1270,7 +1270,7 @@ export const MatchupService = {
       if (matchupStats) {
         // CRITICAL: Check if player is a goalie and use appropriate scoring
         if (isGoalie && (matchupStats.wins !== undefined || matchupStats.saves !== undefined)) {
-          // Goalie scoring: Wins=4, Saves=0.2, Shutouts=3, GA=-1
+          // Goalie scoring defaults: Wins=5, Saves=0.6, Shutouts=5, GA=-3
           // CRITICAL: Validate that stats are for a week, not season
           // For a single week, max should be: ~7 wins, ~300 saves (very high week)
           const MAX_REASONABLE_WEEK_WINS = 7;

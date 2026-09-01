@@ -109,7 +109,10 @@ DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON")) if os.getenv("CITRUS_DE
 # Cache version: Bump this whenever the projection data sources or model change.
 # This invalidates all cached projections from previous versions, forcing recalculation.
 # v3.0 = switched from PBP-derived columns to official nhl_* columns (Feb 2026)
-CACHE_VERSION = "3.0"
+# 4.0 (2026-09-01): INDUSTRY-STANDARD DEFAULT SCORING — Yahoo-aligned point
+# values (G6 A4 PPP2 SOG0.9 BLK1 / W5 SO5 SV0.6 GA-3; SHP/hits/PIM opt-in at
+# 0). Every cached projection scored under the old defaults is stale.
+CACHE_VERSION = "4.0"
 
 
 def supabase_client() -> SupabaseRest:
@@ -198,10 +201,10 @@ def get_positional_avg_fantasy_pts_per_60(
     # This is used if replacement_fpts_per_60 is not yet populated
     skater_scoring = scoring_settings.get("skater", {})
     avg_fpts_per_game = (
-        (pos_data.get("avg_goals_per_game", 0) * float(skater_scoring.get("goals", 3))) +
-        (pos_data.get("avg_assists_per_game", 0) * float(skater_scoring.get("assists", 2))) +
-        (pos_data.get("avg_sog_per_game", 0) * float(skater_scoring.get("shots_on_goal", 0.4))) +
-        (pos_data.get("avg_blocks_per_game", 0) * float(skater_scoring.get("blocks", 0.5)))
+        (pos_data.get("avg_goals_per_game", 0) * float(skater_scoring.get("goals", 6))) +
+        (pos_data.get("avg_assists_per_game", 0) * float(skater_scoring.get("assists", 4))) +
+        (pos_data.get("avg_sog_per_game", 0) * float(skater_scoring.get("shots_on_goal", 0.9))) +
+        (pos_data.get("avg_blocks_per_game", 0) * float(skater_scoring.get("blocks", 1.0)))
         # Note: PPP, SHP, Hits, PIM could be added if available in pos_data
     )
 
@@ -629,14 +632,14 @@ def calculate_hybrid_base(
     # Calculate base PPG using ALL 8 scoring weights
     skater_scoring = scoring_settings.get("skater", {})
     base_projection["ppg"] = (
-        base_projection["goals"] * float(skater_scoring.get("goals", 3)) +
-        base_projection["assists"] * float(skater_scoring.get("assists", 2)) +
-        base_projection["sog"] * float(skater_scoring.get("shots_on_goal", 0.4)) +
-        base_projection["blocks"] * float(skater_scoring.get("blocks", 0.5)) +
-        base_projection["ppp"] * float(skater_scoring.get("power_play_points", 1)) +
-        base_projection["shp"] * float(skater_scoring.get("short_handed_points", 2)) +
-        base_projection["hits"] * float(skater_scoring.get("hits", 0.2)) +
-        base_projection["pim"] * float(skater_scoring.get("penalty_minutes", 0.5))
+        base_projection["goals"] * float(skater_scoring.get("goals", 6)) +
+        base_projection["assists"] * float(skater_scoring.get("assists", 4)) +
+        base_projection["sog"] * float(skater_scoring.get("shots_on_goal", 0.9)) +
+        base_projection["blocks"] * float(skater_scoring.get("blocks", 1.0)) +
+        base_projection["ppp"] * float(skater_scoring.get("power_play_points", 2)) +
+        base_projection["shp"] * float(skater_scoring.get("short_handed_points", 0)) +
+        base_projection["hits"] * float(skater_scoring.get("hits", 0.0)) +
+        base_projection["pim"] * float(skater_scoring.get("penalty_minutes", 0.0))
     )
     
     return base_projection
@@ -1639,23 +1642,23 @@ def calculate_fantasy_points(
     if is_goalie:
         goalie_scoring = scoring_settings.get("goalie", {})
         total_points = (
-            projected_stats.get("wins", 0) * float(goalie_scoring.get("wins", 4)) +
-            projected_stats.get("saves", 0) * float(goalie_scoring.get("saves", 0.2)) +
-            projected_stats.get("shutouts", 0) * float(goalie_scoring.get("shutouts", 3)) +
-            projected_stats.get("goals_against", 0) * float(goalie_scoring.get("goals_against", -1))
+            projected_stats.get("wins", 0) * float(goalie_scoring.get("wins", 5)) +
+            projected_stats.get("saves", 0) * float(goalie_scoring.get("saves", 0.6)) +
+            projected_stats.get("shutouts", 0) * float(goalie_scoring.get("shutouts", 5)) +
+            projected_stats.get("goals_against", 0) * float(goalie_scoring.get("goals_against", -3))
         )
     else:
         skater_scoring = scoring_settings.get("skater", {})
         # Calculate total points using ALL 8 skater stats
         total_points = (
-            projected_stats.get("goals", 0) * float(skater_scoring.get("goals", 3)) +
-            projected_stats.get("assists", 0) * float(skater_scoring.get("assists", 2)) +
-            projected_stats.get("sog", 0) * float(skater_scoring.get("shots_on_goal", 0.4)) +
-            projected_stats.get("blocks", 0) * float(skater_scoring.get("blocks", 0.5)) +
-            projected_stats.get("ppp", 0) * float(skater_scoring.get("power_play_points", 1)) +
-            projected_stats.get("shp", 0) * float(skater_scoring.get("short_handed_points", 2)) +
-            projected_stats.get("hits", 0) * float(skater_scoring.get("hits", 0.2)) +
-            projected_stats.get("pim", 0) * float(skater_scoring.get("penalty_minutes", 0.5))
+            projected_stats.get("goals", 0) * float(skater_scoring.get("goals", 6)) +
+            projected_stats.get("assists", 0) * float(skater_scoring.get("assists", 4)) +
+            projected_stats.get("sog", 0) * float(skater_scoring.get("shots_on_goal", 0.9)) +
+            projected_stats.get("blocks", 0) * float(skater_scoring.get("blocks", 1.0)) +
+            projected_stats.get("ppp", 0) * float(skater_scoring.get("power_play_points", 2)) +
+            projected_stats.get("shp", 0) * float(skater_scoring.get("short_handed_points", 0)) +
+            projected_stats.get("hits", 0) * float(skater_scoring.get("hits", 0.0)) +
+            projected_stats.get("pim", 0) * float(skater_scoring.get("penalty_minutes", 0.0))
         )
     
     return total_points
@@ -2223,11 +2226,12 @@ def calculate_skater_physical_projection(
     and metadata needed by calculate_daily_projection() — avoiding duplicate queries.
     """
     # Use DEFAULT_FALLBACK_SCORING if not provided (for base_ppg calculation)
+    # INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned; SHP/hits/PIM opt-in.
     if not scoring_settings:
         scoring_settings = {
-            "skater": {"goals": 3, "assists": 2, "power_play_points": 1, "short_handed_points": 2,
-                       "shots_on_goal": 0.4, "blocks": 0.5, "hits": 0.2, "penalty_minutes": 0.5},
-            "goalie": {"wins": 4, "shutouts": 3, "saves": 0.2, "goals_against": -1}
+            "skater": {"goals": 6, "assists": 4, "power_play_points": 2, "short_handed_points": 0,
+                       "shots_on_goal": 0.9, "blocks": 1.0, "hits": 0.0, "penalty_minutes": 0.0},
+            "goalie": {"wins": 5, "shutouts": 5, "saves": 0.6, "goals_against": -3}
         }
 
     # Get base projection using Bayesian shrinkage (ALL 8 stats + ppg)
@@ -2590,22 +2594,22 @@ def transform_physical_to_fantasy(
     if is_goalie:
         goalie_scoring = scoring_settings.get("goalie", {})
         fantasy_points = (
-            physical_projection.get("saves", 0) * float(goalie_scoring.get("saves", 0.2)) +
-            physical_projection.get("wins", 0) * float(goalie_scoring.get("wins", 4)) +
-            physical_projection.get("shutouts", 0) * float(goalie_scoring.get("shutouts", 3)) +
-            physical_projection.get("goals_against", 0) * float(goalie_scoring.get("goals_against", -1))
+            physical_projection.get("saves", 0) * float(goalie_scoring.get("saves", 0.6)) +
+            physical_projection.get("wins", 0) * float(goalie_scoring.get("wins", 5)) +
+            physical_projection.get("shutouts", 0) * float(goalie_scoring.get("shutouts", 5)) +
+            physical_projection.get("goals_against", 0) * float(goalie_scoring.get("goals_against", -3))
         )
     else:
         skater_scoring = scoring_settings.get("skater", {})
         fantasy_points = (
-            physical_projection.get("goals", 0) * float(skater_scoring.get("goals", 3)) +
-            physical_projection.get("assists", 0) * float(skater_scoring.get("assists", 2)) +
-            physical_projection.get("shots", 0) * float(skater_scoring.get("shots_on_goal", 0.4)) +
-            physical_projection.get("blocks", 0) * float(skater_scoring.get("blocks", 0.5)) +
-            physical_projection.get("ppp", 0) * float(skater_scoring.get("power_play_points", 1)) +
-            physical_projection.get("shp", 0) * float(skater_scoring.get("short_handed_points", 2)) +
-            physical_projection.get("hits", 0) * float(skater_scoring.get("hits", 0.2)) +
-            physical_projection.get("pim", 0) * float(skater_scoring.get("penalty_minutes", 0.5))
+            physical_projection.get("goals", 0) * float(skater_scoring.get("goals", 6)) +
+            physical_projection.get("assists", 0) * float(skater_scoring.get("assists", 4)) +
+            physical_projection.get("shots", 0) * float(skater_scoring.get("shots_on_goal", 0.9)) +
+            physical_projection.get("blocks", 0) * float(skater_scoring.get("blocks", 1.0)) +
+            physical_projection.get("ppp", 0) * float(skater_scoring.get("power_play_points", 2)) +
+            physical_projection.get("shp", 0) * float(skater_scoring.get("short_handed_points", 0)) +
+            physical_projection.get("hits", 0) * float(skater_scoring.get("hits", 0.0)) +
+            physical_projection.get("pim", 0) * float(skater_scoring.get("penalty_minutes", 0.0))
         )
 
     return round(fantasy_points, 3)
@@ -3186,7 +3190,7 @@ def calculate_daily_projection(
             offensive_paa_60_z = offensive_paa_60_raw
 
         # Defensive Value (VOPA_D)
-        goal_weight = float(scoring_settings.get("skater", {}).get("goals", 3.0))
+        goal_weight = float(scoring_settings.get("skater", {}).get("goals", 6.0))
         if position == "D":
             pos_avg_xga_per_60 = league_avg_xga - 0.25
         else:
@@ -3396,22 +3400,23 @@ def main():
     
     # Get default scoring settings (for now, use defaults - can be enhanced to use league-specific)
     # Note: In production, scoring settings come from leagues.scoring_settings JSONB
+    # INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned; SHP/hits/PIM opt-in.
     default_scoring = {
         "skater": {
-            "goals": 3,
-            "assists": 2,
-            "shots_on_goal": 0.4,
-            "blocks": 0.5,
-            "power_play_points": 1,
-            "short_handed_points": 2,
-            "hits": 0.2,
-            "penalty_minutes": 0.5,
+            "goals": 6,
+            "assists": 4,
+            "shots_on_goal": 0.9,
+            "blocks": 1.0,
+            "power_play_points": 2,
+            "short_handed_points": 0,
+            "hits": 0.0,
+            "penalty_minutes": 0.0,
         },
         "goalie": {
-            "wins": 4,
-            "shutouts": 3,
-            "saves": 0.2,
-            "goals_against": -1,
+            "wins": 5,
+            "shutouts": 5,
+            "saves": 0.6,
+            "goals_against": -3,
         }
     }
     
