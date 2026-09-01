@@ -19,6 +19,7 @@ Features:
 """
 
 import os
+import random
 import time
 import threading
 import itertools
@@ -167,7 +168,25 @@ class ProxyManager:
             if not formatted_proxies:
                 logger.error("[ProxyManager] No valid proxies after formatting")
                 return False
-            
+
+            # SHUFFLE (2026-09-01, injury-sync 403 postmortem, second half).
+            # Webshare returns the pool in a STABLE order, and this class is
+            # rebuilt fresh in every short-lived pipeline process — so every
+            # run of every cron walked the same first handful of IPs from
+            # index 0, while proxies 6-100 never carried a request. The
+            # observed endgame: ESPN had flagged exactly the recurring
+            # front-of-list IPs, a run's whole retry budget burned on them,
+            # and the other ninety-five never got asked. (The first half of
+            # the fix — advancing instead of force-refreshing on a
+            # destination 403 — lives in citrus_request.py.)
+            #
+            # A per-process shuffle makes each run start at a random
+            # permutation: load spreads across the whole pool over time, and
+            # a destination that has flagged some IPs stops seeing the same
+            # ones lead every request. Rotation within a run is unchanged —
+            # still a strict cycle, no repeats until the pool wraps.
+            random.shuffle(formatted_proxies)
+
             # Update cache
             self.proxy_list = formatted_proxies
             self.proxy_cycle = itertools.cycle(self.proxy_list)
