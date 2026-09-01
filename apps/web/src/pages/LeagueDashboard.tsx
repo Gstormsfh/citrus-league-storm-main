@@ -780,7 +780,12 @@ const LeagueDashboard = () => {
                         <span className="sr-only sm:hidden">League Settings</span>
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 text-pastel-cream">
+                    {/* MOBILE SHEET (2026-09-01): below sm the centered 700px
+                        desktop modal crammed eight settings tabs onto a phone.
+                        Pin it as a full-height bottom sheet instead — top edge
+                        under the status bar, safe-area padding at the foot —
+                        while sm+ keeps the desktop modal unchanged. */}
+                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 text-pastel-cream max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-[max(env(safe-area-inset-top),1rem)] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:left-0 max-sm:max-w-none max-sm:w-full max-sm:max-h-none max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:pb-[max(env(safe-area-inset-bottom),1.25rem)]">
                       <DialogHeader>
                         <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
                           ✦ Commissioner
