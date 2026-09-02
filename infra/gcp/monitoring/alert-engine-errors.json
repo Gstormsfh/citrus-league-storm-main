@@ -1,0 +1,43 @@
+{
+  "displayName": "Citrus draft engine: ERROR log rate (3+ in 5 min)",
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "**What it means.** The draft engine container logged three or more `severity: ERROR` structured lines inside a 5-minute window. A healthy engine logs zero ERROR lines; every ERROR emit in `server/src/draft/` is a real failure (RPC failure, subscription fetch/apply failure, snapshot build failure, orphan-scan failure, uWS listen failure...). The threshold is 3 rather than 1 so a single retried blip on a Supabase hiccup does not email at 3 am; a sustained loop (e.g. the 16-hour `connect ECONNREFUSED` of 2026-08-19) trips it within one window.\n\n**What to do.**\n1. Pull the lines (the `event` field names the failing path):\n   `gcloud logging read '(jsonPayload.container.metadata.app=\"citrus-draft-engine\") AND jsonPayload.message:\"\\\"severity\\\":\\\"ERROR\\\"\"' --project=citrus-fantasy-prod --freshness=30m --limit=50 --order=desc --format='value(jsonPayload.message)'`\n2. Map the event to the runbook: `event_subscription.*` -> `docs/RUNBOOKS/draft-engine-v2-operations.md` section 2.13 / 5; `snapshot.*` -> section 6; `registry.*` / `uws.*` -> section 2.1; pick-path RPC errors -> section 2.2 / 2.3; `autopick.*` -> section 2.5.\n3. If a deploy landed in the last hour, compare against `deployment.fingerprint` and consider the rollback playbook (`docs/RUNBOOKS/draft-engine-v2-rollback-playbook.md`).\n\nManaged by `infra/gcp/monitoring/apply-monitoring.sh` (`alert-engine-errors.json`)."
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "logging/user/citrus_engine_error_count > 2 per 5-minute window",
+      "conditionThreshold": {
+        "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_error_count\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_SUM",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "groupByFields": []
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 2,
+        "duration": "0s",
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "notificationChannels": [
+    "${NOTIFICATION_CHANNEL}"
+  ],
+  "alertStrategy": {
+    "autoClose": "1800s"
+  },
+  "severity": "ERROR",
+  "enabled": true,
+  "userLabels": {
+    "app": "citrus-draft-engine",
+    "managed-by": "apply-monitoring-sh",
+    "runbook": "draft-engine-v2-operations-s2-13"
+  }
+}

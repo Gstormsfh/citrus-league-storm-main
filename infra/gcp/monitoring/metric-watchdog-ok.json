@@ -1,0 +1,21 @@
+{
+  "name": "citrus_engine_watchdog_ok",
+  "description": "Count of `event_subscription.watchdog_ok` lines from the citrus-draft-engine container (server/src/draft/eventSubscription.ts). The engine self-NOTIFYs every 60s (watchdogIntervalMs) and logs this on the round-trip; it is the only active liveness signal for the LISTEN/NOTIFY subscription AND for the process itself. Filter matches both the live gcplogs shape (raw JSON line in jsonPayload.message) and a parsed jsonPayload.event, see infra/gcp/monitoring/README.md. Managed by infra/gcp/monitoring/apply-monitoring.sh.",
+  "filter": "(jsonPayload.container.metadata.app=\"citrus-draft-engine\" OR labels.app=\"citrus-draft-engine\") AND (jsonPayload.event=\"event_subscription.watchdog_ok\" OR jsonPayload.message:\"\\\"event\\\":\\\"event_subscription.watchdog_ok\\\"\")",
+  "metricDescriptor": {
+    "metricKind": "DELTA",
+    "valueType": "INT64",
+    "unit": "1",
+    "displayName": "Citrus engine watchdog_ok count",
+    "labels": [
+      {
+        "key": "environment",
+        "valueType": "STRING",
+        "description": "Docker label `environment` forwarded by the gcplogs driver (production / staging). Empty if the logging agent ever stops nesting container metadata."
+      }
+    ]
+  },
+  "labelExtractors": {
+    "environment": "EXTRACT(jsonPayload.container.metadata.environment)"
+  }
+}

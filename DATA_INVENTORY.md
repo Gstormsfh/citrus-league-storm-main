@@ -128,6 +128,7 @@ Workflows in `.github/workflows/`:
 - **`deploy-preview.yml`** — Preview deployments
 - **`production-deploy.yml`** — Prod deploy on tag/release
 - **`staging-deploy.yml`** — Staging deploy on push to `staging` or `staging-setup`
+- **`draft-scorecard.yml`** — Draft Latency Scorecard, Mondays 12:00 UTC: runs `data-pipeline/monitoring/draft_latency_scorecard.py` (read-only) over the `draft_latency_scorecard` view (migration `20260901233000`; per-draft autopick deadline→commit p50/p95/max, autopick share, picks/min, duration; `security_invoker`, SELECT for `service_role` only). Fails the run when a draft breaches the CLAUDE.md autopick p95 ≤ 1000 ms target. Cloud Monitoring side of the same audit item (§B-8/§B-9): `infra/gcp/monitoring/` (log-based metrics, alert policies, "Citrus Draft Mandate" dashboard, `apply-monitoring.sh`).
 
 NPM scripts in `package.json` (root):
 - `dev`, `dev:server`, `dev:all`, `build`, `build:server`, `build:all`, `test`, `test:server`, `lint`, `deploy`, `firebase` — standard development
@@ -140,7 +141,7 @@ NPM scripts in `package.json` (root):
 | `acquisition/` | 13 files | NHL API ingestion: `data_acquisition.py`, `data_scraping_service.py`, `fetch_nhl_stats_from_landing*.py`, `ingest_live_raw_nhl.py`, `ingest_nhl_playoff_bracket.py`, `ingest_playoff_schedule.py`, `ingest_raw_nhl.py`, `ingest_shiftcharts.py`, `populate_team_stats.py`, `scrape_live_nhl_stats.py`, `scrape_per_game_nhl_stats.py`, `sync_playoff_results.py` |
 | `projections/` | 9 files | Projection generation: `build_player_season_stats.py`, `calculate_daily_projections.py`, `fantasy_projection_pipeline.py`, **`nightly_projection_batch.py` (cron entry)**, `projection_uncertainty.py`, `quantify_monte_carlo_impact.py`, `quantify_uncertainty_impact.py`, `run_daily_projections.py`, `sync_ppp_from_gamelog.py` |
 | `scoring/` | 4 files | `calculate_matchup_scores.py`, `reconcile_player_stats.py`, `run_daily_pbp_processing.py`, `simulate_matchups.py` |
-| `monitoring/` | 11 files | Health/freshness checks: `alerting.py`, `audit_projection_accuracy.py`, `check_data_freshness.py`, `health_check_server.py`, `monitor_data_scraping.py`, `monitor_proxy_health.py`, `run_midnight_update.py`, `verify_data_integrity.py`, `verify_projection_pipeline.py` + 2 test files |
+| `monitoring/` | 12 files | Health/freshness checks: `alerting.py`, `audit_projection_accuracy.py`, `check_data_freshness.py`, `draft_latency_scorecard.py` (weekly Mandate scorecard over the `draft_latency_scorecard` view), `health_check_server.py`, `monitor_data_scraping.py`, `monitor_proxy_health.py`, `run_midnight_update.py`, `verify_data_integrity.py`, `verify_projection_pipeline.py` + 2 test files |
 | `utils/` | 4 files | `citrus_request.py` (NHL API throttle), `proxy_health.py`, `proxy_manager.py` (100-IP rotation), `supabase_rest.py` (DB client) |
 | `debug/` | 14 files | One-off `check_*.py` / `audit_*.py` / `find_*.py` / `fix_*.py` / `verify_*.py` McDavid-and-similar scripts. **Keep but reorganize** — these are the reference forensics scripts |
 | `tests/` | (count not enumerated) | Pipeline unit tests |

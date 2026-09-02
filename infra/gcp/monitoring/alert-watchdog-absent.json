@@ -1,0 +1,38 @@
+{
+  "displayName": "Citrus draft engine: watchdog_ok absent for 15 min",
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "**What it means.** The draft engine on `citrus-draft-engine-prod` has not logged `event_subscription.watchdog_ok` for 15 minutes. The engine emits it every 60 s when its self-NOTIFY round-trips over the LISTEN/NOTIFY connection, so silence means one of: the engine process/container is down, the VM is off or mid-failed-converge, the Postgres subscription is dead (watchdog_failed + reconnect loop), or Cloud Logging stopped receiving container logs.\n\n**What to do (in order).**\n1. `curl -s -o /dev/null -w '%{http_code}\\n' https://draft.citrusfantasysports.com/` - 404 means the engine is up (uWS answers), anything else means down.\n2. `gcloud logging read '(jsonPayload.container.metadata.app=\"citrus-draft-engine\") AND jsonPayload.message:\"event_subscription.\"' --project=citrus-fantasy-prod --freshness=30m --limit=20 --order=desc` - look for `watchdog_failed` / `connection_lost` (subscription) vs nothing at all (process/VM).\n3. If the container is gone: `docs/RUNBOOKS/draft-engine-v2-operations.md` section 2.1 (Engine appears down). If the subscription is looping: section 2.13 (LISTEN/NOTIFY failure) and section 5.2 (pooled-URL gotcha, KI-E010).\n4. Check for a `citrus-startup-failed` entry (the VM converge alert) - a failed `docker pull` after a metadata change leaves the OLD container running via `--restart=always`.\n\nManaged by `infra/gcp/monitoring/apply-monitoring.sh` (`alert-watchdog-absent.json`). Edit the file, re-run the script; do not hand-edit in the console."
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "logging/user/citrus_engine_watchdog_ok reports no data for 15 minutes",
+      "conditionAbsent": {
+        "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_watchdog_ok\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_SUM",
+            "crossSeriesReducer": "REDUCE_SUM",
+            "groupByFields": []
+          }
+        ],
+        "duration": "900s",
+        "trigger": {
+          "count": 1
+        }
+      }
+    }
+  ],
+  "notificationChannels": [
+    "${NOTIFICATION_CHANNEL}"
+  ],
+  "severity": "CRITICAL",
+  "enabled": true,
+  "userLabels": {
+    "app": "citrus-draft-engine",
+    "managed-by": "apply-monitoring-sh",
+    "runbook": "draft-engine-v2-operations-s2-1"
+  }
+}
