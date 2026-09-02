@@ -57,6 +57,8 @@ function entry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntry {
     proj_assists: 34,
     proj_sog: 150,
     proj_ppp: 18,
+    proj_blocks: 55,
+    proj_hits: 40,
     proj_wins: null,
     proj_saves: null,
     proj_shutouts: null,

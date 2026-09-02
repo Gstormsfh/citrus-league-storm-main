@@ -66,6 +66,8 @@ function row(id: number, name: string): DashboardIndexEntry {
     proj_assists: 20,
     proj_sog: 100,
     proj_ppp: 10,
+    proj_blocks: 40,
+    proj_hits: 30,
     proj_wins: null,
     proj_saves: null,
     proj_shutouts: null,

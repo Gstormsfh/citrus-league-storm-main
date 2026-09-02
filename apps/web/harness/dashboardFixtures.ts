@@ -520,6 +520,11 @@ export const DASHBOARD_PLAYER_INDEX: DashboardIndexEntry[] = HARNESS_PLAYERS.map
     proj_assists: Math.round((p.assists ?? 0) * 2.4),
     proj_sog: Math.round(shots * 2.4),
     proj_ppp: Math.round((p.points ?? 0) * 0.3),
+    // This fixture carries no hits/blocks for its skaters (both are 0
+    // above), so it projects neither. Null rather than 0: "not projected"
+    // and "projected to record none" are different claims.
+    proj_blocks: null,
+    proj_hits: null,
     proj_wins: isGoalie ? Math.round((p.wins ?? 0) * 1.6) : null,
     proj_saves: isGoalie ? 780 : null,
     proj_shutouts: isGoalie ? 2 : null,

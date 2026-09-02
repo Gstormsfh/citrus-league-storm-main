@@ -139,6 +139,19 @@ export interface DashboardIndexEntry {
   proj_assists: number | null;
   proj_sog: number | null;
   proj_ppp: number | null;
+  /**
+   * Projected blocks and hits (2026-09-02). `player_ros_projections` has
+   * carried both since the table shipped and `ROS_COLS` has always SELECTed
+   * them — they were simply dropped on the way out of this mapper.
+   *
+   * They are not cosmetic. Blocks are worth 1 point in `DEFAULT_SCORING`, so
+   * a consumer scoring the rest-of-season projection through the league's own
+   * categories was short every skater's blocks — roughly fifty points a
+   * player under default scoring. The draft room is the first such consumer
+   * (`apps/web/src/components/draft/draftDecision.ts`).
+   */
+  proj_blocks: number | null;
+  proj_hits: number | null;
   proj_wins: number | null;
   proj_saves: number | null;
   proj_shutouts: number | null;
@@ -703,6 +716,8 @@ export class PlayerDashboardService {
         proj_assists: r?.projected_assists ?? null,
         proj_sog: r?.projected_sog ?? null,
         proj_ppp: r?.projected_ppp ?? null,
+        proj_blocks: r?.projected_blocks ?? null,
+        proj_hits: r?.projected_hits ?? null,
         proj_wins: r?.projected_wins_ros ?? null,
         proj_saves: r?.projected_saves_ros ?? null,
         proj_shutouts: r?.projected_shutouts_ros ?? null,
