@@ -382,11 +382,26 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                      under the ellipsis on every live row. Small and present
                      beats large and truncated. */
                   <div className="lg:hidden flex items-center gap-1 min-w-0 overflow-hidden">
-                    {/* Opponent logo + abbrev, tinted by expected difficulty (M10) */}
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <img loading="lazy" decoding="async" src={logoUrl} alt={opponent || ''} className="w-3.5 h-3.5 object-contain" />
+                    {/* Opponent logo + abbrev, tinted by expected difficulty (M10).
+
+                        THE SHRINKABLE ONE (2026-09-02). This block used to be
+                        `shrink-0` like the state qualifiers after it, which
+                        meant NOTHING in the row could shrink: the line simply
+                        overran its 83px box and `overflow: hidden` cut it. On
+                        the opponent card, whose content is right-aligned, the
+                        cut lands on the far side, so a final score rendered at
+                        x=392.1 against a card edge of 393 -- entirely off a
+                        393px screen. On the user card the same overrun slid
+                        the score under the 28px mug. The row's own comment
+                        below already said the overflow should become "an
+                        ellipsis on the one shrinkable child"; there was no
+                        shrinkable child. There is now: the logo holds its
+                        14px, the label truncates, and the score -- the part
+                        a manager is actually reading -- always fits. */}
+                    <div className="flex items-center gap-0.5 min-w-0">
+                      <img loading="lazy" decoding="async" src={logoUrl} alt={opponent || ''} className="w-3.5 h-3.5 object-contain shrink-0" />
                       <span
-                        className={cn('player-opponent', ROW_META, 'font-display font-semibold', oppTint.className)}
+                        className={cn('player-opponent truncate', ROW_META, 'font-display font-semibold', oppTint.className)}
                         data-opponent-tier={oppTint.tier}
                       >
                         {opPrefix} {opponent}

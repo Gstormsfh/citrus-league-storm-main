@@ -305,4 +305,35 @@ describe('the phone row shows the family name, from the shared module', () => {
     // native title, and the card the row opens on tap.
     expect(PLAYER_CARD).toMatch(/className="player-name" title=\{player\.name\}/);
   });
+
+  // ONE SHRINKABLE CHILD IN THE META LINE (2026-09-02, adversarial review F2).
+  //
+  // The phone meta line is `min-w-0 overflow-hidden` and every child after
+  // the opponent block is `shrink-0` -- the live pill, the period, the score.
+  // The opponent block was `shrink-0` too, so NOTHING in the row could
+  // shrink: the line overran its 83px box and `overflow: hidden` cut it.
+  // Measured at 393x852 before the fix: on the opponent card, whose content
+  // is right-aligned, a final score rendered at x=392.1 against a card edge
+  // of 393 -- zero pixels on a 393px screen. On the user card the same
+  // overrun slid the score under the 28px mug.
+  //
+  // jsdom has no layout engine, so this cannot be asserted geometrically
+  // here. What CAN be pinned is the source contract the geometry depends on:
+  // the opponent block shrinks, its label truncates, and the score does not.
+  // Break any one and the score leaves the screen again.
+  it('the opponent label is the shrinkable child of the meta line, and the score is not', () => {
+    const src = readFileSync(resolve(SRC, 'components/matchup/PlayerCard.tsx'), 'utf8');
+    const meta = src.slice(src.indexOf('player-meta-row'));
+    // The wrapper's own className, not its children's: the logo inside it is
+    // legitimately shrink-0 (a squashed crest is worse than a shorter label).
+    const wrapper = /<div className="flex items-center gap-0\.5([^"]*)"/.exec(meta)?.[1] ?? '';
+    expect(wrapper, 'the opponent block must be allowed to shrink').toContain('min-w-0');
+    expect(wrapper, 'a shrink-0 opponent block leaves nothing to absorb the overflow').not.toContain('shrink-0');
+    // ...and the logo inside it must still hold its 14px.
+    expect(meta.slice(0, meta.indexOf('player-opponent'))).toMatch(/w-3\.5 h-3\.5 object-contain shrink-0/);
+    expect(meta).toMatch(/player-opponent truncate/);
+    // The row still needs its hard-stop container, or the overflow moves out
+    // of the card instead of into an ellipsis.
+    expect(meta).toMatch(/lg:hidden flex items-center gap-1 min-w-0 overflow-hidden/);
+  });
 });
