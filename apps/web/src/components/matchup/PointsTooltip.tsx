@@ -106,7 +106,7 @@ export const PointsTooltip = ({
           </button>
         </PopoverTrigger>
         <PopoverContent 
-          className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] !z-[9999]"
+          className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] !z-popover"
           side="top"
           align="center"
           sideOffset={8}
@@ -138,7 +138,7 @@ export const PointsTooltip = ({
         </button>
       </TooltipTrigger>
       <TooltipContent 
-        className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] !z-[9999]"
+        className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] !z-popover"
         side="top"
         align="center"
         sideOffset={8}

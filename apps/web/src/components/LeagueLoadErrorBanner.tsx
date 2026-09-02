@@ -46,7 +46,7 @@ export function LeagueLoadErrorBanner() {
     <div
       role="alert"
       data-testid="league-load-error-banner"
-      className="sticky top-0 z-50 flex items-center justify-center gap-3 border-b border-destructive/40 bg-destructive/15 px-4 py-2.5 text-sm backdrop-blur"
+      className="sticky top-0 z-app-nav flex items-center justify-center gap-3 border-b border-destructive/40 bg-destructive/15 px-4 py-2.5 text-sm backdrop-blur"
     >
       <AlertTriangle className="h-4 w-4 flex-shrink-0 text-destructive" aria-hidden="true" />
       <span className="text-destructive">

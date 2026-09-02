@@ -190,7 +190,7 @@ export function AutoLineupSheet({
     ) : null;
 
   const sheet = (
-    <div className="fixed inset-0 z-[9999]" data-testid="auto-sheet-root">
+    <div className="fixed inset-0 z-sheet" data-testid="auto-sheet-root">
       <div
         className="absolute inset-0 bg-black/60 animate-in fade-in-0 duration-150"
         onClick={() => onOpenChange(false)}

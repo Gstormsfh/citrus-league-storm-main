@@ -1236,7 +1236,7 @@ function StickyHeader({ leagueId, onRetryNow, clockOffsetMs }: StickyHeaderProps
       : '';
 
   return (
-    <div className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border pb-2 mb-3 pt-safe">
+    <div className="sticky top-0 z-section-header bg-background/95 backdrop-blur border-b border-border pb-2 mb-3 pt-safe">
       <h1 className="sr-only">Draft Room</h1>
       <div className="flex min-h-[44px] items-center justify-between gap-2">
         <Link
@@ -2037,7 +2037,7 @@ function MainTabs({
           the list's last rows scroll clear of it. lg+ keeps it in-flow,
           sticky just below the compact header. */}
       {!isAuctionRoom && (
-        <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-16 lg:z-20">
+        <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-page-header lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-16 lg:z-sticky-raised">
           <OnClockActionBar
             amIOnClock={amIOnClock}
             currentPickDeadline={snapshot?.stateSnapshot.currentPickDeadline ?? null}

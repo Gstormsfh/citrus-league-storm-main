@@ -5430,7 +5430,7 @@ const Matchup = () => {
           matchup (a stranger's pair from the scoreboard is not "My Team").
           The hex-marker header string the menu guard keys on is the legacy
           spelling of the same colour; this bar keeps the token. */}
-      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-page-header bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <StickyScoreBar
           menu={<MobileMenuButton />}
           week={currentMatchup ? selectedWeek : undefined}

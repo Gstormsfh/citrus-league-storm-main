@@ -3293,7 +3293,7 @@ const Roster = () => {
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
       {/* Loading overlay during league switch - non-blocking */}
       {showLoadingOverlay && (
-        <div className="fixed inset-0 bg-[#0F1F15]/90 backdrop-blur-lg z-[100] flex items-center justify-center">
+        <div className="fixed inset-0 bg-[#0F1F15]/90 backdrop-blur-lg z-overlay flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pastel-orange mx-auto mb-4"></div>
             <p className="text-lg font-medium text-pastel-cream">Switching leagues…</p>
@@ -3307,7 +3307,7 @@ const Roster = () => {
       </div>
       
       {/* MOBILE: Compact sticky header with roster context + hamburger menu */}
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-sm font-calistoga font-bold text-pastel-cream truncate">

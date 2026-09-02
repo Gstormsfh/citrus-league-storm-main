@@ -268,18 +268,21 @@ export function CitrusToaster() {
         className={cn(
           // TOP of the screen, full width on a phone.
           //
-          // z-[10000], not the scaffold's z-[100]: the roster sheets that
-          // FIRE the `move` toasts (SlotPickerMenu, FillSlotSheet,
-          // AutoLineupSheet) are z-[9999], and page chrome sits at z-40
-          // (FreeAgents' sticky header) through z-[80] (the nav scrim). A
-          // notification hidden behind the sheet that produced it is not a
-          // notification.
+          // `z-toast` is the top rung of the one z-index scale
+          // (`src/styles/zLayers.ts`), and it is a rung rather than a
+          // number for the reason this comment used to demonstrate: it
+          // read "z-[10000], not the scaffold's z-[100], because the
+          // roster sheets are z-[9999] and page chrome runs z-40 to
+          // z-[80]" — correct, and derived by reading the whole codebase
+          // once. A notification hidden behind the sheet that produced it
+          // is not a notification, and that has to hold without anyone
+          // re-deriving it.
           //
           // pt is calc(env() + 0.5rem), not the `pt-safe` utility: pt-safe is
           // a bare `padding-top: env(safe-area-inset-top)`, which resolves to
           // 0 on every non-notch phone and in the browser — it would beat the
           // container padding and leave the card flush against the top edge.
-          'fixed inset-x-0 top-0 z-[10000] flex w-full flex-col gap-2 px-3 pb-3 outline-none',
+          'fixed inset-x-0 top-0 z-toast flex w-full flex-col gap-2 px-3 pb-3 outline-none',
           'pt-[calc(env(safe-area-inset-top)+0.5rem)]',
           // sm: and up, centre it at 420px rather than top-right. Top-right
           // is taken twice over: <Sonner position="top-right" /> is mounted

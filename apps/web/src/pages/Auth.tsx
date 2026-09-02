@@ -224,7 +224,7 @@ const Auth = () => {
       <Navbar />
       <div
         aria-hidden="true"
-        className="fixed inset-0 pointer-events-none z-0"
+        className="fixed inset-0 pointer-events-none z-page-backdrop"
         style={{ background: 'radial-gradient(ellipse 50% 40% at 80% 15%, rgba(255,107,26,0.08) 0%, transparent 60%)' }}
       />
       <main className="relative z-10 flex items-center justify-center px-4 pt-24 pb-12 lg:pt-28 lg:pb-20 min-h-[calc(100vh-92px)]">

@@ -69,7 +69,7 @@ export function FillSlotSheet({
   const openCount = candidates.filter((p) => !lockedPlayerIds?.has(String(p.id))).length;
 
   const sheet = (
-    <div className="fixed inset-0 z-[9999]" data-testid="fill-sheet-root">
+    <div className="fixed inset-0 z-sheet" data-testid="fill-sheet-root">
       <div
         className="absolute inset-0 bg-black/60 animate-in fade-in-0 duration-150"
         onClick={() => onOpenChange(false)}

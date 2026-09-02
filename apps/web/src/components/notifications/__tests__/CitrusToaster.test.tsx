@@ -262,10 +262,12 @@ describe('CitrusToaster — surface and placement', () => {
     expect(vp.className).toContain('top-0');
     expect(vp.className).toContain('inset-x-0');
     expect(vp.className).toContain('w-full');
-    // Page sticky headers are z-40; the roster sheets that fire the `move`
-    // toasts are z-[9999]. A notification behind the sheet that produced it
-    // is not a notification.
-    expect(vp.className).toContain('z-[10000]');
+    // The top rung of the one z-index scale (src/styles/zLayers.ts), not a
+    // number picked to clear the sheets that fire the `move` toasts. A
+    // notification behind the sheet that produced it is not a notification,
+    // and `zLayerScaleGuard` is what keeps that true as layers are added.
+    expect(vp.className).toContain('z-toast');
+    expect(vp.className).not.toMatch(/z-\[\d+\]/);
     // The notch. `pt-safe` alone is a bare padding-top: env(...) that
     // resolves to 0 on a non-notch phone and would beat the container pad.
     expect(vp.className).toContain('pt-[calc(env(safe-area-inset-top)+0.5rem)]');

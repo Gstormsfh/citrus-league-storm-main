@@ -150,7 +150,7 @@ export function SlotPickerMenu({
     '';
 
   const sheet = (
-    <div className="fixed inset-0 z-[9999]" data-testid="slot-sheet-root">
+    <div className="fixed inset-0 z-sheet" data-testid="slot-sheet-root">
       {/* Scrim — tapping it is Cancel, same as the cancel bar. */}
       <div
         className="absolute inset-0 bg-black/60 animate-in fade-in-0 duration-150"

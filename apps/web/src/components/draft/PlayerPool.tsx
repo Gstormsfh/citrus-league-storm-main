@@ -376,7 +376,7 @@ export const PlayerPool = memo(({
             {displayRank}
           </span>
         </td>
-        <td className="px-2 py-2 sticky left-[44px] bg-pastel-surface-tile z-10 text-pastel-cream">
+        <td className="px-2 py-2 sticky left-[44px] bg-pastel-surface-tile z-sticky-base text-pastel-cream">
           <div className="flex items-center gap-1.5">
             {player.headshot_url && (
               <img
@@ -713,7 +713,7 @@ export const PlayerPool = memo(({
             pushing them off-screen. */}
         <div className="overflow-auto scrollbar-styled lg:max-h-[calc(100dvh-18rem)]" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="w-full min-w-[1400px] text-sm border-collapse">
-            <thead className="bg-pastel-surface-high sticky top-0 z-20 border-b border-white/10">
+            <thead className="bg-pastel-surface-high sticky top-0 z-sticky-raised border-b border-white/10">
               <tr>
                 <th className="px-1.5 py-2 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs w-[44px]"
                   onClick={() => handleHeaderClick('projRank')}
@@ -726,7 +726,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'projRank' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th className="px-2 py-2 text-left font-semibold text-pastel-cream sticky left-[44px] bg-pastel-surface-high z-10 min-w-[190px]">Player</th>
+                <th className="px-2 py-2 text-left font-semibold text-pastel-cream sticky left-[44px] bg-pastel-surface-high z-sticky-base min-w-[190px]">Player</th>
                 <th className="px-2 py-2 text-left font-semibold text-pastel-cream">Pos</th>
                 <th className="px-2 py-2 text-left font-semibold text-pastel-cream">Team</th>
                 <th className="px-2 py-2 text-center font-semibold text-pastel-cream">GP</th>

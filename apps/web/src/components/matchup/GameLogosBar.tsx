@@ -35,7 +35,7 @@ const GameLogoWithTooltip = ({
         side="top"
         align="center"
         sideOffset={6}
-        className="bg-[#1A2A20]/95 backdrop-blur-md text-pastel-cream text-xs p-2.5 rounded-varsity border-2 border-pastel-sage/40 shadow-varsity w-auto max-w-[220px] !z-[9999]"
+        className="bg-[#1A2A20]/95 backdrop-blur-md text-pastel-cream text-xs p-2.5 rounded-varsity border-2 border-pastel-sage/40 shadow-varsity w-auto max-w-[220px] !z-popover"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className="flex items-center justify-between gap-2">

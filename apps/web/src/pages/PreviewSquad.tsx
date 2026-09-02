@@ -35,7 +35,7 @@ export default function PreviewSquad() {
       }}
     >
       {/* Nav */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-white/55 border-b border-white/60">
+      <header className="sticky top-0 z-page-header backdrop-blur-md bg-white/55 border-b border-white/60">
         <div className="max-w-[1240px] mx-auto px-6 h-16 flex items-center justify-between gap-6">
           <Link to="/preview-squad" className="flex items-center gap-1.5">
             <span className="font-calistoga text-[24px] leading-none text-pastel-forest">Citrus</span>

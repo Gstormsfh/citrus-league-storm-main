@@ -207,7 +207,7 @@ describe('Matchup.tsx mounts the bar inside the sticky header (source contract)'
   const page = readFileSync(resolve(here, '../../../pages/Matchup.tsx'), 'utf-8');
 
   it('the sticky header renders StickyScoreBar with the menu button as its menu slot', () => {
-    const header = page.indexOf('lg:hidden sticky top-0 z-40');
+    const header = page.indexOf('lg:hidden sticky top-0 z-page-header');
     expect(header).toBeGreaterThan(-1);
     const slice = page.slice(header, header + 1200);
     expect(slice).toContain('<StickyScoreBar');

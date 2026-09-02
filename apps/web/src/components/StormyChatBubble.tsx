@@ -304,7 +304,7 @@ export const StormyChatBubble = () => {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed h-14 w-14 rounded-full bg-pastel-orange ring-2 ring-pastel-orange/30 shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)] hover:scale-105 hover:-translate-y-1 transition-all z-[100] p-0 overflow-hidden"
+        className="fixed h-14 w-14 rounded-full bg-pastel-orange ring-2 ring-pastel-orange/30 shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)] hover:scale-105 hover:-translate-y-1 transition-all z-overlay p-0 overflow-hidden"
         style={{
           position: 'fixed',
           bottom: isMobile ? 'calc(5rem + env(safe-area-inset-bottom) + 4rem)' : '1.5rem',

@@ -619,7 +619,7 @@ export default function PoolPlayoffRosterEntry() {
       )}
 
       {/* Sticky header with roster progress */}
-      <div className="sticky top-0 z-30 bg-pastel-surface backdrop-blur-xl border-b border-white/10 shadow-sm pt-safe">
+      <div className="sticky top-0 z-section-header bg-pastel-surface backdrop-blur-xl border-b border-white/10 shadow-sm pt-safe">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
@@ -1068,7 +1068,7 @@ export default function PoolPlayoffRosterEntry() {
                     On mobile, table naturally shrinks to fit the few visible columns
                     (no dead horizontal space after the player name). */}
                 <table className="w-full text-sm border-collapse" style={{ minWidth: '1100px' }}>
-                  <thead className="bg-fantasy-light sticky top-0 z-10 border-b border-white/10">
+                  <thead className="bg-fantasy-light sticky top-0 z-sticky-base border-b border-white/10">
                     <tr>
                       <th className="px-2 py-2 text-left text-xs font-display font-bold text-pastel-cream w-8">#</th>
                       <th className="px-2 py-2 text-left text-xs font-display font-bold text-pastel-cream w-20">Action</th>

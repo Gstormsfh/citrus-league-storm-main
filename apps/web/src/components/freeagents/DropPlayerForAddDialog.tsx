@@ -438,7 +438,7 @@ export function DropPlayerForAddDialog({
             <>
               {skaters.length > 0 && (
                 <table className="w-full">
-                  <thead className="sticky top-0 bg-background z-10">{SkaterHeader}</thead>
+                  <thead className="sticky top-0 bg-background z-sticky-base">{SkaterHeader}</thead>
                   <tbody>
                     {skaters.map((p) => renderSkaterRow(p, { selected: selectedDropId === String(p.id) }))}
                   </tbody>
@@ -446,7 +446,7 @@ export function DropPlayerForAddDialog({
               )}
               {goalies.length > 0 && (
                 <table className="w-full">
-                  <thead className="sticky top-0 bg-background z-10">{GoalieHeader}</thead>
+                  <thead className="sticky top-0 bg-background z-sticky-base">{GoalieHeader}</thead>
                   <tbody>
                     {goalies.map((p) => renderGoalieRow(p, { selected: selectedDropId === String(p.id) }))}
                   </tbody>

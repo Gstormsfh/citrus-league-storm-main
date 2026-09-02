@@ -159,7 +159,7 @@ const MobileMenuButton = () => {
           4px strip ("transparent menu"). Portal to <body> so
           position:fixed always means the viewport. */}
       {menuOpen && createPortal(
-        <div className="fixed inset-0 top-0 z-[60] bg-[#0F1F15]/95 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
+        <div className="fixed inset-0 top-0 z-menu bg-[#0F1F15]/95 backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.7)]">
           <div className="flex flex-col h-[calc(100dvh-env(safe-area-inset-bottom))] pt-[calc(env(safe-area-inset-top)+0.75rem)] px-4 pb-3 bg-[#0F1F15] text-pastel-cream relative overflow-hidden">
             {/* Decorative orange + sage halos */}
             <div aria-hidden="true" className="absolute -top-32 -right-20 w-[420px] h-[420px] bg-pastel-orange/15 rounded-full blur-3xl pointer-events-none" />

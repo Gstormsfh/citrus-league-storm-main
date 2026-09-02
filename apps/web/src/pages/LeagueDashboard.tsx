@@ -729,7 +729,7 @@ const LeagueDashboard = () => {
           bar carries the league's identity on phones — not a generic
           "League" label — so the page below can skip the duplicate mega
           header and put the draft CTA above the fold. */}
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream truncate px-1">{league.name}</h1>

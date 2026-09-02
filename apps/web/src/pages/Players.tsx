@@ -499,10 +499,10 @@ const Players = () => {
                       {/* Sticky LEFT as well as top: at phone widths the table
                           scrolls horizontally inside its container — the name
                           column must stay in view or swiped stats lose context. */}
-                      <th className="sticky left-0 top-0 z-20 bg-card px-3 py-2.5">Player</th>
-                      <th className="sticky top-0 z-10 bg-card px-2 py-2.5 text-right">GP</th>
+                      <th className="sticky left-0 top-0 z-sticky-raised bg-card px-3 py-2.5">Player</th>
+                      <th className="sticky top-0 z-sticky-base bg-card px-2 py-2.5 text-right">GP</th>
                       {(group === 'skaters' ? skaterCols : goalieCols).map((col) => (
-                        <th key={col.key} className="sticky top-0 z-10 bg-card px-2 py-2.5 text-right">
+                        <th key={col.key} className="sticky top-0 z-sticky-base bg-card px-2 py-2.5 text-right">
                           <button
                             className={`hover:text-foreground ${
                               (group === 'skaters' ? skaterSort : goalieSort) === col.key ? 'text-pastel-orange' : ''
@@ -528,7 +528,7 @@ const Players = () => {
                           selected?.id === p.id ? 'bg-white/10' : ''
                         }`}
                       >
-                        <td className={`sticky left-0 z-10 px-3 py-2 ${selected?.id === p.id ? 'bg-muted' : 'bg-card'}`}>
+                        <td className={`sticky left-0 z-sticky-base px-3 py-2 ${selected?.id === p.id ? 'bg-muted' : 'bg-card'}`}>
                           <div className="flex items-center gap-2.5">
                             <Headshot player={p} size="sm" />
                             <div className="min-w-0 max-w-[160px]">
@@ -604,7 +604,7 @@ const Players = () => {
             same dashboard as a dismissible overlay sheet. */}
         {mobilePanelOpen && selected && (
           <div
-            className="lg:hidden fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm p-3"
+            className="lg:hidden fixed inset-0 z-app-nav overflow-y-auto bg-black/70 backdrop-blur-sm p-3"
             role="dialog"
             aria-modal="true"
             onClick={() => setMobilePanelOpen(false)}

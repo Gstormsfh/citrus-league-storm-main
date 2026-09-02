@@ -48,7 +48,7 @@ export default function PreviewBoards() {
         />
 
         {/* Nav */}
-        <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F1F15]/85 border-b border-white/5">
+        <header className="sticky top-0 z-page-header backdrop-blur-md bg-[#0F1F15]/85 border-b border-white/5">
           <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between gap-6">
             <Link to="/preview-boards" className="flex items-center gap-1.5">
               <span className="font-calistoga text-[24px] leading-none text-pastel-cream">Citrus</span>

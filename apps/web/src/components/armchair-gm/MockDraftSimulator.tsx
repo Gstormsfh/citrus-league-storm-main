@@ -339,7 +339,7 @@ const MockDraftSimulator = () => {
             </h3>
             <div className="overflow-x-auto max-h-[500px] overflow-y-auto scrollbar-styled">
               <table className="w-full text-xs">
-                <thead className="bg-muted/30 sticky top-0 z-10">
+                <thead className="bg-muted/30 sticky top-0 z-sticky-base">
                   <tr>
                     <th className="px-2 py-1.5 text-left">Player</th>
                     <th className="px-2 py-1.5 text-center">Pos</th>
