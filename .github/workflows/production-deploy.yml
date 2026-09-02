@@ -45,8 +45,32 @@ jobs:
       - name: Lint
         run: cd apps/web && npx eslint src/
 
-      - name: Type check (web)
-        run: cd apps/web && npx tsc --noEmit -p tsconfig.app.json || echo "::warning::TypeScript found type errors — tracked for strict mode migration"
+      # Same ratchet as ci.yml (that copy is canonical; keep the two identical).
+      # This step was `|| echo "::warning::"` until 2026-09-01, so a PR that
+      # passed the CI ratchet could still not regress here -- but a direct push
+      # to master could, and the warning ran green either way. Fails only when
+      # the count GOES UP relative to apps/web/.typecheck-baseline; read that
+      # file's header before changing it.
+      - name: TypeScript compile check (web) - ratchet
+        run: |
+          cd apps/web
+          BASELINE=$(grep -oE '^[0-9]+' .typecheck-baseline | head -1)
+          if [ -z "$BASELINE" ]; then
+            echo "::error::apps/web/.typecheck-baseline has no numeric baseline."
+            exit 1
+          fi
+          npx tsc --noEmit -p tsconfig.app.json 2>&1 | tee /tmp/tsc-web.log || true
+          COUNT=$(grep -c "error TS" /tmp/tsc-web.log || true)
+          COUNT=${COUNT:-0}
+          echo "type errors: $COUNT (baseline $BASELINE)"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::Web type errors rose from $BASELINE to $COUNT. New errors:"
+            grep "error TS" /tmp/tsc-web.log | head -40
+            exit 1
+          fi
+          if [ "$COUNT" -lt "$BASELINE" ]; then
+            echo "::notice::Web type errors fell from $BASELINE to $COUNT - lower apps/web/.typecheck-baseline to $COUNT to lock the win in."
+          fi
 
       - name: Type check (server)
         run: cd server && npx tsc --noEmit

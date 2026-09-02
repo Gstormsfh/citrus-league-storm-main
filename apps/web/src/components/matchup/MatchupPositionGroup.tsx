@@ -5,6 +5,14 @@ interface MatchupPositionGroupProps {
   userPlayers: (MatchupPlayer | null)[];
   opponentPlayers: (MatchupPlayer | null)[];
   isUtilSlot?: boolean[];
+  /**
+   * The SLOT each row belongs to (C / LW / RW / D / G / F), indexed like the
+   * player arrays. Without it a row that is empty on BOTH sides has no
+   * position at all — the label used to be derived from whichever player
+   * happened to occupy the row, so a double-empty G2 rendered a blank
+   * centre. The slot is what the row is; the occupant is a fallback.
+   */
+  slotPositions?: string[];
   isBench?: boolean;
   onPlayerClick?: (player: MatchupPlayer) => void;
   selectedDate?: string | null;
@@ -15,6 +23,7 @@ export const MatchupPositionGroup = ({
   userPlayers,
   opponentPlayers,
   isUtilSlot = [],
+  slotPositions = [],
   isBench = false,
   onPlayerClick,
   selectedDate,
@@ -24,7 +33,7 @@ export const MatchupPositionGroup = ({
   const maxLength = Math.max(userPlayers.length, opponentPlayers.length);
   const paddedUserPlayers = [...userPlayers];
   const paddedOpponentPlayers = [...opponentPlayers];
-  
+
   while (paddedUserPlayers.length < maxLength) {
     paddedUserPlayers.push(null);
   }
@@ -37,7 +46,9 @@ export const MatchupPositionGroup = ({
       {paddedUserPlayers.map((userPlayer, index) => {
         // For UTIL slot, use "UTIL" as position for display, but player's actual position for color
         const isUtil = isUtilSlot[index] || false;
-        const position = isUtil ? 'UTIL' : (userPlayer?.position || opponentPlayers[index]?.position || '');
+        const position = isUtil
+          ? 'UTIL'
+          : (slotPositions[index] || userPlayer?.position || opponentPlayers[index]?.position || '');
         return (
           <MatchupComparisonRow
             key={index}
@@ -54,4 +65,3 @@ export const MatchupPositionGroup = ({
     </>
   );
 };
-

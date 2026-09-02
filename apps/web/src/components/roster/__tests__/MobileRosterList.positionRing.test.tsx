@@ -49,15 +49,22 @@ const EXPECTED_POS_RING_COLOR: Record<string, string> = {
   F: 'ring-emerald-600/30',
 };
 
-// This test reads the compiled component source to verify the maps
-// match. If someone edits the component but forgets to update this
-// test, both the map assertion AND the source-read assertion catch it.
+// This test reads the shipped source to verify the maps match. If someone
+// edits the maps but forgets to update this test, both the map assertion
+// AND the source-read assertion catch it.
+//
+// 2026-09-01: the maps moved out of MobileRosterList.tsx into
+// positionChip.ts so the mobile Matchup rows could wear the SAME chip
+// (one palette, not two). The lock follows them; MobileRosterList is now
+// checked for the opposite property — that it carries no local copy.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = resolve(fileURLToPath(import.meta.url), '..');
-const COMPONENT_PATH = resolve(HERE, '..', 'MobileRosterList.tsx');
+const COMPONENT_PATH = resolve(HERE, '..', 'positionChip.ts');
+const LIST_PATH = resolve(HERE, '..', 'MobileRosterList.tsx');
+const MATCHUP_CENTER_PATH = resolve(HERE, '..', '..', 'matchup', 'CenterColumn.tsx');
 
 /**
  * Parse a `const <name>: Record<string, string> = { ... }` block out of
@@ -141,10 +148,25 @@ describe('MobileRosterList — position-ring map lock (Entry 40 A-lite)', () => 
   // that is exactly how the light chips ended up with white text.
   it('the badge base class does not hard-code a text colour', () => {
     const badgeBase = source.match(
-      /"w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center[^"]*"/,
+      /'w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center[^']*'/,
     );
     expect(badgeBase).toBeTruthy();
     expect(badgeBase![0]).not.toMatch(/\btext-white\b/);
+  });
+
+  // ONE chip. The roster list and the matchup centre column both import the
+  // maps from positionChip.ts; neither is allowed to grow a private copy,
+  // because a private copy is exactly how the matchup page ended up with a
+  // second position palette in the first place.
+  it.each([
+    ['MobileRosterList.tsx', LIST_PATH, /from ['"]\.\/positionChip['"]/],
+    ['matchup/CenterColumn.tsx', MATCHUP_CENTER_PATH, /from ['"]@\/components\/roster\/positionChip['"]/],
+  ])('%s imports the chip rather than redeclaring it', (_name, path, importRe) => {
+    const consumer = readFileSync(path, 'utf8');
+    expect(consumer).toMatch(importRe);
+    expect(consumer).not.toMatch(/const posColor\s*[:=]/);
+    expect(consumer).not.toMatch(/const posRingColor\s*[:=]/);
+    expect(consumer).not.toMatch(/'w-8 h-8 flex-shrink-0 rounded-md/);
   });
 
   it('both maps cover the same position set (LW/C/RW/D/G/UTIL/F)', () => {

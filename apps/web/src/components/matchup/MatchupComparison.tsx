@@ -1,8 +1,44 @@
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { MatchupPlayer } from "./types";
 import { MatchupPositionGroup } from "./MatchupPositionGroup";
 import { organizeMatchupData } from "./matchupUtils";
 import { ScoringCalculator, ScoringSettings } from "@/utils/scoringUtils";
+import { NEUTRAL_CHIP, POSITION_CHIP_BASE } from "@/components/roster/positionChip";
+
+/**
+ * Bench visibility is a per-viewer preference (2026-09-01). A hockey bench is
+ * 4–6 rows × 2 columns of players whose points do not count; on a phone that
+ * is a full screen of noise under the lineup. Collapsed by default below the
+ * lg breakpoint, open on desktop, and whichever way the viewer last left it
+ * wins on every later visit. localStorage can be absent (SSR), blocked
+ * (Safari private mode throws on access), or full — every touch is guarded
+ * and a failure simply means "use the default".
+ */
+export const BENCH_OPEN_STORAGE_KEY = 'citrus:matchup:bench-open';
+
+const isMobileViewport = (): boolean =>
+  typeof window !== 'undefined' && window.innerWidth < 1024;
+
+const readBenchOpen = (): boolean => {
+  try {
+    const stored = window.localStorage.getItem(BENCH_OPEN_STORAGE_KEY);
+    if (stored === '1') return true;
+    if (stored === '0') return false;
+  } catch {
+    // Storage unavailable — fall through to the viewport default.
+  }
+  return !isMobileViewport();
+};
+
+const writeBenchOpen = (open: boolean): void => {
+  try {
+    window.localStorage.setItem(BENCH_OPEN_STORAGE_KEY, open ? '1' : '0');
+  } catch {
+    // Preference simply does not persist this session.
+  }
+};
 
 interface MatchupComparisonProps {
   userStarters: MatchupPlayer[];
@@ -66,20 +102,33 @@ export const MatchupComparison = ({
     opponentSlotAssignments
   );
 
-  // Flatten all players into one continuous list, tracking which are UTIL slots
+  // Flatten all players into one continuous list, tracking which are UTIL
+  // slots and which slot position each row is (so an empty row still knows
+  // what it is an empty row OF).
   const allUserPlayers: (MatchupPlayer | null)[] = [];
   const allOpponentPlayers: (MatchupPlayer | null)[] = [];
   const isUtilSlot: boolean[] = [];
+  const slotPositions: string[] = [];
 
   positionGroups.forEach(group => {
     const isUtil = group.position === 'Util';
     const maxLength = Math.max(group.userPlayers.length, group.opponentPlayers.length);
     for (let i = 0; i < maxLength; i++) {
       isUtilSlot.push(isUtil);
+      slotPositions.push(group.position);
     }
     allUserPlayers.push(...group.userPlayers);
     allOpponentPlayers.push(...group.opponentPlayers);
   });
+
+  // Bench: rows, not players — the section hides/shows both columns at once.
+  const benchRows = Math.max(userBench.length, opponentBench.length);
+  const [benchOpen, setBenchOpen] = useState<boolean>(readBenchOpen);
+  const toggleBench = () => {
+    const next = !benchOpen;
+    setBenchOpen(next);
+    writeBenchOpen(next);
+  };
 
   // Calculate daily contribution - handles dropped players with same fallback as PlayerCard
   const isShowingDailyView = selectedDate !== null && selectedDate !== undefined;
@@ -296,51 +345,83 @@ export const MatchupComparison = ({
           userPlayers={allUserPlayers}
           opponentPlayers={allOpponentPlayers}
           isUtilSlot={isUtilSlot}
+          slotPositions={slotPositions}
           onPlayerClick={onPlayerClick}
           selectedDate={selectedDate}
           dailyStatsMap={dailyStatsMap}
         />
       </div>
-      
+
       {/* Total Points Row - Shows daily total when date selected, weekly otherwise */}
       <div className="matchup-total-row">
         <div className="matchup-total-card matchup-total-user">
           <div className="matchup-total-label">
             {isShowingDailyView ? 'Daily Total' : 'Total'}
           </div>
-          <div className="matchup-total-score">{userTotal.toFixed(1)}</div>
+          <div className="matchup-total-score font-jbmono tabular-nums">{userTotal.toFixed(1)}</div>
         </div>
         <div className="matchup-center-column matchup-total-center">
           <span className="position-label">{isShowingDailyView ? 'DAY' : 'TOT'}</span>
+          {/* Mobile: the same 32px chip the slot rows carry, neutral —
+              a sum is not a position. Keeps the centre axis unbroken
+              from the team header down through the total. */}
+          <span className={cn('matchup-slot-chip lg:hidden', POSITION_CHIP_BASE, NEUTRAL_CHIP)} aria-hidden="true">
+            {isShowingDailyView ? 'DAY' : 'TOT'}
+          </span>
         </div>
         <div className="matchup-total-card matchup-total-opponent">
           <div className="matchup-total-label">
             {isShowingDailyView ? 'Daily Total' : 'Total'}
           </div>
-          <div className="matchup-total-score">{opponentTotal.toFixed(1)}</div>
+          <div className="matchup-total-score font-jbmono tabular-nums">{opponentTotal.toFixed(1)}</div>
         </div>
       </div>
 
-      {/* Bench Section */}
-      {(userBench.length > 0 || opponentBench.length > 0) && (
-        <>
-          <div className="mt-8 mb-4">
-            <div className="bg-muted/30 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-y">
-              Bench
-            </div>
-          </div>
-          <div className="matchup-position-group">
-            <MatchupPositionGroup
-              userPlayers={userBench}
-              opponentPlayers={opponentBench}
-              isUtilSlot={[]}
-              isBench={true}
-              onPlayerClick={onPlayerClick}
-              selectedDate={selectedDate}
-              dailyStatsMap={dailyStatsMap}
+      {/* Bench Section — collapsible. Rows render only while open, so a
+          collapsed bench costs nothing to keep on the page. */}
+      {benchRows > 0 && (
+        <section className="mt-6" data-testid="matchup-bench" data-open={benchOpen ? 'true' : 'false'}>
+          <button
+            type="button"
+            onClick={toggleBench}
+            aria-expanded={benchOpen}
+            aria-controls="matchup-bench-rows"
+            className={cn(
+              'w-full flex items-center gap-2 px-3 py-2.5 min-h-[44px] text-left',
+              'bg-pastel-surface-tile border-y border-white/10',
+              'focus-citrus transition-colors hover:bg-pastel-surface-high',
+            )}
+          >
+            <span className="font-jbmono uppercase tracking-[0.22em] text-[10px] text-white/55">
+              {`Bench (${benchRows})`}
+            </span>
+            {!benchOpen && (
+              <span className="font-display text-[10px] text-white/55">
+                Points do not count
+              </span>
+            )}
+            <ChevronDown
+              className={cn(
+                'ml-auto h-4 w-4 text-white/55 transition-transform',
+                benchOpen && 'rotate-180',
+              )}
+              aria-hidden="true"
             />
-          </div>
-        </>
+          </button>
+          {benchOpen && (
+            <div id="matchup-bench-rows" className="matchup-position-group">
+              <MatchupPositionGroup
+                userPlayers={userBench}
+                opponentPlayers={opponentBench}
+                isUtilSlot={[]}
+                isBench={true}
+                onPlayerClick={onPlayerClick}
+                selectedDate={selectedDate}
+                dailyStatsMap={dailyStatsMap}
+              />
+            </div>
+          )}
+        </section>
       )}
     </div>
   );
