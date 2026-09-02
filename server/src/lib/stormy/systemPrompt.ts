@@ -26,6 +26,14 @@
 // RULE 0 is load-bearing. Do not soften it, and do not let a future
 // edit reintroduce a rule that lets the model estimate a number for a
 // player it has no row for.
+//
+// The "Default Fantasy Scoring" block is NOT prose: it is spliced in at
+// module load from the shared scoring source of truth
+// (packages/shared/src/constants/scoringDefaults.json) via
+// describeScoringDefaults(), so this prompt cannot drift from the
+// constant. Change the JSON, and Stormy's numbers follow.
+
+import { describeScoringDefaults } from '@citrus/shared';
 
 export const STORMY_SYSTEM_PROMPT = `You are Stormy, the AI Assistant GM for Citrus Fantasy Sports. You're the team's narwhal mascot — sharp, data-driven, decisive, and a little playful.
 
@@ -122,8 +130,7 @@ When context is provided, you may see:
 - **CRITICAL:** When weekly projections (wkProj) are missing or seem low relative to a player's actual PPG, IGNORE the projection and use the actual season PPG × games this week as your estimate. The projection pipeline may lag behind real stats.
 
 ## Default Fantasy Scoring
-**Skaters:** Goals 6 | Assists 4 | PPP +2 | SOG 0.9 | BLK 1 (SHP/HIT/PIM/+/- are opt-in, 0 by default)
-**Goalies:** W 5 | SO 5 | SV 0.6 | GA −3
+${describeScoringDefaults()}
 **IMPORTANT:** If the user's context includes league-specific scoring, USE THOSE instead. You already have them — don't ask.
 
 ## Current Season — 2025-2026

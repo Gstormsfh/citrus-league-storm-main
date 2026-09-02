@@ -57,6 +57,7 @@ License: Citrus internal. Methodology section reproducible under MIT.
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import dataclass, asdict
 from typing import Dict, List
@@ -64,22 +65,19 @@ from typing import Dict, List
 import numpy as np
 from scipy import stats as scipy_stats
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401,E402
+
+from data_pipeline.scoring.scoring_defaults import SKATER_SHORT  # noqa: E402
+
 
 # ============================================================================
-# CONFIGURATION — fantasy scoring weights (matches ScoringCalculator default)
+# CONFIGURATION — fantasy scoring weights: the generated single source
+# (scoring_defaults.py, built from packages/shared/.../scoringDefaults.json),
+# keyed by the pipeline's per-game stat names. No literal lives here.
 # ============================================================================
 
-# INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned; SHP/hits/PIM opt-in.
-SCORING = {
-    "goals": 6.0,
-    "assists": 4.0,
-    "ppp": 2.0,
-    "shp": 0.0,
-    "sog": 0.9,
-    "blocks": 1.0,
-    "hits": 0.0,
-    "pim": 0.0,
-}
+SCORING = SKATER_SHORT
 
 # Realistic NHL player archetypes — per-game averages from 2024-25 NHL data
 # Source: aggregated from data-pipeline/projections/build_player_season_stats.py

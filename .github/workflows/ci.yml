@@ -379,6 +379,39 @@ jobs:
       - name: Run server tests
         run: npm run test --workspace=server
 
+  # ── Generated scoring defaults ───────────────────────────────────────
+  # packages/shared/src/constants/scoringDefaults.json is the one source of
+  # the default scoring weights. scripts/gen-scoring-defaults.mjs derives the
+  # Python module (data-pipeline/scoring/scoring_defaults.py) and the docs
+  # table (docs/generated/SCORING_DEFAULTS.md) from it. This job regenerates
+  # both and fails on any diff, so a JSON edit without a regenerate — or a
+  # hand edit to a generated file — cannot merge. Plain Node, no npm ci.
+  scoring-defaults:
+    name: Generated Scoring Defaults
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Regenerate from the JSON source
+        run: npm run gen:scoring
+
+      - name: Generated files must match the committed ones
+        run: |
+          GENERATED="data-pipeline/scoring/scoring_defaults.py docs/generated/SCORING_DEFAULTS.md"
+          # --porcelain also lists an untracked file, which a plain
+          # `git diff --exit-code` would miss if a generated file were deleted.
+          if [ -n "$(git status --porcelain -- $GENERATED)" ]; then
+            git --no-pager diff -- $GENERATED
+            echo "::error::Generated scoring defaults are stale. Run 'npm run gen:scoring' and commit the result."
+            exit 1
+          fi
+          echo "Generated scoring defaults are fresh."
+
   validate-migrations:
     name: Validate Migrations
     runs-on: ubuntu-latest
