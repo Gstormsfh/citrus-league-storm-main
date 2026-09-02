@@ -549,10 +549,27 @@
   @apply outline-none ring-2 ring-primary/70;
   }
   
-  /* Ensure radix portals properly render above content without breaking layout */
-  [data-radix-popper-content-wrapper] {
-  @apply z-[60] !important;
-  }
+  /* THE RULE THAT FLATTENED FOUR LAYERS INTO ONE (removed 2026-09-02).
+   *
+   *   [data-radix-popper-content-wrapper] { @apply z-[60] !important }
+   *
+   * This one was NOT dead — it shipped as
+   * `[data-radix-popper-content-wrapper]{z-index:60!important}` and it was
+   * the only thing deciding where any floating Radix surface stacked.
+   *
+   * Radix's popper reads `getComputedStyle(content).zIndex` and copies it
+   * onto that wrapper as an INLINE style. A stylesheet `!important`
+   * declaration beats a non-important inline one, so the copy never won:
+   * the dropdown (z-[60]), the select (z-[60]), the popover (z-[9999]), the
+   * app's own matchup tooltips (!z-popover) and shadcn's tooltip
+   * (z-[999999]) all rendered at 60. Four rungs, one number, and every
+   * z-index on those components was decoration.
+   *
+   * Nothing replaces it. Letting Radix's copy through IS the fix: each
+   * surface then stacks at the rung its own class names, and those class
+   * names now come from one scale (`src/styles/zLayers.ts`). The wrapper is
+   * `position: fixed` from the popper's own floating strategy, so the
+   * `position` half of the old rule was redundant too. */
 }
 
 @layer components {
@@ -784,10 +801,10 @@
   pointer-events: auto;
 }
 
-/* Ensure dropdowns and popovers stay in viewport and don't shift layout */
-:root {
-  --portal-z-index: 60;
-}
+/* `--portal-z-index` lived here and was read by nothing — the last consumer
+   went when the portal rules above did. Layer numbers now live in exactly
+   one place, `src/styles/zLayers.ts`, and reach the DOM as named Tailwind
+   utilities. A stray custom property is a second place to look. */
 
 /* ================================================= */
 /* 🌎 MATCHUP COMPARISON LAYOUT - UNIVERSAL SETUP */
@@ -886,6 +903,29 @@
   overflow: visible; /* Allow tooltips to escape card boundaries */
   background-color: hsl(var(--card));
   min-height: 40px; /* Consistent compact height */
+}
+
+/* THE NAME LINE (2026-09-02). `.player-name` is the NAME; the status
+   badges beside it are siblings, not children.
+
+   They used to be children, and `.player-name` is
+   `white-space: nowrap; overflow: hidden; text-overflow: ellipsis` — so on
+   the 82.5px phone column the badge was part of the string the ellipsis
+   ate. Measured on `harness/matchup.html` at 393x852: an IR row's name
+   element reported scrollWidth 91 in an 83px box, and the 8px it lost were
+   the badge, so the row read "Celebrini…" and never said IR at all.
+
+   One row: the name shrinks, the badges do not. Declared here rather than
+   only in the mobile block because the desktop card renders the same markup
+   and would otherwise drop each inline-flex badge onto its own line. */
+.player-name-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.player-name-row > :not(.player-name) {
+  flex: 0 0 auto;
 }
 
 /* 🔒 World-Class Alignment Fix: Text Overflow/Ellipsis */
@@ -1519,17 +1559,30 @@
   }
 
 
-/* Ensure tooltips and popovers appear on top of everything */
-[data-radix-tooltip-content],
-[data-radix-popover-content] {
-  z-index: 9999 !important;
-  position: fixed !important;
-}
-
-/* Portal container for tooltips/popovers */
-[data-radix-portal] {
-  z-index: 9999 !important;
-}
+/* THREE DEAD RULES LIVED HERE (removed 2026-09-02).
+ *
+ *   [data-radix-tooltip-content],
+ *   [data-radix-popover-content] { z-index: 9999 !important;
+ *                                  position: fixed !important }
+ *   [data-radix-portal]          { z-index: 9999 !important }
+ *
+ * They read as the app's stacking policy and matched NOTHING. The installed
+ * Radix emits none of those three attributes: `@radix-ui/react-portal`
+ * renders a bare <div>, and floating content is wrapped in
+ * `[data-radix-popper-content-wrapper]`. Verified against
+ * node_modules/@radix-ui/react-{portal,tooltip,popover}/dist — the strings
+ * do not appear.
+ *
+ * Nothing replaces them, because nothing needs to. Radix's popper COPIES the
+ * content element's computed z-index onto that wrapper, so the class the
+ * component already carries is what stacks — `z-popover` on the app's own
+ * tooltips and popovers, from the one scale in `src/styles/zLayers.ts`.
+ * `position: fixed` was likewise already the popper's own strategy.
+ *
+ * The ordering these rules pretended to enforce is now enforced where it can
+ * be read: one named rung per layer, and a guard that fails a new layer off
+ * the scale. See `src/styles/zLayers.ts` and
+ * `src/__tests__/zLayerScaleGuard.test.ts`. */
 
 /* ==========================================
    MOBILE AGGRESSIVE - FULL WIDTH PLAYER CARDS
@@ -1720,6 +1773,14 @@
     justify-content: flex-end !important;
   }
 
+  /* The name line mirrors with the rest of the opponent card: the name (and
+     any badge after it) hugs the screen edge, not the gutter. Before
+     `.player-name-row` existed the name was a block element and
+     `text-align: right` did this; a flex row needs to be told. */
+  .player-card.opponent-team .player-name-row {
+    justify-content: flex-end !important;
+  }
+
   /* Empty player cards - same height */
   .player-card-empty {
     min-height: 64px !important;
@@ -1744,6 +1805,25 @@
      for: "C. McDavid" in 15px Montserrat Bold is 83.6px inside an 85px
      name block. (CSS cannot import the TS module; the module is the place
      the ladder is explained, this is one of its three call sites.) */
+  /* The name line is pinned to the card, like the header above it: a
+     column flex container whose align-items is not `stretch` (the opponent
+     card's `flex-end`) sizes its children to their own content, and a
+     content-sized row cannot shrink its name. Same reasoning as
+     `.player-card-header` at the end of this block. */
+  .player-card .player-name-row {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* The name is the only part of that row allowed to shrink, and it needs
+     `min-width: 0` to do it: a nowrap flex item's automatic minimum size is
+     its whole text. Without this the badge is pushed out of the card
+     instead of the name shortening. */
+  .player-card .player-name-row > .player-name {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+  }
+
   .player-card .player-name {
     font-size: 0.9375rem !important; /* 15px */
     font-weight: 700 !important;

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Mug } from "@/components/roster/Mug";
 import { opponentTint } from "./opponentTint";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { compactPlayerName } from "./compactPlayerName";
 // The phone row type scale — the same four rungs the roster list and the
 // Free Agents rows wear. Everything it names below is inside a `lg:hidden`
 // block, so the desktop card is untouched.
@@ -68,27 +69,6 @@ const getPositionColorClasses = (position: string): string => {
  */
 const SCORE_ACTUAL_CLASS = `player-score-value ${ROW_HEADLINE}`;
 
-/**
- * "Auston Matthews" → "A. Matthews" when `compact` (the phone row), the
- * full name otherwise. Pure: the caller decides what "compact" means —
- * the card passes `useIsMobile()`, which used to be a `window.innerWidth`
- * read inside this function on every render of every row (audit M11).
- */
-const formatPlayerName = (name: string, compact: boolean = false): string => {
-  if (!name) return '';
-  const trimmed = name.trim();
-
-  if (compact) {
-    const parts = trimmed.split(' ');
-    if (parts.length >= 2) {
-      const firstInitial = parts[0].charAt(0);
-      const lastName = parts.slice(1).join(' ');
-      return `${firstInitial}. ${lastName}`;
-    }
-  }
-
-  return trimmed;
-};
 
 // Calculate percentages for data bars (mock calculations based on available stats)
 const calculatePercentages = (player: MatchupPlayer) => {
@@ -127,7 +107,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
     );
   }
 
-  const displayName = formatPlayerName(player.name, isMobile);
+  const displayName = compactPlayerName(player.name, isMobile);
   const positionColors = getPositionColorClasses(player.position);
   const { shotPct, pointRate } = calculatePercentages(player);
   
@@ -319,8 +299,20 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
         {/* Header Section with Unique Stats in Top Right */}
         <div className="player-card-header">
           <div className="player-header-left">
+            {/* THE NAME LINE (2026-09-02). A row, not one element: the
+                status badges used to live INSIDE `.player-name`, which is
+                `white-space: nowrap; text-overflow: ellipsis` — so on the
+                82.5px phone column the badge was part of the string the
+                ellipsis ate, and an IR player rendered "Celebrini…" with
+                no badge at all. Measured on the matchup harness at 393x852:
+                the name element reported scrollWidth 91 in an 83px box, and
+                the 8px it lost were the badge. The name now shrinks and the
+                badges do not, so the row always says IR. */}
+            <div className="player-name-row">
             <div className="player-name" title={player.name}>
               {displayName}
+            </div>
+            <>
               {/* IR Badge - Display if roster_status is not ACT */}
               {(player.roster_status && player.roster_status !== 'ACT') || player.is_ir_eligible ? (
                 <Badge 
@@ -341,6 +333,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                   Dropped
                 </Badge>
               ) : null}
+            </>
             </div>
             {/* Team Name - Below player name. `player-meta-row` lets the
                 mobile stylesheet right-align this line on the opponent

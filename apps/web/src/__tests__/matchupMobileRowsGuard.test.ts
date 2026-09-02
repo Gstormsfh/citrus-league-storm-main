@@ -230,3 +230,79 @@ describe('the row components carry no second palette', () => {
     expect((playerCard.match(/<Mug\b/g) || []).length).toBe(1);
   });
 });
+
+/**
+ * THE NAME COLUMN (2026-09-02).
+ *
+ * The 82.5px name block is not declared anywhere — it is what the card has
+ * left after the two fixed columns and the paddings above, and every rule
+ * that feeds it is already pinned in this file. What is NOT derivable from
+ * the stylesheet is the string the card decides to put in it, so that rule
+ * lives in `components/matchup/compactPlayerName.ts` with its measurement,
+ * and this block pins that the card still asks that module and has not
+ * re-grown a private formatter.
+ *
+ * Why it matters that the rule stays in one place: the same 82.5px column
+ * is the reason `.player-name` is 15px rather than 17px, the reason its
+ * letter-spacing is 0, and the reason the header had to be pinned to the
+ * card's width before the ellipsis could fire. Four decisions, one number —
+ * a second copy of the abbreviation rule is a second answer to it.
+ */
+describe('the phone row shows the family name, from the shared module', () => {
+  const PLAYER_CARD_RAW = readFileSync(resolve(SRC, 'components/matchup/PlayerCard.tsx'), 'utf8');
+  const PLAYER_CARD = code(PLAYER_CARD_RAW);
+  const MODULE = code(readFileSync(resolve(SRC, 'components/matchup/compactPlayerName.ts'), 'utf8'));
+
+  it('PlayerCard imports the rule rather than carrying one', () => {
+    expect(PLAYER_CARD).toMatch(/import \{ compactPlayerName \} from ['"]\.\/compactPlayerName['"]/);
+    expect(PLAYER_CARD).toContain('compactPlayerName(player.name, isMobile)');
+    // The private formatter this replaced, and the shape it produced.
+    expect(PLAYER_CARD).not.toContain('formatPlayerName');
+    expect(PLAYER_CARD).not.toMatch(/firstInitial/);
+  });
+
+  it('the module builds no initial-prefixed form', () => {
+    // `${initial}. ${last}` in any spelling is the rule that lost 23 of 57
+    // surnames to the ellipsis. It must not come back inside the module
+    // either, which is the one place a "clever" hybrid would be added.
+    expect(MODULE).not.toMatch(/charAt\(0\)/);
+    expect(MODULE).not.toMatch(/\$\{[^}]*\}\.\s/);
+  });
+
+  it('the name is still the row\'s own element, truncating in a column pinned to the card', () => {
+    // The module can only help if the block it writes into is still the one
+    // the measurement was taken in: an ellipsis that never fires (the
+    // opponent-card bug above) hides the difference entirely.
+    expect(declares('.player-card .player-name', 'font-size', /0\.9375rem/)).toBe(true);
+    expect(declares('.player-card .player-name', 'text-overflow', /ellipsis/)).toBe(true);
+    expect(declares('.player-card .player-name', 'white-space', /nowrap/)).toBe(true);
+    expect(declares('.player-card .player-name', 'letter-spacing', /0/)).toBe(true);
+  });
+
+  it('the status badges are siblings of the name, not inside the string it truncates', () => {
+    // `.player-name` is nowrap + ellipsis. A badge inside it is part of the
+    // string the ellipsis eats: measured at 393x852, an IR row's name
+    // element was scrollWidth 91 in an 83px box and the 8px it lost were
+    // the badge, so the row said "Celebrini…" and never said IR.
+    expect(PLAYER_CARD).toContain('<div className="player-name-row">');
+    const nameEl = PLAYER_CARD.slice(PLAYER_CARD.indexOf('className="player-name" title='));
+    const closed = nameEl.slice(0, nameEl.indexOf('</div>'));
+    expect(closed).not.toContain('<Badge');
+
+    // Only the name may shrink, and it needs min-width:0 to be able to.
+    expect(declares('.player-card .player-name-row > .player-name', 'flex', /0 1 auto/)).toBe(true);
+    expect(declares('.player-card .player-name-row > .player-name', 'min-width', /0/)).toBe(true);
+    expect(declares('.player-card .player-name-row', 'width', /100%/)).toBe(true);
+    // Mirrored, like every other line on the opponent card.
+    expect(declares('.player-card.opponent-team .player-name-row', 'justify-content', /flex-end/)).toBe(true);
+    // And declared OUTSIDE the mobile block too, or the desktop card drops
+    // each inline-flex badge onto its own line.
+    expect(CSS).toMatch(/\.player-name-row\s*\{[^}]*display:\s*flex/);
+  });
+
+  it('the full name is still reachable from the row', () => {
+    // Dropping the given name is only safe because the row keeps it: the
+    // native title, and the card the row opens on tap.
+    expect(PLAYER_CARD).toMatch(/className="player-name" title=\{player\.name\}/);
+  });
+});
