@@ -47,7 +47,7 @@ export function HockeyNav({
           </div>
         </div>
       )}
-      <header className="sticky top-0 z-page-header backdrop-blur-md bg-pastel-surface/85 border-b border-white/5 pt-safe">
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-pastel-surface/85 border-b border-white/5 pt-safe">
         <div className="max-w-[1280px] mx-auto px-6 h-[68px] flex items-center justify-between gap-6">
           <div className="flex items-center gap-10">
             <Link to="/" className="flex items-center gap-1.5">

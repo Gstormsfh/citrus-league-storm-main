@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
 import MobileMenuButton from '@/components/MobileMenuButton';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
+import { TeamCard } from "@/components/matchup/TeamCard";
 import { MatchupComparison } from "@/components/matchup/MatchupComparison";
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
 import { ScoreCard } from "@/components/matchup/ScoreCard";
@@ -17,9 +18,6 @@ import { getTodayMST, getTodayMSTDate } from '@/utils/timezoneUtils';
 import { getCurrentSeason } from '@/utils/seasonConstants';
 import LeagueNotifications from "@/components/matchup/LeagueNotifications";
 import { MatchupSidebar } from "@/components/matchup/MatchupSidebar";
-import { ScoreboardStrip } from "@/components/matchup/ScoreboardStrip";
-import { StickyScoreBar } from "@/components/matchup/StickyScoreBar";
-import { anyGameLive, type TeamAvatarMap } from "@/components/matchup/scoreboard";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MatchupPlayer, StatBreakdown } from "@/components/matchup/types";
@@ -287,13 +285,6 @@ const Matchup = () => {
   const [viewingTeamId, setViewingTeamId] = useState<string | null>(null);
   // Track user's actual matchup ID (for "(Your Matchup)" label)
   const [userMatchupId, setUserMatchupId] = useState<string | null>(null);
-  // Every team in the league, for the owner avatars on the header discs and
-  // the scoreboard chips (2026-09-01, audit M8). The league/teams response
-  // joins profiles.avatar_url by owner_id; nothing else on this page serves
-  // a picture (/my-team and the matchup rows carry ids and names only).
-  // LeagueService caches this read, so it costs the loader nothing extra —
-  // the opponent lookup below already requests the same list.
-  const [leagueTeams, setLeagueTeams] = useState<Team[]>([]);
   const [firstWeekStart, setFirstWeekStart] = useState<Date | null>(null);
   const [myTeam, setMyTeam] = useState<MatchupPlayer[]>([]);
   const [opponentTeamPlayers, setOpponentTeamPlayers] = useState<MatchupPlayer[]>([]);
@@ -648,7 +639,7 @@ const Matchup = () => {
           cachedPayload = await DemoMatchupCacheService.getPayload(
             requestedWeek && !isNaN(requestedWeek) ? requestedWeek : undefined
           );
-          log(' Edge function cache HIT, skipping ~16 direct queries');
+          log(' Edge function cache HIT — skipping ~16 direct queries');
         } catch (cacheError) {
           log(' Edge function cache unavailable, falling back to direct queries:', cacheError);
         }
@@ -1119,12 +1110,12 @@ const Matchup = () => {
       team: p.team,
       teamAbbreviation: p.team,
       status: null, // Game status not applicable here - use roster_status for IR/SUSP/GTD
-      // Mugshot: the row's own `image` (typed on MatchupPlayer since audit
-      // M4 — every producer sets it); otherwise build the NHL CDN "latest"
-      // mug from the player id. PlayerStatsModal has an onError fallback
-      // chain (team logo → initials) if the URL 404s.
-      image: p.image
-        || (p.id ? `https://assets.nhle.com/mugs/nhl/latest/${p.id}.png` : undefined),
+      // Mugshot: prefer whatever the payload carried; otherwise build the
+      // NHL CDN "latest" mug from the player id. PlayerStatsModal has an
+      // onError fallback chain (team logo → initials) if the URL 404s.
+      image: (p as unknown as { image?: string }).image
+        ?? (p as unknown as { headshot_url?: string }).headshot_url
+        ?? (p.id ? `https://assets.nhle.com/mugs/nhl/latest/${p.id}.png` : undefined),
       projectedPoints: 0
     };
   };
@@ -1144,27 +1135,7 @@ const Matchup = () => {
   };
 
   // Fetch daily stats when a date is selected, or default to today if in matchup week
-  // Load every matchup of the viewed week — the scoreboard strip, the desktop
-  // rail and the "View Matchup" select all read allWeekMatchups. One request,
-  // joined team names copied up beside the ids. Returns the rows it stored
-  // (null when the request failed) so the live-refresh loop can call it too:
-  // the loop recomputes the league's scores every 120s but used to leave this
-  // list at its load-time values, which would make the ticker a lie.
-  const loadWeekMatchups = useCallback(async () => {
-    if (!league?.id || userLeagueState !== 'active-user' || !selectedWeek) return null;
-    const matchupsResp = await matchupApi.getLeagueMatchups(league.id, selectedWeek);
-    const matchups = matchupsResp.data as any[] | null;
-    if (!matchups) return null;
-    const matchupsWithNames = matchups.map((m: any) => ({
-      ...m,
-      team1_name: m.team1?.team_name || 'Unknown',
-      team2_name: m.team2?.team_name || (m.team2_id ? 'Unknown' : 'Bye Week'),
-    }));
-    setAllWeekMatchups(matchupsWithNames);
-    return matchupsWithNames;
-  }, [league?.id, selectedWeek, userLeagueState]);
-
-  // Fetch all matchups for the current week (for the scoreboard + matchup viewer)
+  // Fetch all matchups for the current week (for matchup viewer dropdown)
   useEffect(() => {
     const fetchAllWeekMatchups = async () => {
       if (!league?.id || userLeagueState !== 'active-user' || !selectedWeek) {
@@ -1173,16 +1144,26 @@ const Matchup = () => {
       }
 
       try {
-        const matchups = await loadWeekMatchups();
+        const matchupsResp = await matchupApi.getLeagueMatchups(league.id, selectedWeek);
+        const matchups = matchupsResp.data as any[] | null;
 
         if (!matchups) {
           log('WARN: Error fetching all week matchups');
           return;
         }
 
-        // If no matchup is selected and user's matchup exists, select it
-        if (!selectedMatchupId && currentMatchup) {
-          setSelectedMatchupId(currentMatchup.id);
+        if (matchups) {
+          const matchupsWithNames = (matchups as any[]).map((m: any) => ({
+            ...m,
+            team1_name: m.team1?.team_name || 'Unknown',
+            team2_name: m.team2?.team_name || (m.team2_id ? 'Unknown' : 'Bye Week'),
+          }));
+          setAllWeekMatchups(matchupsWithNames);
+          
+          // If no matchup is selected and user's matchup exists, select it
+          if (!selectedMatchupId && currentMatchup) {
+            setSelectedMatchupId(currentMatchup.id);
+          }
         }
       } catch (error) {
         logger.error('[Matchup] Exception fetching all week matchups:', error);
@@ -1194,7 +1175,7 @@ const Matchup = () => {
   // Using full objects would cause unnecessary re-fetches when scores or other fields update.
   // selectedMatchupId is read inside to conditionally setSelectedMatchupId but should not trigger re-fetch.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [league?.id, selectedWeek, userLeagueState, currentMatchup?.id, loadWeekMatchups]);
+  }, [league?.id, selectedWeek, userLeagueState, currentMatchup?.id]);
 
   // Update player ID refs when teams change (stable references to break death loop)
   // This effect only updates refs and a version counter - it doesn't trigger other effects directly
@@ -1382,7 +1363,7 @@ const Matchup = () => {
             
             let dailyTotalPoints = 0;
             if (isGoalie) {
-              // Goalie Formula: Use league settings (defaults: W=5, SV=0.6, SO=5, GA=-3)
+              // Goalie Formula: Use league settings (defaults: DEFAULT_SCORING.goalie from @citrus/shared)
               dailyTotalPoints = 
                 aggregated.wins * goalieScoring.wins + 
                 aggregated.saves * goalieScoring.saves + 
@@ -1662,7 +1643,7 @@ const Matchup = () => {
           
           let dailyTotalPoints = 0;
           if (isGoalie) {
-            // Goalie Formula: Use league settings (defaults: W=5, SV=0.6, SO=5, GA=-3)
+            // Goalie Formula: Use league settings (defaults: DEFAULT_SCORING.goalie from @citrus/shared)
             dailyTotalPoints = 
               (row.wins || 0) * goalieScoring.wins + 
               (row.saves || 0) * goalieScoring.saves + 
@@ -3381,36 +3362,6 @@ const Matchup = () => {
     return viewingTeamId === userTeam.id;
   }, [userLeagueState, userTeam?.id, viewingTeamId]);
 
-  // Owner avatars for the discs (audit M8). Guests see the demo league,
-  // whose teams have no owners — the discs keep their initials.
-  useEffect(() => {
-    if (!league?.id || userLeagueState !== 'active-user') {
-      setLeagueTeams([]);
-      return;
-    }
-    let cancelled = false;
-    LeagueService.getLeagueTeams(league.id)
-      .then(({ teams }) => {
-        if (!cancelled) setLeagueTeams(teams);
-      })
-      .catch((err) => log('WARN: league teams for avatars unavailable:', err));
-    return () => {
-      cancelled = true;
-    };
-  }, [league?.id, userLeagueState]);
-
-  const teamAvatars = useMemo<TeamAvatarMap>(() => {
-    const map = new Map<string, string | null>();
-    for (const t of leagueTeams) map.set(t.id, t.avatar_url ?? null);
-    return map;
-  }, [leagueTeams]);
-
-  // Left side is the VIEWING team (see viewingTeamId), which is the user's
-  // own team only on their own matchup; the opponent object comes from the
-  // same league list and may already carry its picture.
-  const myTeamAvatarUrl = teamAvatars.get(viewingTeamId ?? userTeam?.id ?? '') ?? null;
-  const opponentTeamAvatarUrl = opponentTeam?.avatar_url ?? teamAvatars.get(opponentTeam?.id ?? '') ?? null;
-
   const opponentTeamPoints = useMemo(() => {
     if (!currentMatchup) {
       return '0.0';
@@ -3575,6 +3526,9 @@ const Matchup = () => {
   const projectedFinals = matchupOutlook && !matchupOutlook.settled
     ? { my: matchupOutlook.myExpectedFinal, opp: matchupOutlook.oppExpectedFinal }
     : null;
+  const winChanceLabel = matchupOutlook
+    ? (matchupOutlook.settled ? 'Final' : `${Math.round(matchupOutlook.probability * 100)}% win`)
+    : '—';
 
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   
@@ -3725,7 +3679,7 @@ const Matchup = () => {
         teamAbbreviation: p.team_abbreviation || p.team || '',
         points: p.fantasy_points || 0,
         total_points: p.fantasy_points || 0,
-        image: p.headshot_url || undefined,
+        headshot_url: p.headshot_url,
         isStarter: isStarter,
         isOnIR: p.status === 'IR' || p.status === 'SUSP',
         stats: {
@@ -4091,7 +4045,7 @@ const Matchup = () => {
             if (isDuplicateKey && hasAnyMatchups) {
               // Matchups already exist — duplicate key is expected.
               // Force regenerate to ensure all current teams are included.
-              log(' Duplicate key during generation, force regenerating with current teams...');
+              log(' Duplicate key during generation — force regenerating with current teams...');
 
               const { error: regenError } = await MatchupService.generateMatchupsForLeague(
                 currentLeague.id,
@@ -4633,7 +4587,7 @@ const Matchup = () => {
                   teamAbbreviation: p.team_abbreviation || p.team || '',
                   points: p.fantasy_points || 0,
                   total_points: p.fantasy_points || 0,
-                  image: p.headshot_url || undefined,
+                  headshot_url: p.headshot_url,
                   isStarter: false,
                   isOnIR: p.status === 'IR' || p.status === 'SUSP',
                   stats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
@@ -4712,7 +4666,7 @@ const Matchup = () => {
                     teamAbbreviation: entry.player_team_abbreviation || entry.player_team || '',
                     points: 0,
                     total_points: 0,
-                    image: entry.player_headshot_url || undefined,
+                    headshot_url: entry.player_headshot_url || '',
                     isStarter,
                     isOnIR: entry.player_status === 'IR' || entry.player_status === 'SUSP',
                     stats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
@@ -4732,7 +4686,7 @@ const Matchup = () => {
               // Leave myRoster empty — do NOT fallback to base roster.
               // This ensures myStarters/Date Change Handler know no per-day data exists
               // and can fall through to the correct behavior (base roster via displayMyTeam).
-              log(` No frozen roster entries for my team on ${date}, skipping (no fallback)`);
+              log(` No frozen roster entries for my team on ${date} — skipping (no fallback)`);
             }
 
             // Build opponent frozen roster
@@ -4767,7 +4721,7 @@ const Matchup = () => {
                     teamAbbreviation: entry.player_team_abbreviation || entry.player_team || '',
                     points: 0,
                     total_points: 0,
-                    image: entry.player_headshot_url || undefined,
+                    headshot_url: entry.player_headshot_url || '',
                     isStarter,
                     isOnIR: entry.player_status === 'IR' || entry.player_status === 'SUSP',
                     stats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
@@ -4785,7 +4739,7 @@ const Matchup = () => {
             } else {
               // No frozen roster entries for opponent on this date.
               // Leave oppRoster empty — do NOT fallback to base roster.
-              log(` No frozen roster entries for opponent on ${date}, skipping (no fallback)`);
+              log(` No frozen roster entries for opponent on ${date} — skipping (no fallback)`);
             }
 
             return {
@@ -4970,7 +4924,7 @@ const Matchup = () => {
                 team: entry.player_team || '',
                 teamAbbreviation: entry.player_team_abbreviation || entry.player_team || '',
                 points: 0, total_points: 0,
-                image: entry.player_headshot_url || undefined,
+                headshot_url: entry.player_headshot_url || '',
                 isStarter,
                 isOnIR: false,
                 stats: { goals: 0, assists: 0, sog: 0, blk: 0, xGoals: 0 },
@@ -5073,10 +5027,6 @@ const Matchup = () => {
       if (currentMatchup.status !== 'in_progress') return;
       try {
         await MatchupService.updateMatchupScores(league.id);
-        // The recompute wrote every matchup's score; re-read the week so the
-        // scoreboard strip ticks with the page (one small request, only
-        // while the week is in progress, only on this cadence).
-        await loadWeekMatchups();
       } catch (error) {
         // Non-blocking - don't stop refresh cycle
       }
@@ -5269,34 +5219,6 @@ const Matchup = () => {
     navigate(`/matchup/${leagueId}/${weekNumber}`);
   }, [userLeagueState, league?.id, navigate]);
 
-  // Switch the viewed matchup in place (2026-09-01, Sleeper parity audit M7).
-  // One handler for both the scoreboard strip and the "View Matchup" select:
-  // clear the roster cache marker and the matchup-scoped state, flag loading,
-  // and let the loader effect — which has selectedMatchupId in its deps —
-  // fetch the new one. No navigation, no reload; the strip stays on screen
-  // with the tapped chip already raised while the lineup below swaps.
-  const handleMatchupSwitch = useCallback((matchupId: string) => {
-    log(' Matchup switched to:', matchupId);
-    loadedMatchupDataRef.current = null;
-    setSelectedMatchupId(matchupId);
-    setSelectedDate(null);
-    setCurrentMatchup(null);
-    setCalculatedDailyTotals(new Map());
-    setMyTeam([]);
-    setOpponentTeamPlayers([]);
-    setLoading(true);
-  }, []);
-
-  // The strip's LIVE dot. The live-refresh interval writes fresh game
-  // statuses into these two rosters every 120s, and between them they cover
-  // most of the league's NHL teams on a game night — no extra request. It is
-  // a strip-level signal by design: nothing served says which OTHER lineups
-  // have a skater on the ice, so no chip guesses (see scoreboard.ts).
-  const scoreboardLive = useMemo(
-    () => anyGameLive([...myTeam, ...opponentTeamPlayers], getTodayMST()),
-    [myTeam, opponentTeamPlayers],
-  );
-
   // =============================================================================
   // SIMPLIFIED LOADING STATE - One-way gate prevents flash/cycling
   // =============================================================================
@@ -5423,29 +5345,56 @@ const Matchup = () => {
         <Navbar />
       </div>
       
-      {/* MOBILE: the one-band sticky header (2026-09-01, audit M8) — ESPN
-          pins the scores while you scroll, Sleeper's header is one dense
-          band: disc · name · win chance · score · proj on BOTH sides, the
-          same numbers the ScoreCard shows at rest. Names follow the VIEWED
-          matchup (a stranger's pair from the scoreboard is not "My Team").
-          The hex-marker header string the menu guard keys on is the legacy
-          spelling of the same colour; this bar keeps the token. */}
-      <div className="lg:hidden sticky top-0 z-page-header bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <StickyScoreBar
-          menu={<MobileMenuButton />}
-          week={currentMatchup ? selectedWeek : undefined}
-          myTeamName={userLeagueState === 'active-user' ? (viewingTeamName || userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
-          myTeamPoints={parseFloat(myTeamPoints || '0').toFixed(1)}
-          myTeamExpectedFinal={projectedFinals?.my}
-          myTeamAvatarUrl={myTeamAvatarUrl}
-          opponentTeamName={userLeagueState === 'active-user' ? (viewingOpponentTeamName || opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
-          opponentTeamPoints={parseFloat(opponentTeamPoints || '0').toFixed(1)}
-          opponentTeamExpectedFinal={projectedFinals?.opp}
-          opponentTeamAvatarUrl={opponentTeamAvatarUrl}
-          winProbability={matchupOutlook ? matchupOutlook.probability * 100 : undefined}
-          settled={matchupOutlook?.settled ?? false}
-          isOwnTeam={isOwnTeamOnLeft}
-        />
+      {/* MOBILE: Sticky scoreboard header — ESPN/Yahoo style */}
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+        <div className="flex items-center justify-between h-14 px-3">
+          {/* My team score — orange is the app-wide "this is you" signal
+              (Standings own-team row, ScoreCard's YOU pill). This bar used to
+              have it backwards: the OPPONENT wore orange and the user wore
+              cream, so the highlighted side was the one that wasn't yours. */}
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="flex flex-col items-start flex-shrink-0">
+              <span className="text-lg font-calistoga font-black text-pastel-orange tabular-nums leading-6">
+                {parseFloat(myTeamPoints || '0').toFixed(1)}
+              </span>
+              {projectedFinals && (
+                <span className="text-[10px] font-jbmono text-white/55 tabular-nums leading-none whitespace-nowrap">
+                  proj {projectedFinals.my.toFixed(1)}
+                </span>
+              )}
+            </div>
+            <span className="text-xs font-jbmono font-semibold text-pastel-orange-soft truncate">
+              {userLeagueState === 'active-user' ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
+            </span>
+          </div>
+          {/* Week badge + win chance for the LEFT team (was a literal "—").
+              Plain fan language, same number the ScoreCard's bar shows. */}
+          <div className="flex flex-col items-center px-2 flex-shrink-0">
+            <span className="text-[10px] font-jbmono font-bold text-white/55 uppercase tracking-wider">
+              {currentMatchup ? `Wk ${selectedWeek}` : 'VS'}
+            </span>
+            <span className="text-xs font-jbmono font-bold text-pastel-cream tabular-nums whitespace-nowrap">
+              {winChanceLabel}
+            </span>
+          </div>
+          {/* Opponent score + menu — deliberately the muted side. */}
+          <div className="flex items-center gap-1 min-w-0 flex-1 justify-end">
+            <span className="text-xs font-jbmono font-semibold text-pastel-cream/70 truncate text-right">
+              {userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Opponent') : 'Thunder Titans'}
+            </span>
+            <div className="flex flex-col items-end flex-shrink-0">
+              <span className="text-lg font-calistoga font-black text-pastel-cream tabular-nums leading-6">
+                {parseFloat(opponentTeamPoints || '0').toFixed(1)}
+              </span>
+              {projectedFinals && (
+                <span className="text-[10px] font-jbmono text-white/55 tabular-nums leading-none whitespace-nowrap">
+                  proj {projectedFinals.opp.toFixed(1)}
+                </span>
+              )}
+            </div>
+            <MobileMenuButton />
+          </div>
+        </div>
       </div>
 
       {/* MOBILE: Full-screen scrollable content / DESKTOP: Grid layout */}
@@ -5518,20 +5467,27 @@ const Matchup = () => {
                       firstWeekStart={firstWeekStart}
                     />
                   )}
-                  {/* Matchup Viewer Dropdown - Show all matchups for current week.
-                      Desktop only since the scoreboard strip (M7): on a phone the
-                      strip below is the scoreboard — every matchup is a tappable
-                      button one flick away, with the viewer's chip ringed — and
-                      this control was a third row of chrome above the first
-                      score. On desktop it stays as the compact keyboard path
-                      next to the week selector; the rail in the aside is the
-                      visual one. Both call handleMatchupSwitch. */}
+                  {/* Matchup Viewer Dropdown - Show all matchups for current week */}
                   {userLeagueState === 'active-user' && allWeekMatchups.length > 0 && (
-                    <div className="hidden lg:flex lg:flex-row lg:items-center gap-2">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2">
                       <label className="text-xs sm:text-sm font-medium text-white/55">View Matchup:</label>
                       <Select
                         value={selectedMatchupId || currentMatchup?.id || ''}
-                        onValueChange={handleMatchupSwitch}
+                        onValueChange={async (value) => {
+                          log(' Dropdown changed to:', value);
+                          // CRITICAL: Clear cache when dropdown changes to force fresh load
+                          loadedMatchupDataRef.current = null;
+                          setSelectedMatchupId(value);
+                          // Reset selected date when switching matchups
+                          setSelectedDate(null);
+                          // Force reload by clearing current matchup state
+                          setCurrentMatchup(null);
+                          setCalculatedDailyTotals(new Map()); // Clear calculated totals for new matchup
+                          setMyTeam([]);
+                          setOpponentTeamPlayers([]);
+                          setLoading(true);
+                          // The useEffect will pick up the selectedMatchupId change and reload
+                        }}
                       >
                         <SelectTrigger className="w-full sm:w-[280px]">
                           <SelectValue placeholder="Select a matchup" />
@@ -5588,27 +5544,7 @@ const Matchup = () => {
                   )}
                 </div>
               </div>
-
-              {/* MOBILE: League scoreboard strip (2026-09-01, audit M7). Sits above
-                  the ScoreCard and OUTSIDE the currentMatchup gate below, so a tap
-                  that swaps the viewed matchup leaves the ticker on screen with the
-                  tapped chip raised while the lineup reloads. Live scores only — the
-                  league endpoint serves no projections for other matchups. The
-                  desktop rail lives in the left aside. */}
-              {userLeagueState === 'active-user' && allWeekMatchups.length > 0 && (
-                <ScoreboardStrip
-                  className="lg:hidden mb-4"
-                  matchups={allWeekMatchups}
-                  ownMatchupId={userMatchupId}
-                  ownTeamId={userTeam?.id}
-                  viewedMatchupId={selectedMatchupId || currentMatchup?.id}
-                  onSelect={handleMatchupSwitch}
-                  week={selectedWeek}
-                  live={scoreboardLive}
-                  teamAvatars={teamAvatars}
-                />
-              )}
-
+          
           {/* Error State - Show friendly message for demo/guest, retry for logged-in users */}
           {!loading && hasInitializedRef.current && !shouldShowLoading && error && (
             <div className="text-center py-12 max-w-lg mx-auto">
@@ -5629,7 +5565,7 @@ const Matchup = () => {
                   </div>
                   <h3 className="text-lg font-bold text-pastel-cream mb-2">Draft Your Team First</h3>
                   <p className="text-sm text-white/55 mb-4">
-                    Weekly matchups open as soon as your league finishes its draft.
+                    Complete your league's draft to unlock weekly matchups and start competing.
                   </p>
                   <Button onClick={() => navigate(`/draft-v2/${activeLeagueId}`)}>
                     Go to Draft Room
@@ -5672,8 +5608,6 @@ const Matchup = () => {
             opponentTeamRecord={userLeagueState === 'active-user' ? opponentTeamRecord : { wins: 9, losses: 1 }}
             myTeamPoints={myTeamPoints}
             opponentTeamPoints={opponentTeamPoints}
-            myTeamAvatarUrl={myTeamAvatarUrl}
-            opponentTeamAvatarUrl={opponentTeamAvatarUrl}
             myTeamGamesRemaining={myTeamGamesRemaining}
             opponentTeamGamesRemaining={opponentTeamGamesRemaining}
             myTeamProjection={myTotalProjection}
@@ -5689,10 +5623,7 @@ const Matchup = () => {
             isOwnTeam={isOwnTeamOnLeft}
           />
           
-          {/* Weekly Schedule - Show for both active users AND guests (the weekly date selector they love!)
-              `compact`: on a phone the "Week Overview" header row is dropped
-              (audit M8) — the day cards are self-explanatory and the row was
-              the third band of chrome above the first player. */}
+          {/* Weekly Schedule - Show for both active users AND guests (the weekly date selector they love!) */}
           {currentMatchup && (
             <div className="mb-6">
               <WeeklySchedule
@@ -5703,7 +5634,6 @@ const Matchup = () => {
                 team1Name={userLeagueState === 'active-user' ? (viewingTeamName || undefined) : 'Citrus Crushers'}
                 team2Name={userLeagueState === 'active-user' ? (viewingOpponentTeamName || undefined) : 'Thunder Titans'}
                 calculatedDailyTotals={calculatedDailyTotals}
-                compact
               />
             </div>
           )}
@@ -5844,22 +5774,7 @@ const Matchup = () => {
             </div>
             {/* Desktop: Sticky sidebar */}
             <aside className="hidden lg:block w-full lg:w-auto order-2 lg:order-1">
-              <div className="lg:sticky lg:top-24 space-y-4">
-                {/* DESKTOP: the league scoreboard as a rail beside the sidebar
-                    (audit M7) — same chips as the phone strip, stacked. */}
-                {userLeagueState === 'active-user' && allWeekMatchups.length > 0 && (
-                  <ScoreboardStrip
-                    layout="rail"
-                    matchups={allWeekMatchups}
-                    ownMatchupId={userMatchupId}
-                    ownTeamId={userTeam?.id}
-                    viewedMatchupId={selectedMatchupId || currentMatchup?.id}
-                    onSelect={handleMatchupSwitch}
-                    week={selectedWeek}
-                    live={scoreboardLive}
-                    teamAvatars={teamAvatars}
-                  />
-                )}
+              <div className="lg:sticky lg:top-24">
                 <MatchupSidebar
                   myStarters={weeklyMyStarters}
                   opponentStarters={weeklyOpponentStarters}

@@ -1,7 +1,6 @@
 import { Calendar } from "lucide-react";
 import { CitrusWedge, CitrusSlice, CitrusBurst } from "@/components/icons/CitrusIcons";
 import { WinProbabilityBar } from "./WinProbabilityBar";
-import { TeamDisc } from "./TeamDisc";
 import { winProbabilityFromTotals } from "@/utils/winProbability";
 
 interface ScoreCardProps {
@@ -11,13 +10,6 @@ interface ScoreCardProps {
   opponentTeamRecord: { wins: number; losses: number };
   myTeamPoints: string;
   opponentTeamPoints: string;
-  /**
-   * Owner's profile picture for each side (the league/teams response joins
-   * `profiles.avatar_url` by owner_id — audit M8). The disc falls back to
-   * the team's initial when absent or when the image fails to load.
-   */
-  myTeamAvatarUrl?: string | null;
-  opponentTeamAvatarUrl?: string | null;
   myTeamGamesRemaining?: number;
   opponentTeamGamesRemaining?: number;
   /** Today's projected points (starters with a game today). */
@@ -55,6 +47,12 @@ interface ScoreCardProps {
    */
   isOwnTeam?: boolean;
 }
+
+/** First initial of a team name, for the badge avatar. */
+const initialOf = (name: string): string => {
+  const ch = (name || '').trim().charAt(0);
+  return ch ? ch.toUpperCase() : '?';
+};
 
 /**
  * "YOU" pill — same treatment as the Standings table's own-team row
@@ -105,8 +103,6 @@ export const ScoreCard = ({
   opponentTeamRecord,
   myTeamPoints,
   opponentTeamPoints,
-  myTeamAvatarUrl,
-  opponentTeamAvatarUrl,
   myTeamGamesRemaining = 0,
   opponentTeamGamesRemaining = 0,
   myTeamProjection = 0,
@@ -151,14 +147,17 @@ export const ScoreCard = ({
   const myBadgeShell = isOwnTeam
     ? 'bg-pastel-orange/10 ring-1 ring-pastel-orange/40'
     : 'bg-white/5 ring-1 ring-white/10';
+  const myAvatarShell = isOwnTeam
+    ? 'bg-pastel-orange/20 ring-2 ring-pastel-orange/50'
+    : 'bg-white/5 ring-1 ring-white/15';
+  const myAvatarText = isOwnTeam ? 'text-pastel-orange-soft' : 'text-pastel-cream';
   const myNameText = isOwnTeam ? 'text-pastel-orange-soft' : 'text-pastel-cream';
 
   // The opponent is ALWAYS the muted side. Previously both badges were
   // identical sage patches distinguished only by an "H"/"A" letter, which
-  // is the "you can't tell whose team is whose" bug this fixes. The discs
-  // themselves (owner avatar → team initial, orange shell = you) are
-  // TeamDisc, shared with the sticky bar and the scoreboard strip.
+  // is the "you can't tell whose team is whose" bug this fixes.
   const oppBadgeShell = 'bg-white/5 ring-1 ring-white/10';
+  const oppAvatarShell = 'bg-white/5 ring-1 ring-white/15';
 
   return (
     <div className="mb-4 md:mb-6 rounded-xl md:rounded-[2rem] bg-[#1A2A20] ring-1 ring-white/10 md:ring-2 shadow-[0_8px_24px_-8px_rgba(0,0,0,0.4)] overflow-hidden relative">
@@ -166,12 +165,7 @@ export const ScoreCard = ({
       <CitrusSlice className="hidden md:block absolute top-3 right-3 w-8 h-8 text-pastel-sage/10 rotate-12" aria-hidden="true" />
       <CitrusBurst className="hidden md:block absolute bottom-3 left-3 w-10 h-10 text-pastel-sage/10" aria-hidden="true" />
 
-      {/* Mobile: Compact single-row layout — the AT-REST header (audit M8).
-          On a phone the page's sticky StickyScoreBar is the compressed
-          version of this card (disc · name · score · proj · win chance,
-          both sides) and never leaves the screen; this card adds what the
-          band has no room for — records, the YOU pill, "N left", the full
-          win-chance bar — and scrolls away with the page.
+      {/* Mobile: Compact single-row layout.
           Identity clusters (avatar · name · record · YOU) stay as they were;
           each score column stacks score / "proj final" / "N left", so what a
           side has banked and what it still has coming read in one glance —
@@ -182,7 +176,9 @@ export const ScoreCard = ({
         <div className="flex items-center justify-between gap-2">
           {/* Team 1 - Compact */}
           <div className={`flex items-center gap-2 min-w-0 flex-1 rounded-lg px-1.5 py-1 ${myBadgeShell}`}>
-            <TeamDisc size="md" name={myTeamName} avatarUrl={myTeamAvatarUrl} own={isOwnTeam} />
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${myAvatarShell}`}>
+              <span className={`font-varsity text-xs ${myAvatarText}`}>{initialOf(myTeamName)}</span>
+            </div>
             <div className="min-w-0">
               <div className={`font-varsity text-[10px] uppercase truncate ${myNameText}`}>{myTeamName}</div>
               <div className="flex items-center gap-1">
@@ -213,7 +209,9 @@ export const ScoreCard = ({
               <div className="font-varsity text-[10px] text-pastel-cream uppercase truncate">{opponentTeamName}</div>
               <div className="font-mono text-[9px] text-white/55">{opponentTeamRecord.wins}-{opponentTeamRecord.losses}</div>
             </div>
-            <TeamDisc size="md" name={opponentTeamName} avatarUrl={opponentTeamAvatarUrl} />
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${oppAvatarShell}`}>
+              <span className="font-varsity text-xs text-pastel-cream">{initialOf(opponentTeamName)}</span>
+            </div>
           </div>
         </div>
 
@@ -233,7 +231,9 @@ export const ScoreCard = ({
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           {/* Team 1 Badge - Embroidered patch */}
           <div className={`flex items-center gap-3 p-3 rounded-2xl ${myBadgeShell}`}>
-            <TeamDisc size="lg" name={myTeamName} avatarUrl={myTeamAvatarUrl} own={isOwnTeam} />
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)] ${myAvatarShell}`}>
+              <span className={`font-varsity text-xl ${myAvatarText}`}>{initialOf(myTeamName)}</span>
+            </div>
             <div>
               <div className="flex items-center gap-2">
                 <div className={`font-varsity text-sm uppercase ${myNameText}`}>{myTeamName}</div>
@@ -291,7 +291,9 @@ export const ScoreCard = ({
                 </div>
               </div>
             </div>
-            <TeamDisc size="lg" name={opponentTeamName} avatarUrl={opponentTeamAvatarUrl} />
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-[inset_0_2px_4px_rgba(0,0,0,0.15)] ${oppAvatarShell}`}>
+              <span className="font-varsity text-xl text-pastel-cream">{initialOf(opponentTeamName)}</span>
+            </div>
           </div>
         </div>
       </div>

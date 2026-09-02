@@ -57,7 +57,7 @@ const NativeBootSplash = () => {
   return (
     <div
       aria-hidden="true"
-      className="fixed inset-0 z-overlay flex items-center justify-center bg-[#0F1F15] transition-opacity ease-out"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0F1F15] transition-opacity ease-out"
       style={{
         opacity: phase === 'fade' ? 0 : 1,
         transitionDuration: `${FADE_MS}ms`,

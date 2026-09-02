@@ -77,7 +77,7 @@ const AuthCallback = () => {
         const hashErrorDescription = hashParams.get('error_description');
 
         if (hashError) {
-          fail(hashErrorDescription || hashError || "Sign-in didn't finish. Head back and try again.");
+          fail(hashErrorDescription || hashError || "Sign-in didn't finish — head back and try again.");
           return;
         }
 
@@ -85,7 +85,7 @@ const AuthCallback = () => {
         const queryError = queryParams.get('error');
         const queryErrorDescription = queryParams.get('error_description');
         if (queryError) {
-          fail(queryErrorDescription || "Sign-in didn't finish. Head back and try again.");
+          fail(queryErrorDescription || "Sign-in didn't finish — head back and try again.");
           return;
         }
 
@@ -108,10 +108,10 @@ const AuthCallback = () => {
 
         // ----- Timeout after 10 seconds -----
         timeoutId = setTimeout(() => {
-          fail("Sign-in took too long. Head back and try again.");
+          fail("Sign-in took too long — head back and try again.");
         }, 10000);
       } catch (err: unknown) {
-        const errorMessage = userMessage(err, "Sign-in hit a snag. Head back and try again.");
+        const errorMessage = userMessage(err, "Sign-in hit a snag — head back and try again.");
         fail(errorMessage);
       }
     };

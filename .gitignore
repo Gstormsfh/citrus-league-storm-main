@@ -64,6 +64,16 @@ git-*.txt
 git-*.log
 git-diagnostic-output/
 
+# Delivery artifacts. Code reaches the Windows clone from the cloud container
+# as a git bundle plus the PR bodies that go with it (docs/RUNBOOKS/DELIVERY.md);
+# they are INPUTS to scripts/delivery/land-bundle.ps1, never repo content.
+# Left behind after a landing they are most of what `git status` shows, which
+# is how a real change gets lost in the noise. `*.ps1` above already covers a
+# delivery folder's own lander.
+*.bundle
+*.patch
+delivery-*/
+
 # Environment variables - NEVER commit .env files with secrets!
 .env
 .env.local

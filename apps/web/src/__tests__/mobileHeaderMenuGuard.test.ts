@@ -19,10 +19,8 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const pagesDir = resolve(here, '../pages');
 
-// The shared mobile chrome header (core-page pattern). `z-page-header` is
-// the rung, not a number: src/styles/zLayers.ts owns the scale and
-// zLayerScaleGuard fails any layer that stacks off it.
-const HEADER = 'lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95';
+// The shared mobile chrome header (core-page pattern).
+const HEADER = 'lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95';
 
 const pagesWithHeader: Array<[string, string]> = readdirSync(pagesDir)
   .filter((f) => f.endsWith('.tsx'))

@@ -106,7 +106,7 @@ export const DraftBoard = ({ teams, draftHistory, currentPick, currentRound, tot
         <div className="inline-block min-w-full">
           {/* Header - All teams in one row */}
           <div 
-            className="grid gap-1.5 mb-2 sticky top-0 bg-background z-sticky-base pb-2"
+            className="grid gap-1.5 mb-2 sticky top-0 bg-background z-10 pb-2"
             style={{ gridTemplateColumns: `60px repeat(${teams.length}, minmax(80px, 1fr))` }}
           >
             <div className="font-medium text-xs text-muted-foreground flex items-center">Round</div>

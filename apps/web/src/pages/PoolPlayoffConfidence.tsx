@@ -363,7 +363,7 @@ export default function PoolPlayoffConfidence() {
                               <span className="font-semibold" style={highInfo ? { color: highInfo.primaryColor } : undefined}>
                                 {high.team_abbrev} {h2hMap[s.bracket_slot].high_wins}
                               </span>
-                              <span className="text-white/55">-</span>
+                              <span className="text-white/55">—</span>
                               <span className="font-semibold" style={lowInfo ? { color: lowInfo.primaryColor } : undefined}>
                                 {h2hMap[s.bracket_slot].low_wins} {low.team_abbrev}
                               </span>
@@ -427,7 +427,7 @@ export default function PoolPlayoffConfidence() {
           <div className="text-[10px] font-display font-bold uppercase text-white/50 mb-1">How Confidence Pools Work</div>
           <ul className="text-[11px] text-white/70 space-y-0.5 list-disc pl-3">
             <li>Pick the winner of each playoff series</li>
-            <li>Assign a confidence value (1-{totalSeries}) to each pick. Each value used exactly once</li>
+            <li>Assign a confidence value (1-{totalSeries}) to each pick — each value used exactly once</li>
             <li>If your pick is correct, you earn that many points</li>
             <li>Higher confidence = more points if right, but more risk</li>
             <li>Most total points at the end of the playoffs wins</li>

@@ -1,8 +1,6 @@
 
 import type { Config } from "tailwindcss";
 
-import { tailwindZIndex } from "./src/styles/zLayers";
-
 export default {
 	darkMode: ["class"],
 	content: [
@@ -21,16 +19,6 @@ export default {
 			}
 		},
 		extend: {
-			/**
-			 * THE Z-INDEX SCALE. Named rungs only — `src/styles/zLayers.ts`
-			 * is the ordered list and carries the reasoning, and
-			 * `__tests__/zLayerScaleGuard.test.ts` fails any `fixed` or
-			 * `sticky` element in `src/` that stacks with a raw number
-			 * instead of one of these names. Tailwind's own numeric scale
-			 * (z-0/10/20/30/40/50/auto) stays, because in-flow `relative
-			 * z-10` layering inside one card is not an app layer.
-			 */
-			zIndex: tailwindZIndex(),
 			colors: {
 			// <alpha-value> is REQUIRED for opacity modifiers to compile against a
 			// CSS-variable colour. Without it Tailwind cannot build the alpha channel

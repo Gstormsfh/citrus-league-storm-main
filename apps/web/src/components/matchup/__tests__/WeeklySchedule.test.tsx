@@ -20,7 +20,19 @@ import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { WeeklySchedule } from '../WeeklySchedule';
 import { getTodayMST } from '@/utils/timezoneUtils';
-import { weekOf } from './weekOf';
+
+// Compute the week (Sun-Sat) containing today so today lands inside it.
+function weekOf(dateStr: string) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const sun = new Date(dt);
+  sun.setDate(dt.getDate() - dt.getDay());
+  const sat = new Date(sun);
+  sat.setDate(sun.getDate() + 6);
+  const fmt = (x: Date) =>
+    `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  return { weekStart: fmt(sun), weekEnd: fmt(sat) };
+}
 
 describe('WeeklySchedule — day-state color lock (Entry 34 WS-1)', () => {
   it('renders exactly 7 day cards for the week', () => {

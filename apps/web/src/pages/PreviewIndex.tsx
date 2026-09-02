@@ -74,7 +74,7 @@ export default function PreviewIndex() {
         </h1>
         <p className="text-[16px] md:text-[17px] text-white/60 max-w-2xl mx-auto leading-relaxed">
           Three Sleeper-inspired marketing pages on dark forest backgrounds. No fake phone mockups
-          this round. Real inline product UI, hockey iconography drawn in code, vibrant orange
+          this round — real inline product UI, hockey iconography drawn in code, vibrant orange
           punch. Pick the one that reads sports.
         </p>
       </header>

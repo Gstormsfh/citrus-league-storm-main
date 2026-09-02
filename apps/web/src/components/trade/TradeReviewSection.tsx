@@ -30,7 +30,7 @@ interface VoteState {
  * Countdown helper — returns "Xh Ym" or "ended"
  */
 const formatCountdown = (reviewEndsAt: string | null): string => {
-  if (!reviewEndsAt) return '-';
+  if (!reviewEndsAt) return '—';
   const diffMs = new Date(reviewEndsAt).getTime() - Date.now();
   if (diffMs <= 0) return 'Ended';
   const hours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -150,7 +150,7 @@ export const TradeReviewSection = ({ tradeOffers, myTeamId, onVoted }: TradeRevi
     } else {
       toast({
         title: vote === 'veto' ? 'Veto recorded' : 'Approval recorded',
-        description: `${result.vetoCount} veto(s): threshold ${result.votesNeeded}`,
+        description: `${result.vetoCount} veto(s) — threshold ${result.votesNeeded}`,
       });
     }
   };
@@ -248,7 +248,7 @@ export const TradeReviewSection = ({ tradeOffers, myTeamId, onVoted }: TradeRevi
                   <Progress value={progress} className="h-2" />
                   {vetoCount >= votesNeeded && votesNeeded > 0 && (
                     <div className="flex items-center gap-1 text-xs text-red-400">
-                      <AlertCircle className="h-3 w-3" /> Veto threshold reached: trade will be rejected
+                      <AlertCircle className="h-3 w-3" /> Veto threshold reached — trade will be rejected
                     </div>
                   )}
                 </div>

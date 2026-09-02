@@ -30,7 +30,7 @@ const GUIDES = {
     { title: 'Mid-Season Adjustments', description: 'How to pivot your strategy as the season progresses to stay competitive.', icon: '⚙️', accent: 'sage' as Accent },
   ],
   advanced: [
-    { title: 'Advanced Metrics, Explained', description: 'What xG, GAR and GSAx measure, and how to use them to pick players.', icon: '📊', accent: 'orange' as Accent },
+    { title: 'Statistical Analysis Deep Dive', description: 'Advanced metrics and how to use them for predictive player evaluation.', icon: '📊', accent: 'orange' as Accent },
     { title: 'Dynasty League Strategy', description: 'Long-term planning for dynasty formats, including prospect evaluation and roster construction.', icon: '👑', accent: 'sage' as Accent },
     { title: 'Game Theory Applications', description: 'Using game theory concepts to gain edges in drafts, trades, and waiver wire competition.', icon: '🎮', accent: 'orange' as Accent },
     { title: 'Bankroll Management', description: 'Advanced techniques for managing your investment across multiple leagues and contests.', icon: '💰', accent: 'sage' as Accent },
@@ -59,7 +59,7 @@ const Guides = () => {
               a library is the part that wasn't true. */}
           <p className="text-[16px] md:text-[18px] leading-relaxed text-white/65 max-w-xl mx-auto">
             What we're writing, from draft night to the playoffs. None of these
-            are published yet. This is the running order.
+            are published yet — this is the running order.
           </p>
         </section>
 
@@ -101,7 +101,7 @@ const Guides = () => {
               </h2>
               <p className="text-[15px] text-white/65 leading-relaxed mb-6 max-w-md mx-auto relative z-10">
                 About your league setup, the scoring, or how the projection model
-                works. Ask and we'll answer.
+                works — ask and we'll answer.
               </p>
               <Link
                 to="/contact"

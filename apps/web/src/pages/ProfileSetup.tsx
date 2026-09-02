@@ -129,7 +129,7 @@ const ProfileSetup = () => {
               Set up your <span className="text-pastel-orange">profile</span>
             </CardTitle>
             <CardDescription className="text-white/60">
-              One last step before puck drop. Name your manager profile
+              One last step before puck drop — name your manager profile
             </CardDescription>
           </CardHeader>
           <CardContent>

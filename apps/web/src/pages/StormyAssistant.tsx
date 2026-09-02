@@ -47,7 +47,7 @@ const StormyAssistant = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [messagesUsed, setMessagesUsed] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const defaultGreeting = "Well boss, Stormy here. I already have your league, your roster and picks, and the live playoff bracket in front of me. Ask me for a roster review, a start/sit, a waiver target, or a read on any matchup, and I'll show you the numbers behind the call.";
+  const defaultGreeting = "Hey! I'm Stormy — your Assistant GM. I already know your league, your picks/roster, and the live playoff bracket. Ask me to review your team, suggest swaps, or break down any matchup. What do you want to tackle?";
   const apiHistoryRef = useRef<StormyMessage[]>((() => {
     try {
       const saved = localStorage.getItem('stormyApiHistory');
@@ -201,7 +201,7 @@ const StormyAssistant = () => {
         ...prev,
         {
           id: (Date.now() + 1).toString(),
-          text: "That one didn't get through. Give me a second and ask again.",
+          text: "Something went wrong — give me a sec and try again.",
           sender: 'stormy',
           timestamp: new Date(),
         },
@@ -214,7 +214,7 @@ const StormyAssistant = () => {
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Stormy Assistant</h1>
@@ -531,7 +531,7 @@ const StormyAssistant = () => {
                     <ul className="text-[11px] text-white/70 space-y-1.5 leading-relaxed">
                       <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Be specific: "Should I bench Y on a B2B?"</li>
                       <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Name your league situation if it matters</li>
-                      <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Ask follow-ups, I keep the thread context</li>
+                      <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Ask follow-ups — I keep the thread context</li>
                     </ul>
                   </div>
                 </div>
@@ -541,7 +541,7 @@ const StormyAssistant = () => {
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">What I see</div>
                   </div>
                   <p className="text-[11px] text-white/70 leading-relaxed">
-                    Your active league, current roster, this week's matchup, and the live xG model. All loaded before you hit send.
+                    Your active league, current roster, this week's matchup, and the live xG model — all loaded before you hit send.
                   </p>
                 </div>
               </div>

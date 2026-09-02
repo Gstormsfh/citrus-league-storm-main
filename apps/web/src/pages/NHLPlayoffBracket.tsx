@@ -311,7 +311,7 @@ export default function NHLPlayoffBracket() {
                             <span className="font-bold text-pastel-cream">
                               {high.team_abbrev} {h2h.high_wins}
                             </span>
-                            <span className="text-white/55">-</span>
+                            <span className="text-white/55">—</span>
                             <span className="font-bold text-pastel-cream">
                               {h2h.low_wins} {low.team_abbrev}
                             </span>

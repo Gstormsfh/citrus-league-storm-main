@@ -1,0 +1,186 @@
+{
+  "$comment": "SINGLE SOURCE OF TRUTH for Citrus default fantasy scoring. Every other copy is derived: packages/shared/src/constants/scoringDefaults.ts imports this file; scripts/gen-scoring-defaults.mjs generates data-pipeline/scoring/scoring_defaults.py and docs/generated/SCORING_DEFAULTS.md from it (run `npm run gen:scoring`; CI fails when they are stale). Change a weight here, regenerate, done. The SQL homes (stat_catalog, the zero-UUID league_scoring_rules rows, the leagues.scoring_settings column default, the projection-rebuild RPCs) still carry literals in supabase/migrations and must ship a migration alongside any change here.",
+  "provenance": {
+    "standard": "Yahoo Fantasy Hockey default points scoring",
+    "sourceUrl": "https://help.yahoo.com/kb/SLN6815",
+    "effectiveDate": "2026-09-01",
+    "deviations": [
+      {
+        "key": "plus_minus",
+        "note": "Yahoo scores plus/minus at 2. Citrus ships it at 0 because the projection engine cannot model plus/minus, and a default category the projections ignore would make every projected total quietly wrong. Commissioners can still enable it."
+      }
+    ],
+    "optInRationale": "Short-handed points, hits, penalty minutes and plus/minus ship disabled (0) because no major platform scores them by default; the `suggested` weight is what a commissioner is offered on toggling one on."
+  },
+  "stats": [
+    {
+      "key": "goals",
+      "id": "g",
+      "name": "Goals",
+      "abbr": "G",
+      "group": "skater",
+      "category": "Offense",
+      "points": 6,
+      "optIn": false,
+      "suggested": null,
+      "pipelineKey": "goals",
+      "legacyBatchKey": "goals"
+    },
+    {
+      "key": "assists",
+      "id": "a",
+      "name": "Assists",
+      "abbr": "A",
+      "group": "skater",
+      "category": "Offense",
+      "points": 4,
+      "optIn": false,
+      "suggested": null,
+      "pipelineKey": "assists",
+      "legacyBatchKey": "assists"
+    },
+    {
+      "key": "power_play_points",
+      "id": "ppp",
+      "name": "Power Play Points",
+      "abbr": "PPP",
+      "group": "skater",
+      "category": "Offense",
+      "points": 2,
+      "optIn": false,
+      "suggested": null,
+      "pipelineKey": "ppp",
+      "legacyBatchKey": "powerplay_points"
+    },
+    {
+      "key": "short_handed_points",
+      "id": "shg",
+      "name": "Shorthanded Points",
+      "abbr": "SHP",
+      "group": "skater",
+      "category": "Offense",
+      "points": 0,
+      "optIn": true,
+      "suggested": 2,
+      "pipelineKey": "shp",
+      "legacyBatchKey": "shorthanded_points"
+    },
+    {
+      "key": "shots_on_goal",
+      "id": "sog",
+      "name": "Shots on Goal",
+      "abbr": "SOG",
+      "group": "skater",
+      "category": "Offense",
+      "points": 0.9,
+      "optIn": false,
+      "suggested": null,
+      "pipelineKey": "sog",
+      "legacyBatchKey": "shots_on_goal"
+    },
+    {
+      "key": "blocks",
+      "id": "blk",
+      "name": "Blocks",
+      "abbr": "BLK",
+      "group": "skater",
+      "category": "Defense",
+      "points": 1,
+      "optIn": false,
+      "suggested": null,
+      "pipelineKey": "blocks",
+      "legacyBatchKey": "blocked_shots"
+    },
+    {
+      "key": "hits",
+      "id": "hit",
+      "name": "Hits",
+      "abbr": "HIT",
+      "group": "skater",
+      "category": "Defense",
+      "points": 0,
+      "optIn": true,
+      "suggested": 0.5,
+      "pipelineKey": "hits",
+      "legacyBatchKey": "hits"
+    },
+    {
+      "key": "penalty_minutes",
+      "id": "pim",
+      "name": "Penalty Minutes",
+      "abbr": "PIM",
+      "group": "skater",
+      "category": "Defense",
+      "points": 0,
+      "optIn": true,
+      "suggested": 0.5,
+      "pipelineKey": "pim",
+      "legacyBatchKey": "pim"
+    },
+    {
+      "key": "plus_minus",
+      "id": "pm",
+      "name": "Plus/Minus",
+      "abbr": "+/-",
+      "group": "skater",
+      "category": "Defense",
+      "points": 0,
+      "optIn": true,
+      "suggested": 2,
+      "pipelineKey": null,
+      "legacyBatchKey": null
+    },
+    {
+      "key": "wins",
+      "id": "w",
+      "name": "Wins",
+      "abbr": "W",
+      "group": "goalie",
+      "category": "Goalie",
+      "points": 5,
+      "optIn": false,
+      "suggested": null,
+      "pipelineKey": "wins",
+      "legacyBatchKey": "wins"
+    },
+    {
+      "key": "shutouts",
+      "id": "so",
+      "name": "Shutouts",
+      "abbr": "SO",
+      "group": "goalie",
+      "category": "Goalie",
+      "points": 5,
+      "optIn": false,
+      "suggested": null,
+      "pipelineKey": "shutouts",
+      "legacyBatchKey": "shutouts"
+    },
+    {
+      "key": "saves",
+      "id": "sv",
+      "name": "Saves",
+      "abbr": "SV",
+      "group": "goalie",
+      "category": "Goalie",
+      "points": 0.6,
+      "optIn": false,
+      "suggested": null,
+      "pipelineKey": "saves",
+      "legacyBatchKey": "saves"
+    },
+    {
+      "key": "goals_against",
+      "id": "ga",
+      "name": "Goals Against",
+      "abbr": "GA",
+      "group": "goalie",
+      "category": "Goalie",
+      "points": -3,
+      "optIn": false,
+      "suggested": null,
+      "pipelineKey": "goals_against",
+      "legacyBatchKey": "goals_against"
+    }
+  ]
+}

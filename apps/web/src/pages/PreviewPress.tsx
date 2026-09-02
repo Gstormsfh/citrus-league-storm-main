@@ -109,7 +109,7 @@ export default function PreviewPress() {
           </h1>
           <p className="text-[17px] text-pastel-forest-soft leading-relaxed mb-8 max-w-md">
             A 31-feature xG model. Live shift-level data. Projections you can serve to your league
-            chat with confidence. Bottled fresh every morning.
+            chat with confidence — bottled fresh every morning.
           </p>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
             <Link

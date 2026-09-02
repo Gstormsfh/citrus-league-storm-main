@@ -159,11 +159,11 @@ export const WinProbabilityBar = ({
         {/* Compact simulation details */}
         {hasSimulation && (
           <div className="flex justify-between mt-1">
-            <span className="text-[8px] font-mono text-white/55">
+            <span className="text-[8px] font-mono text-white/50">
               {simulation.team1Projected.toFixed(1)} vs{" "}
               {simulation.team2Projected.toFixed(1)} proj
             </span>
-            <span className="text-[8px] font-mono text-white/55">
+            <span className="text-[8px] font-mono text-white/50">
               {simulation.nSims.toLocaleString()} sims
             </span>
           </div>
@@ -289,13 +289,13 @@ export const WinProbabilityBar = ({
             </div>
             <div className="font-mono text-[10px] text-pastel-cream space-y-0.5">
               <div className="flex justify-between">
-                <span className="text-white/55">Win 20+</span>
+                <span className="text-white/50">Win 20+</span>
                 <span className="font-bold">
                   {(simulation.pBlowoutWin * 100).toFixed(1)}%
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-white/55">Lose 20+</span>
+                <span className="text-white/50">Lose 20+</span>
                 <span className="font-bold">
                   {(simulation.pBlowoutLoss * 100).toFixed(1)}%
                 </span>

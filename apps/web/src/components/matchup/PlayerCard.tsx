@@ -8,14 +8,6 @@ import { ProjectionTooltip } from "./ProjectionTooltip";
 import { GoalieProjectionTooltip } from "./GoalieProjectionTooltip";
 import { getTodayMST } from "@/utils/timezoneUtils";
 import { Badge } from "@/components/ui/badge";
-import { Mug } from "@/components/roster/Mug";
-import { opponentTint } from "./opponentTint";
-import { useIsMobile } from "@/hooks/useIsMobile";
-import { compactPlayerName } from "./compactPlayerName";
-// The phone row type scale — the same four rungs the roster list and the
-// Free Agents rows wear. Everything it names below is inside a `lg:hidden`
-// block, so the desktop card is untouched.
-import { ROW_HEADLINE, ROW_HEADLINE_LABEL, ROW_META, ROW_MICRO } from "@/components/phoneRowScale";
 
 interface PlayerCardProps {
   player: MatchupPlayer | null;
@@ -56,19 +48,29 @@ const getPositionColorClasses = (position: string): string => {
   return '';
 };
 
-/**
- * The big number in the mobile score stack — the phone scale's HEADLINE
- * rung (17px JetBrains Mono, tabular).
- *
- * 15px → 17px (2026-09-02). The audit measured this row at name 14px /
- * score 15px: the number the row exists to show was one pixel bigger than
- * the name beside it, which reads as one flat band rather than as a
- * hierarchy. The column it sits in widened 38 → 42px in index.css to hold
- * a four-figure week total at this size; the width came out of the card's
- * screen-edge padding, not out of the name.
- */
-const SCORE_ACTUAL_CLASS = `player-score-value ${ROW_HEADLINE}`;
+/** The big number in the mobile score stack: 15px JetBrains Mono, tabular. */
+const SCORE_ACTUAL_CLASS = 'player-score-value font-jbmono tabular-nums text-[15px] font-bold leading-none';
 
+// Format name as "F. LastName" for mobile compactness
+const formatPlayerName = (name: string, compact: boolean = false): string => {
+  if (!name) return '';
+  const trimmed = name.trim();
+  
+  // Always use compact format on mobile (First Initial + Last Name)
+  // Check if we're on mobile using window width
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+  
+  if (isMobile || compact) {
+    const parts = trimmed.split(' ');
+    if (parts.length >= 2) {
+      const firstInitial = parts[0].charAt(0);
+      const lastName = parts.slice(1).join(' ');
+      return `${firstInitial}. ${lastName}`;
+    }
+  }
+  
+  return trimmed;
+};
 
 // Calculate percentages for data bars (mock calculations based on available stats)
 const calculatePercentages = (player: MatchupPlayer) => {
@@ -86,9 +88,6 @@ const calculatePercentages = (player: MatchupPlayer) => {
 };
 
 export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerClick, selectedDate, dailyStatsMap }: PlayerCardProps) => {
-  // Before the early return — hooks run on every render, empty slot or not.
-  const isMobile = useIsMobile();
-
   if (!player) {
     // "Empty", not "Empty Slot": the centre column already says WHICH slot
     // (the desktop label, the mobile chip), so the card only has to say
@@ -107,7 +106,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
     );
   }
 
-  const displayName = compactPlayerName(player.name, isMobile);
+  const displayName = formatPlayerName(player.name);
   const positionColors = getPositionColorClasses(player.position);
   const { shotPct, pointRate } = calculatePercentages(player);
   
@@ -177,34 +176,6 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
   const hasProjection = dailyProjection && projectedPoints > 0;
   const isStarterConfirmed = isGoalie ? (player.goalieProjection?.starter_confirmed ?? false) : true;
   const showTBD = hasGameOnDate && !isGameFinal && !isGameLive && !gameHasStarted && (!hasProjection || (isGoalie && !isStarterConfirmed));
-
-  // WEEK VIEW (2026-09-01, audit M9). With no day selected the page shows
-  // the whole matchup week — the total row sums the week, the ScoreCard
-  // shows the week — but the mobile score stack used to show TONIGHT's
-  // number, and the weekly "F Pts" box with its scoring breakdown is
-  // display:none on phones (index.css). So the phone had no way to reach
-  // "what did he score this week, and for what". The stack now follows
-  // the view's scope: week total (tap → weekly breakdown) in week view,
-  // the day's number (tap → daily breakdown) in day view. Same sentinel as
-  // MatchupComparison's isShowingDailyView, so row and total agree.
-  const isWeekView = selectedDate === null || selectedDate === undefined;
-  const weekPoints = typeof player.total_points === 'number' && Number.isFinite(player.total_points)
-    ? player.total_points
-    : 0;
-  const weekBreakdown =
-    player.stats_breakdown && typeof player.stats_breakdown === 'object' && Object.keys(player.stats_breakdown).length > 0
-      ? player.stats_breakdown
-      : undefined;
-  // Tonight's game still to come, with a number on it: shown under the
-  // week total as "+4.2" (orange = forecast), tappable for its breakdown.
-  const tonightPending = hasGameOnDate && !isGameFinal && !isGameLive && !gameHasStarted && !!hasProjection && isStarterConfirmed;
-  const tonightLive = hasGameOnDate && (isGameLive || (gameHasStarted && !isGameFinal));
-
-  // OPPONENT TINT (2026-09-01, audit M10): the model's opponent multiplier
-  // for this date colours the `vs/@ OPP` label — sage easier, orange-soft
-  // tougher, default within ±5%. The projection tooltip carries the
-  // legend, so the colour is never bare.
-  const oppTint = opponentTint(player.daily_projection?.opponent_adjustment);
   
   // Max points for bar display - 15 for all players (skaters and goalies)
   const maxBarPoints = 15;
@@ -299,25 +270,13 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
         {/* Header Section with Unique Stats in Top Right */}
         <div className="player-card-header">
           <div className="player-header-left">
-            {/* THE NAME LINE (2026-09-02). A row, not one element: the
-                status badges used to live INSIDE `.player-name`, which is
-                `white-space: nowrap; text-overflow: ellipsis` — so on the
-                82.5px phone column the badge was part of the string the
-                ellipsis ate, and an IR player rendered "Celebrini…" with
-                no badge at all. Measured on the matchup harness at 393x852:
-                the name element reported scrollWidth 91 in an 83px box, and
-                the 8px it lost were the badge. The name now shrinks and the
-                badges do not, so the row always says IR. */}
-            <div className="player-name-row">
             <div className="player-name" title={player.name}>
               {displayName}
-            </div>
-            <>
               {/* IR Badge - Display if roster_status is not ACT */}
               {(player.roster_status && player.roster_status !== 'ACT') || player.is_ir_eligible ? (
                 <Badge 
                   variant="destructive" 
-                  className="ml-1 text-[10px] leading-tight px-1 py-0"
+                  className="ml-1 text-[9px] px-1 py-0"
                   title={`Roster Status: ${player.roster_status || 'IR'}`}
                 >
                   IR
@@ -327,13 +286,12 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               {player.wasDropped ? (
                 <Badge 
                   variant="secondary"
-                  className="ml-1 text-[10px] leading-tight px-1 py-0 border-pastel-orange/40 bg-pastel-orange/20 text-pastel-orange font-semibold"
+                  className="ml-1 text-[9px] px-1 py-0 border-pastel-orange/40 bg-pastel-orange/20 text-pastel-orange font-semibold"
                   title="Player was dropped but points still count from when they were in the lineup"
                 >
                   Dropped
                 </Badge>
               ) : null}
-            </>
             </div>
             {/* Team Name - Below player name. `player-meta-row` lets the
                 mobile stylesheet right-align this line on the opponent
@@ -362,60 +320,21 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                 const hasScores = homeScore > 0 || awayScore > 0;
 
                 return (
-                  /* ONE LINE THAT TRUNCATES, NEVER WRAPS (2026-09-02).
-                     `flex-wrap` in an 85px name block put the live badge and
-                     the score on a second and third line — and the mobile
-                     card is `max-height: 64px; overflow: hidden`, so those
-                     lines were not shown small, they were CUT. Nowrap +
-                     min-w-0 + overflow-hidden makes the overflow an ellipsis
-                     on the one shrinkable child instead.
-
-                     TYPE (2026-09-02): the opponent label is the game's
-                     identity and rides the scale's META rung (12px), level
-                     with the team abbreviation beside it, which used to be
-                     11px against this label's 10px — two halves of one line
-                     disagreeing. Everything after it is a state qualifier
-                     that only some rows carry, and it stays on the MICRO
-                     rung: at 393px this column is 85px, the logo plus
-                     "vs TOR" at 12px already spends 55px of it, and
-                     promoting "TOR 1-2, P2" to 12px would push the score
-                     under the ellipsis on every live row. Small and present
-                     beats large and truncated. */
-                  <div className="lg:hidden flex items-center gap-1 min-w-0 overflow-hidden">
-                    {/* Opponent logo + abbrev, tinted by expected difficulty (M10).
-
-                        THE SHRINKABLE ONE (2026-09-02). This block used to be
-                        `shrink-0` like the state qualifiers after it, which
-                        meant NOTHING in the row could shrink: the line simply
-                        overran its 83px box and `overflow: hidden` cut it. On
-                        the opponent card, whose content is right-aligned, the
-                        cut lands on the far side, so a final score rendered at
-                        x=392.1 against a card edge of 393 -- entirely off a
-                        393px screen. On the user card the same overrun slid
-                        the score under the 28px mug. The row's own comment
-                        below already said the overflow should become "an
-                        ellipsis on the one shrinkable child"; there was no
-                        shrinkable child. There is now: the logo holds its
-                        14px, the label truncates, and the score -- the part
-                        a manager is actually reading -- always fits. */}
-                    <div className="flex items-center gap-0.5 min-w-0">
-                      <img loading="lazy" decoding="async" src={logoUrl} alt={opponent || ''} className="w-3.5 h-3.5 object-contain shrink-0" />
-                      <span
-                        className={cn('player-opponent truncate', ROW_META, 'font-display font-semibold', oppTint.className)}
-                        data-opponent-tier={oppTint.tier}
-                      >
-                        {opPrefix} {opponent}
-                      </span>
+                  <div className="lg:hidden flex items-center gap-1 flex-wrap">
+                    {/* Opponent logo + abbrev */}
+                    <div className="flex items-center gap-0.5">
+                      <img loading="lazy" decoding="async" src={logoUrl} alt={opponent || ''} className="w-3.5 h-3.5 object-contain" />
+                      <span className="text-[10px] font-display font-semibold text-white/60">{opPrefix} {opponent}</span>
                     </div>
                     {/* Live badge + score */}
                     {isLive && (
-                      <span className={cn('inline-flex items-center gap-0.5 shrink-0 font-bold px-1 py-0.5 rounded-sm bg-red-500/15 text-red-600 border border-red-500/30 animate-pulse', ROW_MICRO, 'leading-none')}>
+                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1 py-0.5 rounded-sm leading-none bg-red-500/15 text-red-600 border border-red-500/30 animate-pulse">
                         <span className="w-1 h-1 rounded-full bg-red-500" />
                         LIVE
                       </span>
                     )}
                     {isLive && hasScores && (
-                      <span className={cn(ROW_MICRO, 'font-display font-bold text-pastel-cream truncate')}>
+                      <span className="text-[10px] font-display font-bold text-pastel-cream">
                         {isHome
                           ? `${player.team} ${homeScore}-${awayScore}`
                           : `${player.team} ${awayScore}-${homeScore}`}
@@ -424,12 +343,12 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                     )}
                     {/* Final badge + score */}
                     {isFinal && (
-                      <span className={cn(ROW_MICRO, 'leading-none shrink-0 font-bold px-1 py-0.5 rounded-sm bg-white/10 text-white/60 border border-white/20')}>
+                      <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm leading-none bg-white/10 text-white/60 border border-white/20">
                         F
                       </span>
                     )}
                     {isFinal && hasScores && (
-                      <span className={cn(ROW_MICRO, 'font-display font-semibold text-white/60 shrink-0')}>
+                      <span className="text-[10px] font-display font-semibold text-white/60">
                         {isHome
                           ? `${homeScore}-${awayScore}`
                           : `${awayScore}-${homeScore}`}
@@ -437,7 +356,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                     )}
                     {/* Scheduled: show game time */}
                     {!isLive && !isFinal && player.gameInfo?.time && (
-                      <span className={cn(ROW_MICRO, 'font-display text-white/55 truncate')}>
+                      <span className="text-[10px] font-display text-white/50">
                         {player.gameInfo.time}
                       </span>
                     )}
@@ -647,9 +566,9 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               {/* Confidence label badge */}
               {hasProjection && dailyProjection?.confidence_label && (
                 <span className={`text-[7px] px-1 py-0 rounded font-bold ${
-                  dailyProjection.confidence_label === 'High' ? 'bg-pastel-sage/20 text-pastel-sage-soft border border-pastel-sage/30' :
-                  dailyProjection.confidence_label === 'Medium' ? 'bg-pastel-butter/20 text-pastel-butter border border-pastel-butter/30' :
-                  'bg-pastel-orange/20 text-pastel-orange-soft border border-pastel-orange/30'
+                  dailyProjection.confidence_label === 'High' ? 'bg-green-500/20 text-green-700 border border-green-500/30' :
+                  dailyProjection.confidence_label === 'Medium' ? 'bg-blue-500/20 text-blue-700 border border-blue-500/30' :
+                  'bg-orange-500/20 text-orange-700 border border-orange-500/30'
                 }`}>
                   {dailyProjection.confidence_label}
                 </span>
@@ -683,7 +602,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
             {/* Likely Range - "3.2 – 5.8 likely" (50% CI) - HIDDEN ON MOBILE */}
             {hasProjection && isStarterConfirmed && dailyProjection?.likely_low != null && dailyProjection?.likely_high != null && (
               <div className="hidden lg:flex justify-center mb-0.5">
-                <span className="text-[8px] font-display text-white/55">
+                <span className="text-[8px] font-display text-white/50">
                   Likely: {dailyProjection.likely_low.toFixed(1)} – {dailyProjection.likely_high.toFixed(1)}
                 </span>
               </div>
@@ -750,29 +669,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
           </div>
         )}
       </div>
-
-      {/* Mobile-only headshot (2026-09-01, audit M4). A 28px mug on the
-          gutter side of the name block, between it and the score stack —
-          the same DOM order on both cards, so the stylesheet's row-reverse
-          mirrors it: `name · face · number | chip | number · face · name`.
-          Each number therefore carries the face it belongs to, and the two
-          faces meet across the slot chip the way the two numbers already
-          did. Headshot → crest → initials (Mug), never a broken image, and
-          a 14px crest badge names the team the way the roster rows do — on
-          the corner facing the gutter, so the mirror holds.
-
-          Mobile only. On desktop the card is already name + stats box +
-          seven-crest GameLogosBar + projection bar, and at the 1024px
-          breakpoint its name column is ~130px — a 36px mug there turns
-          "Auston Matthews" into an ellipsis on every row. */}
-      <Mug
-        p={player}
-        size="xs"
-        crest
-        crestSide={isUserTeam ? 'right' : 'left'}
-        className="player-mug lg:hidden"
-      />
-
+      
       {/* Mobile-only score stack (2026-09-01) — sits at the gutter beside the
           slot chip on BOTH cards (the opponent card is mirrored by the
           stylesheet, so this block is the innermost element on each side).
@@ -782,64 +679,17 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
           game is live or final the actual sits over "proj 4.2" so the beat
           / miss reads at a glance. Bench rows carry cream — no state colour,
           because the number does not count. Tappable: the actual opens the
-          scoring breakdown, the projection opens the projection breakdown.
-
-          The stack is a fixed 42px column (index.css) so the mug beside it
-          lines up row after row; "proj" and its number therefore sit on two
-          lines rather than one — the width the one-liner needed is the
-          width the face now has.
-
-          Scope follows the view (audit M9): in WEEK view the number is the
-          player's week so far and the tap opens the weekly scoring
-          breakdown — the "F Pts" box the desktop card carries and phones
-          never could reach; under it, tonight's projection ("+4.2", its own
-          tap → projection breakdown) while his game is still to come, "live"
-          while it is on, else the scope label. In DAY view it is the day's
-          number as before. */}
+          scoring breakdown, the projection opens the projection breakdown. */}
       <div
         className={cn(
           'player-mobile-score lg:hidden flex flex-col justify-center leading-none',
           isUserTeam ? 'items-end text-right' : 'items-start text-left',
         )}
         data-side={isUserTeam ? 'user' : 'opponent'}
-        data-scope={isWeekView ? 'week' : 'day'}
       >
-        {isWeekView ? (
-          <>
-            {weekBreakdown ? (
-              <PointsTooltip breakdown={weekBreakdown} totalPoints={weekPoints}>
-                <span className={cn(SCORE_ACTUAL_CLASS, isBench ? 'text-pastel-cream' : 'text-pastel-sage', 'cursor-pointer')}>
-                  {weekPoints.toFixed(1)}
-                </span>
-              </PointsTooltip>
-            ) : (
-              <span className={cn(SCORE_ACTUAL_CLASS, isBench ? 'text-pastel-cream' : 'text-pastel-sage')}>
-                {weekPoints.toFixed(1)}
-              </span>
-            )}
-            {tonightPending && dailyProjection ? (
-              isGoalie ? (
-                <GoalieProjectionTooltip projection={player.goalieProjection}>
-                  <span className={cn('player-score-tonight font-jbmono tabular-nums text-[10px] font-bold leading-none mt-1 cursor-pointer', isBench ? 'text-pastel-cream' : 'text-pastel-orange')}>
-                    +{projectedPoints.toFixed(1)}
-                  </span>
-                </GoalieProjectionTooltip>
-              ) : (
-                <ProjectionTooltip projection={player.daily_projection}>
-                  <span className={cn('player-score-tonight font-jbmono tabular-nums text-[10px] font-bold leading-none mt-1 cursor-pointer', isBench ? 'text-pastel-cream' : 'text-pastel-orange')}>
-                    +{projectedPoints.toFixed(1)}
-                  </span>
-                </ProjectionTooltip>
-              )
-            ) : (
-              <span className={cn('player-score-label', ROW_HEADLINE_LABEL, 'mt-1 text-white/55')}>
-                {tonightLive ? 'live' : 'week'}
-              </span>
-            )}
-          </>
-        ) : !hasGameOnDate && !hasDailyStats ? (
+        {!hasGameOnDate && !hasDailyStats ? (
           // No game on this date and nothing scored — say so, not "0.0".
-          <span className="player-score-none text-white/55 text-[10px] font-display italic leading-tight">
+          <span className="player-score-none text-white/55 text-[10px] font-display italic leading-none">
             No game
           </span>
         ) : shouldShowDailyPoints ? (
@@ -861,15 +711,11 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               </span>
             )}
             {hasProjection ? (
-              // Label over number: two flex-column lines; the whitespace
-              // text node between them keeps the text "proj 4.2" for
-              // copy/paste and assistive tech while rendering nothing.
-              <span className={cn('player-score-proj', ROW_HEADLINE_LABEL, 'tabular-nums mt-1 text-white/55 flex flex-col gap-px')}>
-                <span className="uppercase">proj</span>{' '}
-                <span className="normal-case">{projectedPoints.toFixed(1)}</span>
+              <span className="player-score-proj font-jbmono tabular-nums text-[10px] leading-none mt-1 text-white/55">
+                <span className="uppercase tracking-[0.22em]">proj</span> {projectedPoints.toFixed(1)}
               </span>
             ) : (
-              <span className={cn('player-score-label', ROW_HEADLINE_LABEL, 'mt-1 text-white/55')}>
+              <span className="player-score-label font-jbmono uppercase tracking-[0.22em] text-[10px] leading-none mt-1 text-white/55">
                 {isGameLive || (gameHasStarted && !isGameFinal) ? 'live' : 'final'}
               </span>
             )}
@@ -890,19 +736,17 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                 </span>
               </ProjectionTooltip>
             )}
-            <span className={cn('player-score-label', ROW_HEADLINE_LABEL, 'mt-1 text-white/55')}>
+            <span className="player-score-label font-jbmono uppercase tracking-[0.22em] text-[10px] leading-none mt-1 text-white/55">
               proj
             </span>
           </>
         ) : (
-          // Has a game but no projection yet. "TBD" is what this row's
-          // headline slot holds, so it wears the headline rung (13px was a
-          // third size in a column that only has two jobs).
+          // Has a game but no projection yet.
           <>
-            <span className={cn('player-score-tbd', ROW_HEADLINE, 'text-pastel-cream/80')}>
+            <span className="player-score-tbd font-jbmono text-[13px] font-bold leading-none text-pastel-cream/80">
               TBD
             </span>
-            <span className={cn('player-score-label', ROW_HEADLINE_LABEL, 'mt-1 text-white/55')}>
+            <span className="player-score-label font-jbmono uppercase tracking-[0.22em] text-[10px] leading-none mt-1 text-white/55">
               proj
             </span>
           </>

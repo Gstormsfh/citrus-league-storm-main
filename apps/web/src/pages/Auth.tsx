@@ -72,21 +72,21 @@ const Auth = () => {
     // preserved verbatim where they already met the bar.
     const lower = errorMessage.toLowerCase();
     if (lower.includes('invalid login') || lower.includes('invalid credentials')) return "That email + password combo didn't match. Double-check and try again.";
-    if (lower.includes('already registered') || lower.includes('already exists') || lower.includes('already in use')) return 'This email already has an account. Sign in instead.';
-    if (lower.includes('email not confirmed') || lower.includes('email not verified')) return "Email not verified yet. Check your inbox for the link.";
-    if (lower.includes('rate limit') || lower.includes('too many requests')) return "Too many tries in a row. Take a few minutes, then have another go.";
-    if (lower.includes('provider is not enabled') || lower.includes('unsupported provider')) return "That sign-in method isn't hooked up yet. Use email and password instead.";
-    if (lower.includes('signups not allowed') || lower.includes('signup is disabled')) return "New sign-ups are paused right now. Try again later, or ping support.";
-    if (lower.includes('validation_failed') || lower.includes('validation failed')) return "Sign-up didn't take. Try that again.";
+    if (lower.includes('already registered') || lower.includes('already exists') || lower.includes('already in use')) return 'This email already has an account — sign in instead.';
+    if (lower.includes('email not confirmed') || lower.includes('email not verified')) return "Email not verified yet — check your inbox for the link.";
+    if (lower.includes('rate limit') || lower.includes('too many requests')) return "Too many tries in a row — take a few minutes, then have another go.";
+    if (lower.includes('provider is not enabled') || lower.includes('unsupported provider')) return "That sign-in method isn't hooked up yet — use email + password instead.";
+    if (lower.includes('signups not allowed') || lower.includes('signup is disabled')) return "New sign-ups are paused right now — try again later or ping support.";
+    if (lower.includes('validation_failed') || lower.includes('validation failed')) return "Sign-up didn't take — try that again.";
     if (lower.includes('password')) return errorMessage;
-    if (lower.includes('invalid email') || lower.includes('email format') || lower.includes('malformed email')) return "That email doesn't look right. Double-check it and try again.";
+    if (lower.includes('invalid email') || lower.includes('email format') || lower.includes('malformed email')) return "That email doesn't look right — double-check and try again.";
     return errorMessage;
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!validateEmail(email)) { setError("That email doesn't look right. Try again."); return; }
+    if (!validateEmail(email)) { setError("That email doesn't look right — try again."); return; }
     setLoading(true);
     const { error } = await signIn(email, password);
     if (error) {
@@ -103,9 +103,9 @@ const Auth = () => {
           const info = body?.data || body;
           if (info?.exists && !info.has_password) {
             const oauthProviders = (info.providers || []).filter((p: string) => p !== 'email');
-            if (oauthProviders.includes('google')) { setError("This email signed up with Google. Click 'Continue with Google' above."); setLoading(false); return; }
-            if (oauthProviders.includes('apple')) { setError("This email signed up with Apple. Click 'Continue with Apple' above."); setLoading(false); return; }
-            if (oauthProviders.length > 0) { setError(`This email signed up with ${oauthProviders[0]}. Use that option above.`); setLoading(false); return; }
+            if (oauthProviders.includes('google')) { setError("This email signed up with Google — click 'Continue with Google' above."); setLoading(false); return; }
+            if (oauthProviders.includes('apple')) { setError("This email signed up with Apple — click 'Continue with Apple' above."); setLoading(false); return; }
+            if (oauthProviders.length > 0) { setError(`This email signed up with ${oauthProviders[0]} — use that option above.`); setLoading(false); return; }
           }
         } catch { /* fall through */ }
       }
@@ -141,7 +141,7 @@ const Auth = () => {
     // the user staring at a re-enabled button with no explanation.
     // Now we surface an honest error so the user knows to retry / reach out.
     signInSafetyTimeoutRef.current = setTimeout(() => {
-      setError("Sign-in didn't complete. Try again, or reach out if it keeps happening.");
+      setError("Sign-in didn't complete — try again, or reach out if it keeps happening.");
       setLoading(false);
     }, 4000);
   };
@@ -149,9 +149,9 @@ const Auth = () => {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!validateEmail(email)) { setError("That email doesn't look right. Try again."); return; }
-    if (password.length < 8) { setError("Passwords need at least 8 characters. Try a bit longer."); return; }
-    if (password !== confirmPassword) { setError("Those passwords don't match. Try typing the second one again."); return; }
+    if (!validateEmail(email)) { setError("That email doesn't look right — try again."); return; }
+    if (password.length < 8) { setError("Passwords need at least 8 characters — try a bit longer."); return; }
+    if (password !== confirmPassword) { setError("Those passwords don't match — try typing the second one again."); return; }
     if (!tosAccepted) { setError("Check the Terms box to keep going."); return; }
     setLoading(true);
     try {
@@ -180,7 +180,7 @@ const Auth = () => {
         navigate('/verify-email', { state: { email }, replace: true });
       }
     } catch (err: unknown) {
-      const errorMessage = userMessage(err, "Sign-up hit a snag. Try again in a moment.");
+      const errorMessage = userMessage(err, "Sign-up hit a snag — try again in a moment.");
       setError(errorMessage);
       setLoading(false);
     }
@@ -195,24 +195,24 @@ const Auth = () => {
       // Route through getBetterErrorMessage so a provider that is not yet
       // enabled in Supabase degrades to warm copy ("That sign-in method
       // isn't hooked up yet…") instead of a raw API string.
-      if (error) { setError(getBetterErrorMessage(error.message || `Couldn't reach ${providerLabel}. Try again in a moment.`)); setOauthLoading(null); }
+      if (error) { setError(getBetterErrorMessage(error.message || `Couldn't reach ${providerLabel} — try again in a moment.`)); setOauthLoading(null); }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? getBetterErrorMessage(err.message) : `Couldn't reach ${providerLabel}. Try again in a moment.`;
+      const errorMessage = err instanceof Error ? getBetterErrorMessage(err.message) : `Couldn't reach ${providerLabel} — try again in a moment.`;
       setError(errorMessage);
       setOauthLoading(null);
     }
   };
 
   const handleForgotPassword = async () => {
-    if (!validateEmail(resetEmail)) { setError("That email doesn't look right. Try again."); return; }
+    if (!validateEmail(resetEmail)) { setError("That email doesn't look right — try again."); return; }
     setError(null);
     setResetLoading(true);
     try {
       const { error } = await resetPassword(resetEmail);
-      if (error) setError(error.message || "Couldn't send that reset link. Try again in a moment.");
+      if (error) setError(error.message || "Couldn't send that reset link — try again in a moment.");
       else setResetSuccess(true);
     } catch (err: unknown) {
-      const errorMessage = userMessage(err, "Couldn't send that reset link. Try again in a moment.");
+      const errorMessage = userMessage(err, "Couldn't send that reset link — try again in a moment.");
       setError(errorMessage);
     } finally { setResetLoading(false); }
   };
@@ -224,7 +224,7 @@ const Auth = () => {
       <Navbar />
       <div
         aria-hidden="true"
-        className="fixed inset-0 pointer-events-none z-page-backdrop"
+        className="fixed inset-0 pointer-events-none z-0"
         style={{ background: 'radial-gradient(ellipse 50% 40% at 80% 15%, rgba(255,107,26,0.08) 0%, transparent 60%)' }}
       />
       <main className="relative z-10 flex items-center justify-center px-4 pt-24 pb-12 lg:pt-28 lg:pb-20 min-h-[calc(100vh-92px)]">

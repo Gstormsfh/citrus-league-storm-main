@@ -97,11 +97,8 @@ describe('nothing floats over the player pool during a draft', () => {
   });
 
   it('the on-clock bar owns the bottom edge on phones instead of fighting the header', () => {
-    expect(ROOM).toMatch(/fixed inset-x-3 bottom-\[max\(0\.75rem,env\(safe-area-inset-bottom\)\)\] z-page-header lg:sticky/);
+    expect(ROOM).toMatch(/fixed inset-x-3 bottom-\[max\(0\.75rem,env\(safe-area-inset-bottom\)\)\] z-40 lg:sticky/);
     expect(ROOM).not.toMatch(/"sticky top-24 z-20"/);
-    // On lg it goes back in flow, below the room's own sticky header
-    // (z-section-header). Rung names, from src/styles/zLayers.ts.
-    expect(ROOM).toMatch(/lg:top-16 lg:z-sticky-raised/);
     // …and the room container leaves clearance so the list's last rows
     // scroll out from under it.
     expect(ROOM).toMatch(/pb-28 lg:pb-4/);

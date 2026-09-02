@@ -392,7 +392,7 @@ const WaiverWire = () => {
       logger.error("[WaiverWire] Error checking draft status:", error);
       toast({
         title: "Draft Status Unclear",
-        description: "Couldn't verify where the draft is at. Try again in a moment.",
+        description: "Couldn't verify where the draft is at — try again in a moment.",
         variant: "destructive"
       });
       return;
@@ -490,7 +490,7 @@ const WaiverWire = () => {
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Waiver Wire</h1>
@@ -644,7 +644,7 @@ const WaiverWire = () => {
                 <CardDescription className="text-white/55">
                   {searchLoading
                     ? 'Loading the wire…'
-                    : `${availablePlayers.length} available. Tap one to claim`}
+                    : `${availablePlayers.length} available — tap one to claim`}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -783,7 +783,7 @@ const WaiverWire = () => {
                           className="flex items-center gap-3 px-3 py-2.5 bg-white/[0.03] hover:bg-white/[0.07] transition-colors"
                         >
                           <Badge variant="secondary" className="w-9 shrink-0 justify-center text-[10px] font-jbmono font-bold">
-                            {player.position_code || '-'}
+                            {player.position_code || '—'}
                           </Badge>
 
                           <div className="flex-1 min-w-0">
@@ -841,7 +841,7 @@ const WaiverWire = () => {
                   </CardTitle>
                   <CardDescription className="text-white/55 mt-1">
                     {isFAAB
-                      ? `Bid on ${selectedPlayer.full_name} · Budget: $${faabBudget ?? 0}`
+                      ? `Bid on ${selectedPlayer.full_name} — Budget: $${faabBudget ?? 0}`
                       : `Add ${selectedPlayer.full_name} to your roster`
                     }
                   </CardDescription>

@@ -34,7 +34,7 @@ const VerifyEmail = () => {
 
   const handleResend = async () => {
     if (!email) {
-      setError("We don't have your email. Sign up again to get a fresh link.");
+      setError("We don't have your email — sign up again to get a fresh link.");
       return;
     }
 
@@ -45,12 +45,12 @@ const VerifyEmail = () => {
       const { error } = await resendVerificationEmail(email);
 
       if (error) {
-        setError(error.message || "Couldn't send that link. Try again in a moment.");
+        setError(error.message || "Couldn't send that link — try again in a moment.");
       } else {
         setSuccess(true);
       }
     } catch (err: unknown) {
-      const errorMessage = userMessage(err, "That resend hit a snag. Try again in a moment.");
+      const errorMessage = userMessage(err, "That resend hit a snag — try again in a moment.");
       setError(errorMessage);
     } finally {
       setLoading(false);

@@ -58,7 +58,7 @@ export function ManagerPresencePanel({ teams }: ManagerPresencePanelProps) {
           );
           const statusLabel =
             t.owner_id == null
-              ? '-'
+              ? '—'
               : status === 'connected'
               ? 'connected'
               : status === 'away'

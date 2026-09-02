@@ -55,6 +55,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import _bootstrap  # noqa: F401
 
 from data_pipeline.utils.supabase_rest import SupabaseRest
+from data_pipeline.scoring.scoring_defaults import (
+    SKATER_SHORT as DEFAULT_SKATER_SCORING,
+    GOALIE as DEFAULT_GOALIE_SCORING,
+)
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -88,27 +92,10 @@ else:
 DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
 
 # ============================================================================
-# SCORING WEIGHTS (mirrors packages/shared DEFAULT_SCORING)
-# INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned. SHP/hits/PIM are
-# opt-in categories, 0 by default.
+# SCORING WEIGHTS — DEFAULT_SKATER_SCORING / DEFAULT_GOALIE_SCORING are the
+# generated single source (scoring_defaults.py, built from
+# packages/shared/src/constants/scoringDefaults.json), imported above.
 # ============================================================================
-DEFAULT_SKATER_SCORING = {
-    "goals": 6.0,
-    "assists": 4.0,
-    "ppp": 2.0,
-    "shp": 0.0,
-    "sog": 0.9,
-    "blocks": 1.0,
-    "hits": 0.0,
-    "pim": 0.0,
-}
-
-DEFAULT_GOALIE_SCORING = {
-    "wins": 5.0,
-    "shutouts": 5.0,
-    "saves": 0.6,
-    "goals_against": -3.0,
-}
 
 # Stat categories for skaters (order matters for correlation matrix)
 SKATER_STATS = ["goals", "assists", "sog", "blocks", "ppp", "shp", "hits", "pim"]
@@ -689,22 +676,22 @@ def calculate_fantasy_points(
     if is_goalie:
         weights = scoring or DEFAULT_GOALIE_SCORING
         return (
-            stat_line.get("wins", 0) * weights.get("wins", 5.0) +
-            stat_line.get("saves", 0) * weights.get("saves", 0.6) +
-            stat_line.get("shutouts", 0) * weights.get("shutouts", 5.0) +
-            stat_line.get("goals_against", 0) * weights.get("goals_against", -3.0)
+            stat_line.get("wins", 0) * weights.get("wins", DEFAULT_GOALIE_SCORING["wins"]) +
+            stat_line.get("saves", 0) * weights.get("saves", DEFAULT_GOALIE_SCORING["saves"]) +
+            stat_line.get("shutouts", 0) * weights.get("shutouts", DEFAULT_GOALIE_SCORING["shutouts"]) +
+            stat_line.get("goals_against", 0) * weights.get("goals_against", DEFAULT_GOALIE_SCORING["goals_against"])
         )
     else:
         weights = scoring or DEFAULT_SKATER_SCORING
         return (
-            stat_line.get("goals", 0) * weights.get("goals", 6.0) +
-            stat_line.get("assists", 0) * weights.get("assists", 4.0) +
-            stat_line.get("ppp", 0) * weights.get("ppp", 2.0) +
-            stat_line.get("shp", 0) * weights.get("shp", 0.0) +
-            stat_line.get("sog", 0) * weights.get("sog", 0.9) +
-            stat_line.get("blocks", 0) * weights.get("blocks", 1.0) +
-            stat_line.get("hits", 0) * weights.get("hits", 0.0) +
-            stat_line.get("pim", 0) * weights.get("pim", 0.0)
+            stat_line.get("goals", 0) * weights.get("goals", DEFAULT_SKATER_SCORING["goals"]) +
+            stat_line.get("assists", 0) * weights.get("assists", DEFAULT_SKATER_SCORING["assists"]) +
+            stat_line.get("ppp", 0) * weights.get("ppp", DEFAULT_SKATER_SCORING["ppp"]) +
+            stat_line.get("shp", 0) * weights.get("shp", DEFAULT_SKATER_SCORING["shp"]) +
+            stat_line.get("sog", 0) * weights.get("sog", DEFAULT_SKATER_SCORING["sog"]) +
+            stat_line.get("blocks", 0) * weights.get("blocks", DEFAULT_SKATER_SCORING["blocks"]) +
+            stat_line.get("hits", 0) * weights.get("hits", DEFAULT_SKATER_SCORING["hits"]) +
+            stat_line.get("pim", 0) * weights.get("pim", DEFAULT_SKATER_SCORING["pim"])
         )
 
 

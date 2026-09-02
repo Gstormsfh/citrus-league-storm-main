@@ -194,20 +194,20 @@ export function AuctionPanel({ leagueId, teams, playersById, myTeamId }: Auction
                 </div>
                 <div className="text-sm text-muted-foreground">
                   Leading: <span className="font-bold tabular-nums">${nomination.leadingBid}</span>
-                  {' · '}
+                  {' — '}
                   <span className={iAmLeading ? 'text-pastel-orange font-bold' : ''}>
                     {iAmLeading
                       ? 'you'
                       : teamNameById.get(nomination.leadingBidderId) ?? 'Unknown team'}
                   </span>
                   <span className="ml-2 text-xs">
-                    (nominated by {teamNameById.get(nomination.nominatorTeamId) ?? '-'})
+                    (nominated by {teamNameById.get(nomination.nominatorTeamId) ?? '—'})
                   </span>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-2xl font-bold tabular-nums" data-testid="auction-countdown">
                 <Timer className="w-5 h-5 text-pastel-orange" />
-                {countdown !== null ? `${countdown}s` : '-'}
+                {countdown !== null ? `${countdown}s` : '—'}
               </div>
             </div>
 
@@ -274,7 +274,7 @@ export function AuctionPanel({ leagueId, teams, playersById, myTeamId }: Auction
               {auction.paused ? (
                 <span>Auction paused by the commissioner.</span>
               ) : iAmNominating ? (
-                <span className="font-bold">Your turn to nominate. Search a player below.</span>
+                <span className="font-bold">Your turn to nominate — search a player below.</span>
               ) : (
                 <span>
                   Waiting on{' '}
@@ -362,9 +362,9 @@ export function AuctionPanel({ leagueId, teams, playersById, myTeamId }: Auction
             >
               <Coins className="w-3 h-3 text-pastel-orange" />
               <span className="truncate max-w-[9rem]">{t.team_name}</span>
-              <span className="tabular-nums font-bold">${b ? b.remaining : '-'}</span>
+              <span className="tabular-nums font-bold">${b ? b.remaining : '—'}</span>
               <span className="text-muted-foreground tabular-nums">
-                · {b ? b.slotsRemaining : '-'} slots
+                · {b ? b.slotsRemaining : '—'} slots
               </span>
             </div>
           );
@@ -389,13 +389,13 @@ export function AuctionPanel({ leagueId, teams, playersById, myTeamId }: Auction
                           (h.playerId ? `#${h.playerId}` : 'Player')}
                       </span>
                       <span className="text-muted-foreground">→</span>
-                      <span className="truncate">{h.teamId ? teamNameById.get(h.teamId) ?? '-' : '-'}</span>
+                      <span className="truncate">{h.teamId ? teamNameById.get(h.teamId) ?? '—' : '—'}</span>
                       <span className="ml-auto font-bold tabular-nums">${h.amount}</span>
                     </>
                   )}
                   {h.kind === 'no_sale' && (
                     <span className="text-muted-foreground">
-                      No sale. {h.playerName ?? 'nomination'} went unsold
+                      No sale — {h.playerName ?? 'nomination'} went unsold
                     </span>
                   )}
                   {h.kind === 'skipped' && (

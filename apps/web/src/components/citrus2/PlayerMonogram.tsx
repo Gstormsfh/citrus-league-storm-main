@@ -179,7 +179,7 @@ export function PlayerMonogram({
             'bg-pastel-butter text-pastel-surface',
             'rounded-full px-1 py-px ring-1 ring-pastel-surface',
           )}
-          title="Limited sample: fewer than 20 GP"
+          title="Limited sample size — fewer than 20 GP"
         >
           SS
         </span>

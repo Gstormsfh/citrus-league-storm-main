@@ -155,7 +155,7 @@ export default function PreviewRink() {
         </h1>
         <p className="text-[17px] md:text-[19px] leading-relaxed text-white/65 max-w-xl mx-auto mb-10">
           Every other fantasy platform was built for football and bolted on hockey. We built
-          Citrus for hockey first: 31-feature xG, shift-level scoring, real-time projections.
+          Citrus for hockey first — 31-feature xG, shift-level scoring, real-time projections.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-4 mb-16">
           <Link
@@ -314,7 +314,7 @@ export default function PreviewRink() {
             Game on.
           </div>
           <p className="text-[16px] text-white/65 max-w-md mx-auto mb-8">
-            Free league. 30-second draft setup. Every shot in the corpus scored by our own xG model.
+            Free league. 30-second draft setup. The most accurate projections in fantasy hockey.
           </p>
           <Link
             to="/create-league"

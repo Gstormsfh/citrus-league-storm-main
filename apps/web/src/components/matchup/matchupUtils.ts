@@ -8,8 +8,7 @@ export interface PositionGroup {
   scoreDiffs: (number | undefined)[];
 }
 
-// Standard slot order: 2C, 2RW, 2LW, 4D, 2G, 1UTIL — the row order of the
-// comparison view (MatchupComparison → MatchupPositionGroup).
+// Standard slot order matching TeamCard structure
 const INDIVIDUAL_SLOT_ORDER: Array<{ slot: string; position: string }> = [
   { slot: 'slot-C-1', position: 'C' },
   { slot: 'slot-C-2', position: 'C' },

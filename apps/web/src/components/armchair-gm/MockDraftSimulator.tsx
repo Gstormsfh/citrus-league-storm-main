@@ -34,9 +34,9 @@ const MOCK_TEAM_NAMES = [
 
 const POSITION_COLORS: Record<string, string> = {
   C: 'bg-primary/10 text-primary border-primary/30',
-  LW: 'bg-pastel-sage/15 text-pastel-sage-soft border-pastel-sage/30',
+  LW: 'bg-blue-500/10 text-blue-700 border-blue-500/30',
   RW: 'bg-purple-500/10 text-purple-700 border-purple-500/30',
-  D: 'bg-white/10 text-pastel-cream border-white/20',
+  D: 'bg-slate-500/10 text-slate-700 border-slate-500/30',
   G: 'bg-amber-500/10 text-amber-700 border-amber-500/30',
 };
 
@@ -339,7 +339,7 @@ const MockDraftSimulator = () => {
             </h3>
             <div className="overflow-x-auto max-h-[500px] overflow-y-auto scrollbar-styled">
               <table className="w-full text-xs">
-                <thead className="bg-muted/30 sticky top-0 z-sticky-base">
+                <thead className="bg-muted/30 sticky top-0 z-10">
                   <tr>
                     <th className="px-2 py-1.5 text-left">Player</th>
                     <th className="px-2 py-1.5 text-center">Pos</th>

@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, logger } from '@citrus/shared';
+import { COLUMNS, DEFAULT_SCORING, logger } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
@@ -124,16 +124,12 @@ export class LeagueService {
     // falls back to COALESCE defaults which could surprise commissioners
     // who thought they configured scoring. If caller didn't provide any,
     // write the standard default values explicitly so every stat is set.
-    // INDUSTRY-STANDARD DEFAULTS (2026-09-01) — Yahoo-aligned; must equal
-    // DEFAULT_SCORING in @citrus/shared and the DB defaults (guard-tested).
-    // SHP/hits/PIM/+/- are opt-in categories, 0 by default.
+    // The values are the shared DEFAULT_SCORING (single source:
+    // packages/shared/src/constants/scoringDefaults.json) — copied so the
+    // inserted row never aliases the shared constant.
     const DEFAULT_SCORING_SETTINGS = {
-      skater: {
-        goals: 6, assists: 4, power_play_points: 2, short_handed_points: 0,
-        shots_on_goal: 0.9, blocks: 1, hits: 0, penalty_minutes: 0,
-        plus_minus: 0,
-      },
-      goalie: { wins: 5, saves: 0.6, shutouts: 5, goals_against: -3 },
+      skater: { ...DEFAULT_SCORING.skater },
+      goalie: { ...DEFAULT_SCORING.goalie },
     };
     const needsFantasyScoring = leagueType === 'fantasy' || leagueType === 'playoff-roster-pool';
     const effectiveScoringSettings = scoringSettings
@@ -494,54 +490,18 @@ export class LeagueService {
     return { teams: data || [], error: null };
   }
 
-  /**
-   * Owner avatars for a list of teams (2026-09-01, Sleeper parity audit M8).
-   *
-   * Teams have no picture of their own — a team-level avatar is a later
-   * schema change — so the matchup header and scoreboard discs show the
-   * OWNER's `profiles.avatar_url` and fall back to the team initial. One
-   * explicit-column query for the whole league (`id, avatar_url`, the
-   * "authenticated users can view all profiles" policy covers other
-   * owners); AI teams (owner_id null) and owners without a picture come
-   * back `null`. A failed profile read degrades to null everywhere rather
-   * than failing the teams list — the picture is decoration, the list is
-   * not.
-   */
-  async attachOwnerAvatars<T extends { owner_id?: string | null }>(
-    teams: T[],
-  ): Promise<Array<T & { avatar_url: string | null }>> {
-    const ownerIds = [...new Set(teams.map((t) => t.owner_id).filter((id): id is string => !!id))];
-    const avatarByOwner = new Map<string, string | null>();
-    if (ownerIds.length > 0) {
-      const { data, error } = await this.supabase
-        .from('profiles')
-        .select('id, avatar_url')
-        .in('id', ownerIds);
-      if (error) {
-        logger.warn('[LeagueService] owner avatars unavailable, serving initials:', error);
-      }
-      for (const p of (data || []) as Array<{ id: string; avatar_url: string | null }>) {
-        avatarByOwner.set(p.id, p.avatar_url ?? null);
-      }
-    }
-    return teams.map((t) => ({
-      ...t,
-      avatar_url: (t.owner_id && avatarByOwner.get(t.owner_id)) || null,
-    }));
-  }
-
-  /** Get teams with owner profile names (and the owner's avatar, see attachOwnerAvatars) */
+  /** Get teams with owner profile names */
   async getLeagueTeamsWithOwners(leagueId: string) {
     const { teams, error } = await this.getLeagueTeams(leagueId);
     if (error || !teams.length) return { teams: [], error };
 
     const ownerIds = [...new Set(teams.map((t: { owner_id: string }) => t.owner_id).filter(Boolean))];
-    type OwnerProfile = { id: string; username: string | null; display_name: string | null; first_name: string | null; last_name: string | null; avatar_url?: string | null };
+    type OwnerProfile = { id: string; username: string | null; display_name: string | null; first_name: string | null; last_name: string | null };
     let profiles: OwnerProfile[] = [];
     if (ownerIds.length > 0) {
       const { data } = await this.supabase
         .from('profiles')
-        .select('id, username, display_name, first_name, last_name, avatar_url')
+        .select('id, username, display_name, first_name, last_name')
         .in('id', ownerIds);
       profiles = (data || []) as OwnerProfile[];
     }
@@ -562,7 +522,7 @@ export class LeagueService {
             || (isGeneratedHandle(profile.username) ? 'Manager' : profile.username)
             || 'Manager')
         : 'Unknown';
-      return { ...t, owner_name: ownerName, avatar_url: profile?.avatar_url || null };
+      return { ...t, owner_name: ownerName };
     });
 
     return { teams: teamsWithOwners, error: null };

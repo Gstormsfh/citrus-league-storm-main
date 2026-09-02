@@ -1,0 +1,379 @@
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Lock, Unlock } from 'lucide-react';
+import { MatchupPlayer } from './types';
+import { MatchupService, DailyLineupPlayer } from '@/services/MatchupService';
+import { getTodayMST } from '@/utils/timezoneUtils';
+import { logger } from '@/utils/logger';
+
+interface DailyRostersProps {
+  matchupId: string;
+  teamId: string;
+  opponentTeamId: string | null;
+  weekStart: string;
+  weekEnd: string;
+  myTeamRoster: MatchupPlayer[];       // Current roster (for today/future)
+  opponentTeamRoster: MatchupPlayer[]; // Current roster (for today/future)
+  myDailyPoints: number[];
+  opponentDailyPoints: number[];
+  selectedDate?: string | null;
+}
+
+// Internal state for each day's roster
+interface DayRosterState {
+  date: string;
+  myLineup: DailyLineupPlayer[] | null;  // null = use current roster
+  oppLineup: DailyLineupPlayer[] | null; // null = use current roster
+  myDailyScore: number;
+  oppDailyScore: number;
+  isLocked: boolean;
+  isLoading: boolean;
+}
+
+export const DailyRosters = ({
+  matchupId,
+  teamId,
+  opponentTeamId,
+  weekStart,
+  weekEnd,
+  myTeamRoster,
+  opponentTeamRoster,
+  myDailyPoints,
+  opponentDailyPoints,
+  selectedDate,
+}: DailyRostersProps) => {
+  const [dayRosters, setDayRosters] = useState<Map<string, DayRosterState>>(new Map());
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  // Get all dates in the week
+  const getWeekDates = (start: string, end: string): string[] => {
+    const dates: string[] = [];
+    // Parse date strings manually to avoid UTC midnight shift
+    // new Date("YYYY-MM-DD") parses as UTC midnight, which in MST becomes the previous day
+    const [sy, sm, sd] = start.split('-').map(Number);
+    const [ey, em, ed] = end.split('-').map(Number);
+    const startDate = new Date(sy, sm - 1, sd);
+    const endDate = new Date(ey, em - 1, ed);
+    const current = new Date(startDate);
+
+    while (current <= endDate) {
+      const y = current.getFullYear();
+      const m = String(current.getMonth() + 1).padStart(2, '0');
+      const d = String(current.getDate()).padStart(2, '0');
+      dates.push(`${y}-${m}-${d}`);
+      current.setDate(current.getDate() + 1);
+    }
+    return dates;
+  };
+
+  const allDates = getWeekDates(weekStart, weekEnd);
+  const datesToShow = selectedDate ? [selectedDate] : allDates;
+
+  // Check if a date is in the past (before today)
+  // Use string comparison to avoid timezone issues with Date objects
+  const isPastDate = (dateStr: string): boolean => {
+    const todayStr = getTodayMST(); // Returns YYYY-MM-DD format
+    return dateStr <= todayStr;
+  };
+
+  // Fetch frozen lineups for past days using server-side RPC
+  useEffect(() => {
+    const fetchDailyLineups = async () => {
+      setInitialLoading(true);
+      const newDayRosters = new Map<string, DayRosterState>();
+
+      for (let i = 0; i < allDates.length; i++) {
+        const date = allDates[i];
+        const isPast = isPastDate(date);
+
+        if (isPast) {
+          // PAST DAY: Fetch frozen lineup from server (Yahoo/Sleeper style)
+          try {
+            const [myLineup, oppLineup] = await Promise.all([
+              MatchupService.getDailyLineup(teamId, matchupId, date),
+              opponentTeamId 
+                ? MatchupService.getDailyLineup(opponentTeamId, matchupId, date)
+                : Promise.resolve([])
+            ]);
+
+            // Calculate daily score from the fetched lineup
+            const myDailyScore = myLineup
+              .filter(p => p.slot_type === 'active')
+              .reduce((sum, p) => sum + p.daily_points, 0);
+            const oppDailyScore = oppLineup
+              .filter(p => p.slot_type === 'active')
+              .reduce((sum, p) => sum + p.daily_points, 0);
+
+            newDayRosters.set(date, {
+              date,
+              myLineup,
+              oppLineup: opponentTeamId ? oppLineup : null,
+              myDailyScore,
+              oppDailyScore,
+              isLocked: myLineup.some(p => p.is_locked) || true, // Past days are always locked
+              isLoading: false
+            });
+          } catch (error) {
+            logger.error(`[DailyRosters] Error fetching lineup for ${date}:`, error);
+            // Fallback to current roster if fetch fails
+            newDayRosters.set(date, {
+              date,
+              myLineup: null,
+              oppLineup: null,
+              myDailyScore: myDailyPoints[i] || 0,
+              oppDailyScore: opponentDailyPoints[i] || 0,
+              isLocked: true,
+              isLoading: false
+            });
+          }
+        } else {
+          // TODAY/FUTURE: Use current roster (null = use props)
+          newDayRosters.set(date, {
+            date,
+            myLineup: null,  // Signal to use myTeamRoster prop
+            oppLineup: null, // Signal to use opponentTeamRoster prop
+            myDailyScore: myDailyPoints[i] || 0,
+            oppDailyScore: opponentDailyPoints[i] || 0,
+            isLocked: false,
+            isLoading: false
+          });
+        }
+      }
+
+      setDayRosters(newDayRosters);
+      setInitialLoading(false);
+    };
+
+    fetchDailyLineups();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchDailyLineups is inline; allDates.join(',') is a stable derived value
+  }, [matchupId, teamId, opponentTeamId, weekStart, weekEnd, allDates.join(',')]);
+
+  const formatDate = (dateStr: string): string => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dateOnly = new Date(date);
+    dateOnly.setHours(0, 0, 0, 0);
+
+    if (dateOnly.getTime() === today.getTime()) {
+      return 'Today';
+    }
+
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  // Render a player badge - handles both frozen lineup and current roster
+  const renderPlayerBadge = (
+    player: DailyLineupPlayer | MatchupPlayer,
+    variant: 'active' | 'bench' | 'ir'
+  ) => {
+    const name = 'player_name' in player ? player.player_name : player.name;
+    const position = player.position;
+    
+    if (variant === 'active') {
+      return (
+        <Badge key={name} variant="default" className="text-xs">
+          {name} ({position})
+        </Badge>
+      );
+    } else if (variant === 'bench') {
+      return (
+        <Badge key={name} variant="outline" className="text-xs opacity-60">
+          {name} ({position})
+        </Badge>
+      );
+    } else {
+      return (
+        <Badge key={name} variant="destructive" className="text-xs">
+          {name} ({position})
+        </Badge>
+      );
+    }
+  };
+
+  if (initialLoading) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        Loading daily rosters...
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {!selectedDate && (
+        <div className="text-sm text-muted-foreground mb-4">
+          View daily roster snapshots for this matchup week. Past days show frozen lineups.
+        </div>
+      )}
+      {selectedDate && (
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-sm font-semibold">
+            Daily roster for {formatDate(selectedDate)}
+          </div>
+        </div>
+      )}
+
+      {datesToShow.map((date) => {
+        const dayState = dayRosters.get(date);
+        if (!dayState) return null;
+
+        const isPast = isPastDate(date);
+        
+        // Determine which players to show
+        // Past days: use frozen lineup from server
+        // Today/Future: use current roster props
+        const myActivePlayers = isPast && dayState.myLineup
+          ? dayState.myLineup.filter(p => p.slot_type === 'active')
+          : myTeamRoster.filter(p => p.isStarter);
+        const myBenchPlayers = isPast && dayState.myLineup
+          ? dayState.myLineup.filter(p => p.slot_type === 'bench')
+          : myTeamRoster.filter(p => !p.isStarter && !p.is_ir_eligible);
+        const myIRPlayers = isPast && dayState.myLineup
+          ? dayState.myLineup.filter(p => p.slot_type === 'ir')
+          : myTeamRoster.filter(p => p.is_ir_eligible);
+
+        const oppActivePlayers = isPast && dayState.oppLineup
+          ? dayState.oppLineup.filter(p => p.slot_type === 'active')
+          : opponentTeamRoster.filter(p => p.isStarter);
+        const oppBenchPlayers = isPast && dayState.oppLineup
+          ? dayState.oppLineup.filter(p => p.slot_type === 'bench')
+          : opponentTeamRoster.filter(p => !p.isStarter && !p.is_ir_eligible);
+        const oppIRPlayers = isPast && dayState.oppLineup
+          ? dayState.oppLineup.filter(p => p.slot_type === 'ir')
+          : opponentTeamRoster.filter(p => p.is_ir_eligible);
+
+        return (
+          <Card key={date} className="overflow-visible">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  {formatDate(date)}
+                  {dayState.isLocked || isPast ? (
+                    <Badge variant="outline" className="text-xs">
+                      <Lock className="h-3 w-3 mr-1" aria-hidden="true" />
+                      {isPast ? 'Frozen' : 'Locked'}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs text-muted-foreground">
+                      <Unlock className="h-3 w-3 mr-1" aria-hidden="true" />
+                      Unlocked
+                    </Badge>
+                  )}
+                </CardTitle>
+                <div className="flex gap-4 text-sm">
+                  <div className="text-right">
+                    <div className="text-muted-foreground text-xs">My Team</div>
+                    <div className="font-bold text-[hsl(var(--vibrant-green))]">
+                      {dayState.myDailyScore.toFixed(1)} pts
+                    </div>
+                  </div>
+                  {opponentTeamId && (
+                    <div className="text-right">
+                      <div className="text-muted-foreground text-xs">Opponent</div>
+                      <div className="font-bold text-foreground/80">
+                        {dayState.oppDailyScore.toFixed(1)} pts
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* My Team */}
+                <div>
+                  <div className="text-xs font-semibold text-[hsl(var(--vibrant-green))] mb-3 uppercase tracking-wider">
+                    My Team {isPast && dayState.myLineup && '(Frozen)'}
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-2">
+                        Active ({myActivePlayers.length})
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {myActivePlayers.map((player) => renderPlayerBadge(player, 'active'))}
+                        {myActivePlayers.length === 0 && (
+                          <span className="text-xs text-muted-foreground">No active players</span>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-2">
+                        Bench ({myBenchPlayers.length})
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {myBenchPlayers.map((player) => renderPlayerBadge(player, 'bench'))}
+                        {myBenchPlayers.length === 0 && (
+                          <span className="text-xs text-muted-foreground">No bench players</span>
+                        )}
+                      </div>
+                    </div>
+                    {myIRPlayers.length > 0 && (
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-2">
+                          IR ({myIRPlayers.length})
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {myIRPlayers.map((player) => renderPlayerBadge(player, 'ir'))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Opponent Team */}
+                {opponentTeamId && (
+                  <div>
+                    <div className="text-xs font-semibold text-foreground/80 mb-3 uppercase tracking-wider">
+                      Opponent {isPast && dayState.oppLineup && '(Frozen)'}
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-2">
+                          Active ({oppActivePlayers.length})
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {oppActivePlayers.map((player) => renderPlayerBadge(player, 'active'))}
+                          {oppActivePlayers.length === 0 && (
+                            <span className="text-xs text-muted-foreground">No active players</span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-2">
+                          Bench ({oppBenchPlayers.length})
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {oppBenchPlayers.map((player) => renderPlayerBadge(player, 'bench'))}
+                          {oppBenchPlayers.length === 0 && (
+                            <span className="text-xs text-muted-foreground">No bench players</span>
+                          )}
+                        </div>
+                      </div>
+                      {oppIRPlayers.length > 0 && (
+                        <div>
+                          <div className="text-xs text-muted-foreground mb-2">
+                            IR ({oppIRPlayers.length})
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {oppIRPlayers.map((player) => renderPlayerBadge(player, 'ir'))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+};

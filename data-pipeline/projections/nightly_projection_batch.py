@@ -71,6 +71,7 @@ import _bootstrap  # noqa: F401
 
 from dotenv import load_dotenv
 from data_pipeline.utils.supabase_rest import SupabaseRest
+from data_pipeline.scoring import scoring_defaults
 
 # Import core calculation functions
 from calculate_daily_projections import (
@@ -342,23 +343,10 @@ def fetch_scoring_settings(db: SupabaseRest) -> Dict[str, Any]:
         if isinstance(settings, dict) and "scoring" in settings:
             return settings["scoring"]
     
-    # Default scoring settings
-    # INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned; SHP/hits/PIM
-    # opt-in at 0. (This legacy fallback kept its own key names.)
-    return {
-        "goals": 6.0,
-        "assists": 4.0,
-        "shots_on_goal": 0.9,
-        "blocked_shots": 1.0,
-        "hits": 0.0,
-        "pim": 0.0,
-        "powerplay_points": 2.0,
-        "shorthanded_points": 0.0,
-        "wins": 5.0,
-        "saves": 0.6,
-        "goals_against": -3.0,
-        "shutouts": 5.0
-    }
+    # Default scoring settings — the generated single source
+    # (scoring_defaults.py, built from packages/shared/.../scoringDefaults.json)
+    # in this function's legacy flat vocabulary. Fresh copy per call.
+    return dict(scoring_defaults.LEGACY_BATCH_KEYS)
 
 
 # ============================================================================

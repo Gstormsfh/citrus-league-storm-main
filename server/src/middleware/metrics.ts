@@ -25,25 +25,6 @@ interface RouteMetric {
   latencyBuckets: LatencyBucket[];
 }
 
-/**
- * Ceiling on distinct route keys held in memory (2026-09-02 scale audit).
- *
- * `normalizePath` collapses UUIDs and numeric segments, but not every
- * path parameter is one of those. `/api/account/check-username/:username`
- * is unauthenticated and takes a free-text segment, so before this cap
- * every distinct username ever checked minted a permanent Map entry
- * holding a ten-element bucket array — in a process designed to stay up
- * for the length of a season. `standardRateLimit` allows 600 requests per
- * minute per IP, so a single client could mint ~864k route keys a day,
- * and `/api/metrics` emits twelve lines per key.
- *
- * Requests beyond the cap are still counted; they are folded into a
- * single `<other>` bucket so the totals stay honest while the map stops
- * growing.
- */
-export const MAX_ROUTE_KEYS = 500;
-export const OVERFLOW_ROUTE_KEY = '<other>';
-
 class MetricsCollector {
   private routes = new Map<string, RouteMetric>();
   private startTime = Date.now();
@@ -57,13 +38,6 @@ class MetricsCollector {
 
   private getOrCreateRoute(key: string): RouteMetric {
     let metric = this.routes.get(key);
-    if (!metric && this.routes.size >= MAX_ROUTE_KEYS) {
-      // Cardinality ceiling reached — fold this request into the shared
-      // overflow bucket instead of minting another key. See MAX_ROUTE_KEYS.
-      metric = this.routes.get(OVERFLOW_ROUTE_KEY);
-      if (metric) return metric;
-      key = OVERFLOW_ROUTE_KEY;
-    }
     if (!metric) {
       metric = {
         requests: 0,
@@ -267,58 +241,16 @@ class MetricsCollector {
 export const metrics = new MetricsCollector();
 
 /**
- * The label this request is counted under.
- *
- * Hono's `routePath` is the REGISTERED pattern (`/api/leagues/:leagueId`),
- * not the concrete URL, so it is bounded by the number of routes in the
- * app no matter what a caller puts in a path segment. `normalizePath` is
- * the fallback for the cases `routePath` cannot answer — it collapses
- * UUIDs and numeric ids but nothing else, which is why an unauthenticated
- * free-text segment like `/check-username/:username` used to mint a key
- * per distinct value. See MAX_ROUTE_KEYS.
- */
-function routeLabel(c: Context): string {
-  try {
-    return c.req.routePath || c.req.path;
-  } catch {
-    return c.req.path;
-  }
-}
-
-/**
  * Middleware that records request metrics.
  * Apply to /api/* routes.
- *
- * ERROR ACCOUNTING (2026-09-02 scale audit). This used to `await next()`
- * with no try/catch, so a handler or middleware that THREW skipped every
- * line after it:
- *
- *   - `decrementActive()` never ran, so `activeRequests` — the saturation
- *     gauge you would page on — climbed by one per thrown error and never
- *     came back down. `peakActiveRequests` was permanently poisoned with it.
- *   - `record()` never ran, so the request was invisible: not in
- *     `totalRequests`, not in `totalErrors`, not in the latency histogram.
- *     `citrus_http_error_rate` — the metric an alert rule keys on — could
- *     not see a thrown exception at all. Only handlers that *returned* a
- *     5xx were ever counted, and `app.onError` converts throws into
- *     returned 500s AFTER this middleware has already been skipped.
- *
- * The `finally` fixes the gauge; the `catch` records the throw as the 500
- * that `app.onError` is about to send, then rethrows so error handling is
- * unchanged.
  */
 export async function metricsMiddleware(c: Context, next: Next) {
   metrics.incrementActive();
   const start = performance.now();
 
-  try {
-    await next();
-    metrics.record(c.req.method, routeLabel(c), c.res.status, performance.now() - start);
-  } catch (err) {
-    // `app.onError` turns this into a 500 response. Count it as one.
-    metrics.record(c.req.method, routeLabel(c), 500, performance.now() - start);
-    throw err;
-  } finally {
-    metrics.decrementActive();
-  }
+  await next();
+
+  const durationMs = performance.now() - start;
+  metrics.decrementActive();
+  metrics.record(c.req.method, c.req.path, c.res.status, durationMs);
 }

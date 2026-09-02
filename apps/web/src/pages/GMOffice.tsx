@@ -164,7 +164,7 @@ const GMOffice = () => {
       </div>
 
       {/* MOBILE: Compact sticky header */}
-      <div className="lg:hidden sticky top-0 z-page-header bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">GM's Office</h1>
@@ -205,7 +205,7 @@ const GMOffice = () => {
                     <div className="flex items-center gap-2 min-w-0">
                       <Trophy className="w-5 h-5 text-amber-400 shrink-0" aria-hidden="true" />
                       <span className="font-bold text-pastel-cream truncate">
-                        {playoffChampion.championTeamName}, League Champion
+                        {playoffChampion.championTeamName} — League Champion
                       </span>
                     </div>
                     <span className="text-xs font-jbmono uppercase tracking-[0.22em] font-bold text-amber-300 shrink-0">
@@ -237,7 +237,7 @@ const GMOffice = () => {
                     <div className="flex items-center gap-2 min-w-0">
                       <Trophy className="w-5 h-5 text-pastel-orange shrink-0" aria-hidden="true" />
                       <span className="font-bold text-pastel-cream truncate">
-                        Season complete, rosters locked
+                        Season Complete — Rosters Locked
                       </span>
                     </div>
                     <Badge className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft text-[10px] font-jbmono uppercase tracking-[0.22em] font-bold shrink-0">
@@ -343,7 +343,7 @@ const GMOffice = () => {
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            Season complete, roster locked
+                            Season complete — roster locked
                           </TooltipContent>
                         </Tooltip>
                       );

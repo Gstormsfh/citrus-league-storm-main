@@ -278,13 +278,6 @@ leagueRoutes.put('/:leagueId/category-settings', commissionerMiddleware, validat
 });
 
 // GET /api/leagues/:leagueId/teams — Get all teams in a league
-//
-// Every row carries `avatar_url`: the OWNER's profiles.avatar_url joined by
-// owner_id (2026-09-01, Sleeper parity audit M8), null for AI teams and
-// owners without a picture. The matchup header and scoreboard discs read
-// it; teams have no avatar column of their own yet. Explicit columns on
-// the profiles read (LeagueService.attachOwnerAvatars); membership is
-// checked by the middleware above before any of it runs.
 leagueRoutes.get('/:leagueId/teams', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const withOwners = c.req.query('withOwners') === 'true';
@@ -292,7 +285,6 @@ leagueRoutes.get('/:leagueId/teams', membershipMiddleware, async (c) => {
   const service = new LeagueService(supabase);
 
   if (withOwners) {
-    // Owner names and the avatar come from the same profiles read.
     const { teams, error } = await service.getLeagueTeamsWithOwners(leagueId);
     if (error) return handleError(c, error, 'Failed to fetch teams');
     return ok(c, teams);
@@ -300,7 +292,7 @@ leagueRoutes.get('/:leagueId/teams', membershipMiddleware, async (c) => {
 
   const { teams, error } = await service.getLeagueTeams(leagueId);
   if (error) return handleError(c, error, 'Failed to fetch teams');
-  return ok(c, await service.attachOwnerAvatars(teams));
+  return ok(c, teams);
 });
 
 // GET /api/leagues/:leagueId/teams/:teamId/analytics — projected vs actual

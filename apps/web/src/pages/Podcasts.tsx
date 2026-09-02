@@ -42,7 +42,7 @@ const Podcasts = () => {
           </h1>
           <p className="text-[16px] md:text-[18px] leading-relaxed text-white/65 max-w-xl mx-auto">
             We haven't recorded anything yet. When we do, episodes will land here
-            and on the usual platforms, and you'll be able to play them from this
+            and on the usual platforms — and you'll be able to play them from this
             page.
           </p>
         </section>
@@ -57,7 +57,7 @@ const Podcasts = () => {
               </h2>
               <p className="text-[14px] text-white/65 leading-relaxed max-w-md mx-auto relative z-10">
                 The projections and the league tooling came first. If you'd rather
-                we spent the time on the app than on a microphone, we agree. For
+                we spent the time on the app than on a microphone, we agree — for
                 now.
               </p>
             </div>

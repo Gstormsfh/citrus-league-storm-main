@@ -1,13 +1,9 @@
 import { Hono } from 'hono';
-import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
-import { createUserClient, getSupabaseAdmin } from '../lib/supabase';
+import { createUserClient } from '../lib/supabase';
 import { PlayerService } from '../services/PlayerService';
-import {
-  PlayerDashboardService,
-  parsePlayerDashboardRequest,
-} from '../services/PlayerDashboardService';
+import { PlayerDashboardService } from '../services/PlayerDashboardService';
 import { NhlPlayoffStateService } from '../services/NhlPlayoffStateService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
@@ -264,69 +260,6 @@ playerRoutes.get('/dashboard-index', authMiddleware, async (c) => {
   } catch (err) {
     logger.error('[players/dashboard-index] Unexpected error:', err);
     return handleError(c, err, 'Failed to fetch player dashboard index');
-  }
-});
-
-// GET /api/players/:playerId/dashboard — COMPONENT 6.5. Everything the
-// player dashboard page (the locked Concept 3 "Spatial Hero" composition,
-// apps/web/docs/PLAYER_DASHBOARD_DESIGN_SPEC.md) needs for ONE player, in
-// one round trip: his shots for the requested season with our model's xG
-// on each, his whole `player_xg_season` career arc, GSAx if he is a
-// goalie, his talent-metric row, and a real `as_of` timestamp.
-//
-// Query params:
-//   season   — four-digit season year, 2017..current. Defaults to current.
-//   gameType — 'regular' | 'playoff'. Defaults to 'regular'.
-//
-// Registered ABOVE `/:playerId` for the same reason `/dashboard-index` is:
-// Hono matches in registration order. Two segments cannot collide with the
-// one-segment `/:playerId`, but keeping every literal above the wildcard
-// is the rule that survives the next person adding a route.
-//
-// THE SERVICE-ROLE CLIENT IS DELIBERATE. `nhl_shots` is deny-all to
-// end-user roles by design (RLS on, no policy, SELECT revoked — see the
-// table's own COMMENT and the long note in PlayerDashboardService), so the
-// shot read cannot run on the caller's client. `getSupabaseAdmin()` is
-// passed as the service's SECOND argument, where it is used for that one
-// table and nothing else; every other read on this endpoint stays on the
-// caller's RLS-scoped client. The route itself is `authMiddleware`-gated
-// exactly like `/dashboard-index`, and the elevated query is pinned to the
-// validated `:playerId`, so there is no id a caller can supply that reads
-// anything but one player's public shot events.
-//
-// `getSupabaseAdmin()` THROWS when SUPABASE_SERVICE_ROLE_KEY is unset. That
-// must not 500 an endpoint whose other four reads are fine, so it is caught
-// and the dashboard degrades to `shots_available: false`.
-playerRoutes.get('/:playerId/dashboard', authMiddleware, async (c) => {
-  const parsed = parsePlayerDashboardRequest(
-    c.req.param('playerId'),
-    c.req.query('season'),
-    c.req.query('gameType'),
-  );
-  if (!parsed.value) {
-    return fail(c, AppError.badRequest(parsed.message || 'Invalid player dashboard request'));
-  }
-
-  const supabase = createUserClient(c.get('userToken'));
-
-  let elevated: SupabaseClient | undefined;
-  try {
-    elevated = getSupabaseAdmin();
-  } catch (err) {
-    logger.warn('[players/:id/dashboard] no service-role client; shot map unavailable:', err);
-  }
-
-  const service = new PlayerDashboardService(supabase, elevated);
-
-  try {
-    const { payload, error } = await service.getPlayerDashboard(parsed.value);
-    if (error || !payload) {
-      return handleError(c, error, 'Failed to fetch player dashboard');
-    }
-    return ok(c, payload);
-  } catch (err) {
-    logger.error('[players/:id/dashboard] Unexpected error:', err);
-    return handleError(c, err, 'Failed to fetch player dashboard');
   }
 });
 

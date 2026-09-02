@@ -16,26 +16,13 @@
  *   LW  bg-pastel-sage-soft #C8DCC4 + white .... 1.45:1  invisible
  *   C   bg-pastel-sage      #84A57D + white .... 2.75:1  marginal
  *   UTIL same as C ............................. 2.75:1  marginal
- *   D   bg-white/10 + cream ................... ~13:1    fine
+ *   D   #1A2A20 + white ....................... ~14:1    fine
  *
  * A background and the text that survives on it are one decision, not two.
  * Pairing them here makes an unreadable combination impossible to introduce
  * by editing a single map entry. `pastel-forest` (#1B3022) is the design
  * system's documented "deep forest text" for light surfaces — ~5:1 on sage,
  * ~9:1 on sage-soft.
- *
- * SURFACE (2026-09-02) — a chip has to separate from the tile it sits ON,
- * not only from its own text. D shipped as `bg-[#1A2A20]`, which is the
- * EXACT value of `pastel-surface-tile`. On the phone roster (rows on
- * #0F1F15) that reads as a faint outline; on the new Free Agents row,
- * whose card IS #1A2A20, the fill vanishes entirely and D is the only
- * position with no visible chip — measured in the 393x852 harness, where
- * every other position reads as a filled badge and D reads as an empty
- * box. `bg-white/10` composites to ~#232F27 on the page and ~#2C3A31 on
- * the tile: lighter than both grounds, still the "no colour" identity
- * that distinguishes D from the sage/orange forwards, and well clear of
- * the bg-white/40..84 dead zone the contrast guard forbids. It also
- * retires the last hex literal in this map.
  *
  * RW (#FF6B1A + white, 2.85:1) is deliberately UNCHANGED: it is a brand
  * accent, it is legible at this weight, and inverting it would be a visual
@@ -52,7 +39,7 @@ export const posColor: Record<string, string> = {
   LW: 'bg-pastel-sage-soft text-pastel-forest',
   C: 'bg-pastel-sage text-pastel-forest',
   RW: 'bg-pastel-orange text-white',
-  D: 'bg-white/10 text-pastel-cream',
+  D: 'bg-[#1A2A20] text-white',
   G: 'bg-pastel-sage/15 text-pastel-cream',
   UTIL: 'bg-pastel-sage text-pastel-forest',
   F: 'bg-emerald-600 text-white',

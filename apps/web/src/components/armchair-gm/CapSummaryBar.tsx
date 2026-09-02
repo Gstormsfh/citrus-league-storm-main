@@ -136,7 +136,7 @@ export default function CapSummaryBar({ data }: CapSummaryBarProps) {
               <div className="flex justify-between gap-4 font-bold"><span>Remaining Space:</span><span className="font-varsity">{formatCapFull(data.capSpace)}</span></div>
             </div>
           );
-          const contentClass = "bg-citrus-forest text-citrus-cream p-3 max-w-xs !z-popover";
+          const contentClass = "bg-citrus-forest text-citrus-cream p-3 max-w-xs !z-[9999]";
           return isMobile ? (
             <Popover open={capPopoverOpen} onOpenChange={setCapPopoverOpen}>
               <PopoverTrigger asChild><button className="touch-manipulation w-full">{barContent}</button></PopoverTrigger>

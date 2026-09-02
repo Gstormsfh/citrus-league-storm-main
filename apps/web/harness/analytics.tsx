@@ -4,7 +4,6 @@
 import { createRoot } from 'react-dom/client';
 import '../src/index.css';
 import { ProjectedVsActual } from '../src/components/analytics/ProjectedVsActual';
-import { harnessPlayer } from './players';
 
 const totals = {
   goals:   { projected: 42.0, actual: 40.1 },
@@ -15,28 +14,14 @@ const totals = {
   hits:    { projected: 88.0, actual: 151.2 },
 };
 
-/**
- * The rank list carries no face — `ProjectedVsActual` prints a name and two
- * numbers — but the names still have to be the roster's, or this page and the
- * roster pages disagree about who is on the team (2026-09-02). Positions come
- * from the real player, so a G here is genuinely a G. The NUMBERS are the
- * case and are unchanged.
- */
-const players = (
-  [
-    ['Connor McDavid', 128.4, 141.2, 22],
-    ['Cale Makar', 96.1, 112.8, 21],
-    ['Kirill Kaprizov', 74.5, 82.0, 20],
-    ['Jason Robertson', 81.0, 62.3, 22],
-    // Was Igor Shesterkin, who is not on the harness roster. Vasilevskiy is
-    // the goalie it has; the row's job — a G the model over-projected — holds.
-    ['Andrei Vasilevskiy', 88.0, 61.5, 18],
-    ['Quinn Hughes', 70.2, 48.9, 19],
-  ] as const
-).map(([who, projectedPoints, actualPoints, games], i) => {
-  const p = harnessPlayer(who);
-  return { id: String(i + 1), name: p.name, position: p.position, projectedPoints, actualPoints, games };
-});
+const players = [
+  { id: '1', name: 'Connor McDavid',  position: 'C',  projectedPoints: 128.4, actualPoints: 141.2, games: 22 },
+  { id: '2', name: 'Cale Makar',      position: 'D',  projectedPoints: 96.1,  actualPoints: 112.8, games: 21 },
+  { id: '3', name: 'Kirill Kaprizov', position: 'LW', projectedPoints: 74.5,  actualPoints: 82.0,  games: 20 },
+  { id: '4', name: 'Jason Robertson', position: 'LW', projectedPoints: 81.0,  actualPoints: 62.3,  games: 22 },
+  { id: '5', name: 'Igor Shesterkin', position: 'G',  projectedPoints: 88.0,  actualPoints: 61.5,  games: 18 },
+  { id: '6', name: 'Quinn Hughes',    position: 'D',  projectedPoints: 70.2,  actualPoints: 48.9,  games: 19 },
+];
 
 createRoot(document.getElementById('root')!).render(
   <div className="min-h-screen bg-[#0F1F15] p-3">

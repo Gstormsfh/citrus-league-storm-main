@@ -344,7 +344,7 @@ Service Layer
 
 ## 10. Key Business Logic
 
-1. **ScoringCalculator** (`packages/shared/src/utils/scoring.ts`) — Single source of truth for converting NHL stats into fantasy points. Supports league-specific scoring overrides. Default (industry-standard, Yahoo-aligned since 2026-09-01): G=6, A=4, PPP=2, SOG=0.9, BLK=1, W=5, SO=5, SV=0.6, GA=-3; SHP/HIT/PIM/+/- are opt-in at 0.
+1. **ScoringCalculator** (`packages/shared/src/utils/scoring.ts`) — Single source of truth for converting NHL stats into fantasy points. Supports league-specific scoring overrides. The default weights (industry-standard, Yahoo-aligned since 2026-09-01) live in `packages/shared/src/constants/scoringDefaults.json` and are published as a generated table in [`docs/generated/SCORING_DEFAULTS.md`](./docs/generated/SCORING_DEFAULTS.md) — the Python pipeline's copy is generated from the same JSON by `npm run gen:scoring`.
 
 2. **MatchupService** (`server/src/services/MatchupService.ts`) — Calculates weekly head-to-head matchup scores by aggregating daily player stats against league scoring settings. Powers the core fantasy experience.
 

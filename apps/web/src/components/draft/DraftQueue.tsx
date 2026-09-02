@@ -105,8 +105,8 @@ const positionColors = {
   'C': 'bg-fantasy-primary/20 text-fantasy-primary border-fantasy-primary/30',
   'LW': 'bg-fantasy-secondary/20 text-fantasy-secondary border-fantasy-secondary/30',
   'RW': 'bg-fantasy-tertiary/20 text-fantasy-tertiary border-fantasy-tertiary/30',
-  'D': 'bg-white/10 text-pastel-cream border-white/20',
-  'G': 'bg-pastel-orange/20 text-pastel-orange-soft border-pastel-orange/30',
+  'D': 'bg-blue-200/40 text-blue-700 border-blue-300/40',
+  'G': 'bg-purple-200/40 text-purple-700 border-purple-300/40',
 };
 
 interface SortableQueueItemProps {

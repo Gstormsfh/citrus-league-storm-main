@@ -23,6 +23,9 @@ import pytest
 # collects this file. test_nhl_season_year_parity.py guards against exactly these
 # placeholder values -- if you change them, update _PLACEHOLDER_URL_HOSTS /
 # _PLACEHOLDER_KEY_PREFIXES there or its live tests will try to hit the network.
+# Since 2026-09-01 tests/conftest.py plants the same placeholder shape before any
+# test module is imported, so under pytest these two lines are no-ops; they stay
+# so the file still imports cleanly outside a pytest run.
 os.environ.setdefault("VITE_SUPABASE_URL", "https://test.supabase.co")
 os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "test-key-for-unit-tests")
 

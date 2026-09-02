@@ -185,7 +185,7 @@ function ReconnectingBanner({ state, onRetryNow }: ReconnectingBannerProps) {
           ) : (
             <>
               Reconnecting in {Math.max(0, secondsRemaining)}s
-              {state.lastError ? `: ${state.lastError}` : ''}
+              {state.lastError ? ` — ${state.lastError}` : ''}
             </>
           )}
         </span>
@@ -283,7 +283,7 @@ function FatalBanner({ state, onRetryNow }: FatalBannerProps) {
         <AlertTitle>Waiting on your commissioner</AlertTitle>
         <AlertDescription className="flex items-center justify-between gap-4">
           <span>
-            This draft hasn’t been set up yet. Your commissioner still
+            This draft hasn’t been set up yet — your commissioner still
             needs to set the draft order. Check back shortly.
           </span>
           {onRetryNow && (
@@ -312,7 +312,7 @@ function FatalBanner({ state, onRetryNow }: FatalBannerProps) {
       <AlertDescription className="space-y-2">
         <div>
           The draft server isn’t reachable right now. Tap Retry to try
-          again. Your picks are safe.
+          again — your picks are safe.
         </div>
         <div className="flex items-center gap-2">
           {onRetryNow && (

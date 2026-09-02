@@ -265,14 +265,14 @@ export function OfflineDraftRoom({
       setImported(true);
       toast({
         title: 'Draft results imported',
-        description: `${data.total_picks ?? picks.length} picks are in. Rosters are live.`,
+        description: `${data.total_picks ?? picks.length} picks are in — rosters are live.`,
       });
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       const friendly = raw.includes('already_imported')
         ? 'This draft was already imported.'
         : raw.includes('duplicate_player')
-        ? 'The same player appears twice. Fix the duplicate and retry.'
+        ? 'The same player appears twice — fix the duplicate and retry.'
         : raw.includes('not_rectangular')
         ? 'Every team needs the same number of picks (or check "Import a shorter draft").'
         : raw;
@@ -336,7 +336,7 @@ export function OfflineDraftRoom({
             <div className="text-lg font-bold">Offline draft</div>
             <div className="text-sm text-muted-foreground">
               {imported
-                ? 'Results are in: rosters are built from the imported picks.'
+                ? 'Results are in — rosters are built from the imported picks.'
                 : isCommissioner
                 ? 'Run your draft in person, then enter the results below. Rosters build the moment you import.'
                 : 'This league drafts in person. The commissioner enters the results here when the draft is done.'}
@@ -380,7 +380,7 @@ export function OfflineDraftRoom({
               <div className="text-sm text-muted-foreground">Loading results…</div>
             ) : importedPicks.length === 0 ? (
               <div className="text-sm text-muted-foreground">
-                Results were imported. See team rosters on the league page.
+                Results were imported — see team rosters on the league page.
               </div>
             ) : (
               <div className="max-h-[28rem] overflow-y-auto rounded-lg ring-1 ring-white/10 divide-y divide-white/5">
@@ -449,7 +449,7 @@ export function OfflineDraftRoom({
                 <>
                   Entering pick{' '}
                   <span className="text-primary">#{activeSlot + 1}</span>
-                  {' · '}
+                  {' — '}
                   {teamNameById.get(slotTeam(activeSlot) ?? '') ?? '…'}
                 </>
               ) : (
@@ -494,7 +494,7 @@ export function OfflineDraftRoom({
                 {firstGap !== null && (
                   <span className="text-destructive">
                     {' '}
-                    · pick {firstGap + 1} skipped: fill it before importing
+                    · pick {firstGap + 1} skipped — fill it before importing
                   </span>
                 )}
               </div>
@@ -506,7 +506,7 @@ export function OfflineDraftRoom({
                     onChange={(e) => setAllowPartial(e.target.checked)}
                     data-testid="offline-allow-partial"
                   />
-                  Import a shorter draft ({filledCount} picks: remaining slots stay
+                  Import a shorter draft ({filledCount} picks — remaining slots stay
                   empty; rosters fill from waivers)
                 </label>
               )}

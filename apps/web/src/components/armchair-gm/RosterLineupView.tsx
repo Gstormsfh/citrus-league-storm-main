@@ -227,7 +227,7 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
               <div className="flex items-center gap-2 mb-2">
                 <div className="flex items-center gap-1.5">
                   <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-blue-200/50 to-blue-300/30 border border-blue-400/40 flex items-center justify-center">
-                    <span className="text-[9px] font-varsity font-black text-pastel-cream">{i + 1}</span>
+                    <span className="text-[9px] font-varsity font-black text-blue-900">{i + 1}</span>
                   </div>
                   <span className="text-[10px] font-varsity text-pastel-cream tracking-wider uppercase">
                     {PAIR_LABELS[i]}
@@ -257,10 +257,10 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
                 {/* Position labels */}
                 <div className="grid grid-cols-2 gap-2 md:gap-3 max-w-2xl mx-auto mb-1">
                   <div className="text-center">
-                    <span className="text-[8px] font-varsity text-pastel-sage uppercase tracking-[0.15em]">LD</span>
+                    <span className="text-[8px] font-varsity text-blue-400/60 uppercase tracking-[0.15em]">LD</span>
                   </div>
                   <div className="text-center">
-                    <span className="text-[8px] font-varsity text-pastel-sage uppercase tracking-[0.15em]">RD</span>
+                    <span className="text-[8px] font-varsity text-blue-400/60 uppercase tracking-[0.15em]">RD</span>
                   </div>
                 </div>
 
@@ -526,7 +526,7 @@ function EmptySlot({ position }: { position: string }) {
 const statusColorCompact: Record<string, string> = {
   UFA: 'text-red-600',
   RFA: 'text-amber-600',
-  ELC: 'text-pastel-butter',
+  ELC: 'text-blue-600',
   Signed: 'text-pastel-sage',
   '35+': 'text-purple-600',
 };

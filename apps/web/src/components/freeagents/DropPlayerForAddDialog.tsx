@@ -41,7 +41,7 @@ function isGoalie(p: Player): boolean {
 }
 
 function num(v: number | null | undefined, digits = 0): string {
-  if (v === null || v === undefined || Number.isNaN(v)) return '-';
+  if (v === null || v === undefined || Number.isNaN(v)) return '—';
   return digits > 0 ? v.toFixed(digits) : String(v);
 }
 
@@ -168,7 +168,7 @@ export function DropPlayerForAddDialog({
           title: result.isFreeAgent ? 'Swap Completed' : 'Waiver Claim Submitted',
           description: result.isFreeAgent
             ? `Added ${addPlayer.full_name}${droppedPlayer ? ` and dropped ${droppedPlayer.full_name}` : ''}.`
-            : `${addPlayer.full_name} is on waivers, so the claim goes in with ${droppedPlayer?.full_name ?? 'selected player'} as the conditional drop.`,
+            : `${addPlayer.full_name} is on waivers — claim submitted with ${droppedPlayer?.full_name ?? 'selected player'} as the conditional drop.`,
         });
         onOpenChange(false);
         onSuccess?.();
@@ -366,9 +366,9 @@ export function DropPlayerForAddDialog({
             * layout that has room for it.
             */}
           <DialogDescription className="text-xs sm:text-sm">
-            <span className="sm:hidden">The add and the drop happen together. If either one fails, nothing is saved.</span>
+            <span className="sm:hidden">Add and drop happen together — if either fails, nothing is saved.</span>
             <span className="hidden sm:inline">
-              Select a player from your roster to drop. The add and the drop happen together. If anything fails,
+              Select a player from your roster to drop. Add and drop happen atomically — if anything fails,
               neither change is saved. If {addPlayer?.full_name ?? 'this player'} is on waivers, a claim will
               be submitted automatically with your selected drop as the conditional drop.
             </span>
@@ -438,7 +438,7 @@ export function DropPlayerForAddDialog({
             <>
               {skaters.length > 0 && (
                 <table className="w-full">
-                  <thead className="sticky top-0 bg-background z-sticky-base">{SkaterHeader}</thead>
+                  <thead className="sticky top-0 bg-background z-10">{SkaterHeader}</thead>
                   <tbody>
                     {skaters.map((p) => renderSkaterRow(p, { selected: selectedDropId === String(p.id) }))}
                   </tbody>
@@ -446,7 +446,7 @@ export function DropPlayerForAddDialog({
               )}
               {goalies.length > 0 && (
                 <table className="w-full">
-                  <thead className="sticky top-0 bg-background z-sticky-base">{GoalieHeader}</thead>
+                  <thead className="sticky top-0 bg-background z-10">{GoalieHeader}</thead>
                   <tbody>
                     {goalies.map((p) => renderGoalieRow(p, { selected: selectedDropId === String(p.id) }))}
                   </tbody>

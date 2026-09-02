@@ -9,8 +9,6 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Player } from '@/services/PlayerService';
 import { ScoringCalculator, ScoringSettings } from '@citrus/shared';
-import { DraftPoolRow } from './DraftPoolRow';
-import type { DraftProjection, QualitySignal } from './draftDecision';
 
 interface PlayerPoolProps {
   onPlayerSelect: (player: Player) => void;
@@ -43,17 +41,7 @@ interface PlayerPoolProps {
   /** League scoring settings for calculating fantasy points */
   scoringSettings?: ScoringSettings | null;
   /** Pre-computed projected FPTS from ROS projections */
-  projectedFptsMap?: Map<string, DraftProjection>;
-  /**
-   * DECISION SUPPORT (2026-09-02) — one cohort-relative advanced read per
-   * player, keyed by player id. Built once per pool by the room from
-   * `/api/players/dashboard-index` (see `draftDecision.qualitySignalFor`).
-   *
-   * Optional and empty-by-default on purpose: the endpoint 401s for guests
-   * and demo visitors, and a pool with no signals must render exactly what
-   * it rendered before signals existed.
-   */
-  qualitySignals?: ReadonlyMap<string, QualitySignal>;
+  projectedFptsMap?: Map<string, { total: number; perGp: number; gamesRemaining: number }>;
   /**
    * DR-3.1 (2026-07-29) — F8 fix: when the caller is on the clock,
    * EVERY available row shows an always-visible inline Draft button
@@ -72,22 +60,6 @@ interface PlayerPoolProps {
    */
   isSubmitPending?: boolean;
 }
-
-/**
- * One shared empty map so a caller that passes no signals does not hand the
- * memo a fresh identity on every render — the same reason the harness stubs
- * keep their context values at module scope.
- */
-const EMPTY_SIGNALS: ReadonlyMap<string, QualitySignal> = new Map();
-
-/**
- * Likewise for the projections. This default used to be an inline
- * `new Map()`, which was harmless while nothing depended on its identity;
- * `rankMap` now does, so an inline default would rebuild the ranking of
- * every available player on every render for the v1 room, which passes no
- * map at all.
- */
-const EMPTY_PROJECTIONS: Map<string, DraftProjection> = new Map();
 
 // Normalize position (L -> LW, R -> RW)
 const normalizePosition = (pos: string): string => {
@@ -114,8 +86,7 @@ export const PlayerPool = memo(({
   watchlist = new Set(),
   draftedPlayerSet: externalDraftedSet,
   scoringSettings,
-  projectedFptsMap = EMPTY_PROJECTIONS,
-  qualitySignals = EMPTY_SIGNALS,
+  projectedFptsMap = new Map(),
   isYourTurn = false,
   isSubmitPending = false,
 }: PlayerPoolProps) => {
@@ -158,44 +129,22 @@ export const PlayerPool = memo(({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availablePlayers, scorer]);
 
-  /**
-   * THE POOL'S #1 IS THE BEST PLAYER LEFT TO DRAFT, NOT THE BEST PLAYER LAST
-   * SEASON (2026-09-02).
-   *
-   * This ranking used to be season-actual fantasy points, with the comment
-   * "who's best to draft next" over it. A draft is a forward-looking
-   * decision and season totals answer a backward-looking question: an
-   * injured star who piled up points before Christmas outranked a healthy
-   * player projected to beat him over the rest of the year, and that
-   * ordering is what the room defaulted to.
-   *
-   * Two tiers, never mixed on one scale: players the projection covers,
-   * ordered by their rest-of-season projection; then players it does not,
-   * ordered by season fantasy points. Mixing a rest-of-season total with a
-   * full-season total on one axis compares two different quantities and
-   * produces an order that is wrong in a way nobody can see.
-   *
-   * With no projections at all — a guest's 401, or a caller that passes no
-   * map — the second tier holds everyone and the ordering is exactly what it
-   * was before.
-   */
+  // Rank ALL players by actual season FPTS (using league scoring settings).
+  // Actual stats are always current; ROS projections can be stale if the
+  // pipeline hasn't run recently. Rankings stay dynamic to league scoring.
   const rankMap = useMemo<Map<string, number>>(() => {
-    const projected: { id: string; value: number }[] = [];
-    const unprojected: { id: string; value: number }[] = [];
-    for (const p of availablePlayers) {
-      const proj = projectedFptsMap.get(p.id);
-      if (proj && Number.isFinite(proj.total)) projected.push({ id: p.id, value: proj.total });
-      else unprojected.push({ id: p.id, value: calcFpts(p) });
-    }
-    projected.sort((a, b) => b.value - a.value);
-    unprojected.sort((a, b) => b.value - a.value);
+    const scored = availablePlayers.map(p => ({
+      id: p.id,
+      fpts: calcFpts(p),
+    }));
+    scored.sort((a, b) => b.fpts - a.fpts);
     const map = new Map<string, number>();
-    [...projected, ...unprojected].forEach((p, i) => {
+    scored.forEach((p, i) => {
       map.set(p.id, i + 1);
     });
     return map;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availablePlayers, scorer, projectedFptsMap]);
+  }, [availablePlayers, scorer]);
 
   // Compute data freshness from the most recent last_updated timestamp across all players
   const dataFreshnessLabel = useMemo(() => {
@@ -217,7 +166,7 @@ export const PlayerPool = memo(({
     }
 
     if (!hasAnyStats) {
-      return 'Offseason: showing prior season stats';
+      return 'Offseason — showing prior season stats';
     }
 
     if (!mostRecent) {
@@ -376,7 +325,7 @@ export const PlayerPool = memo(({
             {displayRank}
           </span>
         </td>
-        <td className="px-2 py-2 sticky left-[44px] bg-pastel-surface-tile z-sticky-base text-pastel-cream">
+        <td className="px-2 py-2 sticky left-[44px] bg-pastel-surface-tile z-10 text-pastel-cream">
           <div className="flex items-center gap-1.5">
             {player.headshot_url && (
               <img
@@ -523,14 +472,9 @@ export const PlayerPool = memo(({
         </div>
       </div>
 
-      {/* Filters — ONE LINE ON A PHONE (2026-09-02). `flex-wrap` with a
-          140px minimum on the search box pushed the show-drafted toggle onto
-          a line of its own at 393px: 44px of chrome above the first player,
-          on the screen whose entire job is showing players. The search box
-          shrinks instead (`min-w-0`), and the row goes back to wrapping at
-          `sm` where there is room for it. */}
-      <div className="flex flex-nowrap sm:flex-wrap gap-2 mb-3 px-1">
-        <div className="relative flex-1 min-w-0 sm:min-w-[140px]">
+      {/* Filters - compact on mobile */}
+      <div className="flex flex-wrap gap-2 mb-3 px-1">
+        <div className="relative flex-1 min-w-[140px]">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-pastel-cream/70" />
           <Input
             placeholder="Search..."
@@ -647,37 +591,103 @@ export const PlayerPool = memo(({
         </Button>
       </div>
 
-      {/* THE PHONE POOL (2026-09-02). Was a bespoke 60px flex row with its
-          own five type sizes, its own bare <img> face and last season's
-          fantasy points as its headline. It is now `DraftPoolRow`, which
-          wears the vocabulary the roster, matchup and free-agent lists
-          already share — `Mug`, `positionChip`, the four rungs of
-          `phoneRowScale` — and leads with the rest-of-season projection plus
-          one cohort-relative advanced read. The full stats table remains the
+      {/* MOBILE CARDS (2026-08-23, launch QA): the phone view used to be a
+          900px-wide 11px-font stats table squeezed behind a horizontal
+          scroll — dense to the point of unusable on draft night. Phones now
+          get card rows: name + key stats + FPTS headline + the same select/
+          queue/card/draft affordances. The full stats table remains the
           desktop (md+) experience below. */}
-      <div className="md:hidden border border-white/10 rounded-lg bg-pastel-surface-tile text-pastel-cream backdrop-blur-sm min-w-0 overflow-hidden">
+      <div className="md:hidden border border-white/10 rounded-lg bg-pastel-surface-tile text-pastel-cream backdrop-blur-sm min-w-0">
         <div className="divide-y divide-white/5">
           {visiblePlayers.map((player, index) => {
             const isSelected = selectedPlayer?.id === player.id;
             const isDrafted = draftedSet.has(player.id);
+            const isInQueue = queue.includes(player.id);
+            const fpts = fptsMap.get(player.id) || 0;
+            const ros = projectedFptsMap.get(player.id)?.total || 0;
             return (
-              <DraftPoolRow
+              <div
                 key={player.id}
-                rank={index + 1}
-                player={player}
-                seasonFpts={fptsMap.get(player.id) || 0}
-                projection={projectedFptsMap.get(player.id) ?? null}
-                signal={qualitySignals.get(player.id) ?? null}
-                selected={isSelected}
-                drafted={isDrafted}
-                queued={queue.includes(player.id)}
-                canDraft={(isSelected || isYourTurn) && isDraftActive && !isDrafted}
-                submitting={isSubmitPending}
-                onSelect={() => onPlayerSelect(player)}
-                onDraft={() => onPlayerDraft(player)}
-                onToggleQueue={onAddToQueue ? () => onAddToQueue(player.id) : undefined}
-                onShowCard={onShowCard ? () => onShowCard(player) : undefined}
-              />
+                className={cn(
+                  'flex items-center gap-2 px-2.5 py-2.5 transition-colors active:bg-pastel-surface-high/60',
+                  !isDrafted && 'cursor-pointer',
+                  isSelected && 'bg-fantasy-primary/10 ring-1 ring-inset ring-fantasy-primary/40',
+                  isDrafted && 'opacity-40'
+                )}
+                onClick={() => !isDrafted && onPlayerSelect(player)}
+              >
+                {player.headshot_url && (
+                  <img
+                    src={player.headshot_url}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="h-[26px] w-[26px] rounded-full object-cover ring-1 ring-white/15 bg-white/5 flex-shrink-0"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                )}
+                {/* FULL NAMES (2026-09-01, iPhone 17 Pro sim): the name
+                    line used to carry rank + star + an abbreviated name +
+                    position badge + team all at once, so "Connor McDavid"
+                    rendered as "C. Mc…" — an abbreviation of an
+                    abbreviation. The name now owns line one alone;
+                    position and team open the stat line, where they read
+                    as identity context instead of competing for the same
+                    pixels as the name. */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-4 flex-shrink-0 text-right text-[9px] font-mono font-bold text-pastel-cream/40">{index + 1}</span>
+                    {isInQueue && <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary flex-shrink-0" />}
+                    <span className="min-w-0 truncate font-semibold text-[13px] text-pastel-cream">{player.full_name}</span>
+                  </div>
+                  <div className="mt-0.5 pl-[22px] text-[11px] text-pastel-cream/60 tabular-nums truncate">
+                    <span className="font-semibold text-pastel-cream/80">
+                      {player.eligible_positions && player.eligible_positions.length > 1
+                        ? player.eligible_positions.join('/')
+                        : normalizePosition(player.position)}
+                    </span>
+                    {player.team ? ` · ${player.team}` : ''}
+                    {player.position === 'G' ? (
+                      <> · {player.wins || 0} W · {player.goals_against_average ? player.goals_against_average.toFixed(2) : '0.00'} GAA · {player.save_percentage ? (player.save_percentage * 100).toFixed(1) : '0.0'} SV%</>
+                    ) : (
+                      <> · {player.goals} G · {player.assists} A · {player.points} PTS</>
+                    )}
+                  </div>
+                </div>
+                <div className="shrink-0 text-right leading-tight">
+                  <div className="text-[15px] font-bold text-emerald-300 tabular-nums">{fpts.toFixed(1)}</div>
+                  <div className="text-[8px] uppercase tracking-wide text-pastel-cream/45">{ros > 0 ? `${ros.toFixed(0)} ros` : 'fpts'}</div>
+                </div>
+                <div className="flex shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
+                  {onShowCard && (
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); onShowCard(player); }}
+                      title={`View ${player.full_name} card`}
+                      aria-label={`View ${player.full_name} player card`}
+                      data-testid="pool-row-card-button">
+                      <Info className="h-4 w-4 text-pastel-cream/70" />
+                    </Button>
+                  )}
+                  {onAddToQueue && (
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); onAddToQueue(player.id); }}
+                      title={isInQueue ? 'Remove from queue' : 'Add to queue'}
+                      aria-label={isInQueue ? `Remove ${player.full_name} from your queue` : `Add ${player.full_name} to your queue`}
+                      aria-pressed={isInQueue}
+                      data-testid="pool-queue-star">
+                      <Star className={cn('h-4 w-4', isInQueue ? 'fill-fantasy-tertiary text-fantasy-tertiary' : 'text-pastel-cream/70')} />
+                    </Button>
+                  )}
+                  {(isSelected || isYourTurn) && isDraftActive && !isDrafted && (
+                    <Button size="sm" className="h-8 px-2 text-[10px] font-bold bg-fantasy-primary text-[#0F1F15] hover:bg-fantasy-primary/90"
+                      disabled={isSubmitPending}
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); onPlayerDraft(player); }}
+                      data-testid="pool-row-draft-button">
+                      {isSubmitPending ? 'Submitting…' : 'Draft'}
+                    </Button>
+                  )}
+                </div>
+              </div>
             );
           })}
         </div>
@@ -713,7 +723,7 @@ export const PlayerPool = memo(({
             pushing them off-screen. */}
         <div className="overflow-auto scrollbar-styled lg:max-h-[calc(100dvh-18rem)]" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="w-full min-w-[1400px] text-sm border-collapse">
-            <thead className="bg-pastel-surface-high sticky top-0 z-sticky-raised border-b border-white/10">
+            <thead className="bg-pastel-surface-high sticky top-0 z-20 border-b border-white/10">
               <tr>
                 <th className="px-1.5 py-2 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs w-[44px]"
                   onClick={() => handleHeaderClick('projRank')}
@@ -726,7 +736,7 @@ export const PlayerPool = memo(({
                     {sortBy !== 'projRank' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
                   </div>
                 </th>
-                <th className="px-2 py-2 text-left font-semibold text-pastel-cream sticky left-[44px] bg-pastel-surface-high z-sticky-base min-w-[190px]">Player</th>
+                <th className="px-2 py-2 text-left font-semibold text-pastel-cream sticky left-[44px] bg-pastel-surface-high z-10 min-w-[190px]">Player</th>
                 <th className="px-2 py-2 text-left font-semibold text-pastel-cream">Pos</th>
                 <th className="px-2 py-2 text-left font-semibold text-pastel-cream">Team</th>
                 <th className="px-2 py-2 text-center font-semibold text-pastel-cream">GP</th>
@@ -1003,7 +1013,7 @@ export const PlayerPool = memo(({
             <div className="text-center py-12" data-testid="player-pool-load-error">
               <p className="font-semibold text-destructive">Couldn&apos;t load the player list.</p>
               <p className="text-xs mt-1 text-pastel-cream/70">
-                This is a connection problem, not a filter. No players were loaded at all.
+                This is a connection problem, not a filter — no players were loaded at all.
               </p>
               {onRetryLoad && (
                 <button

@@ -58,7 +58,7 @@ describe('ManagerPresencePanel', () => {
 
     // Unowned → em-dash label
     expect(rows[2].textContent).toContain('Charlie');
-    expect(rows[2].textContent).toContain('-');
+    expect(rows[2].textContent).toContain('—');
 
     // user-d → away (observed leaving)
     expect(rows[3].textContent).toContain('Delta');

@@ -294,7 +294,7 @@ export default function PreviewDashboardPrimitives() {
           </h1>
           <p className="text-[14px] text-white/65 mt-3 max-w-3xl">
             Every state variant of the primitives that ship the Web Summit player profile page
-            (May 11). Built citrus2-native. Dark forest surfaces, JBMono tabular numerics, no
+            (May 11). Built citrus2-native — dark forest surfaces, JBMono tabular numerics, no
             third-party UI libraries, full keyboard + screen-reader support. Locked design
             direction: <strong className="text-pastel-orange-soft">Spatial Hero (Concept 3)</strong>.
           </p>
@@ -306,10 +306,10 @@ export default function PreviewDashboardPrimitives() {
         <SectionHeader
           eyebrow="Locked hero · Concept 3"
           title="RinkHeatmap"
-          blurb="The Spatial Hero: full-bleed offensive-zone rink as the visual anchor, with shot density encoded by xG (color) and attempts (size). Player identity composed AT the rink (jersey watermark + name + eyebrow). Floating Stormy verdict tile top-right. Segmented mode control bottom-right carries the SINGLE page-wide ambient orange glow on the active option."
+          blurb="The Spatial Hero — full-bleed offensive-zone rink as the visual anchor, with shot density encoded by xG (color) and attempts (size). Player identity composed AT the rink (jersey watermark + name + eyebrow). Floating Stormy verdict tile top-right. Segmented mode control bottom-right carries the SINGLE page-wide ambient orange glow on the active option."
         />
 
-        <SubSection title="Composed hero: full Concept 3 treatment">
+        <SubSection title="Composed hero — full Concept 3 treatment">
           <RinkHeatmap
             shots={MOCK_SHOTS}
             mode={rinkMode}
@@ -317,25 +317,25 @@ export default function PreviewDashboardPrimitives() {
             playerName="A. PRIMA"
             eyebrow="C · ROYAL BLUES · 28YR"
             jerseyNumber={97}
-            verdict="Generates 73% of his offense from the high slot. Top-3 in NHL for danger-zone xG."
+            verdict="Generates 73% of his offense from the high slot — top-3 in NHL for danger-zone xG."
             verdictEyebrow="Stormy verdict"
             caption={`5v5 shots · ${MOCK_SHOTS.length} attempts · ${MOCK_SHOTS.filter((s) => s.is_goal).length} goals`}
           />
         </SubSection>
 
-        <SubSection title="States: clean rink only (identity composition demoed in the hero above)">
+        <SubSection title="States — clean rink only (identity composition demoed in the hero above)">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <VariantCard caption="Loading state">
               <div className="w-full">
                 <RinkHeatmap shots={[]} isLoading caption="Loading…" />
               </div>
             </VariantCard>
-            <VariantCard caption="Empty state: no shots in this mode">
+            <VariantCard caption="Empty state — no shots in this mode">
               <div className="w-full">
                 <RinkHeatmap shots={[]} mode="pp" caption="No PP shots yet this season" />
               </div>
             </VariantCard>
-            <VariantCard caption="Low-sample state: overlay caption + muted dots">
+            <VariantCard caption="Low-sample state — overlay caption + muted dots">
               <div className="w-full">
                 <RinkHeatmap
                   shots={MOCK_LOW_SAMPLE}
@@ -343,7 +343,7 @@ export default function PreviewDashboardPrimitives() {
                 />
               </div>
             </VariantCard>
-            <VariantCard caption="Mode switching: change segmented control">
+            <VariantCard caption="Mode switching — change segmented control">
               <div className="w-full">
                 <RinkHeatmap shots={MOCK_SHOTS.slice(0, 80)} mode="pp" onModeChange={() => {}} caption="80 attempts · PP only" />
               </div>
@@ -357,10 +357,10 @@ export default function PreviewDashboardPrimitives() {
         <SectionHeader
           eyebrow="Data zone · Component 2 of 7"
           title="PercentileRingCluster"
-          blurb="Three independent ring gauges stacked vertically. One per metric category (OFF / DEF / ST). Component-scale only, never the hero. Adapts the Vercel Gauge math (gap-percent, primary/secondary stroke pair, animated stroke-dashoffset) into a single SVG-per-ring composition with category-tinted fills."
+          blurb="Three independent ring gauges stacked vertically — one per metric category (OFF / DEF / ST). Component-scale only, never the hero. Adapts the Vercel Gauge math (gap-percent, primary/secondary stroke pair, animated stroke-dashoffset) into a single SVG-per-ring composition with category-tinted fills."
         />
 
-        <SubSection title="Default vertical stack: the data-zone treatment">
+        <SubSection title="Default vertical stack — the data-zone treatment">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <VariantCard caption="Vertical 80px (data-zone default)">
               <div className="w-full flex justify-center">
@@ -402,7 +402,7 @@ export default function PreviewDashboardPrimitives() {
                 />
               </div>
             </VariantCard>
-            <VariantCard caption="Low sample: muted treatment + value opacity">
+            <VariantCard caption="Low sample — muted treatment + value opacity">
               <div className="w-full flex justify-center">
                 <PercentileRingCluster
                   metrics={MOCK_RINGS_LOW_SAMPLE}
@@ -429,10 +429,10 @@ export default function PreviewDashboardPrimitives() {
         <SectionHeader
           eyebrow="Data zone · Component 3 of 7"
           title="SparklineMicroChart"
-          blurb="The wide trend tile beneath the rink hero. Subtraction-as-design. What survives the canvas-design-system Second Pass discipline: line, endpoint accent dot, value, eyebrow caption. No axes, no grid, no decoration. Endpoint value at the right edge in JBMono is the data's punctuation."
+          blurb="The wide trend tile beneath the rink hero. Subtraction-as-design — what survives the canvas-design-system Second Pass discipline: line, endpoint accent dot, value, eyebrow caption. No axes, no grid, no decoration. Endpoint value at the right edge in JBMono is the data's punctuation."
         />
 
-        <SubSection title="Default: full data-zone width treatment">
+        <SubSection title="Default — full data-zone width treatment">
           <div className="w-full">
             <SparklineMicroChart
               data={MOCK_XG_TREND}
@@ -442,7 +442,7 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="Variants: game ticks + event markers + inline annotation (iter #3)">
+        <SubSection title="Variants — game ticks + event markers + inline annotation (iter #3)">
           <div className="space-y-7">
             <SparklineMicroChart
               data={MOCK_GOALS_TREND}
@@ -474,7 +474,7 @@ export default function PreviewDashboardPrimitives() {
 
         <SubSection title="States">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <VariantCard caption="Loading state: shimmer line">
+            <VariantCard caption="Loading state — shimmer line">
               <div className="w-full">
                 <SparklineMicroChart
                   data={MOCK_XG_TREND}
@@ -483,7 +483,7 @@ export default function PreviewDashboardPrimitives() {
                 />
               </div>
             </VariantCard>
-            <VariantCard caption="Empty state: no data yet">
+            <VariantCard caption="Empty state — no data yet">
               <div className="w-full">
                 <SparklineMicroChart
                   data={[]}
@@ -501,10 +501,10 @@ export default function PreviewDashboardPrimitives() {
         <SectionHeader
           eyebrow="Editorial · Component 4 of 7"
           title="VerdictTile"
-          blurb="The Stormy verdict primitive. Italic editorial body in pastel accent, JBMono caps eyebrow, optional dropcap and signature. Two surfaces: floating (backdrop-blur overlay for the rink hero) and embedded (solid tile for the data-zone right column). The rare exception where prose is allowed on a data surface; treated as visual element via italic + accent + framed architecture."
+          blurb="The Stormy verdict primitive — italic editorial body in pastel accent, JBMono caps eyebrow, optional dropcap and signature. Two surfaces: floating (backdrop-blur overlay for the rink hero) and embedded (solid tile for the data-zone right column). The rare exception where prose is allowed on a data surface; treated as visual element via italic + accent + framed architecture."
         />
 
-        <SubSection title="Default: embedded variant, no signature">
+        <SubSection title="Default — embedded variant, no signature">
           <div className="max-w-md">
             <VerdictTile
               body="Elite finisher when shooting from the slot; xG conversion sits 31% above league baseline over the last 200 attempts."
@@ -512,14 +512,14 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="Variants: floating (rink hero) vs embedded (data zone)">
+        <SubSection title="Variants — floating (rink hero) vs embedded (data zone)">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <VariantCard caption="floating · backdrop-blur overlay (matches rink hero)">
               <div className="relative w-full min-h-[200px] rounded-xl bg-gradient-to-br from-pastel-orange/15 via-pastel-surface-tile to-pastel-sage/10 p-6 flex items-start justify-end ring-1 ring-white/5">
                 <div className="w-[320px]">
                   <VerdictTile
                     variant="floating"
-                    body="Elite slot generator: 73% of his xG comes from inside the home plate, top decile in the league."
+                    body="Elite slot generator — 73% of his xG comes from inside the home plate, top decile in the league."
                     accent="orange"
                   />
                 </div>
@@ -529,7 +529,7 @@ export default function PreviewDashboardPrimitives() {
               <div className="w-full">
                 <VerdictTile
                   variant="embedded"
-                  body="Elite slot generator: 73% of his xG comes from inside the home plate, top decile in the league."
+                  body="Elite slot generator — 73% of his xG comes from inside the home plate, top decile in the league."
                   signature="Stormy · Assistant GM"
                 />
               </div>
@@ -537,13 +537,13 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="Sizes: sm / md / lg">
+        <SubSection title="Sizes — sm / md / lg">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
             <VariantCard caption="sm · 13px body · table inserts, sub-tile">
               <div className="w-full">
                 <VerdictTile
                   size="sm"
-                  body="Sample too small to bet the farm: 11 GP this season."
+                  body="Sample too small to bet the farm — 11 GP this season."
                   signature="Stormy"
                 />
               </div>
@@ -569,12 +569,12 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="Accents: orange / sage / butter / cream">
+        <SubSection title="Accents — orange / sage / butter / cream">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <VariantCard caption="orange · finishing / offense">
               <div className="w-full">
                 <VerdictTile
-                  body="Elite slot finisher: top decile in inside xG/60 over the last 30 games."
+                  body="Elite slot finisher — top decile in inside xG/60 over the last 30 games."
                   accent="orange"
                 />
               </div>
@@ -590,7 +590,7 @@ export default function PreviewDashboardPrimitives() {
             <VariantCard caption="butter · special teams / context">
               <div className="w-full">
                 <VerdictTile
-                  body="The PP1 trigger: 9.8 xGF/60 with him on the ice, league-leading among RW units."
+                  body="The PP1 trigger — 9.8 xGF/60 with him on the ice, league-leading among RW units."
                   accent="butter"
                 />
               </div>
@@ -606,20 +606,20 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="Editorial: dropcap on first letter (lg, embedded right column)">
+        <SubSection title="Editorial — dropcap on first letter (lg, embedded right column)">
           <div className="max-w-md">
             <VerdictTile
               size="lg"
               dropcap
-              body="Elite finisher whose model overrates raw volume but underrates his shot selection. Bet the underlying skill, fade the variance."
+              body="Elite finisher whose model overrates raw volume but underrates his shot selection — bet the underlying skill, fade the variance."
               signature="Stormy · Assistant GM"
             />
           </div>
         </SubSection>
 
-        <SubSection title="States: loading + long-text overflow">
+        <SubSection title="States — loading + long-text overflow">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-            <VariantCard caption="Loading skeleton: eyebrow + body + signature shimmer">
+            <VariantCard caption="Loading skeleton — eyebrow + body + signature shimmer">
               <div className="w-full">
                 <VerdictTile
                   body=""
@@ -628,10 +628,10 @@ export default function PreviewDashboardPrimitives() {
                 />
               </div>
             </VariantCard>
-            <VariantCard caption="Long-text overflow: wraps without truncation">
+            <VariantCard caption="Long-text overflow — wraps without truncation">
               <div className="w-full">
                 <VerdictTile
-                  body="Elite slot generator who consistently posts top-decile inside xG/60 numbers, even after adjusting for usage and teammate quality; the only meaningful concern is finishing variance over short samples. Over a full season he projects as a 35-goal floor with a 50-goal ceiling, and the underlying shot quality data says the ceiling is the more honest read."
+                  body="Elite slot generator who consistently posts top-decile inside xG/60 numbers, even after adjusting for usage and teammate quality; the only meaningful concern is finishing variance over short samples — over a full season he projects as a 35-goal floor with a 50-goal ceiling, and the underlying shot quality data says the ceiling is the more honest read."
                   signature="Stormy · Assistant GM"
                 />
               </div>
@@ -645,10 +645,10 @@ export default function PreviewDashboardPrimitives() {
         <SectionHeader
           eyebrow="Share zone · Component 5 of 7"
           title="WrappedChapter"
-          blurb="The screenshot-shareable chapter container. Spotify Wrapped's 'one massive number per slide' applied to a player profile section. Each chapter is OG-image-ready (1200×630) and reads as a standalone hockey story. Children-based composition: the chrome (eyebrow divider, callout column, subtitle caption) is universal; the visualization slot is variable per chapter type. KDEDistribution included as the Web Summit launch chapter visualization."
+          blurb="The screenshot-shareable chapter container — Spotify Wrapped's 'one massive number per slide' applied to a player profile section. Each chapter is OG-image-ready (1200×630) and reads as a standalone hockey story. Children-based composition: the chrome (eyebrow divider, callout column, subtitle caption) is universal; the visualization slot is variable per chapter type. KDEDistribution included as the Web Summit launch chapter visualization."
         />
 
-        <SubSection title="Default: POSITION VS LEAGUE chapter (the canonical Web Summit launch chapter)">
+        <SubSection title="Default — POSITION VS LEAGUE chapter (the canonical Web Summit launch chapter)">
           <div className="rounded-2xl bg-pastel-surface-tile/40 ring-1 ring-white/5 px-6 sm:px-10">
             <WrappedChapter
               chapterNumber={1}
@@ -671,7 +671,7 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="Variant: share (extra padding, optimized for clean OG screenshot crop)">
+        <SubSection title="Variant — share (extra padding, optimized for clean OG screenshot crop)">
           <div className="rounded-2xl bg-pastel-surface-tile/40 ring-1 ring-white/5 px-6 sm:px-10">
             <WrappedChapter
               chapterNumber={1}
@@ -695,7 +695,7 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="Accent variants: orange / sage / butter / cream callout">
+        <SubSection title="Accent variants — orange / sage / butter / cream callout">
           <div className="space-y-6">
             <div className="rounded-2xl bg-pastel-surface-tile/40 ring-1 ring-white/5 px-6 sm:px-10">
               <WrappedChapter
@@ -760,7 +760,7 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="States: loading + empty">
+        <SubSection title="States — loading + empty">
           <div className="space-y-6">
             <div className="rounded-2xl bg-pastel-surface-tile/40 ring-1 ring-white/5 px-6 sm:px-10">
               <WrappedChapter
@@ -781,7 +781,7 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="KDEDistribution standalone: accent + marker label combinations">
+        <SubSection title="KDEDistribution standalone — accent + marker label combinations">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <VariantCard caption="orange · player deep in right tail (+4.21)">
               <div className="w-full">
@@ -837,10 +837,10 @@ export default function PreviewDashboardPrimitives() {
         <SectionHeader
           eyebrow="Primitive 1 of 3"
           title="PlayerMonogram"
-          blurb="License-clean stand-in for an NHL headshot. Initials in cream over team primary color, jersey number badge bottom-right. Squared (not round) so it differentiates from TeamChip. Chip = team, monogram = player. Drop-in replacement everywhere we'd want a photo but legally can't."
+          blurb="License-clean stand-in for an NHL headshot. Initials in cream over team primary color, jersey number badge bottom-right. Squared (not round) so it differentiates from TeamChip — chip = team, monogram = player. Drop-in replacement everywhere we'd want a photo but legally can't."
         />
 
-        <SubSection title="Sizes: xs / sm / md / lg / xl">
+        <SubSection title="Sizes — xs / sm / md / lg / xl">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
             <VariantCard caption="xs · 28px · table cells">
               <PlayerMonogram size="xs" {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
@@ -894,7 +894,7 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="Team color contrast palette, md size">
+        <SubSection title="Team color contrast palette — md size">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <VariantCard caption="EDM · royal navy (light text)">
               <PlayerMonogram size="md" {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
@@ -920,7 +920,7 @@ export default function PreviewDashboardPrimitives() {
           blurb="The JFresh-killer. Bullet chart with median reference, category-tinted fill, pattern overlay at low percentiles for color-not-only accessibility, tabular-numerics readout. Replaces JFresh's flat horizontal bars with something that doesn't look academic."
         />
 
-        <SubSection title="4 categories at the same percentile (87th), compare tints">
+        <SubSection title="4 categories at the same percentile (87th) — compare tints">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <VariantCard caption="offense · pastel-orange">
               <div className="w-full">
@@ -945,29 +945,29 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="Percentile spectrum: fill behavior across the range">
+        <SubSection title="Percentile spectrum — fill behavior across the range">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <VariantCard caption="98th: top decile · ambient glow">
+            <VariantCard caption="98th — top decile · ambient glow">
               <div className="w-full">
                 <PercentileBullet label="Goals/60" context="5v5" percentile={98} rawValue={1.42} rawUnit="/60" sampleSize={68} category="offense" />
               </div>
             </VariantCard>
-            <VariantCard caption="65th: above median">
+            <VariantCard caption="65th — above median">
               <div className="w-full">
                 <PercentileBullet label="Goals/60" context="5v5" percentile={65} rawValue={0.82} rawUnit="/60" sampleSize={68} category="offense" />
               </div>
             </VariantCard>
-            <VariantCard caption="50th: exactly at median">
+            <VariantCard caption="50th — exactly at median">
               <div className="w-full">
                 <PercentileBullet label="Goals/60" context="5v5" percentile={50} rawValue={0.61} rawUnit="/60" sampleSize={68} category="offense" />
               </div>
             </VariantCard>
-            <VariantCard caption="32nd: below median, no pattern">
+            <VariantCard caption="32nd — below median, no pattern">
               <div className="w-full">
                 <PercentileBullet label="Goals/60" context="5v5" percentile={32} rawValue={0.41} rawUnit="/60" sampleSize={68} category="offense" />
               </div>
             </VariantCard>
-            <VariantCard caption="18th: far-low · diagonal stripe pattern" className="md:col-span-2">
+            <VariantCard caption="18th — far-low · diagonal stripe pattern" className="md:col-span-2">
               <div className="w-full">
                 <PercentileBullet label="Goals/60" context="5v5" percentile={18} rawValue={0.22} rawUnit="/60" sampleSize={68} category="offense" />
               </div>
@@ -977,12 +977,12 @@ export default function PreviewDashboardPrimitives() {
 
         <SubSection title="Special states">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <VariantCard caption="No data: empty track + caption">
+            <VariantCard caption="No data — empty track + caption">
               <div className="w-full">
                 <PercentileBullet label="xGA/60" context="5v5" percentile={null} category="defense" />
               </div>
             </VariantCard>
-            <VariantCard caption="Low sample: 50% opacity + SS badge">
+            <VariantCard caption="Low sample — 50% opacity + SS badge">
               <div className="w-full">
                 <PercentileBullet label="xG/60" context="5v5" percentile={73} rawValue={2.91} rawUnit="/60" sampleSize={11} category="offense" />
               </div>
@@ -992,7 +992,7 @@ export default function PreviewDashboardPrimitives() {
                 <PercentileBullet label="loading" percentile={50} isLoading />
               </div>
             </VariantCard>
-            <VariantCard caption="Compact mode: label + bar only">
+            <VariantCard caption="Compact mode — label + bar only">
               <div className="w-full">
                 <PercentileBullet label="EVO GAR" percentile={87} rawValue={2.18} category="defense" compact />
               </div>
@@ -1000,7 +1000,7 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="Sizes: sm vs md">
+        <SubSection title="Sizes — sm vs md">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <VariantCard caption="sm · no floor scale · for stacks of 8+">
               <div className="w-full space-y-2">
@@ -1017,7 +1017,7 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="Full statistical breakdown: stacked vertical layout">
+        <SubSection title="Full statistical breakdown — stacked vertical layout">
           <div className="max-w-md p-5 rounded-2xl bg-pastel-surface-tile ring-1 ring-white/10">
             <div className="flex items-center gap-3 mb-5">
               <PlayerMonogram size="md" {...MCDAVID} teamAbbrev={MCDAVID.team} jerseyNumber={MCDAVID.jersey} />
@@ -1042,10 +1042,10 @@ export default function PreviewDashboardPrimitives() {
         <SectionHeader
           eyebrow="Primitive 3 of 3"
           title="StaleDataBadge"
-          blurb="First-class freshness signal. We display this everywhere a card or section is showing data that hasn't refreshed in 14+ days. Auto-computes severity from days-since-update. Warning (14-30d) → alert (30-84d) → critical (84d+)."
+          blurb="First-class freshness signal. We display this everywhere a card or section is showing data that hasn't refreshed in 14+ days. Auto-computes severity from days-since-update — warning (14-30d) → alert (30-84d) → critical (84d+)."
         />
 
-        <SubSection title="Inline chip: three severity tiers">
+        <SubSection title="Inline chip — three severity tiers">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <VariantCard caption="Warning · 17d (player_directory pattern)">
               <StaleDataBadge asOf={daysAgo(17)} />
@@ -1059,7 +1059,7 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="Block banner: for full sections">
+        <SubSection title="Block banner — for full sections">
           <div className="space-y-3 max-w-2xl">
             <StaleDataBadge variant="block" asOf={daysAgo(17)} label="Player directory" />
             <StaleDataBadge variant="block" asOf={daysAgo(45)} label="ROS projections" />
@@ -1068,7 +1068,7 @@ export default function PreviewDashboardPrimitives() {
           </div>
         </SubSection>
 
-        <SubSection title="Hidden state: fresh data renders nothing">
+        <SubSection title="Hidden state — fresh data renders nothing">
           <VariantCard caption="2d old data → no badge rendered (verify by inspecting the empty card below)">
             <div className="text-white/55 font-jbmono text-[10px] uppercase tracking-wider">
               <StaleDataBadge asOf={daysAgo(2)} />
@@ -1077,7 +1077,7 @@ export default function PreviewDashboardPrimitives() {
           </VariantCard>
         </SubSection>
 
-        <SubSection title="Custom threshold: daily-projected stats want 7-day threshold">
+        <SubSection title="Custom threshold — daily-projected stats want 7-day threshold">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <VariantCard caption="Default 14d threshold · 7d data is fresh">
               <StaleDataBadge asOf={daysAgo(7)} />

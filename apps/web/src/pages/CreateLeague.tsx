@@ -50,7 +50,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { logger } from "@citrus/shared";
+import { logger, defaultLeagueStats, type LeagueStatSetting } from "@citrus/shared";
 import {
   type LeagueType,
   type ScoringFormat,
@@ -98,28 +98,14 @@ const DRAFT_TYPE_ICONS: Record<DraftType, React.ReactNode> = {
 // ============================================================================
 // STAT DEFINITIONS (reusable across formats)
 // ============================================================================
-// INDUSTRY-STANDARD DEFAULTS (2026-09-01) — Yahoo-aligned point values
-// (help.yahoo.com/kb/SLN6815): G6 A4 PPP2 SOG0.9 BLK1 / W5 SO5 SV0.6 GA-3.
-// SHP, Hits, PIM and +/- ship DISABLED (enabled: false → ptsFor() writes 0
-// into scoring_settings) because no major platform scores them by default —
-// and our projections cannot model plus/minus at all. Their `points` values
-// are the suggested weights a commissioner gets on toggling them on.
-// Must stay equal to DEFAULT_SCORING in @citrus/shared (guard-tested).
-const DEFAULT_LEAGUE_STATS = [
-  { id: "g", name: "Goals", points: 6, default: true, category: "Offense", enabled: true },
-  { id: "a", name: "Assists", points: 4, default: true, category: "Offense", enabled: true },
-  { id: "ppp", name: "Power Play Points", points: 2, default: true, category: "Offense", enabled: true },
-  { id: "shg", name: "Shorthanded Points", points: 2, default: false, category: "Offense", enabled: false },
-  { id: "sog", name: "Shots on Goal", points: 0.9, default: true, category: "Offense", enabled: true },
-  { id: "blk", name: "Blocks", points: 1, default: true, category: "Defense", enabled: true },
-  { id: "hit", name: "Hits", points: 0.5, default: false, category: "Defense", enabled: false },
-  { id: "pim", name: "Penalty Minutes", points: 0.5, default: false, category: "Defense", enabled: false },
-  { id: "pm", name: "Plus/Minus", points: 2, default: false, category: "Defense", enabled: false },
-  { id: "w", name: "Wins", points: 5, default: true, category: "Goalie", enabled: true },
-  { id: "so", name: "Shutouts", points: 5, default: true, category: "Goalie", enabled: true },
-  { id: "sv", name: "Saves", points: 0.6, default: true, category: "Goalie", enabled: true },
-  { id: "ga", name: "Goals Against", points: -3, default: true, category: "Goalie", enabled: true },
-];
+// Derived from the scoring source of truth in @citrus/shared
+// (packages/shared/src/constants/scoringDefaults.json) — this page carries
+// no weight literal. SHP, Hits, PIM and +/- ship DISABLED (enabled: false →
+// ptsFor() writes 0 into scoring_settings) because no major platform scores
+// them by default — and our projections cannot model plus/minus at all.
+// Their `points` values are the suggested weights a commissioner gets on
+// toggling them on. Rows: { id, name, points, default, category, enabled }.
+const DEFAULT_LEAGUE_STATS: LeagueStatSetting[] = defaultLeagueStats();
 
 // ============================================================================
 // SECTION HEADER COMPONENT
@@ -687,7 +673,7 @@ const CreateLeague = () => {
     }
 
     if (!resolvedCode) {
-      setError("Add a join code first. Check your invite link.");
+      setError("Add a join code first — check your invite link.");
       return;
     }
     const effectiveCode = resolvedCode;
@@ -727,7 +713,7 @@ const CreateLeague = () => {
       );
 
       if (joinError) throw joinError;
-      if (!league || !team) throw new Error("Couldn't join that league. Try again in a moment.");
+      if (!league || !team) throw new Error("Couldn't join that league — try again in a moment.");
 
       // Refresh the league list, THEN pin the newly joined league as the
       // active one BEFORE navigating. Without this, LeagueContext can
@@ -745,7 +731,7 @@ const CreateLeague = () => {
       setLoading(false);
       routeToLeague(league.id, league.settings as Record<string, unknown> | null);
     } catch (err: unknown) {
-      const errorMessage = userMessage(err, "Couldn't join that league. Try again in a moment.");
+      const errorMessage = userMessage(err, "Couldn't join that league — try again in a moment.");
 
       // "Already a member" is a success case — the first attempt actually
       // joined (even if the response looked glitchy). Redirect them to the
@@ -774,7 +760,7 @@ const CreateLeague = () => {
             title: "Joined League!",
             description: leagueRow?.name
               ? `Welcome to ${leagueRow.name}!`
-              : "You're in. Taking you to the pool now.",
+              : "You're in — taking you to the pool now.",
           });
 
           if (leagueRow?.id) {
@@ -817,7 +803,7 @@ const CreateLeague = () => {
       <div aria-hidden="true" className="absolute bottom-0 left-0 w-96 h-96 bg-pastel-sage/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
 
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Create League</h1>
@@ -850,7 +836,7 @@ const CreateLeague = () => {
             <Sparkles className="h-4 w-4 text-pastel-orange" />
             <AlertDescription className="text-pastel-cream">
               <span className="font-bold text-pastel-orange-soft">Play with friends or AI.</span>{' '}
-              Create your league and share the join code. Friends claim their teams instantly. Short on managers? Fill any open slots with AI opponents at the press of a button and draft right away.
+              Create your league and share the join code — friends claim their teams instantly. Short on managers? Fill any open slots with AI opponents at the press of a button and draft right away.
             </AlertDescription>
           </Alert>
           )}
@@ -990,7 +976,7 @@ const CreateLeague = () => {
                           {(new Date().getMonth() >= 6 || new Date().getMonth() <= 1) && (
                             <p className="text-xs text-amber-400">
                               Heads up: the NHL playoffs start in spring. The pre-filled date is
-                              just a placeholder. Set the lock to right before Round&nbsp;1 Game&nbsp;1
+                              just a placeholder — set the lock to right before Round&nbsp;1 Game&nbsp;1
                               (typically mid-April).
                             </p>
                           )}
@@ -1022,7 +1008,7 @@ const CreateLeague = () => {
                               <div className="flex-1">
                                 <div className="font-jbmono font-bold text-sm mb-1">Round by Round</div>
                                 <p className="text-xs text-white/55">
-                                  Members pick each round&apos;s winners as it starts. You can only pick Round 2 after Round 1 finishes. Forgiving format. No need to predict upsets upfront.
+                                  Members pick each round&apos;s winners as it starts. You can only pick Round 2 after Round 1 finishes. Forgiving format — no need to predict upsets upfront.
                                 </p>
                               </div>
                             </label>
@@ -1039,7 +1025,7 @@ const CreateLeague = () => {
                               <div className="flex-1">
                                 <div className="font-jbmono font-bold text-sm mb-1">Full Bracket (March Madness style)</div>
                                 <p className="text-xs text-white/55">
-                                  Members pick ALL 15 series (including the Stanley Cup champion) before Round 1 Game 1 puck drop. One shot, live with it. Classic playoff pool format.
+                                  Members pick ALL 15 series — including Stanley Cup champion — before Round 1 Game 1 puck drop. One shot, live with it. Classic playoff pool format.
                                 </p>
                               </div>
                             </label>
@@ -1475,22 +1461,23 @@ const CreateLeague = () => {
                                     </SelectTrigger>
                                       <SelectContent>
                                         {(() => {
-                                          // Per-stat option sets — every stat now includes 0 so
-                                          // commissioners can zero out any stat for simpler leagues.
+                                          // Per-stat option sets — every stat includes 0 so commissioners can
+                                          // zero out any stat. The current value (the default from
+                                          // @citrus/shared, or a custom one) is appended if absent.
                                           const OPTIONS_BY_STAT: Record<string, number[]> = {
-                                            g: [0, 1, 2, 3, 4, 5, 6],                    // Goals (default 3)
-                                            a: [0, 1, 1.5, 2, 2.5, 3, 4],                // Assists (default 2)
-                                            ppp: [0, 0.5, 1, 1.5, 2, 3],                 // Power Play Points (default 1)
-                                            shg: [0, 1, 1.5, 2, 2.5, 3, 4],              // Shorthanded Points (default 2)
-                                            sog: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5], // Shots on Goal (default 0.4)
-                                            blk: [0, 0.25, 0.5, 0.75, 1, 1.5],           // Blocks (default 0.5)
-                                            hit: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5],    // Hits (default 0.2)
-                                            pim: [-1, -0.5, -0.25, 0, 0.25, 0.5, 1],     // Penalty Minutes (default 0.5)
-                                            pm: [-1, -0.5, -0.25, 0, 0.25, 0.5, 1, 1.5], // Plus/Minus (default 0.5)
-                                            w: [0, 2, 3, 4, 5, 6, 8],                    // Wins (default 4)
-                                            so: [0, 2, 3, 4, 5, 6, 8],                   // Shutouts (default 3)
-                                            sv: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5],     // Saves (default 0.2)
-                                            ga: [-2, -1.5, -1, -0.5, -0.25, 0],          // Goals Against (default -1)
+                                            g: [0, 1, 2, 3, 4, 5, 6],                    // Goals
+                                            a: [0, 1, 1.5, 2, 2.5, 3, 4],                // Assists
+                                            ppp: [0, 0.5, 1, 1.5, 2, 3],                 // Power Play Points
+                                            shg: [0, 1, 1.5, 2, 2.5, 3, 4],              // Shorthanded Points
+                                            sog: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5], // Shots on Goal
+                                            blk: [0, 0.25, 0.5, 0.75, 1, 1.5],           // Blocks
+                                            hit: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5],    // Hits
+                                            pim: [-1, -0.5, -0.25, 0, 0.25, 0.5, 1],     // Penalty Minutes
+                                            pm: [-1, -0.5, -0.25, 0, 0.25, 0.5, 1, 1.5], // Plus/Minus
+                                            w: [0, 2, 3, 4, 5, 6, 8],                    // Wins
+                                            so: [0, 2, 3, 4, 5, 6, 8],                   // Shutouts
+                                            sv: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5],     // Saves
+                                            ga: [-2, -1.5, -1, -0.5, -0.25, 0],          // Goals Against
                                           };
                                           const opts = OPTIONS_BY_STAT[stat.id] || [0, 0.25, 0.5, 1, 2, 3];
                                           const current = Number(stat.points);

@@ -12,34 +12,56 @@ import '../src/index.css';
 import { PlayerService, type Player } from '../src/services/PlayerService';
 import { rosterApi } from '../src/api/rosters';
 import { DropPlayerForAddDialog } from '../src/components/freeagents/DropPlayerForAddDialog';
-import { CitrusToaster } from '../src/components/notifications/CitrusToaster';
-import { HARNESS_PLAYERS, harnessDirectoryPlayer, harnessPlayer } from './players';
+import { Toaster } from '../src/components/ui/toaster';
+
+const POS = ['C', 'LW', 'RW', 'D', 'D', 'C', 'RW', 'LW', 'D', 'C', 'G', 'G'];
+
+function mkPlayer(i: number): Player {
+  const position = POS[i % POS.length];
+  const goalie = position === 'G';
+  return {
+    id: String(9000 + i),
+    full_name: `Roster Player ${String(i + 1).padStart(2, '0')}`,
+    position,
+    eligible_positions: [position],
+    team: ['EDM', 'COL', 'TOR', 'BOS', 'TBL'][i % 5],
+    jersey_number: String(i + 10),
+    status: 'active',
+    roster_status: null,
+    is_ir_eligible: false,
+    headshot_url: null,
+    last_updated: null,
+    games_played: goalie ? 40 - i : 82 - i,
+    goals: goalie ? 0 : 30 - i,
+    assists: goalie ? 0 : 40 - i,
+    points: goalie ? 0 : 70 - 2 * i,
+    plus_minus: 10 - i,
+    shots: 200 - i,
+    hits: 50 - i,
+    blocks: 40 - i,
+    pim: 20,
+    ppp: 10,
+    shp: 1,
+    icetime_seconds: goalie ? 140000 : 70000,
+    xGoals: 12,
+    wins: goalie ? 25 : null,
+    losses: goalie ? 15 : null,
+    ot_losses: goalie ? 4 : null,
+    saves: goalie ? 1200 : null,
+    shutouts: goalie ? 3 : null,
+    shots_faced: goalie ? 1320 : null,
+    goals_against: goalie ? 110 : null,
+    goals_against_average: goalie ? 2.51 : null,
+    save_percentage: goalie ? 0.913 : null,
+    highDangerSavePct: 0,
+    goalsSavedAboveExpected: 0,
+    goalie_gp: goalie ? 40 - i : undefined,
+  } as Player;
+}
 
 // Roster size is the variable under test — ?n=22 for a deep roster.
 const N = Number(new URLSearchParams(location.search).get('n') ?? 22);
-
-/**
- * THE ROSTER IS REAL (2026-09-02). This file used to build every row as
- * "Roster Player 01".."Roster Player 22" with `headshot_url: null`, so the
- * dialog under review showed a column of initials discs against a column of
- * placeholder strings — neither of which the app has ever rendered. In
- * production all 801 rows in `players` carry an NHL CDN headshot. The names
- * and the faces now come off the shared roster (harness/players.ts).
- *
- * The player being ADDED is held out of the roster: the dialog's whole job is
- * to choose someone to drop to make room, so the incoming player must not
- * already be on the team.
- */
-const ADD_PLAYER = harnessPlayer('Aleksander Barkov');
-const POOL = HARNESS_PLAYERS.filter((p) => p !== ADD_PLAYER);
-
-// `?n=` above 59 CYCLES the roster rather than inventing anyone: a repeated
-// real player is a fixture reading twice, a counter appended to a name is a
-// string no NHL roster can produce. Ids stay unique either way — they are the
-// index, not the player.
-const ROSTER = Array.from({ length: N }, (_, i) =>
-  harnessDirectoryPlayer(POOL[i % POOL.length], i) as unknown as Player,
-);
+const ROSTER = Array.from({ length: N }, (_, i) => mkPlayer(i));
 
 // Runtime stubs. These are plain objects, so assignment is enough.
 (rosterApi as any).getTeamRoster = async () => ({
@@ -47,9 +69,7 @@ const ROSTER = Array.from({ length: N }, (_, i) =>
 });
 (PlayerService as any).getPlayersByIds = async () => ROSTER;
 
-// Id 7999 keeps the incoming player clear of the roster's 7000+index ids for
-// any ?n= a reviewer will ever type.
-const ADD = harnessDirectoryPlayer(ADD_PLAYER, 999) as unknown as Player;
+const ADD = { ...mkPlayer(99), id: '1', full_name: 'Nathan MacKinnon', position: 'C', team: 'COL' } as Player;
 
 function App() {
   const [open, setOpen] = useState(true);
@@ -64,7 +84,7 @@ function App() {
         teamId="harness-team"
         userId="harness-user"
       />
-      <CitrusToaster />
+      <Toaster />
     </>
   );
 }

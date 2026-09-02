@@ -275,7 +275,7 @@ export default function PoolPlayoffBracket() {
               {pickMode === 'full-bracket'
                 ? isGloballyLocked
                   ? 'Your picks are locked. Track how your bracket survives each round.'
-                  : `Pick ALL 15 series (including the Stanley Cup champion) before the deadline. R2+ matchups fill in based on your R1 picks. Points double each round (2 → 4 → 8 → 16).`
+                  : `Pick ALL 15 series — including the Stanley Cup champion — before the deadline. R2+ matchups fill in based on your R1 picks. Points double each round (2 → 4 → 8 → 16).`
                 : 'Pick winners & game counts. Points double each round (2 → 4 → 8 → 16).'}
             </p>
             {pickMode === 'full-bracket' && !isGloballyLocked && (
@@ -414,7 +414,7 @@ export default function PoolPlayoffBracket() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-[10px] uppercase font-display font-bold text-white/55">Series {String.fromCharCode(64 + s.bracket_slot)}</span>
                             {s.conference && (
-                              <Badge variant="outline" className={cn('text-[9px] px-1 py-0', s.conference === 'Eastern' ? 'border-pastel-sage/50 text-pastel-sage' : 'border-orange-400/50 text-orange-400')}>
+                              <Badge variant="outline" className={cn('text-[9px] px-1 py-0', s.conference === 'Eastern' ? 'border-blue-400/50 text-blue-400' : 'border-orange-400/50 text-orange-400')}>
                                 {s.conference === 'Eastern' ? 'EAST' : 'WEST'}
                               </Badge>
                             )}
@@ -450,7 +450,7 @@ export default function PoolPlayoffBracket() {
                             <span className="font-semibold" style={highInfo ? { color: highInfo.primaryColor } : undefined}>
                               {high?.team_abbrev} {h2hMap[s.bracket_slot].high_wins}
                             </span>
-                            <span className="text-white/55">-</span>
+                            <span className="text-white/55">—</span>
                             <span className="font-semibold" style={lowInfo ? { color: lowInfo.primaryColor } : undefined}>
                               {h2hMap[s.bracket_slot].low_wins} {low?.team_abbrev}
                             </span>

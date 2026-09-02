@@ -74,17 +74,6 @@ import {
   notifyPresenceLeft,
 } from '@/lib/draftClient/toasts';
 import { usePreloadedPlayers } from '@/hooks/usePreloadedPlayers';
-import { usePlayerDashboardIndex } from '@/hooks/usePlayerDashboardIndex';
-import {
-  buildDraftProjectionMap,
-  buildQualityScales,
-  normalizeDraftPosition,
-  picksUntilNextTurn,
-  qualitySignalFor,
-  scarcityStrip,
-  type DraftPosition,
-  type QualitySignal,
-} from '@/components/draft/draftDecision';
 import { useOnClockAlarm } from '@/hooks/useOnClockAlarm';
 import {
   toAvailablePlayers,
@@ -201,7 +190,7 @@ export default function DraftRoomV2() {
         setTeamsError(null);
       } catch {
         if (!cancelled) {
-          setTeamsError("Couldn't load this league's teams. The Start button needs them, so refresh and try again.");
+          setTeamsError("Couldn't load this league's teams — the Start button needs them.");
         }
       }
     })();
@@ -611,7 +600,7 @@ function IdentityFailureBanner() {
           ),
         }
       : {
-          title: "Couldn't verify your team. Check your connection and try again.",
+          title: "Couldn't verify your team — check your connection.",
           body: (
             <>
               We couldn't reach the server to confirm which team you
@@ -666,7 +655,7 @@ function describeStatus(
   picksMade: number,
 ): string {
   if (derivedStatus === 'not_started' && picksMade === 0) {
-    return 'active, waiting for pick 1';
+    return 'active — waiting for pick 1';
   }
   if (derivedStatus === 'in_progress') return 'in progress';
   if (derivedStatus === 'completed') return 'completed';
@@ -808,7 +797,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
       } catch {
         if (!cancelled) {
           // Loud, recoverable failure — never a silent no-button state.
-          setLeagueError("Couldn't load league details. The Start button needs them, so refresh and try again.");
+          setLeagueError("Couldn't load league details — the Start button needs them.");
         }
       }
     })();
@@ -835,7 +824,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
   const roomFull = leagueSize == null ? teams.length >= 2 : teams.length >= leagueSize;
   const startBlockedReason = !roomFull
     ? leagueSize != null
-      ? `Waiting for teams: ${teams.length} of ${leagueSize} created. The draft needs all ${leagueSize} before it can start.`
+      ? `Waiting for teams — ${teams.length} of ${leagueSize} created. The draft needs all ${leagueSize} before it can start.`
       : 'Need at least 2 teams to start.'
     : null;
 
@@ -862,7 +851,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
       const { apiClient } = await import('@/api/client');
       await apiClient.post(`/api/leagues/${leagueId}/simulate-fill`, { teamNames });
       toast.success(
-        missing === 1 ? 'AI team added: room is full.' : `${missing} AI teams added: room is full.`,
+        missing === 1 ? 'AI team added — room is full.' : `${missing} AI teams added — room is full.`,
       );
       onRetryTeams();
     } catch (err) {
@@ -918,7 +907,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
       await draftV2Api.startDraftV2(leagueId, idempotencyKey);
       // Live WS receives draft_started; this panel unmounts on the next
       // derivation — no navigate, we are already in /draft-v2.
-      toast.success('Draft started. Good luck!');
+      toast.success('Draft started — good luck!');
     } catch (err) {
       const e = err as { response?: { data?: { error?: string } }; message?: string };
       toast.error('Cannot start draft', {
@@ -968,7 +957,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
             </h2>
             <p className="mt-2 text-sm text-white/55">
               {teamsError ? (
-                'Team list unavailable. See the list below.'
+                'Team list unavailable — see below.'
               ) : (
                 <>
                   <span className="font-semibold text-pastel-cream">
@@ -1094,8 +1083,8 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                   <Button
                     onClick={async () => {
                       const result = await shareInvite(league.name || 'My League', league.join_code as string);
-                      if (result === 'copied') toast.success('Invite copied. Paste it anywhere');
-                      if (result === 'failed') toast.error('Could not share. Use Copy Link');
+                      if (result === 'copied') toast.success('Invite copied — paste it anywhere');
+                      if (result === 'failed') toast.error('Could not share — use Copy Link');
                     }}
                     className="rounded-full bg-pastel-orange text-[#2A0F00] hover:bg-pastel-orange-soft font-black px-6"
                   >
@@ -1236,7 +1225,7 @@ function StickyHeader({ leagueId, onRetryNow, clockOffsetMs }: StickyHeaderProps
       : '';
 
   return (
-    <div className="sticky top-0 z-section-header bg-background/95 backdrop-blur border-b border-border pb-2 mb-3 pt-safe">
+    <div className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border pb-2 mb-3 pt-safe">
       <h1 className="sr-only">Draft Room</h1>
       <div className="flex min-h-[44px] items-center justify-between gap-2">
         <Link
@@ -1665,104 +1654,6 @@ function MainTabs({
     [playersById, renderDerived],
   );
 
-  // ── DECISION SUPPORT (2026-09-02) ──────────────────────────────
-  //
-  // Citrus holds a projection, an xG rate and a GAR decomposition for every
-  // player in this pool, and until this change none of it was on the screen
-  // while a manager was on the clock. `PlayerPool` has always accepted a
-  // `projectedFptsMap`; this page never passed one, so the pool's dominant
-  // number was the player's SEASON TOTAL fantasy points and the desktop
-  // table's four projection columns all read "-".
-  //
-  // ONE FETCH, SHARED. `usePlayerDashboardIndex` is the app-wide
-  // module-level store behind `/api/players/dashboard-index` — the same
-  // payload the player card and the Players page read. It is fetched at most
-  // once per session and it 401s for guests, in which case `players` is an
-  // empty array and every derived structure below is empty: the room then
-  // renders exactly what it rendered before this block existed.
-  const { players: dashboardIndex } = usePlayerDashboardIndex();
-
-  /**
-   * The projection, scored through THIS league's categories rather than the
-   * pipeline's default set. Built off the whole payload rather than the pool
-   * so it survives a filter change without a rebuild; ~2k rows of arithmetic
-   * once per scoring change is cheaper than 240 rows on every keystroke.
-   */
-  const projectedFptsMap = useMemo(
-    () => buildDraftProjectionMap(dashboardIndex, leagueScoring),
-    [dashboardIndex, leagueScoring],
-  );
-
-  /**
-   * One cohort-relative advanced read per player. The scales are built once
-   * from the payload (three cohorts x two metrics plus save rate), then every
-   * player is placed against them — the alternative, a scale per row, is
-   * seven passes over 2k rows per render.
-   */
-  const qualitySignals = useMemo(() => {
-    if (dashboardIndex.length === 0) return new Map<string, QualitySignal>();
-    const scales = buildQualityScales(dashboardIndex);
-    const map = new Map<string, QualitySignal>();
-    for (const entry of dashboardIndex) {
-      const signal = qualitySignalFor(entry, scales);
-      if (signal) map.set(String(entry.id), signal);
-    }
-    return map;
-  }, [dashboardIndex]);
-
-  /**
-   * POSITIONAL SCARCITY — the question a manager is actually answering under
-   * a shot clock. Counts are taken from the pool and the picks already made,
-   * the demand from the league's own roster settings, and the urgency from
-   * the draft-order matrix. Every input is already in this component; the
-   * arithmetic lives in `draftDecision.ts` where a test can reach it.
-   */
-  const scarcity = useMemo(() => {
-    if (!rosterCaps || participatingTeamIds.size === 0 || myTeamId === null) return [];
-    const availableByPosition: Partial<Record<DraftPosition, number>> = {};
-    for (const p of availablePlayers) {
-      const pos = normalizeDraftPosition(p.position);
-      if (pos) availableByPosition[pos] = (availableByPosition[pos] ?? 0) + 1;
-    }
-    const draftedByPosition: Partial<Record<DraftPosition, number>> = {};
-    const myFilledByPosition: Partial<Record<DraftPosition, number>> = {};
-    for (const team of v1Teams) {
-      for (const pick of team.picks) {
-        const pos = normalizeDraftPosition(pick.position);
-        if (!pos) continue;
-        draftedByPosition[pos] = (draftedByPosition[pos] ?? 0) + 1;
-        if (team.id === myTeamId) {
-          myFilledByPosition[pos] = (myFilledByPosition[pos] ?? 0) + 1;
-        }
-      }
-    }
-    return scarcityStrip({
-      teamCount: participatingTeamIds.size,
-      startingSlots: rosterCaps as Partial<Record<DraftPosition, number>>,
-      availableByPosition,
-      draftedByPosition,
-      myFilledByPosition,
-      picksUntilNextTurn: picksUntilNextTurn(
-        matrix ?? null,
-        myTeamId,
-        derived?.currentPickNumber ?? null,
-      ),
-    });
-  }, [
-    rosterCaps,
-    participatingTeamIds,
-    myTeamId,
-    availablePlayers,
-    v1Teams,
-    matrix,
-    derived?.currentPickNumber,
-  ]);
-
-  const selectedProjection = selectedPlayer
-    ? (projectedFptsMap.get(selectedPlayer.id) ?? null)
-    : null;
-  const selectedSignal = selectedPlayer ? (qualitySignals.get(selectedPlayer.id) ?? null) : null;
-
   // amIOnClock is computed once at the top of MainTabs (feeds alarm +
   // action bar + pool + handleDraftFromPool).
 
@@ -1827,9 +1718,9 @@ function MainTabs({
             .getState()
             .rollBackPending(
               attemptId,
-              "We couldn't confirm your pick. Check the board before picking again",
+              "We couldn't confirm your pick — check the board",
             );
-          toast.error("We couldn't confirm your pick. Check the board before picking again");
+          toast.error("We couldn't confirm your pick — check the board");
         }
       }, 8000);
       try {
@@ -2037,7 +1928,7 @@ function MainTabs({
           the list's last rows scroll clear of it. lg+ keeps it in-flow,
           sticky just below the compact header. */}
       {!isAuctionRoom && (
-        <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-page-header lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-16 lg:z-sticky-raised">
+        <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-16 lg:z-20">
           <OnClockActionBar
             amIOnClock={amIOnClock}
             currentPickDeadline={snapshot?.stateSnapshot.currentPickDeadline ?? null}
@@ -2048,11 +1939,6 @@ function MainTabs({
             pickNumber={derived?.currentPickNumber ?? null}
             roundNumber={derived?.currentRoundNumber ?? null}
             isSubmitPending={isSubmitPending}
-            /* DECISION SUPPORT (2026-09-02). All three degrade to nothing:
-               the endpoint behind them 401s for guests and demo visitors. */
-            projection={selectedProjection}
-            signal={selectedSignal}
-            scarcity={scarcity}
           />
         </div>
       )}
@@ -2069,7 +1955,7 @@ function MainTabs({
             data-testid="alarm-mute-toggle"
             aria-pressed={alarm.muted}
           >
-            {alarm.muted ? '🔇 Alarm muted. Click to unmute' : '🔊 Alarm on. Click to mute'}
+            {alarm.muted ? '🔇 Alarm muted — click to unmute' : '🔊 Alarm on — click to mute'}
           </button>
         )}
         {/* V2-PARITY (2026-08-17) — autodraft toggle, always visible so a
@@ -2086,9 +1972,9 @@ function MainTabs({
             }
             data-testid="autodraft-toggle"
             aria-pressed={autodraftOn}
-            title="When on, your picks submit automatically. Top of your queue first, best available otherwise. One attempt per pick; the draft clock is still the backstop."
+            title="When on, your picks submit automatically — top of your queue first, best available otherwise. One attempt per pick; the draft clock is still the backstop."
           >
-            {autodraftOn ? '🤖 Autodraft ON. Click to turn off' : '🤖 Autodraft off. Click to turn on'}
+            {autodraftOn ? '🤖 Autodraft ON — click to turn off' : '🤖 Autodraft off — click to turn on'}
           </button>
         )}
       </div>
@@ -2130,13 +2016,6 @@ function MainTabs({
               /* V2-PARITY (2026-08-17) — per-row info button opens the
                  player card. */
               onShowCard={setCardPlayer}
-              /* DECISION SUPPORT (2026-09-02) — the rest-of-season
-                 projection scored through this league's categories, and one
-                 cohort-relative advanced read, on every row. Both empty when
-                 the payload is unavailable, and the pool falls back to
-                 season fantasy points exactly as before. */
-              projectedFptsMap={projectedFptsMap}
-              qualitySignals={qualitySignals}
             />
           )}
         </TabsContent>
@@ -2148,7 +2027,7 @@ function MainTabs({
               className="mb-3 rounded border border-dashed border-muted-foreground/40 bg-muted/30 p-4 text-sm text-muted-foreground"
               data-testid="board-pre-draft-copy"
             >
-              Draft hasn’t started yet. The board will fill in live as
+              Draft hasn’t started yet — the board will fill in live as
               picks land.
             </div>
           )}
@@ -2293,7 +2172,7 @@ function SidebarPanel({
           className="rounded border border-dashed border-muted-foreground/30 bg-muted/20 p-3 text-xs text-muted-foreground"
           data-testid="rosters-empty-copy"
         >
-          No picks yet. Rosters will fill in as the draft progresses.
+          No picks yet — rosters will fill in as the draft progresses.
         </div>
       )}
       <TeamRosters
@@ -2327,7 +2206,7 @@ function SidebarPanel({
           className="text-xs text-muted-foreground mt-1"
           data-testid="queue-persistence-note"
         >
-          Saved to your team. Used for autopick if your clock expires
+          Saved to your team — used for autopick if your clock expires
         </div>
       </div>
       {/* DR-3 (2026-07-29) — DraftControls HIDDEN per architect ruling:

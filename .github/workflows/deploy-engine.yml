@@ -1,0 +1,728 @@
+name: Deploy Engine
+
+# ─────────────────────────────────────────────────────────────────────
+# Gated, digest-verified deploy of the draft engine to the GCE VM
+# citrus-draft-engine-prod. Runbook: docs/RUNBOOKS/ENGINE_DEPLOY.md.
+#
+# Why this exists (2026-09-01): the engine was deployed by hand in Cloud
+# Shell. An ungated block chained `add-metadata` + `reset` after a
+# cancelled build and pointed the VM at a tag that had never been pushed;
+# the old container survived only because of --restart=always. This
+# workflow makes that sequence impossible:
+#
+#   build ──▶ preflight ──▶ deploy (approval) ──▶ verify
+#
+#   * The VM is only touched from `deploy`, which `needs` a successful
+#     build AND preflight. A failed or cancelled build cannot reach
+#     add-metadata — that is a job dependency, not shell chaining.
+#   * `build` refuses to finish unless Artifact Registry returns a digest
+#     for the tag it just pushed (LAUNCH_BUILD_2026-08-24.md §4 Trap 1).
+#   * image-tag, image-sha and commit-sha are set in ONE add-metadata call
+#     so the fingerprint can never echo a stale value (§4 Trap 2).
+#   * `deploy` runs in the `production-engine` environment: a required
+#     reviewer has to click Approve before anything mutates.
+#   * `verify` waits for the engine's own `deployment.fingerprint` log
+#     line to carry the new digest, then checks the public endpoint, and
+#     prints the exact rollback commands (with the previous values it
+#     pinned before mutating) if either check fails.
+#
+# Authentication — two supported modes, chosen per run:
+#   1. Workload Identity Federation (preferred, no long-lived key). Set the
+#      repository VARIABLES GCP_WORKLOAD_IDENTITY_PROVIDER and
+#      GCP_DEPLOY_SERVICE_ACCOUNT (docs/RUNBOOKS/GCP_ORG_SETUP.md §7.3).
+#   2. Legacy service-account key: the GCP_SA_KEY SECRET that
+#      production-deploy.yml already uses. Used only when the WIF
+#      variables are unset.
+#
+# Least-privilege roles the deploy identity needs (names only; grant
+# commands are in docs/RUNBOOKS/ENGINE_DEPLOY.md):
+#   - roles/cloudbuild.builds.editor            submit the Cloud Build
+#   - roles/artifactregistry.writer  (repo citrus-draft-engine)
+#                                               push the image / read its digest
+#   - custom role or roles/compute.instanceAdmin.v1 scoped to the VM:
+#       compute.instances.get, compute.instances.setMetadata,
+#       compute.instances.reset, compute.zoneOperations.get
+#   - roles/logging.viewer                      read the fingerprint log line
+#
+# Secrets referenced (names only): GCP_SA_KEY (fallback auth),
+# VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY. Variables:
+# GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_DEPLOY_SERVICE_ACCOUNT,
+# OVERRIDE_DRAFT_FREEZE. Nothing here prints a secret value.
+# ─────────────────────────────────────────────────────────────────────
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to build and deploy (branch, tag or full SHA)'
+        required: true
+        default: master
+        type: string
+      skip_daylight_rule:
+        description: 'Bypass the daylight rule (no engine deploy 00:00-06:59 MT, DEPLOY_PROTOCOL_F26_F27.md §4d). Emergency only — explain in reason.'
+        required: false
+        default: false
+        type: boolean
+      reason:
+        description: 'Why this deploy is happening (recorded in the run summary)'
+        required: true
+        type: string
+
+# One engine deploy at a time, and never cancel one that is running: a
+# cancelled deploy is exactly the half-applied state this workflow exists
+# to prevent. A second run queues behind the first.
+concurrency:
+  group: deploy-engine
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  GCP_PROJECT: citrus-fantasy-prod
+  GCP_ZONE: northamerica-northeast1-a
+  ENGINE_VM: citrus-draft-engine-prod
+  IMAGE_REPO: northamerica-northeast1-docker.pkg.dev/citrus-fantasy-prod/citrus-draft-engine/draft-engine
+  ENGINE_URL: https://draft.citrusfantasysports.com/
+  # Daylight rule (DEPLOY_PROTOCOL_F26_F27.md §4d): "no engine deploy after
+  # midnight, the deploy waits for daylight". Encoded as: blocked while the
+  # Mountain Time hour is below DAYLIGHT_START_HOUR. Same IANA zone as
+  # packages/shared/src/utils/timezone.ts.
+  DAYLIGHT_TZ: America/Denver
+  DAYLIGHT_START_HOUR: '7'
+  # How long `verify` waits for the new fingerprint. A boot takes ~60-100 s
+  # (apt + docker pull + secrets); 6 minutes is generous.
+  VERIFY_TIMEOUT_SECONDS: '360'
+
+jobs:
+  # ── 1. Build the image with Cloud Build and prove it was pushed ──────
+  build:
+    name: Build image (Cloud Build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      sha: ${{ steps.target.outputs.sha }}
+      tag: ${{ steps.target.outputs.tag }}
+      image: ${{ steps.target.outputs.image }}
+      digest: ${{ steps.digest.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Resolve deploy target
+        id: target
+        env:
+          REF: ${{ inputs.ref }}
+        run: |
+          set -euo pipefail
+          SHA="$(git rev-parse HEAD)"
+          TAG="engine-${SHA:0:8}"
+          IMAGE="${IMAGE_REPO}:${TAG}"
+          {
+            echo "sha=${SHA}"
+            echo "tag=${TAG}"
+            echo "image=${IMAGE}"
+          } >> "$GITHUB_OUTPUT"
+          echo "ref=${REF}"
+          echo "sha=${SHA}"
+          echo "image=${IMAGE}"
+
+      # ── GCP auth (identical block in build / deploy / verify) ────────
+      - name: Resolve GCP auth mode
+        id: auth-mode
+        env:
+          WIF_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          WIF_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          HAS_SA_KEY: ${{ secrets.GCP_SA_KEY != '' }}
+        run: |
+          set -euo pipefail
+          if [ -n "$WIF_PROVIDER" ] && [ -n "$WIF_SERVICE_ACCOUNT" ]; then
+            echo "mode=wif" >> "$GITHUB_OUTPUT"
+            echo "auth: Workload Identity Federation as ${WIF_SERVICE_ACCOUNT}"
+          elif [ "$HAS_SA_KEY" = "true" ]; then
+            if [ -n "$WIF_PROVIDER" ] || [ -n "$WIF_SERVICE_ACCOUNT" ]; then
+              echo "::warning::Only one of GCP_WORKLOAD_IDENTITY_PROVIDER / GCP_DEPLOY_SERVICE_ACCOUNT is set; falling back to GCP_SA_KEY. Set both variables to use WIF."
+            fi
+            echo "mode=key" >> "$GITHUB_OUTPUT"
+            echo "auth: legacy GCP_SA_KEY secret (set GCP_WORKLOAD_IDENTITY_PROVIDER + GCP_DEPLOY_SERVICE_ACCOUNT to switch to WIF)"
+          else
+            echo "::error::No GCP credentials: set repository variables GCP_WORKLOAD_IDENTITY_PROVIDER + GCP_DEPLOY_SERVICE_ACCOUNT (WIF) or the GCP_SA_KEY secret. See docs/RUNBOOKS/ENGINE_DEPLOY.md."
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        if: steps.auth-mode.outputs.mode == 'wif'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Authenticate to Google Cloud (service-account key)
+        if: steps.auth-mode.outputs.mode == 'key'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # Context is the repo root (the Dockerfile copies every workspace's
+      # package.json). No npm ci here: the build machine does that, and a
+      # bare checkout keeps the source upload small.
+      - name: Cloud Build
+        env:
+          IMAGE: ${{ steps.target.outputs.image }}
+        run: |
+          set -euo pipefail
+          gcloud builds submit . \
+            --project "$GCP_PROJECT" \
+            --config infra/gce/cloudbuild-draft-engine.yaml \
+            --substitutions "_IMAGE=${IMAGE}"
+
+      # Trap 1 (LAUNCH_BUILD_2026-08-24.md §4): a build/push that did not
+      # happen must not produce a green deploy. The tag has to resolve to
+      # a digest in Artifact Registry or this job fails and nothing
+      # downstream runs.
+      - name: Capture image digest (fail if the push did not happen)
+        id: digest
+        env:
+          IMAGE: ${{ steps.target.outputs.image }}
+        run: |
+          set -euo pipefail
+          if ! DIGEST="$(gcloud artifacts docker images describe "$IMAGE" \
+                --project "$GCP_PROJECT" \
+                --format='value(image_summary.digest)')"; then
+            DIGEST=""
+          fi
+          if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::No digest for ${IMAGE} (got '${DIGEST:-<empty>}'). The build did not push a usable image, so the deploy stops here. The VM has not been touched."
+            exit 1
+          fi
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "digest=${DIGEST}"
+
+      - name: Build summary
+        env:
+          REF: ${{ inputs.ref }}
+          REASON: ${{ inputs.reason }}
+          SHA: ${{ steps.target.outputs.sha }}
+          IMAGE: ${{ steps.target.outputs.image }}
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: |
+          {
+            echo "## Engine build"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| requested by | \`${GITHUB_ACTOR}\` |"
+            echo "| reason | ${REASON} |"
+            echo "| ref | \`${REF}\` |"
+            echo "| commit | \`${SHA}\` |"
+            echo "| image | \`${IMAGE}\` |"
+            echo "| digest | \`${DIGEST}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 2. Preflight: is it safe to reset the VM right now? ─────────────
+  # Runs AFTER the build so the reviewer sees a fresh answer next to the
+  # approval button. Nothing here mutates anything.
+  preflight:
+    name: Preflight (drafts, daylight, freeze)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Policy scripts come from the ref the workflow was launched from
+      # (normally master); the engine code comes from inputs.ref.
+      - uses: actions/checkout@v5
+
+      - name: Daylight rule (DEPLOY_PROTOCOL_F26_F27.md §4d)
+        env:
+          SKIP_DAYLIGHT_RULE: ${{ inputs.skip_daylight_rule }}
+        run: |
+          set -euo pipefail
+          NOW_LOCAL="$(TZ="$DAYLIGHT_TZ" date '+%Y-%m-%d %H:%M %Z')"
+          HOUR="$(TZ="$DAYLIGHT_TZ" date '+%H')"
+          WINDOW_END="$(printf '%02d:59' "$((DAYLIGHT_START_HOUR - 1))")"
+          OPENS_AT="$(printf '%02d:00' "$DAYLIGHT_START_HOUR")"
+          echo "Local time (${DAYLIGHT_TZ}): ${NOW_LOCAL}"
+          if (( 10#$HOUR < DAYLIGHT_START_HOUR )); then
+            if [ "$SKIP_DAYLIGHT_RULE" = "true" ]; then
+              echo "::warning::Daylight rule BYPASSED (skip_daylight_rule=true). It is ${NOW_LOCAL}; engine deploys are normally blocked 00:00-${WINDOW_END} MT. Justify in the run's reason."
+            else
+              echo "::error::Daylight rule: it is ${NOW_LOCAL}. No engine deploy between midnight and ${OPENS_AT} MT — a bad deploy at 2 AM has no diagnostic window (DEPLOY_PROTOCOL_F26_F27.md §4d). Re-run after ${OPENS_AT} MT, or re-run with skip_daylight_rule=true for a genuine emergency."
+              exit 1
+            fi
+          else
+            echo "Daylight rule: OK"
+          fi
+
+      # A VM reset disconnects every client of every live room. Any league
+      # sitting in draft_status=in_progress blocks the deploy outright —
+      # if the row is stale, fix the data, do not bypass the check.
+      - name: No draft in progress
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::VITE_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY secrets are not set; cannot prove no draft is live. Failing closed."
+            exit 1
+          fi
+          RESP="$(curl -sS --fail-with-body --max-time 20 \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            "${SUPABASE_URL}/rest/v1/leagues?draft_status=eq.in_progress&select=id")"
+          if ! jq -e 'type == "array"' <<<"$RESP" >/dev/null; then
+            echo "::error::Unexpected PostgREST response shape while checking for live drafts. Failing closed."
+            exit 1
+          fi
+          COUNT="$(jq 'length' <<<"$RESP")"
+          if [ "$COUNT" != "0" ]; then
+            echo "::error::${COUNT} league(s) have draft_status=in_progress — a VM reset would disconnect a live room. League IDs: $(jq -r 'map(.id) | join(", ")' <<<"$RESP")"
+            exit 1
+          fi
+          echo "No league has draft_status=in_progress."
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Same guard, same env, same bypass variable as production-deploy.yml:
+      # blocks inside 24 h of a scheduled draft and during a live one.
+      - name: Change freeze guard (scripts/check_draft_freeze.ts)
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OVERRIDE_DRAFT_FREEZE: ${{ vars.OVERRIDE_DRAFT_FREEZE }}
+        run: npx tsx scripts/check_draft_freeze.ts
+
+      - name: Preflight summary
+        env:
+          SKIP_DAYLIGHT_RULE: ${{ inputs.skip_daylight_rule }}
+        run: |
+          {
+            echo "## Preflight"
+            echo ""
+            echo "- daylight rule: $([ "$SKIP_DAYLIGHT_RULE" = "true" ] && echo 'BYPASSED (skip_daylight_rule=true)' || echo 'passed')"
+            echo "- no draft in progress: passed"
+            echo "- change freeze guard: passed"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 3. Deploy: the only job that touches the VM ─────────────────────
+  # `environment: production-engine` pauses here until a required reviewer
+  # approves (one-time setup in docs/RUNBOOKS/ENGINE_DEPLOY.md). Before the
+  # first mutation the current metadata is recorded as the rollback pin.
+  deploy:
+    name: Deploy to citrus-draft-engine-prod (approval required)
+    needs: [build, preflight]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production-engine
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    outputs:
+      instance_id: ${{ steps.pin.outputs.instance_id }}
+      prev_tag: ${{ steps.pin.outputs.prev_tag }}
+      prev_sha: ${{ steps.pin.outputs.prev_sha }}
+      prev_commit: ${{ steps.pin.outputs.prev_commit }}
+      rollback: ${{ steps.pin.outputs.rollback }}
+      deploy_started_at: ${{ steps.stamp.outputs.deploy_started_at }}
+    steps:
+      # GitHub silently auto-creates an environment the first time a
+      # workflow references it — with NO protection rules. Refuse to
+      # deploy through an environment that has no required reviewer.
+      # (Degrades to a warning if the API cannot be read with GITHUB_TOKEN.)
+      - name: Confirm production-engine has a required reviewer
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          STATUS="$(curl -sS -o env.json -w '%{http_code}' --max-time 20 \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/environments/production-engine")" || STATUS="000"
+          if [ "$STATUS" != "200" ]; then
+            echo "::warning::Could not read the production-engine environment (HTTP ${STATUS}). Confirm in Settings → Environments that it has a required reviewer."
+            exit 0
+          fi
+          if jq -e '[.protection_rules[]? | select(.type == "required_reviewers")] | length > 0' env.json >/dev/null; then
+            echo "production-engine has a required-reviewer rule."
+          else
+            echo "::error::The production-engine environment has NO required reviewer, so this job would have run unapproved. Add yourself as a required reviewer (Settings → Environments → production-engine) and re-run. Nothing was deployed."
+            exit 1
+          fi
+
+      # ── GCP auth (identical block in build / deploy / verify) ────────
+      - name: Resolve GCP auth mode
+        id: auth-mode
+        env:
+          WIF_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          WIF_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          HAS_SA_KEY: ${{ secrets.GCP_SA_KEY != '' }}
+        run: |
+          set -euo pipefail
+          if [ -n "$WIF_PROVIDER" ] && [ -n "$WIF_SERVICE_ACCOUNT" ]; then
+            echo "mode=wif" >> "$GITHUB_OUTPUT"
+            echo "auth: Workload Identity Federation as ${WIF_SERVICE_ACCOUNT}"
+          elif [ "$HAS_SA_KEY" = "true" ]; then
+            echo "mode=key" >> "$GITHUB_OUTPUT"
+            echo "auth: legacy GCP_SA_KEY secret"
+          else
+            echo "::error::No GCP credentials: set repository variables GCP_WORKLOAD_IDENTITY_PROVIDER + GCP_DEPLOY_SERVICE_ACCOUNT (WIF) or the GCP_SA_KEY secret."
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        if: steps.auth-mode.outputs.mode == 'wif'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Authenticate to Google Cloud (service-account key)
+        if: steps.auth-mode.outputs.mode == 'key'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # §4b rollback pin: what the VM is pointed at NOW, captured before
+      # anything changes, so a rollback needs zero diagnosis. The describe
+      # output is parsed with jq and never printed whole (it carries the
+      # startup script).
+      - name: Record rollback pin (current VM metadata)
+        id: pin
+        run: |
+          set -euo pipefail
+          DESCRIBE="$(gcloud compute instances describe "$ENGINE_VM" \
+            --project "$GCP_PROJECT" --zone "$GCP_ZONE" --format json)"
+          meta() { jq -r --arg k "$1" '[.metadata.items[]? | select(.key == $k) | .value] | first // ""' <<<"$DESCRIBE"; }
+          PREV_TAG="$(meta image-tag)"
+          PREV_SHA="$(meta image-sha)"
+          PREV_COMMIT="$(meta commit-sha)"
+          INSTANCE_ID="$(jq -r '.id' <<<"$DESCRIBE")"
+          VM_STATUS="$(jq -r '.status' <<<"$DESCRIBE")"
+          echo "vm=${ENGINE_VM} id=${INSTANCE_ID} status=${VM_STATUS}"
+          echo "previous image-tag  : ${PREV_TAG:-<unset>}"
+          echo "previous image-sha  : ${PREV_SHA:-<unset>}"
+          echo "previous commit-sha : ${PREV_COMMIT:-<unset>}"
+
+          # Rollback = the same one-call metadata write with the previous
+          # values, then a reset. image-tag drives the pull
+          # (infra/gce/draft-engine-startup.sh, IMAGE_URI), so no registry
+          # retag is needed. Keys that were unset before are removed again.
+          SET_PARTS=()
+          UNSET_KEYS=()
+          for pair in "image-tag=${PREV_TAG}" "image-sha=${PREV_SHA}" "commit-sha=${PREV_COMMIT}"; do
+            key="${pair%%=*}"
+            val="${pair#*=}"
+            if [ -n "$val" ]; then SET_PARTS+=("$pair"); else UNSET_KEYS+=("$key"); fi
+          done
+          {
+            echo "# ROLLBACK — three commands, previous values pinned $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "# 1) Point the VM back at the previous image (ONE call, all keys together)"
+            if [ "${#SET_PARTS[@]}" -gt 0 ]; then
+              echo "gcloud compute instances add-metadata ${ENGINE_VM} --project ${GCP_PROJECT} --zone ${GCP_ZONE} --metadata \"$(IFS=,; echo "${SET_PARTS[*]}")\""
+            fi
+            if [ "${#UNSET_KEYS[@]}" -gt 0 ]; then
+              echo "gcloud compute instances remove-metadata ${ENGINE_VM} --project ${GCP_PROJECT} --zone ${GCP_ZONE} --keys \"$(IFS=,; echo "${UNSET_KEYS[*]}")\""
+            fi
+            echo "# 2) Reset so the startup script re-pulls that tag"
+            echo "gcloud compute instances reset ${ENGINE_VM} --project ${GCP_PROJECT} --zone ${GCP_ZONE} --quiet"
+            echo "# 3) Confirm the previous fingerprint is back (imageSha == previous digest), then the endpoint answers 404"
+            echo "gcloud logging read 'resource.type=\"gce_instance\" AND resource.labels.instance_id=\"${INSTANCE_ID}\" AND jsonPayload.message:\"deployment.fingerprint\" AND jsonPayload.message:\"${PREV_SHA:-unset}\"' --project ${GCP_PROJECT} --limit 1 --order desc --freshness 15m --format 'value(jsonPayload.message)'"
+            echo "curl -s -o /dev/null -w '%{http_code}\\n' ${ENGINE_URL}"
+          } > rollback.txt
+
+          {
+            echo "instance_id=${INSTANCE_ID}"
+            echo "prev_tag=${PREV_TAG}"
+            echo "prev_sha=${PREV_SHA}"
+            echo "prev_commit=${PREV_COMMIT}"
+            echo "rollback<<__ROLLBACK__"
+            cat rollback.txt
+            echo "__ROLLBACK__"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Rollback pin (recorded before any mutation)"
+            echo ""
+            echo "| key | previous value |"
+            echo "|---|---|"
+            echo "| image-tag | \`${PREV_TAG:-<unset>}\` |"
+            echo "| image-sha | \`${PREV_SHA:-<unset>}\` |"
+            echo "| commit-sha | \`${PREV_COMMIT:-<unset>}\` |"
+            echo ""
+            echo "<details><summary>Rollback commands</summary>"
+            echo ""
+            echo '```bash'
+            cat rollback.txt
+            echo '```'
+            echo ""
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The approval can sit for hours. Re-check the cheap gates right
+      # before mutating so a room that opened (or a draft scheduled) while
+      # the run waited still blocks the reset. Mirrors the preflight job;
+      # the freeze call is the same RPC scripts/check_draft_freeze.ts uses
+      # (FREEZE_HOURS=24, LIVE_HOURS=6) and honours the same override.
+      - name: Last look (re-check live drafts, freeze and daylight after approval)
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OVERRIDE_DRAFT_FREEZE: ${{ vars.OVERRIDE_DRAFT_FREEZE }}
+          SKIP_DAYLIGHT_RULE: ${{ inputs.skip_daylight_rule }}
+        run: |
+          set -euo pipefail
+          HOUR="$(TZ="$DAYLIGHT_TZ" date '+%H')"
+          if (( 10#$HOUR < DAYLIGHT_START_HOUR )) && [ "$SKIP_DAYLIGHT_RULE" != "true" ]; then
+            echo "::error::Approval landed after midnight MT ($(TZ="$DAYLIGHT_TZ" date '+%H:%M %Z')). Daylight rule §4d blocks the reset; re-run after $(printf '%02d:00' "$DAYLIGHT_START_HOUR") MT. Nothing was deployed."
+            exit 1
+          fi
+          AUTH=(-H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}")
+          LIVE="$(curl -sS --fail-with-body --max-time 20 "${AUTH[@]}" \
+            "${SUPABASE_URL}/rest/v1/leagues?draft_status=eq.in_progress&select=id")"
+          if [ "$(jq 'length' <<<"$LIVE")" != "0" ]; then
+            echo "::error::A league moved to draft_status=in_progress while this run waited for approval: $(jq -r 'map(.id) | join(", ")' <<<"$LIVE"). Nothing was deployed."
+            exit 1
+          fi
+          if [ "${OVERRIDE_DRAFT_FREEZE:-}" = "1" ]; then
+            echo "::warning::OVERRIDE_DRAFT_FREEZE=1 — freeze re-check skipped."
+          else
+            BLOCKERS="$(curl -sS --fail-with-body --max-time 20 "${AUTH[@]}" -X POST \
+              -H "Content-Type: application/json" \
+              -d '{"p_upcoming_hours":24,"p_live_hours":6}' \
+              "${SUPABASE_URL}/rest/v1/rpc/draft_freeze_blockers")"
+            if [ "$(jq 'length' <<<"$BLOCKERS")" != "0" ]; then
+              echo "::error::Change freeze became active while this run waited for approval: $(jq -r 'map(.league_id + " (" + .reason + ")") | join(", ")' <<<"$BLOCKERS"). Nothing was deployed."
+              exit 1
+            fi
+          fi
+          echo "Last look: no live draft, no freeze, daylight OK."
+
+      # Lower bound for the fingerprint search in `verify`. Taken a minute
+      # early so clock skew between the runner and the VM cannot hide the
+      # entry.
+      - name: Stamp deploy start
+        id: stamp
+        run: |
+          set -euo pipefail
+          STARTED="$(date -u -d '-60 seconds' +%Y-%m-%dT%H:%M:%SZ)"
+          echo "deploy_started_at=${STARTED}" >> "$GITHUB_OUTPUT"
+          echo "deploy_started_at=${STARTED}"
+
+      # Trap 2 (LAUNCH_BUILD_2026-08-24.md §4): the engine's fingerprint
+      # echoes these three metadata keys. Writing them in ONE call means the
+      # next boot can only ever report all-new or all-old values.
+      - name: Point the VM at the new image (ONE add-metadata call)
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+          DIGEST: ${{ needs.build.outputs.digest }}
+          SHA: ${{ needs.build.outputs.sha }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || [ -z "$TAG" ] || [ -z "$SHA" ]; then
+            echo "::error::Refusing to write metadata without a complete tag/digest/sha triple (tag='${TAG}' digest='${DIGEST}' sha='${SHA}')."
+            exit 1
+          fi
+          gcloud compute instances add-metadata "$ENGINE_VM" \
+            --project "$GCP_PROJECT" --zone "$GCP_ZONE" \
+            --metadata "image-tag=${TAG},image-sha=${DIGEST},commit-sha=${SHA}"
+          echo "metadata set: image-tag=${TAG} image-sha=${DIGEST} commit-sha=${SHA}"
+
+      - name: Reset the VM (startup script pulls the new tag)
+        run: |
+          set -euo pipefail
+          gcloud compute instances reset "$ENGINE_VM" \
+            --project "$GCP_PROJECT" --zone "$GCP_ZONE" --quiet
+          echo "reset issued at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+      - name: Deploy summary
+        env:
+          TAG: ${{ needs.build.outputs.tag }}
+          DIGEST: ${{ needs.build.outputs.digest }}
+          SHA: ${{ needs.build.outputs.sha }}
+        run: |
+          {
+            echo "## Deploy"
+            echo ""
+            echo "- triggered by: \`${GITHUB_ACTOR}\` (approver: see this run's deployment review)"
+            echo "- metadata written (one call): \`image-tag=${TAG}\` \`image-sha=${DIGEST}\` \`commit-sha=${SHA}\`"
+            echo "- VM reset issued: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # If the job died between add-metadata and reset, the VM will pick
+      # up the new tag on its next boot. Either re-run the reset by hand or
+      # roll the metadata back — the pinned commands are printed here.
+      - name: Rollback commands (deploy job failed after the pin was taken)
+        if: failure() && steps.pin.outcome == 'success'
+        env:
+          ROLLBACK: ${{ steps.pin.outputs.rollback }}
+        run: |
+          echo "::error::Deploy job failed. If 'Point the VM at the new image' succeeded but 'Reset the VM' did not, either re-issue the reset or run the rollback below."
+          echo "$ROLLBACK"
+          {
+            echo "## Deploy FAILED — rollback commands"
+            echo ""
+            echo '```bash'
+            echo "$ROLLBACK"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── 4. Verify: the running engine must report the new digest ────────
+  verify:
+    name: Verify fingerprint + endpoint
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # ── GCP auth (identical block in build / deploy / verify) ────────
+      - name: Resolve GCP auth mode
+        id: auth-mode
+        env:
+          WIF_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          WIF_SERVICE_ACCOUNT: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          HAS_SA_KEY: ${{ secrets.GCP_SA_KEY != '' }}
+        run: |
+          set -euo pipefail
+          if [ -n "$WIF_PROVIDER" ] && [ -n "$WIF_SERVICE_ACCOUNT" ]; then
+            echo "mode=wif" >> "$GITHUB_OUTPUT"
+          elif [ "$HAS_SA_KEY" = "true" ]; then
+            echo "mode=key" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::No GCP credentials for verification. The deploy job already ran — verify by hand with the commands in docs/RUNBOOKS/ENGINE_DEPLOY.md."
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud (Workload Identity Federation)
+        if: steps.auth-mode.outputs.mode == 'wif'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Authenticate to Google Cloud (service-account key)
+        if: steps.auth-mode.outputs.mode == 'key'
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # The engine logs `deployment.fingerprint` once per boot
+      # (server/src/draft/index.ts emitDeploymentFingerprint). Docker's
+      # gcplogs driver wraps each stdout line as jsonPayload.message, so the
+      # JSON is searched as a string in Cloud Logging and then parsed here.
+      # A fingerprint carrying the NEW digest can only come from a container
+      # started by the startup script AFTER a successful pull of the new tag
+      # (the old container keeps its old IMAGE_SHA env, so a failed pull that
+      # resurrects it via --restart=always reports the OLD digest and fails
+      # this check — the ghost-tag case).
+      - name: Wait for deployment.fingerprint with the new digest
+        id: fingerprint
+        env:
+          DIGEST: ${{ needs.build.outputs.digest }}
+          SHA: ${{ needs.build.outputs.sha }}
+          TAG: ${{ needs.build.outputs.tag }}
+          INSTANCE_ID: ${{ needs.deploy.outputs.instance_id }}
+          SINCE: ${{ needs.deploy.outputs.deploy_started_at }}
+        run: |
+          set -euo pipefail
+          FILTER="resource.type=\"gce_instance\" AND resource.labels.instance_id=\"${INSTANCE_ID}\" AND timestamp>=\"${SINCE}\" AND jsonPayload.message:\"deployment.fingerprint\" AND jsonPayload.message:\"${DIGEST}\""
+          echo "filter: ${FILTER}"
+          DEADLINE=$(( $(date +%s) + VERIFY_TIMEOUT_SECONDS ))
+          FOUND=""
+          while :; do
+            ENTRIES="$(gcloud logging read "$FILTER" --project "$GCP_PROJECT" \
+              --limit 5 --order desc --format json)" || ENTRIES='[]'
+            FOUND="$(jq -c --arg d "$DIGEST" \
+              '[.[] | (.jsonPayload.message // empty) | fromjson? | select(.event == "deployment.fingerprint" and .imageSha == $d)] | first // empty' \
+              <<<"$ENTRIES")"
+            if [ -n "$FOUND" ]; then
+              break
+            fi
+            NOW=$(date +%s)
+            if [ "$NOW" -ge "$DEADLINE" ]; then
+              echo "::error::No deployment.fingerprint with imageSha=${DIGEST} within ${VERIFY_TIMEOUT_SECONDS}s of the reset. Either the VM has not finished booting, or the startup script failed (bad pull → --restart=always resurrected the previous container, which reports the previous digest)."
+              echo "Most recent fingerprints from this VM since ${SINCE} (any digest):"
+              gcloud logging read "resource.type=\"gce_instance\" AND resource.labels.instance_id=\"${INSTANCE_ID}\" AND timestamp>=\"${SINCE}\" AND jsonPayload.message:\"deployment.fingerprint\"" \
+                --project "$GCP_PROJECT" --limit 5 --order desc --format 'value(timestamp,jsonPayload.message)' || true
+              exit 1
+            fi
+            echo "$(date -u +%H:%M:%S) not yet — retrying in 15s ($(( DEADLINE - NOW ))s left)"
+            sleep 15
+          done
+          echo "fingerprint: ${FOUND}"
+          FP_COMMIT="$(jq -r '.commitSha // ""' <<<"$FOUND")"
+          if [ "$FP_COMMIT" != "$SHA" ]; then
+            echo "::error::Fingerprint carries the new digest but commitSha=${FP_COMMIT} != ${SHA}. The metadata triple is inconsistent — roll back."
+            exit 1
+          fi
+          echo "Engine booted image-tag=${TAG} imageSha=${DIGEST} commitSha=${SHA}."
+          {
+            echo "## Verify"
+            echo ""
+            echo "- fingerprint: \`${FOUND}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Caddy fronts the uWS port; the engine answers 404 for "/" — that IS
+      # the alive signal (a 502/000 means Caddy is up but the engine is not,
+      # or the VM is still booting).
+      - name: Endpoint alive (expect HTTP 404)
+        run: |
+          set -euo pipefail
+          CODE="000"
+          for attempt in 1 2 3 4 5 6 7 8; do
+            CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$ENGINE_URL")" || CODE="000"
+            if [ "$CODE" = "404" ]; then
+              break
+            fi
+            echo "attempt ${attempt}: HTTP ${CODE} — retrying in 10s"
+            sleep 10
+          done
+          if [ "$CODE" != "404" ]; then
+            echo "::error::${ENGINE_URL} answered HTTP ${CODE}, expected 404 (alive)."
+            exit 1
+          fi
+          echo "${ENGINE_URL} -> HTTP 404 (alive)"
+          echo "- endpoint: \`${ENGINE_URL}\` -> HTTP 404 (alive)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verification FAILED — rollback commands
+        if: failure()
+        env:
+          ROLLBACK: ${{ needs.deploy.outputs.rollback }}
+          PREV_TAG: ${{ needs.deploy.outputs.prev_tag }}
+          PREV_SHA: ${{ needs.deploy.outputs.prev_sha }}
+          PREV_COMMIT: ${{ needs.deploy.outputs.prev_commit }}
+        run: |
+          echo "::error::Verification failed. Roll back FIRST, diagnose after (DEPLOY_PROTOCOL_F26_F27.md §4c halt discipline). Previous pin: image-tag=${PREV_TAG:-<unset>} image-sha=${PREV_SHA:-<unset>} commit-sha=${PREV_COMMIT:-<unset>}"
+          echo ""
+          echo "$ROLLBACK"
+          {
+            echo "## Verification FAILED — rollback commands"
+            echo ""
+            echo "Previous pin: \`image-tag=${PREV_TAG:-<unset>}\` \`image-sha=${PREV_SHA:-<unset>}\` \`commit-sha=${PREV_COMMIT:-<unset>}\`"
+            echo ""
+            echo '```bash'
+            echo "$ROLLBACK"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy verified
+        run: |
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Engine deploy verified.** Next: the smoke sequence in DEPLOY_PROTOCOL_F26_F27.md §4c, then land the same commit on master so API + web follow." >> "$GITHUB_STEP_SUMMARY"

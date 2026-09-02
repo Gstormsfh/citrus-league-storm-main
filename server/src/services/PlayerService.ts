@@ -1,6 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS, getCurrentSeason } from '@citrus/shared';
-import { readAllPaged } from '../lib/pagedRead';
 
 /**
  * PlayerService — Server-side player data with dependency-injected Supabase client.
@@ -111,30 +110,6 @@ interface NormalizedPlayer {
 let playersCache: { data: NormalizedPlayer[]; timestamp: number } | null = null;
 const CACHE_TTL = 2 * 60 * 1000;
 
-/**
- * STAMPEDE GUARD (2026-09-02 scale audit).
- *
- * `playersCache` is a plain read-through cache: check, miss, fetch. That
- * shape is fine at one request at a time and pathological under load. The
- * moment the TTL lapses, EVERY concurrent request misses, and every one of
- * them issues the same four paged table reads and repeats the same merge.
- * At the draft-pool/free-agents request rate the miss is not a single
- * refetch, it is a thundering herd against PostgREST once every two
- * minutes, forever.
- *
- * The fix is one shared promise. The first miss starts the load and parks
- * the promise here; every caller that arrives while it is outstanding
- * awaits the SAME promise instead of starting its own. Requests collapse
- * from N reads to 1 with no change to what any caller receives.
- *
- * Shared across PlayerService instances on purpose — `playersCache` is
- * already module-scoped and already shared across users, so single-flight
- * introduces no data sharing that the cache did not already have. These
- * are public reference tables (directory, season stats, talent metrics,
- * GSAx), not per-user rows.
- */
-let playersInFlight: Promise<{ players: NormalizedPlayer[]; error: unknown }> | null = null;
-
 function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talent?: Partial<TalentMetricsRow>, goalieGsax?: GoalieGsaxRow): NormalizedPlayer {
   const rosterStatus = talent?.roster_status ?? null;
   const isGoalie = p.position_code === 'G';
@@ -218,93 +193,42 @@ export class PlayerService {
   }
 
   /** Get all players with stats, talent metrics, and goalie GSAx */
-  async getAllPlayers(): Promise<{ players: NormalizedPlayer[]; error: unknown }> {
+  async getAllPlayers() {
     // Check cache
     if (playersCache && Date.now() - playersCache.timestamp < CACHE_TTL) {
       return { players: playersCache.data, error: null };
     }
 
-    // A load is already running — join it rather than starting a second.
-    // See the `playersInFlight` note above.
-    if (playersInFlight) return playersInFlight;
-
-    playersInFlight = this.loadAllPlayers();
-    try {
-      return await playersInFlight;
-    } finally {
-      playersInFlight = null;
-    }
-  }
-
-  /** The uncached read+merge behind `getAllPlayers`. */
-  private async loadAllPlayers(): Promise<{ players: NormalizedPlayer[]; error: unknown }> {
-    // PAGED READS (2026-09-02 scale audit).
-    //
-    // These four reads used to be a single `.range(0, 4999)` each with no
-    // `.order()`. `.range()` is not an escape hatch: PostgREST clamps the
-    // ranged response server-side at `db-max-rows` (1,000 on this
-    // project), returns HTTP 200, and says nothing. `player_directory`
-    // carries ~1.9k rows for a season, so this method — which feeds the
-    // DRAFT POOL and FREE AGENTS — was handing callers roughly half the
-    // league, in physical-row order, with no error to notice.
-    //
-    // That is byte-for-byte the defect that put a fringe player at the
-    // top of the draft board in `docs/ARCHITECT_INBOX.md`, fixed in
-    // `usePreloadedPlayers.ts` and again twice in `autopickStrategy.ts`,
-    // and missed here. `readAllPaged` carries the write-up.
-    //
-    // Sort keys are unique per row in every case: (season, player_id) is
-    // one row per player per season in the three season-scoped tables,
-    // and `goalie_gsax_primary.goalie_id` is that table's PRIMARY KEY
-    // (migration 20250114000001).
-    const season = getCurrentSeason();
-
-    const { data: directory, error: dirError } = await readAllPaged<PlayerDirectoryRow>(
-      this.supabase,
-      {
-        table: 'player_directory',
-        columns: COLUMNS.PLAYER_DIRECTORY,
-        filters: [['season', season]],
-        orderBy: ['player_id'],
-      },
-    );
+    // Fetch player directory for current season only (avoids multi-season duplicates)
+    const { data: directory, error: dirError } = await this.supabase
+      .from('player_directory')
+      .select(COLUMNS.PLAYER_DIRECTORY)
+      .eq('season', getCurrentSeason())
+      .range(0, 4999);
 
     if (dirError) {
       return { players: playersCache?.data || [], error: dirError };
     }
 
-    // The other three are independent of each other and of the directory
-    // (no FKs between them; the merge below is an in-memory Map join), so
-    // they fan out rather than queueing.
-    //
-    // This is not gold-plating, it is paying for the paging above. Four
-    // clamped reads used to be four sequential round trips; correct paging
-    // makes it nine at today's row counts (3 + 2 + 3 + 1). Fanning the
-    // three non-directory reads out puts the cold path back to roughly
-    // where it was, and the directory read stays first on its own so its
-    // error still short-circuits before anything else is spent.
-    const [statsRes, talentRes, gsaxRes] = await Promise.all([
-      readAllPaged<PlayerStatsRow>(this.supabase, {
-        table: 'player_season_stats',
-        columns: COLUMNS.PLAYER_STATS,
-        filters: [['season', season]],
-        orderBy: ['player_id'],
-      }),
-      readAllPaged<TalentMetricsRow>(this.supabase, {
-        table: 'player_talent_metrics',
-        columns: COLUMNS.PLAYER_TALENT_METRICS,
-        filters: [['season', season]],
-        orderBy: ['player_id'],
-      }),
-      readAllPaged<GoalieGsaxRow>(this.supabase, {
-        table: 'goalie_gsax_primary',
-        columns: COLUMNS.GOALIE_GSAX,
-        orderBy: ['goalie_id'],
-      }),
-    ]);
-    const stats = statsRes.data;
-    const talents = talentRes.data;
-    const gsax = gsaxRes.data;
+    // Fetch season stats for current season
+    const { data: stats } = await this.supabase
+      .from('player_season_stats')
+      .select(COLUMNS.PLAYER_STATS)
+      .eq('season', getCurrentSeason())
+      .range(0, 4999);
+
+    // Fetch talent metrics for current season
+    const { data: talents } = await this.supabase
+      .from('player_talent_metrics')
+      .select(COLUMNS.PLAYER_TALENT_METRICS)
+      .eq('season', getCurrentSeason())
+      .range(0, 4999);
+
+    // Fetch goalie GSAx (range matches the other three queries above)
+    const { data: gsax } = await this.supabase
+      .from('goalie_gsax_primary')
+      .select(COLUMNS.GOALIE_GSAX)
+      .range(0, 4999);
 
     const statsMap = new Map(((stats || []) as unknown as PlayerStatsRow[]).map((s) => [s.player_id, s]));
     const talentMap = new Map(((talents || []) as unknown as TalentMetricsRow[]).map((t) => [t.player_id, t]));
@@ -479,6 +403,5 @@ export class PlayerService {
 
   static clearCache() {
     playersCache = null;
-    playersInFlight = null;
   }
 }

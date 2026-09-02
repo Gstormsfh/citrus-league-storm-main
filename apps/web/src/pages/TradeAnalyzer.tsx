@@ -232,7 +232,7 @@ const TradeAnalyzer = () => {
         if (isMounted) {
           toast({
             title: "Trade Data Won't Load",
-            description: "Couldn't load the trade data. Refresh and we'll pick it back up.",
+            description: "Couldn't load the trade data — refresh and we'll pick it back up.",
             variant: "destructive"
           });
         }
@@ -527,7 +527,7 @@ const TradeAnalyzer = () => {
   return (
     <div className="min-h-screen bg-[#0F1F15] flex flex-col">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Trade Center</h1>
@@ -1082,7 +1082,7 @@ const TradeAnalyzer = () => {
                     Couldn&apos;t load your trade offers
                   </h3>
                   <p className="text-sm text-white/55 mb-4">
-                    This is a connection problem. You may still have offers waiting.
+                    This is a connection problem — you may still have offers waiting.
                   </p>
                   <Button
                     variant="outline"

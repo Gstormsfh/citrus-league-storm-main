@@ -75,7 +75,7 @@ export default function PreviewAlmanac() {
           </h1>
           <p className="font-editorial italic text-[18px] md:text-[20px] text-pastel-forest-soft leading-relaxed max-w-2xl mx-auto">
             A weekly almanac for the considered manager. Thirty-one features, nineteen-thousand
-            simulations, one hand-stitched edge. Published every Saturday morning.
+            simulations, one hand-stitched edge — published every Saturday morning.
           </p>
         </div>
 
@@ -124,12 +124,12 @@ export default function PreviewAlmanac() {
               </span>
               fter a quiet Friday, tonight's slate runs heavy in the West. Edmonton hosts Colorado
               in a game both teams need; we have McDavid projected for 9.4 fantasy points with a
-              ceiling of 12.1. The highest of the night. Toronto in Montreal is the value play
+              ceiling of 12.1 — the highest of the night. Toronto in Montreal is the value play
               for the Canadiens stack, and Igor Shesterkin draws Boston for what our Bayesian
               shrinkage model calls a near-pristine GSAx matchup.
             </p>
             <p className="font-editorial text-[17px] leading-[1.75] text-pastel-forest-soft mt-5">
-              The full standings, our top ten projections, and dispatches from the wire, all below.
+              The full standings, our top ten projections, and dispatches from the wire — below.
             </p>
             <Link
               to="/create-league"

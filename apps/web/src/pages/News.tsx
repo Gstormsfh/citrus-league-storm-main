@@ -23,7 +23,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
 const categoryColors: Record<string, string> = {
   top: 'bg-pastel-sage/20 text-pastel-sage-soft border-pastel-sage/30',
   fantasy: 'bg-pastel-orange/15 text-pastel-orange-soft border-pastel-orange/30',
-  trade: 'bg-pastel-butter/15 text-pastel-butter border-pastel-butter/30',
+  trade: 'bg-blue-500/15 text-blue-200 border-blue-400/30',
   injury: 'bg-red-500/15 text-red-200 border-red-400/30',
   recap: 'bg-purple-500/15 text-purple-200 border-purple-400/30',
   olympics: 'bg-amber-500/15 text-amber-200 border-amber-400/30',
@@ -132,7 +132,7 @@ const News = () => {
               <p className="text-sm text-white/55 max-w-sm">
                 {searchTerm
                   ? 'Try a different keyword, or clear the search to see everything we\'ve pulled today.'
-                  : 'Check back after the next puck drop. The beat picks up during game hours.'}
+                  : 'Check back after the next puck drop — the beat picks up during game hours.'}
               </p>
               {searchTerm && (
                 <button

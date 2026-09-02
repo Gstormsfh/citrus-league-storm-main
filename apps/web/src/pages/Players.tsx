@@ -9,20 +9,12 @@
 // server merges directory + season stats + GAR components + talent
 // metrics + ROS projections, cached 2 min server-side). All filtering,
 // sorting, and percentile math happens client-side on that bounded
-// payload (~1-2k rows) — no per-interaction network chatter.
-//
-// 2026-09-02: that call moved OUT of this page and into
-// `hooks/usePlayerDashboardIndex`. The same payload now feeds
-// `PlayerAdvancedCard`, which renders inside the shared PlayerStatsModal on
-// eight other surfaces; two independent `useEffect` fetches of the same 1-2k
-// rows was the alternative. The page's behaviour is unchanged — same loading
-// state, same error string, same Retry — but the retry now calls the shared
-// `reload()` instead of bumping a local nonce.
+// payload (~1–2k rows) — no per-interaction network chatter.
 //
 // Deep-link: /players?player=<id> selects that player on load;
 // selection writes the param back so any player view is shareable.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { Card } from '@/components/ui/card';
@@ -30,30 +22,62 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Search, ShieldAlert } from 'lucide-react';
+import { apiClient } from '@/api/client';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
-import {
-  usePlayerDashboardIndex,
-  type DashboardIndexEntry,
-} from '@/hooks/usePlayerDashboardIndex';
 
-/**
- * One row of /api/players/dashboard-index.
- *
- * The shape now lives with the fetch, in `hooks/usePlayerDashboardIndex`, so
- * the advanced player card and this page cannot drift apart on what a row
- * is. Kept as a named export here because that is where it has always been.
- */
-export type DashboardPlayer = DashboardIndexEntry;
+export interface DashboardPlayer {
+  id: number;
+  name: string;
+  team: string;
+  position: string;
+  jersey: number | null;
+  headshot_url: string | null;
+  is_goalie: boolean;
+  roster_status: string | null;
+  gp: number;
+  goals: number;
+  assists: number;
+  points: number;
+  sog: number;
+  hits: number;
+  blocks: number;
+  ppp: number;
+  plus_minus: number;
+  x_goals: number;
+  wins: number;
+  saves: number;
+  save_pct: number;
+  gaa: number;
+  shutouts: number;
+  xg_per_60: number | null;
+  xg_rating: string | null;
+  gar_per_60: number | null;
+  gar_evo: number | null;
+  gar_evd: number | null;
+  gar_ppo: number | null;
+  gar_ppd: number | null;
+  gar_pen: number | null;
+  proj_gp: number | null;
+  proj_fantasy_points: number | null;
+  proj_fantasy_ppg: number | null;
+  proj_goals: number | null;
+  proj_assists: number | null;
+  proj_sog: number | null;
+  proj_ppp: number | null;
+  proj_wins: number | null;
+  proj_saves: number | null;
+  proj_shutouts: number | null;
+}
 
 const POSITIONS = ['C', 'LW', 'RW', 'D', 'G'] as const;
 
 type SkaterSortKey = 'points' | 'goals' | 'assists' | 'sog' | 'xg_per_60' | 'gar_per_60' | 'proj_fantasy_points';
 type GoalieSortKey = 'wins' | 'save_pct' | 'saves' | 'shutouts' | 'proj_wins';
 
-const f1 = (v: number | null | undefined) => (v == null ? '-' : (Math.round(v * 10) / 10).toFixed(1));
-const f2 = (v: number | null | undefined) => (v == null ? '-' : (Math.round(v * 100) / 100).toFixed(2));
+const f1 = (v: number | null | undefined) => (v == null ? '—' : (Math.round(v * 10) / 10).toFixed(1));
+const f2 = (v: number | null | undefined) => (v == null ? '—' : (Math.round(v * 100) / 100).toFixed(2));
 const svp = (v: number | null | undefined) =>
-  v == null || v === 0 ? '-' : (v < 1 ? v : v / 1000).toFixed(3).replace(/^0/, '');
+  v == null || v === 0 ? '—' : (v < 1 ? v : v / 1000).toFixed(3).replace(/^0/, '');
 
 /** Percentile of `val` within `arr` (fraction of values <= val), 0–100. */
 function percentile(arr: number[], val: number): number {
@@ -151,7 +175,7 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
         <div className="min-w-0">
           <h2 className="truncate text-xl font-bold">{player.name}</h2>
           <p className="text-sm text-muted-foreground">
-            #{player.jersey ?? '-'} · {player.position} · {player.team}
+            #{player.jersey ?? '—'} · {player.position} · {player.team}
           </p>
           {player.xg_rating && (
             <Badge variant="secondary" className="mt-1.5">
@@ -215,7 +239,7 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
       {!player.is_goalie && (
         <>
           <h3 className="mt-5 text-xs font-bold uppercase tracking-wider text-pastel-orange">
-            Impact: GAR per 60
+            Impact — GAR per 60
           </h3>
           <div className="mt-2">
             <MetricRow
@@ -276,7 +300,7 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
         </h3>
         {player.proj_fantasy_points == null ? (
           <p className="mt-2 text-sm text-muted-foreground">
-            No projection yet. Projections populate from the nightly pipeline once a player has a season sample.
+            No projection yet — projections populate from the nightly pipeline once a player has a season sample.
           </p>
         ) : (
           <div className="mt-2 space-y-1.5 text-sm">
@@ -327,9 +351,10 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
 
 const Players = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  // The shared, once-per-session payload. Identical loading/error semantics
-  // to the effect this replaced; `reload` is what Retry calls.
-  const { players, loading, error: loadError, reload } = usePlayerDashboardIndex();
+  const [players, setPlayers] = useState<DashboardPlayer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [fetchNonce, setFetchNonce] = useState(0);
 
   const [search, setSearch] = useState('');
   const [team, setTeam] = useState<string>('ALL');
@@ -345,6 +370,29 @@ const Players = () => {
   // never on load — `selected` defaults to the top scorer, which must
   // not auto-open a sheet).
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    void (async () => {
+      try {
+        const response = await apiClient.get<DashboardPlayer[]>('/api/players/dashboard-index');
+        if (cancelled) return;
+        const list = (response.data ?? (response as unknown as DashboardPlayer[])) as DashboardPlayer[];
+        setPlayers(Array.isArray(list) ? list : []);
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError((err as { message?: string })?.message ?? 'Failed to load players.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchNonce]);
 
   const teams = useMemo(
     () => Array.from(new Set(players.map((p) => p.team).filter(Boolean))).sort(),
@@ -417,7 +465,7 @@ const Players = () => {
         <div className="mb-5">
           <h1 className="text-2xl font-bold">Players</h1>
           <p className="text-sm text-muted-foreground">
-            Season actuals, xG shot quality, GAR/60 impact, and rolled-forward projections. Every team, every player.
+            Season actuals, xG shot quality, GAR/60 impact, and rolled-forward projections — every team, every player.
           </p>
         </div>
 
@@ -483,7 +531,7 @@ const Players = () => {
         {!loading && loadError && (
           <Card className="flex items-center justify-between gap-4 p-5">
             <p className="text-sm text-destructive">{loadError}</p>
-            <Button variant="outline" onClick={() => void reload()} data-testid="players-retry">
+            <Button variant="outline" onClick={() => setFetchNonce((n) => n + 1)} data-testid="players-retry">
               Retry
             </Button>
           </Card>
@@ -499,10 +547,10 @@ const Players = () => {
                       {/* Sticky LEFT as well as top: at phone widths the table
                           scrolls horizontally inside its container — the name
                           column must stay in view or swiped stats lose context. */}
-                      <th className="sticky left-0 top-0 z-sticky-raised bg-card px-3 py-2.5">Player</th>
-                      <th className="sticky top-0 z-sticky-base bg-card px-2 py-2.5 text-right">GP</th>
+                      <th className="sticky left-0 top-0 z-20 bg-card px-3 py-2.5">Player</th>
+                      <th className="sticky top-0 z-10 bg-card px-2 py-2.5 text-right">GP</th>
                       {(group === 'skaters' ? skaterCols : goalieCols).map((col) => (
-                        <th key={col.key} className="sticky top-0 z-sticky-base bg-card px-2 py-2.5 text-right">
+                        <th key={col.key} className="sticky top-0 z-10 bg-card px-2 py-2.5 text-right">
                           <button
                             className={`hover:text-foreground ${
                               (group === 'skaters' ? skaterSort : goalieSort) === col.key ? 'text-pastel-orange' : ''
@@ -528,13 +576,13 @@ const Players = () => {
                           selected?.id === p.id ? 'bg-white/10' : ''
                         }`}
                       >
-                        <td className={`sticky left-0 z-sticky-base px-3 py-2 ${selected?.id === p.id ? 'bg-muted' : 'bg-card'}`}>
+                        <td className={`sticky left-0 z-10 px-3 py-2 ${selected?.id === p.id ? 'bg-muted' : 'bg-card'}`}>
                           <div className="flex items-center gap-2.5">
                             <Headshot player={p} size="sm" />
                             <div className="min-w-0 max-w-[160px]">
                               <div className="truncate font-medium">{p.name}</div>
                               <div className="text-xs text-muted-foreground">
-                                {p.team} · #{p.jersey ?? '-'} · {p.position}
+                                {p.team} · #{p.jersey ?? '—'} · {p.position}
                               </div>
                             </div>
                           </div>
@@ -583,7 +631,7 @@ const Players = () => {
               </div>
               {sorted.length > 400 && (
                 <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
-                  Showing top 400 of {sorted.length}. Narrow with search or filters.
+                  Showing top 400 of {sorted.length} — narrow with search or filters.
                 </p>
               )}
             </Card>
@@ -604,7 +652,7 @@ const Players = () => {
             same dashboard as a dismissible overlay sheet. */}
         {mobilePanelOpen && selected && (
           <div
-            className="lg:hidden fixed inset-0 z-app-nav overflow-y-auto bg-black/70 backdrop-blur-sm p-3"
+            className="lg:hidden fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm p-3"
             role="dialog"
             aria-modal="true"
             onClick={() => setMobilePanelOpen(false)}

@@ -30,7 +30,7 @@ export function MascotAvatar({
   return (
     <img
       src={mascot.image}
-      alt={`${mascot.name}, ${mascot.position}`}
+      alt={`${mascot.name} — ${mascot.position}`}
       className={`${dim} rounded-full object-cover ${ringClass} ${className}`}
       loading="lazy"
     />
@@ -53,7 +53,7 @@ export function MascotPortrait({
     <div className={`aspect-square rounded-xl overflow-hidden bg-pastel-sage-soft/40 ${className}`}>
       <img
         src={mascot.image}
-        alt={`${mascot.name}, ${mascot.position}`}
+        alt={`${mascot.name} — ${mascot.position}`}
         className="w-full h-full object-cover"
         loading="lazy"
       />

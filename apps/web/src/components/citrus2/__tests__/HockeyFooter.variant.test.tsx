@@ -49,46 +49,6 @@ describe('HockeyFooter — the app variant drops the pitch', () => {
   });
 });
 
-describe('HockeyFooter — the app variant does not render on a phone', () => {
-  // 2026-09-02: under `lg` every in-app page carries a fixed bottom tab bar,
-  // and <main> reserves room for it with
-  // `pb-[calc(5rem+env(safe-area-inset-bottom))]`. This footer sits OUTSIDE
-  // that padding, so its last ~80px — the squad row and the whole legal line,
-  // Privacy and Terms included — rendered UNDERNEATH the tab bar on 22
-  // in-app pages at 393x852. Unreadable and untappable.
-  //
-  // jsdom has no layout engine and no Tailwind stylesheet, so the fix is a
-  // source/class contract: the <footer> element itself carries the responsive
-  // class, which is the only place it can go and still remove the element's
-  // box from the phone's flow.
-  const footerEl = (props: React.ComponentProps<typeof HockeyFooter> = {}) => {
-    const { container } = render(
-      <MemoryRouter>
-        <HockeyFooter {...props} />
-      </MemoryRouter>,
-    );
-    return container.querySelector('footer')!;
-  };
-
-  it('app is hidden below lg and shown at lg', () => {
-    const cls = footerEl({ variant: 'app' }).className;
-    expect(cls).toContain('hidden');
-    expect(cls).toContain('lg:block');
-  });
-
-  it('marketing renders at every width — the public pages have no tab bar', () => {
-    const cls = footerEl().className;
-    expect(cls).not.toContain('hidden');
-    expect(cls).not.toContain('lg:block');
-  });
-
-  it('the app variant still keeps its own surface — it is hidden, not stripped', () => {
-    const cls = footerEl({ variant: 'app' }).className;
-    expect(cls).toContain('border-t');
-    expect(cls).toContain('bg-black/30');
-  });
-});
-
 describe('HockeyFooter — the app variant keeps what in-app users navigate with', () => {
   it('keeps every link column', () => {
     const f = renderFooter({ variant: 'app' });

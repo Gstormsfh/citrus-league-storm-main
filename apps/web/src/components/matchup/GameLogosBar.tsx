@@ -3,9 +3,22 @@ import { getTeamColor } from "@/utils/teamColors";
 import { getTodayMST, getTodayMSTDate, isTodayMST, formatTimeMST } from "@/utils/timezoneUtils";
 import { logger } from '@/utils/logger';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
-import { useIsMobile } from "@/hooks/useIsMobile";
+
+// Hook to detect mobile/tablet
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  return isMobile;
+};
 
 /** Wrapper that shows a Popover on mobile tap, title tooltip on desktop */
 const GameLogoWithTooltip = ({
@@ -35,7 +48,7 @@ const GameLogoWithTooltip = ({
         side="top"
         align="center"
         sideOffset={6}
-        className="bg-[#1A2A20]/95 backdrop-blur-md text-pastel-cream text-xs p-2.5 rounded-varsity border-2 border-pastel-sage/40 shadow-varsity w-auto max-w-[220px] !z-popover"
+        className="bg-[#1A2A20]/95 backdrop-blur-md text-pastel-cream text-xs p-2.5 rounded-varsity border-2 border-pastel-sage/40 shadow-varsity w-auto max-w-[220px] !z-[9999]"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <div className="flex items-center justify-between gap-2">

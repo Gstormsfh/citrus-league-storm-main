@@ -39,7 +39,6 @@
 // rendered from `DraftRoomV2` at `/draft-v2/*`.
 
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { useCountdownNow } from './countdownTick';
 import { Card } from '@/components/ui/card';
 import { Clock, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -107,27 +106,18 @@ export const DraftTimerV2 = memo(
     tickMs = 500,
     variant = 'card',
   }: DraftTimerV2Props) => {
+    const [now, setNow] = useState(() => Date.now());
     const rafRef = useRef<number | null>(null);
 
-    /**
-     * TWO CLOCKS, ONE TICK (2026-09-02). This was a private
-     * `setInterval(tickMs)`, and so was `OnClockActionBar`'s. Two intervals
-     * started at different moments sample `Date.now()` on different phases,
-     * so for up to half of every second one had crossed a whole-second
-     * boundary and the other had not — header 00:27 against bar 00:28 in one
-     * screenshot, measured on the harness. The 2026-09-01 pass unified the
-     * rounding and the format, which is the other half of the defect.
-     *
-     * Both now wake on the DEADLINE'S own second boundaries. `tickMs`
-     * survives as the ceiling on the gap between samples, which is what its
-     * one test passes it for. See `countdownTick.ts`.
-     */
-    const parsedDeadlineMs = useMemo(() => {
-      if (currentPickDeadline === null) return null;
-      const parsed = new Date(currentPickDeadline).getTime();
-      return Number.isNaN(parsed) ? null : parsed;
-    }, [currentPickDeadline]);
-    const now = useCountdownNow(parsedDeadlineMs, clockOffsetMs, tickMs);
+    // Local tick: setInterval at tickMs cadence. Only runs when a
+    // deadline is present; short-circuits to a no-op otherwise.
+    useEffect(() => {
+      if (currentPickDeadline === null) return;
+      const handle = window.setInterval(() => {
+        setNow(Date.now());
+      }, tickMs);
+      return () => window.clearInterval(handle);
+    }, [currentPickDeadline, tickMs]);
 
     const remainingSec = useMemo(() => {
       if (currentPickDeadline === null) return null;

@@ -225,7 +225,7 @@ export function KeeperPanel({
   };
 
   const limitLabel = dynastyMode
-    ? 'Dynasty: entire roster carries over'
+    ? 'Dynasty — entire roster carries over'
     : `${myDesignations.length} of ${maxKeepers} keeper${maxKeepers === 1 ? '' : 's'} used`;
 
   return (
@@ -329,14 +329,14 @@ export function KeeperPanel({
                 </div>
                 {atLimit && !dynastyMode && !anyLocked && (
                   <p className="text-xs text-white/55 mt-2">
-                    Keeper limit reached. Release a player to keep someone else.
+                    Keeper limit reached — release a player to keep someone else.
                   </p>
                 )}
               </div>
             )}
             {myTeamId !== null && roster.length === 0 && (
               <p className="text-sm text-white/55">
-                Your roster is empty. Keepers become available once your team has players
+                Your roster is empty — keepers become available once your team has players
                 (after the draft).
               </p>
             )}

@@ -1,13 +1,10 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { ArrowRightLeft, Check, ChevronRight, X, Shield, Skull } from 'lucide-react';
 import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
 import type { HockeyPlayer } from './HockeyPlayerCard';
 import { slotLabel } from './slotLabel';
-import { chipClassFor } from './slotChip';
-import { Mug } from './Mug';
-import { tonight } from './tonight';
 
 /**
  * LINE CHANGE SHEET (2026-08-27, second pass)
@@ -88,9 +85,77 @@ function groupSlots(slots: string[]): Group[] {
   return groups.filter((g) => g.slots.length > 0);
 }
 
-// `chipClassFor`, `tonight()` and `Mug` moved to ./slotChip.ts, ./tonight.ts
-// and ./Mug.tsx (2026-09-01) so the Fill sheet wears the same chips, shows
-// the same number and the same face for a player as this sheet does.
+/** Same background/text pairs as MobileRosterList's posColor map — these must
+ *  read as the SAME chips the roster rows wear. */
+const CHIP: Record<string, string> = {
+  LW: 'bg-pastel-sage-soft text-pastel-forest ring-pastel-sage-soft/30',
+  C: 'bg-pastel-sage text-pastel-forest ring-pastel-sage/30',
+  RW: 'bg-pastel-orange text-white ring-pastel-orange/30',
+  D: 'bg-[#1A2A20] text-white ring-white/30',
+  G: 'bg-pastel-sage/15 text-pastel-cream ring-pastel-sage/50',
+  UTIL: 'bg-pastel-sage text-pastel-forest ring-pastel-sage/30',
+  F: 'bg-emerald-600 text-white ring-emerald-600/30',
+};
+
+function chipClassFor(slotId: string): string {
+  if (slotId === 'bench-grid') return 'bg-white/10 text-pastel-cream ring-white/20';
+  if (slotId.startsWith('ir-slot-')) return 'bg-red-500/15 text-red-400 ring-red-500/30';
+  const m = /^slot-([A-Z]+)/.exec(slotId);
+  return (m && CHIP[m[1]]) || 'bg-white/15 text-pastel-cream ring-white/20';
+}
+
+/** Tonight's number for a player, computed the way the roster column does:
+ *  actual points once the game is live/final, otherwise the projection. */
+function tonight(p: HockeyPlayer): { pts: number | null; live: boolean } {
+  const isG = p.position === 'Goalie' || p.position === 'G';
+  const status = p.nextGame?.gameStatus;
+  const live = status === 'live' || status === 'intermission' || status === 'final';
+  if (live && p.daily_actual_points != null) return { pts: p.daily_actual_points, live: true };
+  const proj = isG
+    ? p.goalieProjection?.total_projected_points
+    : p.daily_projection?.total_projected_points;
+  return { pts: proj ?? null, live: false };
+}
+
+/** Headshot with a fallback that still looks designed: the player's initials
+ *  on a forest disc. Real mugs load in production; the fallback carries the
+ *  row when the CDN doesn't. */
+function Mug({ p, size }: { p: HockeyPlayer; size: 'sm' | 'lg' }) {
+  const [err, setErr] = useState(false);
+  const initials = p.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('');
+  const cls = size === 'lg' ? 'w-14 h-14' : 'w-9 h-9';
+  return (
+    <div
+      className={cn(
+        cls,
+        'shrink-0 rounded-full overflow-hidden bg-pastel-sage/10 ring-1 ring-white/15 flex items-center justify-center',
+      )}
+    >
+      {p.image && !err ? (
+        <img
+          src={p.image}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={() => setErr(true)}
+        />
+      ) : (
+        <span
+          className={cn(
+            'font-varsity font-black text-pastel-sage',
+            size === 'lg' ? 'text-lg' : 'text-[11px]',
+          )}
+        >
+          {initials}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export function SlotPickerMenu({
   player,
@@ -150,7 +215,7 @@ export function SlotPickerMenu({
     '';
 
   const sheet = (
-    <div className="fixed inset-0 z-sheet" data-testid="slot-sheet-root">
+    <div className="fixed inset-0 z-[9999]" data-testid="slot-sheet-root">
       {/* Scrim — tapping it is Cancel, same as the cancel bar. */}
       <div
         className="absolute inset-0 bg-black/60 animate-in fade-in-0 duration-150"
@@ -233,7 +298,7 @@ export function SlotPickerMenu({
                   me.live ? 'text-emerald-500' : 'text-pastel-orange',
                 )}
               >
-                {me.pts != null ? me.pts.toFixed(1) : '-'}
+                {me.pts != null ? me.pts.toFixed(1) : '—'}
               </p>
               <p className="mt-0.5 font-display text-[9px] font-semibold uppercase text-white/55">
                 {me.live ? 'live' : 'proj'}
@@ -345,7 +410,7 @@ export function SlotPickerMenu({
                                 occ?.live ? 'text-emerald-500' : 'text-pastel-orange',
                               )}
                             >
-                              {occ?.pts != null ? occ.pts.toFixed(1) : '-'}
+                              {occ?.pts != null ? occ.pts.toFixed(1) : '—'}
                             </span>
                             <span className="block text-[9px] font-display font-semibold uppercase text-white/55">
                               {occ?.live ? 'live' : 'proj'}

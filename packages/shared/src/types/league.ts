@@ -9,6 +9,8 @@
  * - Confidence Pool: Rank your weekly picks by confidence points
  */
 
+import { defaultLeagueStats } from '../constants/scoringDefaults';
+
 // ============================================================================
 // LEAGUE TYPE - The fundamental format of the league
 // ============================================================================
@@ -295,23 +297,6 @@ export type LeagueSettings = Partial<LeagueFormatSettings>;
 // DEFAULT SETTINGS PER LEAGUE TYPE
 // ============================================================================
 
-// INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned; SHP/hits/PIM/+/- opt-in.
-// Must equal DEFAULT_SCORING in @citrus/shared (guard-tested).
-const BASE_STATS = [
-  { id: "g", name: "Goals", points: 6, default: true, category: "Offense", enabled: true },
-  { id: "a", name: "Assists", points: 4, default: true, category: "Offense", enabled: true },
-  { id: "ppp", name: "Power Play Points", points: 2, default: true, category: "Offense", enabled: true },
-  { id: "shg", name: "Shorthanded Points", points: 2, default: false, category: "Offense", enabled: false },
-  { id: "sog", name: "Shots on Goal", points: 0.9, default: true, category: "Offense", enabled: true },
-  { id: "blk", name: "Blocks", points: 1, default: true, category: "Defense", enabled: true },
-  { id: "hit", name: "Hits", points: 0.5, default: false, category: "Defense", enabled: false },
-  { id: "pim", name: "Penalty Minutes", points: 0.5, default: false, category: "Defense", enabled: false },
-  { id: "w", name: "Wins", points: 5, default: true, category: "Goalie", enabled: true },
-  { id: "so", name: "Shutouts", points: 5, default: true, category: "Goalie", enabled: true },
-  { id: "sv", name: "Saves", points: 0.6, default: true, category: "Goalie", enabled: true },
-  { id: "ga", name: "Goals Against", points: -3, default: true, category: "Goalie", enabled: true },
-];
-
 export function getDefaultSettings(leagueType: LeagueType): LeagueFormatSettings {
   switch (leagueType) {
     case 'fantasy':
@@ -332,7 +317,11 @@ export function getDefaultSettings(leagueType: LeagueType): LeagueFormatSettings
         categories: [...DEFAULT_ROTO_CATEGORIES],
         weeklyAddLimit: 0,   // 0 = unlimited (industry standard default)
         seasonAddLimit: 0,   // 0 = unlimited (industry standard default)
-        stats: [...BASE_STATS],
+        // Stat rows derive from the scoring source of truth
+        // (packages/shared/src/constants/scoringDefaults.json) — no weight
+        // literal lives here. Opt-in stats (SHP/hits/PIM/+/-) ship disabled
+        // with their suggested weight. Fresh objects per call.
+        stats: defaultLeagueStats(),
       };
     case 'pickem':
       return {

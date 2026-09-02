@@ -35,7 +35,7 @@ export default function PreviewSunlight() {
       }}
     >
       {/* Quiet nav */}
-      <header className="sticky top-0 z-section-header backdrop-blur-md bg-white/40 border-b border-white/50">
+      <header className="sticky top-0 z-30 backdrop-blur-md bg-white/40 border-b border-white/50">
         <div className="max-w-[1100px] mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/preview-sunlight" className="flex items-center gap-1.5">
             <span className="font-calistoga text-[22px] leading-none text-pastel-forest">Citrus</span>

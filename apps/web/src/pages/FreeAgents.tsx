@@ -38,8 +38,6 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
-import { Mug } from '@/components/roster/Mug';
-import { mugFromDirectory } from '@/components/roster/headshot';
 import { isGuestMode, shouldBlockGuestOperation } from '@/utils/guestHelpers';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
@@ -53,9 +51,6 @@ import { notifyRosterChanged } from '@/utils/rosterRefresh';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { DropPlayerForAddDialog } from '@/components/freeagents/DropPlayerForAddDialog';
-import { FreeAgentRow } from '@/components/freeagents/FreeAgentRow';
-import { FA_CHIP, FA_CHIP_ROW, FA_ROWS_ONLY, FA_TABLE_ONLY, freeAgentAction, sortByProjection, waiverClearsLabel } from '@/components/freeagents/freeAgentRow';
-import { cn } from '@/lib/utils';
 import { ArrowLeftRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -63,10 +58,6 @@ import { supabase } from '@/integrations/supabase/client';
 const addBtnColorCls = (p: Player) => p.is_on_waivers
   ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600'
   : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700';
-
-/** The directory carries ids as strings; every roster/waiver call wants numbers. */
-const toNumericId = (id: string | number): number =>
-  typeof id === 'string' ? parseInt(id, 10) : id;
 
 // Helper function to format position for display (L -> LW, R -> RW)
 const formatPositionForDisplay = (position: string): string => {
@@ -80,6 +71,22 @@ const formatPositionForDisplay = (position: string): string => {
   if (pos.includes('G')) return 'G';
   return position; // Return original if no match
 };
+
+// Tiny reusable mugshot for list rows (Sleeper parity — headshots on
+// every player row). Hides itself if the CDN image fails.
+const MugShot = ({ p, size = 28 }: { p: { headshot_url?: string | null }; size?: number }) => (
+  p?.headshot_url ? (
+    <img
+      src={p.headshot_url}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      className="rounded-full object-cover ring-1 ring-white/15 bg-white/5 flex-shrink-0"
+      style={{ width: size, height: size }}
+      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+    />
+  ) : null
+);
 
 const FreeAgents = () => {
   const { toast } = useToast();
@@ -124,14 +131,6 @@ const FreeAgents = () => {
 
   // Player Stats Modal State
   const [selectedPlayer, setSelectedPlayer] = useState<HockeyPlayer | null>(null);
-  /**
-   * The directory row the open card came from. The card is fed a
-   * `HockeyPlayer`, which has been through a mapper and no longer carries
-   * `is_on_waivers` — so the footer button needs the original to know
-   * whether it says Add or Claim, and to hand the right player back to the
-   * page's own handlers.
-   */
-  const [selectedSourcePlayer, setSelectedSourcePlayer] = useState<Player | null>(null);
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
 
   // Add-player loading state to prevent double-clicks
@@ -142,16 +141,6 @@ const FreeAgents = () => {
   const [swapDialogOpen, setSwapDialogOpen] = useState(false);
   const [swapAddPlayer, setSwapAddPlayer] = useState<Player | null>(null);
   const [swapTeamId, setSwapTeamId] = useState<string | null>(null);
-
-  /**
-   * Is this manager's roster already full? Answered once, off the critical
-   * path (see `enrichRosterCapacity`), so the phone rows can wear `⇄`
-   * instead of `+` BEFORE the tap. Until it resolves the rows say `+`,
-   * which is the same promise the page has always made — and `handleAddPlayer`
-   * still opens the swap dialog either way, so a wrong guess costs a glyph,
-   * never a broken transaction.
-   */
-  const [rosterFull, setRosterFull] = useState(false);
 
   // SETTINGS-ENFORCEMENT (2026-08-16) — league scoring for FPTS
   // display. Undefined → DEFAULT_SCORING inside ScoringCalculator, so
@@ -291,32 +280,6 @@ const FreeAgents = () => {
     }
   };
 
-  /**
-   * Roster capacity, fetched the same way the waiver badge is: AFTER the
-   * list is on screen, and entirely optional. A failure here costs the row
-   * its `⇄` glyph, not the page — `handleAddPlayer` re-checks the real
-   * count server-side before it does anything, so this read is a label, not
-   * a gate. Kept off the load path deliberately (see the "THE LIST IS
-   * READY. RENDER IT." note below): two more round trips before the first
-   * player would undo the fix that note describes.
-   */
-  const enrichRosterCapacity = async (currentLeagueId: string) => {
-    if (!user) return;
-    try {
-      const [leagueResult, myTeamResponse] = await Promise.all([
-        LeagueService.getLeague(currentLeagueId, user.id),
-        leagueApi.getMyTeam(currentLeagueId),
-      ]);
-      const team = myTeamResponse.data as { id: string } | undefined;
-      if (leagueResult.error || !leagueResult.league || !team) return;
-      const { count, error } = await PlayerService.getRosterAssignmentCount(team.id, currentLeagueId);
-      if (error) return;
-      setRosterFull((count || 0) >= (leagueResult.league.roster_size || 22));
-    } catch (err) {
-      logger.warn('Free agents: roster capacity check failed', err);
-    }
-  };
-
   const fetchPlayers = async () => {
     try {
       setLoading(true);
@@ -419,7 +382,6 @@ const FreeAgents = () => {
        */
       setPlayers(freeAgentResult.players);
       if (currentLeagueId) void enrichWithWaiverStatus(currentLeagueId);
-      if (currentLeagueId) void enrichRosterCapacity(currentLeagueId);
 
       setRosterLookupFailed(freeAgentResult.rosterLookupFailed);
       if (freeAgentResult.rosterLookupFailed) {
@@ -1010,23 +972,6 @@ const FreeAgents = () => {
     }
   };
 
-  /**
-   * The phone row's one button, routed to the handler its state names. No
-   * new transaction logic: `handleAddPlayer` still files the add or the
-   * waiver claim (and still opens the swap dialog itself if the server
-   * disagrees about capacity), and `handleAddWithDrop` still opens the
-   * atomic swap. The row only decides WHICH of the two to call, so a
-   * manager whose roster is full lands in the drop picker on purpose
-   * instead of being sent there by a "+" that lied.
-   */
-  const handleRowAction = (player: Player) => {
-    if (freeAgentAction(player, rosterFull) === 'swap') {
-      void handleAddWithDrop(player);
-      return;
-    }
-    void handleAddPlayer(player);
-  };
-
   const toggleWatchlist = (player: Player) => {
     const newWatchlist = new Set(watchlist);
     if (newWatchlist.has(player.id)) {
@@ -1276,7 +1221,6 @@ const FreeAgents = () => {
   // destructive "Move Didn't Take" toast for a tap that moved nothing.
   const handlePlayerClick = async (player: Player) => {
     setSelectedPlayer(servicePlayerToHockeyPlayer(player));
-    setSelectedSourcePlayer(player);
     setIsPlayerDialogOpen(true);
     const playerWithStats = await getPlayerWithSeasonStats(player.id);
     if (playerWithStats) {
@@ -1285,84 +1229,6 @@ const FreeAgents = () => {
       );
     }
   };
-
-  /**
-   * ONE PROJECTION, ONE SCORING PATH (2026-09-02).
-   *
-   * The rest-of-week fantasy projection every list on this page prints —
-   * the Top Projected card, the Schedule tab, and now every phone row's
-   * headline number. It was written out twice, once here and once inline
-   * in the Schedule tab's table body, each building its own
-   * `ScoringCalculator`; two copies of a scoring rule is two answers to
-   * "what is he worth", and the phone row would have made three.
-   *
-   * Preference order is unchanged from the original:
-   *   1. the projection system's own per-day totals, summed over the days
-   *      left in the matchup week (`weeklyProjections`);
-   *   2. failing that, the player's LEAGUE-SCORED points per game
-   *      (`ScoringCalculator`, seeded with this league's
-   *      `scoring_settings`) times the games he has left.
-   * No games left is 0, not a pro-rated guess.
-   */
-  const projectionScorer = useMemo(() => new ScoringCalculator(leagueScoring), [leagueScoring]);
-  /**
-   * The week's schedule, keyed. The old inline `scheduleMaximizers.find(...)`
-   * ran a linear scan per player per render — 800 free agents against 800
-   * maximizers is 640k comparisons for one list, and the phone list is a
-   * second list over the same pool. One Map, rebuilt only when the schedule
-   * changes.
-   */
-  const scheduleById = useMemo(
-    () => new Map(scheduleMaximizers.map(sm => [sm.id, sm])),
-    [scheduleMaximizers],
-  );
-  const withProjection = useCallback(
-    <T extends Player>(p: T): T & { weeklyProjection: number; gamesThisWeek: number; gameDays: string[]; games: NHLGame[] } => {
-      const numericId = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
-      const realProjection = weeklyProjections.get(numericId);
-      const projectionGameCount = weeklyGameCounts.get(numericId) || 0;
-      const scheduleData = scheduleById.get(p.id);
-      const gamesThisWeek = projectionGameCount > 0 ? projectionGameCount : (scheduleData?.gamesThisWeek || 0);
-
-      const isGoalie = p.position === 'G';
-      const estimatedFantasyPPG = isGoalie
-        ? ((p.wins || 0) > 0 && p.games_played > 0 ? projectionScorer.calculatePointsPerGame({
-            wins: p.wins || 0, saves: p.saves || 0, shutouts: p.shutouts || 0, goals_against: p.goals_against || 0
-          }, true, p.games_played) : 3.0)
-        : (p.games_played > 0
-          ? projectionScorer.calculatePointsPerGame({
-              goals: p.goals || 0, assists: p.assists || 0, ppp: p.ppp || 0, shp: p.shp || 0,
-              sog: p.shots || 0, blocks: p.blocks || 0, hits: p.hits || 0, pim: p.pim || 0
-            }, false, p.games_played)
-          : 0);
-      const weeklyProjection = gamesThisWeek === 0
-        ? 0
-        : ((realProjection && realProjection > 0) ? realProjection : (estimatedFantasyPPG * gamesThisWeek));
-
-      return {
-        ...p,
-        weeklyProjection,
-        gamesThisWeek,
-        gameDays: scheduleData?.gameDays || [],
-        games: scheduleData?.games || [],
-      };
-    },
-    [projectionScorer, weeklyProjections, weeklyGameCounts, scheduleById],
-  );
-
-  /**
-   * THE PHONE LIST. Same filtered pool the desktop table shows, ordered by
-   * the projection instead of by whatever order the fetch produced, and
-   * paginated by the same `visibleCount` the table uses so the infinite
-   * scroll sentinel keeps working for both.
-   */
-  const phoneRows = useMemo(
-    () => sortByProjection(filteredPlayers.map(withProjection)).slice(0, visibleCount),
-    [filteredPlayers, withProjection, visibleCount],
-  );
-
-  /** Today in MST — the row's game line asks "which game is next?" against it. */
-  const todayStr = getTodayMST();
 
   // Derived lists for Summary View
   // Use real trending data when available, fallback to estimated adds based on points
@@ -1378,15 +1244,50 @@ const FreeAgents = () => {
       };
     })
     .sort((a, b) => b.adds - a.adds)
-    .slice(0, 10)
-    // The phone row's headline number is the projection, so the ten rows
-    // that survive the trending sort carry it too. Ten calls, not 800.
-    .map(withProjection);
+    .slice(0, 10);
 
   // Combined Top Projected with Schedule Icons - merges projections + schedule data
   // Game count comes from the SAME projection system (how many days had projections = how many games)
   const topProjected = [...filteredPlayers]
-    .map(withProjection)
+    .map(p => {
+      // Use numeric ID to match Map key type
+      const numericId = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
+      const realProjection = weeklyProjections.get(numericId);
+      const projectionGameCount = weeklyGameCounts.get(numericId) || 0;
+
+      // Find matching schedule data for this player (for gameDays/games display)
+      const scheduleData = scheduleMaximizers.find(sm => sm.id === p.id);
+      // Use projection-derived game count when available, fall back to schedule data
+      const gamesThisWeek = projectionGameCount > 0 ? projectionGameCount : (scheduleData?.gamesThisWeek || 0);
+
+      // 0 games remaining = 0 projected points — tied to our internal projection model
+      // Fallback uses season PPG * games this week (not the broken points/20 formula)
+      const seasonPPG = p.games_played > 0 ? (p.points || 0) / p.games_played : 0;
+      const isGoalie = p.position === 'G';
+      // Use centralized ScoringCalculator for fantasy PPG
+      const scorer = new ScoringCalculator(leagueScoring);
+      const estimatedFantasyPPG = isGoalie
+        ? ((p.wins || 0) > 0 && p.games_played > 0 ? scorer.calculatePointsPerGame({
+            wins: p.wins || 0, saves: p.saves || 0, shutouts: p.shutouts || 0, goals_against: p.goals_against || 0
+          }, true, p.games_played) : 3.0)
+        : (p.games_played > 0
+          ? scorer.calculatePointsPerGame({
+              goals: p.goals || 0, assists: p.assists || 0, ppp: p.ppp || 0, shp: p.shp || 0,
+              sog: p.shots || 0, blocks: p.blocks || 0, hits: p.hits || 0, pim: p.pim || 0
+            }, false, p.games_played)
+          : 0);
+      const weeklyProjection = gamesThisWeek === 0
+        ? 0
+        : ((realProjection && realProjection > 0) ? realProjection : (estimatedFantasyPPG * gamesThisWeek));
+
+      return {
+        ...p,
+        weeklyProjection,
+        gamesThisWeek,
+        gameDays: scheduleData?.gameDays || [],
+        games: scheduleData?.games || []
+      };
+    })
     .filter(p => {
       // If projection data is loaded, only show players who actually have games
       if (weeklyGameCounts.size > 0) {
@@ -1411,37 +1312,11 @@ const FreeAgents = () => {
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
       <div className="hidden lg:block"><Navbar /></div>
-      {/*
-        * COMPACT PHONE CHROME (2026-09-02).
-        *
-        * Everything above the first player used to be marketing: a
-        * "✦ Scouting Room" eyebrow, a "Scout the pool." headline, a
-        * subtitle and then the search box — ~250px measured at 393x852,
-        * so the first free agent appeared at y≈900. On the one screen
-        * whose entire job is showing available players, the first screen
-        * showed none.
-        *
-        * Below `lg` the hero is gone and this bar is the page: title,
-        * menu, and the search field the manager actually came for, in
-        * 96px total. The hero survives at `lg`, where a desktop has the
-        * room for it. Both branches are Tailwind responsive classes, not
-        * a `useIsMobile()` read — a CSS branch has no hydration flash and
-        * no `window.innerWidth` on the render path.
-        */}
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Free Agents</h1>
           <MobileMenuButton />
-        </div>
-        <div className="px-4 pb-2.5">
-          <Input
-            placeholder="Search players…"
-            aria-label="Search free agents"
-            className="h-9 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
         </div>
       </div>
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
@@ -1451,16 +1326,14 @@ const FreeAgents = () => {
             {/* Main Content - Appears first on mobile */}
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
 
-              {/* The hero is desktop-only from 2026-09-02 — see the note on
-                  the sticky bar above. `hidden lg:flex`, not a JS branch. */}
-              <div className="hidden lg:flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5 flex items-center gap-2">
               <SlateIcon className="w-3.5 h-3.5" strokeWidth={2} />
               ✦ Scouting Room
             </div>
             <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-none">Scout the pool.</h1>
-            <p className="text-sm text-white/55 mt-2">Available players to improve your roster. Sort, filter, and pick up.</p>
+            <p className="text-sm text-white/55 mt-2">Available players to improve your roster — sort, filter, and pick up.</p>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
             <Input
@@ -1514,22 +1387,18 @@ const FreeAgents = () => {
           </TabsList>
 
           <TabsContent value="available" className="space-y-6">
-            {/* Quick Position Filters — ONE ROW that scrolls sideways below
-                `lg`, never three that wrap. Geometry and the reasoning live
-                in freeAgentRow.ts (FA_CHIP_ROW). */}
-            <div className={FA_CHIP_ROW} data-testid="position-filter-row">
+            {/* Quick Position Filters */}
+            <div className="flex flex-wrap gap-2">
               {positions.map((pos) => {
                 const isActive = positionFilter === pos;
                 return (
                   <Badge
                     key={pos}
-                    className={cn(
-                      FA_CHIP,
-                      'cursor-pointer px-4 py-1 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold border-0 transition-all',
+                    className={`cursor-pointer px-4 py-1 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold border-0 transition-all ${
                       isActive
                         ? 'bg-pastel-orange text-[#581E00] shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]'
-                        : 'bg-white/5 ring-1 ring-white/10 text-white/70 hover:bg-white/[0.08] hover:ring-pastel-orange/30',
-                    )}
+                        : 'bg-white/5 ring-1 ring-white/10 text-white/70 hover:bg-white/[0.08] hover:ring-pastel-orange/30'
+                    }`}
                     onClick={() => setPositionFilter(pos)}
                   >
                     {pos === 'W' ? 'Wingers' : (pos === 'ALL' ? 'All Positions' : pos)}
@@ -1542,7 +1411,7 @@ const FreeAgents = () => {
             {rosterLookupFailed && (
               <div className="flex items-center gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" />
-                <span>Unable to load roster data for this league. Showing all players. Some may already be rostered.</span>
+                <span>Unable to load roster data for this league. Showing all players — some may already be rostered.</span>
               </div>
             )}
 
@@ -1569,30 +1438,34 @@ const FreeAgents = () => {
                         <Button variant="ghost" size="sm" onClick={() => setViewMode('all')}>See All</Button>
                       </CardHeader>
                       <CardContent className="p-0">
-                        {/* Phone list — the shared FreeAgentRow. The old rows
-                            here carried a name, a position and an add count:
-                            nothing you could pick a player WITH. */}
-                        <div className={FA_ROWS_ONLY}>
-                          {topTrending.map((player, i) => (
-                            <FreeAgentRow
-                              key={player.id}
-                              rank={i + 1}
-                              player={player}
-                              projection={player.weeklyProjection}
-                              games={player.games}
-                              todayStr={todayStr}
-                              action={freeAgentAction(player, rosterFull)}
-                              subLabel={`${player.adds.toLocaleString()} adds`}
-                              pending={addingPlayerId === toNumericId(player.id)}
-                              disabled={addingPlayerId !== null}
-                              onOpen={() => handlePlayerClick(player)}
-                              onAction={() => handleRowAction(player)}
-                            />
+                        {/* Mobile List View */}
+                        <div className="md:hidden">
+                          {topTrending.map(player => (
+                            <div key={player.id} className="p-3 border-b flex items-center justify-between">
+                              {/* Name opens the fantasy card — parity with the desktop
+                                  table and the main Available list (mobile). */}
+                              <div className="flex items-center gap-2.5 min-w-0 cursor-pointer active:opacity-70" role="button" tabIndex={0} onClick={() => handlePlayerClick(player)} onKeyDown={(e) => { if (e.key === 'Enter') handlePlayerClick(player); }}>
+                                <MugShot p={player} size={30} />
+                                <div className="flex flex-col min-w-0">
+                                  <span className="font-medium truncate">{player.full_name}</span>
+                                  <span className="text-xs text-white/55">{formatPositionForDisplay(player.position)} • {player.team}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <div className="font-bold text-green-600">{player.adds.toLocaleString()}</div>
+                                  <div className="text-[11px] text-white/55">Adds</div>
+                                </div>
+                                <Button size="default" variant="default" className={`h-10 w-10 font-bold text-xl border shadow-sm disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
+                                </Button>
+                              </div>
+                            </div>
                           ))}
                         </div>
 
-                        {/* The table, from `md` up — see FA_TABLE_ONLY. */}
-                        <div className={FA_TABLE_ONLY}>
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block">
                           <Table className="[&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5 [&_td]:tabular-nums">
                             <TableHeader>
                               <TableRow>
@@ -1607,7 +1480,7 @@ const FreeAgents = () => {
                               <TableRow key={player.id}>
                                 <TableCell className="font-medium">
                                   <div className="flex items-center gap-2.5 min-w-0">
-                                    <Mug p={mugFromDirectory(player)} size="xs" />
+                                    <MugShot p={player} size={28} />
                                     <div className="flex flex-col min-w-0">
                                       <span 
                                         className="hover:underline hover:text-pastel-orange cursor-pointer truncate"
@@ -1664,7 +1537,7 @@ const FreeAgents = () => {
                       <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
                         <div className="min-w-0">
                           <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2 flex-wrap">
-                            <Calendar className="h-5 w-5 text-pastel-sage shrink-0" />
+                            <Calendar className="h-5 w-5 text-blue-500 shrink-0" />
                             Top Projected
                             {loadingProjections && (
                               <Badge variant="outline" className="text-[11px] bg-white/5 ring-1 ring-pastel-sage/30 text-pastel-cream border-0">
@@ -1692,32 +1565,64 @@ const FreeAgents = () => {
                         {!loadingProjections && topProjected.length === 0 && (
                           <div className="px-4 py-6 text-center text-sm text-white/55">
                             {weeklyProjections.size === 0
-                              ? 'No games left this week. Projections return with the schedule.'
+                              ? 'No games left this week — projections return with the schedule.'
                               : 'No projected free agents to show.'}
                           </div>
                         )}
-                        {/* Phone list — the shared FreeAgentRow. */}
-                        <div className={FA_ROWS_ONLY}>
-                          {topProjected.map((player, i) => (
-                            <FreeAgentRow
-                              key={player.id}
-                              rank={i + 1}
-                              player={player}
-                              projection={player.weeklyProjection}
-                              games={player.games}
-                              todayStr={todayStr}
-                              action={freeAgentAction(player, rosterFull)}
-                              subLabel={`${player.gamesThisWeek || 0} game${(player.gamesThisWeek || 0) === 1 ? '' : 's'}`}
-                              pending={addingPlayerId === toNumericId(player.id)}
-                              disabled={addingPlayerId !== null}
-                              onOpen={() => handlePlayerClick(player)}
-                              onAction={() => handleRowAction(player)}
-                            />
+                        {/* Mobile List View - Compact with Schedule Icons */}
+                        <div className="md:hidden">
+                          {topProjected.map(player => (
+                            <div key={player.id} className="p-2 border-b flex items-center gap-2">
+                              {/* Name opens the fantasy card — parity with desktop. */}
+                              <div className="flex-1 min-w-0 cursor-pointer active:opacity-70" role="button" tabIndex={0} onClick={() => handlePlayerClick(player)} onKeyDown={(e) => { if (e.key === 'Enter') handlePlayerClick(player); }}>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-sm truncate">{player.full_name}</span>
+                                  <span className="text-[11px] text-white/55 shrink-0">{formatPositionForDisplay(player.position)}</span>
+                                </div>
+                                {/* Schedule Icons Row */}
+                                {player.games && player.games.length > 0 && (
+                                  <div className="flex gap-1 mt-1">
+                                    {player.games
+                                      .filter((game: NHLGame) => game && game.game_date)
+                                      .sort((a: NHLGame, b: NHLGame) => new Date(a.game_date.split('T')[0] + 'T00:00:00').getTime() - new Date(b.game_date.split('T')[0] + 'T00:00:00').getTime())
+                                      .slice(0, 4)
+                                      .map((game: NHLGame, idx: number) => {
+                                        const isHome = game.home_team === player.team;
+                                        const opponentAbbrev = isHome ? game.away_team : game.home_team;
+                                        return (
+                                          <div key={idx} className="flex items-center gap-0.5 bg-white/5 ring-1 ring-white/10 rounded px-1 py-0.5">
+                                            <span className="text-[10px] text-white/55">{isHome ? 'vs' : '@'}</span>
+                                            <img
+                                              src={`https://assets.nhle.com/logos/nhl/svg/${opponentAbbrev}_light.svg`}
+                                              alt={opponentAbbrev}
+                                              loading="lazy"
+                                              decoding="async"
+                                              className="w-4 h-4"
+                                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                            />
+                                          </div>
+                                        );
+                                      })}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="text-right">
+                                  <div className="font-bold text-blue-600 text-sm">
+                                    {(player.weeklyProjection || 0).toFixed(1)}
+                                  </div>
+                                  <div className="text-[10px] text-white/55">{player.gamesThisWeek || 0}G</div>
+                                </div>
+                                <Button size="sm" variant="default" className={`h-8 w-8 font-bold border shadow-sm p-0 disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
+                                </Button>
+                              </div>
+                            </div>
                           ))}
                         </div>
 
-                        {/* The table, from `md` up — see FA_TABLE_ONLY. */}
-                        <div className={FA_TABLE_ONLY}>
+                        {/* Desktop Table View */}
+                        <div className="hidden md:block">
                           <Table className="[&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5 [&_td]:tabular-nums">
                             <TableHeader>
                               <TableRow>
@@ -1733,7 +1638,7 @@ const FreeAgents = () => {
                               <TableRow key={player.id}>
                                 <TableCell className="font-medium">
                                   <div className="flex items-center gap-2.5 min-w-0">
-                                    <Mug p={mugFromDirectory(player)} size="xs" />
+                                    <MugShot p={player} size={28} />
                                     <div className="flex flex-col min-w-0">
                                       <span 
                                         className="hover:underline hover:text-pastel-orange cursor-pointer truncate"
@@ -1776,7 +1681,7 @@ const FreeAgents = () => {
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex flex-col items-end">
-                                    <span className="font-bold text-pastel-sage-soft">{(player.weeklyProjection || 0).toFixed(1)}</span>
+                                    <span className="font-bold text-blue-600">{(player.weeklyProjection || 0).toFixed(1)}</span>
                                     <span className="text-[11px] text-white/55">{player.gamesThisWeek || 0} games</span>
                                   </div>
                                 </TableCell>
@@ -1813,43 +1718,7 @@ const FreeAgents = () => {
                     </div>
                     
                     <div className="border rounded-lg overflow-hidden">
-                      {/*
-                        * THE PHONE LIST (2026-09-02).
-                        *
-                        * Search and "See All" used to land here, on a
-                        * `min-w-[600px]` table inside `overflow-x-auto`: on a
-                        * 393px phone the decision column — the projection —
-                        * was off the right edge, reachable only by dragging
-                        * the table sideways. Below the point where the table
-                        * FITS it is a list of FreeAgentRows ordered by that
-                        * projection instead.
-                        *
-                        * That point is `md`, not `lg`, and it is measured —
-                        * `FA_ROWS_ONLY` / `FA_TABLE_ONLY` in
-                        * `components/freeagents/freeAgentRow.ts` carry the
-                        * numbers. A 820px tablet was getting a 64px row with
-                        * 700px of empty space beside it and no sortable
-                        * column, on a screen where all twelve columns fit.
-                        */}
-                      <div className={FA_ROWS_ONLY} data-testid="free-agents-phone-list">
-                        {phoneRows.map((player, i) => (
-                          <FreeAgentRow
-                            key={player.id}
-                            rank={i + 1}
-                            player={player}
-                            projection={player.weeklyProjection}
-                            games={player.games}
-                            todayStr={todayStr}
-                            action={freeAgentAction(player, rosterFull)}
-                            subLabel={`${player.gamesThisWeek || 0} game${(player.gamesThisWeek || 0) === 1 ? '' : 's'}`}
-                            pending={addingPlayerId === toNumericId(player.id)}
-                            disabled={addingPlayerId !== null}
-                            onOpen={() => handlePlayerClick(player)}
-                            onAction={() => handleRowAction(player)}
-                          />
-                        ))}
-                      </div>
-                      <div className={`${FA_TABLE_ONLY} overflow-x-auto`}>
+                      <div className="overflow-x-auto">
                         <Table className="min-w-[600px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5 [&_td]:tabular-nums">
                           <TableHeader>
                             <TableRow>
@@ -2000,7 +1869,7 @@ const FreeAgents = () => {
                                 <TableRow key={player.id} className="hover:bg-white/5">
                                   <TableCell className="font-medium whitespace-nowrap">
                                     <div className="flex items-center gap-2.5 min-w-0">
-                                      <Mug p={mugFromDirectory(player)} size="xs" />
+                                      <MugShot p={player} size={28} />
                                       <div className="flex flex-col min-w-0">
                                         <span
                                           className="hover:underline hover:text-pastel-orange cursor-pointer text-sm truncate"
@@ -2063,7 +1932,7 @@ const FreeAgents = () => {
                       {/* Infinite scroll sentinel + count */}
                       <div className="text-center py-2 text-xs text-white/55">
                         {filteredPlayers.length === 0 && players.length > 0
-                          ? 'No players match those filters. Try widening a position or team.'
+                          ? 'No players match those filters — try widening a position or team.'
                           : `Showing ${visiblePlayers.length} of ${filteredPlayers.length} players`}
                       </div>
                       {hasMorePlayers && (
@@ -2079,22 +1948,21 @@ const FreeAgents = () => {
             })()}
           </TabsContent>
           <TabsContent value="schedule" className="space-y-4">
-             <div className="bg-pastel-sage/10 border border-pastel-sage/25 p-4 rounded-lg mb-4 flex items-start gap-3">
-                <Calendar className="h-5 w-5 text-pastel-sage mt-1 shrink-0" />
+             <div className="bg-gradient-to-r from-blue-500/10 to-green-500/10 border border-blue-500/20 p-4 rounded-lg mb-4 flex items-start gap-3">
+                <Calendar className="h-5 w-5 text-blue-500 mt-1 shrink-0" />
                 <div>
-                  <h3 className="font-semibold text-pastel-sage-soft">Top Projected Free Agents (Rest of Week)</h3>
+                  <h3 className="font-semibold text-blue-400">Top Projected Free Agents (Rest of Week)</h3>
                   <p className="text-sm text-white/55">Sorted by projected fantasy points for remaining games this matchup week.</p>
                 </div>
              </div>
 
-             {/* Position Filter for Schedule Tab — same control, same one-row
-                 scroller as the Available tab (FA_CHIP_ROW). */}
-             <div className={cn(FA_CHIP_ROW, 'mb-4')}>
+             {/* Position Filter for Schedule Tab */}
+             <div className="flex flex-wrap gap-2 mb-4">
                {positions.map((pos) => (
                  <Badge
                    key={pos}
                    variant={positionFilter === pos ? "default" : "outline"}
-                   className={cn(FA_CHIP, 'cursor-pointer hover:bg-primary/90 px-4 py-1 text-sm transition-all')}
+                   className="cursor-pointer hover:bg-primary/90 px-4 py-1 text-sm transition-all"
                    onClick={() => setPositionFilter(pos)}
                  >
                    {pos === 'W' ? 'Wingers' : (pos === 'ALL' ? 'All Positions' : pos)}
@@ -2153,10 +2021,10 @@ const FreeAgents = () => {
                           </div>
                         </TableHead>
                         <TableHead
-                          className="text-center cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream bg-pastel-sage/10 whitespace-nowrap"
+                          className="text-center cursor-pointer hover:bg-white/5 select-none text-white/55 hover:text-pastel-cream bg-blue-500/10 whitespace-nowrap"
                           onClick={() => handleSort('weeklyProjection')}
                         >
-                          <div className="flex items-center justify-center gap-1 font-bold text-pastel-sage-soft">
+                          <div className="flex items-center justify-center gap-1 font-bold text-blue-700">
                             <TrendingUp className="h-3.5 w-3.5" />
                             Rest of Week
                             {getSortIcon('weeklyProjection')}
@@ -2176,13 +2044,29 @@ const FreeAgents = () => {
                              normalizedPos === positionFilter);
                         });
                         
-                        // Sort by weekly projection (highest first) by default.
-                        // 2026-09-02: this used to build its OWN ScoringCalculator
-                        // and re-derive the projection — a second answer to the same
-                        // question. It goes through the page's one `withProjection`
-                        // now, so the Schedule tab, the Top Projected card and every
-                        // phone row print the same number for the same player.
-                        const sorted = [...positionFiltered].map(withProjection).sort((a, b) => {
+                        // Sort by weekly projection (highest first) by default
+                        const sorted = [...positionFiltered].map(player => {
+                          const numericId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
+                          const realProjection = weeklyProjections.get(numericId);
+                          // Fallback uses actual fantasy PPG * games (not broken points/20)
+                          const gw = player.gamesThisWeek || 0;
+                          const isG = player.position === 'G';
+                          const faScorer = new ScoringCalculator(leagueScoring);
+                          const estPPG = isG
+                            ? ((player.wins || 0) > 0 && player.games_played > 0 ? faScorer.calculatePointsPerGame({
+                                wins: player.wins || 0, saves: player.saves || 0, shutouts: player.shutouts || 0, goals_against: player.goals_against || 0
+                              }, true, player.games_played) : 3.0)
+                            : (player.games_played > 0
+                              ? faScorer.calculatePointsPerGame({
+                                  goals: player.goals || 0, assists: player.assists || 0, ppp: player.ppp || 0, shp: player.shp || 0,
+                                  sog: player.shots || 0, blocks: player.blocks || 0, hits: player.hits || 0, pim: player.pim || 0
+                                }, false, player.games_played)
+                              : 0);
+                          const weeklyProjection = gw === 0
+                            ? 0
+                            : ((realProjection && realProjection > 0) ? realProjection : (estPPG * gw));
+                          return { ...player, weeklyProjection };
+                        }).sort((a, b) => {
                           if (sortColumn === 'weeklyProjection' || !sortColumn) {
                             return b.weeklyProjection - a.weeklyProjection;
                           }
@@ -2218,7 +2102,7 @@ const FreeAgents = () => {
                                        // page composites to mid-grey, leaving
                                        // this "#2" rank chip at ~3.6:1. Solid
                                        // silver reads cleanly instead.
-                                       index === 1 ? 'bg-pastel-sage-soft text-pastel-forest' :
+                                       index === 1 ? 'bg-slate-300 text-[#0F1F15]' :
                                        'bg-amber-700 text-white'
                                      }`}>
                                        {index + 1}
@@ -2237,7 +2121,7 @@ const FreeAgents = () => {
                                </TableCell>
                                <TableCell className="text-center">
                                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                   isGoalie ? 'bg-pastel-orange/20 text-pastel-orange-soft' : 'bg-pastel-sage/20 text-pastel-sage-soft'
+                                   isGoalie ? 'bg-purple-500/20 text-purple-700' : 'bg-blue-500/20 text-blue-700'
                                  }`}>
                                    {formatPositionForDisplay(player.position)}
                                  </span>
@@ -2265,7 +2149,7 @@ const FreeAgents = () => {
                                                <div 
                                                  key={idx}
                                                  className={`relative flex-shrink-0 w-6 h-6 rounded flex items-center justify-center border ${
-                                                   isPastDate ? 'opacity-30 grayscale border-white/10' : 
+                                                   isPastDate ? 'opacity-30 grayscale border-gray-300' : 
                                                    isToday ? 'border-2 border-green-500' :
                                                    'border-orange-300'
                                                  }`}
@@ -2301,10 +2185,10 @@ const FreeAgents = () => {
                                   </div>
                                 )}
                               </TableCell>
-                              <TableCell className="text-center bg-pastel-sage/5">
+                              <TableCell className="text-center bg-blue-500/5">
                                 <div className="flex flex-col items-center">
                                   <span className={`text-lg font-bold ${
-                                    isTopPick ? 'text-pastel-orange-soft' : 'text-pastel-sage-soft'
+                                    isTopPick ? 'text-green-600' : 'text-blue-600'
                                   }`}>
                                     {player.weeklyProjection.toFixed(1)}
                                   </span>
@@ -2601,39 +2485,11 @@ const FreeAgents = () => {
           </TabsContent>
         </Tabs>
 
-        {/*
-          * Player Stats Modal — with the VERB the row promised.
-          *
-          * The card already supports a primary footer action (the draft
-          * room uses it for "Draft Player"); Free Agents opened it without
-          * one, so a manager who tapped a name to check the schedule then
-          * had to close the card and find the row again to act. It now
-          * carries the same three states the row does, and calls the same
-          * handlers — Claim says so, and says when it clears.
-          */}
+        {/* Player Stats Modal */}
         <PlayerStatsModal
           player={selectedPlayer}
           isOpen={isPlayerDialogOpen}
           onClose={() => setIsPlayerDialogOpen(false)}
-          action={selectedSourcePlayer ? (() => {
-            const source = selectedSourcePlayer;
-            const act = freeAgentAction(source, rosterFull);
-            const clears = act === 'claim' ? waiverClearsLabel(source.waiver_clears_at) : null;
-            return {
-              label: act === 'claim'
-                ? `Claim on waivers${clears ? ` · ${clears}` : ''}`
-                : act === 'swap'
-                  ? 'Add with a drop'
-                  : 'Add to roster',
-              onClick: () => {
-                setIsPlayerDialogOpen(false);
-                handleRowAction(source);
-              },
-              disabled: addingPlayerId !== null,
-              pending: addingPlayerId === toNumericId(source.id),
-              pendingLabel: act === 'claim' ? 'Filing claim…' : 'Adding…',
-            };
-          })() : undefined}
         />
 
         {/* Atomic add+drop swap dialog */}
@@ -2678,7 +2534,7 @@ const FreeAgents = () => {
                     </div>
                     <div className="font-calistoga text-xl text-pastel-cream mb-3">Pickup priority</div>
                     <ul className="text-[11px] text-white/70 space-y-1.5 leading-relaxed">
-                      <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Trending pickups go fast, so claim early</li>
+                      <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Trending pickups go fast — claim early</li>
                       <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Weekly schedule beats raw points-per-game</li>
                       <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Star a player to track him on the watchlist</li>
                     </ul>

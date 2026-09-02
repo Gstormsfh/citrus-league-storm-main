@@ -1,0 +1,68 @@
+name: Draft Latency Scorecard (weekly)
+
+# Process audit 2026-09-01 §B-9 / §D-9. Runbook §3.5 has said
+# "TODO(10c): populate baselines" since May; every "are we inside the
+# Mandate?" question was a fresh query over draft_events. This job reads the
+# `draft_latency_scorecard` view (migration 20260901233000) once a week and
+# writes the answer where a human and the next Claude session can both see
+# it: the job summary, plus one SCORECARD_SUMMARY line in the log.
+#
+# Judged: autopick deadline -> commit p95 <= 1000 ms (CLAUDE.md "Autopick
+# latency"). A breach fails the run, so GitHub e-mails — the same single
+# working channel every other scheduled workflow relies on. Manual-pick and
+# broadcast latency are server-log metrics, not DB-derivable; they live on
+# the Cloud Monitoring dashboard (infra/gcp/monitoring/dashboard-draft-mandate.json).
+#
+# Read-only against the database: the view is SELECT-granted to service_role
+# only; the script writes nothing back.
+
+on:
+  schedule:
+    - cron: '0 12 * * 1'   # Mondays 12:00 UTC (drafts cluster on weekends)
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Only drafts started in the last N days (0 = all time)'
+        required: false
+        default: '7'
+      include_offline:
+        description: 'Include offline (bulk-imported) drafts'
+        type: boolean
+        required: false
+        default: false
+
+concurrency:
+  group: draft-scorecard
+  cancel-in-progress: false
+
+jobs:
+  scorecard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'data-pipeline/requirements.txt'
+
+      - run: pip install -r data-pipeline/requirements.txt
+
+      - name: Query draft_latency_scorecard and judge against the Mandate
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        shell: bash
+        run: |
+          DAYS='${{ github.event.inputs.days }}'
+          DAYS="${DAYS:-7}"
+          EXTRA=()
+          if [ '${{ github.event.inputs.include_offline }}' = 'true' ]; then
+            EXTRA+=(--include-offline)
+          fi
+          # Exit codes: 0 inside Mandate / nothing to judge, 1 breach (fails the
+          # run -> e-mail), 2 the view could not be read (also fails: a missing
+          # migration or a wrong key must not look like "no drafts").
+          python data-pipeline/monitoring/draft_latency_scorecard.py --days "${DAYS}" ${EXTRA[@]+"${EXTRA[@]}"}

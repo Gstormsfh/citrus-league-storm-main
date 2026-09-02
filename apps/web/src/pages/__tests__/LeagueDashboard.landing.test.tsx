@@ -34,15 +34,11 @@ describe('LeagueDashboard — T12P-4 landing COPY_VOICE conformance (Entry 39)',
 
   it('wrong-league description drops "You are not a member" wall + offers a door', () => {
     // COPY_VOICE rule 3: errors own the blame; rule 4: doors not walls.
-    // Pre-fix: "You are not a member of this league." (wall, no door).
-    // Post-fix: "This one's not on your list. Check the invite link
-    // or pick one from GM Office." Owns the framing, offers the door.
-    //
-    // The match is case-insensitive because the 2026-09-02 voice pass split
-    // that sentence at the em dash, which capitalised "Check". The rule
-    // being pinned is that the door is still offered, not how it is cased.
+    // Pre-fix: "You are not a member of this league." — wall, no door.
+    // Post-fix: "This one's not on your list — check the invite link
+    // or pick one from GM Office." — owns the framing + door offered.
     expect(source).not.toMatch(/["']You are not a member of this league\.["']/);
-    expect(source).toMatch(/check the invite link/i);
+    expect(source).toMatch(/check the invite link/);
   });
 
   it('load-failure setError fallback drops banned "Failed to load"', () => {
@@ -52,11 +48,10 @@ describe('LeagueDashboard — T12P-4 landing COPY_VOICE conformance (Entry 39)',
     // brand-new member scenario: replica lag right after auto-join
     // could produce this on first landing.
     // Pre-fix: 'Failed to load league data'
-    // Post-fix: "Couldn't load the league. Refresh to try again."
+    // Post-fix: "Couldn't load the league — refresh to try again."
     // Match: no setError call with the banned "Failed to load".
     expect(source).not.toMatch(/setError\([^)]*["']Failed to load league data["']/);
     // Post-fix must retain a retry door in the same setError branch.
-    // Case-insensitive for the same reason as the test above.
-    expect(source).toMatch(/setError\([^)]*refresh to try again/i);
+    expect(source).toMatch(/setError\([^)]*refresh to try again/);
   });
 });

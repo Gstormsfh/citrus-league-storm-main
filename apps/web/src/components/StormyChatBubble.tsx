@@ -53,7 +53,7 @@ const getContextGreeting = (pathname: string): string => {
     return "Looking at the standings? Ask me about playoff scenarios or trade targets.";
   if (pathname.includes('/draft-room'))
     return "In the draft room! Want me to suggest the best available pick based on our projections?";
-  return "Well boss, Stormy here. Your roster, your scoring settings and your matchup are already loaded. Ask me about a start/sit, a trade, or a waiver target.";
+  return "Hey! I'm Stormy — your AI fantasy hockey analyst. Ask me anything about your team, trades, pickups, or the NHL.";
 };
 
 // ── Types ────────────────────────────────────────────────────────
@@ -269,7 +269,7 @@ export const StormyChatBubble = () => {
         ...prev,
         {
           id: (Date.now() + 1).toString(),
-          text: "That one didn't get through. Give me a second and ask again.",
+          text: "Something went wrong — give me a sec and try again.",
           sender: 'stormy',
           timestamp: new Date(),
         },
@@ -304,7 +304,7 @@ export const StormyChatBubble = () => {
     return (
       <Button
         onClick={() => setIsOpen(true)}
-        className="fixed h-14 w-14 rounded-full bg-pastel-orange ring-2 ring-pastel-orange/30 shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)] hover:scale-105 hover:-translate-y-1 transition-all z-overlay p-0 overflow-hidden"
+        className="fixed h-14 w-14 rounded-full bg-pastel-orange ring-2 ring-pastel-orange/30 shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)] hover:scale-105 hover:-translate-y-1 transition-all z-[100] p-0 overflow-hidden"
         style={{
           position: 'fixed',
           bottom: isMobile ? 'calc(5rem + env(safe-area-inset-bottom) + 4rem)' : '1.5rem',

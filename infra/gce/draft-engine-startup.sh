@@ -55,6 +55,20 @@
 # surfaced the gap; the gcplogs driver in step 6 fixes it without
 # requiring an Ops Agent install.
 #
+#    gcplogs shape (observed in prod 2026-09-01): each container line
+#    lands as `jsonPayload.message` = the raw JSON string the engine
+#    printed, next to `jsonPayload.container.metadata.app` (from the
+#    `--log-opt labels=` below). The driver does NOT parse the line, so
+#    `jsonPayload.event` / `severity` are NOT populated — filter on
+#    `jsonPayload.message:"\"event\":\"deployment.fingerprint\""`. The
+#    committed alert filters in infra/gcp/monitoring/ match both forms.
+#
+# 3. Startup-script FAILURES (this script exiting non-zero) additionally
+#    ship one ERROR entry to Cloud Logging under log name
+#    `citrus-startup-failed` — see the failure-telemetry trap below and
+#    infra/gcp/monitoring/alert-startup-failed.json. Successful runs and
+#    idempotent skips write nothing to Cloud Logging.
+#
 # Security note on the JWT secret
 # ───────────────────────────────
 # `docker run -e SUPABASE_JWT_SECRET=...` makes the value visible in
@@ -74,6 +88,118 @@
 
 set -euo pipefail
 exec >> /var/log/citrus-startup.log 2>&1
+
+# ── Failure telemetry (2026-09-01, process audit §B-8 / §D-8) ────────
+# Until this block, the ONLY record of a failed converge was the log file
+# above, on the VM itself. On 2026-09-01 an ungated Cloud Shell block
+# pointed the VM at an image tag that had never been pushed: `docker pull`
+# at Step 4 died, `set -e` ended the script, and `--restart=always`
+# quietly resurrected the previous container. Nothing outside the VM
+# noticed. Now any non-zero exit ships ONE ERROR entry to Cloud Logging
+# under the log name `citrus-startup-failed`; the alert policy in
+# infra/gcp/monitoring/alert-startup-failed.json pages on it.
+#
+# Semantics preserved (do not "simplify" this):
+#   - `set -euo pipefail` above is untouched. `set -E` only makes the ERR
+#     trap visible inside functions and $(...) subshells so the recorded
+#     line is the one that actually failed; it does not change what fails.
+#   - The ERR trap only RECORDS the failing line + command. The EXIT trap
+#     does the emit, so the explicit `exit 1` FATAL paths in Step 3 (which
+#     never fire ERR) are covered too.
+#   - Every command in the handlers is guarded with `|| true` and the
+#     original exit status is re-raised verbatim. A failure to reach Cloud
+#     Logging (gcloud not yet usable, no network, missing IAM) can never
+#     mask or change the real failure.
+#   - Only the UNEXPANDED command text ($BASH_COMMAND) is shipped, so a
+#     failing `gcloud secrets versions access ...` assignment logs the
+#     variable NAMES, never the values. The log tail is the same text this
+#     script already writes to /var/log/citrus-startup.log (lengths and
+#     hash prefixes only — never secret values).
+#
+# IAM: `gcloud logging write` uses the VM service account and the same
+# roles/logging.logWriter the gcplogs driver already requires (see the IAM
+# block in the header). No new permissions.
+#
+# NOTE — this change reaches the VM only after the startup-script metadata
+# is re-applied (the VM runs whatever `startup-script` metadata holds, not
+# the repo):
+#   gcloud compute instances add-metadata citrus-draft-engine-prod \
+#     --zone=northamerica-northeast1-a --project=citrus-fantasy-prod \
+#     --metadata-from-file=startup-script=infra/gce/draft-engine-startup.sh
+# It takes effect on the next converge (VM reset / boot). Verify with the
+# self-test in infra/gcp/monitoring/README.md ("How to test").
+set -E
+STARTUP_FAILED_LINE=""
+STARTUP_FAILED_CMD=""
+
+# Minimal JSON string escaper (backslash, double quote, CR/LF/TAB). Bash
+# parameter expansion only — no python/jq dependency on the VM.
+citrus_json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "${s}"
+}
+
+citrus_on_startup_err() {
+  # $1 = $LINENO of the failing command, $2 = its unexpanded source text.
+  STARTUP_FAILED_LINE="$1"
+  STARTUP_FAILED_CMD="$2"
+}
+
+citrus_on_startup_exit() {
+  local rc=$?
+  if [ "${rc}" -eq 0 ]; then
+    return 0
+  fi
+  local failed_line="${STARTUP_FAILED_LINE:-unknown}"
+  local failed_cmd="${STARTUP_FAILED_CMD:-<explicit exit — see logTail>}"
+  # Tail BEFORE the summary echo so logTail carries the three lines that
+  # preceded the failure (e.g. the docker pull error text itself).
+  local vm_name log_tail payload
+  log_tail="$(tail -n 3 /var/log/citrus-startup.log 2>/dev/null | head -c 600 || true)"
+  echo "=== citrus-draft-engine startup script FAILED: exit ${rc} at line ${failed_line}: ${failed_cmd} — $(date -u +%FT%TZ) ==="
+
+  # Best-effort emit. Each piece is independently guarded; nothing here can
+  # change ${rc}. `timeout` bounds the hang if the metadata server or the
+  # Logging API is unreachable (the VM may be mid-boot with no network).
+  vm_name="$(hostname 2>/dev/null || echo unknown)"
+  payload="$(printf '{"event":"startup.failed","exitStatus":%s,"line":"%s","command":"%s","logTail":"%s","vm":"%s","environment":"%s","imageUri":"%s","projectId":"%s"}' \
+    "${rc}" \
+    "$(citrus_json_escape "${failed_line}")" \
+    "$(citrus_json_escape "${failed_cmd:0:500}")" \
+    "$(citrus_json_escape "${log_tail}")" \
+    "$(citrus_json_escape "${vm_name}")" \
+    "$(citrus_json_escape "${ENVIRONMENT:-unknown}")" \
+    "$(citrus_json_escape "${IMAGE_URI:-unknown}")" \
+    "$(citrus_json_escape "${PROJECT_ID:-unknown}")")"
+
+  # Before PROJECT_ID is read (a failure in the first ~15 lines) gcloud
+  # falls back to the VM's own project via the metadata server, which is
+  # the right project anyway. `${arr[@]+"${arr[@]}"}` keeps `set -u` happy
+  # on an empty array in every bash version.
+  local -a project_flag=()
+  if [ -n "${PROJECT_ID:-}" ]; then
+    project_flag=(--project="${PROJECT_ID}")
+  fi
+  if timeout 30 gcloud logging write citrus-startup-failed "${payload}" \
+       --payload-type=json --severity=ERROR ${project_flag[@]+"${project_flag[@]}"} >/dev/null 2>&1; then
+    echo "  startup failure shipped to Cloud Logging (citrus-startup-failed, json)."
+  elif timeout 30 gcloud logging write citrus-startup-failed \
+       "citrus-draft-engine startup FAILED on ${vm_name}: exit ${rc} at line ${failed_line}: ${failed_cmd:0:300}" \
+       --severity=ERROR ${project_flag[@]+"${project_flag[@]}"} >/dev/null 2>&1; then
+    echo "  startup failure shipped to Cloud Logging (citrus-startup-failed, text fallback)."
+  else
+    echo "  WARN: could not ship startup failure to Cloud Logging (best-effort; original failure preserved)."
+  fi
+  exit "${rc}"
+}
+
+trap 'citrus_on_startup_err "${LINENO}" "${BASH_COMMAND}"' ERR
+trap 'citrus_on_startup_exit' EXIT
 
 echo "=== citrus-draft-engine startup script start: $(date -u +%FT%TZ) ==="
 

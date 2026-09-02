@@ -236,7 +236,7 @@ export default function PreviewRedesign() {
       </div>
 
       {/* Floating Liquid Glass navbar */}
-      <header className="sticky top-3 z-page-header w-full px-4 md:px-6 mt-3">
+      <header className="sticky top-3 z-40 w-full px-4 md:px-6 mt-3">
         <div className="max-w-[1240px] mx-auto bg-white/65 backdrop-blur-xl border border-white/70 shadow-[0_8px_32px_-8px_rgba(132,165,125,0.22)] rounded-full px-5 md:px-6 h-14 flex items-center justify-between">
           <Link to="/preview-redesign" className="flex items-center gap-1.5">
             <span className="font-calistoga text-[22px] leading-none text-pastel-forest">Citrus</span>
@@ -410,7 +410,7 @@ export default function PreviewRedesign() {
           </span>
         </div>
         <p className="font-sans text-[15px] text-pastel-forest-dim mt-6 max-w-md mx-auto">
-          Features grid, Stormy AI showcase, final CTA, and footer come next, once you've signed off on the hero direction.
+          Features grid, Stormy AI showcase, final CTA, and footer come next — once you've signed off on the hero direction.
         </p>
       </section>
     </div>
