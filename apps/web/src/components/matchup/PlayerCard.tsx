@@ -9,6 +9,7 @@ import { GoalieProjectionTooltip } from "./GoalieProjectionTooltip";
 import { getTodayMST } from "@/utils/timezoneUtils";
 import { Badge } from "@/components/ui/badge";
 import { Mug } from "@/components/roster/Mug";
+import { opponentTint } from "./opponentTint";
 
 interface PlayerCardProps {
   player: MatchupPlayer | null;
@@ -177,6 +178,34 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
   const hasProjection = dailyProjection && projectedPoints > 0;
   const isStarterConfirmed = isGoalie ? (player.goalieProjection?.starter_confirmed ?? false) : true;
   const showTBD = hasGameOnDate && !isGameFinal && !isGameLive && !gameHasStarted && (!hasProjection || (isGoalie && !isStarterConfirmed));
+
+  // WEEK VIEW (2026-09-01, audit M9). With no day selected the page shows
+  // the whole matchup week — the total row sums the week, the ScoreCard
+  // shows the week — but the mobile score stack used to show TONIGHT's
+  // number, and the weekly "F Pts" box with its scoring breakdown is
+  // display:none on phones (index.css). So the phone had no way to reach
+  // "what did he score this week, and for what". The stack now follows
+  // the view's scope: week total (tap → weekly breakdown) in week view,
+  // the day's number (tap → daily breakdown) in day view. Same sentinel as
+  // MatchupComparison's isShowingDailyView, so row and total agree.
+  const isWeekView = selectedDate === null || selectedDate === undefined;
+  const weekPoints = typeof player.total_points === 'number' && Number.isFinite(player.total_points)
+    ? player.total_points
+    : 0;
+  const weekBreakdown =
+    player.stats_breakdown && typeof player.stats_breakdown === 'object' && Object.keys(player.stats_breakdown).length > 0
+      ? player.stats_breakdown
+      : undefined;
+  // Tonight's game still to come, with a number on it: shown under the
+  // week total as "+4.2" (orange = forecast), tappable for its breakdown.
+  const tonightPending = hasGameOnDate && !isGameFinal && !isGameLive && !gameHasStarted && !!hasProjection && isStarterConfirmed;
+  const tonightLive = hasGameOnDate && (isGameLive || (gameHasStarted && !isGameFinal));
+
+  // OPPONENT TINT (2026-09-01, audit M10): the model's opponent multiplier
+  // for this date colours the `vs/@ OPP` label — sage easier, orange-soft
+  // tougher, default within ±5%. The projection tooltip carries the
+  // legend, so the colour is never bare.
+  const oppTint = opponentTint(player.daily_projection?.opponent_adjustment);
   
   // Max points for bar display - 15 for all players (skaters and goalies)
   const maxBarPoints = 15;
@@ -322,10 +351,15 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
 
                 return (
                   <div className="lg:hidden flex items-center gap-1 flex-wrap">
-                    {/* Opponent logo + abbrev */}
+                    {/* Opponent logo + abbrev, tinted by expected difficulty (M10) */}
                     <div className="flex items-center gap-0.5">
                       <img loading="lazy" decoding="async" src={logoUrl} alt={opponent || ''} className="w-3.5 h-3.5 object-contain" />
-                      <span className="text-[10px] font-display font-semibold text-white/60">{opPrefix} {opponent}</span>
+                      <span
+                        className={cn('player-opponent text-[10px] font-display font-semibold', oppTint.className)}
+                        data-opponent-tier={oppTint.tier}
+                      >
+                        {opPrefix} {opponent}
+                      </span>
                     </div>
                     {/* Live badge + score */}
                     {isLive && (
@@ -707,15 +741,57 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
           The stack is a fixed 38px column (index.css) so the mug beside it
           lines up row after row; "proj" and its number therefore sit on two
           lines rather than one — the width the one-liner needed is the
-          width the face now has. */}
+          width the face now has.
+
+          Scope follows the view (audit M9): in WEEK view the number is the
+          player's week so far and the tap opens the weekly scoring
+          breakdown — the "F Pts" box the desktop card carries and phones
+          never could reach; under it, tonight's projection ("+4.2", its own
+          tap → projection breakdown) while his game is still to come, "live"
+          while it is on, else the scope label. In DAY view it is the day's
+          number as before. */}
       <div
         className={cn(
           'player-mobile-score lg:hidden flex flex-col justify-center leading-none',
           isUserTeam ? 'items-end text-right' : 'items-start text-left',
         )}
         data-side={isUserTeam ? 'user' : 'opponent'}
+        data-scope={isWeekView ? 'week' : 'day'}
       >
-        {!hasGameOnDate && !hasDailyStats ? (
+        {isWeekView ? (
+          <>
+            {weekBreakdown ? (
+              <PointsTooltip breakdown={weekBreakdown} totalPoints={weekPoints}>
+                <span className={cn(SCORE_ACTUAL_CLASS, isBench ? 'text-pastel-cream' : 'text-pastel-sage', 'cursor-pointer')}>
+                  {weekPoints.toFixed(1)}
+                </span>
+              </PointsTooltip>
+            ) : (
+              <span className={cn(SCORE_ACTUAL_CLASS, isBench ? 'text-pastel-cream' : 'text-pastel-sage')}>
+                {weekPoints.toFixed(1)}
+              </span>
+            )}
+            {tonightPending && dailyProjection ? (
+              isGoalie ? (
+                <GoalieProjectionTooltip projection={player.goalieProjection}>
+                  <span className={cn('player-score-tonight font-jbmono tabular-nums text-[10px] font-bold leading-none mt-1 cursor-pointer', isBench ? 'text-pastel-cream' : 'text-pastel-orange')}>
+                    +{projectedPoints.toFixed(1)}
+                  </span>
+                </GoalieProjectionTooltip>
+              ) : (
+                <ProjectionTooltip projection={player.daily_projection}>
+                  <span className={cn('player-score-tonight font-jbmono tabular-nums text-[10px] font-bold leading-none mt-1 cursor-pointer', isBench ? 'text-pastel-cream' : 'text-pastel-orange')}>
+                    +{projectedPoints.toFixed(1)}
+                  </span>
+                </ProjectionTooltip>
+              )
+            ) : (
+              <span className="player-score-label font-jbmono uppercase tracking-[0.22em] text-[10px] leading-none mt-1 text-white/55">
+                {tonightLive ? 'live' : 'week'}
+              </span>
+            )}
+          </>
+        ) : !hasGameOnDate && !hasDailyStats ? (
           // No game on this date and nothing scored — say so, not "0.0".
           <span className="player-score-none text-white/55 text-[10px] font-display italic leading-tight">
             No game

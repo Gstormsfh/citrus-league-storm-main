@@ -23,9 +23,17 @@ export type ScoreboardSide = 'team1' | 'team2';
 export interface WeekMatchupTeam {
   id?: string | null;
   team_name?: string | null;
-  /** Not in the schema yet (audit PR 11). Read when present, never required. */
+  /**
+   * A picture for the team, when the row's join carries one. Teams have no
+   * avatar column (audit PR 11); the matchups join serves none today. The
+   * owner's profile picture arrives by the other road — the league/teams
+   * response — as the `teamAvatars` map `avatarOf` also reads.
+   */
   avatar_url?: string | null;
 }
+
+/** Team id → owner's profile picture, from the league/teams response (audit M8). */
+export type TeamAvatarMap = ReadonlyMap<string, string | null | undefined>;
 
 export interface WeekMatchupRow {
   id: string;
@@ -61,9 +69,17 @@ export function teamNameOf(row: WeekMatchupRow, side: ScoreboardSide): string {
   return side === 'team2' && isBye(row) ? 'Bye Week' : 'Unknown';
 }
 
-export function avatarOf(row: WeekMatchupRow, side: ScoreboardSide): string | null {
-  const url = side === 'team1' ? row.team1?.avatar_url : row.team2?.avatar_url;
-  return url && url.trim() ? url : null;
+/**
+ * The picture for one side of a row: the join's own `avatar_url` when the
+ * row carries one, else the owner's profile picture looked up by team id in
+ * `teamAvatars` (the league/teams response). Blank strings are no picture.
+ */
+export function avatarOf(row: WeekMatchupRow, side: ScoreboardSide, teamAvatars?: TeamAvatarMap): string | null {
+  const joined = side === 'team1' ? row.team1?.avatar_url : row.team2?.avatar_url;
+  if (joined && joined.trim()) return joined;
+  const teamId = side === 'team1' ? row.team1_id : row.team2_id;
+  const owner = teamId ? teamAvatars?.get(teamId) : null;
+  return owner && owner.trim() ? owner : null;
 }
 
 /** First initial of a team name, for the disc — same rule as ScoreCard. */

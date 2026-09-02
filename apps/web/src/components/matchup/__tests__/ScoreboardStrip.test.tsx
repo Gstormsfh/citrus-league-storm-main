@@ -278,3 +278,29 @@ describe('ScoreboardStrip — layouts', () => {
     expect(chip('m1').className).toMatch(/w-full/);
   });
 });
+
+describe('ScoreboardStrip — owner avatars on the discs (audit M8)', () => {
+  it('draws the owner picture from the team-avatar map and the initial for everyone else', () => {
+    const teamAvatars = new Map<string, string | null>([['t1', 'https://cdn/owner1.png'], ['t2', null]]);
+    render(
+      <ScoreboardStrip matchups={rows} ownTeamId="t1" ownMatchupId="m1" onSelect={() => {}} today={TODAY} teamAvatars={teamAvatars} />,
+    );
+    const discs = within(chip('m1')).getAllByTestId('team-disc');
+    expect(discs).toHaveLength(2);
+    expect(discs[0]).toHaveAttribute('data-disc-state', 'image');
+    expect(discs[0].querySelector('img')).toHaveAttribute('src', 'https://cdn/owner1.png');
+    // Identity ring stays on the picture: orange means you, with or without a face.
+    expect(discs[0].className).toMatch(/ring-pastel-orange/);
+    expect(discs[1]).toHaveAttribute('data-disc-state', 'initials');
+    expect(discs[1]).toHaveTextContent('T');
+    // Chips for teams the map does not know keep their initials.
+    for (const d of within(chip('m2')).getAllByTestId('team-disc')) {
+      expect(d).toHaveAttribute('data-disc-state', 'initials');
+    }
+  });
+
+  it('without the map the strip is unchanged: every disc is an initial', () => {
+    render(<ScoreboardStrip matchups={rows} onSelect={() => {}} today={TODAY} />);
+    for (const d of screen.getAllByTestId('team-disc')) expect(d).toHaveAttribute('data-disc-state', 'initials');
+  });
+});

@@ -324,6 +324,90 @@ describe('LeagueService', () => {
       expect(result.teams).toHaveLength(1);
       expect(result.teams[0].owner_name).toBe('John Doe');
     });
+
+    // Audit M8 (2026-09-01): the owner's picture rides along on the same
+    // profiles read, explicit columns, null when the owner has none.
+    it('carries the owner avatar from the same profiles read', async () => {
+      mockSupabase.rpc = vi.fn().mockResolvedValue({
+        data: [
+          { id: 't1', owner_id: 'u1', team_name: 'Team A' },
+          { id: 't2', owner_id: 'u2', team_name: 'Team B' },
+          { id: 'ai', owner_id: null, team_name: 'AI Team 1' },
+        ],
+        error: null,
+      });
+      const profiles = createChain({
+        data: [
+          { id: 'u1', username: 'john', display_name: null, first_name: 'John', last_name: 'Doe', avatar_url: 'https://cdn/john.png' },
+          { id: 'u2', username: 'jane', display_name: 'Jane', first_name: null, last_name: null, avatar_url: null },
+        ],
+        error: null,
+      });
+      mockSupabase.from = vi.fn(() => profiles);
+
+      const result = await service.getLeagueTeamsWithOwners('league-1');
+      expect(profiles.select).toHaveBeenCalledWith('id, username, display_name, first_name, last_name, avatar_url');
+      expect(result.teams.map((t: { id: string; avatar_url: string | null }) => [t.id, t.avatar_url])).toEqual([
+        ['t1', 'https://cdn/john.png'],
+        ['t2', null],
+        ['ai', null],
+      ]);
+      expect(result.teams[2].owner_name).toBe('Unknown');
+    });
+  });
+
+  describe('attachOwnerAvatars', () => {
+    // Audit M8 (2026-09-01): teams have no avatar column; the matchup header
+    // and scoreboard discs show the OWNER's profiles.avatar_url.
+    it('joins profiles.avatar_url by owner_id with an explicit column list, one query for the league', async () => {
+      const profiles = createChain({
+        data: [
+          { id: 'u1', avatar_url: 'https://cdn/john.png' },
+          { id: 'u2', avatar_url: null },
+        ],
+        error: null,
+      });
+      mockSupabase.from = vi.fn(() => profiles);
+
+      const result = await service.attachOwnerAvatars([
+        { id: 't1', owner_id: 'u1', team_name: 'Team A' },
+        { id: 't2', owner_id: 'u2', team_name: 'Team B' },
+        { id: 't3', owner_id: 'u1', team_name: 'Team C' },
+        { id: 'ai', owner_id: null, team_name: 'AI Team 1' },
+      ]);
+
+      expect(mockSupabase.from).toHaveBeenCalledTimes(1);
+      expect(mockSupabase.from).toHaveBeenCalledWith('profiles');
+      expect(profiles.select).toHaveBeenCalledWith('id, avatar_url');
+      expect(profiles.select).not.toHaveBeenCalledWith('*');
+      // Deduplicated owner ids, null owners excluded.
+      expect(profiles.in).toHaveBeenCalledWith('id', ['u1', 'u2']);
+      expect(result).toEqual([
+        { id: 't1', owner_id: 'u1', team_name: 'Team A', avatar_url: 'https://cdn/john.png' },
+        { id: 't2', owner_id: 'u2', team_name: 'Team B', avatar_url: null },
+        { id: 't3', owner_id: 'u1', team_name: 'Team C', avatar_url: 'https://cdn/john.png' },
+        { id: 'ai', owner_id: null, team_name: 'AI Team 1', avatar_url: null },
+      ]);
+    });
+
+    it('skips the profiles read entirely when no team has an owner', async () => {
+      mockSupabase.from = vi.fn(() => createChain({ data: [], error: null }));
+      const result = await service.attachOwnerAvatars([{ id: 'ai', owner_id: null, team_name: 'AI Team 1' }]);
+      expect(mockSupabase.from).not.toHaveBeenCalled();
+      expect(result).toEqual([{ id: 'ai', owner_id: null, team_name: 'AI Team 1', avatar_url: null }]);
+    });
+
+    it('a failed profiles read degrades to initials (null) rather than failing the teams list', async () => {
+      mockSupabase.from = vi.fn(() => createChain({ data: null, error: { message: 'boom' } }));
+      const result = await service.attachOwnerAvatars([{ id: 't1', owner_id: 'u1', team_name: 'Team A' }]);
+      expect(result).toEqual([{ id: 't1', owner_id: 'u1', team_name: 'Team A', avatar_url: null }]);
+    });
+
+    it('a blank avatar_url is served as null', async () => {
+      mockSupabase.from = vi.fn(() => createChain({ data: [{ id: 'u1', avatar_url: '' }], error: null }));
+      const result = await service.attachOwnerAvatars([{ id: 't1', owner_id: 'u1', team_name: 'Team A' }]);
+      expect(result[0].avatar_url).toBeNull();
+    });
   });
 
   describe('getUserTeam', () => {

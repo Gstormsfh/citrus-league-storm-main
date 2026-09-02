@@ -69,6 +69,20 @@ describe('teamNameOf — both spellings the page carries', () => {
     expect(avatarOf(row({ team1: { team_name: 'X', avatar_url: 'https://cdn/x.png' } }), 'team1')).toBe('https://cdn/x.png');
   });
 
+  // Audit M8: the owner's profile picture comes from the league/teams
+  // response, keyed by team id; the join wins when both are present.
+  it('falls back to the owner avatar map by team id, and treats blanks as nothing', () => {
+    const avatars = new Map<string, string | null>([
+      ['t1', 'https://cdn/owner1.png'],
+      ['t2', '   '],
+    ]);
+    expect(avatarOf(row(), 'team1', avatars)).toBe('https://cdn/owner1.png');
+    expect(avatarOf(row(), 'team2', avatars)).toBeNull();
+    expect(avatarOf(row({ team2_id: null }), 'team2', avatars)).toBeNull();
+    expect(avatarOf(row({ team1: { team_name: 'X', avatar_url: 'https://cdn/joined.png' } }), 'team1', avatars)).toBe('https://cdn/joined.png');
+    expect(avatarOf(row(), 'team1', new Map())).toBeNull();
+  });
+
   it('initialOf takes the first letter, upper-cased, with ? for nothing', () => {
     expect(initialOf('citrus crushers')).toBe('C');
     expect(initialOf('  ')).toBe('?');

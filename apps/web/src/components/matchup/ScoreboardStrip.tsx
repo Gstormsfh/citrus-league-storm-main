@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { getTodayMST } from '@/utils/timezoneUtils';
+import { TeamDisc } from './TeamDisc';
 import {
   avatarOf,
   formatScore,
-  initialOf,
   isBye,
   isFinal,
   leaderOf,
@@ -12,6 +12,7 @@ import {
   scoreboardState,
   teamNameOf,
   type ScoreboardSide,
+  type TeamAvatarMap,
   type WeekMatchupRow,
 } from './scoreboard';
 
@@ -58,6 +59,12 @@ export interface ScoreboardStripProps {
   week?: number;
   /** True while any NHL game the page knows about is in progress (scoreboard.anyGameLive). */
   live?: boolean;
+  /**
+   * Team id → owner's profile picture (league/teams response, audit M8).
+   * The matchups join serves no picture; without this map every disc is an
+   * initial, which is still a complete strip.
+   */
+  teamAvatars?: TeamAvatarMap;
   layout?: 'strip' | 'rail';
   /** YYYY-MM-DD in Mountain Time; defaults to today. Injectable for tests. */
   today?: string;
@@ -87,38 +94,22 @@ const StateTag = ({ state }: { state: 'final' | 'live' | 'open' }) => {
   return null;
 };
 
-const Disc = ({ name, avatarUrl, own }: { name: string; avatarUrl: string | null; own: boolean }) => {
-  const [broken, setBroken] = useState(false);
-  const shell = own
-    ? 'bg-pastel-orange/20 ring-1 ring-pastel-orange/50 text-pastel-orange-soft'
-    : 'bg-white/5 ring-1 ring-white/15 text-pastel-cream';
-  return (
-    <span
-      className={cn('w-5 h-5 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center', shell)}
-      aria-hidden="true"
-    >
-      {avatarUrl && !broken ? (
-        <img src={avatarUrl} alt="" className="w-full h-full object-cover" onError={() => setBroken(true)} />
-      ) : (
-        <span className="font-varsity text-[9px] leading-none">{initialOf(name)}</span>
-      )}
-    </span>
-  );
-};
-
 interface TeamLineProps {
   row: WeekMatchupRow;
   side: ScoreboardSide;
   own: boolean;
   leading: boolean;
+  teamAvatars?: TeamAvatarMap;
 }
 
-const TeamLine = ({ row, side, own, leading }: TeamLineProps) => {
+const TeamLine = ({ row, side, own, leading, teamAvatars }: TeamLineProps) => {
   const name = teamNameOf(row, side);
   const score = side === 'team1' ? row.team1_score : row.team2_score;
   return (
     <span className="flex items-center gap-1.5 min-w-0" data-testid={`scoreboard-${side}`} data-own={own || undefined}>
-      <Disc name={name} avatarUrl={avatarOf(row, side)} own={own} />
+      {/* The same disc the sticky bar and ScoreCard draw (TeamDisc):
+          owner avatar → team initial. */}
+      <TeamDisc size="xs" name={name} avatarUrl={avatarOf(row, side, teamAvatars)} own={own} />
       <span
         className={cn(
           'flex-1 min-w-0 truncate font-display text-[11px] leading-4',
@@ -157,9 +148,10 @@ interface ChipProps {
   viewed: boolean;
   final: boolean;
   onSelect: (id: string) => void;
+  teamAvatars?: TeamAvatarMap;
 }
 
-const Chip = ({ row, layout, own, ownSide, viewed, final, onSelect }: ChipProps) => {
+const Chip = ({ row, layout, own, ownSide, viewed, final, onSelect, teamAvatars }: ChipProps) => {
   const bye = isBye(row);
   const leader = leaderOf(row);
   const t1 = teamNameOf(row, 'team1');
@@ -193,11 +185,11 @@ const Chip = ({ row, layout, own, ownSide, viewed, final, onSelect }: ChipProps)
         own ? 'ring-2 ring-pastel-orange/60' : viewed ? 'ring-1 ring-white/20' : 'ring-1 ring-white/10',
       )}
     >
-      <TeamLine row={row} side="team1" own={ownSide === 'team1'} leading={leader === 'team1'} />
+      <TeamLine row={row} side="team1" own={ownSide === 'team1'} leading={leader === 'team1'} teamAvatars={teamAvatars} />
       {bye ? (
         <ByeLine />
       ) : (
-        <TeamLine row={row} side="team2" own={ownSide === 'team2'} leading={leader === 'team2'} />
+        <TeamLine row={row} side="team2" own={ownSide === 'team2'} leading={leader === 'team2'} teamAvatars={teamAvatars} />
       )}
     </button>
   );
@@ -211,6 +203,7 @@ export function ScoreboardStrip({
   onSelect,
   week,
   live = false,
+  teamAvatars,
   layout = 'strip',
   today,
   className,
@@ -314,6 +307,7 @@ export function ScoreboardStrip({
         viewed={row.id === viewedMatchupId}
         final={isFinal(row, todayStr)}
         onSelect={handleSelect}
+        teamAvatars={teamAvatars}
       />
     </li>
   ));
