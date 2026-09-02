@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { CitrusLogo } from './CitrusLogo';
 import { MASCOT_LIST } from '@/constants/mascots';
 
@@ -93,7 +94,24 @@ export function HockeyFooter({
 }) {
   const isApp = variant === 'app';
   return (
-    <footer className="relative border-t border-white/5 bg-black/30">
+    /*
+     * PHONE: THE APP FOOTER DOES NOT RENDER (2026-09-02).
+     *
+     * Under `lg` every in-app page carries a fixed bottom tab bar, and the
+     * pages reserve room for it with `pb-[calc(5rem+env(safe-area-inset-bottom))]`
+     * on <main>. This footer sits OUTSIDE that padding, so on a phone its
+     * last ~80px — the squad row and the whole legal line, Privacy and
+     * Terms included — rendered underneath the tab bar and could not be
+     * read or tapped. Measured on 22 in-app pages at 393x852.
+     *
+     * A three-column link farm is desktop chrome anyway: on a phone the
+     * same destinations are one tap away in the tab bar and the menu, and
+     * the app variant has already dropped the pitch that was the only
+     * thing here a phone user could not get elsewhere. So the app variant
+     * is desktop-only, and `marketing` — the public pages, which have no
+     * tab bar — is untouched.
+     */
+    <footer className={cn('relative border-t border-white/5 bg-black/30', isApp && 'hidden lg:block')}>
       <div className="max-w-[1280px] mx-auto px-6 py-12">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-10">
           <div className="col-span-2">

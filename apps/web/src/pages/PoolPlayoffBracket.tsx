@@ -414,7 +414,7 @@ export default function PoolPlayoffBracket() {
                           <div className="flex items-center gap-1.5">
                             <span className="text-[10px] uppercase font-display font-bold text-white/55">Series {String.fromCharCode(64 + s.bracket_slot)}</span>
                             {s.conference && (
-                              <Badge variant="outline" className={cn('text-[9px] px-1 py-0', s.conference === 'Eastern' ? 'border-blue-400/50 text-blue-400' : 'border-orange-400/50 text-orange-400')}>
+                              <Badge variant="outline" className={cn('text-[9px] px-1 py-0', s.conference === 'Eastern' ? 'border-pastel-sage/50 text-pastel-sage' : 'border-orange-400/50 text-orange-400')}>
                                 {s.conference === 'Eastern' ? 'EAST' : 'WEST'}
                               </Badge>
                             )}

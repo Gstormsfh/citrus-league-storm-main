@@ -717,7 +717,7 @@ export default function PoolPlayoffRosterEntry() {
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <Badge variant="outline" className={cn(
                                   'text-[8px] px-1 py-0',
-                                  normalizePos(p.position) === 'G' ? 'border-purple-400/50 text-purple-400' : normalizePos(p.position) === 'D' ? 'border-blue-400/50 text-blue-400' : 'border-citrus-sage text-pastel-cream'
+                                  normalizePos(p.position) === 'G' ? 'border-purple-400/50 text-purple-400' : normalizePos(p.position) === 'D' ? 'border-pastel-sage/50 text-pastel-sage' : 'border-citrus-sage text-pastel-cream'
                                 )}>{normalizePos(p.position)}</Badge>
                                 <span className="font-medium truncate">{shortName(p.full_name)}</span>
                               </div>
@@ -974,7 +974,7 @@ export default function PoolPlayoffRosterEntry() {
                     <div className="flex items-center gap-2 pr-6 mb-2">
                       <Badge variant="outline" className={cn(
                         'text-[11px] px-2 flex-shrink-0',
-                        norm === 'G' ? 'border-purple-400/50 text-purple-400' : norm === 'D' ? 'border-blue-400/50 text-blue-400' : 'border-citrus-sage text-pastel-cream'
+                        norm === 'G' ? 'border-purple-400/50 text-purple-400' : norm === 'D' ? 'border-pastel-sage/50 text-pastel-sage' : 'border-citrus-sage text-pastel-cream'
                       )}>{norm}</Badge>
                       <div className="min-w-0 flex-1">
                         <div className="font-display font-bold text-base text-pastel-cream truncate">{selectedPlayer.full_name}</div>
@@ -1178,7 +1178,7 @@ export default function PoolPlayoffRosterEntry() {
                           <td className="px-2 py-1.5 text-center">
                             <Badge variant="outline" className={cn(
                               'text-[10px] px-1.5',
-                              norm === 'G' ? 'border-purple-400/50 text-purple-400' : norm === 'D' ? 'border-blue-400/50 text-blue-400' : 'border-citrus-sage text-pastel-cream'
+                              norm === 'G' ? 'border-purple-400/50 text-purple-400' : norm === 'D' ? 'border-pastel-sage/50 text-pastel-sage' : 'border-citrus-sage text-pastel-cream'
                             )}>
                               {norm}
                             </Badge>
@@ -1318,9 +1318,9 @@ export default function PoolPlayoffRosterEntry() {
                   <div className="text-[10px] font-display font-bold uppercase text-pastel-cream/65 mb-1">Defense ({posCounts.D}/{posReqs.D})</div>
                   <div className="space-y-1">
                     {roster.filter(p => normalizePos(p.position) === 'D').map(p => (
-                      <div key={p.id} className="flex items-center justify-between py-1 px-2 bg-blue-950/20 rounded border border-blue-400/20">
+                      <div key={p.id} className="flex items-center justify-between py-1 px-2 bg-pastel-sage/10 rounded border border-pastel-sage/20">
                         <div className="flex items-center gap-2 min-w-0">
-                          <Badge variant="outline" className="text-[9px] px-1 border-blue-400/50 text-blue-400">D</Badge>
+                          <Badge variant="outline" className="text-[9px] px-1 border-pastel-sage/50 text-pastel-sage">D</Badge>
                           <button
                             type="button"
                             onClick={() => setStatsModalPlayer(p)}

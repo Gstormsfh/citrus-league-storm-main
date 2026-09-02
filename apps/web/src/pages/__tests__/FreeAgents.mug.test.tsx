@@ -22,9 +22,16 @@ import { mugFromDirectory, teamCrestUrl } from '@/components/roster/headshot';
 import type { Player } from '@/services/PlayerService';
 
 const HERE = resolve(fileURLToPath(import.meta.url), '..');
-const PAGE = readFileSync(resolve(HERE, '..', 'FreeAgents.tsx'), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '')
-  .replace(/^\s*\/\/.*$/gm, '');
+const strip = (f: string) =>
+  readFileSync(f, 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+
+const PAGE = strip(resolve(HERE, '..', 'FreeAgents.tsx'));
+// 2026-09-02: the phone lists moved out of the page into the shared
+// FreeAgentRow, so the "one face" contract follows them. Both files are held
+// to it — the page for its desktop tables, the row for every phone list.
+const ROW = strip(resolve(HERE, '..', '..', 'components', 'freeagents', 'FreeAgentRow.tsx'));
 
 const MUG = 'https://assets.nhle.com/mugs/nhl/20252026/TOR/8479318.png';
 
@@ -42,22 +49,37 @@ describe('FreeAgents.tsx — the face is the shared Mug', () => {
   it('imports Mug and the directory adapter, and owns no private mugshot', () => {
     expect(PAGE).toMatch(/from ['"]@\/components\/roster\/Mug['"]/);
     expect(PAGE).toMatch(/import \{ mugFromDirectory \} from ['"]@\/components\/roster\/headshot['"]/);
-    expect(PAGE).not.toMatch(/MugShot/);
-    // No hand-rolled headshot <img>: nothing reads headshot_url into a src.
-    // (The opponent crests in the schedule column are a different element
-    // and keep their own onError; only the FACE is held to the Mug.)
-    expect(PAGE).not.toMatch(/src=\{[^}]*headshot_url/);
-    expect(PAGE).not.toMatch(/headshot_url[^\n]*onError/);
+    for (const src of [PAGE, ROW]) {
+      expect(src).not.toMatch(/MugShot/);
+      // No hand-rolled headshot <img>: nothing reads headshot_url into a src.
+      // (The opponent crests in the schedule column are a different element
+      // and keep their own onError; only the FACE is held to the Mug.)
+      expect(src).not.toMatch(/src=\{[^}]*headshot_url/);
+      expect(src).not.toMatch(/headshot_url[^\n]*onError/);
+    }
   });
 
-  it('every list row draws the 28px face through the adapter', () => {
+  it('every desktop table row draws the 28px face through the adapter', () => {
     const faces = PAGE.match(/<Mug\b[^>]*\/>/g) ?? [];
-    // Trending (phone list + table), Projected table, the main Available table.
-    expect(faces.length).toBeGreaterThanOrEqual(4);
+    // Trending table, Projected table, the main Available table. The phone
+    // lists that used to sit beside them are FreeAgentRows now.
+    expect(faces.length).toBeGreaterThanOrEqual(3);
     for (const tag of faces) {
       expect(tag).toMatch(/p=\{mugFromDirectory\(player\)\}/);
       expect(tag).toMatch(/size="xs"/);
     }
+  });
+
+  it('the phone row draws the 44px face through the same adapter', () => {
+    expect(ROW).toMatch(/from ['"]@\/components\/roster\/Mug['"]/);
+    expect(ROW).toMatch(/mugFromDirectory/);
+    const faces = ROW.match(/<Mug\b[^>]*\/>/g) ?? [];
+    expect(faces).toHaveLength(1);
+    expect(faces[0]).toMatch(/p=\{mugFromDirectory\(player\)\}/);
+    // 44px, as a NAMED size — not a className override, which would leave the
+    // crest and initials fallbacks sized for a 28px box.
+    expect(faces[0]).toMatch(/size="md"/);
+    expect(faces[0]).not.toMatch(/className=/);
   });
 });
 

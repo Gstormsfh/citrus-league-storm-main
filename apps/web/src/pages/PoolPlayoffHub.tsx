@@ -636,7 +636,7 @@ export default function PoolPlayoffHub() {
                                   const posColor = p.is_goalie
                                     ? 'bg-purple-950/30 text-purple-400 border-purple-400/30'
                                     : p.position === 'D'
-                                    ? 'bg-blue-950/30 text-blue-400 border-blue-400/30'
+                                    ? 'bg-pastel-sage/10 text-pastel-sage border-pastel-sage/30'
                                     : 'bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0';
                                   return (
                                     <div key={p.player_id} className="flex items-center justify-between gap-2 text-xs">

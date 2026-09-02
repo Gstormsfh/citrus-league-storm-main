@@ -20,8 +20,8 @@ const positionColors: Record<string, { bg: string; border: string; text: string 
   C: { bg: 'from-citrus-sage/40 to-[#7CB518]/30', border: 'border-citrus-sage', text: 'text-pastel-cream' },
   LW: { bg: 'from-[#7CB518]/40 to-citrus-sage/30', border: 'border-[#7CB518]/70', text: 'text-pastel-cream' },
   RW: { bg: 'from-citrus-orange/30 to-citrus-peach/40', border: 'border-citrus-orange/60', text: 'text-pastel-cream' },
-  D: { bg: 'from-blue-200/50 to-blue-300/30', border: 'border-blue-400/60', text: 'text-blue-900' },
-  G: { bg: 'from-purple-200/50 to-purple-300/30', border: 'border-purple-400/60', text: 'text-purple-900' },
+  D: { bg: 'from-blue-200/50 to-blue-300/30', border: 'border-blue-400/60', text: 'text-pastel-cream' },
+  G: { bg: 'from-purple-200/50 to-purple-300/30', border: 'border-purple-400/60', text: 'text-pastel-cream' },
 };
 
 const sizeMap = {

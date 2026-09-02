@@ -29,11 +29,18 @@ import { describe, it, expect } from 'vitest';
 //
 // RW stays white-on-orange (2.85:1): a brand accent, legible at this
 // weight, and inverting it is a redesign rather than a legibility fix.
+//
+// SURFACE (2026-09-02) — D was `bg-[#1A2A20]`, the exact value of
+// pastel-surface-tile, so the chip disappeared into any tile-coloured
+// card (the new Free Agents row) and read as a bare outline on the
+// roster. `bg-white/10` sits above both grounds and keeps D's "no
+// colour" identity. This line is the regression test: the value is
+// pinned here and in positionChip.ts, and drift in either fails.
 const EXPECTED_POS_COLOR: Record<string, string> = {
   LW: 'bg-pastel-sage-soft text-pastel-forest',
   C: 'bg-pastel-sage text-pastel-forest',
   RW: 'bg-pastel-orange text-white',
-  D: 'bg-[#1A2A20] text-white',
+  D: 'bg-white/10 text-pastel-cream',
   G: 'bg-pastel-sage/15 text-pastel-cream',
   UTIL: 'bg-pastel-sage text-pastel-forest',
   F: 'bg-emerald-600 text-white',

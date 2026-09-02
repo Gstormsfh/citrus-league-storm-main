@@ -2,12 +2,28 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { mugInitials, mugTeamAbbrev, teamCrestUrl, type MugPlayer } from './headshot';
 
-/** 28px on a list row, 36px in the sheets' rows, 56px in a sheet header. */
-export type MugSize = 'xs' | 'sm' | 'lg';
+/**
+ * 28px on a list row, 36px in the sheets' rows, 44px on the Free Agents
+ * phone row, 56px in a sheet header.
+ *
+ * `md` (44px) was added 2026-09-02 for the Free Agents phone list. That row
+ * is a DECISION surface — a manager scanning the pool has to recognise a
+ * face at a glance, next to a 15px name and a 17px projection — and 28px
+ * next to that type reads as a bullet point, not a player. 44 is also the
+ * iOS minimum touch target, so the face and the row's tap area agree
+ * instead of the face being a decoration inside a bigger hit box.
+ *
+ * Sizes are NAMED here rather than passed as a className override at the
+ * call site: a `w-11 h-11` override would leave `initials` and `crest`
+ * sized for the old box, so the fallback states would be wrong at exactly
+ * the moment the CDN is failing and nobody is looking.
+ */
+export type MugSize = 'xs' | 'sm' | 'md' | 'lg';
 
 const SIZE: Record<MugSize, { box: string; initials: string; crest: string }> = {
   xs: { box: 'w-7 h-7', initials: 'text-[10px]', crest: 'w-5 h-5' },
   sm: { box: 'w-9 h-9', initials: 'text-[11px]', crest: 'w-6 h-6' },
+  md: { box: 'w-11 h-11', initials: 'text-[13px]', crest: 'w-7 h-7' },
   lg: { box: 'w-14 h-14', initials: 'text-lg', crest: 'w-9 h-9' },
 };
 

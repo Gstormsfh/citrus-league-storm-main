@@ -1362,7 +1362,7 @@ const Profile = () => {
                   </Card>
                   <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardContent className="p-6 text-center">
-                      <Target className="h-8 w-8 mx-auto mb-2 text-blue-300" />
+                      <Target className="h-8 w-8 mx-auto mb-2 text-pastel-sage-soft" />
                       <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{userStats.overallRecord}</div>
                       <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1.5">W-L Record</div>
                     </CardContent>

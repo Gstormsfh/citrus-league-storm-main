@@ -141,9 +141,9 @@ export const ProjectionTooltip = ({ projection, children }: ProjectionTooltipPro
               </span>
               {projection.confidence_label && (
                 <span className={`text-[8px] px-1 py-0 rounded font-bold ${
-                  projection.confidence_label === 'High' ? 'bg-green-500/20 text-green-700' :
-                  projection.confidence_label === 'Medium' ? 'bg-blue-500/20 text-blue-700' :
-                  'bg-orange-500/20 text-orange-700'
+                  projection.confidence_label === 'High' ? 'bg-pastel-sage/20 text-pastel-sage-soft' :
+                  projection.confidence_label === 'Medium' ? 'bg-pastel-butter/20 text-pastel-butter' :
+                  'bg-pastel-orange/20 text-pastel-orange-soft'
                 }`}>
                   {projection.confidence_label}
                 </span>

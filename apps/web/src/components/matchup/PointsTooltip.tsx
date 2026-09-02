@@ -69,7 +69,7 @@ export const PointsTooltip = ({
           <div key={stat.label} className="p-2 bg-white/5 rounded-lg border border-citrus-orange/30">
             <div className="flex items-baseline justify-between gap-1 mb-0.5">
               <span className="text-[10px] text-citrus-orange uppercase font-bold truncate">{stat.label}</span>
-              <span className="text-xs text-gray-600 bg-gray-100 px-1 rounded">×{stat.count}</span>
+              <span className="text-xs text-pastel-cream bg-white/10 px-1 rounded">×{stat.count}</span>
             </div>
             <div className="font-bold text-lg text-green-700">+{stat.points.toFixed(1)}</div>
           </div>

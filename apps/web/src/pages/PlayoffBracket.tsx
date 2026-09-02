@@ -134,7 +134,7 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
         series.status === 'active' && 'bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft',
         series.status === 'completed' && 'bg-green-900/30 text-green-400',
         series.status === 'pending' && 'bg-white/5 ring-1 ring-white/10 text-white/55',
-        series.status === 'bye' && 'bg-blue-900/20 text-blue-400',
+        series.status === 'bye' && 'bg-pastel-sage/10 text-pastel-sage-soft',
       )}>
         {series.status === 'active' && 'Live'}
         {series.status === 'completed' && 'Final'}
@@ -459,7 +459,7 @@ const SeedList: React.FC<{
                   {seed.regular_season_ties > 0 ? `-${seed.regular_season_ties}` : ''}
                 </span>
                 {hasBye && (
-                  <span className="text-[9px] font-bold text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded">
+                  <span className="text-[9px] font-bold text-pastel-sage-soft bg-pastel-sage/20 px-1.5 py-0.5 rounded">
                     BYE
                   </span>
                 )}

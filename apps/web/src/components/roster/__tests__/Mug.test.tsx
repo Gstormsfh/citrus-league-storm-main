@@ -141,9 +141,13 @@ describe('Mug — crest badge', () => {
 });
 
 describe('Mug — geometry', () => {
+  // `md` (44px) added 2026-09-02 for the Free Agents phone row: 28px next to
+  // a 15px name and a 17px projection reads as a bullet point, not a player,
+  // and 44 is the iOS minimum touch target.
   it.each([
     ['xs', 'w-7 h-7'],
     ['sm', 'w-9 h-9'],
+    ['md', 'w-11 h-11'],
     ['lg', 'w-14 h-14'],
   ] as const)('%s is a fixed %s box that cannot shrink', (size, cls) => {
     const { container } = render(<Mug p={MCDAVID} size={size} />);
@@ -152,6 +156,27 @@ describe('Mug — geometry', () => {
     expect(el.className).toContain('shrink-0');
     // The picture fills the box; the box, not the picture, sets the size.
     expect(screen.getByAltText('Connor McDavid').className).toMatch(/w-full h-full object-cover/);
+  });
+
+  it('every named size scales its own fallbacks, so a CDN failure is never mis-sized', () => {
+    // The reason a 44px face is a NAMED size rather than a className
+    // override at the call site: an override moves the box and leaves the
+    // initials and the crest sized for the old one.
+    const initials: Record<string, string> = {};
+    const crests: Record<string, string> = {};
+    for (const size of ['xs', 'sm', 'md', 'lg'] as const) {
+      const noFace = render(<Mug p={{ name: 'Connor McDavid', team: 'Edmonton Oilers' }} size={size} />);
+      initials[size] = noFace.getByRole('img', { name: 'Connor McDavid' }).className;
+      noFace.unmount();
+
+      const crestOnly = render(<Mug p={{ ...MCDAVID, image: undefined }} size={size} />);
+      crests[size] = crestOnly.getByAltText('EDM').className;
+      crestOnly.unmount();
+    }
+    expect(new Set(Object.values(initials)).size).toBe(4);
+    expect(new Set(Object.values(crests)).size).toBe(4);
+    expect(initials.md).toContain('text-[13px]');
+    expect(crests.md).toContain('w-7 h-7');
   });
 
   it('merges a caller className onto the box', () => {

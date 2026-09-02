@@ -233,7 +233,7 @@ const safeValue = (val: number) => {
     
     // Adjusted thresholds for 5-6 point scale
     if (avgProj >= 5.0) return { score: avgProj, label: 'Elite', color: 'text-green-500', bg: 'bg-green-500/10' };
-    if (avgProj >= 4.0) return { score: avgProj, label: 'Strong', color: 'text-blue-500', bg: 'bg-blue-500/10' };
+    if (avgProj >= 4.0) return { score: avgProj, label: 'Strong', color: 'text-pastel-sage-soft', bg: 'bg-pastel-sage/10' };
     if (avgProj >= 3.0) return { score: avgProj, label: 'Average', color: 'text-yellow-500', bg: 'bg-yellow-500/10' };
     return { score: avgProj, label: 'Weak', color: 'text-orange-500', bg: 'bg-orange-500/10' };
   };
@@ -3832,7 +3832,7 @@ const Roster = () => {
                             elapsed — a real number under a heading describing a
                             different quantity. Same number, honest name. */}
                         <span className="text-sm text-white/55">Avg per Player</span>
-                        <Activity className="h-4 w-4 text-blue-500" aria-hidden="true" />
+                        <Activity className="h-4 w-4 text-pastel-sage" aria-hidden="true" />
                       </div>
                       <div className="text-2xl font-bold">{teamStats.avgPoints}</div>
                       <p className="text-xs text-white/55 mt-1">pts / drafted player</p>

@@ -606,9 +606,9 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               {/* Confidence label badge */}
               {hasProjection && dailyProjection?.confidence_label && (
                 <span className={`text-[7px] px-1 py-0 rounded font-bold ${
-                  dailyProjection.confidence_label === 'High' ? 'bg-green-500/20 text-green-700 border border-green-500/30' :
-                  dailyProjection.confidence_label === 'Medium' ? 'bg-blue-500/20 text-blue-700 border border-blue-500/30' :
-                  'bg-orange-500/20 text-orange-700 border border-orange-500/30'
+                  dailyProjection.confidence_label === 'High' ? 'bg-pastel-sage/20 text-pastel-sage-soft border border-pastel-sage/30' :
+                  dailyProjection.confidence_label === 'Medium' ? 'bg-pastel-butter/20 text-pastel-butter border border-pastel-butter/30' :
+                  'bg-pastel-orange/20 text-pastel-orange-soft border border-pastel-orange/30'
                 }`}>
                   {dailyProjection.confidence_label}
                 </span>

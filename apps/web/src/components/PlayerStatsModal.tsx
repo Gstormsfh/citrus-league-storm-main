@@ -394,7 +394,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
     IR:   { label: 'Injury Reserve', cls: 'bg-red-500/10 text-red-400 border-red-400/40', icon: AlertCircle },
     SUSP: { label: 'Suspended', cls: 'bg-orange-500/10 text-orange-400 border-orange-400/40', icon: AlertCircle },
     GTD:  { label: 'Game Time Decision', cls: 'bg-yellow-500/10 text-yellow-400 border-yellow-400/40', icon: Clock },
-    WVR:  { label: 'Waiver', cls: 'bg-blue-500/10 text-blue-400 border-blue-400/40', icon: AlertCircle },
+    WVR:  { label: 'Waiver', cls: 'bg-pastel-sage/15 text-pastel-sage-soft border-pastel-sage/40', icon: AlertCircle },
   };
   const statusInfo = player.status ? statusConfig[player.status] : null;
 
