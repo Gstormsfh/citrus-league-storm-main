@@ -278,16 +278,16 @@ START: fantasy_projection_pipeline.py (Daily at 6 AM MT)
   │    └─► For Each League:
   │         │
   │         ├─► Load: leagues.scoring_settings (JSONB)
-  │         │    Example:
+  │         │    Shape (defaults: docs/generated/SCORING_DEFAULTS.md):
   │         │    {
   │         │      "skater": {
-  │         │        "goals": 6,
-  │         │        "assists": 4,
-  │         │        "power_play_points": 2,
-  │         │        "shots_on_goal": 0.9,
-  │         │        "blocks": 1,
-  │         │        "hits": 0,
-  │         │        "penalty_minutes": 0
+  │         │        "goals": …,
+  │         │        "assists": …,
+  │         │        "power_play_points": …,
+  │         │        "shots_on_goal": …,
+  │         │        "blocks": …,
+  │         │        "hits": …,
+  │         │        "penalty_minutes": …
   │         │      }
   │         │    }
   │         │
@@ -355,23 +355,23 @@ TRIGGER: calculate_matchup_scores.py (Runs every night at 11 PM MT)
   │    ├─► Load League Scoring Settings:
   │    │    Query: SELECT scoring_settings FROM leagues WHERE league_id = ?
   │    │    │
-  │    │    └─► Parse JSONB:
+  │    │    └─► Parse JSONB (defaults: docs/generated/SCORING_DEFAULTS.md):
   │    │         {
   │    │           "skater": {
-  │    │             "goals": 6,
-  │    │             "assists": 4,
-  │    │             "power_play_points": 2,
-  │    │             "short_handed_points": 0,
-  │    │             "shots_on_goal": 0.9,
-  │    │             "blocks": 1,
-  │    │             "hits": 0,
-  │    │             "penalty_minutes": 0
+  │    │             "goals": …,
+  │    │             "assists": …,
+  │    │             "power_play_points": …,
+  │    │             "short_handed_points": …,
+  │    │             "shots_on_goal": …,
+  │    │             "blocks": …,
+  │    │             "hits": …,
+  │    │             "penalty_minutes": …
   │    │           },
   │    │           "goalie": {
-  │    │             "wins": 5,
-  │    │             "shutouts": 5,
-  │    │             "saves": 0.6,
-  │    │             "goals_against": -3
+  │    │             "wins": …,
+  │    │             "shutouts": …,
+  │    │             "saves": …,
+  │    │             "goals_against": …
   │    │           }
   │    │         }
   │    │

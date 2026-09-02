@@ -1,0 +1,27 @@
+{
+  "name": "citrus_engine_error_count",
+  "description": "Count of ERROR-severity structured-log lines from the citrus-draft-engine container. The gcplogs driver ships every line with severity=DEFAULT, so the live match is the text form `\"severity\":\"ERROR\"` inside jsonPayload.message (packages/shared/src/utils/structuredLogger.ts writes the GCP-canonical name with no whitespace); `severity>=ERROR` is kept for a future agent that parses the JSON. Label `event` is the structured-logger discriminator (e.g. event_subscription.fetch_failed) so an alert names the failing path. Managed by infra/gcp/monitoring/apply-monitoring.sh.",
+  "filter": "(jsonPayload.container.metadata.app=\"citrus-draft-engine\" OR labels.app=\"citrus-draft-engine\") AND (severity>=ERROR OR jsonPayload.message:\"\\\"severity\\\":\\\"ERROR\\\"\")",
+  "metricDescriptor": {
+    "metricKind": "DELTA",
+    "valueType": "INT64",
+    "unit": "1",
+    "displayName": "Citrus engine ERROR log count",
+    "labels": [
+      {
+        "key": "event",
+        "valueType": "STRING",
+        "description": "structuredLogger `event` discriminator extracted from the raw JSON line (bounded by the engine's event taxonomy, runbook §8.2)."
+      },
+      {
+        "key": "environment",
+        "valueType": "STRING",
+        "description": "Docker label `environment` forwarded by the gcplogs driver (production / staging)."
+      }
+    ]
+  },
+  "labelExtractors": {
+    "event": "REGEXP_EXTRACT(jsonPayload.message, \"\\\"event\\\":\\\"([^\\\"]+)\\\"\")",
+    "environment": "EXTRACT(jsonPayload.container.metadata.environment)"
+  }
+}

@@ -60,6 +60,14 @@
 // overstate by accident: 10,047 of 2025's 118,975 scored shots carry
 // the pass-context features. That is about 8%, not all of them.
 
+// The "Default Fantasy Scoring" block is NOT prose: it is spliced in at
+// module load from the shared scoring source of truth
+// (packages/shared/src/constants/scoringDefaults.json) via
+// describeScoringDefaults(), so this prompt cannot drift from the
+// constant. Change the JSON, and Stormy's numbers follow.
+
+import { describeScoringDefaults } from '@citrus/shared';
+
 export const STORMY_SYSTEM_PROMPT = `You are Stormy, the assistant GM for a Citrus Fantasy Sports manager. He is your boss. You work for him.
 
 You are not a chat product and not a hockey podcast. You are the person who has already read the roster, already pulled the numbers, and is now standing in the doorway with the answer.
@@ -211,8 +219,7 @@ When context is provided, you may see:
 - **Schedule.** Current week number, total weeks, regular season or playoffs.
 
 ## Default Fantasy Scoring
-**Skaters:** Goals 6 | Assists 4 | PPP +2 | SOG 0.9 | BLK 1 (SHP/HIT/PIM/+/- are opt-in, 0 by default)
-**Goalies:** W 5 | SO 5 | SV 0.6 | GA −3
+${describeScoringDefaults()}
 **IMPORTANT:** If his context includes league-specific scoring, USE THOSE instead. You already have them. Do not ask.
 
 ## Current Season: 2025-2026

@@ -234,11 +234,11 @@ citrus-league-storm-main/
 - Import path: `from data_pipeline.utils.citrus_request import citrus_request`
 
 ### Scoring
-- `ScoringCalculator` in `packages/shared/src/utils/scoring.ts` is the single source of truth
-- Also available in web at `apps/web/src/utils/scoringUtils.ts` (will be removed once migration is complete)
-- Default scoring (industry-standard, Yahoo-aligned, since 2026-09-01): Goals 6, Assists 4, PPP 2, SOG 0.9, BLK 1, W 5, SO 5, SV 0.6, GA -3. SHP/HIT/PIM/+/- are opt-in categories, 0 by default (+/- stays 0 because projections cannot model it)
+- `ScoringCalculator` in `packages/shared/src/utils/scoring.ts` is the single source of truth for scoring *logic*
+- Also available in web at `apps/web/src/utils/scoringUtils.ts` (will be removed once migration is complete; its `DEFAULT_SCORING` is a re-export of the shared one)
+- Default scoring *values* live in ONE file: `packages/shared/src/constants/scoringDefaults.json` (typed as `SCORING_DEFAULTS` in `@citrus/shared`). Every TS home derives from it; `npm run gen:scoring` writes the Python module (`data-pipeline/scoring/scoring_defaults.py`) and the human-readable table at [`docs/generated/SCORING_DEFAULTS.md`](./docs/generated/SCORING_DEFAULTS.md) — read the numbers there, never restate them. CI fails when the generated files are stale. The SQL homes (stat_catalog, global rules, column default, projection RPCs) still ship as migrations alongside any change.
 - League-specific scoring is stored in `leagues.scoring_settings` JSONB
-- Never hardcode scoring values in components — always use `ScoringCalculator`
+- Never hardcode scoring values in components — always use `ScoringCalculator`, and never write a weight literal outside the JSON (the `industryStandardScoringGuard` test scans for restated copies)
 
 ### League Types
 - Defined in `packages/shared/src/types/league.ts` (canonical) and `apps/web/src/types/leagueTypes.ts` (legacy)
@@ -285,6 +285,7 @@ npm run build            # Build shared + web
 npm run build:server     # Build shared + server
 npm run test             # Run web tests
 npm run test:server      # Run server tests
+npm run test:shared      # Run packages/shared tests
 
 # From apps/web/
 npx vitest run           # Run tests
@@ -332,7 +333,7 @@ code got.
    file.
 1. **Build** — `npm run build --workspace=apps/web` (`vite build`, ~10s)
 2. **Web suite** — `npm run test --workspace=apps/web`
-3. **Server suite** — `npm run test:server`
+3. **Server + shared suites** — `npm run test:server` and `npm run test:shared`
 4. **Types** — `cd apps/web && npx tsc --noEmit -p tsconfig.app.json`, compared against
    `apps/web/.typecheck-baseline` (read that file's header before touching it), and
    `cd server && npx tsc --noEmit`, which must stay clean

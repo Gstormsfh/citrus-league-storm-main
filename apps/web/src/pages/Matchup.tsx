@@ -1382,7 +1382,7 @@ const Matchup = () => {
             
             let dailyTotalPoints = 0;
             if (isGoalie) {
-              // Goalie Formula: Use league settings (defaults: W=5, SV=0.6, SO=5, GA=-3)
+              // Goalie Formula: Use league settings (defaults: DEFAULT_SCORING.goalie from @citrus/shared)
               dailyTotalPoints = 
                 aggregated.wins * goalieScoring.wins + 
                 aggregated.saves * goalieScoring.saves + 
@@ -1662,7 +1662,7 @@ const Matchup = () => {
           
           let dailyTotalPoints = 0;
           if (isGoalie) {
-            // Goalie Formula: Use league settings (defaults: W=5, SV=0.6, SO=5, GA=-3)
+            // Goalie Formula: Use league settings (defaults: DEFAULT_SCORING.goalie from @citrus/shared)
             dailyTotalPoints = 
               (row.wins || 0) * goalieScoring.wins + 
               (row.saves || 0) * goalieScoring.saves + 

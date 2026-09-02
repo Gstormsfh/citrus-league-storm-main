@@ -20,6 +20,7 @@ npx vite --config harness/vite.config.ts
 | `/harness/cards.html` | HockeyPlayerCard gallery + MobileRosterList |
 | `/harness/draft.html` | DraftRoomV2, live clock, scripted picks |
 | `/harness/tabs.html` | Roster tab bars |
+| `/harness/scores.html` | Scores page, real components, fixture days |
 | `/harness/slot.html` | MobileRosterList + Line Change sheet, page-shaped wiring |
 | `/harness/today.html` | Today strip in every state, locked chips, empty rows, Fill sheet (`?fill=slot-LW-1` opens it), Auto Lineup preview (`?auto=1` opens it; the strip's link does too) |
 | `/harness/scoreboard.html` | League scoreboard strip (live / open / final / bye) and the desktop rail; `?n=10` for a 20-team league |
@@ -31,6 +32,12 @@ npx vite --config harness/vite.config.ts
 exposes `window.__harnessAdvance()` so a script can drive the draft forward one
 pick at a time.
 
+`scores.html` accepts `?case=slate|live|mine|empty`. `slate`, `mine` and
+`empty` are transcribed from production on 2026-09-02 (real games, real
+projections, real puck-drop times). `live` is **synthetic and labelled so on
+screen**: `nhl_games` has never held a live row, so the clock, the
+intermission marker and the final-minute treatment cannot be exercised by real
+data and this case exists to check them before the first live night.
 `matchup.html` mounts the rows directly rather than the page: `page.html?p=matchup`
 renders "No matchup data available" because the harness stubs the three league GETs
 and not `MatchupService`, so the rows it exists to show never mount there. The rows

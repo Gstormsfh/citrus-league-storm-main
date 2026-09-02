@@ -50,7 +50,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { logger } from "@citrus/shared";
+import { logger, defaultLeagueStats, type LeagueStatSetting } from "@citrus/shared";
 import {
   type LeagueType,
   type ScoringFormat,
@@ -98,28 +98,14 @@ const DRAFT_TYPE_ICONS: Record<DraftType, React.ReactNode> = {
 // ============================================================================
 // STAT DEFINITIONS (reusable across formats)
 // ============================================================================
-// INDUSTRY-STANDARD DEFAULTS (2026-09-01) — Yahoo-aligned point values
-// (help.yahoo.com/kb/SLN6815): G6 A4 PPP2 SOG0.9 BLK1 / W5 SO5 SV0.6 GA-3.
-// SHP, Hits, PIM and +/- ship DISABLED (enabled: false → ptsFor() writes 0
-// into scoring_settings) because no major platform scores them by default —
-// and our projections cannot model plus/minus at all. Their `points` values
-// are the suggested weights a commissioner gets on toggling them on.
-// Must stay equal to DEFAULT_SCORING in @citrus/shared (guard-tested).
-const DEFAULT_LEAGUE_STATS = [
-  { id: "g", name: "Goals", points: 6, default: true, category: "Offense", enabled: true },
-  { id: "a", name: "Assists", points: 4, default: true, category: "Offense", enabled: true },
-  { id: "ppp", name: "Power Play Points", points: 2, default: true, category: "Offense", enabled: true },
-  { id: "shg", name: "Shorthanded Points", points: 2, default: false, category: "Offense", enabled: false },
-  { id: "sog", name: "Shots on Goal", points: 0.9, default: true, category: "Offense", enabled: true },
-  { id: "blk", name: "Blocks", points: 1, default: true, category: "Defense", enabled: true },
-  { id: "hit", name: "Hits", points: 0.5, default: false, category: "Defense", enabled: false },
-  { id: "pim", name: "Penalty Minutes", points: 0.5, default: false, category: "Defense", enabled: false },
-  { id: "pm", name: "Plus/Minus", points: 2, default: false, category: "Defense", enabled: false },
-  { id: "w", name: "Wins", points: 5, default: true, category: "Goalie", enabled: true },
-  { id: "so", name: "Shutouts", points: 5, default: true, category: "Goalie", enabled: true },
-  { id: "sv", name: "Saves", points: 0.6, default: true, category: "Goalie", enabled: true },
-  { id: "ga", name: "Goals Against", points: -3, default: true, category: "Goalie", enabled: true },
-];
+// Derived from the scoring source of truth in @citrus/shared
+// (packages/shared/src/constants/scoringDefaults.json) — this page carries
+// no weight literal. SHP, Hits, PIM and +/- ship DISABLED (enabled: false →
+// ptsFor() writes 0 into scoring_settings) because no major platform scores
+// them by default — and our projections cannot model plus/minus at all.
+// Their `points` values are the suggested weights a commissioner gets on
+// toggling them on. Rows: { id, name, points, default, category, enabled }.
+const DEFAULT_LEAGUE_STATS: LeagueStatSetting[] = defaultLeagueStats();
 
 // ============================================================================
 // SECTION HEADER COMPONENT
@@ -1475,22 +1461,23 @@ const CreateLeague = () => {
                                     </SelectTrigger>
                                       <SelectContent>
                                         {(() => {
-                                          // Per-stat option sets — every stat now includes 0 so
-                                          // commissioners can zero out any stat for simpler leagues.
+                                          // Per-stat option sets — every stat includes 0 so commissioners can
+                                          // zero out any stat. The current value (the default from
+                                          // @citrus/shared, or a custom one) is appended if absent.
                                           const OPTIONS_BY_STAT: Record<string, number[]> = {
-                                            g: [0, 1, 2, 3, 4, 5, 6],                    // Goals (default 3)
-                                            a: [0, 1, 1.5, 2, 2.5, 3, 4],                // Assists (default 2)
-                                            ppp: [0, 0.5, 1, 1.5, 2, 3],                 // Power Play Points (default 1)
-                                            shg: [0, 1, 1.5, 2, 2.5, 3, 4],              // Shorthanded Points (default 2)
-                                            sog: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5], // Shots on Goal (default 0.4)
-                                            blk: [0, 0.25, 0.5, 0.75, 1, 1.5],           // Blocks (default 0.5)
-                                            hit: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5],    // Hits (default 0.2)
-                                            pim: [-1, -0.5, -0.25, 0, 0.25, 0.5, 1],     // Penalty Minutes (default 0.5)
-                                            pm: [-1, -0.5, -0.25, 0, 0.25, 0.5, 1, 1.5], // Plus/Minus (default 0.5)
-                                            w: [0, 2, 3, 4, 5, 6, 8],                    // Wins (default 4)
-                                            so: [0, 2, 3, 4, 5, 6, 8],                   // Shutouts (default 3)
-                                            sv: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5],     // Saves (default 0.2)
-                                            ga: [-2, -1.5, -1, -0.5, -0.25, 0],          // Goals Against (default -1)
+                                            g: [0, 1, 2, 3, 4, 5, 6],                    // Goals
+                                            a: [0, 1, 1.5, 2, 2.5, 3, 4],                // Assists
+                                            ppp: [0, 0.5, 1, 1.5, 2, 3],                 // Power Play Points
+                                            shg: [0, 1, 1.5, 2, 2.5, 3, 4],              // Shorthanded Points
+                                            sog: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5], // Shots on Goal
+                                            blk: [0, 0.25, 0.5, 0.75, 1, 1.5],           // Blocks
+                                            hit: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5],    // Hits
+                                            pim: [-1, -0.5, -0.25, 0, 0.25, 0.5, 1],     // Penalty Minutes
+                                            pm: [-1, -0.5, -0.25, 0, 0.25, 0.5, 1, 1.5], // Plus/Minus
+                                            w: [0, 2, 3, 4, 5, 6, 8],                    // Wins
+                                            so: [0, 2, 3, 4, 5, 6, 8],                   // Shutouts
+                                            sv: [0, 0.1, 0.15, 0.2, 0.25, 0.3, 0.5],     // Saves
+                                            ga: [-2, -1.5, -1, -0.5, -0.25, 0],          // Goals Against
                                           };
                                           const opts = OPTIONS_BY_STAT[stat.id] || [0, 0.25, 0.5, 1, 2, 3];
                                           const current = Number(stat.points);

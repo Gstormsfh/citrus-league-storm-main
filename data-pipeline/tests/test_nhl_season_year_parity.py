@@ -30,6 +30,14 @@ from data_pipeline.utils.season_config import (  # noqa: E402
     derive_nhl_season_year,
 )
 
+# Every test in this module calls the real SQL functions over PostgREST. The
+# marker (registered in pytest.ini) lets a sandbox with no network deselect
+# them up front with `pytest -m "not network"`. It is a second line of
+# defence: _live_supabase() below still self-skips on placeholder credentials,
+# so the module is safe either way -- the marker just says so explicitly
+# instead of relying on the guard recognising whatever placeholder was planted.
+pytestmark = pytest.mark.network
+
 
 # Boundary dates chosen to cover:
 #   - Sep 29 / Sep 30: under the bare CALENDAR rule these are the last two
@@ -78,6 +86,12 @@ def _live_supabase():
     # absent, while passing when each file was run on its own. Recognise the
     # placeholders explicitly. In CI the real secrets are exported before python
     # starts, so setdefault leaves them alone and these tests run for real.
+    #
+    # Since 2026-09-01 tests/conftest.py plants the same placeholder shape
+    # (https://test.supabase.co / test-key-placeholder) before any test module
+    # is imported, so they are present in EVERY sandbox run, not just the ones
+    # that collect test_projection_logic.py. This guard must keep recognising
+    # both values; change them together.
     placeholder = (
         not url
         or not key

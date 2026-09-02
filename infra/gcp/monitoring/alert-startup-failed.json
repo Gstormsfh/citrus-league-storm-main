@@ -1,0 +1,37 @@
+{
+  "displayName": "Citrus draft engine: VM startup script failed",
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "**What it means.** `infra/gce/draft-engine-startup.sh` exited non-zero on `citrus-draft-engine-prod` and shipped a `citrus-startup-failed` entry (log-based alert; one notification per 5 minutes at most). The entry carries `exitStatus`, `line`, the unexpanded failing `command`, `logTail` (last 3 lines of /var/log/citrus-startup.log) and `imageUri`. The usual cause is a deploy that pointed `image-tag` metadata at a tag that was never pushed: `docker pull` fails at Step 4, the script stops, and `--restart=always` keeps the PREVIOUS container serving - the engine looks alive while running old code.\n\n**What to do.**\n1. Read the entry: `gcloud logging read 'logName=\"projects/citrus-fantasy-prod/logs/citrus-startup-failed\"' --project=citrus-fantasy-prod --freshness=1h --limit=5 --order=desc --format=json`\n2. Confirm what is actually running: `gcloud logging read '(jsonPayload.container.metadata.app=\"citrus-draft-engine\") AND jsonPayload.message:\"deployment.fingerprint\"' --project=citrus-fantasy-prod --limit=1 --order=desc --format='value(jsonPayload.message)'` and compare `imageSha` with the `image-sha` metadata on the VM (`gcloud compute instances describe citrus-draft-engine-prod --zone=northamerica-northeast1-a --format='value(metadata.items)'`).\n3. Pull failure (`docker pull` at Step 4): re-point `image-tag` / `image-sha` / `commit-sha` at the last good digest and `reset` per `docs/DEPLOY_PROTOCOL_F26_F27.md` section 4b (retag -> metadata revert -> reset) and `docs/RUNBOOKS/draft-engine-v2-rollback-playbook.md` Scenario 2. Secret failure (Step 3 FATAL): check Secret Manager access / value per `docs/RUNBOOKS/draft-engine-v2-operations.md` section 2.1 and 5.2.\n4. Do NOT restart the VM mid-draft: the freeze rule in `docs/DEPLOY_PROTOCOL_F26_F27.md` section 4d still applies.\n\nManaged by `infra/gcp/monitoring/apply-monitoring.sh` (`alert-startup-failed.json`). The startup-script trap only runs on the VM after `--metadata-from-file=startup-script=` is re-applied."
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "citrus-startup-failed log entry received",
+      "conditionMatchedLog": {
+        "filter": "logName=\"projects/${PROJECT_ID}/logs/citrus-startup-failed\" AND severity>=ERROR",
+        "labelExtractors": {
+          "vm": "EXTRACT(jsonPayload.vm)",
+          "line": "EXTRACT(jsonPayload.line)",
+          "imageUri": "EXTRACT(jsonPayload.imageUri)"
+        }
+      }
+    }
+  ],
+  "notificationChannels": [
+    "${NOTIFICATION_CHANNEL}"
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "300s"
+    },
+    "autoClose": "1800s"
+  },
+  "severity": "CRITICAL",
+  "enabled": true,
+  "userLabels": {
+    "app": "citrus-draft-engine",
+    "managed-by": "apply-monitoring-sh",
+    "runbook": "draft-engine-v2-rollback-playbook"
+  }
+}

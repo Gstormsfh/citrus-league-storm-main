@@ -1270,23 +1270,25 @@ Locked players have a 🔒 icon and grayed-out appearance.
 ```json
 {
   "skater": {
-    "goals": 6,
-    "assists": 4,
-    "power_play_points": 2,
-    "shots_on_goal": 0.9,
-    "blocks": 1,
-    "hits": 0,
-    "penalty_minutes": 0
+    "goals": "<points per goal>",
+    "assists": "<points per assist>",
+    "power_play_points": "…",
+    "short_handed_points": "…",
+    "shots_on_goal": "…",
+    "blocks": "…",
+    "hits": "…",
+    "penalty_minutes": "…",
+    "plus_minus": "…"
   },
   "goalie": {
-    "wins": 5,
-    "saves": 0.6,
-    "shutouts": 5,
-    "goals_against": -3
+    "wins": "…",
+    "shutouts": "…",
+    "saves": "…",
+    "goals_against": "…"
   }
 }
 ```
-*(Industry-standard defaults, Yahoo-aligned, since 2026-09-01. SHP, hits, PIM and +/- are opt-in categories, 0 by default.)*
+*The default weights (industry-standard, Yahoo-aligned, since 2026-09-01) are the generated table in [`generated/SCORING_DEFAULTS.md`](./generated/SCORING_DEFAULTS.md); the source is `packages/shared/src/constants/scoringDefaults.json`. SHP, hits, PIM and +/- are opt-in categories, 0 by default.*
 
 **Step 2: Get Active Players for Each Day**
 ```sql

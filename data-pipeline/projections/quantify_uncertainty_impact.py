@@ -102,13 +102,9 @@ def generate_realistic_player(archetype="average", rng=None):
     noise = rng.normal(1.0, 0.05)
     noise = max(0.85, min(1.15, noise))
 
-    # Calculate total_pts from scoring weights
-    # INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned; SHP/hits/PIM 0.
-    total_pts = (
-        p["goals"] * 6.0 + p["assists"] * 4.0 + p["sog"] * 0.9 +
-        p["blocks"] * 1.0 + p["ppp"] * 2.0 + p["shp"] * 0.0 +
-        p["hits"] * 0.0 + p["pim"] * 0.0
-    ) * noise
+    # Calculate total_pts from the default scoring weights (the generated
+    # single source, via projection_uncertainty.DEFAULT_SCORING_WEIGHTS)
+    total_pts = sum(p[s] * DEFAULT_SCORING_WEIGHTS[s] for s in SKATER_STATS) * noise
 
     projection = {
         "player_id": rng.integers(8470000, 8490000),

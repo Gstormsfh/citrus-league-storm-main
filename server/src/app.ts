@@ -5,6 +5,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import { requestId } from 'hono/request-id';
 import { leagueRoutes } from './routes/leagues';
 import { playerRoutes } from './routes/players';
+import { scoresRoutes } from './routes/scores';
 import { matchupRoutes } from './routes/matchups';
 import { draftRoutes } from './routes/draft';
 import { draftsRoutes } from './routes/drafts';
@@ -34,6 +35,7 @@ import { bestballRoutes } from './routes/bestball';
 import { accountRoutes } from './routes/account';
 import { publicRoutes } from './routes/public';
 import { newsRoutes } from './routes/news';
+import { draftKitRoutes } from './routes/draftKit';
 import { demoMatchupRoutes } from './routes/demoMatchup';
 import { poolRoutes } from './routes/pools';
 import { nhlPlayoffsRoutes } from './routes/nhl-playoffs';
@@ -274,6 +276,7 @@ app.post('/api/vitals', async (c) => {
 // ── API routes ───────────────────────────────────────────────────────
 app.route('/api/leagues', leagueRoutes);
 app.route('/api/players', playerRoutes);
+app.route('/api/scores', scoresRoutes);
 app.route('/api/matchups', matchupRoutes);
 app.route('/api/draft', draftRoutes);
 // Phase 4.5 chunk 11g.1 — discovery endpoint at /api/drafts/:draftId/server.
@@ -306,6 +309,9 @@ app.route('/api/bestball', bestballRoutes);
 app.route('/api/account', accountRoutes);
 app.route('/api/public', publicRoutes);
 app.route('/api/news', newsRoutes);
+// Draft Kit — the paid analytics section. Every route is authed and the
+// entitlement gate lives in DraftKitService, ahead of payload assembly.
+app.route('/api/draft-kit', draftKitRoutes);
 // Chunk 11g.9 (2026-08-24): guest Matchup payload, ported off the
 // retired `demo-matchup-cache` Edge Function. Public + unauthenticated
 // by design (no authMiddleware on the route), still covered by the

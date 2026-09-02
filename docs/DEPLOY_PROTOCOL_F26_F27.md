@@ -9,6 +9,35 @@ Author: architect (protocol shape, 2026-08-06) + terminal (§1-3 verbatim citati
 
 ---
 
+## §0 Automated path (added 2026-09-02)
+
+For **production** the manual sequence in §1–§4 is superseded by the
+gated `Deploy Engine` workflow — `.github/workflows/deploy-engine.yml`,
+runbook `docs/RUNBOOKS/ENGINE_DEPLOY.md`: `build` (Cloud Build via
+`infra/gce/cloudbuild-draft-engine.yaml`, fails unless the pushed tag
+resolves to a digest) → `preflight` (no `in_progress` draft, the §4d
+daylight rule as a hard check, `scripts/check_draft_freeze.ts`) →
+`deploy` (required-reviewer approval in the `production-engine`
+environment; the §4b rollback pin is recorded in the job summary before
+the one `add-metadata` call and the `reset`) → `verify` (the engine's
+`deployment.fingerprint` must carry the new digest, then the endpoint
+must answer 404). Use §1–§4 by hand only when GitHub Actions or the GCP
+auth path is unavailable. The 2026-09-01 ghost-tag reset — metadata +
+reset chained after a cancelled build — is the failure the job graph
+makes impossible.
+
+Two corrections to the text below that the workflow already encodes:
+
+- The VM builds `IMAGE_URI` from the `image-tag` metadata key
+  (`infra/gce/draft-engine-startup.sh`), so the §4b `:latest` retag is
+  not required for the metadata-driven VM. Rollback is the previous
+  `image-tag` / `image-sha` / `commit-sha` in **one** `add-metadata` call
+  followed by `reset`.
+- Docker's gcplogs driver ships the engine's JSON line as the *string*
+  `jsonPayload.message`, so Cloud Logging queries must use
+  `jsonPayload.message:"deployment.fingerprint"` (substring), not
+  `jsonPayload.message="deployment.fingerprint"` as written in §4b.
+
 ## §1 Base pipeline (verbatim from 527ceb38 documented deploy, 2026-08-04)
 
 The 527ceb38 deploy (KI-026 close entry in `docs/REGISTRY.md:271`) established the documented shape. F26+F27 rides this pipeline unchanged for §1's steps; §4 adds four new items.

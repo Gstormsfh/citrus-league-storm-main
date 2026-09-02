@@ -70,10 +70,12 @@ const Blog = lazyWithErrorHandling(() => import("./pages/Blog"));
 const Podcasts = lazyWithErrorHandling(() => import("./pages/Podcasts"));
 const Guides = lazyWithErrorHandling(() => import("./pages/Guides"));
 const Matchup = lazyWithErrorHandling(() => import("./pages/Matchup"));
+const Scores = lazyWithErrorHandling(() => import("./pages/Scores"));
 const PlayoffBracket = lazyWithErrorHandling(() => import("./pages/PlayoffBracket"));
 const FreeAgents = lazyWithErrorHandling(() => import("./pages/FreeAgents"));
 const Players = lazyWithErrorHandling(() => import("./pages/Players"));
 const PlayerDashboard = lazyWithErrorHandling(() => import("./pages/PlayerDashboard"));
+const DraftKit = lazyWithErrorHandling(() => import("./pages/DraftKit"));
 const GMOffice = lazyWithErrorHandling(() => import("./pages/GMOffice"));
 const StormyAssistant = lazyWithErrorHandling(() => import("./pages/StormyAssistant"));
 const News = lazyWithErrorHandling(() => import("./pages/News"));
@@ -205,6 +207,8 @@ const App = () => {
                     <Route path="/matchup/:leagueId/:weekId?" element={<ErrorBoundary><Matchup /></ErrorBoundary>} />
                     <Route path="/matchup" element={<ErrorBoundary><Matchup /></ErrorBoundary>} /> {/* Fallback for /matchup without params */}
                     <Route path="/league/:leagueId/playoffs" element={<ProtectedRoute><ErrorBoundary><PlayoffBracket /></ErrorBoundary></ProtectedRoute>} />
+                {/* Live NHL scoreboard. Auth-only: the Citrus panel reads league rosters. */}
+                <Route path="/scores" element={<ProtectedRoute><ErrorBoundary><Scores /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/free-agents" element={<ErrorBoundary><FreeAgents /></ErrorBoundary>} />
                 <Route path="/players" element={<ProtectedRoute><ErrorBoundary><Players /></ErrorBoundary></ProtectedRoute>} />
                 {/* COMPONENT 6.5 — the player dashboard, SHIPPED. The
@@ -222,6 +226,10 @@ const App = () => {
                     own sign-in state, which is the honest version of the
                     same gate and the one that tells the visitor what to do. */}
                 <Route path="/players/:playerId" element={<ErrorBoundary><PlayerDashboard /></ErrorBoundary>} />
+                {/* Draft Kit — paid analytics section. Authed because the
+                    entitlement gate needs an identity to resolve; the free
+                    tier still gets a real preview from the server. */}
+                <Route path="/draft-kit" element={<ProtectedRoute><ErrorBoundary><DraftKit /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/gm-office" element={<ProtectedRoute><ErrorBoundary><GMOffice /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/gm-office/stormy" element={<ProtectedRoute><ErrorBoundary><StormyAssistant /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/news" element={<News />} />

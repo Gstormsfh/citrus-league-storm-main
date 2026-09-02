@@ -1,0 +1,530 @@
+{
+  "displayName": "Citrus Draft Mandate",
+  "labels": {
+    "app": "citrus-draft-engine",
+    "managed-by": "apply-monitoring-sh"
+  },
+  "mosaicLayout": {
+    "columns": 12,
+    "tiles": [
+      {
+        "xPos": 0,
+        "yPos": 0,
+        "width": 12,
+        "height": 2,
+        "widget": {
+          "title": "How to read this board",
+          "text": {
+            "format": "MARKDOWN",
+            "content": "Targets are CLAUDE.md 'Hard performance targets': manual pick p95 <= 300 ms / p99 <= 500 ms, autopick p95 <= 1000 ms / p99 <= 2000 ms, pick-to-broadcast fanout p95 <= 200 ms. Series are log-based DISTRIBUTION metrics over the engine's structured lines (`pick.processed {totalMs, rpcMs, broadcastMs}` = engine-authored picks, i.e. autopicks today; `external_event.applied.notifyToBroadcastMs` = events written by another process, i.e. every manual pick submitted over HTTP today). Server side only; end-to-end client numbers live in the 10c harness. RED lines are Mandate limits, YELLOW lines are guidance. Autopick deadline->commit latency from `draft_events` is the weekly `draft-scorecard` workflow, not this board. Runbook: docs/RUNBOOKS/draft-engine-v2-operations.md sections 2.4 / 2.5 / 3.5. Managed by infra/gcp/monitoring/apply-monitoring.sh - edit the JSON, not the console."
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 2,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Autopick totalMs (pick.processed, wasAutopick=true) - p50 / p95 / p99 [Mandate p95 <= 1000, p99 <= 2000]",
+          "xyChart": {
+            "chartOptions": {
+              "mode": "COLOR"
+            },
+            "yAxis": {
+              "label": "ms",
+              "scale": "LINEAR"
+            },
+            "thresholds": [
+              {
+                "label": "Mandate autopick p95 (1000 ms)",
+                "value": 1000,
+                "color": "RED",
+                "direction": "ABOVE",
+                "targetAxis": "Y1"
+              },
+              {
+                "label": "Mandate autopick p99 (2000 ms)",
+                "value": 2000,
+                "color": "YELLOW",
+                "direction": "ABOVE",
+                "targetAxis": "Y1"
+              }
+            ],
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "legendTemplate": "p50",
+                "minAlignmentPeriod": "60s",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_pick_total_ms\" AND metric.label.wasAutopick = \"true\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_50",
+                      "groupByFields": []
+                    }
+                  }
+                }
+              },
+              {
+                "plotType": "LINE",
+                "legendTemplate": "p95",
+                "minAlignmentPeriod": "60s",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_pick_total_ms\" AND metric.label.wasAutopick = \"true\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_95",
+                      "groupByFields": []
+                    }
+                  }
+                }
+              },
+              {
+                "plotType": "LINE",
+                "legendTemplate": "p99",
+                "minAlignmentPeriod": "60s",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_pick_total_ms\" AND metric.label.wasAutopick = \"true\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_99",
+                      "groupByFields": []
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "xPos": 6,
+        "yPos": 2,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Manual pick, HTTP route: NOTIFY -> broadcast (external_event.applied, eventType=pick) - p50 / p95 / p99 [Mandate fanout p95 <= 200; manual p95 <= 300 end to end]",
+          "xyChart": {
+            "chartOptions": {
+              "mode": "COLOR"
+            },
+            "yAxis": {
+              "label": "ms",
+              "scale": "LINEAR"
+            },
+            "thresholds": [
+              {
+                "label": "Mandate fanout p95 (200 ms)",
+                "value": 200,
+                "color": "RED",
+                "direction": "ABOVE",
+                "targetAxis": "Y1"
+              },
+              {
+                "label": "Mandate manual pick p95 (300 ms, end to end)",
+                "value": 300,
+                "color": "YELLOW",
+                "direction": "ABOVE",
+                "targetAxis": "Y1"
+              }
+            ],
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "legendTemplate": "p50",
+                "minAlignmentPeriod": "60s",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_external_event_notify_to_broadcast_ms\" AND metric.label.eventType = \"pick\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_50",
+                      "groupByFields": []
+                    }
+                  }
+                }
+              },
+              {
+                "plotType": "LINE",
+                "legendTemplate": "p95",
+                "minAlignmentPeriod": "60s",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_external_event_notify_to_broadcast_ms\" AND metric.label.eventType = \"pick\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_95",
+                      "groupByFields": []
+                    }
+                  }
+                }
+              },
+              {
+                "plotType": "LINE",
+                "legendTemplate": "p99",
+                "minAlignmentPeriod": "60s",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_external_event_notify_to_broadcast_ms\" AND metric.label.eventType = \"pick\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_99",
+                      "groupByFields": []
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 6,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "Broadcast fanout, server side (pick.processed.broadcastMs) - p50 / p95 [Mandate fanout p95 <= 200]",
+          "xyChart": {
+            "chartOptions": {
+              "mode": "COLOR"
+            },
+            "yAxis": {
+              "label": "ms",
+              "scale": "LINEAR"
+            },
+            "thresholds": [
+              {
+                "label": "Mandate fanout p95 (200 ms)",
+                "value": 200,
+                "color": "RED",
+                "direction": "ABOVE",
+                "targetAxis": "Y1"
+              }
+            ],
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "legendTemplate": "p50 autopick=${metric.labels.wasAutopick}",
+                "minAlignmentPeriod": "60s",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_pick_broadcast_ms\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_50",
+                      "groupByFields": [
+                        "metric.label.wasAutopick"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "plotType": "LINE",
+                "legendTemplate": "p95 autopick=${metric.labels.wasAutopick}",
+                "minAlignmentPeriod": "60s",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_pick_broadcast_ms\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_95",
+                      "groupByFields": [
+                        "metric.label.wasAutopick"
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "xPos": 6,
+        "yPos": 6,
+        "width": 6,
+        "height": 4,
+        "widget": {
+          "title": "submit_pick_v2 RPC (pick.processed.rpcMs) - p50 / p95 [guidance: > 200 ms server-side is what to chase, runbook 2.4 step 4]",
+          "xyChart": {
+            "chartOptions": {
+              "mode": "COLOR"
+            },
+            "yAxis": {
+              "label": "ms",
+              "scale": "LINEAR"
+            },
+            "thresholds": [
+              {
+                "label": "RPC guidance (200 ms)",
+                "value": 200,
+                "color": "YELLOW",
+                "direction": "ABOVE",
+                "targetAxis": "Y1"
+              }
+            ],
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "legendTemplate": "p50 autopick=${metric.labels.wasAutopick}",
+                "minAlignmentPeriod": "60s",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_pick_rpc_ms\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_50",
+                      "groupByFields": [
+                        "metric.label.wasAutopick"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "plotType": "LINE",
+                "legendTemplate": "p95 autopick=${metric.labels.wasAutopick}",
+                "minAlignmentPeriod": "60s",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_pick_rpc_ms\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_95",
+                      "groupByFields": [
+                        "metric.label.wasAutopick"
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 10,
+        "width": 4,
+        "height": 4,
+        "widget": {
+          "title": "Manual pick, engine path (pick.processed, wasAutopick=false) - p95 / p99 [Mandate p95 <= 300, p99 <= 500] - EMPTY until WS-direct submit ships (10c-2)",
+          "xyChart": {
+            "chartOptions": {
+              "mode": "COLOR"
+            },
+            "yAxis": {
+              "label": "ms",
+              "scale": "LINEAR"
+            },
+            "thresholds": [
+              {
+                "label": "Mandate manual p95 (300 ms)",
+                "value": 300,
+                "color": "RED",
+                "direction": "ABOVE",
+                "targetAxis": "Y1"
+              },
+              {
+                "label": "Mandate manual p99 (500 ms)",
+                "value": 500,
+                "color": "YELLOW",
+                "direction": "ABOVE",
+                "targetAxis": "Y1"
+              }
+            ],
+            "dataSets": [
+              {
+                "plotType": "LINE",
+                "legendTemplate": "p95",
+                "minAlignmentPeriod": "60s",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_pick_total_ms\" AND metric.label.wasAutopick = \"false\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_95",
+                      "groupByFields": []
+                    }
+                  }
+                }
+              },
+              {
+                "plotType": "LINE",
+                "legendTemplate": "p99",
+                "minAlignmentPeriod": "60s",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_pick_total_ms\" AND metric.label.wasAutopick = \"false\"",
+                    "aggregation": {
+                      "alignmentPeriod": "60s",
+                      "perSeriesAligner": "ALIGN_DELTA",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_99",
+                      "groupByFields": []
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "xPos": 4,
+        "yPos": 10,
+        "width": 4,
+        "height": 4,
+        "widget": {
+          "title": "watchdog_ok per 5 min (expect 5; alert: absent 15 min)",
+          "xyChart": {
+            "chartOptions": {
+              "mode": "COLOR"
+            },
+            "yAxis": {
+              "label": "count / 5 min",
+              "scale": "LINEAR"
+            },
+            "thresholds": [
+              {
+                "label": "absent",
+                "value": 1,
+                "color": "RED",
+                "direction": "BELOW",
+                "targetAxis": "Y1"
+              }
+            ],
+            "dataSets": [
+              {
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "watchdog_ok ${metric.labels.environment}",
+                "minAlignmentPeriod": "300s",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_watchdog_ok\"",
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "perSeriesAligner": "ALIGN_SUM",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "groupByFields": [
+                        "metric.label.environment"
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "xPos": 8,
+        "yPos": 10,
+        "width": 4,
+        "height": 4,
+        "widget": {
+          "title": "ERROR lines per 5 min by event (alert: 3+)",
+          "xyChart": {
+            "chartOptions": {
+              "mode": "COLOR"
+            },
+            "yAxis": {
+              "label": "count / 5 min",
+              "scale": "LINEAR"
+            },
+            "thresholds": [
+              {
+                "label": "alert threshold (> 2)",
+                "value": 2,
+                "color": "RED",
+                "direction": "ABOVE",
+                "targetAxis": "Y1"
+              }
+            ],
+            "dataSets": [
+              {
+                "plotType": "STACKED_BAR",
+                "legendTemplate": "${metric.labels.event}",
+                "minAlignmentPeriod": "300s",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_error_count\"",
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "perSeriesAligner": "ALIGN_SUM",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "groupByFields": [
+                        "metric.label.event"
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "xPos": 0,
+        "yPos": 14,
+        "width": 3,
+        "height": 5,
+        "widget": {
+          "title": "watchdog_ok, last 5 min",
+          "scorecard": {
+            "timeSeriesQuery": {
+              "timeSeriesFilter": {
+                "filter": "metric.type = \"logging.googleapis.com/user/citrus_engine_watchdog_ok\"",
+                "aggregation": {
+                  "alignmentPeriod": "300s",
+                  "perSeriesAligner": "ALIGN_SUM",
+                  "crossSeriesReducer": "REDUCE_SUM",
+                  "groupByFields": []
+                }
+              }
+            },
+            "sparkChartView": {
+              "sparkChartType": "SPARK_BAR"
+            },
+            "thresholds": [
+              {
+                "label": "absent",
+                "value": 1,
+                "color": "RED",
+                "direction": "BELOW"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "xPos": 3,
+        "yPos": 14,
+        "width": 9,
+        "height": 5,
+        "widget": {
+          "title": "Deploy fingerprints, watchdog failures and VM startup failures (raw lines)",
+          "logsPanel": {
+            "filter": "(logName=\"projects/${PROJECT_ID}/logs/citrus-startup-failed\") OR ((jsonPayload.container.metadata.app=\"citrus-draft-engine\" OR labels.app=\"citrus-draft-engine\") AND (jsonPayload.event=\"deployment.fingerprint\" OR jsonPayload.event=\"event_subscription.watchdog_failed\" OR jsonPayload.message:\"\\\"event\\\":\\\"deployment.fingerprint\\\"\" OR jsonPayload.message:\"\\\"event\\\":\\\"event_subscription.watchdog_failed\\\"\"))"
+          }
+        }
+      }
+    ]
+  }
+}
