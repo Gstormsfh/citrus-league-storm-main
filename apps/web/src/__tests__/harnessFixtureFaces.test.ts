@@ -232,6 +232,7 @@ describe('harness fixtures render real players with real faces', () => {
       'harness/slot.tsx',
       'harness/matchup.tsx',
       'harness/analytics.tsx',
+      'harness/advanced.tsx',
       'harness/stubs/draftFixtures.ts',
     ];
     const offenders: string[] = [];

@@ -23,6 +23,7 @@ npx vite --config harness/vite.config.ts
 | `/harness/slot.html` | MobileRosterList + Line Change sheet, page-shaped wiring |
 | `/harness/today.html` | Today strip in every state, locked chips, empty rows, Fill sheet (`?fill=slot-LW-1` opens it), Auto Lineup preview (`?auto=1` opens it; the strip's link does too) |
 | `/harness/scoreboard.html` | League scoreboard strip (live / open / final / bye) and the desktop rail; `?n=10` for a 20-team league |
+| `/harness/advanced.html` | `PlayerAdvancedCard` (PWS-1) — skater compact + expanded, defenceman, goalie, thin sample, and both degraded (401 / unknown player) states. `?w=NNN` sets the column width; default 353 is what the card gets inside `PlayerStatsModal` at 393. Identity is real; the xG/GAR/projection columns are derived arithmetic, and the page says so |
 | `/harness/matchup.html` | The mobile matchup lineup rows — real `MatchupPositionGroup` / `PlayerCard` / `CenterColumn`, week view, bench, day view, live and final states |
 
 `draft.html` accepts `?picks=N` to open the room N picks deep (default 5), and

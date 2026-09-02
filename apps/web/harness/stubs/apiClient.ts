@@ -1,5 +1,5 @@
 /** Stand-in for @/api/client. Routes the three GETs the draft room makes. */
-import { TEAMS, MY_TEAM_ID, ROUNDS, TEAM_COUNT } from './draftFixtures';
+import { TEAMS, MY_TEAM_ID, ROUNDS, TEAM_COUNT, DASHBOARD_INDEX } from './draftFixtures';
 
 const LEAGUE = {
   id: 'harness-league',
@@ -16,6 +16,13 @@ const LEAGUE = {
 };
 
 async function get<T>(path: string): Promise<{ data: T }> {
+  // The advanced player card's payload. Served here so the draft room's
+  // real PlayerStatsModal shows the real card; a stub that returned {} left
+  // the card in its degraded (render-nothing) state and the integration
+  // could not be reviewed at all.
+  if (/\/api\/players\/dashboard-index/.test(path)) {
+    return { data: DASHBOARD_INDEX as unknown as T };
+  }
   if (/\/my-team$/.test(path)) return { data: { id: MY_TEAM_ID } as T };
   if (/\/teams$/.test(path)) return { data: TEAMS as unknown as T };
   if (/\/api\/leagues\/[^/]+$/.test(path)) return { data: LEAGUE as unknown as T };

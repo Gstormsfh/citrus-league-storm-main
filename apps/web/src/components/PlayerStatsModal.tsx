@@ -21,6 +21,7 @@ import { ScoringCalculator } from '@/utils/scoringUtils';
 import { generatePlayerWriteup, WriteupTone } from '@/utils/playerWriteup';
 import { getUpcomingSeasonStartDate, getCurrentSeason } from '@citrus/shared';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
+import { PlayerAdvancedCard } from '@/components/player/PlayerAdvancedCard';
 
 /* 2026-08-19 visual audit — muted-text correction.
    text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
@@ -722,6 +723,33 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
             {/* ─── Detailed Stats Tab ─── */}
             <TabsContent value="advanced" className="mt-0 space-y-4">
+              {/* PWS-1 ADVANCED CARD (2026-09-02) — the highest-leverage
+                  single integration of the player-dashboard design system,
+                  because THIS modal is the one player card the whole app
+                  opens: Roster, Free Agents, Matchup, Trade Analyzer, Other
+                  Team, Pool Playoff Roster, Team Intel Hub, DraftRoom and
+                  DraftRoomV2 all render it (grepped 2026-09-02, ten call
+                  sites). Wiring it here puts xG/60, G-xG finishing, the GAR
+                  decomposition and the ROS projection on every one of them
+                  from one diff.
+
+                  It leads the DETAILED tab rather than Overview on purpose.
+                  Overview already opens with the derived Citrus writeup,
+                  which is a verdict-shaped block; a second verdict line
+                  above it would be the "double-up" PWS-2 warns about. This
+                  tab is where a manager comes for exactly these numbers,
+                  and the card supersedes the two-cell "Advanced" box
+                  (xGoals + SH%) that used to be the whole of it.
+
+                  `enabled={isOpen}` so a closed modal on a guest surface
+                  never even asks; and the card returns null on 401, so the
+                  tab renders precisely what it rendered before. */}
+              <PlayerAdvancedCard
+                playerId={player.id}
+                variant="expanded"
+                enabled={isOpen}
+              />
+
               {isGoalie ? (
                 <>
                   <div className="grid grid-cols-2 gap-2">

@@ -88,3 +88,70 @@ export const PLAYERS = Array.from({ length: 240 }, (_, i) => {
     highDangerSavePct: 0, goalsSavedAboveExpected: 0,
   };
 });
+
+/**
+ * The `/api/players/dashboard-index` payload for the draft harness, built
+ * from the SAME pool rows above so the card and the row a reviewer tapped
+ * cannot disagree about the same player.
+ *
+ * REAL: name, team, sweater, NHL id, headshot URL — off `harness/players.ts`.
+ * DERIVED: `x_goals`, `xg_per_60`, the five `gar_*` components and every
+ * `proj_*` column. The harness has no database and this endpoint is exactly
+ * the thing being stood in for. The arithmetic is deterministic and lands in
+ * a plausible range so the layout can be measured; nobody should read a
+ * NUMBER off a harness screenshot. `/harness/advanced.html` carries the same
+ * note on the page itself.
+ */
+export const DASHBOARD_INDEX = PLAYERS.map((row) => {
+  const isGoalie = row.position === 'G';
+  const isD = row.position === 'D';
+  const gp = isGoalie ? (row.goalie_gp ?? 0) : row.games_played;
+  const xGoals = isGoalie ? 0 : Math.round(row.shots * 0.083 * 10) / 10;
+  const sixties = gp > 0 ? (gp * (isD ? 21 : 18)) / 60 : 0;
+  const ppg = gp > 0 ? row.points / gp : 0;
+  const garTotal = isGoalie ? null : Math.round(ppg * 0.55 * 100) / 100;
+  const share = (f: number) => (garTotal == null ? null : Math.round(garTotal * f * 100) / 100);
+  return {
+    id: Number(row.id),
+    name: row.full_name,
+    team: row.team,
+    position: row.position,
+    jersey: Number(row.jersey_number),
+    headshot_url: row.headshot_url,
+    is_goalie: isGoalie,
+    roster_status: null,
+    gp,
+    goals: row.goals,
+    assists: row.assists,
+    points: row.points,
+    sog: row.shots,
+    hits: row.hits,
+    blocks: row.blocks,
+    ppp: row.ppp,
+    plus_minus: row.plus_minus,
+    x_goals: xGoals,
+    wins: row.wins ?? 0,
+    saves: row.saves ?? 0,
+    save_pct: row.save_percentage ?? 0,
+    gaa: row.goals_against_average ?? 0,
+    shutouts: row.shutouts ?? 0,
+    xg_per_60: isGoalie || sixties === 0 ? null : Math.round((xGoals / sixties) * 100) / 100,
+    xg_rating: null,
+    gar_per_60: garTotal,
+    gar_evo: isD ? share(0.25) : share(0.6),
+    gar_evd: isD ? share(0.5) : share(0.12),
+    gar_ppo: share(0.2),
+    gar_ppd: share(0.03),
+    gar_pen: share(0.05),
+    proj_gp: isGoalie ? 34 : 58,
+    proj_fantasy_points: Math.round(ppg * 58 * 4.2 * 10) / 10,
+    proj_fantasy_ppg: Math.round(ppg * 4.2 * 100) / 100,
+    proj_goals: Math.round(row.goals * 0.7),
+    proj_assists: Math.round(row.assists * 0.7),
+    proj_sog: Math.round(row.shots * 0.7),
+    proj_ppp: Math.round(row.ppp * 0.7),
+    proj_wins: isGoalie ? Math.round((row.wins ?? 0) * 0.6) : null,
+    proj_saves: isGoalie ? 780 : null,
+    proj_shutouts: isGoalie ? 2 : null,
+  };
+});

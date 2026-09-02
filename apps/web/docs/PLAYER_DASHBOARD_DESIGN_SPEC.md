@@ -542,6 +542,58 @@ in job-to-be-done:
 but with Citrus 2.0 design vocabulary (PercentileBullet primitives,
 dark forest surfaces, JBMono numerics, hairline rings).
 
+#### Implementation note — 2026-09-02 (shipped)
+
+Built as `apps/web/src/components/player/PlayerAdvancedCard.tsx`, with the
+numbers in `player/playerAdvancedMetrics.ts` and the cohort/percentile maths
+in `utils/playerPercentiles.ts`. Wired into `components/PlayerStatsModal.tsx`
+(the Detailed tab), which is the single player card Roster, Free Agents,
+Matchup, Trade Analyzer, Other Team, Pool Playoff Roster, Team Intel Hub,
+DraftRoom and DraftRoomV2 all open — ten call sites from one integration.
+Data comes from the existing `/api/players/dashboard-index` via a new shared
+once-per-session hook, `hooks/usePlayerDashboardIndex.ts`. Review surface:
+`/harness/advanced.html`.
+
+Five deviations from the spec above, each forced by something measured:
+
+1. **The stated envelope cannot hold the stated content.** PWS-1 asks for
+   ~180–240px tall AND 6–8 `PercentileBullet size="sm"` rows. A `sm` bullet
+   measures ~27px plus an 8px gap, so eight rows are ~272px before the
+   identity strip, the verdict or anything else. Measured in the harness at
+   393×852: the card is **353 × 407px with four metric rows** (`compact`) and
+   **353 × 587px with seven plus the projection** (`expanded`). The height
+   number in this spec is the one that has to move; the content list is what
+   makes the card worth having.
+2. **Two variants, not one.** `compact` is the embedded card (four rows);
+   `expanded` adds the rest of the GAR decomposition and the rest-of-season
+   projection, for hosts with the height. The modal uses `expanded`.
+3. **The eyebrow reads `POS · TEAM · #JERSEY`, not `POS · TEAM · AGE`.**
+   There is no birth date on `DashboardIndexEntry` and `player_directory`
+   is not joined for one. Jersey takes the slot rather than an invented age.
+4. **The click-through is a labelled link, not the whole card.** PWS-1 says
+   "card is a link to `/players/[slug]-[playerId]`". That route does not
+   exist — `App.tsx` registers `/players`, and `Players.tsx` reads a
+   `?player=` param — so the href is `/players?player=<id>`. And the card's
+   biggest host is a modal that opens inside a LIVE DRAFT: making the whole
+   surface a navigation target would let a manager tap a percentile bar and
+   leave the draft room. One "Full dashboard →" link instead.
+5. **No `SparklineMicroChart` and no `StaleDataBadge` on this card.** Both
+   were in scope and both were cut for the same reason: the payload cannot
+   support them honestly. The sparkline needs a series and the endpoint
+   reads `getCurrentSeason()` only (`player_xg_season` holds 2017–2025 in
+   the database — a real career arc, and the obvious next win); the badge
+   needs an `asOf` and there is no timestamp on the payload, so it would
+   render a permanent "Very outdated · Update timestamp unavailable" chip,
+   which is itself a false claim. Both become available with a server
+   change; neither was made on a UI branch.
+
+Also noted as follow-up, not done here: **GSAx is missing from the goalie
+card**. `goalie_gsax_primary` carries `raw_gsax` / `regressed_gsax` for 98
+goalies in 2025 and it is the best goalie metric Citrus owns, but
+`PlayerDashboardService` does not join that table. The goalie card therefore
+runs on save rate, GAA, wins and shutouts. Adding the join makes a GSAx
+bullet a ten-line change to `playerAdvancedMetrics.ts`.
+
 ### PWS-2: Profile-page consolidation — condensed card at top of full profile
 
 Garrett's observation post-iter #2 walkthrough: the full
@@ -594,3 +646,4 @@ with a dated note. Don't let the spec drift from reality.
 | 2026-05-04 | Initial spec — Concept 3 (Spatial Hero) locked | Garrett + Claude |
 | 2026-05-04 | Added Section 8 (canonical mockup paths) + Section 9 (META-RULE: 4-step resource consultation protocol). Section 10 was previously Section 8. | Garrett + Claude |
 | 2026-05-05 | Added Post-Web-Summit todos section: PWS-1 PlayerCard (condensed), PWS-2 profile-page consolidation, PWS-3 WrappedChapter library extension, PWS-4 G−xG true differential color encoding | Garrett + Claude |
+| 2026-09-02 | PWS-1 BUILT and shipped into `PlayerStatsModal`. Added an implementation note under PWS-1 recording five measured deviations: the 180–240px envelope cannot hold 6–8 bullets (measured 407px compact / 587px expanded at 353px wide), a compact/expanded variant split, `#JERSEY` in place of `AGE` (no birth date on the payload), a labelled click-through to `/players?player=<id>` in place of a whole-card link to a route that does not exist, and Sparkline/StaleDataBadge cut because the payload carries neither a series nor a timestamp. GSAx logged as the top server-side follow-up. | Claude |

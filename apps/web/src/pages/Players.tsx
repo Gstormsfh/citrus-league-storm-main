@@ -9,12 +9,20 @@
 // server merges directory + season stats + GAR components + talent
 // metrics + ROS projections, cached 2 min server-side). All filtering,
 // sorting, and percentile math happens client-side on that bounded
-// payload (~1–2k rows) — no per-interaction network chatter.
+// payload (~1-2k rows) — no per-interaction network chatter.
+//
+// 2026-09-02: that call moved OUT of this page and into
+// `hooks/usePlayerDashboardIndex`. The same payload now feeds
+// `PlayerAdvancedCard`, which renders inside the shared PlayerStatsModal on
+// eight other surfaces; two independent `useEffect` fetches of the same 1-2k
+// rows was the alternative. The page's behaviour is unchanged — same loading
+// state, same error string, same Retry — but the retry now calls the shared
+// `reload()` instead of bumping a local nonce.
 //
 // Deep-link: /players?player=<id> selects that player on load;
 // selection writes the param back so any player view is shareable.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { Card } from '@/components/ui/card';
@@ -22,52 +30,20 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Search, ShieldAlert } from 'lucide-react';
-import { apiClient } from '@/api/client';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
+import {
+  usePlayerDashboardIndex,
+  type DashboardIndexEntry,
+} from '@/hooks/usePlayerDashboardIndex';
 
-export interface DashboardPlayer {
-  id: number;
-  name: string;
-  team: string;
-  position: string;
-  jersey: number | null;
-  headshot_url: string | null;
-  is_goalie: boolean;
-  roster_status: string | null;
-  gp: number;
-  goals: number;
-  assists: number;
-  points: number;
-  sog: number;
-  hits: number;
-  blocks: number;
-  ppp: number;
-  plus_minus: number;
-  x_goals: number;
-  wins: number;
-  saves: number;
-  save_pct: number;
-  gaa: number;
-  shutouts: number;
-  xg_per_60: number | null;
-  xg_rating: string | null;
-  gar_per_60: number | null;
-  gar_evo: number | null;
-  gar_evd: number | null;
-  gar_ppo: number | null;
-  gar_ppd: number | null;
-  gar_pen: number | null;
-  proj_gp: number | null;
-  proj_fantasy_points: number | null;
-  proj_fantasy_ppg: number | null;
-  proj_goals: number | null;
-  proj_assists: number | null;
-  proj_sog: number | null;
-  proj_ppp: number | null;
-  proj_wins: number | null;
-  proj_saves: number | null;
-  proj_shutouts: number | null;
-}
+/**
+ * One row of /api/players/dashboard-index.
+ *
+ * The shape now lives with the fetch, in `hooks/usePlayerDashboardIndex`, so
+ * the advanced player card and this page cannot drift apart on what a row
+ * is. Kept as a named export here because that is where it has always been.
+ */
+export type DashboardPlayer = DashboardIndexEntry;
 
 const POSITIONS = ['C', 'LW', 'RW', 'D', 'G'] as const;
 
@@ -351,10 +327,9 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
 
 const Players = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [players, setPlayers] = useState<DashboardPlayer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [fetchNonce, setFetchNonce] = useState(0);
+  // The shared, once-per-session payload. Identical loading/error semantics
+  // to the effect this replaced; `reload` is what Retry calls.
+  const { players, loading, error: loadError, reload } = usePlayerDashboardIndex();
 
   const [search, setSearch] = useState('');
   const [team, setTeam] = useState<string>('ALL');
@@ -370,29 +345,6 @@ const Players = () => {
   // never on load — `selected` defaults to the top scorer, which must
   // not auto-open a sheet).
   const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setLoadError(null);
-    void (async () => {
-      try {
-        const response = await apiClient.get<DashboardPlayer[]>('/api/players/dashboard-index');
-        if (cancelled) return;
-        const list = (response.data ?? (response as unknown as DashboardPlayer[])) as DashboardPlayer[];
-        setPlayers(Array.isArray(list) ? list : []);
-      } catch (err) {
-        if (!cancelled) {
-          setLoadError((err as { message?: string })?.message ?? 'Failed to load players.');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchNonce]);
 
   const teams = useMemo(
     () => Array.from(new Set(players.map((p) => p.team).filter(Boolean))).sort(),
@@ -531,7 +483,7 @@ const Players = () => {
         {!loading && loadError && (
           <Card className="flex items-center justify-between gap-4 p-5">
             <p className="text-sm text-destructive">{loadError}</p>
-            <Button variant="outline" onClick={() => setFetchNonce((n) => n + 1)} data-testid="players-retry">
+            <Button variant="outline" onClick={() => void reload()} data-testid="players-retry">
               Retry
             </Button>
           </Card>
