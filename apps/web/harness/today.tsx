@@ -22,7 +22,7 @@ import { AutoLineupSheet, type AutoLineupScope } from '../src/components/roster/
 import { planAutoLineup, BENCH } from '../src/components/roster/autoLineup';
 import { TodayStrip } from '../src/components/roster/TodayStrip';
 import { computeTodaySummary } from '../src/components/roster/todaySummary';
-import { Toaster } from '../src/components/ui/toaster';
+import { CitrusToaster } from '../src/components/notifications/CitrusToaster';
 import type { HockeyPlayer } from '../src/components/roster/HockeyPlayerCard';
 
 declare global { interface Window { __log: string[] } }
@@ -142,7 +142,7 @@ function App() {
     <div className="min-h-screen bg-[#0F1F15] p-3 space-y-3">
       {/* First, so its subscription exists before the list's first-run hint
           dispatches — in the app the Toaster lives at the root of App.tsx. */}
-      <Toaster />
+      <CitrusToaster />
       <p className="font-jbmono text-[10px] uppercase tracking-[0.2em] text-white/55">
         Today strip states @ 393
       </p>

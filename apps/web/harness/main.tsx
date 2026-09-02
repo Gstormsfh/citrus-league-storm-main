@@ -12,7 +12,7 @@ import '../src/index.css';
 import { PlayerService, type Player } from '../src/services/PlayerService';
 import { rosterApi } from '../src/api/rosters';
 import { DropPlayerForAddDialog } from '../src/components/freeagents/DropPlayerForAddDialog';
-import { Toaster } from '../src/components/ui/toaster';
+import { CitrusToaster } from '../src/components/notifications/CitrusToaster';
 
 const POS = ['C', 'LW', 'RW', 'D', 'D', 'C', 'RW', 'LW', 'D', 'C', 'G', 'G'];
 
@@ -84,7 +84,7 @@ function App() {
         teamId="harness-team"
         userId="harness-user"
       />
-      <Toaster />
+      <CitrusToaster />
     </>
   );
 }
