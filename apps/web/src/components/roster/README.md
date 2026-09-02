@@ -76,7 +76,14 @@ locked player's chip goes neutral with a lock glyph (`LOCKED_CHIP` in
 starter row is one tap target**: with a player selected it is the move
 target, with nothing selected it opens the Fill sheet. Pass `swapHint` on
 editable lists to show the one-time "Tap a position to swap" toast
-(`useSwapHint`, localStorage-backed, try/catch).
+(`useSwapHint`, localStorage-backed, try/catch). The **Injured Reserve
+section is always on the page**, headed `n/N` from `irSlotCount` (resolve it
+with `resolveIrSlotCount` in `irSlots.ts` — the server's rule,
+`settings.rosterSlots.IR` else 3); empty it reads "No one on IR", and with an
+IR-eligible player selected the open slot is a move target like any other.
+The row's `team · vs OPP · 7:00 PM` line comes from the selected date's
+schedule row (`gameDay.ts`: `gameOnDate` + `rowGameFor`), never from a
+placeholder — no opponent, no text.
 
 ### SlotPickerMenu ("Line change") and FillSlotSheet ("Fill a spot")
 Two directions of the same move, one bottom-sheet language. Line change is

@@ -66,6 +66,20 @@ describe('TodayStrip — what it says', () => {
     expect(screen.queryByTestId('strip-locked')).toBeNull();
   });
 
+  it('carries a past day\'s read-only mark when asked — the phone chrome has no Viewing line for it (audit R4)', () => {
+    render(<TodayStrip summary={summary()} dayLabel="Tue Oct 14" tense="past" readOnly />);
+    expect(screen.getByTestId('strip-readonly')).toHaveTextContent(/read only/);
+    expect(strip()).toHaveTextContent(/starters played/);
+  });
+
+  it('says nothing about read-only by default, and never while pending', () => {
+    const { unmount } = render(<TodayStrip summary={summary()} dayLabel="Tue Oct 14" tense="past" />);
+    expect(screen.queryByTestId('strip-readonly')).toBeNull();
+    unmount();
+    render(<TodayStrip summary={summary()} dayLabel="Tue Oct 14" tense="past" readOnly pending />);
+    expect(screen.queryByTestId('strip-readonly')).toBeNull();
+  });
+
   it('shows a pending line instead of zeros while projections load', () => {
     render(
       <TodayStrip

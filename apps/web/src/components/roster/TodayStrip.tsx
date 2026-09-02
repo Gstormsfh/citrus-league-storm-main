@@ -51,6 +51,13 @@ export interface TodayStripProps {
   editable?: boolean;
   /** Inline "Auto Lineup" — the page's existing handler. Hidden when absent. */
   onAutoLineup?: () => void;
+  /**
+   * The day is frozen and this strip is the only place that says so
+   * (2026-09-01, audit R4): the phone chrome dropped the "Viewing: … Read
+   * Only" line, so a past day carries its lock here — "read only" after the
+   * numbers, in the same segment style as the locked count.
+   */
+  readOnly?: boolean;
   className?: string;
 }
 
@@ -66,6 +73,7 @@ export function TodayStrip({
   pending = false,
   editable = false,
   onAutoLineup,
+  readOnly = false,
   className,
 }: TodayStripProps) {
   const attention = !pending && editable && summary.needsAttention;
@@ -143,6 +151,18 @@ export function TodayStrip({
               {DOT}
               <Lock className="w-2.5 h-2.5 self-center" aria-hidden="true" />
               <span className={cn(NUM, 'text-pastel-cream')}>{summary.locked}</span> locked
+            </span>
+          )}
+
+          {readOnly && (
+            <span
+              data-testid="strip-readonly"
+              className="inline-flex items-baseline gap-1 whitespace-nowrap"
+              title="This day has been played. Lineups for past days cannot be changed."
+            >
+              {DOT}
+              <Lock className="w-2.5 h-2.5 self-center" aria-hidden="true" />
+              read only
             </span>
           )}
         </>

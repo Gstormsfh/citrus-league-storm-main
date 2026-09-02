@@ -8,6 +8,7 @@ import { SlotPickerMenu } from "./SlotPickerMenu";
 // Aliased: the list body already names its slot->position map `slotLabel`.
 import { slotLabel as labelForSlot } from "./slotLabel";
 import { LOCKED_CHIP } from "./slotChip";
+import { DEFAULT_IR_SLOT_COUNT, irSlotIds } from "./irSlots";
 import { Mug } from "./Mug";
 import { useSwapHint } from "@/hooks/useSwapHint";
 import { useMemo } from "react";
@@ -55,6 +56,13 @@ interface MobileRosterListProps {
   swapHint?: boolean;
   positionType?: PositionType;
   rosterSlots?: Record<string, number>;
+  /**
+   * Injured Reserve slots in this league (audit R8). The section renders
+   * whether or not anyone is on IR, headed "Injured Reserve n/N", so the
+   * slot is discoverable before the first injury. Resolve it with
+   * `resolveIrSlotCount` (the server's rule); 0 hides the section.
+   */
+  irSlotCount?: number;
 }
 
 /**
@@ -378,12 +386,14 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
 };
 
 // ─── Section header ──────────────────────────────────────────────────
-const SectionHeader = ({ label, count, icon }: { label: string; count: number; icon: React.ReactNode }) => (
+// `of` prints the badge as "filled/slots" — the IR header uses it so an
+// empty section still says how many slots the league has (audit R8).
+const SectionHeader = ({ label, count, of, icon }: { label: string; count: number; of?: number; icon: React.ReactNode }) => (
   <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-pastel-sage/20 via-pastel-sage/10 to-transparent border-b border-pastel-sage/25">
     {icon}
     <span className="text-sm font-varsity font-black text-pastel-cream uppercase tracking-wide">{label}</span>
-    <Badge variant="outline" className="text-[10px] font-display h-4 px-1.5 ml-auto border-pastel-sage/30 text-white/60">
-      {count}
+    <Badge variant="outline" className="text-[10px] font-display tabular-nums h-4 px-1.5 ml-auto border-pastel-sage/30 text-white/60">
+      {of == null ? count : `${count}/${of}`}
     </Badge>
   </div>
 );
@@ -406,6 +416,7 @@ const MobileRosterList = ({
   swapHint = false,
   positionType = 'individual',
   rosterSlots,
+  irSlotCount = DEFAULT_IR_SLOT_COUNT,
 }: MobileRosterListProps) => {
 
   // First-visit hint (audit R2) — once, and only when there is a roster to
@@ -494,6 +505,15 @@ const MobileRosterList = ({
 
   const benchIsTarget = tapSelectedPlayerId != null && tapEligibleSlots.has('bench-grid');
 
+  // The first OPEN IR slot the page judged legal for the selected player —
+  // `tapEligibleSlots` is Roster.tsx's and already carries the is_ir_eligible
+  // gate; this only skips slots someone is already lying in.
+  const openIrTarget = useMemo(() => {
+    if (tapSelectedPlayerId == null) return null;
+    const taken = new Set(Object.values(slotAssignments));
+    return irSlotIds(irSlotCount).find((id) => tapEligibleSlots.has(id) && !taken.has(id)) ?? null;
+  }, [tapSelectedPlayerId, tapEligibleSlots, slotAssignments, irSlotCount]);
+
   // CONTRAST (2026-08-13) — was `bg-card`, which resolves to the LIGHT
   // theme token (--card: 85 40% 90% => #E7F0DB). Every text token in
   // this component is a DARK-surface token: text-pastel-cream for
@@ -580,12 +600,17 @@ const MobileRosterList = ({
         })}
       </div>
 
-      {/* IR */}
-      {ir.length > 0 && (
+      {/* IR — always on the page (audit R8). The section used to render only
+          once someone was hurt, so a manager with a healthy roster had no way
+          to learn the league even had IR slots. Now it is headed "Injured
+          Reserve n/N" from the league's real slot count, with an empty-state
+          row until it is needed. */}
+      {irSlotCount > 0 && (
         <>
           <SectionHeader
             label="Injured Reserve"
             count={ir.length}
+            of={irSlotCount}
             icon={<Skull className="w-4 h-4 text-red-400" />}
           />
           {ir.map(player => {
@@ -605,6 +630,30 @@ const MobileRosterList = ({
             );
             return row;
           })}
+          {openIrTarget ? (
+            /* A selected IR-eligible player: the open slot is a move target,
+               the same gesture the empty starter rows offer. */
+            <div
+              role="button"
+              aria-label="Move here: IR"
+              data-testid="ir-move-target"
+              className="flex items-center px-3 py-2 min-h-[44px] cursor-pointer bg-pastel-sage/10 border-b border-pastel-sage/30 active:bg-pastel-sage/15"
+              onClick={() => onSlotTap?.(openIrTarget)}
+            >
+              <div className="flex-1 flex items-center justify-center py-1.5 rounded-md border border-dashed border-pastel-sage bg-pastel-sage/5">
+                <span className="text-xs font-display text-pastel-sage font-bold">Tap to move to IR</span>
+              </div>
+            </div>
+          ) : ir.length === 0 ? (
+            <div
+              data-testid="ir-empty"
+              className="flex items-center px-3 py-2 min-h-[44px] border-b border-pastel-sage/10"
+            >
+              <div className="flex-1 flex items-center justify-center py-1.5 rounded-md border border-dashed border-white/10 bg-white/[0.03]">
+                <span className="text-xs font-display text-white/55">No one on IR</span>
+              </div>
+            </div>
+          ) : null}
         </>
       )}
 

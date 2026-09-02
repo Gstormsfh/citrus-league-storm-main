@@ -15,6 +15,15 @@ interface WeeklyScheduleProps {
   // SINGLE SOURCE OF TRUTH: Calculated totals from MatchupComparison
   calculatedDailyTotals?: Map<string, { myTotal: number; oppTotal: number }>;
   hideScores?: boolean; // If true, hide the points display (for Roster tab)
+  /**
+   * One-row day picker for the phone roster chrome (2026-09-01, audit R4):
+   * seven chips, weekday + day number, no scores, no header row. The
+   * "Viewing:" line and the Full Week button belong to the matchup page —
+   * on a lineup there is no "full week" to return to, and the selected chip
+   * already says which day is open. Day-state rings are unchanged: today =
+   * orange, selected = sage (selected wins), otherwise white/10.
+   */
+  compact?: boolean;
 }
 
 export const WeeklySchedule = ({
@@ -26,6 +35,7 @@ export const WeeklySchedule = ({
   team2Name,
   calculatedDailyTotals,
   hideScores = false,
+  compact = false,
 }: WeeklyScheduleProps) => {
   const todayStr = getTodayMST(); // Get today's date string in MST (YYYY-MM-DD)
 
@@ -98,6 +108,64 @@ export const WeeklySchedule = ({
   const isSelected = (dateStr: string): boolean => {
     return selectedDate === dateStr;
   };
+
+  const formatDayNumber = (dateStr: string): string => String(Number(dateStr.split('-')[2]));
+
+  if (compact) {
+    return (
+      <div className="w-full" data-testid="weekly-schedule-compact">
+        <div className="grid grid-cols-7 gap-1" role="group" aria-label="Day of the week">
+          {dates.map((date) => {
+            const isTodayDate = isToday(date);
+            const isPastDate = isPast(date);
+            const isSelectedDate = isSelected(date);
+            return (
+              <Card
+                key={date}
+                role="button"
+                tabIndex={0}
+                aria-pressed={isSelectedDate}
+                aria-label={`${formatDayLabel(date)} ${formatDateLabel(date)}${isTodayDate ? ', today' : ''}`}
+                data-today={isTodayDate ? 'true' : undefined}
+                data-selected={isSelectedDate ? 'true' : undefined}
+                className={cn(
+                  "cursor-pointer transition-all rounded-lg overflow-hidden bg-[#1A2A20] active:scale-95",
+                  isSelectedDate && "ring-2 ring-pastel-sage shadow-[0_8px_24px_-8px_rgba(132,165,125,0.4)]",
+                  isTodayDate && !isSelectedDate && "ring-2 ring-pastel-orange",
+                  !isSelectedDate && !isTodayDate && "ring-1 ring-white/10",
+                  isPastDate && "opacity-75"
+                )}
+                onClick={() => onDayClick(date)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onDayClick(date);
+                  }
+                }}
+              >
+                <CardContent className="p-0 py-1.5">
+                  <div className="flex flex-col items-center gap-0.5 leading-none">
+                    <div className={cn(
+                      "font-jbmono text-[8px] font-bold uppercase tracking-[0.12em]",
+                      isTodayDate ? "text-pastel-orange" : "text-white/55"
+                    )}>
+                      {formatDayLabel(date)}
+                    </div>
+                    <div className={cn(
+                      "font-jbmono text-[12px] font-bold tabular-nums",
+                      isTodayDate ? "text-pastel-orange" : "text-pastel-cream"
+                    )}>
+                      {formatDayNumber(date)}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">

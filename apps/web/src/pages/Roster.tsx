@@ -33,6 +33,8 @@ import { TodayStrip } from '@/components/roster/TodayStrip';
 import { computeTodaySummary } from '@/components/roster/todaySummary';
 import { AutoLineupSheet, type AutoLineupDay, type AutoLineupScope } from '@/components/roster/AutoLineupSheet';
 import { planAutoLineup, type AutoLineupPlan } from '@/components/roster/autoLineup';
+import { resolveIrSlotCount } from '@/components/roster/irSlots';
+import { gameOnDate, rowGameFor } from '@/components/roster/gameDay';
 import { ApiError } from '@/api/client';
 import MobileMenuButton from '@/components/MobileMenuButton';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
@@ -42,7 +44,7 @@ import { LeagueService, Transaction, LEAGUE_TEAMS_DATA } from '@/services/League
 import type { LeagueSettings } from '@/types/leagueTypes';
 import { DraftService } from '@/services/DraftService';
 import { CitrusPuckService } from '@/services/CitrusPuckService';
-import { ScheduleService } from '@/services/ScheduleService';
+import { ScheduleService, type NHLGame } from '@/services/ScheduleService';
 import { MatchupService } from '@/services/MatchupService';
 import { GameLockService } from '@/services/GameLockService';
 import { WaiverService } from '@/services/WaiverService';
@@ -315,6 +317,11 @@ const Roster = () => {
     };
   }, [leaguePositionType, leagueRosterSlots]);
 
+  // Injured Reserve slots per the league's roster config — the server's rule
+  // (settings.rosterSlots.IR, else 3), so the "n/N" the list shows is the
+  // count a save will honour (audit R8).
+  const irSlotCount = useMemo(() => resolveIrSlotCount(leagueRosterSlots), [leagueRosterSlots]);
+
   const [teamStats, setTeamStats] = useState({
     record: "0-0-0",
     rank: "-",
@@ -349,8 +356,11 @@ const Roster = () => {
   const [projectionsByDate, setProjectionsByDate] = useState<Map<string, Map<number, any>>>(new Map());
   // Daily actual game stats (for live/final games)
   const [dailyStatsByDateMap, setDailyStatsByDateMap] = useState<Map<string, Map<number, any>>>(new Map());
-  // Game status from schedule (scheduled/live/intermission/final)
-  const [gameStatusMap, setGameStatusMap] = useState<Map<number, { status: string; score?: string }>>(new Map());
+  // The schedule rows for every team on the roster, keyed by team abbreviation,
+  // covering the selected matchup week (or just the selected day when no
+  // matchup frames it). Rows derive opponent, face-off time, live/final status
+  // and score for the selected date from this — see gameDay.ts (audit R9).
+  const [scheduleByTeam, setScheduleByTeam] = useState<Map<string, NHLGame[]>>(new Map());
   
   // Initial empty roster state
   const [roster, setRoster] = useState<RosterState>({
@@ -1841,61 +1851,64 @@ const Roster = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, roster.starters.length, roster.bench.length, roster.ir.length]);
 
-  // Fetch game status from schedule for players with games today
+  // The teams on the roster, as one stable key — the schedule effect below
+  // refetches when the set changes, not when a player object is re-created.
+  const rosterTeamsKey = useMemo(() => {
+    const teams = new Set<string>();
+    for (const p of [...roster.starters, ...roster.bench, ...roster.ir]) {
+      const t = (p.teamAbbreviation || '').toUpperCase();
+      if (t) teams.add(t);
+    }
+    return [...teams].sort().join(',');
+  }, [roster.starters, roster.bench, roster.ir]);
+
+  // SCHEDULE FOR THE SELECTED WEEK (2026-09-01, audit R9)
+  //
+  // This used to fetch each team's NEXT game and keep only its status and
+  // score, and only when that game fell on the selected date — so a past day
+  // had no status unless the team also played today, and every row's
+  // opponent came from `loadRoster`, which reads today's schedule alone.
+  // Now one bounded request covers the whole matchup week (ScheduleService
+  // dedupes and caches it, and it is a superset of the today-only lookups
+  // the page already makes), and the rows derive opponent, time, status and
+  // score for whichever day is open from these rows. Today keeps the 60s
+  // refresh for live scores; other days are fetched once.
+  const matchupWeekStart = currentMatchup?.week_start_date;
+  const matchupWeekEnd = currentMatchup?.week_end_date;
   useEffect(() => {
     const targetDate = selectedDate || getTodayMST();
-    const todayStr = getTodayMST();
-    // Only fetch game status for today's games (past games are always final)
-    if (targetDate !== todayStr && targetDate < todayStr) {
-      // Past date: all games are final
-      const allPlayers = [...roster.starters, ...roster.bench, ...roster.ir];
-      const statusMap = new Map<number, { status: string; score?: string }>();
-      allPlayers.forEach(p => {
-        const pid = typeof p.id === 'string' ? parseInt(p.id) : p.id;
-        if (p.nextGame) statusMap.set(pid, { status: 'final' });
-      });
-      setGameStatusMap(statusMap);
-      return;
-    }
+    const teams = rosterTeamsKey ? rosterTeamsKey.split(',') : [];
+    if (teams.length === 0) return;
 
-    // For today: use schedule data to get live game status
-    const fetchGameStatus = async () => {
+    const inMatchupWeek =
+      !!matchupWeekStart && !!matchupWeekEnd &&
+      matchupWeekStart <= targetDate && targetDate <= matchupWeekEnd;
+    const rangeStart = inMatchupWeek ? matchupWeekStart : targetDate;
+    const rangeEnd = inMatchupWeek ? matchupWeekEnd : targetDate;
+
+    let cancelled = false;
+    const fetchSchedule = async () => {
       try {
-        const allPlayers = [...roster.starters, ...roster.bench, ...roster.ir];
-        const uniqueTeams = [...new Set(allPlayers.map(p => p.teamAbbreviation || '').filter(Boolean))];
-        if (uniqueTeams.length === 0) return;
-
-        const gamesMap = await ScheduleService.getNextGamesForTeams(uniqueTeams);
-        const statusMap = new Map<number, { status: string; score?: string }>();
-
-        allPlayers.forEach(player => {
-          const teamAbbrev = player.teamAbbreviation || '';
-          const game = gamesMap.get(teamAbbrev);
-          if (game) {
-            const gameDate = game.game_date?.split('T')[0];
-            if (gameDate === targetDate) {
-              const status = (game.status || 'scheduled').toLowerCase();
-              const homeScore = game.home_score ?? 0;
-              const awayScore = game.away_score ?? 0;
-              const score = (status === 'live' || status === 'intermission' || status === 'final')
-                ? `${homeScore}-${awayScore}` : undefined;
-              const pid = typeof player.id === 'string' ? parseInt(player.id) : player.id;
-              statusMap.set(pid, { status, score });
-            }
-          }
-        });
-        setGameStatusMap(statusMap);
+        const { gamesByTeam } = await ScheduleService.getGamesForTeams(
+          teams,
+          new Date(rangeStart + 'T00:00:00'),
+          new Date(rangeEnd + 'T00:00:00'),
+        );
+        if (!cancelled) setScheduleByTeam(gamesByTeam);
       } catch (error) {
-        logger.warn('[Roster] Game status fetch error:', error);
+        logger.warn('[Roster] Schedule fetch error:', error);
       }
     };
 
-    fetchGameStatus();
-    // Refresh game status every 60 seconds for live games
-    const interval = setInterval(fetchGameStatus, 60000);
-    return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, roster.starters.length, roster.bench.length, roster.ir.length]);
+    fetchSchedule();
+    if (targetDate === getTodayMST()) {
+      // Live scores move while today is on screen, so poll (60s, the same
+      // cadence the lock refresh uses). Any other day is fetched once.
+      const interval = setInterval(fetchSchedule, 60000);
+      return () => { cancelled = true; clearInterval(interval); };
+    }
+    return () => { cancelled = true; };
+  }, [selectedDate, rosterTeamsKey, matchupWeekStart, matchupWeekEnd]);
 
   // =============================================================================
   // DISPLAY ROSTER - Applies projections at render time (same pattern as Matchup tab)
@@ -1906,11 +1919,13 @@ const Roster = () => {
   // =============================================================================
   const displayRoster = useMemo(() => {
     const targetDate = selectedDate || getTodayMST();
-    
+    const todayStr = getTodayMST();
+    const isTargetToday = targetDate === todayStr;
+
     // Get projections for selected date ONLY (no fallback - that was causing duplicate projection display)
     const dateProjections = projectionsByDate.get(targetDate);
     const userTimezone = profile?.timezone || 'America/Denver';
-    
+
     const dateActualStats = dailyStatsByDateMap.get(targetDate);
 
     const enrichPlayer = (player: HockeyPlayer): HockeyPlayer => {
@@ -1924,8 +1939,20 @@ const Roster = () => {
 
       // Enrich with actual game stats and game status
       const actualStat = dateActualStats?.get(playerId);
-      const gameInfo = gameStatusMap.get(playerId);
-      
+      // The schedule line for THIS date (audit R9): opponent, time, status,
+      // score — from the week's schedule rows, not from today's `nextGame`.
+      const teamAbbrev = (player.teamAbbreviation || '').toUpperCase();
+      const gameInfo = rowGameFor(
+        gameOnDate(scheduleByTeam.get(teamAbbrev), targetDate),
+        teamAbbrev,
+        { targetDate, todayStr, timezone: userTimezone },
+      );
+      // `loadRoster` fills `player.nextGame` from today's schedule, so it is a
+      // valid fallback for today only — on any other day it would be today's
+      // opponent wearing that day's row. Past days read final by the calendar.
+      const fallbackGame = isTargetToday ? player.nextGame : undefined;
+      const fallbackStatus: 'scheduled' | 'final' = targetDate < todayStr ? 'final' : 'scheduled';
+
       if (!projection) {
         // No projection = no game on this date
         // Clear any existing nextGame/projection data
@@ -1939,14 +1966,16 @@ const Roster = () => {
       }
       
       // Projection exists = player has game on this date
-      // Build nextGame info from projection context + game status
-      const gameStatus = (gameInfo?.status || player.nextGame?.gameStatus || 'scheduled') as 'scheduled' | 'live' | 'intermission' | 'final';
+      // Build nextGame info from the schedule line + projection context.
+      // No placeholder: when the schedule has no line, `opponent` is simply
+      // absent and the row prints nothing there (audit R9).
+      const gameStatus = gameInfo?.status ?? fallbackGame?.gameStatus ?? fallbackStatus;
       const enrichedPlayer = {
         ...player,
         nextGame: {
-          opponent: player.nextGame?.opponent || 'Game',
+          opponent: gameInfo?.opponent ?? fallbackGame?.opponent,
           isToday: true,
-          gameTime: player.nextGame?.gameTime,
+          gameTime: gameInfo?.gameTime ?? fallbackGame?.gameTime,
           gameStatus,
           score: gameInfo?.score,
         },
@@ -2032,7 +2061,7 @@ const Roster = () => {
       ir: roster.ir.map(enrichPlayer),
       slotAssignments: roster.slotAssignments
     };
-  }, [roster, projectionsByDate, dailyStatsByDateMap, gameStatusMap, selectedDate, profile?.timezone]);
+  }, [roster, projectionsByDate, dailyStatsByDateMap, scheduleByTeam, selectedDate, profile?.timezone]);
 
   /**
    * Are the daily projections for the selected date actually loaded?
@@ -2443,17 +2472,25 @@ const Roster = () => {
   /**
    * Projected points + has-a-game for one date, the way `displayRoster` does
    * it for the selected date: a projection row IS the game. Opponent and
-   * time are not known for other days, so the sheet says "Has a game".
+   * face-off time come from the week's schedule rows (audit R9); when the
+   * schedule has no line for that day the sheet says "Has a game" rather
+   * than a stand-in word.
    */
   type ProjectionRowLite = { total_projected_points?: number | string | null };
-  const enrichForDate = (p: HockeyPlayer, projections: Map<number, ProjectionRowLite> | undefined): HockeyPlayer => {
+  const enrichForDate = (p: HockeyPlayer, date: string, projections: Map<number, ProjectionRowLite> | undefined): HockeyPlayer => {
     const pid = typeof p.id === 'string' ? parseInt(p.id) : p.id;
     const projection = projections?.get(pid);
     if (!projection) return { ...p, nextGame: undefined, projectedPoints: 0 };
+    const team = (p.teamAbbreviation || '').toUpperCase();
+    const line = rowGameFor(gameOnDate(scheduleByTeam.get(team), date), team, {
+      targetDate: date,
+      todayStr: getTodayMST(),
+      timezone: profile?.timezone || 'America/Denver',
+    });
     return {
       ...p,
       projectedPoints: Number(projection.total_projected_points || 0),
-      nextGame: { opponent: 'Game', isToday: true },
+      nextGame: { opponent: line?.opponent, isToday: true, gameTime: line?.gameTime },
     };
   };
 
@@ -2539,8 +2576,8 @@ const Roster = () => {
           for (const p of allPlayers) if (!seen.has(String(p.id))) structural.bench.push(p);
           const proj = projections.get(date);
           current = {
-            starters: structural.starters.map((p) => enrichForDate(p, proj)),
-            bench: structural.bench.map((p) => enrichForDate(p, proj)),
+            starters: structural.starters.map((p) => enrichForDate(p, date, proj)),
+            bench: structural.bench.map((p) => enrichForDate(p, date, proj)),
             ir: structural.ir,
             slotAssignments: structural.slotAssignments,
           };
@@ -3312,11 +3349,21 @@ const Roster = () => {
           )}>
             {/* Main Content - MOBILE: Full width / DESKTOP: Scrollable panel */}
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-3 lg:px-0 order-1 lg:order-2">
-              {/* Fantasy Team Header — Citrus 2.0 dark surface */}
-              <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-5 mb-4 relative overflow-hidden">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pastel-orange to-pastel-orange-soft ring-1 ring-pastel-orange/40 flex items-center justify-center text-[#0F1F15] text-2xl font-calistoga relative overflow-hidden shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
+              {/* Fantasy Team Header — Citrus 2.0 dark surface.
+
+                  ONE LINE ON PHONES (2026-09-01, audit R4). Below lg the card
+                  stacked three deep — disc + name + manager, then Record /
+                  Rank / Total Pts, then Auto Lineup — under a sticky header
+                  that already says the name and record, so the first player
+                  row began most of a screen down. On phones it is now a single
+                  row: disc · team name · record · Auto Lineup. Rank and Total
+                  Pts live on the Team Stats tab; the manager eyebrow is a
+                  desktop nicety. Every desktop element is untouched — the
+                  compaction is responsive classes only. */}
+              <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-3 lg:p-5 mb-3 lg:mb-4 relative overflow-hidden">
+                <div data-testid="roster-header-card" className="flex items-center gap-3 lg:gap-4 lg:justify-between relative z-10">
+              <div className="flex items-center gap-2.5 lg:gap-3 min-w-0 flex-1 lg:flex-none">
+                <div className="w-8 h-8 lg:w-12 lg:h-12 flex-shrink-0 rounded-lg lg:rounded-xl bg-gradient-to-br from-pastel-orange to-pastel-orange-soft ring-1 ring-pastel-orange/40 flex items-center justify-center text-[#0F1F15] text-sm lg:text-2xl font-calistoga relative overflow-hidden shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
                   {/* Background pattern */}
                   <div className="absolute inset-0 opacity-20">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(255,255,255,0.4)_0%,_transparent_60%)]"></div>
@@ -3325,13 +3372,13 @@ const Roster = () => {
                     {userLeagueState === 'guest' ? 'CC' : (userTeam?.team_name?.substring(0, 2).toUpperCase() || profile?.username?.substring(0, 2).toUpperCase() || 'TM')}
                   </span>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-2xl font-calistoga text-pastel-cream">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h1 className="text-base lg:text-2xl font-calistoga text-pastel-cream max-lg:truncate">
                       {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Team')}
                     </h1>
                   </div>
-                  <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft font-bold">
+                  <div className="hidden lg:block font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft font-bold">
                     {/* SWEEP FIX (2026-08-16): prefer display_name; never show
                         the generated user_<id> signup handle. */}
                     Manager · {userLeagueState === 'guest'
@@ -3343,22 +3390,32 @@ const Roster = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="text-center px-4 py-2">
+              <div className="flex items-center gap-3 flex-shrink-0">
+                {/* Phone: the record alone, as a number. */}
+                <span
+                  data-testid="roster-header-record"
+                  className="lg:hidden font-jbmono text-xs font-bold tabular-nums text-pastel-cream"
+                  aria-label={`Record ${teamStats.record}`}
+                >
+                  {teamStats.record}
+                </span>
+                <div className="hidden lg:block text-center px-4 py-2">
                   <div className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/55 font-bold">Record</div>
                   <div className="font-calistoga text-pastel-cream tabular-nums">{teamStats.record}</div>
                 </div>
-                <div className="text-center px-4 py-2">
+                <div className="hidden lg:block text-center px-4 py-2">
                   <div className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/55 font-bold">Rank</div>
                   <div className="font-calistoga text-pastel-cream tabular-nums">{teamStats.rank}</div>
                 </div>
-                <div className="text-center px-4 py-2">
+                <div className="hidden lg:block text-center px-4 py-2">
                   <div className="font-jbmono text-[9px] tracking-[0.22em] uppercase text-white/55 font-bold">Total Pts</div>
                   <div className="font-calistoga text-pastel-orange tabular-nums">{teamStats.totalPoints}</div>
                 </div>
               </div>
 
-              <div>
+              <div className="flex-shrink-0">
+                {/* Phone: a 32px pill, since the row is one line; lg restores
+                    the default 48px varsity button exactly. */}
                 {userLeagueState === 'active-user' && (
                   <Button
                     onClick={handleAutoLineup}
@@ -3371,7 +3428,7 @@ const Roster = () => {
                           ? 'Preview the best lineup for this date'
                           : 'Loading projections for this date…'
                     }
-                    className="flex gap-2 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex gap-1.5 lg:gap-2 h-8 min-h-0 px-2.5 text-xs border-2 [&_svg]:size-4 lg:h-12 lg:min-h-[48px] lg:px-6 lg:text-base lg:border-4 lg:[&_svg]:size-5 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Wand2 className="w-4 h-4" aria-hidden="true" />
                     Auto Lineup
@@ -3427,7 +3484,7 @@ const Roster = () => {
                 </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="roster" className="m-0 p-6">
+                <TabsContent value="roster" className="m-0 px-3 py-4 lg:p-6">
                 {/* Read-only banner for demo/guest users */}
                 {(userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league' || (userTeam && isDemoLeague(userTeam.league_id))) && (
                   <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
@@ -3441,8 +3498,60 @@ const Roster = () => {
                   </div>
                 )}
 
-                {/* Week and Date Selectors */}
+                {/* Week and Date Selectors.
+
+                    PHONES (2026-09-01, audit R4): week and day are ONE row —
+                    a small `Wk 5 ▾` trigger (the same week select) beside the
+                    seven day chips. The "Viewing: Oct 14" line is gone; the
+                    selected chip says it, and a past day's Read Only badge
+                    moves into the game-day strip. Desktop keeps the varsity
+                    week bar, the day card and the Viewing line as they were. */}
                 {userTeam?.league_id && availableWeeks.length > 0 && firstWeekStart && selectedWeek > 0 && (
+                  isMobile ? (
+                  <div className="mb-3">
+                    {currentMatchup && matchupWeekDates.length > 0 ? (
+                      <div
+                        data-testid="roster-week-day-row"
+                        className="flex items-center gap-2 bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-2"
+                      >
+                        <MatchupScheduleSelector
+                          compact
+                          currentWeek={selectedWeek}
+                          scheduleLength={availableWeeks.length}
+                          availableWeeks={availableWeeks}
+                          onWeekChange={handleWeekChange}
+                          firstWeekStart={firstWeekStart}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <WeeklySchedule
+                            compact
+                            weekStart={currentMatchup.week_start_date}
+                            weekEnd={currentMatchup.week_end_date}
+                            // loadRoster follows selectedDate through its own
+                            // effect — never call it here (stale closure race).
+                            onDayClick={(date) => setSelectedDate(date)}
+                            selectedDate={selectedDate}
+                            hideScores={true}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <MatchupScheduleSelector
+                          compact
+                          currentWeek={selectedWeek}
+                          scheduleLength={availableWeeks.length}
+                          availableWeeks={availableWeeks}
+                          onWeekChange={handleWeekChange}
+                          firstWeekStart={firstWeekStart}
+                        />
+                        {!currentMatchup && selectedWeek && (
+                          <span className="text-sm text-white/55">No matchup found for Week {selectedWeek}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  ) : (
                   <div className="mb-6 space-y-4">
                     {/* Week Selector */}
                     <MatchupScheduleSelector
@@ -3498,24 +3607,38 @@ const Roster = () => {
                       </div>
                     )}
                   </div>
+                  )
                 )}
-                
+
                 {/* Game-day strip (audit R1 + R5). Replaces the blue "N players
                     locked" banner: the locked count lives here now and the row
                     chips carry the lock glyph, so the two-sentence banner had
-                    nothing left to say. */}
+                    nothing left to say. On phones it also carries a past day's
+                    read-only mark (audit R4) — the Viewing line that used to
+                    wear the badge is desktop-only now. */}
                 {showTodayStrip && (
                   <TodayStrip
-                    className="mb-4"
+                    className="mb-3 lg:mb-4"
                     summary={todaySummary}
                     dayLabel={stripDayLabel}
                     tense={isPastDate ? 'past' : 'present'}
                     pending={!projectionsReadyForSelectedDate}
                     editable={canEditLineup && !isPastDate}
+                    readOnly={isMobile && isPastDate}
                     onAutoLineup={handleAutoLineup}
                   />
                 )}
-                <div className="flex justify-between items-center mb-4">
+                {/* "Lineup" + Season / Rest-of-Season: desktop only (audit R4).
+                    The toggle drives HockeyPlayerCard's season stat block,
+                    which the phone rows do not render — their one number is
+                    the day's projection (or live/final points), the same
+                    figure the game-day strip, the Line Change sheet and the
+                    Fill sheet quote, so swapping it for a season PPG under a
+                    toggle whose default is "Season" would break the game-day
+                    reading of every row. Season and rest-of-season stats stay
+                    a name-tap away in the player card. The heading itself
+                    labels nothing the section headers do not. */}
+                <div className="hidden lg:flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Lineup</h2>
                     <ToggleGroup type="single" value={statView} onValueChange={(v) => v && setStatView(v as any)} className="bg-white/5 p-1 rounded-lg">
                         <ToggleGroupItem value="seasonToDate" size="sm" className="text-xs">Season</ToggleGroupItem>
@@ -3628,6 +3751,7 @@ const Roster = () => {
                         onFillSlot={handleFillSlot}
                         swapHint={canEdit}
                         positionType={leaguePositionType}
+                        irSlotCount={irSlotCount}
                       />
                       {/* Fill sheet — slot-first counterpart of the Line
                           Change sheet; opens from an empty row (audit R2). */}
