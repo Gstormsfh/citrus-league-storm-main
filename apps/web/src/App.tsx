@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from "react";
-import { Toaster } from "@/components/ui/toaster";
+import { CitrusToaster } from "@/components/notifications/CitrusToaster";
 import { logger } from '@/utils/logger';
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -174,7 +174,7 @@ const App = () => {
         <NativeBootSplash />
         <AuthProvider>
           <TooltipProvider>
-            <Toaster />
+            <CitrusToaster />
             <Sonner position="top-right" closeButton />
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <a href="#main-content" className="skip-to-content">Skip to content</a>

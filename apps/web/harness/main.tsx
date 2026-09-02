@@ -12,7 +12,7 @@ import '../src/index.css';
 import { PlayerService, type Player } from '../src/services/PlayerService';
 import { rosterApi } from '../src/api/rosters';
 import { DropPlayerForAddDialog } from '../src/components/freeagents/DropPlayerForAddDialog';
-import { Toaster } from '../src/components/ui/toaster';
+import { CitrusToaster } from '../src/components/notifications/CitrusToaster';
 import { HARNESS_PLAYERS, harnessDirectoryPlayer, harnessPlayer } from './players';
 
 // Roster size is the variable under test — ?n=22 for a deep roster.
@@ -64,7 +64,7 @@ function App() {
         teamId="harness-team"
         userId="harness-user"
       />
-      <Toaster />
+      <CitrusToaster />
     </>
   );
 }

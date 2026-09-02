@@ -4,6 +4,11 @@ import type {
   ToastActionElement,
   ToastProps,
 } from "@/components/ui/toast"
+import type { MugPlayer } from "@/components/roster/headshot"
+import type {
+  NotificationKind,
+  ToastStatus,
+} from "@/components/notifications/notificationKind"
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
@@ -22,6 +27,29 @@ type ToasterToast = ToastProps & {
   title?: React.ReactNode
   description?: React.ReactNode
   action?: ToastActionElement
+  /**
+   * CITRUS STATUS CARDS (2026-09-02). Every field below is ADDITIVE and
+   * optional. `kind` is resolved by resolveKind() in notificationKind.ts,
+   * which defaults an absent kind to 'info' — so the 292 existing
+   * `toast({ title, description })` call sites across 35 files keep
+   * rendering a title and a description with nothing to update.
+   *
+   * The reducer, TOAST_LIMIT and the TOAST_AUTO_DISMISS_MS mechanism above
+   * are untouched: this is a payload widening, not a behaviour change.
+   */
+  kind?: NotificationKind
+  /** `kind: 'player'` — the face on the card. Structural; a roster
+   * HockeyPlayer and a matchup MatchupPlayer both satisfy it already. */
+  player?: MugPlayer
+  /** The line under the name: position · team · what happened. Wins over
+   * `description` on a status card, which has room for exactly one. */
+  meta?: string
+  /** The pill. Call sites name the MEANING ('good' | 'attention' | 'bad');
+   * notificationKind.ts owns which colour that is. */
+  status?: ToastStatus
+  /** When the event happened, epoch ms. Rendered as "now" / "2m" / "1h".
+   * Omitted on a status card, the card stamps its own arrival. */
+  at?: number
 }
 
 const actionTypes = {
