@@ -88,7 +88,7 @@ describe('AutoLineupSheet — the preview', () => {
   it("a player without a game shows a dash, not a zero, and the row says so", () => {
     renderSheet();
     const row = screen.getAllByTestId('auto-move')[0];
-    expect(within(row).getByText('—')).toBeInTheDocument();
+    expect(within(row).getByText('-')).toBeInTheDocument();
     expect(within(row).getByText(/No game/)).toBeInTheDocument();
   });
 

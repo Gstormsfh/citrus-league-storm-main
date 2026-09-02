@@ -190,7 +190,7 @@ export default function DraftRoomV2() {
         setTeamsError(null);
       } catch {
         if (!cancelled) {
-          setTeamsError("Couldn't load this league's teams — the Start button needs them.");
+          setTeamsError("Couldn't load this league's teams. The Start button needs them, so refresh and try again.");
         }
       }
     })();
@@ -600,7 +600,7 @@ function IdentityFailureBanner() {
           ),
         }
       : {
-          title: "Couldn't verify your team — check your connection.",
+          title: "Couldn't verify your team. Check your connection and try again.",
           body: (
             <>
               We couldn't reach the server to confirm which team you
@@ -655,7 +655,7 @@ function describeStatus(
   picksMade: number,
 ): string {
   if (derivedStatus === 'not_started' && picksMade === 0) {
-    return 'active — waiting for pick 1';
+    return 'active, waiting for pick 1';
   }
   if (derivedStatus === 'in_progress') return 'in progress';
   if (derivedStatus === 'completed') return 'completed';
@@ -797,7 +797,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
       } catch {
         if (!cancelled) {
           // Loud, recoverable failure — never a silent no-button state.
-          setLeagueError("Couldn't load league details — the Start button needs them.");
+          setLeagueError("Couldn't load league details. The Start button needs them, so refresh and try again.");
         }
       }
     })();
@@ -824,7 +824,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
   const roomFull = leagueSize == null ? teams.length >= 2 : teams.length >= leagueSize;
   const startBlockedReason = !roomFull
     ? leagueSize != null
-      ? `Waiting for teams — ${teams.length} of ${leagueSize} created. The draft needs all ${leagueSize} before it can start.`
+      ? `Waiting for teams: ${teams.length} of ${leagueSize} created. The draft needs all ${leagueSize} before it can start.`
       : 'Need at least 2 teams to start.'
     : null;
 
@@ -851,7 +851,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
       const { apiClient } = await import('@/api/client');
       await apiClient.post(`/api/leagues/${leagueId}/simulate-fill`, { teamNames });
       toast.success(
-        missing === 1 ? 'AI team added — room is full.' : `${missing} AI teams added — room is full.`,
+        missing === 1 ? 'AI team added: room is full.' : `${missing} AI teams added: room is full.`,
       );
       onRetryTeams();
     } catch (err) {
@@ -907,7 +907,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
       await draftV2Api.startDraftV2(leagueId, idempotencyKey);
       // Live WS receives draft_started; this panel unmounts on the next
       // derivation — no navigate, we are already in /draft-v2.
-      toast.success('Draft started — good luck!');
+      toast.success('Draft started. Good luck!');
     } catch (err) {
       const e = err as { response?: { data?: { error?: string } }; message?: string };
       toast.error('Cannot start draft', {
@@ -957,7 +957,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
             </h2>
             <p className="mt-2 text-sm text-white/55">
               {teamsError ? (
-                'Team list unavailable — see below.'
+                'Team list unavailable. See the list below.'
               ) : (
                 <>
                   <span className="font-semibold text-pastel-cream">
@@ -1083,8 +1083,8 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                   <Button
                     onClick={async () => {
                       const result = await shareInvite(league.name || 'My League', league.join_code as string);
-                      if (result === 'copied') toast.success('Invite copied — paste it anywhere');
-                      if (result === 'failed') toast.error('Could not share — use Copy Link');
+                      if (result === 'copied') toast.success('Invite copied. Paste it anywhere');
+                      if (result === 'failed') toast.error('Could not share. Use Copy Link');
                     }}
                     className="rounded-full bg-pastel-orange text-[#2A0F00] hover:bg-pastel-orange-soft font-black px-6"
                   >
@@ -1718,9 +1718,9 @@ function MainTabs({
             .getState()
             .rollBackPending(
               attemptId,
-              "We couldn't confirm your pick — check the board",
+              "We couldn't confirm your pick. Check the board before picking again",
             );
-          toast.error("We couldn't confirm your pick — check the board");
+          toast.error("We couldn't confirm your pick. Check the board before picking again");
         }
       }, 8000);
       try {
@@ -1955,7 +1955,7 @@ function MainTabs({
             data-testid="alarm-mute-toggle"
             aria-pressed={alarm.muted}
           >
-            {alarm.muted ? '🔇 Alarm muted — click to unmute' : '🔊 Alarm on — click to mute'}
+            {alarm.muted ? '🔇 Alarm muted. Click to unmute' : '🔊 Alarm on. Click to mute'}
           </button>
         )}
         {/* V2-PARITY (2026-08-17) — autodraft toggle, always visible so a
@@ -1972,9 +1972,9 @@ function MainTabs({
             }
             data-testid="autodraft-toggle"
             aria-pressed={autodraftOn}
-            title="When on, your picks submit automatically — top of your queue first, best available otherwise. One attempt per pick; the draft clock is still the backstop."
+            title="When on, your picks submit automatically. Top of your queue first, best available otherwise. One attempt per pick; the draft clock is still the backstop."
           >
-            {autodraftOn ? '🤖 Autodraft ON — click to turn off' : '🤖 Autodraft off — click to turn on'}
+            {autodraftOn ? '🤖 Autodraft ON. Click to turn off' : '🤖 Autodraft off. Click to turn on'}
           </button>
         )}
       </div>
@@ -2027,7 +2027,7 @@ function MainTabs({
               className="mb-3 rounded border border-dashed border-muted-foreground/40 bg-muted/30 p-4 text-sm text-muted-foreground"
               data-testid="board-pre-draft-copy"
             >
-              Draft hasn’t started yet — the board will fill in live as
+              Draft hasn’t started yet. The board will fill in live as
               picks land.
             </div>
           )}
@@ -2172,7 +2172,7 @@ function SidebarPanel({
           className="rounded border border-dashed border-muted-foreground/30 bg-muted/20 p-3 text-xs text-muted-foreground"
           data-testid="rosters-empty-copy"
         >
-          No picks yet — rosters will fill in as the draft progresses.
+          No picks yet. Rosters will fill in as the draft progresses.
         </div>
       )}
       <TeamRosters
@@ -2206,7 +2206,7 @@ function SidebarPanel({
           className="text-xs text-muted-foreground mt-1"
           data-testid="queue-persistence-note"
         >
-          Saved to your team — used for autopick if your clock expires
+          Saved to your team. Used for autopick if your clock expires
         </div>
       </div>
       {/* DR-3 (2026-07-29) — DraftControls HIDDEN per architect ruling:

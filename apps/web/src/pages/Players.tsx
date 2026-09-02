@@ -50,10 +50,10 @@ const POSITIONS = ['C', 'LW', 'RW', 'D', 'G'] as const;
 type SkaterSortKey = 'points' | 'goals' | 'assists' | 'sog' | 'xg_per_60' | 'gar_per_60' | 'proj_fantasy_points';
 type GoalieSortKey = 'wins' | 'save_pct' | 'saves' | 'shutouts' | 'proj_wins';
 
-const f1 = (v: number | null | undefined) => (v == null ? '—' : (Math.round(v * 10) / 10).toFixed(1));
-const f2 = (v: number | null | undefined) => (v == null ? '—' : (Math.round(v * 100) / 100).toFixed(2));
+const f1 = (v: number | null | undefined) => (v == null ? '-' : (Math.round(v * 10) / 10).toFixed(1));
+const f2 = (v: number | null | undefined) => (v == null ? '-' : (Math.round(v * 100) / 100).toFixed(2));
 const svp = (v: number | null | undefined) =>
-  v == null || v === 0 ? '—' : (v < 1 ? v : v / 1000).toFixed(3).replace(/^0/, '');
+  v == null || v === 0 ? '-' : (v < 1 ? v : v / 1000).toFixed(3).replace(/^0/, '');
 
 /** Percentile of `val` within `arr` (fraction of values <= val), 0–100. */
 function percentile(arr: number[], val: number): number {
@@ -151,7 +151,7 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
         <div className="min-w-0">
           <h2 className="truncate text-xl font-bold">{player.name}</h2>
           <p className="text-sm text-muted-foreground">
-            #{player.jersey ?? '—'} · {player.position} · {player.team}
+            #{player.jersey ?? '-'} · {player.position} · {player.team}
           </p>
           {player.xg_rating && (
             <Badge variant="secondary" className="mt-1.5">
@@ -215,7 +215,7 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
       {!player.is_goalie && (
         <>
           <h3 className="mt-5 text-xs font-bold uppercase tracking-wider text-pastel-orange">
-            Impact — GAR per 60
+            Impact: GAR per 60
           </h3>
           <div className="mt-2">
             <MetricRow
@@ -276,7 +276,7 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
         </h3>
         {player.proj_fantasy_points == null ? (
           <p className="mt-2 text-sm text-muted-foreground">
-            No projection yet — projections populate from the nightly pipeline once a player has a season sample.
+            No projection yet. Projections populate from the nightly pipeline once a player has a season sample.
           </p>
         ) : (
           <div className="mt-2 space-y-1.5 text-sm">
@@ -417,7 +417,7 @@ const Players = () => {
         <div className="mb-5">
           <h1 className="text-2xl font-bold">Players</h1>
           <p className="text-sm text-muted-foreground">
-            Season actuals, xG shot quality, GAR/60 impact, and rolled-forward projections — every team, every player.
+            Season actuals, xG shot quality, GAR/60 impact, and rolled-forward projections. Every team, every player.
           </p>
         </div>
 
@@ -534,7 +534,7 @@ const Players = () => {
                             <div className="min-w-0 max-w-[160px]">
                               <div className="truncate font-medium">{p.name}</div>
                               <div className="text-xs text-muted-foreground">
-                                {p.team} · #{p.jersey ?? '—'} · {p.position}
+                                {p.team} · #{p.jersey ?? '-'} · {p.position}
                               </div>
                             </div>
                           </div>
@@ -583,7 +583,7 @@ const Players = () => {
               </div>
               {sorted.length > 400 && (
                 <p className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
-                  Showing top 400 of {sorted.length} — narrow with search or filters.
+                  Showing top 400 of {sorted.length}. Narrow with search or filters.
                 </p>
               )}
             </Card>

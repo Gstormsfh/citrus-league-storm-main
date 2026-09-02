@@ -1460,7 +1460,7 @@ const FreeAgents = () => {
               ✦ Scouting Room
             </div>
             <h1 className="font-calistoga text-3xl sm:text-4xl text-pastel-cream leading-none">Scout the pool.</h1>
-            <p className="text-sm text-white/55 mt-2">Available players to improve your roster — sort, filter, and pick up.</p>
+            <p className="text-sm text-white/55 mt-2">Available players to improve your roster. Sort, filter, and pick up.</p>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
             <Input
@@ -1542,7 +1542,7 @@ const FreeAgents = () => {
             {rosterLookupFailed && (
               <div className="flex items-center gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-200">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" />
-                <span>Unable to load roster data for this league. Showing all players — some may already be rostered.</span>
+                <span>Unable to load roster data for this league. Showing all players. Some may already be rostered.</span>
               </div>
             )}
 
@@ -1692,7 +1692,7 @@ const FreeAgents = () => {
                         {!loadingProjections && topProjected.length === 0 && (
                           <div className="px-4 py-6 text-center text-sm text-white/55">
                             {weeklyProjections.size === 0
-                              ? 'No games left this week — projections return with the schedule.'
+                              ? 'No games left this week. Projections return with the schedule.'
                               : 'No projected free agents to show.'}
                           </div>
                         )}
@@ -2056,7 +2056,7 @@ const FreeAgents = () => {
                       {/* Infinite scroll sentinel + count */}
                       <div className="text-center py-2 text-xs text-white/55">
                         {filteredPlayers.length === 0 && players.length > 0
-                          ? 'No players match those filters — try widening a position or team.'
+                          ? 'No players match those filters. Try widening a position or team.'
                           : `Showing ${visiblePlayers.length} of ${filteredPlayers.length} players`}
                       </div>
                       {hasMorePlayers && (
@@ -2671,7 +2671,7 @@ const FreeAgents = () => {
                     </div>
                     <div className="font-calistoga text-xl text-pastel-cream mb-3">Pickup priority</div>
                     <ul className="text-[11px] text-white/70 space-y-1.5 leading-relaxed">
-                      <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Trending pickups go fast — claim early</li>
+                      <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Trending pickups go fast, so claim early</li>
                       <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Weekly schedule beats raw points-per-game</li>
                       <li className="flex gap-2"><span className="text-pastel-orange">▸</span> Star a player to track him on the watchlist</li>
                     </ul>

@@ -231,12 +231,12 @@ export default function PreviewSquad() {
           {
             icon: MessageCircle,
             label: 'League chat',
-            body: 'Real-time messages, draft-night reactions, gif support. Your league chat lives where the league lives — no Discord needed.',
+            body: 'Real-time messages, draft-night reactions, gif support. Your league chat lives where the league lives. No Discord needed.',
           },
           {
             icon: Trophy,
             label: 'Trophy room',
-            body: 'Champions, runner-ups, last-place legends. Your league history is preserved season after season — with bragging rights intact.',
+            body: 'Champions, runner-ups, last-place legends. Your league history is preserved season after season, with bragging rights intact.',
           },
           {
             icon: Flame,

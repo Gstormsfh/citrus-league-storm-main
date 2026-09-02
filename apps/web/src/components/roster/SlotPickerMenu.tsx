@@ -233,7 +233,7 @@ export function SlotPickerMenu({
                   me.live ? 'text-emerald-500' : 'text-pastel-orange',
                 )}
               >
-                {me.pts != null ? me.pts.toFixed(1) : '—'}
+                {me.pts != null ? me.pts.toFixed(1) : '-'}
               </p>
               <p className="mt-0.5 font-display text-[9px] font-semibold uppercase text-white/55">
                 {me.live ? 'live' : 'proj'}
@@ -345,7 +345,7 @@ export function SlotPickerMenu({
                                 occ?.live ? 'text-emerald-500' : 'text-pastel-orange',
                               )}
                             >
-                              {occ?.pts != null ? occ.pts.toFixed(1) : '—'}
+                              {occ?.pts != null ? occ.pts.toFixed(1) : '-'}
                             </span>
                             <span className="block text-[9px] font-display font-semibold uppercase text-white/55">
                               {occ?.live ? 'live' : 'proj'}

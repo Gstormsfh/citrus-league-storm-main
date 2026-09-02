@@ -687,7 +687,7 @@ const CreateLeague = () => {
     }
 
     if (!resolvedCode) {
-      setError("Add a join code first — check your invite link.");
+      setError("Add a join code first. Check your invite link.");
       return;
     }
     const effectiveCode = resolvedCode;
@@ -727,7 +727,7 @@ const CreateLeague = () => {
       );
 
       if (joinError) throw joinError;
-      if (!league || !team) throw new Error("Couldn't join that league — try again in a moment.");
+      if (!league || !team) throw new Error("Couldn't join that league. Try again in a moment.");
 
       // Refresh the league list, THEN pin the newly joined league as the
       // active one BEFORE navigating. Without this, LeagueContext can
@@ -745,7 +745,7 @@ const CreateLeague = () => {
       setLoading(false);
       routeToLeague(league.id, league.settings as Record<string, unknown> | null);
     } catch (err: unknown) {
-      const errorMessage = userMessage(err, "Couldn't join that league — try again in a moment.");
+      const errorMessage = userMessage(err, "Couldn't join that league. Try again in a moment.");
 
       // "Already a member" is a success case — the first attempt actually
       // joined (even if the response looked glitchy). Redirect them to the
@@ -774,7 +774,7 @@ const CreateLeague = () => {
             title: "Joined League!",
             description: leagueRow?.name
               ? `Welcome to ${leagueRow.name}!`
-              : "You're in — taking you to the pool now.",
+              : "You're in. Taking you to the pool now.",
           });
 
           if (leagueRow?.id) {
@@ -850,7 +850,7 @@ const CreateLeague = () => {
             <Sparkles className="h-4 w-4 text-pastel-orange" />
             <AlertDescription className="text-pastel-cream">
               <span className="font-bold text-pastel-orange-soft">Play with friends or AI.</span>{' '}
-              Create your league and share the join code — friends claim their teams instantly. Short on managers? Fill any open slots with AI opponents at the press of a button and draft right away.
+              Create your league and share the join code. Friends claim their teams instantly. Short on managers? Fill any open slots with AI opponents at the press of a button and draft right away.
             </AlertDescription>
           </Alert>
           )}
@@ -990,7 +990,7 @@ const CreateLeague = () => {
                           {(new Date().getMonth() >= 6 || new Date().getMonth() <= 1) && (
                             <p className="text-xs text-amber-400">
                               Heads up: the NHL playoffs start in spring. The pre-filled date is
-                              just a placeholder — set the lock to right before Round&nbsp;1 Game&nbsp;1
+                              just a placeholder. Set the lock to right before Round&nbsp;1 Game&nbsp;1
                               (typically mid-April).
                             </p>
                           )}
@@ -1022,7 +1022,7 @@ const CreateLeague = () => {
                               <div className="flex-1">
                                 <div className="font-jbmono font-bold text-sm mb-1">Round by Round</div>
                                 <p className="text-xs text-white/55">
-                                  Members pick each round&apos;s winners as it starts. You can only pick Round 2 after Round 1 finishes. Forgiving format — no need to predict upsets upfront.
+                                  Members pick each round&apos;s winners as it starts. You can only pick Round 2 after Round 1 finishes. Forgiving format. No need to predict upsets upfront.
                                 </p>
                               </div>
                             </label>
@@ -1039,7 +1039,7 @@ const CreateLeague = () => {
                               <div className="flex-1">
                                 <div className="font-jbmono font-bold text-sm mb-1">Full Bracket (March Madness style)</div>
                                 <p className="text-xs text-white/55">
-                                  Members pick ALL 15 series — including Stanley Cup champion — before Round 1 Game 1 puck drop. One shot, live with it. Classic playoff pool format.
+                                  Members pick ALL 15 series (including the Stanley Cup champion) before Round 1 Game 1 puck drop. One shot, live with it. Classic playoff pool format.
                                 </p>
                               </div>
                             </label>

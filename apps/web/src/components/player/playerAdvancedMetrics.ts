@@ -61,17 +61,17 @@ import type { PercentileCategory } from '@/components/citrus2/PercentileBullet';
 
 /** GAR components, xG/60 — modelled rates, two decimals. */
 export function fmt2(v: number | null | undefined): string {
-  return v == null || !Number.isFinite(v) ? '—' : (Math.round(v * 100) / 100).toFixed(2);
+  return v == null || !Number.isFinite(v) ? '-' : (Math.round(v * 100) / 100).toFixed(2);
 }
 
 /** Expected goals and fantasy-point totals — one decimal. */
 export function fmt1(v: number | null | undefined): string {
-  return v == null || !Number.isFinite(v) ? '—' : (Math.round(v * 10) / 10).toFixed(1);
+  return v == null || !Number.isFinite(v) ? '-' : (Math.round(v * 10) / 10).toFixed(1);
 }
 
 /** Signed, one decimal: `+4.2`, `-3.1`, `0.0`. */
 export function fmtSigned1(v: number | null | undefined): string {
-  if (v == null || !Number.isFinite(v)) return '—';
+  if (v == null || !Number.isFinite(v)) return '-';
   const r = Math.round(v * 10) / 10;
   // `-0.0` is a real IEEE value and reads as a claim the player is behind.
   const safe = Object.is(r, -0) ? 0 : r;
@@ -93,7 +93,7 @@ export function normalizeSavePct(v: number | null | undefined): number | null {
 
 export function fmtSavePct(v: number | null | undefined): string {
   const n = normalizeSavePct(v);
-  return n == null ? '—' : n.toFixed(3).replace(/^0/, '');
+  return n == null ? '-' : n.toFixed(3).replace(/^0/, '');
 }
 
 /** 1st / 2nd / 3rd / 11th / 21st. */
@@ -231,7 +231,7 @@ export const GOALIE_METRICS: MetricSpec[] = [
     category: 'defense',
     direction: 'higher',
     select: (p) => normalizeSavePct(p.save_pct),
-    format: (v) => (v == null || !Number.isFinite(v) ? '—' : v.toFixed(3).replace(/^0/, '')),
+    format: (v) => (v == null || !Number.isFinite(v) ? '-' : v.toFixed(3).replace(/^0/, '')),
   },
   {
     key: 'gaa',
@@ -249,7 +249,7 @@ export const GOALIE_METRICS: MetricSpec[] = [
     category: 'offense',
     direction: 'higher',
     select: (p) => (p.gp > 0 ? p.wins : null),
-    format: (v) => (v == null || !Number.isFinite(v) ? '—' : String(Math.round(v))),
+    format: (v) => (v == null || !Number.isFinite(v) ? '-' : String(Math.round(v))),
   },
   {
     key: 'shutouts',
@@ -258,7 +258,7 @@ export const GOALIE_METRICS: MetricSpec[] = [
     category: 'special',
     direction: 'higher',
     select: (p) => (p.gp > 0 ? p.shutouts : null),
-    format: (v) => (v == null || !Number.isFinite(v) ? '—' : String(Math.round(v))),
+    format: (v) => (v == null || !Number.isFinite(v) ? '-' : String(Math.round(v))),
   },
 ];
 
@@ -376,7 +376,7 @@ export function buildAdvancedCardData(
  * license a model call and it does not license a claim the numbers do not
  * support, so this is a decision table over data we hold, and every branch
  * requires the inputs it cites to be non-null. If none fires, the caller
- * gets `null` and the card omits the line entirely — an absent verdict is
+ * gets `null` and the card omits the line entirely: an absent verdict is
  * cheaper than a wrong one.
  *
  * NOTHING IS SAID ABOUT A PLAYER WITH FEWER THAN `DISTRIBUTION_MIN_GP`
@@ -385,10 +385,33 @@ export function buildAdvancedCardData(
  * describing noise in a confident voice, which is the exact failure the
  * repo's fabrication guard exists to prevent.
  *
- * Rule order is deliberate — the shot-quality-vs-finishing rules come first
+ * Rule order is deliberate. The shot-quality-vs-finishing rules come first
  * because that pairing is the one read a Sleeper card cannot produce, and it
  * is the read that changes a draft decision (elite looks + cold stick is a
  * buy; cold looks + hot stick is a sell).
+ *
+ * ── VOICE (2026-09-02) ────────────────────────────────────────────
+ *
+ * These sentences are the product's own writing, on a card a manager reads
+ * before a draft pick, so they are written to the same brief as the rest of
+ * the copy: a beat writer's fantasy note, not a dashboard caption.
+ *
+ *   * NO EM DASH. `src/__tests__/aiVoiceGuard.test.ts` fails the build on
+ *     one, and every line here used to open with a clause, an em dash and
+ *     a statistic, which is the single most recognisable AI tell in the
+ *     product.
+ *   * THE SOURCE IS NAMED IN THE SENTENCE. "Citrus xG", "Citrus GAR".
+ *     A number a reader cannot attribute is a number they cannot check,
+ *     and this module's whole claim is that its numbers are real.
+ *   * THE FANTASY IMPLICATION IS STATED where the data carries one. "Buy
+ *     low" and "Sell high" are the two calls the finishing gap actually
+ *     licenses, and they are the same calls `CitrusNewsService` already
+ *     tags its bounce-back and regression notes with.
+ *
+ * LENGTH BUDGET moved from 115 to `VERDICT_MAX_CHARS` (140). Naming the
+ * source costs roughly ten characters a line and it is not optional. The
+ * longest branch measures 105; the budget is the ceiling the unit test
+ * pins, not a target.
  */
 export function deriveVerdict(
   player: DashboardIndexEntry,
@@ -406,13 +429,15 @@ export function deriveVerdict(
     const sv = by('save_pct');
     if (sv?.percentile != null && sv.value != null) {
       const rate = sv.display;
+      // The rate itself is NHL.com's; the ranking is ours, off the cohort
+      // this module builds. The sentence keeps the two apart on purpose.
       if (sv.percentile >= 75) {
-        return `Stopping more than his share — ${rate} save rate, ${ordinal(sv.percentile)} among ${noun}.`;
+        return `Stopping more than his share. ${rate} save rate, ${ordinal(sv.percentile)} among ${noun} on the Citrus board.`;
       }
       if (sv.percentile <= 25) {
-        return `Leaking more than he should — ${rate} save rate, ${ordinal(sv.percentile)} among ${noun}.`;
+        return `Leaking more than he should. ${rate} save rate, ${ordinal(sv.percentile)} among ${noun} on the Citrus board.`;
       }
-      return `${rate} save rate over ${player.gp} appearances — ${ordinal(sv.percentile)} among ${noun}.`;
+      return `${rate} save rate over ${player.gp} appearances, ${ordinal(sv.percentile)} among ${noun} on the Citrus board.`;
     }
     return null;
   }
@@ -423,16 +448,16 @@ export function deriveVerdict(
   // Shot quality vs finishing. `fin` is already guarded on real xG data.
   if (xgPct != null && fin != null && Math.abs(fin) >= 1.5) {
     if (xgPct >= 75 && fin <= -1.5) {
-      return `Elite looks, cold stick — ${ordinal(xgPct)}-percentile xG/60 and ${fmt1(Math.abs(fin))} goals under expected.`;
+      return `Elite looks, cold stick. Citrus xG has him ${fmt1(Math.abs(fin))} goals under expected on ${ordinal(xgPct)}-percentile chances. Buy low.`;
     }
     if (xgPct >= 75 && fin >= 1.5) {
-      return `Elite looks and burying them — ${ordinal(xgPct)}-percentile xG/60, ${fmtSigned1(fin)} goals over expected.`;
+      return `Elite looks and burying them. Citrus xG has him ${fmtSigned1(fin)} goals over expected on ${ordinal(xgPct)}-percentile chances.`;
     }
     if (xgPct <= 40 && fin >= 1.5) {
-      return `Outrunning his chances — ${fmtSigned1(fin)} goals over expected on ${ordinal(xgPct)}-percentile looks.`;
+      return `Outrunning his chances. Citrus xG has him ${fmtSigned1(fin)} goals over expected on ${ordinal(xgPct)}-percentile looks. Sell high.`;
     }
     if (xgPct <= 40 && fin <= -1.5) {
-      return `Thin looks and not burying them — ${ordinal(xgPct)}-percentile xG/60, ${fmt1(Math.abs(fin))} goals under expected.`;
+      return `Thin looks and not burying them. Citrus xG has him ${fmt1(Math.abs(fin))} goals under expected on ${ordinal(xgPct)}-percentile chances.`;
     }
   }
 
@@ -447,23 +472,36 @@ export function deriveVerdict(
     const v = driver.value as number;
     const name = DRIVER_PHRASE[driver.spec.key] ?? driver.spec.label.toLowerCase();
     if (v > 0 && driver.percentile != null && driver.percentile >= 60) {
-      return `Value is mostly ${name} — ${fmt2(v)} GAR/60 there, ${ordinal(driver.percentile)} among ${noun}.`;
+      return `Value is mostly ${name}. Citrus GAR has him at ${fmt2(v)} there, ${ordinal(driver.percentile)} among ${noun}.`;
     }
     if (v < 0 && driver.percentile != null && driver.percentile <= 40) {
-      return `${capitalise(name)} is the drag — ${fmt2(v)} GAR/60, ${ordinal(driver.percentile)} among ${noun}.`;
+      return `${capitalise(name)} is the drag. Citrus GAR has him at ${fmt2(v)}, ${ordinal(driver.percentile)} among ${noun}.`;
     }
   }
 
   // Nothing sharper survived; fall back to the honest headline, if we have it.
   const gar = by('gar_per_60');
   if (gar?.percentile != null && gar.value != null) {
-    return `${ordinal(gar.percentile)}-percentile total impact among ${noun} over ${player.gp} games.`;
+    return `Citrus GAR puts him ${ordinal(gar.percentile)}-percentile for total impact among ${noun} over ${player.gp} games.`;
   }
   if (finPercentile != null && fin != null) {
-    return `${fmtSigned1(fin)} goals over expected — ${ordinal(finPercentile)} among ${noun} at finishing.`;
+    return `Citrus xG has him ${fmtSigned1(fin)} goals over expected, ${ordinal(finPercentile)} among ${noun} at finishing.`;
   }
   return null;
 }
+
+/**
+ * The ceiling the unit test pins on every branch above.
+ *
+ * PWS-1's "~80-100 chars" was written before the source-attribution rule.
+ * Naming Citrus xG or Citrus GAR inside the sentence costs about ten
+ * characters and it is not negotiable, so the ceiling moved to 140. The
+ * longest branch as written measures 105. Measured at 353px (the width the
+ * card gets inside PlayerStatsModal on a 393px phone) a 140-character
+ * verdict wraps to four lines, which is the most the tile can hold before
+ * it pushes the metric rows off the card.
+ */
+export const VERDICT_MAX_CHARS = 140;
 
 /** Prose names for the GAR components. Hockey words, per the STYLEGUIDE. */
 const DRIVER_PHRASE: Record<string, string> = {

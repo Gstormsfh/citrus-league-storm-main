@@ -53,7 +53,7 @@ const getContextGreeting = (pathname: string): string => {
     return "Looking at the standings? Ask me about playoff scenarios or trade targets.";
   if (pathname.includes('/draft-room'))
     return "In the draft room! Want me to suggest the best available pick based on our projections?";
-  return "Hey! I'm Stormy — your AI fantasy hockey analyst. Ask me anything about your team, trades, pickups, or the NHL.";
+  return "Well boss, Stormy here. Your roster, your scoring settings and your matchup are already loaded. Ask me about a start/sit, a trade, or a waiver target.";
 };
 
 // ── Types ────────────────────────────────────────────────────────
@@ -269,7 +269,7 @@ export const StormyChatBubble = () => {
         ...prev,
         {
           id: (Date.now() + 1).toString(),
-          text: "Something went wrong — give me a sec and try again.",
+          text: "That one didn't get through. Give me a second and ask again.",
           sender: 'stormy',
           timestamp: new Date(),
         },

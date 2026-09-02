@@ -59,7 +59,7 @@ describe('FillSlotSheet — what it offers', () => {
     renderSheet();
     expect(sheet().getByText('4.8')).toBeInTheDocument();
     expect(sheet().getByText('No game today')).toBeInTheDocument();
-    expect(sheet().getAllByText('—').length).toBe(1);
+    expect(sheet().getAllByText('-').length).toBe(1);
   });
 
   it('shows the live number once his game is under way', () => {

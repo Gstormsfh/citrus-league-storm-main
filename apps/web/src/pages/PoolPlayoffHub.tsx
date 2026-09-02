@@ -480,7 +480,7 @@ export default function PoolPlayoffHub() {
                 <CardContent>
                   <p className="text-xs text-white/70 mb-3">
                     {lockCountdown?.locked
-                      ? 'Rosters are locked — check your lineup and watch live scoring.'
+                      ? 'Rosters are locked. Check your lineup and watch live scoring.'
                       : leagueType === 'playoff-roster-pool'
                         ? 'Build your roster from players across all 16 playoff teams.'
                         : leagueType === 'playoff-confidence-pool'
@@ -532,7 +532,7 @@ export default function PoolPlayoffHub() {
                       <CardTitle className="text-base flex items-center justify-between gap-2">
                         <span className="flex items-center gap-2">
                           <Calendar className="h-5 w-5 text-pastel-orange" aria-hidden="true" />
-                          Today&apos;s Games — Your Players
+                          Today&apos;s Games: Your Players
                         </span>
                         <span className="text-xl font-calistoga font-black text-pastel-cream">
                           {totalRosterFpts.toFixed(1)} <span className="text-[10px] font-display text-white/55">FPTS</span>
@@ -863,7 +863,7 @@ export default function PoolPlayoffHub() {
                 </CardHeader>
                 <CardContent className="p-0">
                   {teams.length === 0 ? (
-                    <p className="text-xs text-white/55 italic p-4">No members yet — invite friends with the join code →</p>
+                    <p className="text-xs text-white/55 italic p-4">No members yet. Invite friends with the join code →</p>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">

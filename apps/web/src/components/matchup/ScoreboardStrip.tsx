@@ -172,7 +172,7 @@ const Chip = ({ row, layout, own, ownSide, viewed, final, onSelect, teamAvatars 
       data-viewed={viewed || undefined}
       data-final={final || undefined}
       aria-current={viewed ? 'true' : undefined}
-      aria-label={suffix ? `${label} — ${suffix}` : label}
+      aria-label={suffix ? `${label}, ${suffix}` : label}
       onClick={() => {
         if (!viewed) onSelect(row.id);
       }}

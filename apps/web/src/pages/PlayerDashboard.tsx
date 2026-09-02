@@ -421,7 +421,7 @@ function ZoneShareRow({
           {share.toFixed(0)}% of attempts · {goals} G
         </span>
         <span className="font-jbmono uppercase tracking-[0.18em] text-[9px] font-bold text-white/55 tabular-nums">
-          {xgPerShot != null ? `${xgPerShot.toFixed(3)} xG/shot` : '—'}
+          {xgPerShot != null ? `${xgPerShot.toFixed(3)} xG/shot` : '-'}
         </span>
       </div>
     </div>
@@ -441,7 +441,7 @@ function ShotBreakdownTile({ summary, modeLabel }: { summary: ShotSummary; modeL
       </div>
       <div className="mb-4 text-[11px] leading-snug text-white/70">
         {summary.plotted} of {summary.total} attempts placed on the rink. Zones are the rink&apos;s
-        own geometry — the slot is {SHOT_ZONE_DEFINITION.SLOT}.
+        own geometry. The slot is {SHOT_ZONE_DEFINITION.SLOT}.
       </div>
       <div className="flex flex-1 flex-col divide-y divide-white/[0.06]">
         {summary.zones.map((z) => (
@@ -679,7 +679,7 @@ export default function PlayerDashboard() {
       <MessageState
         eyebrow="Sign in required"
         title="Player dashboards are for signed-in managers"
-        body="The shot data behind this page — every attempt of the season, scored by our own expected-goals model — is served to signed-in accounts only. Sign in and this link will open straight onto the player."
+        body="The shot data behind this page (every attempt of the season, scored by our own expected-goals model) is served to signed-in accounts only. Sign in and this link opens straight onto the player."
         action={
           <CitrusButton to="/auth" variant="primary">
             Sign in
@@ -702,7 +702,7 @@ export default function PlayerDashboard() {
       <MessageState
         eyebrow="Could not load"
         title="This dashboard did not come back"
-        body={`${dash.error ?? 'The request failed.'} Nothing is broken on your end — try again, and if it keeps failing the API is having a moment.`}
+        body={`${dash.error ?? 'The request failed.'} Nothing is broken on your end. Try again, and if it keeps failing the API is having a moment.`}
         action={
           <CitrusButton variant="primary" onClick={dash.reload}>
             Try again
@@ -861,7 +861,7 @@ export default function PlayerDashboard() {
         {payload.shots_truncated && (
           <div className="mx-auto mt-3 max-w-[1100px]">
             <span className="font-jbmono text-[9px] font-bold uppercase tracking-[0.22em] text-pastel-butter">
-              Shot list capped at {payload.shots_cap} — the map shows the first {payload.shots_cap} attempts of the season
+              Shot list capped at {payload.shots_cap}. The map shows the first {payload.shots_cap} attempts of the season
             </span>
           </div>
         )}
@@ -939,7 +939,7 @@ export default function PlayerDashboard() {
           <p className="mt-3 max-w-[70ch] text-[11px] leading-snug text-white/70">
             Expected goals here are summed over this season&apos;s scored shot events (
             {xgRow.xg.toFixed(2)}). The card at the top of the page reads the season-stats rollup (
-            {(indexEntry.x_goals ?? 0).toFixed(2)}) — a separate pipeline over the same shots — so
+            {(indexEntry.x_goals ?? 0).toFixed(2)}): a separate pipeline over the same shots, so
             the two finishing figures do not match. Both are our model; neither is a measurement,
             and the shot-summed figure is the one the map above is drawn from.
           </p>

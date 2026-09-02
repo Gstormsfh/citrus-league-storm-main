@@ -275,7 +275,7 @@ export default function PoolPlayoffBracket() {
               {pickMode === 'full-bracket'
                 ? isGloballyLocked
                   ? 'Your picks are locked. Track how your bracket survives each round.'
-                  : `Pick ALL 15 series — including the Stanley Cup champion — before the deadline. R2+ matchups fill in based on your R1 picks. Points double each round (2 → 4 → 8 → 16).`
+                  : `Pick ALL 15 series (including the Stanley Cup champion) before the deadline. R2+ matchups fill in based on your R1 picks. Points double each round (2 → 4 → 8 → 16).`
                 : 'Pick winners & game counts. Points double each round (2 → 4 → 8 → 16).'}
             </p>
             {pickMode === 'full-bracket' && !isGloballyLocked && (
@@ -450,7 +450,7 @@ export default function PoolPlayoffBracket() {
                             <span className="font-semibold" style={highInfo ? { color: highInfo.primaryColor } : undefined}>
                               {high?.team_abbrev} {h2hMap[s.bracket_slot].high_wins}
                             </span>
-                            <span className="text-white/55">—</span>
+                            <span className="text-white/55">-</span>
                             <span className="font-semibold" style={lowInfo ? { color: lowInfo.primaryColor } : undefined}>
                               {h2hMap[s.bracket_slot].low_wins} {low?.team_abbrev}
                             </span>

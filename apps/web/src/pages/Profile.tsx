@@ -600,7 +600,7 @@ const Profile = () => {
     totalSeasons: 0,
     championships: 0,
     playoffAppearances: 0,
-    overallRecord: '—',
+    overallRecord: '-',
     currentRank: null as number | null,
     bestFinish: null as string | null,
     totalPoints: 0,
@@ -1303,7 +1303,7 @@ const Profile = () => {
                         <div className="grid grid-cols-2 gap-3">
                           <div className="text-center p-3 rounded-xl bg-pastel-orange/10 ring-1 ring-pastel-orange/30">
                             <div className="font-calistoga text-2xl text-pastel-orange tabular-nums leading-none">
-                              {userStats.currentRank ?? '—'}
+                              {userStats.currentRank ?? '-'}
                             </div>
                             <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1">Current Rank</div>
                           </div>
@@ -1377,7 +1377,7 @@ const Profile = () => {
                   <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardContent className="p-6 text-center">
                       <Medal className="h-8 w-8 mx-auto mb-2 text-pastel-orange" />
-                      <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{userStats.avgPointsPerGame || '—'}</div>
+                      <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{userStats.avgPointsPerGame || '-'}</div>
                       <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1.5">Avg Pts/Week</div>
                     </CardContent>
                   </Card>
@@ -1822,7 +1822,7 @@ const Profile = () => {
                                     <SelectItem value="faab">FAAB (Bidding)</SelectItem>
                                   </SelectContent>
                                 </Select>
-                                <p className="text-xs text-white/55">Join Order: seeded by when teams joined. Reverse Draft Order: the last round-one pick holds waiver 1. Both roll — the claimant drops to the back. Reverse Standings: recomputed weekly, worst record first.</p>
+                                <p className="text-xs text-white/55">Join Order: seeded by when teams joined. Reverse Draft Order: the last round-one pick holds waiver 1. Both roll. The claimant drops to the back. Reverse Standings: recomputed weekly, worst record first.</p>
                               </div>
 
                               <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
@@ -1990,7 +1990,7 @@ const Profile = () => {
                                     className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 tabular-nums disabled:opacity-50"
                                   />
                                   {selectedLeagueData?.draft_status === 'completed' && (
-                                    <p className="text-xs text-white/55">Draft is completed — rounds cannot be changed</p>
+                                    <p className="text-xs text-white/55">Draft is completed: rounds cannot be changed</p>
                                   )}
                                 </div>
                                 <div className="space-y-2">
@@ -2006,7 +2006,7 @@ const Profile = () => {
                                     className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 tabular-nums disabled:opacity-50"
                                   />
                                   {selectedLeagueData?.draft_status === 'completed' && (
-                                    <p className="text-xs text-white/55">Draft is completed — time limit cannot be changed</p>
+                                    <p className="text-xs text-white/55">Draft is completed: time limit cannot be changed</p>
                                   )}
                                 </div>
                               </div>

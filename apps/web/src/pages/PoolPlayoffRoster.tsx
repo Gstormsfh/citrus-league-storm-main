@@ -612,7 +612,7 @@ export default function PoolPlayoffRosterEntry() {
               <div className="text-sm font-display font-bold text-pastel-cream">
                 Viewing {viewOwnerName || 'Teammate'}&apos;s Roster
               </div>
-              <div className="text-[11px] text-pastel-cream/70">Read-only — you cannot modify this roster.</div>
+              <div className="text-[11px] text-pastel-cream/70">Read-only. You cannot change this roster.</div>
             </div>
           </div>
         </div>
@@ -663,7 +663,7 @@ export default function PoolPlayoffRosterEntry() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-citrus-orange" />
-                Today&apos;s Games — {isViewMode ? `${viewOwnerName || 'Their'} Players` : 'Your Players'}
+                Today&apos;s Games: {isViewMode ? `${viewOwnerName || 'Their'} Players` : 'Your Players'}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -1197,7 +1197,7 @@ export default function PoolPlayoffRosterEntry() {
                               <td className="px-2 py-1.5 text-center text-xs">{player.goals_against || 0}</td>
                               {/* HIT+BLK placeholders only when headers are showing (skater/all filter) */}
                               {posFilter !== 'G' && (
-                                <td className="px-2 py-1.5 text-center text-xs text-pastel-cream/60" colSpan={2}>—</td>
+                                <td className="px-2 py-1.5 text-center text-xs text-pastel-cream/60" colSpan={2}>-</td>
                               )}
                               <td className="px-2 py-1.5 text-center text-xs">
                                 {(() => {
@@ -1206,7 +1206,7 @@ export default function PoolPlayoffRosterEntry() {
                                   if (!sp && player.saves && player.shots_faced) {
                                     sp = player.saves / player.shots_faced;
                                   }
-                                  if (!sp) return '—';
+                                  if (!sp) return '-';
                                   const pct = sp < 1 ? sp * 100 : sp;
                                   return pct.toFixed(1) + '%';
                                 })()}
@@ -1218,10 +1218,10 @@ export default function PoolPlayoffRosterEntry() {
                                   if (!g && player.goals_against && player.icetime_seconds) {
                                     g = (player.goals_against * 3600) / player.icetime_seconds;
                                   }
-                                  return g > 0 ? g.toFixed(2) : '—';
+                                  return g > 0 ? g.toFixed(2) : '-';
                                 })()}
                               </td>
-                              <td className="px-2 py-1.5 text-center text-xs">—</td>
+                              <td className="px-2 py-1.5 text-center text-xs">-</td>
                             </>
                           ) : (
                             <>
@@ -1237,7 +1237,7 @@ export default function PoolPlayoffRosterEntry() {
                               <td className="px-2 py-1.5 text-center text-xs text-purple-400 font-semibold">
                                 {(() => {
                                   const xg = player.xGoals ?? player.x_goals ?? 0;
-                                  return xg > 0 ? xg.toFixed(1) : '—';
+                                  return xg > 0 ? xg.toFixed(1) : '-';
                                 })()}
                               </td>
                               <td className="px-2 py-1.5 text-center text-xs text-pastel-cream/75">
@@ -1246,7 +1246,7 @@ export default function PoolPlayoffRosterEntry() {
                                   const m = Math.floor(totalSec / 60);
                                   const s = totalSec % 60;
                                   return `${m}:${s < 10 ? '0' : ''}${s}`;
-                                })() : '—'}
+                                })() : '-'}
                               </td>
                             </>
                           )}
@@ -1425,7 +1425,7 @@ export default function PoolPlayoffRosterEntry() {
                 <ul className="text-[11px] text-pastel-cream/75 space-y-0.5 list-disc pl-3">
                   <li>Pick {rosterSize} players from playoff teams</li>
                   {hasCap && <li>Max {maxPerTeam} players per NHL team</li>}
-                  {!hasCap && <li>No per-team cap — stack any team if you want</li>}
+                  {!hasCap && <li>No per-team cap: stack any team if you want</li>}
                   <li>Total fantasy points across all playoff games</li>
                   <li>Click any player row to add them</li>
                   <li>Your FPTS uses your league's custom scoring</li>

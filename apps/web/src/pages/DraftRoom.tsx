@@ -354,7 +354,7 @@ const DraftRoomInner = () => {
       const { leagues, error } = await LeagueService.getUserLeagues(user.id);
       
       if (error) {
-        setError("Couldn't load your leagues — give it a moment and try again.");
+        setError("Couldn't load your leagues. Give it a moment and try again.");
         setLoading(false);
         return;
       }
@@ -377,7 +377,7 @@ const DraftRoomInner = () => {
       // leagues. Direct navigation closes that window entirely.
       navigate(`/draft-v2/${encodeURIComponent(targetLeague.id)}`, { replace: true });
     } catch (error: unknown) {
-      setError("Couldn't load your leagues — give it a moment and try again.");
+      setError("Couldn't load your leagues. Give it a moment and try again.");
       setLoading(false);
     }
   }, [user, navigate, searchParams, activeLeagueId]);
@@ -453,7 +453,7 @@ const DraftRoomInner = () => {
 
         if (!leagueResponse.data) {
           logger.error('[DraftRoom] Error loading demo league: no data returned');
-          setError("Couldn't load the demo league — refresh to try again.");
+          setError("Couldn't load the demo league. Refresh to try again.");
           setLoading(false);
           return;
         }
@@ -469,7 +469,7 @@ const DraftRoomInner = () => {
 
         if (!demoTeamsData || (demoTeamsData as unknown[]).length === 0) {
           logger.error('[DraftRoom] Error loading demo teams: no teams returned');
-          setError("Couldn't load the demo teams — refresh to try again.");
+          setError("Couldn't load the demo teams. Refresh to try again.");
           setLoading(false);
           return;
         }
@@ -497,7 +497,7 @@ const DraftRoomInner = () => {
 
         if (picksError) {
           logger.error('[DraftRoom] Error loading demo draft picks:', picksError);
-          setError("Couldn't load the demo draft picks — refresh to try again.");
+          setError("Couldn't load the demo draft picks. Refresh to try again.");
           setLoading(false);
           return;
         }
@@ -537,7 +537,7 @@ const DraftRoomInner = () => {
         return;
       } catch (error: unknown) {
         logger.error('[DraftRoom] Error loading demo draft:', error);
-        setError("Couldn't load the demo draft — refresh to try again.");
+        setError("Couldn't load the demo draft. Refresh to try again.");
         setLoading(false);
         return;
       }
@@ -904,7 +904,7 @@ const DraftRoomInner = () => {
 
     } catch (error: unknown) {
       logger.error('DraftRoom: Error loading draft data:', error);
-      const errorMessage = error instanceof Error ? error.message : (typeof error === 'string' ? error : JSON.stringify(error)) || "Couldn't load the draft data — refresh to try again.";
+      const errorMessage = error instanceof Error ? error.message : (typeof error === 'string' ? error : JSON.stringify(error)) || "Couldn't load the draft data. Refresh to try again.";
       setError(errorMessage);
       setLoading(false);
       // Ensure draftPhase is set even on error
@@ -1297,7 +1297,7 @@ const DraftRoomInner = () => {
         auctionCloseInProgress = true;
         const closeResult = await AuctionDraftService.closeNomination(leagueId, auctionSessionId, nomination.id);
         if (closeResult.success) {
-          toast({ title: 'Nomination Closed', description: closeResult.winner_team_id ? `Sold for $${closeResult.amount}!` : 'No bids — player returned to pool.' });
+          toast({ title: 'Nomination Closed', description: closeResult.winner_team_id ? `Sold for $${closeResult.amount}!` : 'No bids. The player goes back in the pool.' });
           // Refresh auction state to advance to next nominator
           const refreshed = await AuctionDraftService.getAuctionState(leagueId, auctionSessionId);
           if (refreshed) {
@@ -1792,7 +1792,7 @@ const DraftRoomInner = () => {
         if ('Notification' in window) {
           if (Notification.permission === 'granted') {
             new Notification("It's Your Turn!", {
-              body: "You're on the clock — make your pick!",
+              body: "You're on the clock. Make your pick.",
               tag: 'draft-turn',
               requireInteraction: true,
             });
@@ -1800,7 +1800,7 @@ const DraftRoomInner = () => {
             Notification.requestPermission().then((perm) => {
               if (perm === 'granted') {
                 new Notification("It's Your Turn!", {
-                  body: "You're on the clock — make your pick!",
+                  body: "You're on the clock. Make your pick.",
                   tag: 'draft-turn',
                   requireInteraction: true,
                 });
@@ -2445,7 +2445,7 @@ const DraftRoomInner = () => {
                 setDraftedPlayerIds(new Set(rServerPicks.map((p: DraftPick) => p.player_id)));
               }
             } else {
-              toast({ title: "Not Your Turn", description: "The draft advanced — it's another team's turn now." });
+              toast({ title: "Not Your Turn", description: "The draft advanced. It's another team's turn now." });
             }
           }
         } catch (retryError) {
@@ -2467,7 +2467,7 @@ const DraftRoomInner = () => {
           const isTimeout = errorName === 'TimeoutError' || errorName === 'AbortError' || errorMessage.includes('timed out');
           const isNetwork = errorMessage === 'Failed to fetch' || errorMessage.includes('Network');
           const userMsg = isTimeout
-            ? 'Pick timed out. Please try again — the server may be busy.'
+            ? 'Pick timed out. The server may be busy, so try that again.'
             : isNetwork
               ? 'Network error. Check your connection and try again.'
               : `Failed to draft player: ${errorMessage}`;
@@ -3719,7 +3719,7 @@ const DraftRoomInner = () => {
           'connected' is the quiescent state; we don't render anything. */}
       {realtimeStatus === 'reconnecting' && (
         <div className="sticky top-0 z-50 bg-amber-500 text-black text-sm font-semibold px-4 py-2 text-center shadow-md pt-[env(safe-area-inset-top)]">
-          Reconnecting to draft — your picks may be delayed for a few seconds.
+          Reconnecting to draft. Your picks may be delayed for a few seconds.
         </div>
       )}
       {realtimeStatus === 'disconnected' && (
@@ -4241,7 +4241,7 @@ const DraftRoomInner = () => {
                                   Couldn&apos;t load the auction state.
                                 </p>
                                 <p className="text-xs mt-1">
-                                  This is a connection problem — the auction is still running.
+                                  This is a connection problem. The auction is still running.
                                 </p>
                                 <Button
                                   size="sm"

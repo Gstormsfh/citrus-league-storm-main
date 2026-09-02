@@ -108,7 +108,7 @@ describe('the roster row wears the headshot', () => {
 
   it('an empty row has no picture', () => {
     renderList();
-    const empty = screen.getByRole('button', { name: /Empty LW1 — tap to fill/ });
+    const empty = screen.getByRole('button', { name: /Empty LW1, tap to fill/ });
     expect(empty.querySelector('[data-mug-state]')).toBeNull();
     expect(empty.querySelector('img')).toBeNull();
   });

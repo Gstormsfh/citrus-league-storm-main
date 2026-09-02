@@ -50,7 +50,7 @@ export function LeagueLoadErrorBanner() {
     >
       <AlertTriangle className="h-4 w-4 flex-shrink-0 text-destructive" aria-hidden="true" />
       <span className="text-destructive">
-        We couldn&apos;t load your leagues just now — this is a connection problem, not a
+        We couldn&apos;t load your leagues just now. This is a connection problem, not a
         sign that your leagues are gone.
       </span>
       <button

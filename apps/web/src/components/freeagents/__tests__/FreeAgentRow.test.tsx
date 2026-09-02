@@ -196,7 +196,7 @@ describe('FreeAgentRow — the button says which transaction the tap is', () => 
     const btn = screen.getByTestId('fa-action');
     expect(within(btn).getByText('W')).toBeTruthy();
     expect(btn.textContent).toMatch(/clears \w{3}/);
-    expect(btn.getAttribute('aria-label')).toMatch(/^Claim Connor McDavid — clears \w{3}$/);
+    expect(btn.getAttribute('aria-label')).toMatch(/^Claim Connor McDavid, clears \w{3}$/);
   });
 
   it('claim with no clear time on file: still W, never "Invalid Date"', () => {

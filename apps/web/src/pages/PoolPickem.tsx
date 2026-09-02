@@ -314,9 +314,9 @@ const PoolPickem = () => {
       if (r.success) {
         toast({ title: 'Picks Saved!', description: `${arr.length} picks submitted.` });
       } else {
-        toast({ title: "Picks Didn't Submit", description: r.error || "Couldn't submit your picks — try again in a moment.", variant: 'destructive' });
+        toast({ title: "Picks Didn't Submit", description: r.error || "Couldn't submit your picks. Try again in a moment.", variant: 'destructive' });
       }
-    } catch { toast({ title: "Picks Didn't Submit", description: "Couldn't reach the pool server — try again in a moment.", variant: 'destructive' }); }
+    } catch { toast({ title: "Picks Didn't Submit", description: "Couldn't reach the pool server. Try again in a moment.", variant: 'destructive' }); }
     finally { setSubmitting(false); }
   };
 
@@ -422,7 +422,7 @@ const PoolPickem = () => {
                       ✦ Between slates
                     </div>
                     <p className="font-bold text-lg text-pastel-cream">The board is dark tonight.</p>
-                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">This week's slate hasn't dropped yet — swing back Wednesday for lock-in.</p>
+                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">This week's slate hasn't dropped yet. Swing back Wednesday for lock-in.</p>
                   </div>
                 </GlowCard>
               ) : (
@@ -487,7 +487,7 @@ const PoolPickem = () => {
                       ✦ Awaiting the first whistle
                     </div>
                     <p className="font-bold text-pastel-cream text-base">Standings light up after week 1 wraps.</p>
-                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Get your picks in first — every game counts.</p>
+                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Get your picks in first. Every game counts.</p>
                     <button
                       type="button"
                       onClick={() => setActiveTab('picks')}

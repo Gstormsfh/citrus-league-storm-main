@@ -349,7 +349,9 @@ describe('verdicts — assembled from measured values, never generated', () => {
   it('names the busiest zone, its share and our model’s xG per attempt there', () => {
     const v = deriveShotVerdict(summariseShots(busySeason), 7.5)!;
     expect(v).toContain('He takes 100% of his attempts from the low slot');
-    expect(v).toContain('0.250 expected goals apiece on our model');
+    // The model is NAMED (2026-09-02 voice brief): "our model" was
+    // unattributable and the copy rules require the source in the sentence.
+    expect(v).toContain('0.250 expected goals apiece on Citrus xG v3');
     expect(v).toContain('7.5 goals ahead');
   });
 

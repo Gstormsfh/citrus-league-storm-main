@@ -179,7 +179,7 @@ export function FillSlotSheet({
                       {locked ? (
                         <>
                           <span className="text-white/25" aria-hidden="true">·</span>
-                          <span>Game started — can't move</span>
+                          <span>Game started: can't move</span>
                         </>
                       ) : hasGame ? (
                         <>
@@ -212,7 +212,7 @@ export function FillSlotSheet({
                         t.live ? 'text-emerald-500' : hasGame ? 'text-pastel-orange' : 'text-white/55',
                       )}
                     >
-                      {t.pts != null && hasGame ? t.pts.toFixed(1) : '—'}
+                      {t.pts != null && hasGame ? t.pts.toFixed(1) : '-'}
                     </span>
                     <span className="block text-[9px] font-display font-semibold uppercase text-white/55">
                       {t.live ? 'live' : 'proj'}

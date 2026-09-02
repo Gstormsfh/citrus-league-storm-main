@@ -126,7 +126,7 @@ describe('locked players', () => {
 });
 
 describe('an empty starter row is one target', () => {
-  const emptyRow = () => screen.getByRole('button', { name: /Empty LW1 — tap to fill/ });
+  const emptyRow = () => screen.getByRole('button', { name: /Empty LW1, tap to fill/ });
 
   it('is labelled "Empty · tap to fill" and exposed as a button', () => {
     renderList();

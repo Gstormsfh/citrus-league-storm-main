@@ -110,7 +110,7 @@ export function FreeAgentRow({
 
   const actionLabel =
     action === 'claim'
-      ? `Claim ${player.full_name}${clears ? ` — ${clears}` : ''}`
+      ? `Claim ${player.full_name}${clears ? `, ${clears}` : ''}`
       : action === 'swap'
         ? `Add ${player.full_name} with a drop`
         : `Add ${player.full_name}`;

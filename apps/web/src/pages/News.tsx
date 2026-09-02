@@ -132,7 +132,7 @@ const News = () => {
               <p className="text-sm text-white/55 max-w-sm">
                 {searchTerm
                   ? 'Try a different keyword, or clear the search to see everything we\'ve pulled today.'
-                  : 'Check back after the next puck drop — the beat picks up during game hours.'}
+                  : 'Check back after the next puck drop. The beat picks up during game hours.'}
               </p>
               {searchTerm && (
                 <button

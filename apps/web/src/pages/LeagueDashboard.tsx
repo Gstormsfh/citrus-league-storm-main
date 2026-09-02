@@ -136,7 +136,7 @@ const LeagueDashboard = () => {
           navigate('/gm-office');
           toast({
             title: "Wrong League",
-            description: "This one's not on your list — check the invite link or pick one from GM Office.",
+            description: "This one's not on your list. Check the invite link or pick one from GM Office.",
             variant: "destructive"
           });
           return;
@@ -279,7 +279,7 @@ const LeagueDashboard = () => {
         }
       }
     } catch (err: unknown) {
-      setError(userMessage(err, "Couldn't load the league — refresh to try again."));
+      setError(userMessage(err, "Couldn't load the league. Refresh to try again."));
     } finally {
       setLoading(false);
     }
@@ -385,7 +385,7 @@ const LeagueDashboard = () => {
       logger.error('handleSimulateFill: Exception:', err);
       toast({
         title: "Simulation Didn't Take",
-        description: userMessage(err, "Couldn't simulate the teams — try again in a moment."),
+        description: userMessage(err, "Couldn't simulate the teams. Try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -547,7 +547,7 @@ const LeagueDashboard = () => {
     } catch (err: unknown) {
       toast({
         title: "Settings Didn't Stick",
-        description: userMessage(err, "Couldn't save the settings — try again in a moment."),
+        description: userMessage(err, "Couldn't save the settings. Try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -587,7 +587,7 @@ const LeagueDashboard = () => {
       if (!result.success) {
         toast({
           title: "Waivers Didn't Process",
-          description: result.error || "Couldn't process the waiver run — retrying might help.",
+          description: result.error || "Couldn't process the waiver run. Retrying might help.",
           variant: 'destructive',
         });
         return;
@@ -627,7 +627,7 @@ const LeagueDashboard = () => {
     } catch (err: unknown) {
       toast({
         title: "Waivers Didn't Process",
-        description: userMessage(err, "Couldn't process the waiver run — retrying might help."),
+        description: userMessage(err, "Couldn't process the waiver run. Retrying might help."),
         variant: 'destructive',
       });
     } finally {
@@ -649,7 +649,7 @@ const LeagueDashboard = () => {
       if (!syncResult) {
         toast({
           title: "Roster Sync Didn't Take",
-          description: "Couldn't sync the rosters — try again in a moment.",
+          description: "Couldn't sync the rosters. Try again in a moment.",
           variant: 'destructive',
         });
         return;
@@ -678,7 +678,7 @@ const LeagueDashboard = () => {
     } catch (err: unknown) {
       toast({
         title: "Roster Sync Didn't Take",
-        description: userMessage(err, "Couldn't sync the rosters — try again in a moment."),
+        description: userMessage(err, "Couldn't sync the rosters. Try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -932,7 +932,7 @@ const LeagueDashboard = () => {
                             </SelectContent>
                           </Select>
                           <p className="text-xs text-white/55">
-                            Join Order: seeded by when teams joined. Reverse Draft Order: the last round-one pick holds waiver 1. Both roll — the claimant drops to the back. Reverse Standings: recomputed weekly, worst record first. FAAB: teams bid from a season budget — highest bid wins, ties go to the worse record.
+                            Join Order: seeded by when teams joined. Reverse Draft Order: the last round-one pick holds waiver 1. Both roll. The claimant drops to the back. Reverse Standings: recomputed weekly, worst record first. FAAB: teams bid from a season budget. Highest bid wins, ties go to the worse record.
                           </p>
                         </div>
 
@@ -955,7 +955,7 @@ const LeagueDashboard = () => {
                               className="w-40"
                             />
                             <p className="text-xs text-white/55">
-                              Season bidding budget per team (default $100). Set this before the season — teams that
+                              Season bidding budget per team (default $100). Set this before the season. Teams that
                               have already placed a bid keep the budget they started with.
                             </p>
                           </div>
@@ -1090,7 +1090,7 @@ const LeagueDashboard = () => {
                                 Sync Rosters from Draft
                               </Label>
                               <p className="text-xs text-white/55">
-                                Rebuild team rosters from the completed draft results (safety net —
+                                Rebuild team rosters from the completed draft results (safety net:
                                 covers live, auction, and offline drafts)
                               </p>
                             </div>
@@ -1393,7 +1393,7 @@ const LeagueDashboard = () => {
                                   Dynasty Mode
                                 </Label>
                                 <p className="text-xs text-white/55 mt-1">
-                                  Entire roster carries over between seasons — unlimited keepers.
+                                  Entire roster carries over between seasons. Unlimited keepers.
                                 </p>
                               </div>
                               <Switch
@@ -1725,7 +1725,7 @@ const LeagueDashboard = () => {
                       if (!leagueId) {
                         toast({
                           title: 'Missing League ID',
-                          description: "Something's off with the URL — refresh the page and we'll pick it back up.",
+                          description: "Something's off with the URL. Refresh the page and we'll pick it back up.",
                           variant: 'destructive',
                         });
                         return;
@@ -1786,7 +1786,7 @@ const LeagueDashboard = () => {
                         {league.draft_status === 'completed'
                           ? myRosterCount !== null && myRosterCount > 0
                             ? `Roster set · ${myRosterCount} players`
-                            : 'Draft complete — set your opening lineup'
+                            : 'Draft complete. Set your opening lineup'
                           : 'Manage your roster, set lineups, scout the wire.'}
                       </CardDescription>
                     </div>
@@ -1947,7 +1947,7 @@ const LeagueDashboard = () => {
                 {/* An unset setting rendered as a confident "0" reads as a real
                     configured value. Show an em dash so the tile says
                     "not configured" rather than asserting zero. */}
-                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">{league.roster_size || '—'}</div>
+                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">{league.roster_size || '-'}</div>
                 <p className="text-xs text-white/55 mt-2">{league.roster_size ? 'Players per team' : 'Not configured'}</p>
               </CardContent>
             </Card>
@@ -1961,7 +1961,7 @@ const LeagueDashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="relative z-10">
-                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">{league.draft_rounds || '—'}</div>
+                <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">{league.draft_rounds || '-'}</div>
                 <p className="text-xs text-white/55 mt-2">{league.draft_rounds ? 'Total draft rounds' : 'Not configured'}</p>
               </CardContent>
             </Card>
@@ -2005,7 +2005,7 @@ const LeagueDashboard = () => {
                       <span className="font-bold text-pastel-cream tabular-nums">{teams.length}</span> of <span className="font-bold text-pastel-cream tabular-nums">{league.settings?.teamsCount || 12}</span> teams in.
                       {' '}
                       {league.draft_status === 'not_started' && 'Draft is on deck.'}
-                      {league.draft_status === 'in_progress' && 'Draft is live — get in there.'}
+                      {league.draft_status === 'in_progress' && 'Draft is live. Get in there.'}
                       {/* Tri-state. "Rosters set" is only claimed when a roster
                           was actually observed. myRosterCount === null means we
                           could not check, and we say nothing rather than guess. */}
@@ -2013,8 +2013,8 @@ const LeagueDashboard = () => {
                       {league.draft_status === 'completed' && myRosterCount !== null && myRosterCount > 0 && 'Rosters set. Time to play.'}
                       {league.draft_status === 'completed' && myRosterCount === 0 && (
                         <span className="text-pastel-orange-soft font-semibold">
-                          Draft is marked complete, but your roster is empty. Nothing was assigned —
-                          the commissioner can re-sync rosters in League Settings before week 1.
+                          Draft is marked complete, but your roster is empty. Nothing was assigned.
+                          The commissioner can re-sync rosters in League Settings before week 1.
                         </span>
                       )}
                     </p>

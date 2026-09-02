@@ -1313,7 +1313,7 @@ const Roster = () => {
         setLoading(false);
         toast({
           title: "Roster Won't Load",
-          description: "Couldn't load your roster — refresh and we'll pick it back up.",
+          description: "Couldn't load your roster. Refresh and we'll pick it back up.",
           variant: 'destructive'
         });
       }
@@ -2457,7 +2457,7 @@ const Roster = () => {
     if (!projectionsReadyForSelectedDate) {
       toast({
         title: 'Projections still loading',
-        description: 'Give it a second — the plan needs to know who plays.',
+        description: 'Give it a second. The plan needs to know who plays.',
       });
       return;
     }
@@ -3697,7 +3697,7 @@ const Roster = () => {
                         <span className="text-amber-400 font-bold text-sm">Best Ball Mode</span>
                       </div>
                       <p className="text-xs text-amber-300 mt-1">
-                        Your lineup is automatically optimized each day to maximize points. No manual roster management needed — just draft well!
+                        Your lineup is automatically optimized each day to maximize points. No manual roster management needed. Just draft well!
                       </p>
                     </div>
                   )}
@@ -3950,7 +3950,7 @@ const Roster = () => {
                          </div>
                          {teamGrades.every((g) => g.pct === null) && (
                            <p className="text-xs text-white/55 mt-3">
-                             No games played yet — grades appear once your players start
+                             No games played yet. Grades appear once your players start
                              logging games.
                            </p>
                          )}
@@ -3970,7 +3970,7 @@ const Roster = () => {
                            * is a projection. In August that heading described a season
                            * that has not been played.
                            */}
-                         <h3 className="font-bold text-lg">Season Totals — Starters</h3>
+                         <h3 className="font-bold text-lg">Season Totals: Starters</h3>
                       </div>
                       
                       <div className="space-y-6">
@@ -4109,7 +4109,7 @@ const Roster = () => {
                                 ✦ Clean slate
                               </div>
                               <p className="text-pastel-cream font-bold text-base">No moves yet.</p>
-                              <p className="text-sm text-white/55 mt-2 max-w-sm mx-auto">Every add, drop, trade, and waiver claim you make lands here — the receipts of your season.</p>
+                              <p className="text-sm text-white/55 mt-2 max-w-sm mx-auto">Every add, drop, trade, and waiver claim you make lands here. The receipts of your season, in one place.</p>
                             </div>
                           ) : (
                             <div className="rounded-md border">
@@ -4315,7 +4315,7 @@ const Roster = () => {
                       logger.error("[Roster] Error checking draft status:", error);
                       toast({
                         title: "Draft Status Unclear",
-                        description: "Couldn't verify where the draft is at — try again in a moment.",
+                        description: "Couldn't verify where the draft is at. Try again in a moment.",
                         variant: "destructive"
                       });
                       return;
@@ -4333,7 +4333,7 @@ const Roster = () => {
                       if (!dropSuccess) {
                         toast({
                           title: "Drop Didn't Take",
-                          description: dropError?.message || "Couldn't drop the player — try again in a moment.",
+                          description: dropError?.message || "Couldn't drop the player. Try again in a moment.",
                           variant: "destructive"
                         });
                         return;
@@ -4378,7 +4378,7 @@ const Roster = () => {
                     } catch (error: any) {
                       toast({
                         title: "Move Didn't Take",
-                        description: error?.message || "Something got in the way — try that move again.",
+                        description: error?.message || "That move didn't go through. Try it again.",
                         variant: "destructive"
                       });
                     }

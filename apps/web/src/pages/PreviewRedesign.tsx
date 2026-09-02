@@ -410,7 +410,7 @@ export default function PreviewRedesign() {
           </span>
         </div>
         <p className="font-sans text-[15px] text-pastel-forest-dim mt-6 max-w-md mx-auto">
-          Features grid, Stormy AI showcase, final CTA, and footer come next — once you've signed off on the hero direction.
+          Features grid, Stormy AI showcase, final CTA, and footer come next, once you've signed off on the hero direction.
         </p>
       </section>
     </div>

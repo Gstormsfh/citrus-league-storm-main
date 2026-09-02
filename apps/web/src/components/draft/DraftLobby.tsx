@@ -349,7 +349,7 @@ export const DraftLobby = ({
                 </div>
               </div>
               <p className="text-xs text-muted-foreground text-center">
-                Inherited from your league settings — nothing to re-enter.
+                Inherited from your league settings. Nothing to re-enter.
               </p>
 
               {isCommissioner && (

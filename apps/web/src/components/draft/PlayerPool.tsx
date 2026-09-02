@@ -166,7 +166,7 @@ export const PlayerPool = memo(({
     }
 
     if (!hasAnyStats) {
-      return 'Offseason — showing prior season stats';
+      return 'Offseason: showing prior season stats';
     }
 
     if (!mostRecent) {
@@ -1013,7 +1013,7 @@ export const PlayerPool = memo(({
             <div className="text-center py-12" data-testid="player-pool-load-error">
               <p className="font-semibold text-destructive">Couldn&apos;t load the player list.</p>
               <p className="text-xs mt-1 text-pastel-cream/70">
-                This is a connection problem, not a filter — no players were loaded at all.
+                This is a connection problem, not a filter. No players were loaded at all.
               </p>
               {onRetryLoad && (
                 <button

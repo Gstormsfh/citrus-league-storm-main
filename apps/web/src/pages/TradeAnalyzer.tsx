@@ -232,7 +232,7 @@ const TradeAnalyzer = () => {
         if (isMounted) {
           toast({
             title: "Trade Data Won't Load",
-            description: "Couldn't load the trade data — refresh and we'll pick it back up.",
+            description: "Couldn't load the trade data. Refresh and we'll pick it back up.",
             variant: "destructive"
           });
         }
@@ -1082,7 +1082,7 @@ const TradeAnalyzer = () => {
                     Couldn&apos;t load your trade offers
                   </h3>
                   <p className="text-sm text-white/55 mb-4">
-                    This is a connection problem — you may still have offers waiting.
+                    This is a connection problem. You may still have offers waiting.
                   </p>
                   <Button
                     variant="outline"

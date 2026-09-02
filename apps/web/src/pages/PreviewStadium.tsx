@@ -113,8 +113,8 @@ export default function PreviewStadium() {
               <em className="font-calistoga not-italic font-normal text-pastel-orange-deep">should be</em>.
             </h1>
             <p className="text-[17px] md:text-[18px] leading-relaxed text-pastel-forest-soft max-w-md mb-8">
-              The wildly accurate xG model fantasy hockey deserves. Draft, manage, talk smack with
-              your league — all in one place, all in one feed.
+              The 31-feature xG model fantasy hockey deserves. Draft, manage, talk smack with
+              your league. All in one place, all in one feed.
             </p>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-4 mb-10">
               <Link
@@ -218,7 +218,7 @@ export default function PreviewStadium() {
             </h2>
             <p className="text-[16px] text-pastel-forest-soft leading-relaxed mb-6">
               Spin up a 12-team mock against our model bots in 30 seconds. Pick your draft type
-              and we'll handle the rest — no account required.
+              and we'll handle the rest. No account required.
             </p>
             <Link
               to="/draft"

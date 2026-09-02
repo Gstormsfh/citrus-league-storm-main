@@ -78,7 +78,7 @@ export default function PreviewPulse() {
             </h1>
             <p className="text-[17px] md:text-[18px] leading-relaxed text-pastel-forest-soft max-w-md mb-8">
               Real-time projections that update as the goals go in. Shift-level scoring, line
-              changes, scratch alerts — everything you need, the second it matters.
+              changes, scratch alerts. Everything you need, the second it matters.
             </p>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-4 mb-10">
               <Link
@@ -220,12 +220,12 @@ export default function PreviewPulse() {
           {
             icon: Bell,
             label: 'Smart alerts',
-            body: 'Get pinged when your starter scores, when a goalie gets pulled, or when an injured stash unlocks waiver value.',
+            body: 'Get pinged when your starter scores, when a goalie gets pulled, or when an injured stash is worth a waiver claim.',
           },
           {
             icon: Zap,
             label: 'Live re-projection',
-            body: "Lineup changes, scratches, line shuffles — our model re-runs your matchup in real time. No refresh required.",
+            body: "Lineup changes, scratches, line shuffles. Our model re-runs your matchup in real time. No refresh required.",
           },
         ].map((f) => {
           const Icon = f.icon;

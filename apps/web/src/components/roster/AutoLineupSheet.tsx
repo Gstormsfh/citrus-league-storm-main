@@ -121,7 +121,7 @@ function MoveRow({ move }: { move: LineupMove }) {
             plays ? 'text-pastel-orange' : 'text-white/55',
           )}
         >
-          {plays ? fmt(proj) : '—'}
+          {plays ? fmt(proj) : '-'}
         </span>
         <span className="block text-[9px] font-display font-semibold uppercase text-white/55">proj</span>
       </span>

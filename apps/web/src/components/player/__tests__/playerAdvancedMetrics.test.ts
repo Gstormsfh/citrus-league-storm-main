@@ -25,6 +25,7 @@ import {
   normalizeSavePct,
   ordinal,
   playerDashboardHref,
+  VERDICT_MAX_CHARS,
 } from '../playerAdvancedMetrics';
 
 // ── Fixtures ────────────────────────────────────────────────────────
@@ -111,14 +112,14 @@ describe('formatters — precision is a truth claim', () => {
   it('fmt2 prints modelled rates to two decimals and nothing to none', () => {
     expect(fmt2(1.239)).toBe('1.24');
     expect(fmt2(-0.1)).toBe('-0.10');
-    expect(fmt2(null)).toBe('—');
-    expect(fmt2(undefined)).toBe('—');
-    expect(fmt2(NaN)).toBe('—');
+    expect(fmt2(null)).toBe('-');
+    expect(fmt2(undefined)).toBe('-');
+    expect(fmt2(NaN)).toBe('-');
   });
 
   it('fmt1 prints counting-derived numbers to one decimal', () => {
     expect(fmt1(18.44)).toBe('18.4');
-    expect(fmt1(null)).toBe('—');
+    expect(fmt1(null)).toBe('-');
   });
 
   it('fmtSigned1 always carries a sign, and never prints minus zero', () => {
@@ -131,7 +132,7 @@ describe('formatters — precision is a truth claim', () => {
     expect(fmtSigned1(-3.05)).toBe('-3.0');
     // -0.02 rounds to -0, which would render "-0.0" and read as a deficit.
     expect(fmtSigned1(-0.02)).toBe('0.0');
-    expect(fmtSigned1(null)).toBe('—');
+    expect(fmtSigned1(null)).toBe('-');
   });
 
   it('normalizeSavePct accepts both units the column ships in', () => {
@@ -145,7 +146,7 @@ describe('formatters — precision is a truth claim', () => {
   it('fmtSavePct prints the hockey convention', () => {
     expect(fmtSavePct(0.918)).toBe('.918');
     expect(fmtSavePct(918)).toBe('.918');
-    expect(fmtSavePct(0)).toBe('—');
+    expect(fmtSavePct(0)).toBe('-');
   });
 
   it('ordinal handles the teens and every ones digit', () => {
@@ -283,7 +284,7 @@ describe('buildAdvancedCardData', () => {
     const data = buildAdvancedCardData(bare, [...league, bare]);
     for (const m of data.metrics) {
       expect(m.value).toBeNull();
-      expect(m.display).toBe('—');
+      expect(m.display).toBe('-');
       expect(m.percentile).toBeNull();
     }
   });
@@ -318,7 +319,11 @@ describe('deriveVerdict — derived, or nothing', () => {
     expect(v).toContain('Elite looks, cold stick');
     expect(v).toContain('88th-percentile');
     expect(v).toContain('3.1 goals under expected');
-    expect(v.length).toBeLessThanOrEqual(110);
+    // The source is named and the fantasy call is stated, per the
+    // 2026-09-02 voice brief. Both are the point of the sentence.
+    expect(v).toContain('Citrus xG');
+    expect(v).toContain('Buy low');
+    expect(v.length).toBeLessThanOrEqual(VERDICT_MAX_CHARS);
   });
 
   it('calls out elite chances that ARE being buried', () => {
@@ -333,6 +338,7 @@ describe('deriveVerdict — derived, or nothing', () => {
     const v = deriveVerdict(entry({ gp: 40 }), 'F', m, 5.0, 94)!;
     expect(v).toContain('Outrunning his chances');
     expect(v).toContain('22nd-percentile');
+    expect(v).toContain('Sell high');
   });
 
   it('does not fire the finishing rules on a difference inside the noise', () => {
@@ -351,7 +357,7 @@ describe('deriveVerdict — derived, or nothing', () => {
       gar_evo: { value: 0.05, percentile: 40 },
     });
     const v = deriveVerdict(entry({ gp: 40 }), 'D', m, null, null)!;
-    expect(v).toBe('Value is mostly even-strength defence — 0.42 GAR/60 there, 91st among defencemen.');
+    expect(v).toBe('Value is mostly even-strength defence. Citrus GAR has him at 0.42 there, 91st among defencemen.');
   });
 
   it('names the biggest negative component as the drag', () => {
@@ -360,7 +366,7 @@ describe('deriveVerdict — derived, or nothing', () => {
       gar_evo: { value: 0.05, percentile: 40 },
     });
     const v = deriveVerdict(entry({ gp: 40 }), 'F', m, null, null)!;
-    expect(v).toBe('Penalties drawn is the drag — -0.31 GAR/60, 6th among forwards.');
+    expect(v).toBe('Penalties drawn is the drag. Citrus GAR has him at -0.31, 6th among forwards.');
   });
 
   it('falls back to total impact when no component stands out', () => {
@@ -369,7 +375,7 @@ describe('deriveVerdict — derived, or nothing', () => {
       gar_evo: { value: 0.2, percentile: 50 },
     });
     const v = deriveVerdict(entry({ gp: 41 }), 'F', m, null, null)!;
-    expect(v).toBe('72nd-percentile total impact among forwards over 41 games.');
+    expect(v).toBe('Citrus GAR puts him 72nd-percentile for total impact among forwards over 41 games.');
   });
 
   it('returns null when nothing at all is known', () => {
@@ -424,7 +430,7 @@ describe('deriveVerdict — derived, or nothing', () => {
     for (const [m, fin, finPct] of cases) {
       const v = deriveVerdict(entry({ gp: 41 }), 'F', m, fin, finPct);
       expect(v).toBeTruthy();
-      expect(v!.length).toBeLessThanOrEqual(115);
+      expect(v!.length).toBeLessThanOrEqual(VERDICT_MAX_CHARS);
     }
   });
 });

@@ -183,7 +183,7 @@ export function OnClockActionBar({
             : 'No deadline'
         }
       >
-        {secondsRemaining !== null ? formatCountdown(secondsRemaining) : '—:—'}
+        {secondsRemaining !== null ? formatCountdown(secondsRemaining) : '--:--'}
       </div>
       <Button
         size="lg"

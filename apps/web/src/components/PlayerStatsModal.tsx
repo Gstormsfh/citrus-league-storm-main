@@ -401,7 +401,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
   const handleDropPlayer = async () => {
     if (!user || !leagueId || !player?.id) {
-      toast({ title: "Can't Drop Player", description: "We're missing some info this drop needs — reopen the modal and try again.", variant: "destructive" });
+      toast({ title: "Can't Drop Player", description: "We're missing some info this drop needs. Reopen the modal and try again.", variant: "destructive" });
       return;
     }
     if (!confirm(`Are you sure you want to drop ${player.name}?`)) return;
@@ -419,7 +419,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         onPlayerDropped?.();
         onClose();
       } else {
-        toast({ title: "Drop Didn't Take", description: (error as { message?: string })?.message || "Couldn't drop the player — try again in a moment.", variant: "destructive" });
+        toast({ title: "Drop Didn't Take", description: (error as { message?: string })?.message || "Couldn't drop the player. Try again in a moment.", variant: "destructive" });
       }
     } catch (error: unknown) {
       const message = userMessage(error, "Failed to drop player.");
@@ -522,7 +522,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                         month: 'long',
                         day: 'numeric',
                       });
-                      return `Off-season — games return ${label}`;
+                      return `Off-season. Games return ${label}`;
                     })()}
                   </span>
                 </>
@@ -536,7 +536,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 "text-xl font-varsity font-black",
                 hasGame ? "text-citrus-orange" : "text-white/55"
               )}>
-                {hasGame ? heroProjectedPts.toFixed(1) : '—'}
+                {hasGame ? heroProjectedPts.toFixed(1) : '-'}
               </span>
             </div>
           </div>
@@ -755,11 +755,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                   <div className="grid grid-cols-2 gap-2">
                     <StatCell label="SV%" value={stats.savePct ? `${(stats.savePct * 100).toFixed(3)}` : '0.000'} />
                     <StatCell label="GAA" value={stats.gaa?.toFixed(2) ?? '0.00'} />
-                    <StatCell label="HD SV%" value={stats.highDangerSavePct ? `${(stats.highDangerSavePct * 100).toFixed(1)}` : '—'} />
+                    <StatCell label="HD SV%" value={stats.highDangerSavePct ? `${(stats.highDangerSavePct * 100).toFixed(1)}` : '-'} />
                     <StatCell label="GSAx" value={
                       stats.goalsSavedAboveExpected
                         ? `${stats.goalsSavedAboveExpected > 0 ? '+' : ''}${stats.goalsSavedAboveExpected.toFixed(1)}`
-                        : '—'
+                        : '-'
                     } highlight={!!(stats.goalsSavedAboveExpected && stats.goalsSavedAboveExpected > 0)} />
                   </div>
                   <div className="grid grid-cols-3 gap-2">
@@ -788,7 +788,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                         { label: 'PPP', value: stats.powerPlayPoints ?? 0 },
                         { label: 'SHP', value: stats.shortHandedPoints ?? 0 },
                         { label: 'GP', value: stats.gamesPlayed ?? 0 },
-                        { label: 'TOI/G', value: stats.toi ?? '—' },
+                        { label: 'TOI/G', value: stats.toi ?? '-' },
                       ].map((item, i) => (
                         <div key={i} className="bg-card p-2.5 flex flex-col items-center text-center">
                           <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase tracking-wider">{item.label}</span>
@@ -807,12 +807,12 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                     <div className="grid grid-cols-2 gap-2">
                       <StatCell
                         label="xGoals"
-                        value={stats.xGoals?.toFixed(1) ?? '—'}
+                        value={stats.xGoals?.toFixed(1) ?? '-'}
                         sub={stats.xGoals && stats.goals != null ? `${((stats.goals - stats.xGoals) > 0 ? '+' : '')}${(stats.goals - stats.xGoals).toFixed(1)} diff` : undefined}
                       />
                       <StatCell
                         label="SH%"
-                        value={shootingPct ? `${shootingPct}%` : '—'}
+                        value={shootingPct ? `${shootingPct}%` : '-'}
                       />
                     </div>
                   </div>
@@ -909,7 +909,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                               "text-xl font-varsity font-black",
                               hasActuals ? "text-pastel-cream" : (displayPoints > 0 ? "text-citrus-orange" : "text-pastel-cream/60")
                             )}>
-                              {hasActuals ? displayPoints.toFixed(1) : (displayPoints > 0 ? displayPoints.toFixed(1) : (gp.isPast ? 'DNP' : '—'))}
+                              {hasActuals ? displayPoints.toFixed(1) : (displayPoints > 0 ? displayPoints.toFixed(1) : (gp.isPast ? 'DNP' : '-'))}
                             </div>
                             <div className="text-[10px] text-pastel-cream/60 font-display uppercase">
                               {hasActuals ? 'pts' : (gp.isPast ? '' : 'proj')}
@@ -928,8 +928,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                   { label: 'SV', value: Number(as.saves || 0) },
                                   { label: 'SO', value: Number(as.shutouts || 0) },
                                   { label: 'GA', value: Number(as.goals_against || 0) },
-                                  { label: 'GAA', value: as.gaa != null ? Number(as.gaa).toFixed(2) : '—' },
-                                  { label: 'SV%', value: as.save_pct != null ? `${(Number(as.save_pct) * 100).toFixed(1)}` : '—' },
+                                  { label: 'GAA', value: as.gaa != null ? Number(as.gaa).toFixed(2) : '-' },
+                                  { label: 'SV%', value: as.save_pct != null ? `${(Number(as.save_pct) * 100).toFixed(1)}` : '-' },
                                 ].map((s, i) => (
                                   <div key={i} className="flex flex-col items-center py-1 bg-citrus-sage/10 rounded border border-citrus-sage/15">
                                     <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
@@ -968,11 +968,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                   { label: 'SO', value: (gp.projection.projected_shutouts as number | undefined)?.toFixed(2) },
                                   { label: 'GA', value: (gp.projection.projected_goals_against as number | undefined)?.toFixed(2) },
                                   { label: 'GAA', value: (gp.projection.projected_gaa as number | undefined)?.toFixed(2) },
-                                  { label: 'SV%', value: gp.projection.projected_save_pct ? `${(Number(gp.projection.projected_save_pct) * 100).toFixed(1)}` : '—' },
+                                  { label: 'SV%', value: gp.projection.projected_save_pct ? `${(Number(gp.projection.projected_save_pct) * 100).toFixed(1)}` : '-' },
                                 ].map((s, i) => (
                                   <div key={i} className="flex flex-col items-center py-1 bg-white/5 rounded border border-citrus-sage/10">
                                     <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
-                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value ?? '—'}</span>
+                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value ?? '-'}</span>
                                   </div>
                                 ))}
                               </div>
@@ -990,7 +990,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                 ].map((s, i) => (
                                   <div key={i} className="flex flex-col items-center py-1 bg-white/5 rounded border border-citrus-sage/10">
                                     <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
-                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value ?? '—'}</span>
+                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value ?? '-'}</span>
                                   </div>
                                 ))}
                               </div>

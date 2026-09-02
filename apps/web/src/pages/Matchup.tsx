@@ -648,7 +648,7 @@ const Matchup = () => {
           cachedPayload = await DemoMatchupCacheService.getPayload(
             requestedWeek && !isNaN(requestedWeek) ? requestedWeek : undefined
           );
-          log(' Edge function cache HIT — skipping ~16 direct queries');
+          log(' Edge function cache HIT, skipping ~16 direct queries');
         } catch (cacheError) {
           log(' Edge function cache unavailable, falling back to direct queries:', cacheError);
         }
@@ -4091,7 +4091,7 @@ const Matchup = () => {
             if (isDuplicateKey && hasAnyMatchups) {
               // Matchups already exist — duplicate key is expected.
               // Force regenerate to ensure all current teams are included.
-              log(' Duplicate key during generation — force regenerating with current teams...');
+              log(' Duplicate key during generation, force regenerating with current teams...');
 
               const { error: regenError } = await MatchupService.generateMatchupsForLeague(
                 currentLeague.id,
@@ -4732,7 +4732,7 @@ const Matchup = () => {
               // Leave myRoster empty — do NOT fallback to base roster.
               // This ensures myStarters/Date Change Handler know no per-day data exists
               // and can fall through to the correct behavior (base roster via displayMyTeam).
-              log(` No frozen roster entries for my team on ${date} — skipping (no fallback)`);
+              log(` No frozen roster entries for my team on ${date}, skipping (no fallback)`);
             }
 
             // Build opponent frozen roster
@@ -4785,7 +4785,7 @@ const Matchup = () => {
             } else {
               // No frozen roster entries for opponent on this date.
               // Leave oppRoster empty — do NOT fallback to base roster.
-              log(` No frozen roster entries for opponent on ${date} — skipping (no fallback)`);
+              log(` No frozen roster entries for opponent on ${date}, skipping (no fallback)`);
             }
 
             return {
@@ -5629,7 +5629,7 @@ const Matchup = () => {
                   </div>
                   <h3 className="text-lg font-bold text-pastel-cream mb-2">Draft Your Team First</h3>
                   <p className="text-sm text-white/55 mb-4">
-                    Complete your league's draft to unlock weekly matchups and start competing.
+                    Weekly matchups open as soon as your league finishes its draft.
                   </p>
                   <Button onClick={() => navigate(`/draft-v2/${activeLeagueId}`)}>
                     Go to Draft Room

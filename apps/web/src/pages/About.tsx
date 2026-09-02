@@ -34,7 +34,7 @@ export default function About() {
 
         <section className="relative max-w-[1100px] mx-auto px-6 pb-16">
           <div className="relative w-full aspect-[16/9] sm:aspect-[21/9] rounded-3xl overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
-            <img src="/mascots/scene-squad.webp" alt="The Citrus Squad — Lemon, Stormy, Kiwi, and Pineapple on the bench" className="w-full h-full object-cover" loading="eager" />
+            <img src="/mascots/scene-squad.webp" alt="The Citrus Squad: Lemon, Stormy, Kiwi, and Pineapple on the bench" className="w-full h-full object-cover" loading="eager" />
             <div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to top, rgba(15,31,21,0.75) 0%, transparent 35%)' }} />
             <div className="absolute bottom-5 left-6 sm:bottom-8 sm:left-10 z-10">
               <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5">
@@ -58,7 +58,7 @@ export default function About() {
             </h2>
             <p className="text-[16px] text-white/70 leading-relaxed">
               Twelve games on a Saturday slate. Maximum chaos. Your matchup gets decided when it
-              actually matters — not on Sunday morning when 3 teams are playing and your opponent
+              actually matters, not on Sunday morning when 3 teams are playing and your opponent
               already won. Saturday night is peak hockey. Your fantasy week should end then too.
             </p>
           </article>
@@ -73,7 +73,7 @@ export default function About() {
             <p className="text-[16px] text-white/70 leading-relaxed">
               Our XGBoost xG model uses xGF%, Corsi, deployment patterns, line chemistry, PP1
               share, zone entry rates, and Bayesian shrinkage for low-sample players. We don't
-              just project a single number — we give you a Monte Carlo distribution: floor,
+              just project a single number. We give you a Monte Carlo distribution: floor,
               median, ceiling. So you know who has the highest upside and who has the safest
               floor.
             </p>
@@ -100,7 +100,7 @@ export default function About() {
           <SectionHeader
             eyebrow="Roll Call"
             title="The Citrus Squad."
-            sub="Four characters who live inside the app — Stormy on the bench, Lemon up front, Kiwi on the back end, Pineapple in the crease."
+            sub="Four characters who live inside the app: Stormy on the bench, Lemon up front, Kiwi on the back end, Pineapple in the crease."
             align="center"
           />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">

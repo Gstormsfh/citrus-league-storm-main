@@ -225,7 +225,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
   const isEmpty = player == null;
   const emptyLabel = isEligibleTarget
     ? `Move here: ${labelForSlot(slotId)}`
-    : `Empty ${labelForSlot(slotId)} — tap to fill`;
+    : `Empty ${labelForSlot(slotId)}, tap to fill`;
 
   return (
     <div
@@ -418,7 +418,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 </span>
               </div>
             ) : (
-              <span className={cn(ROW_META, "text-white/55 font-display")}>—</span>
+              <span className={cn(ROW_META, "text-white/55 font-display")}>-</span>
             )}
           </div>
         </>

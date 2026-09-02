@@ -387,14 +387,20 @@ export function signed(v: number, digits = 2): string {
 }
 
 /**
- * The floating hero verdict, ASSEMBLED FROM MEASURED VALUES — never
+ * The floating hero verdict, ASSEMBLED FROM MEASURED VALUES. Never
  * generated, never adjectival about anything the payload does not carry.
  *
  * Every clause below is a number the response contains: the busiest zone
  * and its share of placed attempts, our model's xG per attempt there, and
  * the season's goals-minus-expected. Under `MIN_SHOTS_FOR_VERDICT` placed
- * shots there is no sentence at all — a shot-location claim off fifteen
- * attempts is noise wearing a verdict's clothes.
+ * shots there is no sentence at all, because a shot-location claim off
+ * fifteen attempts is noise wearing a verdict's clothes.
+ *
+ * VOICE (2026-09-02): no em dash, and the model is named in the sentence
+ * rather than referred to as "our model". "Citrus xG v3" is what the copy
+ * brief calls it and what Stormy is told to call it, so the two surfaces
+ * name the same thing the same way. See
+ * `src/__tests__/aiVoiceGuard.test.ts`, which fails the build on the dash.
  */
 export function deriveShotVerdict(
   summary: ShotSummary,
@@ -414,7 +420,7 @@ export function deriveShotVerdict(
   const zonePhrase = `He takes ${Math.round(busiest.share)}% of his attempts from the ${busiest.zone.toLowerCase()}`;
   const qualityPhrase =
     busiest.xgPerShot != null
-      ? `, worth ${busiest.xgPerShot.toFixed(3)} expected goals apiece on our model`
+      ? `, worth ${busiest.xgPerShot.toFixed(3)} expected goals apiece on Citrus xG v3`
       : '';
 
   if (finishing == null) return `${zonePhrase}${qualityPhrase}.`;
@@ -426,13 +432,13 @@ export function deriveShotVerdict(
         ? `he is ${Math.abs(finishing).toFixed(1)} goals behind what that shot profile expects`
         : 'he is finishing level with what that shot profile expects';
 
-  return `${zonePhrase}${qualityPhrase} — and ${finishPhrase}.`;
+  return `${zonePhrase}${qualityPhrase}, and ${finishPhrase}.`;
 }
 
 /**
  * The goalie's floating verdict. Same rule: every clause is a stored number.
- * GSAx is our model's expected goals against minus the goals he actually
- * allowed, over primary (non-rebound) shots only — which is what
+ * Citrus GSAx is our model's expected goals against minus the goals he
+ * actually allowed, over primary (non-rebound) shots only, which is what
  * `goalie_gsax_primary` holds and why the sentence says so.
  */
 export function deriveGoalieVerdict(gsax: {
@@ -448,5 +454,5 @@ export function deriveGoalieVerdict(gsax: {
     gsax.raw_gsax >= 0
       ? `${magnitude} goals better than expectation`
       : `${magnitude} goals worse than expectation`;
-  return `On ${gsax.shots_faced.toLocaleString()} primary shots our model expected ${gsax.xga.toFixed(1)} goals against; he allowed ${gsax.ga}. That is ${verdict}, ${signed(gsax.regressed_gsax, 1)} once regressed for workload.`;
+  return `On ${gsax.shots_faced.toLocaleString()} primary shots Citrus GSAx expected ${gsax.xga.toFixed(1)} goals against; he allowed ${gsax.ga}. That is ${verdict}, ${signed(gsax.regressed_gsax, 1)} once regressed for workload.`;
 }

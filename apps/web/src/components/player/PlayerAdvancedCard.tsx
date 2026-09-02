@@ -203,7 +203,7 @@ export function PlayerAdvancedCard({
       data-testid="player-advanced-card"
       data-cohort={data.cohort}
       data-variant={variant}
-      aria-label={`${player.name} — advanced metrics`}
+      aria-label={`${player.name}: advanced metrics`}
       className={cn(
         'w-full min-w-0 overflow-hidden rounded-2xl',
         'bg-pastel-surface-tile ring-1 ring-white/10',
@@ -236,7 +236,7 @@ export function PlayerAdvancedCard({
              floor the distribution is built on. */
           <span
             data-testid="advanced-card-low-sample"
-            title={`${player.gp} games played — too few to trust a per-60 rate`}
+            title={`${player.gp} games played, too thin a sample to trust a per-60 rate`}
             className={cn(
               ROW_MICRO,
               'flex-shrink-0 rounded-md px-1.5 py-0.5 font-jbmono font-bold uppercase tracking-[0.18em]',

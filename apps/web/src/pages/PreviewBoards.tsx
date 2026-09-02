@@ -7,7 +7,7 @@ const STORMY_THREAD = [
   { from: 'you', text: "Who do I start at LW between Pastrnak and Marchand tonight?" },
   {
     from: 'stormy',
-    text: "Pastrnak. He's projecting 8.4 vs Marchand's 6.9 — Boston has a softer matchup against NJD, and Pastrnak's xG is +18% over his season baseline this week.",
+    text: "Pastrnak. He's projecting 8.4 vs Marchand's 6.9. Boston has a softer matchup against NJD, and Pastrnak's xG is +18% over his season baseline this week.",
   },
 ];
 
@@ -248,7 +248,7 @@ export default function PreviewBoards() {
             {
               icon: Users,
               label: 'League chat built in',
-              body: 'Message your league, post draft-night reactions, share standings — no Discord required.',
+              body: 'Message your league, post draft-night reactions, share standings. No Discord required.',
             },
           ].map((f) => {
             const Icon = f.icon;
@@ -282,7 +282,7 @@ export default function PreviewBoards() {
                 Drop the puck.
               </h2>
               <p className="text-[16px] text-white/60 max-w-md mx-auto mb-8">
-                Free league. 30-second draft setup. The most accurate fantasy hockey on the planet.
+                Free league. 30-second draft setup. A 31-feature xG model behind every projection.
               </p>
               <Link
                 to="/create-league"

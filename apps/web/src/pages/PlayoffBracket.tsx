@@ -555,7 +555,7 @@ const PlayoffBracket = () => {
     } catch (err: unknown) {
       toast({
         title: "Bracket Didn't Build",
-        description: userMessage(err, "Couldn't generate the bracket — try again in a moment."),
+        description: userMessage(err, "Couldn't generate the bracket. Try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -579,7 +579,7 @@ const PlayoffBracket = () => {
     } catch (err: unknown) {
       toast({
         title: "Round Didn't Advance",
-        description: userMessage(err, "Couldn't advance the round — try again in a moment."),
+        description: userMessage(err, "Couldn't advance the round. Try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -601,7 +601,7 @@ const PlayoffBracket = () => {
     } catch (err: unknown) {
       toast({
         title: "Bracket Reset Didn't Take",
-        description: userMessage(err, "Couldn't reset the bracket — try again in a moment."),
+        description: userMessage(err, "Couldn't reset the bracket. Try again in a moment."),
         variant: 'destructive',
       });
     } finally {
