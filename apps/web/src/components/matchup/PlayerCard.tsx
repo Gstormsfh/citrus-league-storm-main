@@ -10,6 +10,7 @@ import { getTodayMST } from "@/utils/timezoneUtils";
 import { Badge } from "@/components/ui/badge";
 import { Mug } from "@/components/roster/Mug";
 import { opponentTint } from "./opponentTint";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 interface PlayerCardProps {
   player: MatchupPlayer | null;
@@ -53,16 +54,17 @@ const getPositionColorClasses = (position: string): string => {
 /** The big number in the mobile score stack: 15px JetBrains Mono, tabular. */
 const SCORE_ACTUAL_CLASS = 'player-score-value font-jbmono tabular-nums text-[15px] font-bold leading-none';
 
-// Format name as "F. LastName" for mobile compactness
+/**
+ * "Auston Matthews" → "A. Matthews" when `compact` (the phone row), the
+ * full name otherwise. Pure: the caller decides what "compact" means —
+ * the card passes `useIsMobile()`, which used to be a `window.innerWidth`
+ * read inside this function on every render of every row (audit M11).
+ */
 const formatPlayerName = (name: string, compact: boolean = false): string => {
   if (!name) return '';
   const trimmed = name.trim();
-  
-  // Always use compact format on mobile (First Initial + Last Name)
-  // Check if we're on mobile using window width
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
-  
-  if (isMobile || compact) {
+
+  if (compact) {
     const parts = trimmed.split(' ');
     if (parts.length >= 2) {
       const firstInitial = parts[0].charAt(0);
@@ -70,7 +72,7 @@ const formatPlayerName = (name: string, compact: boolean = false): string => {
       return `${firstInitial}. ${lastName}`;
     }
   }
-  
+
   return trimmed;
 };
 
@@ -90,6 +92,9 @@ const calculatePercentages = (player: MatchupPlayer) => {
 };
 
 export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerClick, selectedDate, dailyStatsMap }: PlayerCardProps) => {
+  // Before the early return — hooks run on every render, empty slot or not.
+  const isMobile = useIsMobile();
+
   if (!player) {
     // "Empty", not "Empty Slot": the centre column already says WHICH slot
     // (the desktop label, the mobile chip), so the card only has to say
@@ -108,7 +113,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
     );
   }
 
-  const displayName = formatPlayerName(player.name);
+  const displayName = formatPlayerName(player.name, isMobile);
   const positionColors = getPositionColorClasses(player.position);
   const { shotPct, pointRate } = calculatePercentages(player);
   
@@ -391,7 +396,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                     )}
                     {/* Scheduled: show game time */}
                     {!isLive && !isFinal && player.gameInfo?.time && (
-                      <span className="text-[10px] font-display text-white/50">
+                      <span className="text-[10px] font-display text-white/55">
                         {player.gameInfo.time}
                       </span>
                     )}
@@ -637,7 +642,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
             {/* Likely Range - "3.2 – 5.8 likely" (50% CI) - HIDDEN ON MOBILE */}
             {hasProjection && isStarterConfirmed && dailyProjection?.likely_low != null && dailyProjection?.likely_high != null && (
               <div className="hidden lg:flex justify-center mb-0.5">
-                <span className="text-[8px] font-display text-white/50">
+                <span className="text-[8px] font-display text-white/55">
                   Likely: {dailyProjection.likely_low.toFixed(1)} – {dailyProjection.likely_high.toFixed(1)}
                 </span>
               </div>

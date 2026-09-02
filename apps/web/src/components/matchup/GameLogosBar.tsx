@@ -3,22 +3,9 @@ import { getTeamColor } from "@/utils/teamColors";
 import { getTodayMST, getTodayMSTDate, isTodayMST, formatTimeMST } from "@/utils/timezoneUtils";
 import { logger } from '@/utils/logger';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X } from "lucide-react";
-
-// Hook to detect mobile/tablet
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  return isMobile;
-};
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 /** Wrapper that shows a Popover on mobile tap, title tooltip on desktop */
 const GameLogoWithTooltip = ({

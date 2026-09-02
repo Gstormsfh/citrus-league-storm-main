@@ -93,8 +93,10 @@ in from the bench — games first, then projection; locked bench players
 listed but disabled). Neither recomputes eligibility: both take the set
 Roster.tsx judged legal (`tapEligibleSlots` / `fillCandidates`). Shared
 pieces: `Mug` (headshot → crest → initials, fixed box, lazy; also every
-mobile roster and matchup row), `tonight()` (live vs projected number),
-`chipClassFor()` / `slotLabel()`.
+mobile roster and matchup row, and the Free Agents lists via
+`mugFromDirectory()` in `headshot.ts` for the `full_name` / `headshot_url`
+directory shape — one face component, no private `<img>` fallbacks),
+`tonight()` (live vs projected number), `chipClassFor()` / `slotLabel()`.
 
 ### AutoLineupSheet + `planAutoLineup`
 Auto Lineup previews before it saves (Yahoo's Start Active Players and

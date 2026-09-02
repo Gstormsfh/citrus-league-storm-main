@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
 import MobileMenuButton from '@/components/MobileMenuButton';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
-import { TeamCard } from "@/components/matchup/TeamCard";
 import { MatchupComparison } from "@/components/matchup/MatchupComparison";
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
 import { ScoreCard } from "@/components/matchup/ScoreCard";

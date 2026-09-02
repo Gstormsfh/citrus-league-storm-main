@@ -8,8 +8,9 @@ import {
 
 interface CenterColumnProps {
   position: string;
-  userPlayer?: { projectedPoints?: number; position?: string } | null;
-  opponentPlayer?: { projectedPoints?: number; position?: string } | null;
+  /** Only the occupant's position is read — it colours a UTIL slot. */
+  userPlayer?: { position?: string } | null;
+  opponentPlayer?: { position?: string } | null;
   /**
    * Bench rows carry a neutral "BN" chip instead of a position: a benched
    * player's points do not count, and the chip is where the row says so

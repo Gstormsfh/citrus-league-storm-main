@@ -13,6 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart, Lock, Clock, AlertCircle } from 'lucide-react';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from 'recharts';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -271,12 +272,9 @@ const Roster = () => {
   const [tapSelectedPlayerId, setTapSelectedPlayerId] = useState<string | number | null>(null);
   // The empty starter slot the Fill sheet is open for (phone list only).
   const [fillSlotId, setFillSlotId] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 1024);
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 1024);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  // Phone list vs desktop grid — the shared breakpoint (audit M11). This
+  // used to be its own state fed by TWO resize listeners in this file.
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(true);
   
   // Tab reset mechanism - reset to default tab when league changes
@@ -3108,13 +3106,6 @@ const Roster = () => {
     
     toast({ title: "Lineup Updated", description: "Player moved successfully." });
   };
-
-  // Mobile detection for tap-to-swap
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // All known starter slot IDs for tap-to-swap eligibility calculation (dynamic based on position type)
   const ALL_STARTER_SLOT_IDS = useMemo(() => {

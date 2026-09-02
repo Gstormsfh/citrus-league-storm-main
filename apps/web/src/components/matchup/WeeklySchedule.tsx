@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { getTodayMST } from '@/utils/timezoneUtils';
 import { CitrusSparkle } from '@/components/icons/CitrusIcons';
 import { logger } from '@/utils/logger';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface WeeklyScheduleProps {
   weekStart: string; // Sunday date (YYYY-MM-DD)
@@ -37,10 +38,6 @@ interface WeeklyScheduleProps {
   compact?: boolean;
 }
 
-/** Below the lg breakpoint — the same line index.css's mobile block draws. */
-const isPhoneViewport = (): boolean =>
-  typeof window !== 'undefined' && window.innerWidth < 1024;
-
 export const WeeklySchedule = ({
   weekStart,
   weekEnd,
@@ -54,6 +51,8 @@ export const WeeklySchedule = ({
   chips = false,
 }: WeeklyScheduleProps) => {
   const todayStr = getTodayMST(); // Get today's date string in MST (YYYY-MM-DD)
+  // Below the lg breakpoint — the same line index.css's mobile block draws.
+  const isPhone = useIsMobile();
 
   // Generate all dates in the week (Sun-Sat)
   // Parse dates carefully to avoid timezone issues
@@ -128,7 +127,7 @@ export const WeeklySchedule = ({
   // Compact mode on a phone: the selected card is also the way back to the
   // full week (the header row's "Full Week" button is hidden there).
   const handleDayClick = (dateStr: string) => {
-    if (compact && isSelected(dateStr) && isPhoneViewport()) {
+    if (compact && isSelected(dateStr) && isPhone) {
       onDayClick(null);
       return;
     }

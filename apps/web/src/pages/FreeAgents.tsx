@@ -38,6 +38,8 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import { Mug } from '@/components/roster/Mug';
+import { mugFromDirectory } from '@/components/roster/headshot';
 import { isGuestMode, shouldBlockGuestOperation } from '@/utils/guestHelpers';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
@@ -71,22 +73,6 @@ const formatPositionForDisplay = (position: string): string => {
   if (pos.includes('G')) return 'G';
   return position; // Return original if no match
 };
-
-// Tiny reusable mugshot for list rows (Sleeper parity — headshots on
-// every player row). Hides itself if the CDN image fails.
-const MugShot = ({ p, size = 28 }: { p: { headshot_url?: string | null }; size?: number }) => (
-  p?.headshot_url ? (
-    <img
-      src={p.headshot_url}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      className="rounded-full object-cover ring-1 ring-white/15 bg-white/5 flex-shrink-0"
-      style={{ width: size, height: size }}
-      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-    />
-  ) : null
-);
 
 const FreeAgents = () => {
   const { toast } = useToast();
@@ -1445,7 +1431,7 @@ const FreeAgents = () => {
                               {/* Name opens the fantasy card — parity with the desktop
                                   table and the main Available list (mobile). */}
                               <div className="flex items-center gap-2.5 min-w-0 cursor-pointer active:opacity-70" role="button" tabIndex={0} onClick={() => handlePlayerClick(player)} onKeyDown={(e) => { if (e.key === 'Enter') handlePlayerClick(player); }}>
-                                <MugShot p={player} size={30} />
+                                <Mug p={mugFromDirectory(player)} size="xs" />
                                 <div className="flex flex-col min-w-0">
                                   <span className="font-medium truncate">{player.full_name}</span>
                                   <span className="text-xs text-white/55">{formatPositionForDisplay(player.position)} • {player.team}</span>
@@ -1480,7 +1466,7 @@ const FreeAgents = () => {
                               <TableRow key={player.id}>
                                 <TableCell className="font-medium">
                                   <div className="flex items-center gap-2.5 min-w-0">
-                                    <MugShot p={player} size={28} />
+                                    <Mug p={mugFromDirectory(player)} size="xs" />
                                     <div className="flex flex-col min-w-0">
                                       <span 
                                         className="hover:underline hover:text-pastel-orange cursor-pointer truncate"
@@ -1638,7 +1624,7 @@ const FreeAgents = () => {
                               <TableRow key={player.id}>
                                 <TableCell className="font-medium">
                                   <div className="flex items-center gap-2.5 min-w-0">
-                                    <MugShot p={player} size={28} />
+                                    <Mug p={mugFromDirectory(player)} size="xs" />
                                     <div className="flex flex-col min-w-0">
                                       <span 
                                         className="hover:underline hover:text-pastel-orange cursor-pointer truncate"
@@ -1869,7 +1855,7 @@ const FreeAgents = () => {
                                 <TableRow key={player.id} className="hover:bg-white/5">
                                   <TableCell className="font-medium whitespace-nowrap">
                                     <div className="flex items-center gap-2.5 min-w-0">
-                                      <MugShot p={player} size={28} />
+                                      <Mug p={mugFromDirectory(player)} size="xs" />
                                       <div className="flex flex-col min-w-0">
                                         <span
                                           className="hover:underline hover:text-pastel-orange cursor-pointer text-sm truncate"

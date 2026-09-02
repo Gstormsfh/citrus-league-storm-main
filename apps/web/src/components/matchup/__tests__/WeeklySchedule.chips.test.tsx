@@ -12,18 +12,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { WeeklySchedule } from '../WeeklySchedule';
 import { getTodayMST } from '@/utils/timezoneUtils';
-
-function weekOf(dateStr: string) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const dt = new Date(y, m - 1, d);
-  const sun = new Date(dt);
-  sun.setDate(dt.getDate() - dt.getDay());
-  const sat = new Date(sun);
-  sat.setDate(sun.getDate() + 6);
-  const fmt = (x: Date) =>
-    `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
-  return { weekStart: fmt(sun), weekEnd: fmt(sat) };
-}
+import { weekOf } from './weekOf';
 
 const renderCompact = (selectedDate: string | null, onDayClick = vi.fn()) => {
   const { weekStart, weekEnd } = weekOf(getTodayMST());

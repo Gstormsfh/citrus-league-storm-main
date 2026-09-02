@@ -1,28 +1,14 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StatBreakdown } from "./types";
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 /* 2026-08-19 visual audit: light "glass" surface on a dark page — see
    the surface-correction note in the armchair-gm components. bg-white/50
    composites to mid-grey on #0F1F15, where neither light nor dark text
    reaches 4.5:1. Uses the dark tile family instead. */
-
-
-// Hook to detect mobile
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(false);
-  
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-  
-  return isMobile;
-};
 
 export const PointsTooltip = ({
   breakdown,
