@@ -934,7 +934,9 @@
    side is mine" had to be remembered instead of read. Mirrors
    .matchup-comparison-row's 47%/6%/47% columns so each label sits directly
    over its own column, and matches the .user-team/.opponent-team card
-   padding so a name lines up with the player names beneath it. */
+   padding so a name lines up with the player names beneath it. Below
+   1024px the MOBILE block overrides all three grids (header, rows, total)
+   to the same 1fr / 36px / 1fr so they share one centre line. */
 .matchup-team-header {
   display: grid;
   grid-template-columns: 47% 6% 47%;
@@ -1694,30 +1696,55 @@
     margin: 0 !important;
   }
   
-  /* Grid: 50% / 50% - NO center column */
-  .matchup-comparison-row {
-    display: grid !important;
-    grid-template-columns: 50% 50% !important;
-    padding: 0 !important;
-    margin: 0 !important;
+  /* ONE GRID (2026-09-01): 1fr | 36px slot chip | 1fr for the team header,
+     every player row AND the total row. Before this the rows were 50/50
+     with the centre column display:none — a phone row carried no slot
+     label at all, position was a 4px border colour — and the header was
+     still 47/6/47, so the three stacked on one page with three different
+     centre lines. minmax(0, 1fr) rather than bare 1fr: 1fr's automatic
+     minimum lets a long nowrap name push its column past half-width and
+     break the mirror. */
+  .matchup-comparison-row,
+  .matchup-total-row,
+  .matchup-team-header {
+    grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr) !important;
     width: 100% !important;
     max-width: 100% !important;
     gap: 0 !important;
     box-sizing: border-box !important;
   }
 
-  /* HIDE the center column */
-  .matchup-center-column {
-    display: none !important;
+  .matchup-comparison-row {
+    display: grid !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
 
-  /* Total row 50/50 */
-  .matchup-total-row {
-    grid-template-columns: 50% 50% !important;
-    width: 100% !important;
-    gap: 0 !important;
+  /* The opponent's name sits at the screen edge, like the opponent's
+     player names in the rows beneath it (see .opponent-team below). */
+  .matchup-team-header-opponent {
+    justify-content: flex-end !important;
+    text-align: right !important;
   }
-  .matchup-total-center {
+
+  /* Centre column: a transparent 36px cell holding the 32px slot chip —
+     the same chip the roster list uses. The desktop tint/borders come in
+     as inline styles from CenterColumn, hence !important here; the
+     desktop text label yields to the chip. */
+  .matchup-center-column {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
+
+  .matchup-center-column .position-label {
     display: none !important;
   }
 
@@ -1764,8 +1791,34 @@
     background: linear-gradient(135deg, #1A2A20 0%, #16241B 100%) !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
     overflow: hidden !important;
+    /* MIRRORED ROWS (2026-09-01). A row, not a column: [name block][score]
+       with the score at the gutter next to the slot chip. The opponent
+       card runs in reverse so ITS score is also at the gutter and its
+       names run out toward the screen edge — Sleeper's mirrored matchup
+       row, where the two numbers you compare sit 36px apart instead of a
+       full screen apart. Before this both cards pinned the score right:8px,
+       so the left card's number sat at the gutter and the right card's at
+       the screen edge. */
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
   }
-  
+
+  .player-card.opponent-team {
+    flex-direction: row-reverse !important;
+  }
+
+  .player-card.opponent-team .player-card-content,
+  .player-card.opponent-team .player-card-header,
+  .player-card.opponent-team .player-header-left {
+    align-items: flex-end !important;
+    text-align: right !important;
+  }
+
+  .player-card.opponent-team .player-meta-row {
+    justify-content: flex-end !important;
+  }
+
   /* Empty player cards - same height */
   .player-card-empty {
     min-height: 64px !important;
@@ -1773,6 +1826,12 @@
     height: 64px !important;
     background: linear-gradient(135deg, #16241B 0%, #121C15 100%) !important;
     opacity: 0.6 !important;
+  }
+
+  /* "Empty" is a placeholder, not a name — muted, not cream. */
+  .player-card-empty .player-name {
+    color: rgba(255, 248, 240, 0.55) !important;
+    font-weight: 600 !important;
   }
   
   /* Player name - BIGGER and more prominent on mobile */
@@ -1813,29 +1872,40 @@
     display: none !important;
   }
   
-  /* Show mobile score display */
+  /* Score stack: an in-flow flex item at the gutter end of the row. Layout
+     only — the JSX owns colour and type (sage = live/final, orange =
+     projected, cream on the bench). The rule this replaces forced
+     color:#F9A436 !important over the component, which is how "projected"
+     and "actual" ended up the same orange on every phone. */
   .player-card .player-mobile-score {
     display: flex !important;
-    position: absolute !important;
-    top: 50% !important;
-    right: 8px !important;
-    transform: translateY(-50%) !important;
-    font-size: 0.75rem !important; /* 12px */
-    font-weight: 800 !important;
-    color: #F9A436 !important;
-    background: rgba(249, 164, 54, 0.15) !important;
-    padding: 2px 6px !important;
-    border-radius: 4px !important;
-    border: 1px solid rgba(249, 164, 54, 0.3) !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    flex: 0 0 auto !important;
+    position: static !important;
+    transform: none !important;
+    max-width: 45% !important;
   }
-  
-  /* Player card content layout */
+
+  .player-card.user-team .player-mobile-score {
+    align-items: flex-end !important;
+    text-align: right !important;
+  }
+
+  .player-card.opponent-team .player-mobile-score {
+    align-items: flex-start !important;
+    text-align: left !important;
+  }
+
+  /* Player card content layout — takes whatever the score stack leaves */
   .player-card .player-card-content {
     display: flex !important;
     flex-direction: column !important;
     justify-content: center !important;
     height: 100% !important;
-    padding-right: 50px !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    padding: 0 !important;
   }
   
   /* Player header - compact */

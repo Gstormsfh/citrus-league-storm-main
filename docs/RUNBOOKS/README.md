@@ -32,6 +32,7 @@ is muscle memory from a runtime that no longer exists.
 | Investigating a recurring or previously-documented issue | [`draft-engine-v2-known-issues.md`](./draft-engine-v2-known-issues.md) |
 | Deciding whether and how to roll back | [`draft-engine-v2-rollback-playbook.md`](./draft-engine-v2-rollback-playbook.md) |
 | Recovering from roster / data-pipeline data loss (NOT a draft incident) | [`../EMERGENCY_RUNBOOK.md`](../EMERGENCY_RUNBOOK.md) |
+| Landing a bundle from Claude as a PR (which terminal, the one line, what each failure means) | [`DELIVERY.md`](./DELIVERY.md) |
 
 The boundary between draft-engine runbooks and `EMERGENCY_RUNBOOK.md` is
 load-bearing. **Draft-engine runbooks** cover the live draft hot path:
