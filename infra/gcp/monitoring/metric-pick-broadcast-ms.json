@@ -1,0 +1,33 @@
+{
+  "name": "citrus_engine_pick_broadcast_ms",
+  "description": "DISTRIBUTION of `pick.processed.broadcastMs` (server/src/draft/LobbyManager.ts): the uWS publish cost after the RPC commits — the server-side half of the Mandate's pick-to-broadcast fanout target (p95 <= 200 ms). Duplicate submits (wasDuplicate=true) skip the broadcast and are excluded here so their broadcastMs=0 does not flatter the distribution. Value is regex-extracted from the raw JSON line because the gcplogs driver does not parse it (see README). Managed by infra/gcp/monitoring/apply-monitoring.sh.",
+  "filter": "(jsonPayload.container.metadata.app=\"citrus-draft-engine\" OR labels.app=\"citrus-draft-engine\") AND (jsonPayload.event=\"pick.processed\" OR jsonPayload.message:\"\\\"event\\\":\\\"pick.processed\\\"\") AND NOT (jsonPayload.wasDuplicate=true OR jsonPayload.message:\"\\\"wasDuplicate\\\":true\")",
+  "valueExtractor": "REGEXP_EXTRACT(jsonPayload.message, \"\\\"broadcastMs\\\":([0-9]+)\")",
+  "metricDescriptor": {
+    "metricKind": "DELTA",
+    "valueType": "DISTRIBUTION",
+    "unit": "ms",
+    "displayName": "Citrus engine pick.processed broadcastMs",
+    "labels": [
+      {
+        "key": "wasAutopick",
+        "valueType": "STRING",
+        "description": "true = engine-fired autopick; false = manual pick through the engine path."
+      },
+      {
+        "key": "environment",
+        "valueType": "STRING",
+        "description": "Docker label `environment` forwarded by the gcplogs driver (production / staging)."
+      }
+    ]
+  },
+  "labelExtractors": {
+    "wasAutopick": "REGEXP_EXTRACT(jsonPayload.message, \"\\\"wasAutopick\\\":(true|false)\")",
+    "environment": "EXTRACT(jsonPayload.container.metadata.environment)"
+  },
+  "bucketOptions": {
+    "explicitBuckets": {
+      "bounds": [1, 2, 5, 10, 20, 30, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750, 1000, 1500, 2000, 3000, 5000, 10000]
+    }
+  }
+}

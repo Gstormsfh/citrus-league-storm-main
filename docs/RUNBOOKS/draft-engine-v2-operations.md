@@ -232,6 +232,14 @@ Each playbook follows the same template:
   performance targets" thresholds. Surfaced by 10d alert policy
   `mandate.manual_pick.p95_breach` (TODO(10d): wire alert when monitoring
   lands).
+  > 2026-09-01 (audit §D-8): the monitoring is now code in
+  > `infra/gcp/monitoring/` — the "Citrus Draft Mandate" dashboard
+  > (`dashboard-draft-mandate.json`) draws the 300/500/200 ms lines over
+  > log-based distribution metrics on `pick.processed {totalMs, rpcMs,
+  > broadcastMs}` and `external_event.applied.notifyToBroadcastMs` (the
+  > manual-pick path today). A p95-breach *alert* is still not wired: the
+  > shipped policies are watchdog-absent, ERROR-rate and startup-failed
+  > (`alert-*.json`); see the README there for filters, apply and test.
 - **Architectural truth.** Manual pick path = WS receive → action queue
   → `submit_pick_v2` RPC commit → uWS publish (chunk 11g.4 step 6).
   Sub-300ms p95 is achievable on the shipped architecture; breach means
@@ -248,7 +256,9 @@ Each playbook follows the same template:
        `ps -p <pid> -o rss,vsz`), occasional Postgres slow queries
        (Supabase Dashboard → Database → Query Performance), or
        network blips (no specific tool today — TODO(10d) wire latency
-       monitoring).
+       monitoring; since 2026-09-01 the `rpcMs` / `broadcastMs` panels on
+       the "Citrus Draft Mandate" dashboard, `infra/gcp/monitoring/`,
+       separate the RPC from the fanout for exactly this call).
   2. Sustained: check recent deploys. If new SHA, consider rollback
      playbook scenario #2.
   3. Sustained: check VM resource usage:
@@ -271,6 +281,14 @@ Each playbook follows the same template:
 - **Detection signal.** Autopick p95 or p99 exceeds CLAUDE.md targets
   (1000ms / 2000ms). Surfaced by 10d alert
   `mandate.autopick.p95_breach` (TODO(10d)).
+  > 2026-09-01 (audit §D-8/§D-9): two signals exist now. Live: the autopick
+  > `totalMs` panel (1000/2000 ms lines) on the "Citrus Draft Mandate"
+  > dashboard in `infra/gcp/monitoring/`. Weekly: the `draft-scorecard`
+  > workflow (`.github/workflows/draft-scorecard.yml`) reads the
+  > `draft_latency_scorecard` view (migration `20260901233000`) and FAILS the
+  > run — i.e. e-mails — when any draft's deadline→commit p95 exceeds
+  > 1000 ms (`data-pipeline/monitoring/draft_latency_scorecard.py`). The
+  > per-minute p95-breach alert policy itself is still TODO.
 - **Architectural truth.** Autopick = `LobbyManager.handleClockExpired` →
   in-process `setTimeout` fires → `autopickStrategy` (snake/linear) or
   `auctionAutoNominateStrategy` (auction) consults in-memory cached
@@ -676,6 +694,16 @@ post-deploy is investigation-worthy.
 
 TODO(10c): populate measured p50 / p95 / p99 baselines from staging
 harness in `PHASE_4_5_BASELINE.json`. Targets (CLAUDE.md):
+
+> 2026-09-01 (audit §D-9): production baselines now accrue on their own
+> instead of waiting for a harness run. Per-draft autopick deadline→commit
+> p50/p95/max, autopick share, picks/min and duration:
+> `SELECT * FROM public.draft_latency_scorecard` (service_role; migration
+> `supabase/migrations/20260901233000_draft_latency_scorecard.sql`), or the
+> weekly job summary of `.github/workflows/draft-scorecard.yml`. Server-side
+> pick / RPC / broadcast percentiles: the "Citrus Draft Mandate" dashboard,
+> `infra/gcp/monitoring/dashboard-draft-mandate.json`. Timer drift, state
+> load and reconnect still have no emitter and remain harness-only.
 
 - Manual pick submission: p95 ≤ 300ms, p99 ≤ 500ms
 - Autopick latency: p95 ≤ 1000ms, p99 ≤ 2000ms
