@@ -249,7 +249,7 @@ describe('PlayerAdvancedCard — skater', () => {
     const { unmount } = renderCard({ playerId: 8478402, indexOverride: index });
     expect(screen.getByTestId('advanced-card-link')).toHaveAttribute(
       'href',
-      '/players?player=8478402',
+      '/players/8478402',
     );
     unmount();
     renderCard({ playerId: 8478402, indexOverride: index, showLink: false });

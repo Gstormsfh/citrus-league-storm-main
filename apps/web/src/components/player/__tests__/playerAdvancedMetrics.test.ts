@@ -449,9 +449,11 @@ describe('findDashboardPlayer', () => {
 });
 
 describe('playerDashboardHref', () => {
-  it('deep-links the Players page, which is the route that exists today', () => {
-    // PWS-1 names `/players/[slug]-[playerId]`; that route is not in
-    // App.tsx. `/players?player=<id>` is, and Players.tsx reads the param.
-    expect(playerDashboardHref(8478402)).toBe('/players?player=8478402');
+  it('links to the real player dashboard route', () => {
+    // Was `/players?player=<id>` until Component 6.5, because the route
+    // PWS-1 names did not exist. `App.tsx` now registers
+    // `/players/:playerId` OUTSIDE the import.meta.env.DEV gate, so the
+    // card's "Full dashboard →" finally goes to the dashboard.
+    expect(playerDashboardHref(8478402)).toBe('/players/8478402');
   });
 });

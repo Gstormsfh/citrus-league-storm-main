@@ -616,6 +616,74 @@ also doubles as a "skip to chapters" anchor and an OG-image-ready
 glance summary. Decide formally during Phase 5 planning; for
 Web Summit demo the current composition stays as-is.
 
+#### Implementation note — 2026-09-02 (Component 6.5, shipped)
+
+Option 1 built. `apps/web/src/pages/PlayerDashboard.tsx` renders
+`PlayerAdvancedCard` (`variant="compact"`, `showLink={false}` — the link
+points at this page) inline above the hero, capped at 380px and LEFT-anchored
+rather than centred, because §4 #5 makes asymmetric composition the law and a
+centred card reads as a brochure. The deep-dive follows: hero → career arc →
+breakdown → Wrapped chapter.
+
+The page is routed at `/players/:playerId` **outside** `App.tsx`'s
+`import.meta.env.DEV` gate, which is the whole point of the component: the
+composition existed at `/preview-player-profile` inside that gate, the gate is
+statically false in a production build, and Rollup dropped the route and its
+chunk. Nobody had ever seen this screen. `PreviewPlayerProfile.tsx` is deleted
+— its `MOCK_*` constants and `jitter()` helper with it.
+
+Deliberately NOT behind `ProtectedRoute`, unlike `/players`: this is the
+shareable deep link, and a shared link that bounces a signed-out visitor to
+`/auth` is a dead link. `/api/players/:playerId/dashboard` still 401s (it is
+behind `authMiddleware`), and the page renders that as its own sign-in state.
+
+Deviations taken, each forced by something measured:
+
+1. **SIX shot zones, not the five in §2.2.** The spec lists SLOT / LOW SLOT /
+   HIGH SLOT / POINT / BOARDS. With only those five, every attempt outside the
+   |y| ≤ 15 ft slot lane falls into BOARDS — including faceoff-circle shots at
+   |y| ≈ 20 ft, which are most of a power-play forward's volume. Measured in
+   the harness: the page said "33% of his attempts come from the boards" about
+   a player shooting from the circles. `CIRCLES` (15–28 ft off centre) is now
+   its own row and `BOARDS` means beyond 28 ft.
+2. **The Shot Breakdown rows are NOT `PercentileBullet`.** §2.2 asks for that
+   bullet treatment and this keeps its anatomy exactly — caps eyebrow left,
+   thin meter middle, tabular value right, hairline dividers — but the meter
+   encodes SHARE OF THIS PLAYER'S OWN ATTEMPTS, not a rank. The endpoint
+   returns one player's shots, not the league's, so there is no zone-share
+   distribution to rank against; feeding a share into `PercentileBullet` would
+   have printed "38th" for a number that is not a percentile.
+3. **The rink hero's floating verdict moves BELOW the rink under `lg`.** The
+   tile is `max-w-[320px]` at the rink's top-right and the rink is
+   `aspect-[100/55]`; at 393px that is a 361 × 199px box, so the tile covered
+   280 of 361px and sat on the slot cluster. The identity block, the jersey
+   watermark and the segmented control stay composed AT the rink at every
+   width — that composition is the signature (§1) and it survives 361px.
+4. **A goalie gets a Concrete Poetry hero without a rink.** He has no map of
+   his own attempts and an empty rink outline is not a coherent claim about a
+   goaltender. Same movement — jersey watermark, monumental figure, floating
+   verdict — with GSAx from `goalie_gsax_primary` as the monumental number.
+   The same fallback hero carries the "no shots on record", "the shot read
+   failed" and "the coordinates failed their own distance check" states, each
+   with its own sentence.
+5. **The season/game-type control is the URL, not a second segmented control.**
+   `?season=&gameType=` are read off the query string and passed to the
+   endpoint. §4 #6 allows one segmented control per view and the rink already
+   owns it; a second one beside it would be a tab strip with rounded corners.
+
+Two honesty notes that a reviewer should check:
+
+* **Expected goals exist in two pipelines and this page shows both.** The
+  condensed card reads `player_season_stats.x_goals` (via
+  `/api/players/dashboard-index`); the career-arc tile reads
+  `player_xg_season.xg`, summed over the scored shot events. They differ. The
+  page says so, in words, and only when the gap is actually visible.
+* **The shot map refuses to draw itself when it cannot verify its own
+  geometry.** `distance` is frame-independent, so `hypot(89 − x, y)` against
+  the stored distance is an independent check on every placement; a shot that
+  fails it by more than 6 ft is dropped, and a player with fewer than half his
+  attempts placed gets the labelled fallback instead of a thin map.
+
 ### PWS-3: WrappedChapter library extension
 
 Web Summit ships one chapter (POSITION VS LEAGUE). Future
@@ -646,4 +714,5 @@ with a dated note. Don't let the spec drift from reality.
 | 2026-05-04 | Initial spec — Concept 3 (Spatial Hero) locked | Garrett + Claude |
 | 2026-05-04 | Added Section 8 (canonical mockup paths) + Section 9 (META-RULE: 4-step resource consultation protocol). Section 10 was previously Section 8. | Garrett + Claude |
 | 2026-05-05 | Added Post-Web-Summit todos section: PWS-1 PlayerCard (condensed), PWS-2 profile-page consolidation, PWS-3 WrappedChapter library extension, PWS-4 G−xG true differential color encoding | Garrett + Claude |
+| 2026-09-02 | **COMPONENT 6.5 — the dashboard SHIPS.** `pages/PlayerDashboard.tsx` routed at `/players/:playerId` OUTSIDE the `import.meta.env.DEV` gate that had hidden the composition since it was built, wired to a new `GET /api/players/:playerId/dashboard` (shots + `player_xg_season` career arc + `goalie_gsax_primary` + `player_talent_metrics` + a real `as_of`). `PreviewPlayerProfile.tsx` deleted with its mock data. PWS-2 Option 1 implemented. Five deviations recorded under PWS-2: a sixth `CIRCLES` shot zone (five zones called circle shots "boards"), share-meters instead of `PercentileBullet` in the Shot Breakdown (a share is not a rank), the hero verdict moving below the rink under `lg` (measured 280 of 361px of cover at 393), a rink-free Concrete Poetry hero for goalies and for every no-map state, and season/game-type on the URL instead of a second segmented control. | Claude |
 | 2026-09-02 | PWS-1 BUILT and shipped into `PlayerStatsModal`. Added an implementation note under PWS-1 recording five measured deviations: the 180–240px envelope cannot hold 6–8 bullets (measured 407px compact / 587px expanded at 353px wide), a compact/expanded variant split, `#JERSEY` in place of `AGE` (no birth date on the payload), a labelled click-through to `/players?player=<id>` in place of a whole-card link to a route that does not exist, and Sparkline/StaleDataBadge cut because the payload carries neither a series nor a timestamp. GSAx logged as the top server-side follow-up. | Claude |

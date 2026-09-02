@@ -40,8 +40,10 @@ import {
  * and `pages/PreviewPlayerProfile`. `App.tsx` gates every `Preview*` route
  * behind `import.meta.env.DEV`, which is statically false in a production
  * build, so Rollup drops those routes and with them every import below them.
- * The design system rendered for nobody. This component is the first
- * production consumer of it.
+ * The design system rendered for nobody. This component was the first
+ * production consumer of it; Component 6.5 then shipped the page itself as
+ * `pages/PlayerDashboard.tsx` on `/players/:playerId`, outside the gate, and
+ * `PreviewPlayerProfile` was deleted along with its mock data.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * IT MUST NEVER BREAK ITS HOST

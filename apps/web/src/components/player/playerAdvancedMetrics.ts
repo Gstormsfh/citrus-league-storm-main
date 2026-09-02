@@ -501,9 +501,18 @@ export function findDashboardPlayer(
   return index.find((p) => p.id === numeric) ?? null;
 }
 
-/** Deep link to the full Players dashboard, pre-selected on this player. */
+/**
+ * Deep link to this player's full dashboard.
+ *
+ * Was `/players?player=<id>` when this module shipped, because the route
+ * PWS-1 asks for did not exist — `App.tsx` registered `/players` and
+ * `Players.tsx` read a `?player=` param. Component 6.5 shipped the real
+ * page, so the link now goes where the spec always said it should. The
+ * `?player=` deep link into the Players TABLE still works and is still what
+ * that table sets on a row tap; this is the link to the deep-dive.
+ */
 export function playerDashboardHref(id: number): string {
-  return `/players?player=${id}`;
+  return `/players/${id}`;
 }
 
 // Re-exported so the card imports one module, not three.

@@ -24,6 +24,7 @@ npx vite --config harness/vite.config.ts
 | `/harness/today.html` | Today strip in every state, locked chips, empty rows, Fill sheet (`?fill=slot-LW-1` opens it), Auto Lineup preview (`?auto=1` opens it; the strip's link does too) |
 | `/harness/scoreboard.html` | League scoreboard strip (live / open / final / bye) and the desktop rail; `?n=10` for a 20-team league |
 | `/harness/advanced.html` | `PlayerAdvancedCard` (PWS-1) — skater compact + expanded, defenceman, goalie, thin sample, and both degraded (401 / unknown player) states. `?w=NNN` sets the column width; default 353 is what the card gets inside `PlayerStatsModal` at 393. Identity is real; the xG/GAR/projection columns are derived arithmetic, and the page says so |
+| `/harness/dashboard.html` | `PlayerDashboard` (Component 6.5) — the whole page at a phone viewport. `?case=skater\|defence\|goalie\|empty\|noshots\|skewed` picks the state: a forward with a season of shots, a defenceman (point-heavy zones), a goalie (GSAx hero, no rink), a player with nothing on record, a FAILED shot read, and coordinates that disagree with their own stored distances. Identity is real; the shot coordinates, per-shot xG, season rows and GSAx are generated, and a strip under the page says so |
 | `/harness/matchup.html` | The mobile matchup lineup rows — real `MatchupPositionGroup` / `PlayerCard` / `CenterColumn`, week view, bench, day view, live and final states |
 
 `draft.html` accepts `?picks=N` to open the room N picks deep (default 5), and
@@ -86,6 +87,14 @@ so what renders here is what renders in the app.
 | `@/lib/draftClient/fetchDraftOrderMatrix` | 12-team snake matrix |
 | `@/lib/draftClient/submitPick` | always succeeds, advances the draft |
 | `@/hooks/usePreloadedPlayers` | 240-player directory, the real roster cycled |
+| `@/integrations/supabase/client` | an inert client — every call resolves `{ data: null, error }` |
+
+The Supabase alias is not optional plumbing. The real module calls
+`createClient(...)` at MODULE SCOPE and throws when `VITE_SUPABASE_*` are
+unset, which they are here on purpose. `Navbar` reaches it four hops down
+(`notificationStore` → `NotificationService` → the client), so any harness
+entry that renders a page with the app chrome used to mount a blank
+`<div id="root">` with the error visible only in the devtools console.
 
 Stub context values are **module-level constants**, deliberately. Returning a
 fresh object per render makes every consumer's dependency array compare unequal
