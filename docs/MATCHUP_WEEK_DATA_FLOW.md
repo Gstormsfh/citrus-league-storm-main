@@ -3,7 +3,7 @@
 ## Overview
 This document traces the complete logic flow from raw game statistics to displayed weekly matchup totals.
 
-> **Scoring note (2026-09-01):** the inline `goals * 3 + assists * 2 + …` excerpts below are historical. Points now flow through `ScoringCalculator` with the league's own `scoring_settings`; the industry-standard defaults are G 6 / A 4 / PPP 2 / SOG 0.9 / BLK 1 and W 5 / SO 5 / SV 0.6 / GA −3 (SHP, hits, PIM and +/- opt-in at 0).
+> **Scoring note (2026-09-01):** the inline `goals * 3 + assists * 2 + …` excerpts below are historical. Points now flow through `ScoringCalculator` with the league's own `scoring_settings`; the industry-standard default weights are the generated table in [`generated/SCORING_DEFAULTS.md`](./generated/SCORING_DEFAULTS.md).
 
 ---
 

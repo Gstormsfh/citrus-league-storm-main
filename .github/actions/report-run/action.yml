@@ -1,0 +1,142 @@
+name: Report run to ops_ci_runs
+description: >-
+  Writes one row describing this job's outcome to public.ops_ci_runs (Supabase,
+  service-role only) so Claude can read CI, deploy and nightly results through
+  the Supabase MCP instead of a pasted log. Always exits 0: a telemetry failure
+  is a ::warning::, never a red job. Callers still add `continue-on-error: true`
+  so a runner-level failure of the step cannot fail the job either.
+  See docs/RUNBOOKS/CI_TELEMETRY.md.
+
+inputs:
+  status:
+    description: success | failure | cancelled | skipped. Normally `${{ job.status }}`.
+    required: true
+  job:
+    description: Job identifier stored in the row. Defaults to the job key (GITHUB_JOB).
+    required: false
+    default: ''
+  summary:
+    description: One line of context (a result, a step name). Optional.
+    required: false
+    default: ''
+  log-file:
+    description: >-
+      Optional path to a step's captured output. The action appends the test
+      runner's totals line(s) from it (vitest, pytest, node:test) or, failing
+      that, its last non-empty line. Missing file is ignored.
+    required: false
+    default: ''
+  supabase-url:
+    description: Project URL. Pass `${{ secrets.VITE_SUPABASE_URL }}`.
+    required: true
+  service-role-key:
+    description: Service-role key. Pass `${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}`. Never echoed.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: POST /rest/v1/ops_ci_runs
+      shell: bash
+      env:
+        IN_STATUS: ${{ inputs.status }}
+        IN_JOB: ${{ inputs.job }}
+        IN_SUMMARY: ${{ inputs.summary }}
+        IN_LOG_FILE: ${{ inputs.log-file }}
+        SUPABASE_URL: ${{ inputs.supabase-url }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ inputs.service-role-key }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # `shell: bash` runs this under `bash -eo pipefail`; turn that off. Every
+        # failure below is handled explicitly and ends in exit 0. Never `set -x`:
+        # the key is in the curl arguments.
+        set +e +o pipefail
+        warn() { echo "::warning::report-run: $*"; }
+
+        if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+          warn "VITE_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not available to this run; nothing reported."
+          exit 0
+        fi
+
+        case "$IN_STATUS" in
+          success|failure|cancelled|skipped) ;;
+          *) warn "status '$IN_STATUS' is not one of success|failure|cancelled|skipped; nothing reported."; exit 0 ;;
+        esac
+
+        JOB="${IN_JOB:-$GITHUB_JOB}"
+
+        # pull_request runs build the synthetic merge commit; the PR head is what
+        # a person can find. Fall back to GITHUB_SHA for every other event.
+        SHA=""
+        if [ -n "${GITHUB_EVENT_PATH:-}" ] && [ -f "$GITHUB_EVENT_PATH" ]; then
+          SHA=$(jq -r '.pull_request.head.sha // empty' "$GITHUB_EVENT_PATH" 2>/dev/null || true)
+        fi
+        SHA="${SHA:-$GITHUB_SHA}"
+        REF="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+        URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}"
+
+        # Run start, best effort. Needs actions:read on the token; a job that
+        # narrowed its permissions simply stores NULL.
+        STARTED_AT=$(curl -sS --max-time 5 \
+          -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+          "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" 2>/dev/null \
+          | jq -r '.run_started_at // empty' 2>/dev/null || true)
+
+        # Summary: caller text, plus the totals line(s) from a captured log when
+        # one was given (vitest "Tests N passed", pytest "N passed in", node:test
+        # "# pass N"; else the log's last non-empty line).
+        strip_ansi() { sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g'; }
+        SUMMARY="$IN_SUMMARY"
+        if [ -n "$IN_LOG_FILE" ] && [ -f "$IN_LOG_FILE" ]; then
+          TOTALS=$(strip_ansi < "$IN_LOG_FILE" \
+            | grep -E '^[[:space:]]*(Test Files|Tests)[[:space:]]+[0-9]+ |^[0-9]+ (passed|failed|errors?|skipped|deselected|xfailed|xpassed|warnings?)\b|^# (tests|pass|fail) [0-9]+' \
+            | sed -E 's/^[[:space:]]+//; s/[[:space:]]+/ /g' | tail -n 4 | paste -sd ';' - || true)
+          if [ -z "$TOTALS" ]; then
+            # No runner totals: the last error line if there is one, else the last line.
+            TOTALS=$(strip_ansi < "$IN_LOG_FILE" | grep -E '^(ERROR|FATAL|Error|error)\b' | tail -n 1 || true)
+          fi
+          if [ -z "$TOTALS" ]; then
+            TOTALS=$(strip_ansi < "$IN_LOG_FILE" | grep -v '^[[:space:]]*$' | tail -n 1 | sed -E 's/^[[:space:]]+//' || true)
+          fi
+          if [ -n "$TOTALS" ]; then
+            SUMMARY="${SUMMARY:+$SUMMARY · }$TOTALS"
+          fi
+        fi
+        # Cap at 4000 BYTES of valid UTF-8 (column CHECK is octet_length <= 4096):
+        # jq replaces invalid input bytes, cuts to 4000 code points, then trims
+        # until the byte length fits. Output is a JSON string literal.
+        SUMMARY_JSON=$(printf '%s' "$SUMMARY" | strip_ansi \
+          | jq -Rs '.[:4000] | until(utf8bytelength <= 4000; .[:-1])' 2>/dev/null) || SUMMARY_JSON='""'
+
+        PAYLOAD=$(jq -cn \
+          --arg workflow "$GITHUB_WORKFLOW" \
+          --arg run_id "$GITHUB_RUN_ID" \
+          --arg run_attempt "${GITHUB_RUN_ATTEMPT:-1}" \
+          --arg sha "$SHA" \
+          --arg ref "$REF" \
+          --arg job "$JOB" \
+          --arg status "$IN_STATUS" \
+          --arg started_at "$STARTED_AT" \
+          --argjson summary "$SUMMARY_JSON" \
+          --arg url "$URL" \
+          '{workflow: $workflow, run_id: ($run_id|tonumber), run_attempt: ($run_attempt|tonumber),
+            sha: $sha, ref: $ref, job: $job, status: $status,
+            started_at: (if $started_at == "" then null else $started_at end),
+            summary: (if $summary == "" then null else $summary end), url: $url}') || {
+          warn "could not build the JSON payload; nothing reported."; exit 0; }
+
+        # The key travels in headers only. --fail-with-body surfaces PostgREST's
+        # error JSON (which never echoes request headers) on a non-2xx.
+        RESP=$(curl -sS --fail-with-body --max-time 10 \
+          -X POST "${SUPABASE_URL%/}/rest/v1/ops_ci_runs" \
+          -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+          -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+          -H "Content-Type: application/json" \
+          -H "Prefer: return=minimal" \
+          --data-binary "$PAYLOAD" 2>&1)
+        RC=$?
+        if [ "$RC" -ne 0 ]; then
+          warn "POST ops_ci_runs failed (curl exit $RC): ${RESP:0:300}"
+          exit 0
+        fi
+        echo "report-run: ${GITHUB_WORKFLOW} / ${JOB} -> ${IN_STATUS} recorded in ops_ci_runs"

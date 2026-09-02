@@ -48,11 +48,22 @@ Usage:
 
 import logging
 import hashlib
+import os
+import sys
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import date
 
 import numpy as np
 from scipy import stats as scipy_stats
+
+# This module is imported by bare name (calculate_daily_projections, the
+# audits, the tests) as well as as a script, so it registers the
+# data_pipeline package alias itself before reaching for the generated
+# scoring defaults. _bootstrap is idempotent.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401,E402
+
+from data_pipeline.scoring.scoring_defaults import SKATER_SHORT  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -94,18 +105,10 @@ FINISHING_PRIOR_BETA = 90.0
 FINISHING_STABILIZATION_SHOTS = 50
 OPPONENT_STABILIZATION_GAMES = 10
 
-# Default scoring weights (mirrors packages/shared DEFAULT_SCORING)
-# INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned; SHP/hits/PIM opt-in.
-DEFAULT_SCORING_WEIGHTS = {
-    "goals": 6.0,
-    "assists": 4.0,
-    "sog": 0.9,
-    "blocks": 1.0,
-    "ppp": 2.0,
-    "shp": 0.0,
-    "hits": 0.0,
-    "pim": 0.0,
-}
+# Default scoring weights — the generated single source (scoring_defaults.py,
+# built from packages/shared/src/constants/scoringDefaults.json), keyed by
+# the per-game stat names in SKATER_STATS. No literal lives here.
+DEFAULT_SCORING_WEIGHTS = SKATER_SHORT
 
 # ── Dynamic-confidence calibration (2026-09-01, confidence-calibration.md) ──
 #

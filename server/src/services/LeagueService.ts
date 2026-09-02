@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, logger } from '@citrus/shared';
+import { COLUMNS, DEFAULT_SCORING, logger } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
@@ -124,16 +124,12 @@ export class LeagueService {
     // falls back to COALESCE defaults which could surprise commissioners
     // who thought they configured scoring. If caller didn't provide any,
     // write the standard default values explicitly so every stat is set.
-    // INDUSTRY-STANDARD DEFAULTS (2026-09-01) — Yahoo-aligned; must equal
-    // DEFAULT_SCORING in @citrus/shared and the DB defaults (guard-tested).
-    // SHP/hits/PIM/+/- are opt-in categories, 0 by default.
+    // The values are the shared DEFAULT_SCORING (single source:
+    // packages/shared/src/constants/scoringDefaults.json) — copied so the
+    // inserted row never aliases the shared constant.
     const DEFAULT_SCORING_SETTINGS = {
-      skater: {
-        goals: 6, assists: 4, power_play_points: 2, short_handed_points: 0,
-        shots_on_goal: 0.9, blocks: 1, hits: 0, penalty_minutes: 0,
-        plus_minus: 0,
-      },
-      goalie: { wins: 5, saves: 0.6, shutouts: 5, goals_against: -3 },
+      skater: { ...DEFAULT_SCORING.skater },
+      goalie: { ...DEFAULT_SCORING.goalie },
     };
     const needsFantasyScoring = leagueType === 'fantasy' || leagueType === 'playoff-roster-pool';
     const effectiveScoringSettings = scoringSettings

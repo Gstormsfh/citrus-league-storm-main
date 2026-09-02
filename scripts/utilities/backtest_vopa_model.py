@@ -37,6 +37,12 @@ if sys.platform == "win32":
     if sys.stderr.encoding != "utf-8":
         sys.stderr.reconfigure(encoding="utf-8")
 
+# Register the data_pipeline package alias (repo-root/data-pipeline) so the
+# generated scoring defaults resolve from this utility's location.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data-pipeline"))
+import _bootstrap  # noqa: F401,E402
+
+from data_pipeline.scoring import scoring_defaults  # noqa: E402
 from supabase_rest import SupabaseRest
 from calculate_daily_projections import (
     calculate_daily_projection,
@@ -58,29 +64,11 @@ def supabase_client() -> SupabaseRest:
 
 
 def get_default_scoring_settings() -> Dict[str, Any]:
-    """Returns default scoring settings structure.
-
-    INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned;
-    SHP/hits/PIM opt-in at 0. Mirrors packages/shared DEFAULT_SCORING.
+    """Returns default scoring settings structure — the generated single
+    source (data-pipeline/scoring/scoring_defaults.py, built from
+    packages/shared/src/constants/scoringDefaults.json). Fresh copy per call.
     """
-    return {
-        "skater": {
-            "goals": 6,
-            "assists": 4,
-            "power_play_points": 2,
-            "short_handed_points": 0,
-            "shots_on_goal": 0.9,
-            "blocks": 1.0,
-            "hits": 0.0,
-            "penalty_minutes": 0.0
-        },
-        "goalie": {
-            "wins": 5,
-            "shutouts": 5,
-            "saves": 0.6,
-            "goals_against": -3
-        }
-    }
+    return scoring_defaults.scoring_settings()
 
 
 def get_completed_games(

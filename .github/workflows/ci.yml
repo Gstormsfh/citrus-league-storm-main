@@ -20,6 +20,93 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # ── Branch freshness (advisory) ──────────────────────────────────────
+  # Added 2026-09-02. On 2026-09-01 four PRs landed on master (#387-#390)
+  # while twenty branches were open. #388 fixed a real calibration bug and
+  # rewrote the three tests in test_projection_uncertainty.py that encode
+  # it. Every branch cut before that carried the pre-#388 tests, so the
+  # Data Pipeline Tests job failed the same three tests on every push, on
+  # every one of those branches, for reasons none of them caused and none
+  # of them could fix by their own content. Twenty branches, one root
+  # cause, and nothing in the run said so -- the visible failure was an
+  # assertion about scoring weights in a file the branch never opened.
+  #
+  # This job never fails. Its whole job is to put one sentence at the top
+  # of the run that names the distance and the fix, so a red X below it is
+  # legible in five seconds instead of an afternoon. Requiring branches to
+  # be up to date is a branch-protection setting, not a workflow one; this
+  # is the part CI can do.
+  freshness:
+    name: Branch Freshness (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # The BRANCH TIP, not the pull_request merge ref. checkout's default
+      # for a pull_request event is refs/pull/N/merge, which already
+      # contains the base -- measuring distance from there always says
+      # zero, which is exactly the blind spot this job exists to remove.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Report distance from base
+        env:
+          BASE: ${{ github.event.pull_request.base.ref || 'master' }}
+        run: |
+          set -uo pipefail
+          git fetch --quiet origin "$BASE" || { echo "could not fetch $BASE"; exit 0; }
+          BEHIND=$(git rev-list --count HEAD..origin/"$BASE")
+          AHEAD=$(git rev-list --count origin/"$BASE"..HEAD)
+          echo "ahead $AHEAD / behind $BEHIND (vs origin/$BASE)"
+
+          {
+            echo "### Branch freshness"
+            echo
+            echo "\`$AHEAD\` commit(s) ahead of \`$BASE\`, \`$BEHIND\` behind."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$BEHIND" -eq 0 ]; then
+            echo "Up to date with origin/$BASE."
+            {
+              echo
+              echo "Up to date. Any failure in this run belongs to this branch."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # The commits this branch is missing, and -- the part that matters
+          # -- which of them touch files this branch never opened. A failing
+          # check in one of THOSE is inherited, not caused here.
+          MISSING=$(git log --oneline HEAD..origin/"$BASE")
+          MERGE_BASE=$(git merge-base HEAD origin/"$BASE")
+          git diff --name-only "$MERGE_BASE"..HEAD | sort -u > /tmp/mine.txt
+          git diff --name-only "$MERGE_BASE"..origin/"$BASE" | sort -u > /tmp/theirs.txt
+          comm -13 /tmp/mine.txt /tmp/theirs.txt > /tmp/untouched.txt
+          N=$(grep -c . /tmp/untouched.txt || true)
+
+          {
+            echo
+            echo "**Missing from this branch:**"
+            echo
+            printf '%s\n' "$MISSING" | sed 's/^/- /'
+            echo
+            if [ "${N:-0}" -gt 0 ]; then
+              echo "\`$N\` file(s) changed on \`$BASE\` that this branch never opened."
+              echo "A failing check in any of them is inherited, not caused here:"
+              echo
+              echo '```'
+              head -40 /tmp/untouched.txt
+              echo '```'
+              echo
+            fi
+            echo "Fix: \`git fetch origin && git merge origin/$BASE\` (or rebase), then push."
+            echo
+            echo "See \`docs/RUNBOOKS/CI_RED_X_TRIAGE.md\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "::warning title=Branch is $BEHIND commit(s) behind $BASE::Failures in this run may be inherited, not caused by this branch. Run: git fetch origin && git merge origin/$BASE"
+
   # ── Data pipeline (Python) ───────────────────────────────────────────
   # Added 2026-08-11. Before this, ci.yml ran ZERO Python: nine test files
   # under data-pipeline/tests had never gated anything, and three of them
@@ -58,13 +145,44 @@ jobs:
 
       - name: pytest
         working-directory: data-pipeline
+        shell: bash
         env:
           # The season-parity tests call the real SQL functions over PostgREST
           # rather than re-implementing them. Without these they self-skip.
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          pytest tests/ -q --no-header
+          pytest tests/ -q --no-header 2>&1 | tee /tmp/pytest.log
+
+      # Every job ends with this step. It writes one row to public.ops_ci_runs
+      # (Supabase, service-role only) so Claude can read the outcome through the
+      # Supabase MCP -- the container cannot reach github.com, so without it a
+      # CI result only reaches a session as a pasted log. `if: always()` runs it
+      # on failure and cancellation; `continue-on-error` plus the action's own
+      # exit-0 contract mean telemetry can never turn a job red. Test jobs tee
+      # their runner output to a file (`shell: bash` sets pipefail, so the tee
+      # cannot mask a failure) and pass it as log-file for the totals line.
+      # Details: docs/RUNBOOKS/CI_TELEMETRY.md.
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          log-file: /tmp/pytest.log
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      # Only speaks up when pytest already failed. The 2026-09-01 case was
+      # three assertions in test_projection_uncertainty.py -- in a file the
+      # branch had never opened -- failing because the branch predated #388.
+      # The distance itself is measured by the `freshness` job, which is
+      # checked out at the branch tip; this step just makes sure nobody
+      # reads a red pytest without being told that job exists.
+      - name: Where to look first
+        if: failure()
+        run: |
+          echo "::notice title=Check Branch Freshness before this failure::If the 'Branch Freshness (advisory)' job in this run reports commits behind the base, these failures may be inherited -- #388 rewrote the tests in test_projection_uncertainty.py. See docs/RUNBOOKS/CI_RED_X_TRIAGE.md."
 
   lint:
     name: Lint
@@ -82,6 +200,15 @@ jobs:
 
       - name: Run ESLint
         run: cd apps/web && npx eslint src/
+
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   typecheck:
     name: Type Check (Web)
@@ -118,7 +245,7 @@ jobs:
           npx tsc --noEmit -p tsconfig.app.json 2>&1 | tee /tmp/tsc-web.log || true
           COUNT=$(grep -c "error TS" /tmp/tsc-web.log || true)
           COUNT=${COUNT:-0}
-          echo "type errors: $COUNT (baseline $BASELINE)"
+          echo "type errors: $COUNT (baseline $BASELINE)" | tee /tmp/tsc-web.summary
           if [ "$COUNT" -gt "$BASELINE" ]; then
             echo "::error::Web type errors rose from $BASELINE to $COUNT. New errors:"
             grep "error TS" /tmp/tsc-web.log | head -40
@@ -127,6 +254,16 @@ jobs:
           if [ "$COUNT" -lt "$BASELINE" ]; then
             echo "::notice::Web type errors fell from $BASELINE to $COUNT - lower apps/web/.typecheck-baseline to $COUNT to lock the win in."
           fi
+
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          log-file: /tmp/tsc-web.summary
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   typecheck-server:
     name: Type Check (Server)
@@ -143,7 +280,18 @@ jobs:
       - run: npm ci
 
       - name: TypeScript compile check (server)
-        run: cd server && npx tsc --noEmit
+        shell: bash
+        run: cd server && npx tsc --noEmit 2>&1 | tee /tmp/tsc-server.log
+
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          log-file: /tmp/tsc-server.log
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   build:
     name: Build (Web)
@@ -328,6 +476,15 @@ jobs:
 
           echo "PASS — dist total within gzipped budget."
 
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
   build-server:
     name: Build (Server)
     runs-on: ubuntu-latest
@@ -348,6 +505,15 @@ jobs:
       - name: Build server
         run: npm run build --workspace=server
 
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
   test:
     name: Test (Web)
     runs-on: ubuntu-latest
@@ -363,7 +529,18 @@ jobs:
       - run: npm ci
 
       - name: Run web tests
-        run: npm run test --workspace=apps/web
+        shell: bash
+        run: npm run test --workspace=apps/web 2>&1 | tee /tmp/test-web.log
+
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          log-file: /tmp/test-web.log
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
 
   test-server:
     name: Test (Server)
@@ -383,7 +560,115 @@ jobs:
         run: npm run build --workspace=packages/shared
 
       - name: Run server tests
-        run: npm run test --workspace=server
+        shell: bash
+        run: npm run test --workspace=server 2>&1 | tee /tmp/test-server.log
+
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          log-file: /tmp/test-server.log
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+  # Contract tests for the repo's operational scripts (scripts/**/*.test.mjs).
+  # node:test only, no npm ci: they must stay dependency-free so they run
+  # anywhere node does. The first one pins scripts/delivery/land-bundle.ps1
+  # (refspec fetch, never a checkout, refuses master, $LASTEXITCODE after every
+  # git/gh call) -- PowerShell cannot run on this runner, so the script is
+  # checked as text.
+  test-scripts:
+    name: Test (Scripts)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Run script contract tests
+        shell: bash
+        run: npm run test:scripts 2>&1 | tee /tmp/test-scripts.log
+
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          log-file: /tmp/test-scripts.log
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+  # Added 2026-09-01. The six suites under packages/shared/src/**/__tests__
+  # were run by nothing: the package had no `test` script, the web and server
+  # vitest configs only include their own `src/**`, and no job here ran them.
+  # One of them (leagueTimeline.test.ts) had been failing since the 2026-08-24
+  # launch build and nobody saw it. Same shape as "Test (Web)" above.
+  test-shared:
+    name: Test (Shared)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run shared tests
+        shell: bash
+        run: npm run test --workspace=packages/shared 2>&1 | tee /tmp/test-shared.log
+
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          log-file: /tmp/test-shared.log
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+  # ── Generated scoring defaults ───────────────────────────────────────
+  # packages/shared/src/constants/scoringDefaults.json is the one source of
+  # the default scoring weights. scripts/gen-scoring-defaults.mjs derives the
+  # Python module (data-pipeline/scoring/scoring_defaults.py) and the docs
+  # table (docs/generated/SCORING_DEFAULTS.md) from it. This job regenerates
+  # both and fails on any diff, so a JSON edit without a regenerate — or a
+  # hand edit to a generated file — cannot merge. Plain Node, no npm ci.
+  scoring-defaults:
+    name: Generated Scoring Defaults
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Regenerate from the JSON source
+        run: npm run gen:scoring
+
+      - name: Generated files must match the committed ones
+        run: |
+          GENERATED="data-pipeline/scoring/scoring_defaults.py docs/generated/SCORING_DEFAULTS.md"
+          # --porcelain also lists an untracked file, which a plain
+          # `git diff --exit-code` would miss if a generated file were deleted.
+          if [ -n "$(git status --porcelain -- $GENERATED)" ]; then
+            git --no-pager diff -- $GENERATED
+            echo "::error::Generated scoring defaults are stale. Run 'npm run gen:scoring' and commit the result."
+            exit 1
+          fi
+          echo "Generated scoring defaults are fresh."
 
   # Contract tests for the repo's operational scripts (scripts/**/*.test.mjs).
   # node:test only, no npm ci: they must stay dependency-free so they run
@@ -488,6 +773,15 @@ jobs:
           fi
           echo "All migrations pass basic validation."
 
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
@@ -548,3 +842,12 @@ jobs:
             echo "::warning::Found console.log usage — prefer logger from @citrus/shared"
           fi
           echo "Console.log audit complete."
+
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

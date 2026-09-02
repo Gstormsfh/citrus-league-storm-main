@@ -16,6 +16,8 @@
  * ```
  */
 
+import { DEFAULT_SCORING as SHARED_DEFAULT_SCORING } from '@citrus/shared';
+
 export interface ScoringSettings {
   skater: {
     goals: number;
@@ -37,36 +39,14 @@ export interface ScoringSettings {
 }
 
 /**
- * Default scoring settings matching database defaults
- * These are the standard fantasy hockey point values
+ * Default scoring settings matching database defaults.
+ *
+ * This is the shared constant, re-exported: the values live in ONE place
+ * (packages/shared/src/constants/scoringDefaults.json) and this legacy
+ * mirror carries no literal of its own. It stays exported only until the
+ * remaining `@/utils/scoringUtils` imports move to `@citrus/shared`.
  */
-export const DEFAULT_SCORING: ScoringSettings = {
-  // INDUSTRY-STANDARD DEFAULTS (2026-09-01) — Yahoo-aligned; the full
-  // rationale lives on packages/shared/src/utils/scoring.ts (this file
-  // is its verbatim mirror until the migration to @citrus/shared lands).
-  skater: {
-    goals: 6,
-    assists: 4,
-    power_play_points: 2,
-    short_handed_points: 0,
-    shots_on_goal: 0.9,
-    blocks: 1,
-    hits: 0,
-    penalty_minutes: 0,
-    // 0, and it stays 0. These constants must equal the database global
-    // default rows, which is what the scoring engine actually applies.
-    // Yahoo defaults +/- to 2, but the projection engine cannot model
-    // plus/minus, so a non-zero default here would make every projected
-    // total quietly understate real scoring. Commissioners can enable it.
-    plus_minus: 0
-  },
-  goalie: {
-    wins: 5,
-    shutouts: 5,
-    saves: 0.6,
-    goals_against: -3
-  }
-};
+export const DEFAULT_SCORING: ScoringSettings = SHARED_DEFAULT_SCORING;
 
 /**
  * Centralized scoring calculator

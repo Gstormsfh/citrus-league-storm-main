@@ -26,7 +26,9 @@
     "validate-migration": "ts-node scripts/validate-migration.ts",
     "validate-all-migrations": "ts-node scripts/validate-migration.ts",
     "test-migrations": "ts-node scripts/test-migrations.ts",
-    "db:push": "node scripts/db-push.mjs"
+    "db:push": "node scripts/db-push.mjs",
+    "gen:scoring": "node scripts/gen-scoring-defaults.mjs",
+    "gen:scoring:check": "node scripts/gen-scoring-defaults.mjs --check"
   },
   "devDependencies": {
     "typescript": "^5.5.3"

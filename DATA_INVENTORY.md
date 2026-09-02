@@ -40,6 +40,7 @@ trigger rules. Verification procedure:
 | `raw_nhl_data` | 1,350 | 41 MB (JSONB) | `data-pipeline/acquisition/ingest_raw_nhl.py` |
 | `player_directory` / `player_season_stats` / `player_talent_metrics` / `player_gar_components` / `player_ros_projections` | 938 / 1066 / 1012 / 935 / 926 | <1 MB each | various scripts/utilities |
 | `goalie_*` family | 82-197 | <200 KB each | `scripts/utilities/calculate_goalie_*.py` |
+| `ops_ci_runs` | 0 at creation (2026-09-01); ~20 rows per CI run | grows ~1 MB/month | `.github/actions/report-run` (every job in `ci.yml`, `production-deploy.yml`, `main.yml`, `data-invariants.yml`, `schema-snapshot.yml`) over PostgREST with the service-role key. Service-role only (RLS on, no policies). Read by Claude via MCP — `docs/RUNBOOKS/CI_TELEMETRY.md` |
 
 **Critical observations:**
 - `player_shifts_official` has a row-count discrepancy (pg_class says 198K, list_tables says 0). Worth investigating.
@@ -128,10 +129,13 @@ Workflows in `.github/workflows/`:
 - **`deploy-preview.yml`** — Preview deployments
 - **`production-deploy.yml`** — Prod deploy on tag/release
 - **`staging-deploy.yml`** — Staging deploy on push to `staging` or `staging-setup`
+- **`schema-snapshot.yml`** — Sundays 09:00 UTC + manual: read-only `pg_dump --schema-only` of prod + `cron.job` manifest via `scripts/ops/dump-prod-schema.sh` → `supabase/schema/prod_schema.sql`, `prod_cron.sql`; opens a `chore/schema-snapshot-<date>` PR when they differ. Needs secret `PROD_DB_URL` (direct URL).
+- **`draft-scorecard.yml`** — Draft Latency Scorecard, Mondays 12:00 UTC: runs `data-pipeline/monitoring/draft_latency_scorecard.py` (read-only) over the `draft_latency_scorecard` view (migration `20260901233000`; per-draft autopick deadline→commit p50/p95/max, autopick share, picks/min, duration; `security_invoker`, SELECT for `service_role` only). Fails the run when a draft breaches the CLAUDE.md autopick p95 ≤ 1000 ms target. Cloud Monitoring side of the same audit item (§B-8/§B-9): `infra/gcp/monitoring/` (log-based metrics, alert policies, "Citrus Draft Mandate" dashboard, `apply-monitoring.sh`).
 
 NPM scripts in `package.json` (root):
 - `dev`, `dev:server`, `dev:all`, `build`, `build:server`, `build:all`, `test`, `test:server`, `lint`, `deploy`, `firebase` — standard development
 - `validate-migration` / `validate-all-migrations` / `test-migrations` — wraps `scripts/validate-migration.ts` and `scripts/test-migrations.ts`
+- `gen:scoring` / `gen:scoring:check` — wraps `scripts/gen-scoring-defaults.mjs`: regenerates (or verifies) `data-pipeline/scoring/scoring_defaults.py` and `docs/generated/SCORING_DEFAULTS.md` from `packages/shared/src/constants/scoringDefaults.json`, the single source of the default scoring weights
 
 ### 3.2 `data-pipeline/` directory (16 active production scripts)
 
@@ -139,8 +143,8 @@ NPM scripts in `package.json` (root):
 |---|---|---|
 | `acquisition/` | 13 files | NHL API ingestion: `data_acquisition.py`, `data_scraping_service.py`, `fetch_nhl_stats_from_landing*.py`, `ingest_live_raw_nhl.py`, `ingest_nhl_playoff_bracket.py`, `ingest_playoff_schedule.py`, `ingest_raw_nhl.py`, `ingest_shiftcharts.py`, `populate_team_stats.py`, `scrape_live_nhl_stats.py`, `scrape_per_game_nhl_stats.py`, `sync_playoff_results.py` |
 | `projections/` | 9 files | Projection generation: `build_player_season_stats.py`, `calculate_daily_projections.py`, `fantasy_projection_pipeline.py`, **`nightly_projection_batch.py` (cron entry)**, `projection_uncertainty.py`, `quantify_monte_carlo_impact.py`, `quantify_uncertainty_impact.py`, `run_daily_projections.py`, `sync_ppp_from_gamelog.py` |
-| `scoring/` | 4 files | `calculate_matchup_scores.py`, `reconcile_player_stats.py`, `run_daily_pbp_processing.py`, `simulate_matchups.py` |
-| `monitoring/` | 11 files | Health/freshness checks: `alerting.py`, `audit_projection_accuracy.py`, `check_data_freshness.py`, `health_check_server.py`, `monitor_data_scraping.py`, `monitor_proxy_health.py`, `run_midnight_update.py`, `verify_data_integrity.py`, `verify_projection_pipeline.py` + 2 test files |
+| `scoring/` | 5 files | `calculate_matchup_scores.py`, `reconcile_player_stats.py`, `run_daily_pbp_processing.py`, `simulate_matchups.py`, **`scoring_defaults.py` (generated — do not edit; `npm run gen:scoring`)** |
+| `monitoring/` | 12 files | Health/freshness checks: `alerting.py`, `audit_projection_accuracy.py`, `check_data_freshness.py`, `draft_latency_scorecard.py` (weekly Mandate scorecard over the `draft_latency_scorecard` view), `health_check_server.py`, `monitor_data_scraping.py`, `monitor_proxy_health.py`, `run_midnight_update.py`, `verify_data_integrity.py`, `verify_projection_pipeline.py` + 2 test files |
 | `utils/` | 4 files | `citrus_request.py` (NHL API throttle), `proxy_health.py`, `proxy_manager.py` (100-IP rotation), `supabase_rest.py` (DB client) |
 | `debug/` | 14 files | One-off `check_*.py` / `audit_*.py` / `find_*.py` / `fix_*.py` / `verify_*.py` McDavid-and-similar scripts. **Keep but reorganize** — these are the reference forensics scripts |
 | `tests/` | (count not enumerated) | Pipeline unit tests |
@@ -169,6 +173,7 @@ NPM scripts in `package.json` (root):
 - `functions/` — 6 edge functions: `_shared/`, `demo-matchup-cache/`, `draft-autopick/`, `fetch-spreads/`, `pipeline-deadman/`, `stormy-chat/`
 - `seed.sql`, `seeds/`, `templates/`, `tests/` — standard Supabase scaffolding
 - `config.toml` — Supabase project config
+- `schema/` — prod schema record. `production_snapshot_20260813.sql` is the hand-taken one (retire it once the first `schema-snapshot.yml` PR merges); `prod_schema.sql` + `prod_cron.sql` are the weekly generated pair (see §3.1).
 
 ---
 

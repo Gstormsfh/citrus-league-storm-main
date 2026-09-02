@@ -61,6 +61,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import _bootstrap  # noqa: F401
 
 from data_pipeline.utils.supabase_rest import SupabaseRest
+from data_pipeline.scoring import scoring_defaults
 
 # Import calculation functions
 from calculate_daily_projections import (
@@ -88,28 +89,11 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
 
-# Single source of truth for fallback scoring — matches DEFAULT_SCORING in packages/shared.
-# Used when a player has no league context (free agents) or when league settings can't be loaded.
-# INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned (help.yahoo.com/kb/SLN6815);
-# SHP/hits/PIM are opt-in categories, 0 by default.
-DEFAULT_FALLBACK_SCORING = {
-    "skater": {
-        "goals": 6,
-        "assists": 4,
-        "power_play_points": 2,
-        "short_handed_points": 0,
-        "shots_on_goal": 0.9,
-        "blocks": 1.0,
-        "hits": 0.0,
-        "penalty_minutes": 0.0,
-    },
-    "goalie": {
-        "wins": 5,
-        "shutouts": 5,
-        "saves": 0.6,
-        "goals_against": -3,
-    }
-}
+# Fallback scoring — the generated single source (scoring_defaults.py, built
+# from packages/shared/src/constants/scoringDefaults.json); no literal here.
+# Used when a player has no league context (free agents) or when league
+# settings can't be loaded.
+DEFAULT_FALLBACK_SCORING = scoring_defaults.scoring_settings()
 
 
 def get_fresh_supabase_client() -> SupabaseRest:
@@ -1051,12 +1035,8 @@ def main():
                     rejected_logs = []
                     for rejected in rejected_projections:
                         # Get scoring settings (use default for traceability - main goal is debugging)
-                        default_scoring = {
-                            "skater": {"goals": 6, "assists": 4, "shots_on_goal": 0.9, "blocks": 1.0},
-                            "goalie": {"wins": 5, "shutouts": 5, "saves": 0.6, "goals_against": -3}
-                        }
                         traceability = generate_traceability_log_for_rejection(
-                            db, rejected, args.season, default_scoring
+                            db, rejected, args.season, DEFAULT_FALLBACK_SCORING
                         )
                         rejected_logs.append(traceability)
 
