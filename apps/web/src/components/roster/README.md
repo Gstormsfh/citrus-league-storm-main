@@ -67,6 +67,61 @@ Three fixed IR slots. Tap-eligible like the others — `isPositionValid`
 gates IR slots on `is_ir_eligible`, so only officially IR/LTIR players can
 be tapped into one.
 
+### MobileRosterList (phones and portrait tablets, `< 1024px`)
+List rows: position chip · headshot (crest badge) · name / team · opp ·
+time / live line · tonight's number. The **position chip is the swap trigger** (Sleeper,
+Yahoo and ESPN use the same gesture) and wears a `⇄` glyph to say so; a
+locked player's chip goes neutral with a lock glyph (`LOCKED_CHIP` in
+`slotChip.ts`) while the rest of his row stays fully legible. An **empty
+starter row is one tap target**: with a player selected it is the move
+target, with nothing selected it opens the Fill sheet. Pass `swapHint` on
+editable lists to show the one-time "Tap a position to swap" toast
+(`useSwapHint`, localStorage-backed, try/catch). The **Injured Reserve
+section is always on the page**, headed `n/N` from `irSlotCount` (resolve it
+with `resolveIrSlotCount` in `irSlots.ts` — the server's rule,
+`settings.rosterSlots.IR` else 3); empty it reads "No one on IR", and with an
+IR-eligible player selected the open slot is a move target like any other.
+The row's `team · vs OPP · 7:00 PM` line comes from the selected date's
+schedule row (`gameDay.ts`: `gameOnDate` + `rowGameFor`), never from a
+placeholder — no opponent, no text.
+
+### SlotPickerMenu ("Line change") and FillSlotSheet ("Fill a spot")
+Two directions of the same move, one bottom-sheet language. Line change is
+player-first (tap a player, pick a destination — occupant and tonight's
+number shown per row). Fill is slot-first (tap an empty row, pick who steps
+in from the bench — games first, then projection; locked bench players
+listed but disabled). Neither recomputes eligibility: both take the set
+Roster.tsx judged legal (`tapEligibleSlots` / `fillCandidates`). Shared
+pieces: `Mug` (headshot → crest → initials, fixed box, lazy; also every
+mobile roster and matchup row, and the Free Agents lists via
+`mugFromDirectory()` in `headshot.ts` for the `full_name` / `headshot_url`
+directory shape — one face component, no private `<img>` fallbacks),
+`tonight()` (live vs projected number), `chipClassFor()` / `slotLabel()`.
+
+### AutoLineupSheet + `planAutoLineup`
+Auto Lineup previews before it saves (Yahoo's Start Active Players and
+ESPN's Quick Lineup both fire blind). `autoLineup.ts` is the pure planner:
+locked players are PINNED — a locked starter keeps his slot, a locked bench
+player stays benched — and the rest are matched to the open slots exactly
+(maximum-weight assignment: a game outranks no game, then projection, with
+small bonuses for filling a slot and for staying put so nothing shuffles for
++0.1 and slot numbers never change on their own). It returns the moves,
+the projected total before and after, and who was pinned. The sheet reads
+that: `3 moves · proj +2.4`, one row per move (`C1 → BN  Player  4.8`), a
+`Today` / `Rest of week` toggle, `Apply` / `Keep current`; zero moves is
+"Lineup already optimal". Rest of week plans each remaining day of the
+matchup week against that day's projections and that day's lineup on record
+and saves them one after another through `rosterApi.saveLineup`. The server
+refuses any save that moves a locked player (409, naming him) — see
+`server/src/services/LineupService.findLockedLineupChanges`.
+
+### TodayStrip + `computeTodaySummary`
+The game-day readout beneath the day selector — `9/13 starters play · 2 on
+bench with games · proj 41.6 · 3 locked`. Pure arithmetic over the page's
+enriched roster (`todaySummary.ts`, tested on its own). Amber only when a
+bench player has a game while a starter spot is empty or idle, and only on
+an editable day; in that state it carries the Auto Lineup action inline.
+
 ## Usage Example
 
 ```tsx

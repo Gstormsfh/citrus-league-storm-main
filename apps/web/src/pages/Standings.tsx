@@ -481,7 +481,7 @@ const Standings = () => {
       </div>
 
       {/* MOBILE: Compact header with league context */}
-      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-page-header bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <h1 className="text-lg font-bold text-pastel-cream">Standings</h1>
           <div className="flex items-center gap-1">
@@ -601,7 +601,7 @@ const Standings = () => {
                       logger.error('[Standings] Error refreshing:', error);
                       toast({
                         title: "Refresh Didn't Take",
-                        description: "Couldn't refresh the standings — try again in a moment.",
+                        description: "Couldn't refresh the standings. Try again in a moment.",
                         variant: 'destructive',
                       });
                       setLoading(false);
@@ -943,7 +943,7 @@ const Standings = () => {
                     Say which it is. */}
                 {teams.length === 0 ? (
                   <p className="py-4 text-center text-xs font-display text-white/55">
-                    No points scored yet — leaders appear after week 1.
+                    No points scored yet. Leaders appear after week 1.
                   </p>
                 ) : (
                 <div className="space-y-3">

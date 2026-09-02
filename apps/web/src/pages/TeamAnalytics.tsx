@@ -225,7 +225,7 @@ const TeamAnalytics = () => {
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Analytics</h1>
@@ -290,7 +290,7 @@ const TeamAnalytics = () => {
                       />
                       <p className="text-[10px] text-white/55 px-1">
                         Measured across {analytics.measuredPlayers} of {analytics.rosterSize} rostered
-                        players — those with both a season projection and games played.
+                        players. Those with both a season projection and games played.
                       </p>
                     </>
                   )}
@@ -307,7 +307,7 @@ const TeamAnalytics = () => {
                   >
                     <ScoreboardIcon className="h-4 w-4 shrink-0 text-pastel-orange" strokeWidth={2} />
                     <span className="min-w-0 flex-1 text-[13px] text-white/70">
-                      Positional grades — offense, peripherals, goaltending and depth
+                      Positional grades: offense, peripherals, goaltending and depth
                       <span className="text-white/55"> · on the Roster page</span>
                     </span>
                     <ChevronRight className="h-4 w-4 shrink-0 text-white/55" strokeWidth={2.5} />

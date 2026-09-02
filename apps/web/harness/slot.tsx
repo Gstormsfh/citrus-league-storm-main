@@ -15,30 +15,43 @@ import { useMemo, useState } from 'react';
 import '../src/index.css';
 import MobileRosterList from '../src/components/roster/MobileRosterList';
 import type { HockeyPlayer } from '../src/components/roster/HockeyPlayerCard';
+import { harnessPlayer, harnessRowPlayer } from './players';
 
 declare global { interface Window { __log: string[] } }
 window.__log = [];
 const log = (s: string) => { window.__log.push(s); };
 
-const mk = (id: string, name: string, position: string, team = 'EDM', proj?: number): HockeyPlayer =>
-  ({
-    id, name, position, number: 9, starter: true, team, teamAbbreviation: team, stats: {},
+/**
+ * REAL PLAYERS, REAL FACES (2026-09-02). These seven used to be names typed
+ * into this file with no face field, so every row in the list this harness
+ * exists to drive fell through `Mug` to an initials disc — the one thing no
+ * production row does (801 of 801 `players` rows carry an NHL CDN headshot).
+ * Identity and face come off the shared roster; the SLOT STATE below is
+ * still written here, because that is what this file tests.
+ */
+const mk = (id: string, who: string, proj?: number): HockeyPlayer => {
+  const p = harnessRowPlayer(harnessPlayer(who));
+  return {
+    id, ...p, starter: true, stats: {},
     nextGame: { opponent: 'vs TOR', isToday: true, gameTime: '7:30 PM', gameStatus: 'scheduled' },
     ...(proj != null
-      ? position === 'G'
+      ? p.position === 'G'
         ? { goalieProjection: { total_projected_points: proj } }
         : { daily_projection: { total_projected_points: proj } }
       : {}),
-  }) as HockeyPlayer;
+  } as HockeyPlayer;
+};
 
 const P = {
-  mcdavid: mk('1', 'Connor McDavid', 'C', 'EDM', 5.2),
-  draisaitl: mk('2', 'Leon Draisaitl', 'C', 'EDM', 4.8),
-  makar: mk('3', 'Cale Makar', 'D', 'COL', 4.1),
-  hughes: mk('4', 'Quinn Hughes', 'D', 'VAN', 3.9),
-  shesterkin: mk('5', 'Igor Shesterkin', 'G', 'NYR', 6.0),
-  panarin: mk('6', 'Artemi Panarin', 'LW', 'NYR', 3.4),
-  kaprizov: mk('7', 'Kirill Kaprizov', 'LW', 'MIN', 4.5),
+  mcdavid: mk('1', 'Connor McDavid', 5.2),
+  draisaitl: mk('2', 'Leon Draisaitl', 4.8),
+  makar: mk('3', 'Cale Makar', 4.1),
+  hughes: mk('4', 'Quinn Hughes', 3.9),
+  // The roster has no NYR goalie; Swayman is the goalie it has. The slot the
+  // row occupies (slot-G-1) and the G eligibility it proves are unchanged.
+  swayman: mk('5', 'Jeremy Swayman', 6.0),
+  panarin: mk('6', 'Artemi Panarin', 3.4),
+  kaprizov: mk('7', 'Kirill Kaprizov', 4.5),
 };
 
 // slot-LW-1 and slot-D-2 are deliberately EMPTY: the highlighted-empty-slot tap

@@ -129,7 +129,7 @@ const Contact = () => {
             Get in <span className="text-pastel-orange">touch</span>.
           </h1>
           <p className="text-[16px] text-white/65 max-w-xl mx-auto leading-relaxed">
-            Questions, feedback, or just want to chirp at us? Drop a line — we read every message.
+            Questions, feedback, or just want to chirp at us? Drop a line. We read every message.
           </p>
         </div>
 

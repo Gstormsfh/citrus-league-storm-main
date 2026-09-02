@@ -3,35 +3,58 @@ import { createRoot } from 'react-dom/client';
 import '../src/index.css';
 import HockeyPlayerCard, { HockeyPlayer } from '../src/components/roster/HockeyPlayerCard';
 import MobileRosterList from '../src/components/roster/MobileRosterList';
+import { harnessPlayer, harnessRowPlayer } from './players';
 
-const base = (over: Partial<HockeyPlayer>): HockeyPlayer => ({
-  id: 1, name: 'Connor McDavid', position: 'C', number: 97, starter: true,
-  team: 'Edmonton Oilers', teamAbbreviation: 'EDM',
+/**
+ * THE GALLERY IS REAL (2026-09-02). Every case below used to be a name typed
+ * into this file with no face field at all, so `HockeyPlayerCard` fell
+ * straight through to the team crest on all ten cards and the gallery could
+ * not show the one element it exists to show. Production carries a headshot
+ * on all 801 rows of `players`; these ten now carry the same URLs.
+ *
+ * `harnessRowPlayer` supplies name, face, team, jersey and position. Each
+ * case then overrides ONLY the state it exists to test — IR, GTD, locked,
+ * live actuals, zeroed stats — because the state is the case and the player
+ * never was.
+ */
+const base = (who: string, over: Partial<HockeyPlayer>): HockeyPlayer => ({
+  id: 1,
+  ...harnessRowPlayer(harnessPlayer(who)),
+  starter: true,
   stats: { goals: 34, assists: 66, points: 100, gamesPlayed: 71, shots: 219, hits: 42, blockedShots: 21, plusMinus: 18 },
   nextGame: { opponent: 'vs BOS', isToday: true, gameTime: '7:30 PM', gameStatus: 'scheduled' },
   ...over,
 } as HockeyPlayer);
 
 const RAW: { label: string; player: HockeyPlayer; inSlot?: boolean; locked?: boolean }[] = [
-  { label: 'skater · season', player: base({}) },
-  { label: 'skater · long name', player: base({ name: 'Alexander Wennberg-Nylander', position: 'LW', number: 8, teamAbbreviation: 'SEA' }) },
-  { label: 'skater · live actuals', player: base({
-      name: 'Nathan MacKinnon', number: 29, teamAbbreviation: 'COL',
+  // `team` is the FULL club name on this one card, on purpose: the directory
+  // hands rows either form, and `mugTeamAbbrev` only builds a crest URL from a
+  // 2-4 letter code — this is the case that proves it falls back to
+  // `teamAbbreviation` instead of requesting a 404 on "Edmonton Oilers".
+  { label: 'skater · season', player: base('Connor McDavid', { team: 'Edmonton Oilers' }) },
+  // Was the invented 27-character "Alexander Wennberg-Nylander". The
+  // truncation case is now bounded by the longest name that can actually
+  // reach this card: 20 characters, and a real defenceman.
+  { label: 'skater · long name', player: base('Oliver Ekman-Larsson', {}) },
+  { label: 'skater · live actuals', player: base('Nathan MacKinnon', {
       nextGame: { opponent: 'vs VGK', isToday: true, gameStatus: 'live', score: '2-1' },
       daily_actual_stats: { goals: 1, assists: 2, shots_on_goal: 7, hits: 3 }, daily_actual_points: 12.8 }) },
-  { label: 'skater · IR', player: base({ name: 'Jack Hughes', number: 86, teamAbbreviation: 'NJD', position: 'C', status: 'IR' }) },
-  { label: 'D · GTD', player: base({ name: 'Cale Makar', number: 8, teamAbbreviation: 'COL', position: 'D', status: 'GTD',
+  // IR / GTD are the STATE each row tests; the players are real and healthy.
+  { label: 'skater · IR', player: base('Jack Eichel', { status: 'IR' }) },
+  { label: 'D · GTD', player: base('Cale Makar', { status: 'GTD',
       stats: { goals: 21, assists: 71, points: 92, gamesPlayed: 80, shots: 216, hits: 30, blockedShots: 96, plusMinus: 27 } }) },
-  { label: 'RW · big numbers', player: base({ name: 'Auston Matthews', number: 34, teamAbbreviation: 'TOR', position: 'RW',
+  { label: 'RW · big numbers', player: base('David Pastrnak', {
       stats: { goals: 69, assists: 38, points: 107, gamesPlayed: 81, shots: 349, hits: 55, blockedShots: 29, plusMinus: 34 } }) },
-  { label: 'goalie · season', player: base({ name: 'Igor Shesterkin', number: 31, teamAbbreviation: 'NYR', position: 'G',
+  { label: 'goalie · season', player: base('Andrei Vasilevskiy', {
       stats: { wins: 36, losses: 17, otl: 6, gaa: 2.58, savePct: 0.9134, saves: 1652, shutouts: 4, gamesPlayed: 55 } }) },
-  { label: 'goalie · live actuals', player: base({ name: 'Jake Oettinger', number: 29, teamAbbreviation: 'DAL', position: 'G',
+  { label: 'goalie · live actuals', player: base('Jake Oettinger', {
       stats: { wins: 35, losses: 14, otl: 6, gaa: 2.72, savePct: 0.9053, saves: 1430, shutouts: 2, gamesPlayed: 53 },
       nextGame: { opponent: '@ MIN', isToday: true, gameStatus: 'final', score: '4-2' },
       daily_actual_stats: { wins: 1, saves: 34, goals_against: 2 }, daily_actual_points: 10.8 }) },
-  { label: 'skater · locked', player: base({ name: 'Mitch Marner', number: 16, teamAbbreviation: 'TOR', position: 'RW' }), locked: true },
-  { label: 'skater · zero stats', player: base({ name: 'Rookie Callup', number: 72, teamAbbreviation: 'ANA', position: 'LW',
+  { label: 'skater · locked', player: base('Mitch Marner', {}), locked: true },
+  // Was "Rookie Callup", a name. The zeros are the case — a call-up who has
+  // not played — so they stay; the player wearing them is real.
+  { label: 'skater · zero stats', player: base('Cutter Gauthier', {
       stats: { goals: 0, assists: 0, points: 0, gamesPlayed: 0, shots: 0, hits: 0, blockedShots: 0, plusMinus: 0 },
       nextGame: undefined }) },
 ];

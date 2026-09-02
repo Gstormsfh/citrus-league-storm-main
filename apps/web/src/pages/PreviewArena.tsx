@@ -16,7 +16,7 @@ const GAME_MODES = [
   {
     label: 'Hockey Pickem',
     headline: 'Pick the night, every night',
-    body: 'Daily NHL pickem — straight up or against the spread, your call.',
+    body: 'Daily NHL pickem: straight up or against the spread, your call.',
     badge: 'Every night',
     accent: 'sage',
     icon: Flame,
@@ -106,7 +106,7 @@ export default function PreviewArena() {
       />
 
       {/* Nav */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F1F15]/85 border-b border-white/5">
+      <header className="sticky top-0 z-page-header backdrop-blur-md bg-[#0F1F15]/85 border-b border-white/5">
         <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between gap-6 relative">
           <Link to="/preview-arena" className="flex items-center gap-1.5">
             <span className="font-calistoga text-[24px] leading-none text-pastel-cream">Citrus</span>
@@ -159,7 +159,7 @@ export default function PreviewArena() {
               <span className="text-pastel-orange">2026</span>
             </h1>
             <p className="text-[17px] md:text-[18px] leading-relaxed text-white/65 max-w-md mb-9">
-              Play the most accurate fantasy hockey on the planet. Draft, manage, and dominate
+              Play fantasy hockey on a model that scored every shot itself. Draft, manage, and dominate
               your league with a 31-feature xG model trained on every shift.
             </p>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-4 mb-10">

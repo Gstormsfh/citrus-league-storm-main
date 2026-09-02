@@ -8,8 +8,11 @@
 //
 //   * one colour pair app-wide: sage = happened (live/final), orange =
 //     forecast — the same "sage = ahead" the ScoreCard uses;
-//   * once a game is live/final the actual (15px mono) stacks over
+//   * once a game is live/final the actual (17px mono) stacks over
 //     "proj 4.2" (10px, /55) so beat/miss reads at a glance;
+//     (15px -> 17px on 2026-09-02, the phone type scale's HEADLINE rung —
+//     the number was one pixel bigger than the 14px name beside it, which
+//     is a flat band, not a hierarchy. See src/components/phoneRowScale.ts.)
 //   * the opponent card is mirrored — its stack is left-aligned, at the
 //     gutter (the stylesheet reverses the row; the DOM carries the intent);
 //   * every label is >= 10px;
@@ -107,7 +110,10 @@ describe('PlayerCard — mobile score stack: states', () => {
     expect(v.className).toContain('text-pastel-orange');
     expect(v.className).not.toContain('text-pastel-sage');
     expect(v.className).toContain('font-jbmono');
-    expect(v.className).toContain('text-[15px]');
+    // The HEADLINE rung. Pinned, not asserted loosely: the whole point of
+    // this number is that it is bigger than the 15px name beside it.
+    expect(v.className).toContain('text-[17px]');
+    expect(v.className).toContain('tabular-nums');
     expect(stack(container).textContent).toContain('proj');
   });
 

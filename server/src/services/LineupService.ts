@@ -2,6 +2,46 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS, logger, getTodayMST, getTodayMSTDate, getTodayNhlScheduleDate, getCurrentSeason } from '@citrus/shared';
 import { resolveSlotConfig, validateSlotAssignments } from '../lib/leagueRules';
 
+/** The spot a player holds in a lineup: which list, and which slot if it has one. */
+type LineupSpot = { type: 'active' | 'bench' | 'ir'; slot: string | null };
+
+type LineupShape = { starters: string[]; bench: string[]; ir: string[]; slot_assignments: Record<string, string> };
+
+/** A locked player whose spot a lineup save would change. */
+export interface LockedLineupChange {
+  playerId: string;
+  playerName: string;
+  from: string;
+  to: string;
+}
+
+const describeSpot = (s: LineupSpot): string =>
+  s.type === 'bench' ? 'bench' : s.type === 'ir' ? 'IR' : s.slot ?? 'starter';
+
+/** slot id -> spot map for a requested lineup. */
+function spotsOf(lineup: LineupShape): Map<string, LineupSpot> {
+  const spots = new Map<string, LineupSpot>();
+  const slots = lineup.slot_assignments ?? {};
+  for (const id of lineup.ir ?? []) spots.set(String(id), { type: 'ir', slot: slots[String(id)] ?? null });
+  for (const id of lineup.bench ?? []) spots.set(String(id), { type: 'bench', slot: null });
+  for (const id of lineup.starters ?? []) spots.set(String(id), { type: 'active', slot: slots[String(id)] ?? null });
+  return spots;
+}
+
+/**
+ * The plain sentence a 409 carries. Names the player(s); says what to expect.
+ */
+export function lockedMoveMessage(changes: LockedLineupChange[]): string {
+  const names = changes.map((c) => c.playerName || `Player ${c.playerId}`);
+  const list =
+    names.length === 1
+      ? names[0]
+      : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return names.length === 1
+    ? `${list}'s game has started — locked players can't be moved until tomorrow.`
+    : `${list}'s games have started — locked players can't be moved until tomorrow.`;
+}
+
 /**
  * LineupService — Server-side lineup management with DI Supabase client.
  *
@@ -366,6 +406,145 @@ export class LineupService {
       }
     }
     return true;
+  }
+
+  /**
+   * Which of these players cannot be moved on `date`, evaluated NOW — the
+   * rule `canUpdateRosterForDate` and the client's GameLockService share: a
+   * game that is live or final, or scheduled with a start time already past.
+   * Hands back the players' names too, so a refusal can say who.
+   */
+  async lockedPlayersOn(playerIds: string[], date: string): Promise<{ locked: Set<string>; nameOf: Map<string, string> }> {
+    const locked = new Set<string>();
+    const nameOf = new Map<string, string>();
+    const ids = [...new Set(playerIds.map((id) => Number(id)).filter((n) => Number.isFinite(n)))];
+    if (ids.length === 0) return { locked, nameOf };
+
+    const { data: players } = await this.supabase
+      .from('player_directory')
+      .select('player_id, full_name, team_abbrev')
+      .eq('season', getCurrentSeason())
+      .in('player_id', ids);
+    if (!players || players.length === 0) return { locked, nameOf };
+
+    const teamOf = new Map<string, string>();
+    for (const p of players as Array<{ player_id: number; full_name: string | null; team_abbrev: string | null }>) {
+      nameOf.set(String(p.player_id), p.full_name ?? '');
+      if (p.team_abbrev) teamOf.set(String(p.player_id), p.team_abbrev);
+    }
+    const teams = [...new Set(teamOf.values())];
+    if (teams.length === 0) return { locked, nameOf };
+
+    const { data: games } = await this.supabase
+      .from('nhl_games')
+      .select('game_time, status, home_team, away_team')
+      .eq('game_date', date)
+      .or(`home_team.in.(${teams.join(',')}),away_team.in.(${teams.join(',')})`);
+
+    const now = Date.now();
+    const started = new Set<string>();
+    for (const g of (games ?? []) as Array<{ game_time: string | null; status: string | null; home_team: string | null; away_team: string | null }>) {
+      const status = String(g.status ?? '').toLowerCase();
+      const underWay =
+        status === 'live' || status === 'final' || status === 'intermission' ||
+        (status === 'scheduled' && !!g.game_time && new Date(g.game_time).getTime() < now);
+      if (!underWay) continue;
+      if (g.home_team) started.add(g.home_team);
+      if (g.away_team) started.add(g.away_team);
+    }
+    for (const [pid, team] of teamOf) if (started.has(team)) locked.add(pid);
+    return { locked, nameOf };
+  }
+
+  /**
+   * The spot each player holds on `date` according to the record that day
+   * is scored from: the day's fantasy_daily_rosters rows, else the base
+   * team_lineups lineup the day inherits. Null when there is no record.
+   */
+  private async lineupOnRecord(teamId: string, leagueId: string, date: string): Promise<Map<string, LineupSpot> | null> {
+    const { data: rows } = await this.supabase
+      .from('fantasy_daily_rosters')
+      .select('player_id, slot_type, slot_id')
+      .eq('team_id', teamId)
+      .eq('league_id', leagueId)
+      .eq('roster_date', date);
+    if (rows && rows.length > 0) {
+      const spots = new Map<string, LineupSpot>();
+      for (const r of rows as Array<{ player_id: number | string; slot_type: string; slot_id: string | null }>) {
+        const type = r.slot_type === 'active' ? 'active' : r.slot_type === 'ir' ? 'ir' : 'bench';
+        spots.set(String(r.player_id), { type, slot: type === 'bench' ? null : r.slot_id ?? null });
+      }
+      return spots;
+    }
+
+    const { data: base } = await this.supabase
+      .from('team_lineups')
+      .select('starters, bench, ir, slot_assignments')
+      .eq('team_id', teamId)
+      .eq('league_id', leagueId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!base) return null;
+    return spotsOf({
+      starters: ((base.starters as unknown[]) ?? []).map(String),
+      bench: ((base.bench as unknown[]) ?? []).map(String),
+      ir: ((base.ir as unknown[]) ?? []).map(String),
+      slot_assignments: (base.slot_assignments as Record<string, string>) ?? {},
+    });
+  }
+
+  /**
+   * GAME-LOCK ENFORCEMENT (2026-09-01, Sleeper parity audit R6).
+   *
+   * Until now the PUT lineup route guarded season-complete only; the
+   * client's GameLockService was the whole gate, and Auto Lineup did not
+   * even consult it. Any client could save a lineup that benched a starter
+   * whose game had begun, and the snapshot writer's upsert would overwrite
+   * the locked row with it.
+   *
+   * Compares the requested lineup with the lineup on record for today and
+   * returns every LOCKED player whose spot would change — list (active /
+   * bench / IR) or, when both sides know it, slot. A locked player absent
+   * from the request is not a move (drops are governed by the roster
+   * protection check, and a dropped locked player keeps scoring anyway).
+   *
+   * Only a save that can touch today's rows can move a locked player: a
+   * save for today, a base save (no date), or a past date (which falls back
+   * to the base lineup and propagates to today). A strictly future day has
+   * no locks to break and is not checked.
+   */
+  async findLockedLineupChanges(
+    teamId: string,
+    leagueId: string,
+    lineup: LineupShape,
+    targetDate?: string,
+  ): Promise<LockedLineupChange[]> {
+    const today = getTodayMST();
+    if (targetDate && targetDate > today) return [];
+
+    const record = await this.lineupOnRecord(teamId, leagueId, today);
+    if (!record || record.size === 0) return [];
+
+    const requested = spotsOf(lineup);
+    const candidates = [...record.keys()].filter((pid) => {
+      const before = record.get(pid)!;
+      const after = requested.get(pid);
+      if (!after) return false;
+      if (before.type !== after.type) return true;
+      return !!before.slot && !!after.slot && before.slot !== after.slot;
+    });
+    if (candidates.length === 0) return [];
+
+    const { locked, nameOf } = await this.lockedPlayersOn(candidates, today);
+    return candidates
+      .filter((pid) => locked.has(pid))
+      .map((pid) => ({
+        playerId: pid,
+        playerName: nameOf.get(pid) ?? '',
+        from: describeSpot(record.get(pid)!),
+        to: describeSpot(requested.get(pid)!),
+      }));
   }
 
   /**

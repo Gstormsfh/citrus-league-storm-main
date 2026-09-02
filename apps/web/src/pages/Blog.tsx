@@ -50,7 +50,7 @@ const Blog = () => {
               </h2>
               <p className="text-[14px] text-white/65 leading-relaxed max-w-md mx-auto relative z-10">
                 For player news and injuries, the app's own headlines feed pulls
-                from real sources — that's the one you want in-season.
+                from real sources. That's the one you want in-season.
               </p>
             </div>
           </GlowCard>

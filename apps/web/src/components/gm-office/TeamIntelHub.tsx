@@ -378,7 +378,7 @@ export const TeamIntelHub = () => {
       if (day.rosterGames === 0 && day.totalGames > 0) {
         insights.push({
           type: 'empty_roster_day',
-          message: `No players on ${day.dayLabel} — stream a pickup`,
+          message: `No players on ${day.dayLabel}. Stream a pickup`,
           action: 'Find Streamer',
           actionUrl: '/waiver-wire'
         });
@@ -390,7 +390,7 @@ export const TeamIntelHub = () => {
       if (depth.strength === 'Weak') {
         insights.push({
           type: 'position_need',
-          message: `${depth.position} is weak (${depth.grade}) — upgrade via trade or waivers`,
+          message: `${depth.position} is weak (${depth.grade}). Upgrade via trade or waivers`,
           action: `Find ${depth.position}`,
           actionUrl: `/free-agents?position=${depth.position}`
         });
@@ -402,7 +402,7 @@ export const TeamIntelHub = () => {
       if (day.totalGames <= 3 && day.totalGames > 0) {
         insights.push({
           type: 'streaming_opportunity',
-          message: `${day.dayLabel}: only ${day.totalGames} games — stream a hot pickup`,
+          message: `${day.dayLabel}: only ${day.totalGames} games. Stream a hot pickup`,
           action: 'Find Streamer',
           actionUrl: '/free-agents'
         });
@@ -646,7 +646,7 @@ export const TeamIntelHub = () => {
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     {upcomingSeasonStartLabel
-                      ? `The season opens ${upcomingSeasonStartLabel} — schedule planning lights up then.`
+                      ? `The season opens ${upcomingSeasonStartLabel}. Schedule planning lights up then.`
                       : 'Nothing is scheduled for these dates.'}
                   </div>
                 </div>

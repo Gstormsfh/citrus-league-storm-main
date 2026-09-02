@@ -26,7 +26,7 @@ const NotFound = () => {
             Off<span className="text-pastel-orange">sides</span>.
           </h1>
           <p className="text-[15px] text-white/65 leading-relaxed mb-8">
-            This page got called for a penalty. Pineapple is making the save —
+            This page got called for a penalty. Pineapple is making the save,
             but you'll need to head back to find what you're looking for.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">

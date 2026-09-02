@@ -271,7 +271,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
       <CitrusLeaf className="absolute bottom-20 left-2 w-12 h-12 text-pastel-cream opacity-5 -rotate-45 pointer-events-none" />
       
       {/* Header */}
-      <div className="px-4 py-3 border-b-4 border-white/10 bg-gradient-to-r from-pastel-sage/20 via-pastel-sage/10 to-pastel-sage/10 backdrop-blur-sm sticky top-0 z-10 relative">
+      <div className="px-4 py-3 border-b-4 border-white/10 bg-gradient-to-r from-pastel-sage/20 via-pastel-sage/10 to-pastel-sage/10 backdrop-blur-sm sticky top-0 z-sticky-base relative">
         <div className="flex items-center justify-between mb-1 relative z-10">
           <h3 className="text-sm font-varsity font-black text-pastel-cream uppercase tracking-tight flex items-center gap-1.5">
             <CitrusSparkle className="w-4 h-4 text-pastel-orange" />

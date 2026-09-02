@@ -102,8 +102,8 @@ const PoolSurvivor = () => {
       if (result.success) {
         toast({ title: 'Pick Locked In', description: `${selectedTeam} for Week ${currentWeek}.` });
         setUsedTeams([...usedTeams, selectedTeam]); setSelectedTeam(null);
-      } else { toast({ title: "Pick Didn't Submit", description: result.error || "Couldn't submit your pick — try again in a moment.", variant: 'destructive' }); }
-    } catch { toast({ title: "Pick Didn't Submit", description: "Couldn't reach the pool server — try again in a moment.", variant: 'destructive' }); }
+      } else { toast({ title: "Pick Didn't Submit", description: result.error || "Couldn't submit your pick. Try again in a moment.", variant: 'destructive' }); }
+    } catch { toast({ title: "Pick Didn't Submit", description: "Couldn't reach the pool server. Try again in a moment.", variant: 'destructive' }); }
     finally { setSubmitting(false); }
   };
 
@@ -123,7 +123,7 @@ const PoolSurvivor = () => {
         <div className="flex-1 min-w-0 px-3 sm:px-4 lg:px-8 xl:px-12">
           {userLeagueState === 'logged-in-no-league' && (
             <div className="mb-8 max-w-3xl mx-auto">
-              <LeagueCreationCTA title="Join a Survivor Pool" description="Pick one team to win each week — get it wrong and you're out!" />
+              <LeagueCreationCTA title="Join a Survivor Pool" description="Pick one team to win each week. Get it wrong and you're out." />
             </div>
           )}
 
@@ -151,7 +151,7 @@ const PoolSurvivor = () => {
           </div>
 
           {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 sticky top-[92px] z-30 bg-[#0F1F15]/95 backdrop-blur-md py-2 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 sticky top-[92px] z-section-header bg-[#0F1F15]/95 backdrop-blur-md py-2 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
             <div className="flex items-center gap-2">
               <div className="flex items-center bg-[#1A2A20] rounded-md ring-1 ring-white/10 overflow-hidden">
                 <Button variant="ghost" size="icon" aria-label="Previous week" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
@@ -196,7 +196,7 @@ const PoolSurvivor = () => {
                     <h3 className="font-sans font-black text-[1.75rem] tracking-[-0.025em] text-pastel-cream mb-2">
                       You've been <span className="text-pastel-orange">eliminated</span>.
                     </h3>
-                    <p className="text-[14px] text-white/55">Better luck next season — the Squad's still on the bench.</p>
+                    <p className="text-[14px] text-white/55">Better luck next season. The Squad's still on the bench.</p>
                   </div>
                 </GlowCard>
               ) : (
@@ -305,7 +305,7 @@ const PoolSurvivor = () => {
                       ✦ Everyone's still alive
                     </div>
                     <p className="font-bold text-pastel-cream text-base">Standings light up after the first slate wraps.</p>
-                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Lock in your team before puck drops — one wrong pick and you're out.</p>
+                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Lock in your team before puck drops. One wrong pick and you're out.</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
@@ -372,7 +372,7 @@ const PoolSurvivor = () => {
                       ✦ Ready when you are
                     </div>
                     <p className="font-bold text-pastel-cream text-base">Your pick history is empty.</p>
-                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Head to the Picks tab and lock in this week's team — every choice you make lands here.</p>
+                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Head to the Picks tab and lock in this week's team. Every choice you make lands here.</p>
                     <button
                       type="button"
                       // 'picks' matches none of this page's tab values

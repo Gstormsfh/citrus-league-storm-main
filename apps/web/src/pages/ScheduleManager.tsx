@@ -153,7 +153,7 @@ const ScheduleManager = () => {
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Schedule</h1>
@@ -454,7 +454,7 @@ const ScheduleManager = () => {
                       <div className="space-y-2">
                         {upcomingMatchups.length === 0 && (
                           <div className="text-center py-6 text-white/55 text-sm">
-                            No upcoming matchups available — visit the Matchup page to see this week.
+                            No upcoming matchups available. Visit the Matchup page to see this week.
                           </div>
                         )}
                         {upcomingMatchups.map((matchup, index) => (
@@ -487,7 +487,7 @@ const ScheduleManager = () => {
                       <div className="space-y-2">
                         {recentResults.length === 0 && (
                           <div className="text-center py-6 text-white/55 text-sm">
-                            No past results yet — your finished weeks will appear here.
+                            No past results yet. Your finished weeks will appear here.
                           </div>
                         )}
                         {recentResults.map((result, index) => (
@@ -544,7 +544,7 @@ const ScheduleManager = () => {
                     <div className="flex items-baseline justify-between">
                       <span className="text-[11px] text-white/55">Heaviest day</span>
                       <span className="font-jbmono text-[11px] text-pastel-orange tabular-nums font-bold">
-                        {Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '—'}
+                        {Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '-'}
                         <span className="text-white/55 ml-1">
                           ({Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]?.[1] || 0})
                         </span>

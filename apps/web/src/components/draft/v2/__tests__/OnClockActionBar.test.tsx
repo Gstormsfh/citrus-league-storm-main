@@ -191,7 +191,7 @@ describe('OnClockActionBar', () => {
     expect(onDraft).not.toHaveBeenCalled();
   });
 
-  it('renders "—:—" when currentPickDeadline is null', () => {
+  it('renders "--:--" when currentPickDeadline is null', () => {
     render(
       <OnClockActionBar
         amIOnClock={true}
@@ -202,7 +202,7 @@ describe('OnClockActionBar', () => {
         roundNumber={1}
       />,
     );
-    expect(screen.getByTestId('on-clock-countdown').textContent).toBe('—:—');
+    expect(screen.getByTestId('on-clock-countdown').textContent).toBe('--:--');
   });
 
   // Entry 87 Fix C (CLOCK-DISPLAY-35) — the bar now consumes the

@@ -28,7 +28,7 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({
   return (
     <div
       className={cn(
-        'fixed inset-0 z-50 flex items-center justify-center cursor-pointer',
+        'fixed inset-0 z-app-nav flex items-center justify-center cursor-pointer',
         'bg-pastel-surface',
         className
       )}

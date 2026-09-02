@@ -24,6 +24,15 @@ export default defineConfig({
       { find: /^@\/lib\/draftClient\/fetchDraftOrderMatrix$/, replacement: path.resolve(__dirname, 'stubs/fetchDraftOrderMatrix.ts') },
       { find: /^@\/lib\/draftClient\/submitPick$/, replacement: path.resolve(__dirname, 'stubs/submitPick.ts') },
       { find: /^@\/api\/client$/, replacement: path.resolve(__dirname, 'stubs/apiClient.ts') },
+      // The real client calls createClient() at MODULE SCOPE and throws when
+      // VITE_SUPABASE_* are unset — which they are here, on purpose. Any page
+      // whose chrome reaches it (Navbar → notificationStore →
+      // NotificationService → this module) rendered a blank root with the
+      // error only in the console. See stubs/supabaseClient.ts.
+      {
+        find: /^@\/integrations\/supabase\/client$/,
+        replacement: path.resolve(__dirname, 'stubs/supabaseClient.ts'),
+      },
       { find: /^@\/hooks\/usePreloadedPlayers$/, replacement: path.resolve(__dirname, 'stubs/usePreloadedPlayers.ts') },
       { find: '@', replacement: path.resolve(__dirname, '..', 'src') },
     ],

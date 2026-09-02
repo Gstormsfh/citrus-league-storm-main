@@ -38,7 +38,7 @@ const Waitlist = () => {
               </h1>
 
               <p className="text-[17px] md:text-[19px] leading-relaxed text-white/65 max-w-xl mx-auto mb-4">
-                Citrus is building the next generation of fantasy hockey — real-time xG projections,
+                Citrus is building the next generation of fantasy hockey. Real-time xG projections,
                 Stormy AI as your assistant GM, and a platform designed by people who actually watch the games.
               </p>
 
@@ -57,7 +57,7 @@ const Waitlist = () => {
                       </h2>
                     </div>
                     <p className="text-[13px] text-white/65 mb-6 leading-relaxed">
-                      Drop your email below and we'll notify you as soon as we're live. No spam — just launch news.
+                      Drop your email below and we'll notify you as soon as we're live. No spam. Just launch news.
                     </p>
                     <WaitlistSignup source="waitlist_page" variant="default" />
                   </div>
