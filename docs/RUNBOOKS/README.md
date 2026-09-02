@@ -34,6 +34,7 @@ is muscle memory from a runtime that no longer exists.
 | Deciding whether and how to roll back | [`draft-engine-v2-rollback-playbook.md`](./draft-engine-v2-rollback-playbook.md) |
 | Recovering from roster / data-pipeline data loss (NOT a draft incident) | [`../EMERGENCY_RUNBOOK.md`](../EMERGENCY_RUNBOOK.md) |
 | Landing a bundle from Claude as a PR (which terminal, the one line, what each failure means) | [`DELIVERY.md`](./DELIVERY.md) |
+| Asking "did CI / the deploy / last night's batch pass?" without a pasted log, or reviewing a weekly prod schema snapshot PR | [`CI_TELEMETRY.md`](./CI_TELEMETRY.md) |
 
 The boundary between draft-engine runbooks and `EMERGENCY_RUNBOOK.md` is
 load-bearing. **Draft-engine runbooks** cover the live draft hot path:
@@ -54,6 +55,24 @@ path beyond "wake Garrett." Decision-time targets in the rollback playbook
 Future state (placeholder for when team grows): primary on-call + escalation
 chain + paging integration. Reserved for the rotation framework when it
 exists; no commitment yet.
+
+---
+
+## Where CI and prod state are readable without a paste
+
+Claude's container cannot reach github.com, so two things are written where the
+Supabase MCP can read them (details and the SQL in [`CI_TELEMETRY.md`](./CI_TELEMETRY.md)):
+
+- **`public.ops_ci_runs`** — one row per GitHub Actions job (`ci.yml`,
+  `production-deploy.yml`, `main.yml`, `data-invariants.yml`,
+  `schema-snapshot.yml`) with status, a one-line summary and the run URL.
+  Service-role only. First question of any "did it pass?" conversation:
+  `SELECT … FROM public.ops_ci_runs WHERE status = 'failure' ORDER BY created_at DESC LIMIT 20`.
+- **`supabase/schema/prod_schema.sql` + `prod_cron.sql`** — weekly read-only
+  `pg_dump` of prod and the `cron.job` manifest, opened as a PR when they differ
+  from `master`. A hunk with no migration file behind it is drift
+  (`../PROD_CHANGE_LEDGER.md` Rule 1). Needs the `PROD_DB_URL` secret (direct
+  URL, never the pooler — KI-E010).
 
 ---
 
