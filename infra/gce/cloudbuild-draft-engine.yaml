@@ -1,0 +1,73 @@
+# ─────────────────────────────────────────────────────────────────────
+# Citrus Draft Engine — Cloud Build config
+# ─────────────────────────────────────────────────────────────────────
+#
+# Builds server/Dockerfile.draft-engine with the REPO ROOT as the Docker
+# context (the Dockerfile copies package.json files from every workspace
+# plus server/ and packages/shared/) and pushes the result to Artifact
+# Registry. This file replaces the ad-hoc /tmp cloudbuild yaml that the
+# manual Cloud Shell deploy used to write by hand.
+#
+# Invoked by .github/workflows/deploy-engine.yml:
+#
+#   gcloud builds submit \
+#     --project citrus-fantasy-prod \
+#     --config infra/gce/cloudbuild-draft-engine.yaml \
+#     --substitutions _IMAGE=northamerica-northeast1-docker.pkg.dev/citrus-fantasy-prod/citrus-draft-engine/draft-engine:engine-<short-sha> \
+#     .
+#
+# Same command works from Cloud Shell for a manual build. The workflow
+# reads the pushed image's digest afterwards with
+#   gcloud artifacts docker images describe "$_IMAGE" --format='value(image_summary.digest)'
+# and REFUSES to continue if that is empty — a build that did not push
+# must never reach the VM (2026-09-01: an ungated Cloud Shell block
+# chained add-metadata + reset after a cancelled build and pointed the
+# VM at a tag that did not exist).
+#
+# Runtime identity: the build runs as the project's default Cloud Build
+# service account (the Compute Engine default SA on this project — see
+# docs/RUNBOOKS/GCP_ORG_SETUP.md §7.3a), which already holds
+# roles/cloudbuild.builds.builder and therefore can push to the
+# citrus-draft-engine repository. The *submitter* (CI or a human) only
+# needs roles/cloudbuild.builds.editor + read on the staging bucket.
+#
+# Source upload: `gcloud builds submit .` honours .gcloudignore, and
+# generates one from .gitignore when it is absent, so node_modules and
+# dist never leave the runner. Inside the build, .dockerignore trims the
+# context further (apps/web/src, data-pipeline, tests).
+
+substitutions:
+  # Fully qualified image reference INCLUDING the tag. Required — there
+  # is deliberately no default so a bare `gcloud builds submit` cannot
+  # push to a surprise location.
+  _IMAGE: ''
+
+steps:
+  - id: build-draft-engine
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - server/Dockerfile.draft-engine
+      - -t
+      - ${_IMAGE}
+      - .
+
+# Listing the image here makes Cloud Build push it after the steps
+# succeed and record the digest in the build result. If the build fails,
+# nothing is pushed and the tag never exists — which is exactly the
+# state the workflow's "digest must be non-empty" check detects.
+images:
+  - ${_IMAGE}
+
+# The full build (npm ci of the workspace + image assembly) took ~4.5
+# minutes on 2026-09-01. 30 minutes is generous headroom without letting
+# a wedged build hold the workflow's concurrency slot for an hour.
+timeout: 1800s
+
+# Optional: a bigger build machine roughly halves the npm ci step. Opt in
+# by uncommenting both lines. The default pool machine is what the
+# ~4.5 min figure above was measured on and is known-good; the larger
+# machine costs more per minute and is not needed for a build this size.
+# options:
+#   machineType: E2_HIGHCPU_8

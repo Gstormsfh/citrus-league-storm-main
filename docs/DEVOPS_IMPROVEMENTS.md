@@ -1,6 +1,6 @@
 # DevOps Suggestions
 
-A running list of improvements to evaluate and implement. Items are not prioritized — order reflects discovery, not urgency.
+A running list of improvements to evaluate and implement. Items are not prioritized — order reflects discovery, not urgency. Items carry a **Status** line once they ship or are decided; items without one are open.
 
 ---
 
@@ -125,3 +125,15 @@ A running list of improvements to evaluate and implement. Items are not prioriti
 - `continue-on-error: true` is a silent failure trap — it makes a workflow green while hiding broken steps
 - The playoff sync incident showed that a broken automated pipeline can go undetected for weeks with no user-visible signal other than stale data
 - No rollback or recovery is possible if nobody knows the pipeline is broken
+
+---
+
+## 8. Gated, digest-verified draft-engine deploy workflow
+
+**Status (2026-09-02):** Shipped — `.github/workflows/deploy-engine.yml`, `infra/gce/cloudbuild-draft-engine.yaml`, `docs/RUNBOOKS/ENGINE_DEPLOY.md`. Blocked on Garrett's one-time setup before the first run: create the `production-engine` environment with himself as required reviewer, and grant the deploy service account the VM/logging roles (WIF pool + provider preferred, `GCP_SA_KEY` fallback accepted). Setup steps, names only, in the runbook §6.
+
+**Previous state:** `production-deploy.yml` shipped the API and web on every push to `master`, but the draft engine on `citrus-draft-engine-prod` was deployed entirely by hand in Cloud Shell (`gcloud builds submit` → digest → `add-metadata` → `reset` → log grep). On 2026-09-01 an ungated block chained `add-metadata` + `reset` after a cancelled build and pointed the VM at a tag that had never been pushed; the old container survived only because of `--restart=always`.
+
+**Change:** `workflow_dispatch` → `build` (Cloud Build; fails unless the tag resolves to a digest) → `preflight` (no `in_progress` draft, daylight rule, `check_draft_freeze.ts`) → `deploy` (`environment: production-engine`, rollback pin recorded, one `add-metadata` call, `reset`) → `verify` (`deployment.fingerprint` with the new digest, endpoint 404, rollback commands printed on failure). Process audit 2026-09-01 §B-2 / §D-2.
+
+**Follow-ups:** move `production-deploy.yml` to the same WIF variables once runbook §6.2 is done; post run outcomes to the `ops_ci_runs` bridge (audit §D-5) when it exists.
