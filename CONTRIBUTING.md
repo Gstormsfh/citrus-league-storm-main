@@ -24,10 +24,21 @@ npm install
 npm run dev:all      # web (port 8080) + API server (port 3001)
 npm run test         # web tests (Vitest)
 npm run test:server  # server tests
+npm run test:shared  # packages/shared tests
 ```
 
 Python pipeline: see `docs/DATA_PIPELINE_MASTER_GUIDE.md`. Note the tracked `data_pipeline`
 symlink at the repo root — do not rename or remove it (CI depends on it).
+
+```bash
+cd data-pipeline && pip install -r requirements.txt pytest
+pytest                     # everything; tests marked `network` need real Supabase creds
+pytest -m "not network"    # sandboxes / no network: skip the live PostgREST tests
+```
+
+`tests/conftest.py` plants placeholder `VITE_SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`
+values so modules that require them at import still load; real values exported before
+pytest starts win, which is how CI runs the `network` tests for real.
 
 ## Before every PR
 
@@ -39,6 +50,7 @@ version, and why the build leads, is in [`CLAUDE.md`](CLAUDE.md) under
 npm run build --workspace=apps/web                    # vite build (~10s)
 npm run test --workspace=apps/web
 npm run test:server
+npm run test:shared
 cd apps/web && npx tsc --noEmit -p tsconfig.app.json  # vs .typecheck-baseline
 cd server  && npx tsc --noEmit                        # must be clean
 cd apps/web && npx eslint src/

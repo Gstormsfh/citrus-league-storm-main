@@ -285,6 +285,7 @@ npm run build            # Build shared + web
 npm run build:server     # Build shared + server
 npm run test             # Run web tests
 npm run test:server      # Run server tests
+npm run test:shared      # Run packages/shared tests
 
 # From apps/web/
 npx vitest run           # Run tests
@@ -332,7 +333,7 @@ code got.
    file.
 1. **Build** — `npm run build --workspace=apps/web` (`vite build`, ~10s)
 2. **Web suite** — `npm run test --workspace=apps/web`
-3. **Server suite** — `npm run test:server`
+3. **Server + shared suites** — `npm run test:server` and `npm run test:shared`
 4. **Types** — `cd apps/web && npx tsc --noEmit -p tsconfig.app.json`, compared against
    `apps/web/.typecheck-baseline` (read that file's header before touching it), and
    `cd server && npx tsc --noEmit`, which must stay clean

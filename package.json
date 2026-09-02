@@ -19,6 +19,7 @@
     "test": "npm run test --workspace=apps/web",
     "test:server": "npm run test --workspace=server",
     "test:scripts": "node --test \"scripts/**/*.test.mjs\"",
+    "test:shared": "npm run test --workspace=packages/shared",
     "lint": "npm run lint --workspace=apps/web",
     "deploy": "npm run build && npm run deploy --workspace=apps/web",
     "firebase": "cd apps/web && npx firebase",
