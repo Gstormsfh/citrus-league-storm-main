@@ -5,6 +5,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import { requestId } from 'hono/request-id';
 import { leagueRoutes } from './routes/leagues';
 import { playerRoutes } from './routes/players';
+import { scoresRoutes } from './routes/scores';
 import { matchupRoutes } from './routes/matchups';
 import { draftRoutes } from './routes/draft';
 import { draftsRoutes } from './routes/drafts';
@@ -274,6 +275,7 @@ app.post('/api/vitals', async (c) => {
 // ── API routes ───────────────────────────────────────────────────────
 app.route('/api/leagues', leagueRoutes);
 app.route('/api/players', playerRoutes);
+app.route('/api/scores', scoresRoutes);
 app.route('/api/matchups', matchupRoutes);
 app.route('/api/draft', draftRoutes);
 // Phase 4.5 chunk 11g.1 — discovery endpoint at /api/drafts/:draftId/server.

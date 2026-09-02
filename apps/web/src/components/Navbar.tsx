@@ -6,7 +6,7 @@ import {
   Menu, X, Bell, Search, Users, LogOut, CircleUser,
   Trophy, ChevronDown, UserPlus, Calendar, BarChart3,
   Swords, Newspaper, Sparkles, Settings, DollarSign,
-  Target, Shield, TrendingUp
+  Target, Shield, TrendingUp, Radio
 } from 'lucide-react';
 import { CitrusLogo } from '@/components/citrus2';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -552,7 +552,16 @@ const Navbar = () => {
               {/* Divider */}
               <div className="h-px bg-white/10 my-3" />
 
-              {/* Secondary links */}
+              {/* Secondary links.
+
+                  Scores is in the drawer and NOT in the desktop tab row on
+                  purpose: that row is a fixed six at lg and a seventh pushes
+                  it past the container at 1024px. TestFlight is a phone
+                  build, and on a phone the drawer IS the navigation. */}
+              <Link to="/scores" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-md text-white/55 hover:text-pastel-cream hover:bg-white/5 transition-all">
+                <Radio className="h-4 w-4" />
+                <span className="text-[13px] font-bold">Scores</span>
+              </Link>
               <Link to="/news" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-md text-white/55 hover:text-pastel-cream hover:bg-white/5 transition-all">
                 <Newspaper className="h-4 w-4" />
                 <span className="text-[13px] font-bold">News</span>
