@@ -776,7 +776,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
           because the number does not count. Tappable: the actual opens the
           scoring breakdown, the projection opens the projection breakdown.
 
-          The stack is a fixed 38px column (index.css) so the mug beside it
+          The stack is a fixed 42px column (index.css) so the mug beside it
           lines up row after row; "proj" and its number therefore sit on two
           lines rather than one — the width the one-liner needed is the
           width the face now has.

@@ -59,6 +59,7 @@ scripts/utilities/_golden_postload.json
 # Ignore stray PowerShell scratch scripts, but allow our ops scripts
 *.ps1
 !ops/windows/*.ps1
+!scripts/delivery/*.ps1
 git-*.txt
 git-*.log
 git-diagnostic-output/
