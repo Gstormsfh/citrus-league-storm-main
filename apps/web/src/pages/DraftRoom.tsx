@@ -47,6 +47,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { DestructiveConsequence } from '@/components/confirm/DestructiveConsequence';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { useStartDraftFull } from '@/hooks/useStartDraftFull';
@@ -3718,17 +3719,17 @@ const DraftRoomInner = () => {
           drops so users know their draft isn't silently stalled.
           'connected' is the quiescent state; we don't render anything. */}
       {realtimeStatus === 'reconnecting' && (
-        <div className="sticky top-0 z-50 bg-amber-500 text-black text-sm font-semibold px-4 py-2 text-center shadow-md pt-[env(safe-area-inset-top)]">
+        <div className="sticky top-0 z-app-nav bg-amber-500 text-black text-sm font-semibold px-4 py-2 text-center shadow-md pt-[env(safe-area-inset-top)]">
           Reconnecting to draft. Your picks may be delayed for a few seconds.
         </div>
       )}
       {realtimeStatus === 'disconnected' && (
-        <div className="sticky top-0 z-50 bg-red-600 text-white text-sm font-semibold px-4 py-2 text-center shadow-md pt-[env(safe-area-inset-top)]">
+        <div className="sticky top-0 z-app-nav bg-red-600 text-white text-sm font-semibold px-4 py-2 text-center shadow-md pt-[env(safe-area-inset-top)]">
           Lost connection to draft. Refresh the page to reconnect. Your picks will not arrive in real time until you do.
         </div>
       )}
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-page-header bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-center h-12 px-4">
           <h1 className="text-lg font-bold text-pastel-cream">Draft Room</h1>
         </div>
@@ -3837,7 +3838,7 @@ const DraftRoomInner = () => {
             )}
 
             {/* Sticky Draft Header - Mobile-first compact design */}
-            <div className="bg-pastel-surface-tile border-b border-white/10 sticky top-0 z-30 shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)]">
+            <div className="bg-pastel-surface-tile border-b border-white/10 sticky top-0 z-section-header shadow-[0_8px_24px_-12px_rgba(0,0,0,0.5)]">
               <div className="px-3 py-2 md:container md:mx-auto md:px-4 md:py-3">
                 {/* Row 1: Pick info + Timer + Action */}
                 <div className="flex items-center justify-between gap-2">
@@ -4459,9 +4460,14 @@ const DraftRoomInner = () => {
                                   <AlertDialogHeader>
                                     <AlertDialogTitle>Delete Draft Completely?</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      This will permanently delete ALL draft picks, reset the draft order, and return everyone to the lobby. This action cannot be undone.
+                                      Everyone goes back to the lobby and the draft starts from scratch.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
+                                  {/* The consequence is a question, not a
+                                      failure — components/confirm. */}
+                                  <DestructiveConsequence>
+                                    This permanently deletes every draft pick and resets the draft order. It cannot be undone.
+                                  </DestructiveConsequence>
                                   <AlertDialogFooter>
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                                     <AlertDialogAction
@@ -4628,9 +4634,12 @@ const DraftRoomInner = () => {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Delete Draft Completely?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This will permanently delete ALL draft picks, reset the draft order, and return everyone to the lobby. This action cannot be undone.
+                                Everyone goes back to the lobby and the draft starts from scratch.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
+                            <DestructiveConsequence>
+                              This permanently deletes every draft pick and resets the draft order. It cannot be undone.
+                            </DestructiveConsequence>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
                               <AlertDialogAction
@@ -4654,7 +4663,7 @@ const DraftRoomInner = () => {
             {isCommissioner && draftPhase === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
               <>
                 {/* Mobile: Fixed bottom bar spanning full width */}
-                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-pastel-surface-tile border-t border-white/10 shadow-[0_-2px_10px_rgba(0,0,0,0.5)] px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-app-nav bg-pastel-surface-tile border-t border-white/10 shadow-[0_-2px_10px_rgba(0,0,0,0.5)] px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
                   <div className="flex items-center justify-center gap-2">
                     <span className="text-[10px] font-semibold text-destructive uppercase tracking-wide flex-shrink-0">Commish</span>
                     {/* Undo Last Pick */}
@@ -4693,7 +4702,7 @@ const DraftRoomInner = () => {
                   </div>
                 </div>
                 {/* Desktop: Floating buttons in bottom-right corner */}
-                <div className="hidden sm:flex fixed bottom-4 right-4 z-50 items-center gap-2">
+                <div className="hidden sm:flex fixed bottom-4 right-4 z-app-nav items-center gap-2">
                   {/* Undo Last Pick */}
                   {draftHistory.length > 0 && (
                     <Button
@@ -4803,7 +4812,7 @@ const DraftRoomInner = () => {
 
             {/* Show Pause/Continue buttons for in-progress drafts - Disabled in demo state */}
             {isCommissioner && userLeagueState === 'active-user' && (draftPhase as string) === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
-              <div className="fixed bottom-4 right-4 z-50">
+              <div className="fixed bottom-4 right-4 z-app-nav">
                 {league?.settings?.timerStartedAt ? (
                   <Button
                     size="lg"
@@ -4882,7 +4891,7 @@ const DraftRoomInner = () => {
        draftPhase !== DraftPhase.ACTIVE && 
        draftPhase !== DraftPhase.COMPLETED &&
        (!league || !teams || !Array.isArray(teams) || teams.length === 0) && (
-        <div className="fixed inset-0 bg-background z-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-background z-app-nav flex items-center justify-center">
           <Card className="max-w-md mx-4">
             <CardHeader>
               <CardTitle>Unexpected State</CardTitle>
@@ -4914,8 +4923,16 @@ const DraftRoomInner = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{confirmDialog?.title}</AlertDialogTitle>
-            <AlertDialogDescription>{confirmDialog?.description}</AlertDialogDescription>
           </AlertDialogHeader>
+          {/* Every caller of this dialog is a destructive action, and its
+              `description` is always the consequence sentence. It gets the
+              confirmation panel rather than plain body copy, and the red
+              stays on the action button below. `asChild` so the panel IS the
+              dialog's description: Radix needs one for `aria-describedby`,
+              and a second copy would be read twice. */}
+          <AlertDialogDescription asChild>
+            <DestructiveConsequence>{confirmDialog?.description}</DestructiveConsequence>
+          </AlertDialogDescription>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction

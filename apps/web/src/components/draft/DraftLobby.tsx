@@ -25,7 +25,7 @@ import {
   ArrowDown,
   Edit,
   Trash2,
-  AlertTriangle,
+  TriangleAlert,
   Copy,
   Check,
   Mail,
@@ -34,6 +34,8 @@ import {
   X,
   Share2
 } from 'lucide-react';
+import { DestructiveConsequence } from '@/components/confirm/DestructiveConsequence';
+import { CONFIRM_ICON, CONFIRM_TITLE } from '@/components/confirm/destructiveConfirm';
 import { useToast } from '@/hooks/use-toast';
 import { buildInviteLink, canSystemShare, emailInvite, shareInvite } from '@/utils/inviteShare';
 import { logger } from '@/utils/logger';
@@ -1137,15 +1139,21 @@ export const DraftLobby = ({
       <Dialog open={!!teamToDelete} onOpenChange={() => setTeamToDelete(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+            {/* A question, not a failure. The title used to be
+                `text-destructive` and the triangle red, so the first line a
+                commissioner read announced a problem that had not happened.
+                See components/confirm/destructiveConfirm.ts. */}
+            <DialogTitle className={CONFIRM_TITLE}>
+              <TriangleAlert className={CONFIRM_ICON} aria-hidden="true" />
               Remove Team
             </DialogTitle>
             <DialogDescription>
               Are you sure you want to remove <span className="font-semibold">{teamToDelete?.name}</span> from this league?
-              This will remove all their draft picks, roster data, and cannot be undone.
             </DialogDescription>
           </DialogHeader>
+          <DestructiveConsequence>
+            This removes all of their draft picks and roster data, and it cannot be undone.
+          </DestructiveConsequence>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTeamToDelete(null)}>
               Cancel

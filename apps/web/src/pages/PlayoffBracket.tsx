@@ -24,13 +24,13 @@ import {
 } from '@/services/PlayoffService';
 import {
   Trophy, ChevronRight, Crown, Shield, RotateCcw,
-  Play, Swords, Medal, AlertTriangle,
+  Play, Swords, Medal,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DestructiveConsequence } from '@/components/confirm/DestructiveConsequence';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { LeagueMembershipService } from '@/services/LeagueMembershipService';
@@ -381,12 +381,11 @@ const CommissionerControls: React.FC<CommissionerControlsProps> = ({
               </Button>
             ) : (
               <div className="space-y-2">
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-                  <AlertDescription className="text-xs">
-                    This will permanently delete the bracket and all playoff matchups.
-                  </AlertDescription>
-                </Alert>
+                {/* A question, not a failure — see components/confirm. The
+                    red stays on "Confirm Reset" below. */}
+                <DestructiveConsequence>
+                  This will permanently delete the bracket and all playoff matchups.
+                </DestructiveConsequence>
                 <div className="flex gap-2">
                   <Button
                     variant="destructive"
@@ -653,7 +652,7 @@ const PlayoffBracket = () => {
   const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Playoffs</h1>
