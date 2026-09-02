@@ -15,3 +15,17 @@
 *.mp4 binary
 *.webm binary
 *.pdf binary
+
+# ── Append-only registries ──────────────────────────────────────────────
+# apps/web/harness/README.md carries a table of harness routes that every
+# feature branch appends a row to, at the same anchor. On 2026-09-02 that
+# one file conflicted on 13 of 17 open branches, always the same way: two
+# sides adding different rows to the same table. `union` keeps both sides'
+# lines instead of writing markers, which is the right answer for a list
+# whose entries are independent.
+#
+# The tradeoff is real and small: if two sides edit the same *prose*
+# sentence here, union keeps both versions rather than flagging it. That
+# is visible in review, where a conflict marker would be too, and it is
+# worth trading for thirteen resolutions of a route table.
+apps/web/harness/README.md merge=union

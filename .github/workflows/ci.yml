@@ -20,6 +20,93 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # ── Branch freshness (advisory) ──────────────────────────────────────
+  # Added 2026-09-02. On 2026-09-01 four PRs landed on master (#387-#390)
+  # while twenty branches were open. #388 fixed a real calibration bug and
+  # rewrote the three tests in test_projection_uncertainty.py that encode
+  # it. Every branch cut before that carried the pre-#388 tests, so the
+  # Data Pipeline Tests job failed the same three tests on every push, on
+  # every one of those branches, for reasons none of them caused and none
+  # of them could fix by their own content. Twenty branches, one root
+  # cause, and nothing in the run said so -- the visible failure was an
+  # assertion about scoring weights in a file the branch never opened.
+  #
+  # This job never fails. Its whole job is to put one sentence at the top
+  # of the run that names the distance and the fix, so a red X below it is
+  # legible in five seconds instead of an afternoon. Requiring branches to
+  # be up to date is a branch-protection setting, not a workflow one; this
+  # is the part CI can do.
+  freshness:
+    name: Branch Freshness (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # The BRANCH TIP, not the pull_request merge ref. checkout's default
+      # for a pull_request event is refs/pull/N/merge, which already
+      # contains the base -- measuring distance from there always says
+      # zero, which is exactly the blind spot this job exists to remove.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Report distance from base
+        env:
+          BASE: ${{ github.event.pull_request.base.ref || 'master' }}
+        run: |
+          set -uo pipefail
+          git fetch --quiet origin "$BASE" || { echo "could not fetch $BASE"; exit 0; }
+          BEHIND=$(git rev-list --count HEAD..origin/"$BASE")
+          AHEAD=$(git rev-list --count origin/"$BASE"..HEAD)
+          echo "ahead $AHEAD / behind $BEHIND (vs origin/$BASE)"
+
+          {
+            echo "### Branch freshness"
+            echo
+            echo "\`$AHEAD\` commit(s) ahead of \`$BASE\`, \`$BEHIND\` behind."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$BEHIND" -eq 0 ]; then
+            echo "Up to date with origin/$BASE."
+            {
+              echo
+              echo "Up to date. Any failure in this run belongs to this branch."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # The commits this branch is missing, and -- the part that matters
+          # -- which of them touch files this branch never opened. A failing
+          # check in one of THOSE is inherited, not caused here.
+          MISSING=$(git log --oneline HEAD..origin/"$BASE")
+          MERGE_BASE=$(git merge-base HEAD origin/"$BASE")
+          git diff --name-only "$MERGE_BASE"..HEAD | sort -u > /tmp/mine.txt
+          git diff --name-only "$MERGE_BASE"..origin/"$BASE" | sort -u > /tmp/theirs.txt
+          comm -13 /tmp/mine.txt /tmp/theirs.txt > /tmp/untouched.txt
+          N=$(grep -c . /tmp/untouched.txt || true)
+
+          {
+            echo
+            echo "**Missing from this branch:**"
+            echo
+            printf '%s\n' "$MISSING" | sed 's/^/- /'
+            echo
+            if [ "${N:-0}" -gt 0 ]; then
+              echo "\`$N\` file(s) changed on \`$BASE\` that this branch never opened."
+              echo "A failing check in any of them is inherited, not caused here:"
+              echo
+              echo '```'
+              head -40 /tmp/untouched.txt
+              echo '```'
+              echo
+            fi
+            echo "Fix: \`git fetch origin && git merge origin/$BASE\` (or rebase), then push."
+            echo
+            echo "See \`docs/RUNBOOKS/CI_RED_X_TRIAGE.md\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "::warning title=Branch is $BEHIND commit(s) behind $BASE::Failures in this run may be inherited, not caused by this branch. Run: git fetch origin && git merge origin/$BASE"
+
   # ── Data pipeline (Python) ───────────────────────────────────────────
   # Added 2026-08-11. Before this, ci.yml ran ZERO Python: nine test files
   # under data-pipeline/tests had never gated anything, and three of them
@@ -65,6 +152,17 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           pytest tests/ -q --no-header
+
+      # Only speaks up when pytest already failed. The 2026-09-01 case was
+      # three assertions in test_projection_uncertainty.py -- in a file the
+      # branch had never opened -- failing because the branch predated #388.
+      # The distance itself is measured by the `freshness` job, which is
+      # checked out at the branch tip; this step just makes sure nobody
+      # reads a red pytest without being told that job exists.
+      - name: Where to look first
+        if: failure()
+        run: |
+          echo "::notice title=Check Branch Freshness before this failure::If the 'Branch Freshness (advisory)' job in this run reports commits behind the base, these failures may be inherited -- #388 rewrote the tests in test_projection_uncertainty.py. See docs/RUNBOOKS/CI_RED_X_TRIAGE.md."
 
   lint:
     name: Lint

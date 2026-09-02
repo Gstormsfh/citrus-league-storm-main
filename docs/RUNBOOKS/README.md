@@ -28,6 +28,7 @@ is muscle memory from a runtime that no longer exists.
 | If you're … | Read |
 |---|---|
 | On-call during an active draft incident | [`draft-engine-v2-operations.md`](./draft-engine-v2-operations.md) — start at §1 triage tree |
+| Staring at a red X on a PR and not sure whose failure it is | [`CI_RED_X_TRIAGE.md`](./CI_RED_X_TRIAGE.md) — start at "The 60-second version" |
 | Standing up staging or running pre-deploy validation | [`draft-engine-v2-staging-preflight.md`](./draft-engine-v2-staging-preflight.md) |
 | Investigating a recurring or previously-documented issue | [`draft-engine-v2-known-issues.md`](./draft-engine-v2-known-issues.md) |
 | Deciding whether and how to roll back | [`draft-engine-v2-rollback-playbook.md`](./draft-engine-v2-rollback-playbook.md) |
