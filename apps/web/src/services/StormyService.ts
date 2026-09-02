@@ -751,12 +751,20 @@ class StormyServiceImpl {
             else if (teamAbbrevAlive.has(teamAbbrev)) aliveCount++;
             slotCounts[pick.position_slot] = (slotCounts[pick.position_slot] ?? 0) + 1;
 
+            // SEPARATOR IS `|`, NOT AN EM DASH (2026-09-02 voice pass).
+            // Everything this method builds is model input. A model mirrors
+            // the punctuation of its context, so 40 lines of
+            // `Name (TOR, C) - 12GP 8PTS` written with em dashes teaches
+            // Stormy to answer in em dashes, and the system prompt then has
+            // to argue with its own context window. The prompt bans the
+            // character outright (see server/src/lib/stormy/systemPrompt.ts
+            // section 2); the context has to hold up its end.
             let line = `${pick.position_slot} ${p.full_name} (${teamAbbrev})${status}${teamState}`;
             if (s) {
               if (s.is_goalie) {
-                line += ` — ${s.games_played ?? 0}GP ${s.wins ?? 0}W ${s.saves ?? 0}SV ${s.shutouts ?? 0}SO ${s.goals_against ?? 0}GA`;
+                line += ` | ${s.games_played ?? 0}GP ${s.wins ?? 0}W ${s.saves ?? 0}SV ${s.shutouts ?? 0}SO ${s.goals_against ?? 0}GA`;
               } else if ((s.games_played ?? 0) > 0) {
-                line += ` — ${s.games_played}GP ${s.goals ?? 0}G ${s.assists ?? 0}A ${s.points ?? 0}PTS`;
+                line += ` | ${s.games_played}GP ${s.goals ?? 0}G ${s.assists ?? 0}A ${s.points ?? 0}PTS`;
                 const ppg = ((s.points ?? 0) / s.games_played).toFixed(2);
                 line += ` (${ppg}PPG) ${s.shots ?? 0}SOG ${s.hits ?? 0}HIT ${s.blocks ?? 0}BLK`;
                 if ((s.ppp ?? 0) > 0) line += ` ${s.ppp}PPP`;
@@ -765,10 +773,10 @@ class StormyServiceImpl {
                 totalAssists += s.assists ?? 0;
                 totalPoints += s.points ?? 0;
               } else {
-                line += ` — 0GP (has not played yet)`;
+                line += ` | 0GP (has not played yet)`;
               }
             } else {
-              line += ` — no playoff stats yet`;
+              line += ` | no playoff stats yet`;
             }
             rosterLines.push(line);
           }
@@ -780,7 +788,7 @@ class StormyServiceImpl {
           const balance = balanceParts.join('/');
           const headerStats = `${picks.length} players (${balance}) · ${aliveCount} alive · ${eliminatedCount} eliminated · totals so far: ${totalPoints}PTS (${totalGoals}G ${totalAssists}A across ${totalGP} skater GP)`;
 
-          ctx.rosterSummary = `YOUR PLAYOFF ROSTER — ${headerStats}\n` + rosterLines.join('\n');
+          ctx.rosterSummary = `YOUR PLAYOFF ROSTER | ${headerStats}\n` + rosterLines.join('\n');
 
           // ── Top unrostered playoff scorers on still-alive teams ─────────
           // Roster pools LOCK the roster at draft time — no add/drops, no
@@ -827,9 +835,9 @@ class StormyServiceImpl {
                 const pos = meta?.position ?? '?';
                 const ta = row.team_abbrev ?? '?';
                 if (row.is_goalie) {
-                  return `  ${nm} (${ta}, G) — ${row.games_played}GP ${row.wins ?? 0}W ${row.saves ?? 0}SV ${row.shutouts ?? 0}SO`;
+                  return `  ${nm} (${ta}, G) | ${row.games_played}GP ${row.wins ?? 0}W ${row.saves ?? 0}SV ${row.shutouts ?? 0}SO`;
                 }
-                return `  ${nm} (${ta}, ${pos}) — ${row.games_played}GP ${row.points ?? 0}PTS (${ppg.toFixed(2)}PPG) ${row.shots ?? 0}SOG ${row.hits ?? 0}HIT ${row.blocks ?? 0}BLK`;
+                return `  ${nm} (${ta}, ${pos}) | ${row.games_played}GP ${row.points ?? 0}PTS (${ppg.toFixed(2)}PPG) ${row.shots ?? 0}SOG ${row.hits ?? 0}HIT ${row.blocks ?? 0}BLK`;
               });
               ctx.extra = (ctx.extra ? ctx.extra + '\n\n' : '') +
                 `TOP UNROSTERED PLAYOFF SCORERS (alive teams, sorted by PPG, min 2 GP):\n${hotLines.join('\n')}`;
@@ -864,7 +872,7 @@ class StormyServiceImpl {
             if (p.predicted_games) line += ` in ${p.predicted_games}`;
             if (s && s.series_status === 'completed') {
               const correct = p.is_correct ? '✓' : '✗';
-              line += ` [${correct} — ${p.points_earned ?? 0} pts]`;
+              line += ` [${correct} | ${p.points_earned ?? 0} pts]`;
             } else if (s) {
               // Active or pending — annotate live tightness so Stormy can flag at-risk picks.
               const t = tightnessBySlot.get(p.series_slot);
@@ -876,7 +884,7 @@ class StormyServiceImpl {
                 let riskTag = `[${t.label}]`;
                 if (t.label !== 'final' && t.label !== 'not started') {
                   const userTrailing = userPickIsHigh ? hi < lo : lo < hi;
-                  if (userTrailing) riskTag = `[⚠️ AT RISK — ${t.label}]`;
+                  if (userTrailing) riskTag = `[⚠️ AT RISK | ${t.label}]`;
                 }
                 line += ` ${riskTag}`;
               }
@@ -926,9 +934,9 @@ class StormyServiceImpl {
                 const userTrailing = userPickIsHigh ? hi < lo : lo < hi;
                 const isHighConf = p.confidence_value >= highConfThreshold;
                 if (t.label !== 'final' && t.label !== 'not started' && userTrailing && isHighConf) {
-                  line += ` [🚨 HIGH-CONF AT RISK — ${t.label}]`;
+                  line += ` [🚨 HIGH-CONF AT RISK | ${t.label}]`;
                 } else if (t.label.startsWith('TIGHT') && isHighConf) {
-                  line += ` [⚠️ HIGH-CONF in tight series — ${t.label}]`;
+                  line += ` [⚠️ HIGH-CONF in tight series | ${t.label}]`;
                 } else if (t.label !== 'final' && t.label !== 'not started') {
                   line += ` [${t.label}]`;
                 }
@@ -944,10 +952,10 @@ class StormyServiceImpl {
 
       // Pool-mode hint in extra so Stormy responds appropriately
       const mode = leagueType === 'playoff-roster-pool'
-        ? 'PLAYOFF ROSTER POOL — user drafted a single locked playoff roster at the start. NO add/drops, NO waivers, NO trades — they keep their drafted roster the entire playoffs. Eliminated players stay on roster but score zero from here. Ask about MY roster, hot playoff performers (as missed-draft context, NOT as pickups), and matchup analysis.'
+        ? 'PLAYOFF ROSTER POOL. User drafted a single locked playoff roster at the start. NO add/drops, NO waivers, NO trades: they keep their drafted roster the entire playoffs. Eliminated players stay on roster but score zero from here. Ask about MY roster, hot playoff performers (as missed-draft context, NOT as pickups), and matchup analysis.'
         : leagueType === 'playoff-bracket-pickem'
-        ? 'PLAYOFF BRACKET PICKEM — user picks series winners across all 4 rounds. Winner = most correct picks (with round multipliers).'
-        : 'PLAYOFF CONFIDENCE POOL — user assigns confidence values (1-15) to series picks. Winner = highest total from correct picks weighted by confidence.';
+        ? 'PLAYOFF BRACKET PICKEM. User picks series winners across all 4 rounds. Winner = most correct picks (with round multipliers).'
+        : 'PLAYOFF CONFIDENCE POOL. User assigns confidence values (1-15) to series picks. Winner = highest total from correct picks weighted by confidence.';
       ctx.extra = (ctx.extra ? ctx.extra + '\n\n' : '') + `POOL MODE: ${mode}`;
     } catch {
       // Non-critical — Stormy still works without context

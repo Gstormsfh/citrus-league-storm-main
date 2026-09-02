@@ -612,14 +612,14 @@ export default function PoolPlayoffRosterEntry() {
               <div className="text-sm font-display font-bold text-pastel-cream">
                 Viewing {viewOwnerName || 'Teammate'}&apos;s Roster
               </div>
-              <div className="text-[11px] text-pastel-cream/70">Read-only — you cannot modify this roster.</div>
+              <div className="text-[11px] text-pastel-cream/70">Read-only. You cannot change this roster.</div>
             </div>
           </div>
         </div>
       )}
 
       {/* Sticky header with roster progress */}
-      <div className="sticky top-0 z-30 bg-pastel-surface backdrop-blur-xl border-b border-white/10 shadow-sm pt-safe">
+      <div className="sticky top-0 z-section-header bg-pastel-surface backdrop-blur-xl border-b border-white/10 shadow-sm pt-safe">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
@@ -663,7 +663,7 @@ export default function PoolPlayoffRosterEntry() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-citrus-orange" />
-                Today&apos;s Games — {isViewMode ? `${viewOwnerName || 'Their'} Players` : 'Your Players'}
+                Today&apos;s Games: {isViewMode ? `${viewOwnerName || 'Their'} Players` : 'Your Players'}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -717,7 +717,7 @@ export default function PoolPlayoffRosterEntry() {
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <Badge variant="outline" className={cn(
                                   'text-[8px] px-1 py-0',
-                                  normalizePos(p.position) === 'G' ? 'border-purple-400/50 text-purple-400' : normalizePos(p.position) === 'D' ? 'border-blue-400/50 text-blue-400' : 'border-citrus-sage text-pastel-cream'
+                                  normalizePos(p.position) === 'G' ? 'border-purple-400/50 text-purple-400' : normalizePos(p.position) === 'D' ? 'border-pastel-sage/50 text-pastel-sage' : 'border-citrus-sage text-pastel-cream'
                                 )}>{normalizePos(p.position)}</Badge>
                                 <span className="font-medium truncate">{shortName(p.full_name)}</span>
                               </div>
@@ -974,7 +974,7 @@ export default function PoolPlayoffRosterEntry() {
                     <div className="flex items-center gap-2 pr-6 mb-2">
                       <Badge variant="outline" className={cn(
                         'text-[11px] px-2 flex-shrink-0',
-                        norm === 'G' ? 'border-purple-400/50 text-purple-400' : norm === 'D' ? 'border-blue-400/50 text-blue-400' : 'border-citrus-sage text-pastel-cream'
+                        norm === 'G' ? 'border-purple-400/50 text-purple-400' : norm === 'D' ? 'border-pastel-sage/50 text-pastel-sage' : 'border-citrus-sage text-pastel-cream'
                       )}>{norm}</Badge>
                       <div className="min-w-0 flex-1">
                         <div className="font-display font-bold text-base text-pastel-cream truncate">{selectedPlayer.full_name}</div>
@@ -1068,7 +1068,7 @@ export default function PoolPlayoffRosterEntry() {
                     On mobile, table naturally shrinks to fit the few visible columns
                     (no dead horizontal space after the player name). */}
                 <table className="w-full text-sm border-collapse" style={{ minWidth: '1100px' }}>
-                  <thead className="bg-fantasy-light sticky top-0 z-10 border-b border-white/10">
+                  <thead className="bg-fantasy-light sticky top-0 z-sticky-base border-b border-white/10">
                     <tr>
                       <th className="px-2 py-2 text-left text-xs font-display font-bold text-pastel-cream w-8">#</th>
                       <th className="px-2 py-2 text-left text-xs font-display font-bold text-pastel-cream w-20">Action</th>
@@ -1178,7 +1178,7 @@ export default function PoolPlayoffRosterEntry() {
                           <td className="px-2 py-1.5 text-center">
                             <Badge variant="outline" className={cn(
                               'text-[10px] px-1.5',
-                              norm === 'G' ? 'border-purple-400/50 text-purple-400' : norm === 'D' ? 'border-blue-400/50 text-blue-400' : 'border-citrus-sage text-pastel-cream'
+                              norm === 'G' ? 'border-purple-400/50 text-purple-400' : norm === 'D' ? 'border-pastel-sage/50 text-pastel-sage' : 'border-citrus-sage text-pastel-cream'
                             )}>
                               {norm}
                             </Badge>
@@ -1197,7 +1197,7 @@ export default function PoolPlayoffRosterEntry() {
                               <td className="px-2 py-1.5 text-center text-xs">{player.goals_against || 0}</td>
                               {/* HIT+BLK placeholders only when headers are showing (skater/all filter) */}
                               {posFilter !== 'G' && (
-                                <td className="px-2 py-1.5 text-center text-xs text-pastel-cream/60" colSpan={2}>—</td>
+                                <td className="px-2 py-1.5 text-center text-xs text-pastel-cream/60" colSpan={2}>-</td>
                               )}
                               <td className="px-2 py-1.5 text-center text-xs">
                                 {(() => {
@@ -1206,7 +1206,7 @@ export default function PoolPlayoffRosterEntry() {
                                   if (!sp && player.saves && player.shots_faced) {
                                     sp = player.saves / player.shots_faced;
                                   }
-                                  if (!sp) return '—';
+                                  if (!sp) return '-';
                                   const pct = sp < 1 ? sp * 100 : sp;
                                   return pct.toFixed(1) + '%';
                                 })()}
@@ -1218,10 +1218,10 @@ export default function PoolPlayoffRosterEntry() {
                                   if (!g && player.goals_against && player.icetime_seconds) {
                                     g = (player.goals_against * 3600) / player.icetime_seconds;
                                   }
-                                  return g > 0 ? g.toFixed(2) : '—';
+                                  return g > 0 ? g.toFixed(2) : '-';
                                 })()}
                               </td>
-                              <td className="px-2 py-1.5 text-center text-xs">—</td>
+                              <td className="px-2 py-1.5 text-center text-xs">-</td>
                             </>
                           ) : (
                             <>
@@ -1237,7 +1237,7 @@ export default function PoolPlayoffRosterEntry() {
                               <td className="px-2 py-1.5 text-center text-xs text-purple-400 font-semibold">
                                 {(() => {
                                   const xg = player.xGoals ?? player.x_goals ?? 0;
-                                  return xg > 0 ? xg.toFixed(1) : '—';
+                                  return xg > 0 ? xg.toFixed(1) : '-';
                                 })()}
                               </td>
                               <td className="px-2 py-1.5 text-center text-xs text-pastel-cream/75">
@@ -1246,7 +1246,7 @@ export default function PoolPlayoffRosterEntry() {
                                   const m = Math.floor(totalSec / 60);
                                   const s = totalSec % 60;
                                   return `${m}:${s < 10 ? '0' : ''}${s}`;
-                                })() : '—'}
+                                })() : '-'}
                               </td>
                             </>
                           )}
@@ -1318,9 +1318,9 @@ export default function PoolPlayoffRosterEntry() {
                   <div className="text-[10px] font-display font-bold uppercase text-pastel-cream/65 mb-1">Defense ({posCounts.D}/{posReqs.D})</div>
                   <div className="space-y-1">
                     {roster.filter(p => normalizePos(p.position) === 'D').map(p => (
-                      <div key={p.id} className="flex items-center justify-between py-1 px-2 bg-blue-950/20 rounded border border-blue-400/20">
+                      <div key={p.id} className="flex items-center justify-between py-1 px-2 bg-pastel-sage/10 rounded border border-pastel-sage/20">
                         <div className="flex items-center gap-2 min-w-0">
-                          <Badge variant="outline" className="text-[9px] px-1 border-blue-400/50 text-blue-400">D</Badge>
+                          <Badge variant="outline" className="text-[9px] px-1 border-pastel-sage/50 text-pastel-sage">D</Badge>
                           <button
                             type="button"
                             onClick={() => setStatsModalPlayer(p)}
@@ -1425,7 +1425,7 @@ export default function PoolPlayoffRosterEntry() {
                 <ul className="text-[11px] text-pastel-cream/75 space-y-0.5 list-disc pl-3">
                   <li>Pick {rosterSize} players from playoff teams</li>
                   {hasCap && <li>Max {maxPerTeam} players per NHL team</li>}
-                  {!hasCap && <li>No per-team cap — stack any team if you want</li>}
+                  {!hasCap && <li>No per-team cap: stack any team if you want</li>}
                   <li>Total fantasy points across all playoff games</li>
                   <li>Click any player row to add them</li>
                   <li>Your FPTS uses your league's custom scoring</li>

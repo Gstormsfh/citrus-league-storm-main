@@ -15,6 +15,13 @@ export type MatchupPlayer = {
   name: string;
   position: string;
   team: string;
+  /**
+   * Headshot URL (NHL CDN mug), the same field `HockeyPlayer.image` carries.
+   * Every producer had it — `Player.headshot_url` from the directory, the
+   * server's frozen-roster `player_headshot_url` — and dropped it at the
+   * transform; the rows render it now (audit M4).
+   */
+  image?: string;
   points: number; // Keep for backward compatibility, but will use total_points from DB
   projectedPoints?: number;
   gamesRemaining: number;

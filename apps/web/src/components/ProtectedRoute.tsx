@@ -49,7 +49,7 @@ export const ProtectedRoute = ({ children, requireProfile = false }: ProtectedRo
     if (isError) {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 text-center bg-[#0F1F15]">
-          <p className="text-pastel-cream">We couldn't load your profile — give it another try.</p>
+          <p className="text-pastel-cream">We couldn't load your profile. Give it another try.</p>
           <Button onClick={() => refetch()} variant="outline">
             Retry
           </Button>

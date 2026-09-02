@@ -1,20 +1,20 @@
 const VARIANTS = [
   {
     id: 'v1',
-    label: 'V1 — Brutalist Typography',
-    vibe: 'Statsbomb × Linear × Bloomberg — the headline IS the design. Dense monospace data card. Tactical authority.',
+    label: 'V1: Brutalist Typography',
+    vibe: 'Statsbomb × Linear × Bloomberg: the headline IS the design. Dense monospace data card. Tactical authority.',
     src: '/mockups/v1-brutalist.jpg',
   },
   {
     id: 'v2',
-    label: 'V2 — Editorial Elegance',
-    vibe: 'The Athletic × Vercel × Apple — Playfair serif headline, refined initial-ring avatars, atmospheric warm glow.',
+    label: 'V2: Editorial Elegance',
+    vibe: 'The Athletic × Vercel × Apple: Playfair serif headline, refined initial-ring avatars, atmospheric warm glow.',
     src: '/mockups/v2-editorial.jpg',
   },
   {
     id: 'v3',
-    label: 'V3 — Moat-Forward',
-    vibe: 'Linear × Stripe × OpenAI — sells the engine, not the players. 97.6% accuracy live. Zero licensing exposure.',
+    label: 'V3: Moat-Forward',
+    vibe: 'Linear × Stripe × OpenAI: sells the engine, not the players. The shot model out front. Zero licensing exposure.',
     src: '/mockups/v3-moat-forward.jpg',
   },
 ];
@@ -31,7 +31,7 @@ export default function PreviewMockups() {
             Three Directions
           </h1>
           <p style={{ fontSize: '1rem', lineHeight: 1.6, color: '#A1A1AA', maxWidth: '720px' }}>
-            All three are license-clean (no player headshots, no team logos). Click any image to view at full resolution. Reply with which variant you want to ship — I'll rebuild the staging page to match.
+            All three are license-clean (no player headshots, no team logos). Click any image to view at full resolution. Reply with which variant you want to ship. I'll rebuild the staging page to match.
           </p>
         </header>
 

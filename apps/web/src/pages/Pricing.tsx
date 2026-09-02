@@ -27,7 +27,7 @@ const FREE_FEATURES = [
 
 const PRO_TEASE = [
   'Everything in Free',
-  'Stormy Pro — priority answers, deeper analysis',
+  'Stormy Pro: priority answers, deeper analysis',
   'Custom scoring presets',
   'Advanced commish tools',
   'Multi-league dashboard',
@@ -37,7 +37,7 @@ const PRO_TEASE = [
 const FAQ: FaqEntry[] = [
   {
     q: 'Is it really free during launch?',
-    a: "Yes. Every feature on Citrus today is free — no credit card, no trial expiration, no upsell. We're building the brand and the user base first. Monetization comes later.",
+    a: "Yes. Every feature on Citrus today is free. No credit card, no trial expiration, no upsell. We're building the brand and the user base first. Monetization comes later.",
   },
   {
     q: 'What does "founders pricing locked in" mean?',
@@ -45,7 +45,7 @@ const FAQ: FaqEntry[] = [
   },
   {
     q: "What's coming in the paid tiers?",
-    a: "We're working on Stormy Pro (faster, deeper AI answers), advanced commish tools (custom rules, branded leagues, deeper standings analytics), and a multi-league dashboard for managers in 5+ leagues. None of these are launched yet — just teasing what's on the roadmap.",
+    a: "We're working on Stormy Pro (faster, deeper AI answers), advanced commish tools (custom rules, branded leagues, deeper standings analytics), and a multi-league dashboard for managers in 5+ leagues. None of these are launched yet. Just teasing what's on the roadmap.",
   },
   {
     q: 'Will the free tier get worse when paid launches?',
@@ -71,7 +71,7 @@ export default function Pricing() {
           </h1>
           <p className="text-[16px] md:text-[18px] leading-relaxed text-white/65 max-w-xl mx-auto">
             Every feature on Citrus is free today. Sign up now and you'll lock in founders pricing
-            on whatever paid tiers launch later — for as long as you keep your account.
+            on whatever paid tiers launch later. For as long as you keep your account.
           </p>
         </section>
 
@@ -141,8 +141,8 @@ export default function Pricing() {
                 Founders pricing locked in
               </div>
               <p className="text-[14px] text-white/65 leading-relaxed mb-6 relative z-10">
-                Power-user tier launching later this year. Founders get a permanent discount —
-                exact pricing not set yet, but always favorable for early users.
+                Power-user tier launching later this year. Founders get a permanent discount.
+                Exact pricing not set yet, but always favorable for early users.
               </p>
               <ul className="space-y-2.5 mb-8 relative z-10">
                 {PRO_TEASE.map((f) => (
@@ -157,7 +157,7 @@ export default function Pricing() {
                 className="w-full inline-flex items-center justify-center gap-2 bg-white/5 text-white/55 text-[14px] font-bold px-5 rounded-md cursor-not-allowed ring-1 ring-white/10 relative z-10"
                 style={{ height: '48px' }}
               >
-                Coming soon — sign up to lock in
+                Coming soon. Sign up to lock in
               </button>
               </div>
             </article>

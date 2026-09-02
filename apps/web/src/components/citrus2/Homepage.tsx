@@ -81,7 +81,7 @@ function getHeroSlides(): HeroSlide[] {
       id: 'pickem',
       eyebrow: 'Pickem · Daily · Free',
       headline: { lead: 'Pick tonight.', accent: 'Pick every night.' },
-      sub: 'Pick the winner of every NHL game on the slate. Straight up — no spreads, no over-unders. Locks at puck drop, settled at the final horn. Climb the league leaderboard.',
+      sub: 'Pick the winner of every NHL game on the slate. Straight up, no spreads, no over-unders. Locks at puck drop, settled at the final horn. Climb the league leaderboard.',
       primary: { label: 'Drop In', to: '/pool/pickem' },
       secondary: { label: "Tonight's slate →", to: '/pool/pickem' },
       visual: <SceneVisual src="/mascots/scene-pickem.webp" alt="Lemon picking between EDM and COL" />,
@@ -90,7 +90,7 @@ function getHeroSlides(): HeroSlide[] {
       id: 'survivor',
       eyebrow: 'Survivor · Weekly · Free',
       headline: { lead: 'One pick a week.', accent: "Don't lose" },
-      sub: "Pick one team to win each week. Use any team only once all season. Lose your pick and you're in the sin bin — eliminated. Last manager standing takes the pool.",
+      sub: "Pick one team to win each week. Use any team only once all season. Lose your pick and you're in the sin bin, eliminated on the spot. Last manager standing takes the pool.",
       primary: { label: 'Last One Standing', to: '/pool/survivor' },
       secondary: { label: 'How it works →', to: '/pool/survivor' },
       visual: <SceneVisual src="/mascots/scene-survivor.webp" alt="Kiwi alone in the spotlight" />,
@@ -101,7 +101,7 @@ function getHeroSlides(): HeroSlide[] {
       // SWEEP FIX (2026-08-16): "An assistant GM who" overflowed the
       // viewport edge at tablet widths — shorter lead line wraps cleanly.
       headline: { lead: 'An assistant GM', accent: 'who knows hockey' },
-      sub: 'Stormy is plugged into your roster, scoring, and matchup. She cites xGF%, TOI, PP1 share, save% — never generic boilerplate. The AI assistant GM you wish your team had.',
+      sub: 'Stormy is plugged into your roster, scoring, and matchup. He quotes the actual numbers, xGF%, TOI, PP1 share, save%, and names where each one came from. The assistant GM you wish your team had.',
       primary: { label: 'Talk to Stormy', to: '/gm-office/stormy' },
       secondary: { label: 'See an example →', to: '#stormy' },
       visual: <SceneVisual src="/mascots/scene-stormy-ai.webp" alt="Stormy with coach playbook and lineup board" />,
@@ -110,7 +110,7 @@ function getHeroSlides(): HeroSlide[] {
       id: 'brackets',
       eyebrow: '🏒 Stanley Cup Playoff Brackets · Returns in April',
       headline: { lead: 'Lift the', accent: 'Cup' },
-      sub: 'Predict the entire Stanley Cup playoffs round-by-round — First Round, Second Round, Conference Finals, Cup Final. Live bracket updates every 60 seconds when the field is set.',
+      sub: 'Predict the entire Stanley Cup playoffs round by round: First Round, Second Round, Conference Finals, Cup Final. Live bracket updates every 60 seconds once the field is set.',
       primary: { label: 'See How Brackets Work', to: '/nhl/playoffs' },
       secondary: { label: 'Last season’s bracket →', to: '/nhl/playoffs' },
       visual: <SceneVisual src="/mascots/scene-cup.webp" alt="Pineapple lifting the Stanley Cup" />,
@@ -207,7 +207,7 @@ const ONBOARDING_CARDS: Array<{
   },
   {
     title: 'Run a Mock',
-    body: 'A 12-team mock against AI managers. No signup, instant draft room — see the projections rip live.',
+    body: 'A 12-team mock against AI managers. No signup, instant draft room, and the projections run live while you pick.',
     cta: 'Mock now',
     icon: DraftIcon,
     accent: 'sage',
@@ -216,7 +216,7 @@ const ONBOARDING_CARDS: Array<{
   },
   {
     title: 'Chirp at Stormy',
-    body: 'Ask the assistant GM anything — a roster move, a matchup edge, a trade. She cites xGF%, Corsi, TOI before answering.',
+    body: 'Ask the assistant GM anything: a roster move, a matchup edge, a trade. He reads the xGF%, the Corsi and the TOI before he answers.',
     cta: 'Open Stormy',
     icon: ShiftIcon,
     accent: 'butter',
@@ -261,13 +261,13 @@ const REAL_FEATURES: Array<{
   },
   {
     label: 'Advanced Metrics',
-    desc: 'xGF%, Corsi, PP1 share, deployment splits, zone entry rates — built in, no extra subscription.',
+    desc: 'xGF%, Corsi, PP1 share, deployment splits, zone entry rates. Built in, no extra subscription.',
     icon: XGModelIcon,
     accent: 'sage',
   },
   {
     label: 'Monte Carlo Ranges',
-    desc: 'Floor / median / ceiling per skater per night. See the upside, not just a single number.',
+    desc: 'Floor, median and ceiling per skater per night. You see the range, not one number.',
     icon: RangeIcon,
     accent: 'orange',
   },
@@ -278,15 +278,15 @@ const MASCOT_ACCENTS: AccentName[] = ['orange', 'butter', 'sage', 'peach'];
 const FAQ: FaqEntry[] = [
   {
     q: 'How does Citrus work?',
-    a: "Create or join a fantasy hockey league. Draft your roster — snake, auction, or salary cap. Set your lineup before puck drop each day. Live shift-level scoring updates your matchup in real time. Stormy, your AI assistant GM, answers questions about your roster, matchup, or trades.",
+    a: "Create or join a fantasy hockey league. Draft your roster in a snake, an auction or a salary-cap format. Set your lineup before puck drop each day. Live shift-level scoring updates your matchup in real time. Stormy, your AI assistant GM, answers questions about your roster, matchup, or trades.",
   },
   {
     q: 'Is Citrus free?',
-    a: "Yes — leagues, mock drafts, projections, Stormy are all free during launch. We're building a Stormy Pro tier and advanced commish tools for power managers later this year, but anyone who joins now gets founders pricing locked in.",
+    a: "Yes. Leagues, mock drafts, projections and Stormy are all free during launch. We're building a Stormy Pro tier and advanced commish tools for power managers later this year, but anyone who joins now gets founders pricing locked in.",
   },
   {
     q: 'What makes your projections different?',
-    a: "A 31-feature XGBoost xG model with Bayesian shrinkage for low-sample players. xGF%, deployment patterns, line combos, PP1 time, zone entry rates. Each projection is a Monte Carlo distribution — floor, median, and ceiling for every skater, every night.",
+    a: "A 31-feature XGBoost xG model with Bayesian shrinkage for low-sample players. xGF%, deployment patterns, line combos, PP1 time, zone entry rates. Each projection is a Monte Carlo distribution, so you get a floor, a median and a ceiling for every skater, every night.",
   },
   {
     q: 'What league formats do you support?',
@@ -294,11 +294,11 @@ const FAQ: FaqEntry[] = [
   },
   {
     q: "How does Stormy actually help? Isn't AI just hot air?",
-    a: "Stormy is plugged into your league — your roster, your scoring settings, your matchup. Ask start/sit, trade analysis, waiver targets. She cites real metrics (xGF%, TOI, PP1 time, save%) rather than 'monitor the situation' boilerplate. She's the assistant GM you'd want.",
+    a: "Stormy is plugged into your league: your roster, your scoring settings, your matchup. Ask him start/sit, trade analysis, waiver targets. He quotes real metrics (xGF%, TOI, PP1 time, save%) and says which source each one came from, instead of telling you to monitor the situation.",
   },
   {
     q: 'Where is Citrus available?',
-    a: 'Web app, anywhere with a browser. Mobile-optimized — works great on a phone, no install required.',
+    a: 'Web app, anywhere with a browser. Mobile-optimized, so it works on a phone with no install.',
   },
 ];
 
@@ -382,7 +382,7 @@ export function Homepage() {
         <SectionHeader
           eyebrow="What You Get"
           title="The data that wins championships."
-          sub="Every feature below ships free during launch. Stormy Pro and advanced league tools are in the works — early users get founders pricing for life."
+          sub="Every feature below ships free during launch. Stormy Pro and advanced league tools are in the works, and early users get founders pricing for life."
           align="center"
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -421,7 +421,7 @@ export function Homepage() {
               An AI assistant GM<br />who actually knows hockey.
             </h2>
             <p className="text-[15px] text-white/60 leading-relaxed mb-5">
-              Stormy is plugged into your league — your roster, your scoring settings, your matchup.
+              Stormy is plugged into your league: your roster, your scoring settings, your matchup.
               Every answer cites real metrics: xGF%, TOI, PP1 share, save%, line combos.
             </p>
             <p className="text-[15px] text-white/60 leading-relaxed mb-7">
@@ -440,7 +440,7 @@ export function Homepage() {
               exchange={{
                 question: 'Is this trade fair? I give Matthews, get MacKinnon plus a 3rd round pick.',
                 answer:
-                  "Take it. MacKinnon's xGF% is 61.4% vs Matthews' 54.8%. MacKinnon also gets 3+ minutes more TOI per game and his line has better zone entry rates. The 3rd rounder is gravy. Our projections have MacKinnon finishing 8–12 points higher ROS. Plus, Matthews' shooting% is unsustainable at 18.2% — regression coming.",
+                  "Take it. MacKinnon's xGF% is 61.4% vs Matthews' 54.8%. MacKinnon also gets 3+ minutes more TOI per game and his line has better zone entry rates. The 3rd rounder is gravy. Our projections have MacKinnon finishing 8–12 points higher ROS. Matthews is also shooting 18.2%, which nobody holds. That comes back to earth.",
               }}
             />
           </div>

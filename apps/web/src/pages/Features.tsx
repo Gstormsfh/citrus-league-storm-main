@@ -48,7 +48,7 @@ const CORE_FEATURES: Array<{
   },
   {
     label: 'League Customization',
-    desc: 'Deep customization options for scoring, rosters, and playoffs to match your league\'s style. Snake, auction, salary cap — all formats supported.',
+    desc: 'Deep customization options for scoring, rosters, and playoffs to match your league\'s style. Snake, auction, salary cap. All formats supported.',
     icon: CrossedSticksIcon,
     accent: 'butter',
   },
@@ -95,7 +95,7 @@ const FORMATS: Array<{
   {
     label: 'Daily Pickem',
     scene: '/mascots/scene-pickem.webp',
-    sub: 'Pick the winner of every NHL game. Straight up — no spreads, no over-unders.',
+    sub: 'Pick the winner of every NHL game. Straight up. No spreads, no over-unders.',
     badge: 'Daily',
     accent: 'sage',
     icon: PickemIcon,
@@ -138,8 +138,8 @@ export default function Features() {
           </h1>
           <p className="text-[15px] md:text-[18px] leading-relaxed text-white/65 max-w-xl mx-auto mb-8 md:mb-10 px-4">
             Citrus is built for people who watch every game, refresh every box score, and care
-            about xGF%. Here's everything that ships in the platform — no upsells, no premium
-            tier you have to unlock.
+            about xGF%. Here's everything that ships in the platform. No upsells, and no premium
+            tier held back behind a paywall.
           </p>
           <Link
             to="/create-league"
@@ -196,8 +196,8 @@ export default function Features() {
               </h2>
               <p className="text-[14px] md:text-[15px] text-white/65 leading-relaxed mb-6 max-w-2xl">
                 Stormy is plugged into your roster, your scoring settings, and your matchup. Ask
-                start/sit, trade analysis, waiver targets — she answers in real hockey advanced
-                stats: xGF%, Corsi, TOI, PP1 share, save%. Trained on every shift since 2007.
+                start/sit, trade analysis, waiver targets. He answers in real hockey advanced
+                stats: xGF%, Corsi, TOI, PP1 share, save%, and he names the source of every one.
               </p>
               <Link
                 to="/gm-office/stormy"

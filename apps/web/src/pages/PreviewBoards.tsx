@@ -7,7 +7,7 @@ const STORMY_THREAD = [
   { from: 'you', text: "Who do I start at LW between Pastrnak and Marchand tonight?" },
   {
     from: 'stormy',
-    text: "Pastrnak. He's projecting 8.4 vs Marchand's 6.9 — Boston has a softer matchup against NJD, and Pastrnak's xG is +18% over his season baseline this week.",
+    text: "Pastrnak. He's projecting 8.4 vs Marchand's 6.9. Boston has a softer matchup against NJD, and Pastrnak's xG is +18% over his season baseline this week.",
   },
 ];
 
@@ -48,7 +48,7 @@ export default function PreviewBoards() {
         />
 
         {/* Nav */}
-        <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0F1F15]/85 border-b border-white/5">
+        <header className="sticky top-0 z-page-header backdrop-blur-md bg-[#0F1F15]/85 border-b border-white/5">
           <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between gap-6">
             <Link to="/preview-boards" className="flex items-center gap-1.5">
               <span className="font-calistoga text-[24px] leading-none text-pastel-cream">Citrus</span>
@@ -248,7 +248,7 @@ export default function PreviewBoards() {
             {
               icon: Users,
               label: 'League chat built in',
-              body: 'Message your league, post draft-night reactions, share standings — no Discord required.',
+              body: 'Message your league, post draft-night reactions, share standings. No Discord required.',
             },
           ].map((f) => {
             const Icon = f.icon;
@@ -282,7 +282,7 @@ export default function PreviewBoards() {
                 Drop the puck.
               </h2>
               <p className="text-[16px] text-white/60 max-w-md mx-auto mb-8">
-                Free league. 30-second draft setup. The most accurate fantasy hockey on the planet.
+                Free league. 30-second draft setup. A 31-feature xG model behind every projection.
               </p>
               <Link
                 to="/create-league"

@@ -1,28 +1,14 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StatBreakdown } from "./types";
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 /* 2026-08-19 visual audit: light "glass" surface on a dark page — see
    the surface-correction note in the armchair-gm components. bg-white/50
    composites to mid-grey on #0F1F15, where neither light nor dark text
    reaches 4.5:1. Uses the dark tile family instead. */
-
-
-// Hook to detect mobile
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(false);
-  
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-  
-  return isMobile;
-};
 
 export const PointsTooltip = ({
   breakdown,
@@ -83,7 +69,7 @@ export const PointsTooltip = ({
           <div key={stat.label} className="p-2 bg-white/5 rounded-lg border border-citrus-orange/30">
             <div className="flex items-baseline justify-between gap-1 mb-0.5">
               <span className="text-[10px] text-citrus-orange uppercase font-bold truncate">{stat.label}</span>
-              <span className="text-xs text-gray-600 bg-gray-100 px-1 rounded">×{stat.count}</span>
+              <span className="text-xs text-pastel-cream bg-white/10 px-1 rounded">×{stat.count}</span>
             </div>
             <div className="font-bold text-lg text-green-700">+{stat.points.toFixed(1)}</div>
           </div>
@@ -120,7 +106,7 @@ export const PointsTooltip = ({
           </button>
         </PopoverTrigger>
         <PopoverContent 
-          className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] !z-[9999]"
+          className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] !z-popover"
           side="top"
           align="center"
           sideOffset={8}
@@ -152,7 +138,7 @@ export const PointsTooltip = ({
         </button>
       </TooltipTrigger>
       <TooltipContent 
-        className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] !z-[9999]"
+        className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] !z-popover"
         side="top"
         align="center"
         sideOffset={8}

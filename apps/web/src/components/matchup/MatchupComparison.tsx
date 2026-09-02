@@ -6,6 +6,7 @@ import { MatchupPositionGroup } from "./MatchupPositionGroup";
 import { organizeMatchupData } from "./matchupUtils";
 import { ScoringCalculator, ScoringSettings } from "@/utils/scoringUtils";
 import { NEUTRAL_CHIP, POSITION_CHIP_BASE } from "@/components/roster/positionChip";
+import { isMobileViewport } from "@/hooks/useIsMobile";
 
 /**
  * Bench visibility is a per-viewer preference (2026-09-01). A hockey bench is
@@ -15,11 +16,12 @@ import { NEUTRAL_CHIP, POSITION_CHIP_BASE } from "@/components/roster/positionCh
  * wins on every later visit. localStorage can be absent (SSR), blocked
  * (Safari private mode throws on access), or full — every touch is guarded
  * and a failure simply means "use the default".
+ *
+ * The viewport is read ONCE, as the default for a `useState` initialiser —
+ * a resize should not slam a bench the viewer opened shut — so this is the
+ * plain `isMobileViewport()` read, not the hook.
  */
 export const BENCH_OPEN_STORAGE_KEY = 'citrus:matchup:bench-open';
-
-const isMobileViewport = (): boolean =>
-  typeof window !== 'undefined' && window.innerWidth < 1024;
 
 const readBenchOpen = (): boolean => {
   try {

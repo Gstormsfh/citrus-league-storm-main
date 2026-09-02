@@ -11,8 +11,11 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MatchupPlayer } from "./types";
-import { useState, useEffect, ReactNode } from "react";
+import { useState, ReactNode } from "react";
 import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { opponentTint, opponentTierTooltipClass } from "./opponentTint";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 /* 2026-08-19 visual audit — muted-text correction.
    text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
@@ -27,21 +30,6 @@ import { X } from "lucide-react";
    composites to mid-grey on #0F1F15, where neither light nor dark text
    reaches 4.5:1. Uses the dark tile family instead. */
 
-
-// Hook to detect mobile
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  return isMobile;
-};
-
 interface ProjectionTooltipProps {
   projection: MatchupPlayer['daily_projection'];
   children?: ReactNode;
@@ -52,6 +40,16 @@ export const ProjectionTooltip = ({ projection, children }: ProjectionTooltipPro
   const isMobile = useIsMobile();
 
   if (!projection) return null;
+
+  // Opponent difficulty (2026-09-01, audit M10): the multiplier the model
+  // applied for tonight's opponent, and the legend for the tint the row's
+  // `vs/@ OPP` label wears because of it. Shown only when the model
+  // supplied one — no number, no colour, nothing to explain.
+  const opponentAdj =
+    typeof projection.opponent_adjustment === 'number' && Number.isFinite(projection.opponent_adjustment)
+      ? projection.opponent_adjustment
+      : null;
+  const tint = opponentTint(opponentAdj);
 
   // ALWAYS show ALL 8 STATS for full transparency (even if 0)
   const stats = [
@@ -95,6 +93,31 @@ export const ProjectionTooltip = ({ projection, children }: ProjectionTooltipPro
         ))}
       </div>
 
+      {/* Opponent difficulty + the one-line legend for the row's tint (M10) */}
+      {opponentAdj !== null && (
+        <div className="px-4 py-2 border-t border-citrus-sage/20" data-testid="projection-opponent">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-display font-semibold text-pastel-forest-soft uppercase">Opponent</span>
+            <span
+              data-testid="projection-opponent-tier"
+              data-opponent-tier={tint.tier}
+              className={cn('text-xs font-varsity font-black tabular-nums', opponentTierTooltipClass(tint.tier))}
+            >
+              {tint.label} · ×{opponentAdj.toFixed(2)}
+            </span>
+          </div>
+          <p
+            data-testid="projection-opponent-legend"
+            className="mt-0.5 text-[10px] font-display text-pastel-forest-soft leading-tight flex items-center gap-1 flex-wrap"
+          >
+            <span aria-hidden="true" className="inline-block w-1.5 h-1.5 rounded-full bg-pastel-sage" />
+            <span>sage = easier than average</span>
+            <span aria-hidden="true" className="inline-block w-1.5 h-1.5 rounded-full bg-pastel-orange-soft ml-1" />
+            <span>orange = tougher</span>
+          </p>
+        </div>
+      )}
+
       {/* Likely Range + Confidence (Citrus 3.1) */}
       {projection.likely_low != null && projection.likely_high != null && (
         <div className="px-4 py-2 bg-white/30 border-t border-citrus-sage/20">
@@ -118,9 +141,9 @@ export const ProjectionTooltip = ({ projection, children }: ProjectionTooltipPro
               </span>
               {projection.confidence_label && (
                 <span className={`text-[8px] px-1 py-0 rounded font-bold ${
-                  projection.confidence_label === 'High' ? 'bg-green-500/20 text-green-700' :
-                  projection.confidence_label === 'Medium' ? 'bg-blue-500/20 text-blue-700' :
-                  'bg-orange-500/20 text-orange-700'
+                  projection.confidence_label === 'High' ? 'bg-pastel-sage/20 text-pastel-sage-soft' :
+                  projection.confidence_label === 'Medium' ? 'bg-pastel-butter/20 text-pastel-butter' :
+                  'bg-pastel-orange/20 text-pastel-orange-soft'
                 }`}>
                   {projection.confidence_label}
                 </span>
@@ -164,7 +187,7 @@ export const ProjectionTooltip = ({ projection, children }: ProjectionTooltipPro
           </button>
         </PopoverTrigger>
         <PopoverContent
-          className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] !z-[9999]"
+          className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] !z-popover"
           side="top"
           align="center"
           sideOffset={8}
@@ -192,7 +215,7 @@ export const ProjectionTooltip = ({ projection, children }: ProjectionTooltipPro
         </button>
       </TooltipTrigger>
       <TooltipContent
-        className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] !z-[9999]"
+        className="p-0 bg-[#E8EED9]/95 backdrop-blur-md rounded-xl border-2 border-citrus-forest shadow-lg w-[280px] !z-popover"
         side="top"
         align="center"
         sideOffset={8}

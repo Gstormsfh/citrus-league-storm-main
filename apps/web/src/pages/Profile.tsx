@@ -51,7 +51,6 @@ import {
   Check,
   Crown,
   RotateCcw,
-  AlertTriangle,
   Clock,
   RefreshCw,
   Play,
@@ -65,6 +64,8 @@ import {
   ShieldCheck,
   ShieldAlert
 } from 'lucide-react';
+import { DestructiveConsequence } from '@/components/confirm/DestructiveConsequence';
+import { CONFIRM_SURFACE_RING } from '@/components/confirm/destructiveConfirm';
 import { logger } from '@/utils/logger';
 import { DEFAULT_SCORING } from '@/utils/scoringUtils';
 import { SCORING_DEFAULTS } from '@citrus/shared';
@@ -615,7 +616,7 @@ const Profile = () => {
     totalSeasons: 0,
     championships: 0,
     playoffAppearances: 0,
-    overallRecord: '—',
+    overallRecord: '-',
     currentRank: null as number | null,
     bestFinish: null as string | null,
     totalPoints: 0,
@@ -1021,7 +1022,7 @@ const Profile = () => {
             lg and renders its own sticky safe-area header (see
             LeagueDashboard); Profile now matches. */}
         <div className="hidden lg:block"><Navbar /></div>
-        <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+        <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
           <div className="flex items-center justify-between h-12 px-4">
             <div className="w-10" />
             <h1 className="text-lg font-bold text-pastel-cream">Profile</h1>
@@ -1065,7 +1066,7 @@ const Profile = () => {
           above and every other core page: Navbar is desktop-only, phones get
           the sticky safe-area header + bottom nav. */}
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Profile</h1>
@@ -1318,7 +1319,7 @@ const Profile = () => {
                         <div className="grid grid-cols-2 gap-3">
                           <div className="text-center p-3 rounded-xl bg-pastel-orange/10 ring-1 ring-pastel-orange/30">
                             <div className="font-calistoga text-2xl text-pastel-orange tabular-nums leading-none">
-                              {userStats.currentRank ?? '—'}
+                              {userStats.currentRank ?? '-'}
                             </div>
                             <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1">Current Rank</div>
                           </div>
@@ -1377,7 +1378,7 @@ const Profile = () => {
                   </Card>
                   <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardContent className="p-6 text-center">
-                      <Target className="h-8 w-8 mx-auto mb-2 text-blue-300" />
+                      <Target className="h-8 w-8 mx-auto mb-2 text-pastel-sage-soft" />
                       <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{userStats.overallRecord}</div>
                       <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1.5">W-L Record</div>
                     </CardContent>
@@ -1392,7 +1393,7 @@ const Profile = () => {
                   <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardContent className="p-6 text-center">
                       <Medal className="h-8 w-8 mx-auto mb-2 text-pastel-orange" />
-                      <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{userStats.avgPointsPerGame || '—'}</div>
+                      <div className="font-calistoga text-3xl text-pastel-cream tabular-nums leading-none">{userStats.avgPointsPerGame || '-'}</div>
                       <div className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-white/55 font-bold mt-1.5">Avg Pts/Week</div>
                     </CardContent>
                   </Card>
@@ -1713,13 +1714,13 @@ const Profile = () => {
                             )}
                           </div>
                         )}
-                        <div className="flex items-start gap-2 p-3 bg-red-400/10 ring-1 ring-red-400/30 rounded-xl">
-                          <AlertTriangle className="h-4 w-4 text-red-300 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs text-red-300/90 leading-relaxed">
-                            <strong className="text-red-300">Warning:</strong> Resetting a draft will permanently delete all draft picks and draft order data.
-                            This action cannot be undone. Only reset if you need to start the draft completely fresh.
-                          </p>
-                        </div>
+                        {/* A standing note about an action nobody has taken
+                            yet, so it wears the confirmation treatment, not
+                            the error one. See components/confirm. */}
+                        <DestructiveConsequence className="text-xs">
+                          Resetting a draft permanently deletes all draft picks and draft order data, and it cannot be undone.
+                          Only reset if you need to start the draft completely fresh.
+                        </DestructiveConsequence>
                       </CardContent>
                     </Card>
                   )}
@@ -1837,7 +1838,7 @@ const Profile = () => {
                                     <SelectItem value="faab">FAAB (Bidding)</SelectItem>
                                   </SelectContent>
                                 </Select>
-                                <p className="text-xs text-white/55">Join Order: seeded by when teams joined. Reverse Draft Order: the last round-one pick holds waiver 1. Both roll — the claimant drops to the back. Reverse Standings: recomputed weekly, worst record first.</p>
+                                <p className="text-xs text-white/55">Join Order: seeded by when teams joined. Reverse Draft Order: the last round-one pick holds waiver 1. Both roll. The claimant drops to the back. Reverse Standings: recomputed weekly, worst record first.</p>
                               </div>
 
                               <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
@@ -1991,7 +1992,7 @@ const Profile = () => {
                                     className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 tabular-nums disabled:opacity-50"
                                   />
                                   {selectedLeagueData?.draft_status === 'completed' && (
-                                    <p className="text-xs text-white/55">Draft is completed — rounds cannot be changed</p>
+                                    <p className="text-xs text-white/55">Draft is completed: rounds cannot be changed</p>
                                   )}
                                 </div>
                                 <div className="space-y-2">
@@ -2007,7 +2008,7 @@ const Profile = () => {
                                     className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 tabular-nums disabled:opacity-50"
                                   />
                                   {selectedLeagueData?.draft_status === 'completed' && (
-                                    <p className="text-xs text-white/55">Draft is completed — time limit cannot be changed</p>
+                                    <p className="text-xs text-white/55">Draft is completed: time limit cannot be changed</p>
                                   )}
                                 </div>
                               </div>
@@ -2294,15 +2295,19 @@ const Profile = () => {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="bg-red-400/10 p-4 rounded-xl ring-1 ring-red-400/30">
-                        <h4 className="font-bold text-red-300 mb-2">This action cannot be undone</h4>
-                        <ul className="text-sm text-red-300/80 space-y-1 ml-4 list-disc marker:text-red-300/60 leading-relaxed">
+                      {/* The card around this is the danger zone and keeps
+                          its red framing; the panel INSIDE it states what a
+                          deletion would cost and is a question, so it wears
+                          the confirmation treatment. */}
+                      <DestructiveConsequence className="flex-col gap-2 px-4 py-4">
+                        <h4 className="font-bold text-pastel-cream mb-2">This action cannot be undone</h4>
+                        <ul className="text-sm space-y-1 ml-4 list-disc marker:text-pastel-orange/60 leading-relaxed">
                           <li>Your account and authentication credentials will be permanently deleted</li>
                           <li>All your fantasy teams and league data will be removed</li>
                           <li>If you're a league commissioner, your leagues may be orphaned</li>
                           <li>Your draft history and transactions will be anonymized</li>
                         </ul>
-                      </div>
+                      </DestructiveConsequence>
 
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
@@ -2311,7 +2316,7 @@ const Profile = () => {
                             Delete My Account
                           </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent className="bg-[#1A2A20] border-0 ring-1 ring-red-400/40 text-pastel-cream">
+                        <AlertDialogContent className={`bg-[#1A2A20] border-0 ${CONFIRM_SURFACE_RING} text-pastel-cream`}>
                           <AlertDialogHeader>
                             <AlertDialogTitle className="font-calistoga text-pastel-cream">Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription className="space-y-4 text-white/70">
@@ -2321,7 +2326,7 @@ const Profile = () => {
                               </p>
                               <div>
                                 <Label htmlFor="deleteConfirmation" className="text-sm font-bold text-pastel-cream">
-                                  Type <span className="font-bold text-red-300">DELETE</span> to confirm:
+                                  Type <span className="font-bold text-pastel-orange">DELETE</span> to confirm:
                                 </Label>
                                 <Input
                                   id="deleteConfirmation"

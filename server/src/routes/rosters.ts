@@ -7,7 +7,7 @@ import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
-import { LineupService } from '../services/LineupService';
+import { LineupService, lockedMoveMessage } from '../services/LineupService';
 import { SeasonStateService } from '../services/SeasonStateService';
 import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
@@ -130,16 +130,38 @@ rosterRoutes.put('/league/:leagueId/team/:teamId/lineup', membershipMiddleware, 
   }
 
   const lineupService = new LineupService(supabase);
+  const lineup = {
+    starters: ((body.starters || []) as (string | number)[]).map(String),
+    bench: ((body.bench || []) as (string | number)[]).map(String),
+    ir: ((body.ir || []) as (string | number)[]).map(String),
+    slot_assignments: (body.slot_assignments || {}) as Record<string, string>,
+  };
+  const targetDate = body.target_date as string | undefined;
+
+  // Game-lock guard (2026-09-01, audit R6): a player whose game has begun
+  // keeps his spot. The client refuses the move too, but the client is not
+  // the gate — this is. 409, naming the player, so the app can say why.
+  try {
+    const lockedChanges = await lineupService.findLockedLineupChanges(teamId, leagueId, lineup, targetDate);
+    if (lockedChanges.length > 0) {
+      logger.info('[rosters] lineup save blocked — locked player moved', {
+        leagueId,
+        teamId,
+        players: lockedChanges.map((ch) => `${ch.playerId}:${ch.from}->${ch.to}`),
+      });
+      return fail(c, AppError.conflict(lockedMoveMessage(lockedChanges)));
+    }
+  } catch (lockErr) {
+    // A read failure here must not take lineup saves down with it; the
+    // client-side lock still stands, and the snapshot writer stamps the row.
+    logger.warn('[rosters] lock check failed open', { leagueId, teamId, error: String(lockErr) });
+  }
+
   const result = await lineupService.saveLineup(
     teamId,
     leagueId,
-    {
-      starters: (body.starters || []) as string[],
-      bench: (body.bench || []) as string[],
-      ir: (body.ir || []) as string[],
-      slot_assignments: (body.slot_assignments || {}) as Record<string, string>,
-    },
-    body.target_date as string | undefined,
+    lineup,
+    targetDate,
     (body.allow_player_removal as boolean) || false,
   );
 

@@ -82,6 +82,14 @@ export interface Team {
   team_name: string;
   created_at: string;
   updated_at: string;
+  /**
+   * The OWNER's profile picture (`profiles.avatar_url`), joined in by
+   * `GET /api/leagues/:leagueId/teams` (2026-09-01, audit M8). Not a column
+   * on `teams` — team-level avatars are a later schema change — so it is
+   * absent on every other team payload (`/my-team`, join/create responses)
+   * and null for AI teams and owners without a picture.
+   */
+  avatar_url?: string | null;
 }
 
 /**

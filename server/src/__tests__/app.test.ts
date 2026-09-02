@@ -99,6 +99,16 @@ describe('API App — Auth Required Routes', () => {
     expect(res.status).toBe(401);
   });
 
+  // COMPONENT 6.5 — the player dashboard endpoint reads `nhl_shots` through
+  // a SERVICE-ROLE client, so the gate in front of it is load-bearing in a
+  // way the browse index's is not. Asserted here against the REAL auth
+  // middleware; the route's behaviour is covered in
+  // playerDashboardRoute.test.ts, which stubs auth out.
+  it('returns 401 for unauthenticated player dashboard requests', async () => {
+    const res = await app.request('/api/players/8478402/dashboard?season=2025');
+    expect(res.status).toBe(401);
+  });
+
   it('returns 401 for invalid Authorization header format', async () => {
     const res = await app.request('/api/leagues', {
       headers: { Authorization: 'InvalidFormat' },

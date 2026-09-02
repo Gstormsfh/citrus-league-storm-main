@@ -55,7 +55,10 @@ export interface HockeyPlayer {
   experience?: string;
   image?: string;
   nextGame?: {
-    opponent: string; // e.g. "vs BOS", "@ NYR"
+    // "vs BOS" / "@ NYR" from the schedule. Optional since 2026-09-01 (audit
+    // R9): when the schedule has no line for the day the row prints nothing
+    // here — the old required string forced a 'Game' placeholder into it.
+    opponent?: string;
     isToday: boolean;
     gameTime?: string; // e.g. "7:30 PM"
     gameStatus?: 'scheduled' | 'live' | 'intermission' | 'final'; // Game status from schedule

@@ -260,7 +260,7 @@ export const TradeGridView = ({
   return (
     <div className="flex flex-col gap-4">
       {/* Sticky Trade Proposal Bar */}
-      <Card className="border-primary/30 shadow-md sticky top-2 z-20 bg-background/95 backdrop-blur">
+      <Card className="border-primary/30 shadow-md sticky top-2 z-sticky-raised bg-background/95 backdrop-blur">
         <CardHeader className="pb-2 pt-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <CardTitle className="flex items-center gap-2 text-base">

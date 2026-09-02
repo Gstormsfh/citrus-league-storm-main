@@ -155,7 +155,7 @@ export function ScoringRulesEditor({ leagueId, canEdit }: ScoringRulesEditorProp
         <CardTitle>Scoring</CardTitle>
         <CardDescription>
           Points awarded per stat. Set a category to <strong>0</strong> to turn it off.
-          Categories marked <em>New</em> were previously unavailable — the data was always
+          Categories marked <em>New</em> were previously unavailable: the data was always
           there, the scoring engine just could not reach it.
         </CardDescription>
       </CardHeader>

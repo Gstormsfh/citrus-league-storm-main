@@ -24,13 +24,13 @@ import {
 } from '@/services/PlayoffService';
 import {
   Trophy, ChevronRight, Crown, Shield, RotateCcw,
-  Play, Swords, Medal, AlertTriangle,
+  Play, Swords, Medal,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DestructiveConsequence } from '@/components/confirm/DestructiveConsequence';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { LeagueMembershipService } from '@/services/LeagueMembershipService';
@@ -134,7 +134,7 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
         series.status === 'active' && 'bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft',
         series.status === 'completed' && 'bg-green-900/30 text-green-400',
         series.status === 'pending' && 'bg-white/5 ring-1 ring-white/10 text-white/55',
-        series.status === 'bye' && 'bg-blue-900/20 text-blue-400',
+        series.status === 'bye' && 'bg-pastel-sage/10 text-pastel-sage-soft',
       )}>
         {series.status === 'active' && 'Live'}
         {series.status === 'completed' && 'Final'}
@@ -381,12 +381,11 @@ const CommissionerControls: React.FC<CommissionerControlsProps> = ({
               </Button>
             ) : (
               <div className="space-y-2">
-                <Alert variant="destructive">
-                  <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-                  <AlertDescription className="text-xs">
-                    This will permanently delete the bracket and all playoff matchups.
-                  </AlertDescription>
-                </Alert>
+                {/* A question, not a failure — see components/confirm. The
+                    red stays on "Confirm Reset" below. */}
+                <DestructiveConsequence>
+                  This will permanently delete the bracket and all playoff matchups.
+                </DestructiveConsequence>
                 <div className="flex gap-2">
                   <Button
                     variant="destructive"
@@ -459,7 +458,7 @@ const SeedList: React.FC<{
                   {seed.regular_season_ties > 0 ? `-${seed.regular_season_ties}` : ''}
                 </span>
                 {hasBye && (
-                  <span className="text-[9px] font-bold text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded">
+                  <span className="text-[9px] font-bold text-pastel-sage-soft bg-pastel-sage/20 px-1.5 py-0.5 rounded">
                     BYE
                   </span>
                 )}
@@ -555,7 +554,7 @@ const PlayoffBracket = () => {
     } catch (err: unknown) {
       toast({
         title: "Bracket Didn't Build",
-        description: userMessage(err, "Couldn't generate the bracket — try again in a moment."),
+        description: userMessage(err, "Couldn't generate the bracket. Try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -579,7 +578,7 @@ const PlayoffBracket = () => {
     } catch (err: unknown) {
       toast({
         title: "Round Didn't Advance",
-        description: userMessage(err, "Couldn't advance the round — try again in a moment."),
+        description: userMessage(err, "Couldn't advance the round. Try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -601,7 +600,7 @@ const PlayoffBracket = () => {
     } catch (err: unknown) {
       toast({
         title: "Bracket Reset Didn't Take",
-        description: userMessage(err, "Couldn't reset the bracket — try again in a moment."),
+        description: userMessage(err, "Couldn't reset the bracket. Try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -653,7 +652,7 @@ const PlayoffBracket = () => {
   const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Playoffs</h1>

@@ -21,6 +21,7 @@ import { ScoringCalculator } from '@/utils/scoringUtils';
 import { generatePlayerWriteup, WriteupTone } from '@/utils/playerWriteup';
 import { getUpcomingSeasonStartDate, getCurrentSeason } from '@citrus/shared';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
+import { PlayerAdvancedCard } from '@/components/player/PlayerAdvancedCard';
 
 /* 2026-08-19 visual audit — muted-text correction.
    text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
@@ -394,13 +395,13 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
     IR:   { label: 'Injury Reserve', cls: 'bg-red-500/10 text-red-400 border-red-400/40', icon: AlertCircle },
     SUSP: { label: 'Suspended', cls: 'bg-orange-500/10 text-orange-400 border-orange-400/40', icon: AlertCircle },
     GTD:  { label: 'Game Time Decision', cls: 'bg-yellow-500/10 text-yellow-400 border-yellow-400/40', icon: Clock },
-    WVR:  { label: 'Waiver', cls: 'bg-blue-500/10 text-blue-400 border-blue-400/40', icon: AlertCircle },
+    WVR:  { label: 'Waiver', cls: 'bg-pastel-sage/15 text-pastel-sage-soft border-pastel-sage/40', icon: AlertCircle },
   };
   const statusInfo = player.status ? statusConfig[player.status] : null;
 
   const handleDropPlayer = async () => {
     if (!user || !leagueId || !player?.id) {
-      toast({ title: "Can't Drop Player", description: "We're missing some info this drop needs — reopen the modal and try again.", variant: "destructive" });
+      toast({ title: "Can't Drop Player", description: "We're missing some info this drop needs. Reopen the modal and try again.", variant: "destructive" });
       return;
     }
     if (!confirm(`Are you sure you want to drop ${player.name}?`)) return;
@@ -418,7 +419,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         onPlayerDropped?.();
         onClose();
       } else {
-        toast({ title: "Drop Didn't Take", description: (error as { message?: string })?.message || "Couldn't drop the player — try again in a moment.", variant: "destructive" });
+        toast({ title: "Drop Didn't Take", description: (error as { message?: string })?.message || "Couldn't drop the player. Try again in a moment.", variant: "destructive" });
       }
     } catch (error: unknown) {
       const message = userMessage(error, "Failed to drop player.");
@@ -521,7 +522,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                         month: 'long',
                         day: 'numeric',
                       });
-                      return `Off-season — games return ${label}`;
+                      return `Off-season. Games return ${label}`;
                     })()}
                   </span>
                 </>
@@ -535,7 +536,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 "text-xl font-varsity font-black",
                 hasGame ? "text-citrus-orange" : "text-white/55"
               )}>
-                {hasGame ? heroProjectedPts.toFixed(1) : '—'}
+                {hasGame ? heroProjectedPts.toFixed(1) : '-'}
               </span>
             </div>
           </div>
@@ -722,16 +723,43 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
             {/* ─── Detailed Stats Tab ─── */}
             <TabsContent value="advanced" className="mt-0 space-y-4">
+              {/* PWS-1 ADVANCED CARD (2026-09-02) — the highest-leverage
+                  single integration of the player-dashboard design system,
+                  because THIS modal is the one player card the whole app
+                  opens: Roster, Free Agents, Matchup, Trade Analyzer, Other
+                  Team, Pool Playoff Roster, Team Intel Hub, DraftRoom and
+                  DraftRoomV2 all render it (grepped 2026-09-02, ten call
+                  sites). Wiring it here puts xG/60, G-xG finishing, the GAR
+                  decomposition and the ROS projection on every one of them
+                  from one diff.
+
+                  It leads the DETAILED tab rather than Overview on purpose.
+                  Overview already opens with the derived Citrus writeup,
+                  which is a verdict-shaped block; a second verdict line
+                  above it would be the "double-up" PWS-2 warns about. This
+                  tab is where a manager comes for exactly these numbers,
+                  and the card supersedes the two-cell "Advanced" box
+                  (xGoals + SH%) that used to be the whole of it.
+
+                  `enabled={isOpen}` so a closed modal on a guest surface
+                  never even asks; and the card returns null on 401, so the
+                  tab renders precisely what it rendered before. */}
+              <PlayerAdvancedCard
+                playerId={player.id}
+                variant="expanded"
+                enabled={isOpen}
+              />
+
               {isGoalie ? (
                 <>
                   <div className="grid grid-cols-2 gap-2">
                     <StatCell label="SV%" value={stats.savePct ? `${(stats.savePct * 100).toFixed(3)}` : '0.000'} />
                     <StatCell label="GAA" value={stats.gaa?.toFixed(2) ?? '0.00'} />
-                    <StatCell label="HD SV%" value={stats.highDangerSavePct ? `${(stats.highDangerSavePct * 100).toFixed(1)}` : '—'} />
+                    <StatCell label="HD SV%" value={stats.highDangerSavePct ? `${(stats.highDangerSavePct * 100).toFixed(1)}` : '-'} />
                     <StatCell label="GSAx" value={
                       stats.goalsSavedAboveExpected
                         ? `${stats.goalsSavedAboveExpected > 0 ? '+' : ''}${stats.goalsSavedAboveExpected.toFixed(1)}`
-                        : '—'
+                        : '-'
                     } highlight={!!(stats.goalsSavedAboveExpected && stats.goalsSavedAboveExpected > 0)} />
                   </div>
                   <div className="grid grid-cols-3 gap-2">
@@ -760,7 +788,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                         { label: 'PPP', value: stats.powerPlayPoints ?? 0 },
                         { label: 'SHP', value: stats.shortHandedPoints ?? 0 },
                         { label: 'GP', value: stats.gamesPlayed ?? 0 },
-                        { label: 'TOI/G', value: stats.toi ?? '—' },
+                        { label: 'TOI/G', value: stats.toi ?? '-' },
                       ].map((item, i) => (
                         <div key={i} className="bg-card p-2.5 flex flex-col items-center text-center">
                           <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase tracking-wider">{item.label}</span>
@@ -779,12 +807,12 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                     <div className="grid grid-cols-2 gap-2">
                       <StatCell
                         label="xGoals"
-                        value={stats.xGoals?.toFixed(1) ?? '—'}
+                        value={stats.xGoals?.toFixed(1) ?? '-'}
                         sub={stats.xGoals && stats.goals != null ? `${((stats.goals - stats.xGoals) > 0 ? '+' : '')}${(stats.goals - stats.xGoals).toFixed(1)} diff` : undefined}
                       />
                       <StatCell
                         label="SH%"
-                        value={shootingPct ? `${shootingPct}%` : '—'}
+                        value={shootingPct ? `${shootingPct}%` : '-'}
                       />
                     </div>
                   </div>
@@ -881,7 +909,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                               "text-xl font-varsity font-black",
                               hasActuals ? "text-pastel-cream" : (displayPoints > 0 ? "text-citrus-orange" : "text-pastel-cream/60")
                             )}>
-                              {hasActuals ? displayPoints.toFixed(1) : (displayPoints > 0 ? displayPoints.toFixed(1) : (gp.isPast ? 'DNP' : '—'))}
+                              {hasActuals ? displayPoints.toFixed(1) : (displayPoints > 0 ? displayPoints.toFixed(1) : (gp.isPast ? 'DNP' : '-'))}
                             </div>
                             <div className="text-[10px] text-pastel-cream/60 font-display uppercase">
                               {hasActuals ? 'pts' : (gp.isPast ? '' : 'proj')}
@@ -900,8 +928,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                   { label: 'SV', value: Number(as.saves || 0) },
                                   { label: 'SO', value: Number(as.shutouts || 0) },
                                   { label: 'GA', value: Number(as.goals_against || 0) },
-                                  { label: 'GAA', value: as.gaa != null ? Number(as.gaa).toFixed(2) : '—' },
-                                  { label: 'SV%', value: as.save_pct != null ? `${(Number(as.save_pct) * 100).toFixed(1)}` : '—' },
+                                  { label: 'GAA', value: as.gaa != null ? Number(as.gaa).toFixed(2) : '-' },
+                                  { label: 'SV%', value: as.save_pct != null ? `${(Number(as.save_pct) * 100).toFixed(1)}` : '-' },
                                 ].map((s, i) => (
                                   <div key={i} className="flex flex-col items-center py-1 bg-citrus-sage/10 rounded border border-citrus-sage/15">
                                     <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
@@ -940,11 +968,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                   { label: 'SO', value: (gp.projection.projected_shutouts as number | undefined)?.toFixed(2) },
                                   { label: 'GA', value: (gp.projection.projected_goals_against as number | undefined)?.toFixed(2) },
                                   { label: 'GAA', value: (gp.projection.projected_gaa as number | undefined)?.toFixed(2) },
-                                  { label: 'SV%', value: gp.projection.projected_save_pct ? `${(Number(gp.projection.projected_save_pct) * 100).toFixed(1)}` : '—' },
+                                  { label: 'SV%', value: gp.projection.projected_save_pct ? `${(Number(gp.projection.projected_save_pct) * 100).toFixed(1)}` : '-' },
                                 ].map((s, i) => (
                                   <div key={i} className="flex flex-col items-center py-1 bg-white/5 rounded border border-citrus-sage/10">
                                     <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
-                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value ?? '—'}</span>
+                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value ?? '-'}</span>
                                   </div>
                                 ))}
                               </div>
@@ -962,7 +990,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                 ].map((s, i) => (
                                   <div key={i} className="flex flex-col items-center py-1 bg-white/5 rounded border border-citrus-sage/10">
                                     <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
-                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value ?? '—'}</span>
+                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value ?? '-'}</span>
                                   </div>
                                 ))}
                               </div>
