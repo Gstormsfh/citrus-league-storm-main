@@ -150,6 +150,8 @@ export const DASHBOARD_INDEX = PLAYERS.map((row) => {
     proj_assists: Math.round(row.assists * 0.7),
     proj_sog: Math.round(row.shots * 0.7),
     proj_ppp: Math.round(row.ppp * 0.7),
+    proj_blocks: isGoalie ? null : Math.round(row.blocks * 0.7),
+    proj_hits: isGoalie ? null : Math.round(row.hits * 0.7),
     proj_wins: isGoalie ? Math.round((row.wins ?? 0) * 0.6) : null,
     proj_saves: isGoalie ? 780 : null,
     proj_shutouts: isGoalie ? 2 : null,

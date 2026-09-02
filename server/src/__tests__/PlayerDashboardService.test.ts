@@ -153,6 +153,27 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     expect(am.proj_gp).toBe(63);
   });
 
+  // REGRESSION (2026-09-02, draft-room decision support). `ROS_COLS` has
+  // always SELECTed projected_hits and projected_blocks and the mapper
+  // dropped both, so no consumer could score a rest-of-season projection
+  // through a league's own categories without silently losing blocks —
+  // worth 1 point each in DEFAULT_SCORING, roughly fifty points a skater.
+  it('carries projected blocks and hits so a league can score its own categories', async () => {
+    mockTables(mockSupabase);
+    const { players } = await service.getDashboardIndex();
+    const am = players.find((p) => p.id === 8479318)!;
+    expect(am.proj_blocks).toBeCloseTo(78.87);
+    expect(am.proj_hits).toBeCloseTo(49.02);
+  });
+
+  it('a player with no projection row gets null blocks and hits, not zeros', async () => {
+    mockTables(mockSupabase);
+    const { players } = await service.getDashboardIndex();
+    const woll = players.find((p) => p.id === 8479361)!;
+    expect(woll.proj_blocks).toBeNull();
+    expect(woll.proj_hits).toBeNull();
+  });
+
   it('goalies read gp from goalie_gp and carry goalie stat columns', async () => {
     mockTables(mockSupabase);
     const { players } = await service.getDashboardIndex();

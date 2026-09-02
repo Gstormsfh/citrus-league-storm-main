@@ -105,7 +105,7 @@ function indexEntry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntr
     xg_per_60: 1.42, xg_rating: 'Elite',
     gar_per_60: 0.5, gar_evo: 0.31, gar_evd: 0.04, gar_ppo: 0.11, gar_ppd: 0.01, gar_pen: 0.03,
     proj_gp: 58, proj_fantasy_points: 320, proj_fantasy_ppg: 5.5,
-    proj_goals: 30, proj_assists: 34, proj_sog: 200, proj_ppp: 18,
+    proj_goals: 30, proj_assists: 34, proj_sog: 200, proj_ppp: 18, proj_blocks: 55, proj_hits: 40,
     proj_wins: null, proj_saves: null, proj_shutouts: null,
     ...over,
   };

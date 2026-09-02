@@ -74,6 +74,17 @@ import {
   notifyPresenceLeft,
 } from '@/lib/draftClient/toasts';
 import { usePreloadedPlayers } from '@/hooks/usePreloadedPlayers';
+import { usePlayerDashboardIndex } from '@/hooks/usePlayerDashboardIndex';
+import {
+  buildDraftProjectionMap,
+  buildQualityScales,
+  normalizeDraftPosition,
+  picksUntilNextTurn,
+  qualitySignalFor,
+  scarcityStrip,
+  type DraftPosition,
+  type QualitySignal,
+} from '@/components/draft/draftDecision';
 import { useOnClockAlarm } from '@/hooks/useOnClockAlarm';
 import {
   toAvailablePlayers,
@@ -1654,6 +1665,104 @@ function MainTabs({
     [playersById, renderDerived],
   );
 
+  // ── DECISION SUPPORT (2026-09-02) ──────────────────────────────
+  //
+  // Citrus holds a projection, an xG rate and a GAR decomposition for every
+  // player in this pool, and until this change none of it was on the screen
+  // while a manager was on the clock. `PlayerPool` has always accepted a
+  // `projectedFptsMap`; this page never passed one, so the pool's dominant
+  // number was the player's SEASON TOTAL fantasy points and the desktop
+  // table's four projection columns all read "-".
+  //
+  // ONE FETCH, SHARED. `usePlayerDashboardIndex` is the app-wide
+  // module-level store behind `/api/players/dashboard-index` — the same
+  // payload the player card and the Players page read. It is fetched at most
+  // once per session and it 401s for guests, in which case `players` is an
+  // empty array and every derived structure below is empty: the room then
+  // renders exactly what it rendered before this block existed.
+  const { players: dashboardIndex } = usePlayerDashboardIndex();
+
+  /**
+   * The projection, scored through THIS league's categories rather than the
+   * pipeline's default set. Built off the whole payload rather than the pool
+   * so it survives a filter change without a rebuild; ~2k rows of arithmetic
+   * once per scoring change is cheaper than 240 rows on every keystroke.
+   */
+  const projectedFptsMap = useMemo(
+    () => buildDraftProjectionMap(dashboardIndex, leagueScoring),
+    [dashboardIndex, leagueScoring],
+  );
+
+  /**
+   * One cohort-relative advanced read per player. The scales are built once
+   * from the payload (three cohorts x two metrics plus save rate), then every
+   * player is placed against them — the alternative, a scale per row, is
+   * seven passes over 2k rows per render.
+   */
+  const qualitySignals = useMemo(() => {
+    if (dashboardIndex.length === 0) return new Map<string, QualitySignal>();
+    const scales = buildQualityScales(dashboardIndex);
+    const map = new Map<string, QualitySignal>();
+    for (const entry of dashboardIndex) {
+      const signal = qualitySignalFor(entry, scales);
+      if (signal) map.set(String(entry.id), signal);
+    }
+    return map;
+  }, [dashboardIndex]);
+
+  /**
+   * POSITIONAL SCARCITY — the question a manager is actually answering under
+   * a shot clock. Counts are taken from the pool and the picks already made,
+   * the demand from the league's own roster settings, and the urgency from
+   * the draft-order matrix. Every input is already in this component; the
+   * arithmetic lives in `draftDecision.ts` where a test can reach it.
+   */
+  const scarcity = useMemo(() => {
+    if (!rosterCaps || participatingTeamIds.size === 0 || myTeamId === null) return [];
+    const availableByPosition: Partial<Record<DraftPosition, number>> = {};
+    for (const p of availablePlayers) {
+      const pos = normalizeDraftPosition(p.position);
+      if (pos) availableByPosition[pos] = (availableByPosition[pos] ?? 0) + 1;
+    }
+    const draftedByPosition: Partial<Record<DraftPosition, number>> = {};
+    const myFilledByPosition: Partial<Record<DraftPosition, number>> = {};
+    for (const team of v1Teams) {
+      for (const pick of team.picks) {
+        const pos = normalizeDraftPosition(pick.position);
+        if (!pos) continue;
+        draftedByPosition[pos] = (draftedByPosition[pos] ?? 0) + 1;
+        if (team.id === myTeamId) {
+          myFilledByPosition[pos] = (myFilledByPosition[pos] ?? 0) + 1;
+        }
+      }
+    }
+    return scarcityStrip({
+      teamCount: participatingTeamIds.size,
+      startingSlots: rosterCaps as Partial<Record<DraftPosition, number>>,
+      availableByPosition,
+      draftedByPosition,
+      myFilledByPosition,
+      picksUntilNextTurn: picksUntilNextTurn(
+        matrix ?? null,
+        myTeamId,
+        derived?.currentPickNumber ?? null,
+      ),
+    });
+  }, [
+    rosterCaps,
+    participatingTeamIds,
+    myTeamId,
+    availablePlayers,
+    v1Teams,
+    matrix,
+    derived?.currentPickNumber,
+  ]);
+
+  const selectedProjection = selectedPlayer
+    ? (projectedFptsMap.get(selectedPlayer.id) ?? null)
+    : null;
+  const selectedSignal = selectedPlayer ? (qualitySignals.get(selectedPlayer.id) ?? null) : null;
+
   // amIOnClock is computed once at the top of MainTabs (feeds alarm +
   // action bar + pool + handleDraftFromPool).
 
@@ -1939,6 +2048,11 @@ function MainTabs({
             pickNumber={derived?.currentPickNumber ?? null}
             roundNumber={derived?.currentRoundNumber ?? null}
             isSubmitPending={isSubmitPending}
+            /* DECISION SUPPORT (2026-09-02). All three degrade to nothing:
+               the endpoint behind them 401s for guests and demo visitors. */
+            projection={selectedProjection}
+            signal={selectedSignal}
+            scarcity={scarcity}
           />
         </div>
       )}
@@ -2016,6 +2130,13 @@ function MainTabs({
               /* V2-PARITY (2026-08-17) — per-row info button opens the
                  player card. */
               onShowCard={setCardPlayer}
+              /* DECISION SUPPORT (2026-09-02) — the rest-of-season
+                 projection scored through this league's categories, and one
+                 cohort-relative advanced read, on every row. Both empty when
+                 the payload is unavailable, and the pool falls back to
+                 season fantasy points exactly as before. */
+              projectedFptsMap={projectedFptsMap}
+              qualitySignals={qualitySignals}
             />
           )}
         </TabsContent>

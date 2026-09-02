@@ -124,6 +124,15 @@ export interface DashboardIndexEntry {
   proj_assists: number | null;
   proj_sog: number | null;
   proj_ppp: number | null;
+  /**
+   * Projected blocks and hits (2026-09-02). Both are columns on
+   * `player_ros_projections` that `PlayerDashboardService` selected and then
+   * dropped; the draft room needs them to score a rest-of-season projection
+   * through a league's own categories (blocks are 1 point in the default
+   * set). Null for a player with no projection row.
+   */
+  proj_blocks: number | null;
+  proj_hits: number | null;
   proj_wins: number | null;
   proj_saves: number | null;
   proj_shutouts: number | null;

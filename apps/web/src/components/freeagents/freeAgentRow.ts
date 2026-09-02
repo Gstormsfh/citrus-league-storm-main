@@ -155,32 +155,14 @@ export function sortByProjection<T extends { full_name: string; weeklyProjection
 /**
  * The injury/availability chip that sits beside the name.
  *
- * Dark-surface tokens, not the roster row's `bg-red-500 text-white` set:
- * this chip sits on #0F1F15 next to a 15px cream name, and a solid
- * saturated fill at 8px reads as a smudge there. A tinted fill with the
- * bright text colour keeps the same meaning at a tenth of the visual
- * weight — which is right, because on THIS page the status is a caveat on
- * a pickup, not the headline it is on your own roster.
- *
- * Anything the map does not know about gets no chip. A player carrying an
- * unrecognised status string is not "fine", but inventing a chip for it
- * would print raw database text at 8px next to a player's name.
+ * MOVED (2026-09-02) to `@/components/player/statusChip`, unchanged, so the
+ * draft pool can use it: this module imports `ScheduleService` for its game
+ * line, which reaches the Supabase client and throws at module scope under
+ * vitest, and importing the chip from here took three `PlayerPool` suites
+ * down before an assertion ran. Re-exported under both names so every Free
+ * Agents call site and test keeps working against the name it already uses.
  */
-export const FA_STATUS_CHIP: Record<string, { label: string; cls: string }> = {
-  IR: { label: 'IR', cls: 'bg-fantasy-grapefruit-red/20 text-fantasy-grapefruit-red' },
-  LTIR: { label: 'LTIR', cls: 'bg-fantasy-grapefruit-red/20 text-fantasy-grapefruit-red' },
-  SUSP: { label: 'SUSP', cls: 'bg-pastel-orange/20 text-pastel-orange-soft' },
-  GTD: { label: 'GTD', cls: 'bg-amber-500/20 text-amber-200' },
-  DTD: { label: 'DTD', cls: 'bg-amber-500/20 text-amber-200' },
-  WVR: { label: 'WVR', cls: 'bg-pastel-sage/20 text-pastel-sage-soft' },
-};
-
-/** The chip for a raw status string, or null when there is nothing to say. */
-export function statusChipFor(status: string | null | undefined) {
-  const key = (status ?? '').trim().toUpperCase();
-  if (!key || key === 'ACTIVE' || key === 'ACT') return null;
-  return FA_STATUS_CHIP[key] ?? null;
-}
+export { PLAYER_STATUS_CHIP as FA_STATUS_CHIP, statusChipFor } from '@/components/player/statusChip';
 
 // ─── Geometry ────────────────────────────────────────────────────────
 //
