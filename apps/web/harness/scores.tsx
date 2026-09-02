@@ -60,6 +60,10 @@ const side = (abbrev: string) => ({
   name: TEAM_META[abbrev]?.name ?? null,
 });
 
+/** Same CDN shape the roster/draft harness fixtures use (harness/players.ts). */
+const harnessHeadshotUrl = (team: string, nhlId: number) =>
+  `https://assets.nhle.com/mugs/nhl/20252026/${team}/${nhlId}.png`;
+
 const player = (
   playerId: number,
   name: string,
@@ -74,7 +78,14 @@ const player = (
   teamAbbrev,
   position,
   isGoalie: position === 'G',
-  headshotUrl: null,
+  // A REAL FACE (2026-09-02). This said `headshotUrl: null`, which is the
+  // exact defect `harnessFixtureFaces` was written to catch: a fixture that
+  // nulls the face makes every screenshot taken off this harness show the
+  // initials fallback, so a review passes on a page the app never renders.
+  // Production carries a headshot for 801 of 801 directory rows, all on the
+  // NHL CDN, and the id and club here are real, so the URL is derivable
+  // rather than invented.
+  headshotUrl: harnessHeadshotUrl(teamAbbrev, playerId),
   projectedPoints,
   confidenceLabel,
   actualPoints: null,

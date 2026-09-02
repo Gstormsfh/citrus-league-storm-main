@@ -113,7 +113,7 @@ export default function Scores() {
           </button>
         </header>
 
-        <div className="sticky top-0 z-20">
+        <div className="sticky top-0 z-sticky-raised">
           <ScoresDateStrip selected={selectedDate} onSelect={selectDate} />
         </div>
 
