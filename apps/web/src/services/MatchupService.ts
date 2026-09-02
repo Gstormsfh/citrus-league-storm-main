@@ -1339,6 +1339,7 @@ export const MatchupService = {
         name: player.name,
         position: player.position,
         team: teamAbbrev,
+        image: player.image || undefined,
         points: fantasyPoints || 0,
         total_points: fantasyPoints || 0,
         gamesRemaining,
@@ -1485,6 +1486,7 @@ export const MatchupService = {
         name: player.name,
         position: player.position,
         team: teamAbbrev,
+        image: player.image || undefined,
         points: 0, // Matchup points start at 0
         gamesRemaining: 0,
         status: null,

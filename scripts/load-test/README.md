@@ -20,6 +20,7 @@ evidence.
 | `realtime-connections.js` | Supabase plan tier can hold 200 websockets | Once per plan tier upgrade |
 | `notification-storm.js` | No cross-league leak under load (April 10 §5 regression) | Before public beta |
 | `reconnection-storm.js` | 200 users can reconnect after a realtime blip | Before public beta |
+| `hot-reads.js` | The expensive authenticated reads survive 200 concurrent browsers | Before public beta, and after any change to the player read model |
 
 **If only one test runs: `smoke.js`.** If only two: `smoke.js` then
 `steady-state.js`. Always run the cheap one before the expensive one;
@@ -175,6 +176,42 @@ reconnect latency < 3s, **zero** auth 429s.
 If auth 429s > 0, the Supabase auth rate limit is too tight for real
 clients — raise it, or the next realtime blip will trigger a
 site-wide sign-out.
+
+### Hot authenticated reads (13 minutes, 200 VUs)
+
+```bash
+TEST_LEAGUE_ID=<staging-league-uuid> \
+  k6 run scripts/load-test/scenarios/hot-reads.js
+```
+
+Added by the 2026-09-02 scale audit. `steady-state.js` proves 200 users
+can browse *public* endpoints, but 40% of its traffic is `/api/health`
+and none of its four paths reads a season-scoped player table. This
+scenario drives the reads that actually cost something:
+`/api/players/dashboard-index`, `/api/players`,
+`/api/players/ros-projections`, and the per-league matchup and standings
+reads.
+
+Two things to watch in the summary that no other scenario reports:
+
+- **`response bytes`.** `dashboard-index` measured 1,294 KiB raw / 165
+  KiB gzipped for 1,900 players offline
+  (`server/scripts/bench-hot-paths.ts`). If the max here is close to the
+  raw figure, nothing in front of the API is compressing — check with
+  `curl -H 'Accept-Encoding: gzip' -sI "$TARGET_URL/api/players/dashboard-index"`
+  and look for `content-encoding: gzip`.
+- **`exactly-1000-row responses`.** PostgREST clamps every response at
+  `db-max-rows` (1,000 here) with an HTTP 200 and no error. A read that
+  returns exactly 1,000 rows is far more likely clamped than coincidental.
+  Non-zero means go and look at that endpoint's query.
+
+Both player endpoints sit behind a 2-minute in-process cache, so run the
+full 13 minutes — a short run measures the cache, not the database.
+
+**Read-only.** This scenario issues no writes, so it is safe against a
+staging project with real fixtures. It is still 200 VUs of authenticated
+load, so set `TARGET_URL` explicitly and never leave it on the
+production default.
 
 ---
 

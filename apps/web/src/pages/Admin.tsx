@@ -85,7 +85,7 @@ const Admin = () => {
         navigate('/');
         return;
       }
-      toast({ title: "Admin Dashboard Won't Load", description: "Couldn't load the admin dashboard — refresh and we'll pick it back up.", variant: 'destructive' });
+      toast({ title: "Admin Dashboard Won't Load", description: "Couldn't load the admin dashboard. Refresh and we'll pick it back up.", variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -224,8 +224,8 @@ const Admin = () => {
               <TableBody>
                 {users.map((u: any) => (
                   <TableRow key={u.id}>
-                    <TableCell className="font-medium">{u.username || '—'}</TableCell>
-                    <TableCell>{[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}</TableCell>
+                    <TableCell className="font-medium">{u.username || '-'}</TableCell>
+                    <TableCell>{[u.first_name, u.last_name].filter(Boolean).join(' ') || '-'}</TableCell>
                     <TableCell>{formatDate(u.created_at)}</TableCell>
                     <TableCell className="text-xs text-white/55 font-mono">{u.id?.slice(0, 8)}...</TableCell>
                   </TableRow>
@@ -279,7 +279,7 @@ const Admin = () => {
                 {auditLog.map((entry: any) => (
                   <TableRow key={entry.id}>
                     <TableCell><Badge variant="outline">{entry.event_type}</Badge></TableCell>
-                    <TableCell className="text-xs font-mono">{entry.user_id?.slice(0, 8) || '—'}...</TableCell>
+                    <TableCell className="text-xs font-mono">{entry.user_id?.slice(0, 8) || '-'}...</TableCell>
                     <TableCell className="max-w-xs truncate text-xs">{typeof entry.details === 'object' ? JSON.stringify(entry.details) : entry.details}</TableCell>
                     <TableCell>{formatDate(entry.created_at)}</TableCell>
                   </TableRow>

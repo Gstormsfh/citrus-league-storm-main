@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from "react";
-import { Toaster } from "@/components/ui/toaster";
+import { CitrusToaster } from "@/components/notifications/CitrusToaster";
 import { logger } from '@/utils/logger';
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -74,6 +74,7 @@ const Scores = lazyWithErrorHandling(() => import("./pages/Scores"));
 const PlayoffBracket = lazyWithErrorHandling(() => import("./pages/PlayoffBracket"));
 const FreeAgents = lazyWithErrorHandling(() => import("./pages/FreeAgents"));
 const Players = lazyWithErrorHandling(() => import("./pages/Players"));
+const PlayerDashboard = lazyWithErrorHandling(() => import("./pages/PlayerDashboard"));
 const GMOffice = lazyWithErrorHandling(() => import("./pages/GMOffice"));
 const StormyAssistant = lazyWithErrorHandling(() => import("./pages/StormyAssistant"));
 const News = lazyWithErrorHandling(() => import("./pages/News"));
@@ -128,7 +129,6 @@ const PreviewRink = lazyWithErrorHandling(() => import("./pages/PreviewRink"));
 const PreviewBoards = lazyWithErrorHandling(() => import("./pages/PreviewBoards"));
 const PreviewClone = lazyWithErrorHandling(() => import("./pages/PreviewClone"));
 const PreviewDashboardPrimitives = lazyWithErrorHandling(() => import("./pages/PreviewDashboardPrimitives"));
-const PreviewPlayerProfile = lazyWithErrorHandling(() => import("./pages/PreviewPlayerProfile"));
 
 // Use the picturesque LoadingScreen as the Suspense fallback for lazy-loaded routes
 const PageLoader = () => <LoadingScreen />;
@@ -175,7 +175,7 @@ const App = () => {
         <NativeBootSplash />
         <AuthProvider>
           <TooltipProvider>
-            <Toaster />
+            <CitrusToaster />
             <Sonner position="top-right" closeButton />
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <a href="#main-content" className="skip-to-content">Skip to content</a>
@@ -210,6 +210,21 @@ const App = () => {
                 <Route path="/scores" element={<ProtectedRoute><ErrorBoundary><Scores /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/free-agents" element={<ErrorBoundary><FreeAgents /></ErrorBoundary>} />
                 <Route path="/players" element={<ProtectedRoute><ErrorBoundary><Players /></ErrorBoundary></ProtectedRoute>} />
+                {/* COMPONENT 6.5 — the player dashboard, SHIPPED. The
+                    composition lived at /preview-player-profile inside the
+                    import.meta.env.DEV gate below, which is statically false
+                    in a production build, so Rollup dropped the route and
+                    nobody has ever seen it. This route is outside the gate.
+
+                    Deliberately NOT wrapped in ProtectedRoute, unlike
+                    /players. This is the shareable, deep-linkable surface
+                    (spec PWS-1: "standalone deep-dive, SEO-indexable"), and
+                    a shared link that bounces a signed-out visitor to /auth
+                    is a dead link. The API still 401s — the endpoint is
+                    behind authMiddleware — and the page renders that as its
+                    own sign-in state, which is the honest version of the
+                    same gate and the one that tells the visitor what to do. */}
+                <Route path="/players/:playerId" element={<ErrorBoundary><PlayerDashboard /></ErrorBoundary>} />
                 <Route path="/gm-office" element={<ProtectedRoute><ErrorBoundary><GMOffice /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/gm-office/stormy" element={<ProtectedRoute><ErrorBoundary><StormyAssistant /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/news" element={<News />} />
@@ -262,7 +277,6 @@ const App = () => {
                 <Route path="/preview-boards" element={<PreviewBoards />} />
                 <Route path="/preview-clone" element={<PreviewClone />} />
                 <Route path="/preview-dashboard-primitives" element={<PreviewDashboardPrimitives />} />
-                <Route path="/preview-player-profile" element={<PreviewPlayerProfile />} />
                 </>)}
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

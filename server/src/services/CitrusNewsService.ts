@@ -205,14 +205,14 @@ const bounceBackDetector: Detector = {
         season,
         headline: `${person.full_name} generated ${fmt(xg)} goals' worth of chances and scored ${goals}`,
         body:
-          `${person.full_name} finished last season with ${goals} goals in ${row.games_played} games ` +
-          `on ${fmt(xg)} expected — a shortfall of ${fmt(shortfall)}. ` +
-          `The chances were there; the finishing wasn't.`,
+          `${person.full_name} finished last season with ${goals} goals in ${row.games_played} games. ` +
+          `Citrus xG v3 had him at ${fmt(xg)} expected, a shortfall of ${fmt(shortfall)}. ` +
+          `The chances were there. The finishing wasn't.`,
         analysis:
           `Shooting percentage is the least repeatable number on a stat sheet, and a gap this size ` +
           `usually closes on its own. ${surname} is the type drafts undervalue, because draft position ` +
-          `anchors on last year's goal total rather than the chances behind it. Worth a look anywhere ` +
-          `he's being priced on the ${goals}.`,
+          `anchors on last year's goal total rather than the chances behind it. Buy him anywhere ` +
+          `he's priced on the ${goals}.`,
         severity: 'positive',
         tags: ['Bounce-back', 'Buy-low', 'xG'],
       });
@@ -252,12 +252,12 @@ const regressionRiskDetector: Detector = {
         season,
         headline: `${person.full_name} scored ${goals} on ${fmt(xg)} expected goals`,
         body:
-          `${person.full_name} put up ${goals} goals in ${row.games_played} games against ${fmt(xg)} expected, ` +
-          `finishing ${fmt(over)} goals above what the quality of his chances predicted.`,
+          `${person.full_name} put up ${goals} goals in ${row.games_played} games against ${fmt(xg)} expected ` +
+          `on Citrus xG v3, finishing ${fmt(over)} goals above what the quality of his chances predicted.`,
         analysis:
           `This is a flag, not a verdict. Genuinely elite shooters beat their expected totals year after ` +
-          `year, and the model does not know how good a release is — so the honest read is that some of ` +
-          `this is skill and some is variance. What is hard to defend is paying for a repeat of the full ` +
+          `year, and Citrus xG cannot see how good a release is, so some of this is skill and some is ` +
+          `variance. What is hard to defend is paying for a repeat of the full ` +
           `${goals}. If ${surname}'s draft price assumes that number is the new baseline, the risk sits ` +
           `with whoever pays it.`,
         severity: 'caution',
@@ -323,8 +323,8 @@ const usageSurgeDetector: Detector = {
         season,
         headline: `${person.full_name}'s ice time jumped ${fmt(delta)} minutes a night`,
         body:
-          `${person.full_name} averaged ${fmt(now)} minutes per game last season, up from ${fmt(before)} ` +
-          `the year before — a ${fmt(delta)}-minute increase across ${row.games_played} games.`,
+          `${person.full_name} averaged ${fmt(now)} minutes per game last season on the Citrus season ` +
+          `file, up from ${fmt(before)} the year before, a ${fmt(delta)}-minute jump across ${row.games_played} games.`,
         analysis:
           `Ice time is the most stable input to fantasy production, and a jump this size is a coaching ` +
           `decision rather than a hot streak. Even if the point totals haven't caught up yet, the ` +
@@ -379,7 +379,7 @@ const goalieWorkloadDetector: Detector = {
           `percentage${row.wins ? ` and ${row.wins} wins` : ''}` +
           `${row.shutouts ? `, including ${row.shutouts} shutout${row.shutouts === 1 ? '' : 's'}` : ''}.`,
         analysis:
-          `Volume is most of a fantasy goalie's value — saves and wins are counting stats, and you cannot ` +
+          `Volume is most of a fantasy goalie's value. Saves and wins are counting stats and you cannot ` +
           `accumulate either from the bench. A goalie who clears 45 appearances at this save rate is ` +
           `holding a crease outright rather than splitting it, which is the profile worth drafting. ` +
           `${surname} belongs in the tier where you take the starts and stop worrying about the committee.`,
@@ -512,7 +512,7 @@ const bigGameDetector: Detector = {
           `${row.shots_on_goal ? `, on ${row.shots_on_goal} shot${Number(row.shots_on_goal) === 1 ? '' : 's'} on goal` : ''}` +
           `${toiMin ? ` across ${fmt(toiMin)} minutes of ice time` : ''}.`,
         analysis:
-          `One night is one night — a ${points}-point game says more about the night than the player. ` +
+          `One night is one night. A ${points}-point game says more about the night than the player. ` +
           `What's worth checking is whether the ice time behind it is new: production follows deployment, ` +
           `and a jump in minutes is the part that lasts after the box score stops being interesting.`,
         severity: 'positive',
@@ -561,7 +561,7 @@ const goalieGemDetector: Detector = {
           : `${surname} turned aside ${saves} of ${shotsFaced} shots to win ${weekdayName(row.game_date)}'s game.`,
         analysis:
           `Goalie starts are the scarcest resource in fantasy hockey, and the useful signal in a night ` +
-          `like this is the workload, not the result — a netminder facing this volume is being trusted ` +
+          `like this is the workload, not the result. A netminder facing this volume is being trusted ` +
           `with the crease rather than splitting it.`,
         severity: 'positive',
         tags: shutout ? ['Shutout', 'Goalie'] : ['Goalie', 'Workload'],
@@ -632,7 +632,7 @@ const pointStreakDetector: Detector = {
           `${surname} has ${points} point${points === 1 ? '' : 's'} (${goals}G, ${assists}A) over the run, ` +
           `which is still active as of ${weekdayName(mostRecent.game_date)}'s game.`,
         analysis:
-          `Streaks are worth reading as evidence of role rather than as a prediction — the run itself ` +
+          `Streaks are worth reading as evidence of role rather than as a prediction. The run itself ` +
           `won't continue indefinitely, but a player producing this consistently is being given the ` +
           `minutes and linemates to do it. That part usually outlasts the streak.`,
         severity: 'positive',
@@ -748,13 +748,13 @@ const seasonOutlookDetector: Detector = {
         let verdict: string;
         if (gp >= 55) {
           tier = 'Clear starter';
-          verdict = `${gp} projected appearances is an undisputed crease. That volume is the single most valuable thing a fantasy goalie offers, and it is what separates the position's first tier from everyone else.`;
+          verdict = `${gp} projected appearances on the Citrus ROS projection is an undisputed crease. That volume is the single most valuable thing a fantasy goalie offers, and it is what separates the position's first tier from everyone else.`;
         } else if (gp >= 45) {
           tier = "Starter's share";
           verdict = `${gp} projected appearances is a starter's workload with a real backup behind him. Draftable as a number one, but the margin for a cold stretch is thinner than it looks.`;
         } else if (gp >= 30) {
           tier = 'Committee crease';
-          verdict = `${gp} projected appearances points at a split crease. Committee goalies win you weeks and lose you months — better as a matchup streamer than a set-and-forget starter.`;
+          verdict = `${gp} projected appearances on the Citrus ROS projection points at a split crease. Committee goalies win you weeks and lose you months, so stream him on matchups rather than setting him and forgetting him.`;
         } else {
           tier = 'Backup';
           verdict = `${gp} projected appearances is backup usage. Worth a look only if the starter ahead of him is fragile or the schedule is unusually heavy.`;
@@ -767,7 +767,7 @@ const seasonOutlookDetector: Detector = {
           season: outlookSeason,
           headline: `${label} Outlook: ${tier}`,
           body:
-            `${name} projects for ${gp} appearances in ${label}, with ` +
+            `The Citrus ROS projection has ${name} at ${gp} appearances in ${label}, with ` +
             `${sentenceList([
               `${Math.round(wins)} wins`,
               `${Math.round(saves)} saves`,
@@ -794,19 +794,19 @@ const seasonOutlookDetector: Detector = {
       let verdict: string;
       if (fppg >= 4.5) {
         tier = 'Elite fantasy asset';
-        verdict = `A first-round profile. Roughly the top of the projection set, and the kind of player you build a roster around rather than fit into one.`;
+        verdict = `A first-round profile. Roughly the top of the Citrus ROS projection set, and the kind of player you build a roster around rather than fit into one.`;
       } else if (fppg >= 4.0) {
         tier = 'Top-tier starter';
-        verdict = `Only about 60 skaters project at this rate — around five per team in a 12-team league. That is a genuine early-round starter, not a good player who happens to be available.`;
+        verdict = `Only about 60 skaters project at this rate on the Citrus ROS projection, around five per team in a 12-team league. That is a genuine early-round starter, not a good player who happens to be available.`;
       } else if (fppg >= 3.15) {
         tier = 'Weekly starter';
-        verdict = `Comfortably above the median projection. The kind of player you start every week without checking the matchup first.`;
+        verdict = `Comfortably above the median on the Citrus ROS projection. The kind of player you start every week without checking the matchup first.`;
       } else if (fppg >= 2.45) {
         tier = 'Depth piece';
-        verdict = `Right around the middle of the projection set. Useful on a bench, worth starting on a heavy schedule week, not someone to reach for.`;
+        verdict = `Right around the middle of the Citrus ROS projection set. Useful on a bench, worth starting on a heavy schedule week, not someone to reach for.`;
       } else {
         tier = 'Streamer';
-        verdict = `Below the median projection. Best used as a schedule-driven streamer than a rostered starter — the value is in the games played, not the rate.`;
+        verdict = `Below the median on the Citrus ROS projection. Better as a schedule-driven streamer than a rostered starter, because the value is in the games played, not the rate.`;
       }
 
       // Peripherals are the whole case for a lot of otherwise ordinary
@@ -831,8 +831,8 @@ const seasonOutlookDetector: Detector = {
         season: outlookSeason,
         headline: `${label} Outlook: ${tier}`,
         body:
-          `${name} projects for ${Math.round(goals)} goals and ${Math.round(assists)} assists across ` +
-          `${gp} games in ${label} — ${fmt(fppg, 2)} fantasy points per game, ` +
+          `The Citrus ROS projection has ${name} at ${Math.round(goals)} goals and ${Math.round(assists)} assists across ` +
+          `${gp} games in ${label}: ${fmt(fppg, 2)} fantasy points per game, ` +
           `${Math.round(totalFantasy)} on the season.`,
         analysis: `${verdict}${extraSentence}`,
         severity: fppg >= 3.15 ? 'positive' : 'info',

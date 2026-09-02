@@ -5,7 +5,13 @@ import { HockeyPlayer } from "./HockeyPlayerCard";
 import { CitrusSparkle, CitrusLeaf } from "@/components/icons/CitrusIcons";
 import { generatePlayerWriteup } from "@/utils/playerWriteup";
 import { SlotPickerMenu } from "./SlotPickerMenu";
-import { useMemo, useState } from "react";
+// Aliased: the list body already names its slot->position map `slotLabel`.
+import { slotLabel as labelForSlot } from "./slotLabel";
+import { LOCKED_CHIP } from "./slotChip";
+import { DEFAULT_IR_SLOT_COUNT, irSlotIds } from "./irSlots";
+import { Mug } from "./Mug";
+import { useSwapHint } from "@/hooks/useSwapHint";
+import { useMemo } from "react";
 // The chip (geometry, per-position colour + ring, raw-position -> key) lives
 // in its own module so the mobile Matchup rows wear the identical chip. The
 // contrast rationale for the colour pairs is documented there.
@@ -17,6 +23,18 @@ import {
   posRingColor,
   positionChipKey,
 } from "./positionChip";
+
+// The phone row type scale (name / headline number / meta / micro). Lives in
+// its own module because the matchup rows and the Free Agents rows wear the
+// SAME four rungs — the audit finding was that this row is flat, not that it
+// is small, and a ladder only exists if every row climbs the same one.
+import {
+  ROW_HEADLINE,
+  ROW_HEADLINE_LABEL,
+  ROW_META,
+  ROW_MICRO,
+  ROW_NAME,
+} from "@/components/phoneRowScale";
 
 import type { PositionType } from "@/utils/rosterUtils";
 
@@ -35,8 +53,28 @@ interface MobileRosterListProps {
   onBenchTap?: () => void;
   /** Clear the tap selection. Fired when the slot menu is dismissed. */
   onCancelSelection?: () => void;
+  /**
+   * An EMPTY starter row was tapped with nothing selected — the manager is
+   * standing on the hole and wants to fill it. The page opens the Fill
+   * sheet with the bench players who can legally take the slot. (With a
+   * player already selected the same tap is a move, via `onSlotTap`.)
+   */
+  onFillSlot?: (slotId: string) => void;
+  /**
+   * Show the one-time "Tap a position to swap" hint when this list is
+   * editable. Off by default so read-only surfaces (demo league, guests)
+   * never promise a gesture that only toasts "read only".
+   */
+  swapHint?: boolean;
   positionType?: PositionType;
   rosterSlots?: Record<string, number>;
+  /**
+   * Injured Reserve slots in this league (audit R8). The section renders
+   * whether or not anyone is on IR, headed "Injured Reserve n/N", so the
+   * slot is discoverable before the first injury. Resolve it with
+   * `resolveIrSlotCount` (the server's rule); 0 hides the section.
+   */
+  irSlotCount?: number;
 }
 
 /**
@@ -115,12 +153,20 @@ const formatStatLine = (player: HockeyPlayer): { text: string; isActual: boolean
 // squeeze and wrapped — "FINAL 4-2" rendered as "FINAL 4-" over "2", which
 // doubled the row height and broke the list's rhythm. A status chip is
 // atomic: it is either shown whole or the row truncates something else.
+//
+// 9px -> 10px + leading-none (2026-09-02, type-scale pass): 10px is the
+// scale's MICRO floor, and `leading-none` is what pays for the extra pixel
+// — the chip's own line box, not the 12px text beside it, sets the height
+// of the meta line, so at 9px/normal leading it made that line 17.5px and
+// at 10px/none it makes it 14px. Bigger chip, shorter row. The class lists
+// stay literal strings: MobileRosterList.statusChip.test.ts parses this
+// block for `<span className="...">` and reads the guards out of it.
 const GameStatusBadge = ({ status, score }: { status?: string; score?: string }) => {
   if (!status || status === 'scheduled') return null;
 
   if (status === 'final') {
     return (
-      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-white/10 text-white/70 uppercase whitespace-nowrap flex-shrink-0">
+      <span className="text-[10px] leading-none font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-white/10 text-white/70 uppercase whitespace-nowrap flex-shrink-0">
         Final{score ? ` ${score}` : ''}
       </span>
     );
@@ -128,7 +174,7 @@ const GameStatusBadge = ({ status, score }: { status?: string; score?: string })
 
   if (status === 'live' || status === 'intermission') {
     return (
-      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-red-500/15 text-red-400 uppercase animate-pulse whitespace-nowrap flex-shrink-0">
+      <span className="text-[10px] leading-none font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-red-500/15 text-red-400 uppercase animate-pulse whitespace-nowrap flex-shrink-0">
         {status === 'intermission' ? 'INT' : 'LIVE'}{score ? ` ${score}` : ''}
       </span>
     );
@@ -151,8 +197,6 @@ interface PlayerRowProps {
 }
 
 const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isEligibleTarget, onPositionTap, onNameTap, onEmptySlotTap }: PlayerRowProps) => {
-  const [imgErr, setImgErr] = useState(false);
-
   const isGoalie = player ? (player.position === 'Goalie' || player.position === 'G') : slotPosition === 'G';
   const gameStatus = player?.nextGame?.gameStatus;
   const isLiveOrFinal = gameStatus === 'live' || gameStatus === 'intermission' || gameStatus === 'final';
@@ -162,7 +206,6 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
   const projPts = dailyProj?.total_projected_points || 0;
   const displayPts = isLiveOrFinal ? actualPts : projPts;
   const teamAbbr = player?.teamAbbreviation || (player?.team?.split(' ').pop()?.substring(0, 3).toUpperCase()) || '';
-  const teamLogoUrl = player ? `https://assets.nhle.com/logos/nhl/svg/${player.teamAbbreviation || 'NHL'}_light.svg` : '';
   // Same one-liner the desktop card carries, so the roster reads identically
   // on both surfaces. Pure arithmetic over player.stats — no fetch.
   const writeup = player ? generatePlayerWriteup(player) : null;
@@ -174,68 +217,95 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
     WVR: { label: 'WVR', cls: 'bg-blue-500 text-white' },
   }[player.status] : null;
 
+  // EMPTY ROW = ONE TARGET (2026-09-01, audit R2). The dashed box used to be
+  // the only tappable part of an empty row, and with nothing selected the
+  // tap did nothing at all. Now the whole row is the control: with a player
+  // selected it is the move target it always was; with nothing selected it
+  // opens the Fill sheet. The label says which.
+  const isEmpty = player == null;
+  const emptyLabel = isEligibleTarget
+    ? `Move here: ${labelForSlot(slotId)}`
+    : `Empty ${labelForSlot(slotId)}, tap to fill`;
+
   return (
     <div
       className={cn(
         "flex items-center gap-2.5 px-3 py-2 min-h-[52px] transition-all border-b border-pastel-sage/10",
         isSwapSelected && "!bg-pastel-orange/10 !border-pastel-orange/30",
         isEligibleTarget && !isSwapSelected && "!bg-pastel-sage/10 !border-pastel-sage/30",
-        isLocked && "opacity-60",
+        // LOCKED ROWS STAY LEGIBLE (audit R5): no row-level dimming. The
+        // players scoring RIGHT NOW were the hardest to read at 60%; the
+        // chip carries the lock instead (see below).
+        isEmpty && "cursor-pointer active:bg-white/5",
       )}
+      role={isEmpty ? 'button' : undefined}
+      aria-label={isEmpty ? emptyLabel : undefined}
+      onClick={isEmpty ? onEmptySlotTap : undefined}
     >
-      {/* Position badge — tap to swap */}
+      {/* Position badge — tap to swap. The ⇄ glyph (audit R2) says so; on a
+          locked player the lock takes its place (audit R5). Both live in
+          CHILD spans: the base class and the posColor/posRingColor maps are
+          pinned by MobileRosterList.positionRing.test.tsx and stay as they are. */}
       <div
         className={cn(
           // No `text-white` in the base — posColor owns the text colour so
           // it can never disagree with its own background (see positionChip).
           POSITION_CHIP_BASE,
-          "active:scale-95 transition-transform cursor-pointer",
-          posColor[slotPosition] || POSITION_CHIP_FALLBACK,
-          posRingColor[slotPosition] || POSITION_RING_FALLBACK,
+          // flex-col: the roster chip stacks the label over the swap/lock glyph.
+          "flex-col active:scale-95 transition-transform cursor-pointer",
+          // Locked players wear the neutral locked chip (audit R5); the
+          // fallback pair lives beside the maps in positionChip.
+          isLocked ? LOCKED_CHIP : (posColor[slotPosition] || POSITION_CHIP_FALLBACK),
+          !isLocked && (posRingColor[slotPosition] || POSITION_RING_FALLBACK),
           isEligibleTarget && !isSwapSelected && "!ring-pastel-sage !ring-2 animate-pulse",
           isSwapSelected && "!ring-pastel-orange !ring-2",
         )}
-        onClick={(e) => { e.stopPropagation(); onPositionTap?.(); }}
+        data-locked={isLocked ? 'true' : undefined}
+        onClick={(e) => { e.stopPropagation(); (isEmpty ? onEmptySlotTap : onPositionTap)?.(); }}
       >
-        {slotPosition}
+        <span className="leading-none">{slotPosition}</span>
+        {isLocked ? (
+          <span data-testid="chip-lock" className="mt-px flex items-center justify-center leading-none" aria-hidden="true">
+            <Lock className="w-2.5 h-2.5" />
+          </span>
+        ) : (
+          <span data-testid="chip-swap-glyph" className="-mt-px font-sans text-[10px] leading-none opacity-80" aria-hidden="true">
+            ⇄
+          </span>
+        )}
       </div>
 
       {player ? (
         <>
-          {/* Team logo */}
-          <div className="w-7 h-7 flex-shrink-0 rounded-full overflow-hidden bg-pastel-sage/10 border border-pastel-sage/20 relative">
-            {!imgErr ? (
-              <img
-                src={teamLogoUrl}
-                alt={teamAbbr}
-                className="w-full h-full object-contain p-0.5"
-                onError={() => setImgErr(true)}
-              />
-            ) : (
-              <Shield className="w-4 h-4 text-pastel-sage absolute inset-0 m-auto" />
-            )}
-            {isLocked && (
-              <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
-                <Lock className="w-2.5 h-2.5 text-muted-foreground" />
-              </div>
-            )}
-          </div>
+          {/* Headshot (2026-09-01, audit R3) — the face, where the team crest
+              used to be. The same 28px box, so nothing else on the row moved;
+              the crest survives as a 14px badge on the mug's shoulder. Falls
+              back crest → initials, never a broken image (see Mug). */}
+          <Mug p={player} size="xs" crest />
 
           {/* Player info — 2 lines max, tap to open card */}
           <div className="flex-1 min-w-0 cursor-pointer" onClick={(e) => { e.stopPropagation(); onNameTap?.(); }}>
-            {/* Line 1: Name + status badge */}
+            {/* Line 1: Name + status badge. 13px -> the scale's NAME rung
+                (15px): this is the row's first read and it was two pixels
+                off the number it sits beside. */}
             <div className="flex items-center gap-1.5">
-              <span className="font-display font-bold text-[13px] text-pastel-cream truncate leading-tight">
+              <span className={cn(ROW_NAME, "text-pastel-cream")}>
                 {player.name}
               </span>
               {statusBadge && (
-                <span className={cn("text-[8px] font-bold px-1 py-px rounded-sm leading-none flex-shrink-0", statusBadge.cls)}>
+                /* 8px -> the MICRO rung. A solid saturated fill at 8px beside
+                   a 15px name is a smudge rather than a word (the same note
+                   freeAgentRow.ts makes about its own status chip). */
+                <span className={cn(ROW_MICRO, "leading-none font-bold px-1 py-px rounded-sm flex-shrink-0", statusBadge.cls)}>
                   {statusBadge.label}
                 </span>
               )}
             </div>
-            {/* Line 2: Team · Opponent · Game status/time · Stats (single line, truncated) */}
-            <div className="flex items-center gap-1 text-[11px] text-white/55 font-display leading-tight mt-0.5 overflow-hidden">
+            {/* Line 2: Team · Opponent · Game status/time · Stats (single line,
+                truncated). 11px -> the META rung (12px), and `mt-0.5`/
+                `leading-tight` -> `mt-px`/`leading-none`, which is what keeps
+                the three-line row at 62px instead of 67 (see ROW_META). */}
+            <div className={cn(ROW_META, "flex items-center gap-1 text-white/55 font-display mt-px overflow-hidden")}>
               <span className="font-semibold flex-shrink-0">{teamAbbr}</span>
               {player.nextGame?.opponent && (
                 <>
@@ -257,7 +327,13 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                         return (
                           <>
                             <span className="text-white/25 flex-shrink-0">·</span>
-                            <span className="text-emerald-700 font-semibold truncate">
+                            {/* text-emerald-700 (#047857) measured 2.71:1 on
+                                the #1A2A20 tile — dark ink on a dark page,
+                                and the one line of the row that only appears
+                                once a game is LIVE. pastel-sage is the app's
+                                own "this has happened" green and measures
+                                5.5:1 on the same tile. */}
+                            <span className="text-pastel-sage font-semibold truncate">
                               {statInfo.text}
                             </span>
                           </>
@@ -279,7 +355,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 Availability (IR/GTD/SUSP) wins this line when it applies, since
                 that is the decision the manager is actually making. */}
             {writeup?.cardNote && (
-              <div className="flex items-center gap-1 mt-0.5 overflow-hidden">
+              <div className="flex items-center gap-1 mt-px overflow-hidden">
                 <span
                   className={cn(
                     'w-1 h-1 rounded-full flex-shrink-0',
@@ -291,50 +367,78 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                   )}
                   aria-hidden="true"
                 />
-                <span className="text-[10px] font-display text-white/55 truncate leading-tight">
+                {/* HELD AT THE MICRO RUNG, on purpose. This is the row's
+                    fourth line and its only optional one — an aside, not a
+                    fact the lineup decision turns on. Promoting it to 12px
+                    would put it level with the game line and cost every
+                    three-line row ~3px of height; holding it at 10px is what
+                    makes the 12px game line above it read as a rung up. */}
+                <span className={cn(ROW_MICRO, "font-display text-white/55 truncate")}>
                   {writeup.cardNote}
                 </span>
               </div>
             )}
           </div>
 
-          {/* Points column */}
+          {/* Points column — the number the row exists to show.
+              15px font-varsity black -> the scale's HEADLINE rung (17px
+              JetBrains Mono, tabular). Three things changed at once because
+              they were one defect:
+                * SIZE: 15px against a 13px name is not a hierarchy.
+                * FAMILY: `font-varsity` put this number under index.css's
+                  `h1, h2, .font-varsity:not(button) { text-pastel-cream }`
+                  (specificity 0-1-1), which beat both utilities below it —
+                  every points figure on the phone roster rendered CREAM, so
+                  a final score and a projection were the same colour and the
+                  row's only state signal was absent. Measured in the harness
+                  at 393x852: rgb(255,248,240) on a row whose class said
+                  text-pastel-orange.
+                * FIGURES: tabular-nums holds the decimal point on one x down
+                  a forty-row list.
+              "12.3" at 17px JetBrains Mono is 40.8px, inside this column's
+              52px, so nothing moved sideways. */}
           <div className="flex-shrink-0 w-[52px] text-right">
             {hasGame ? (
               <div className="flex flex-col items-end">
                 <span className={cn(
-                  "font-varsity text-[15px] font-black leading-none",
-                  isLiveOrFinal ? "text-emerald-700" : "text-pastel-orange"
+                  ROW_HEADLINE,
+                  // sage = a number that has happened, orange = a forecast.
+                  // The same pair the matchup score stack uses, app-wide.
+                  isLiveOrFinal ? "text-pastel-sage" : "text-pastel-orange"
                 )}>
                   {displayPts.toFixed(1)}
                 </span>
-                <span className={cn(
-                  "text-[9px] font-display font-semibold uppercase leading-tight mt-0.5",
-                  isLiveOrFinal ? "text-emerald-600/70" : "text-white/55"
-                )}>
+                {/* One muted colour for the unit in BOTH states: the number
+                    above carries the state, and a label that also changed
+                    colour was a second signal saying the same thing at a
+                    tenth of the size. (The old live/final variant was
+                    text-emerald-600/70 — 3.4:1 on this tile.) */}
+                <span className={cn(ROW_HEADLINE_LABEL, "font-semibold text-white/55 mt-1")}>
                   {isLiveOrFinal ? (gameStatus === 'final' ? 'final' : 'live') : 'proj'}
                 </span>
               </div>
             ) : (
-              <span className="text-[11px] text-white/55 font-display">—</span>
+              <span className={cn(ROW_META, "text-white/55 font-display")}>-</span>
             )}
           </div>
         </>
       ) : (
-        /* Empty slot */
+        /* Empty slot — the row itself is the target (see the wrapper). */
         <div
           className={cn(
             "flex-1 flex items-center justify-center py-1.5 rounded-md border border-dashed",
             isEligibleTarget ? "border-pastel-sage bg-pastel-sage/5" : "border-white/10 bg-white/[0.03]",
           )}
-          onClick={onEmptySlotTap}
         >
-          <span className={cn(
-            "text-xs font-display",
-            isEligibleTarget ? "text-pastel-sage font-bold" : "text-white/25",
-          )}>
-            {isEligibleTarget ? "Tap to move here" : "Empty"}
-          </span>
+          {isEligibleTarget ? (
+            <span className="text-xs font-display text-pastel-sage font-bold">Tap to move here</span>
+          ) : (
+            <span className="text-xs font-display text-white/55">
+              Empty
+              <span className="text-white/25" aria-hidden="true"> · </span>
+              <span className="text-pastel-sage font-semibold">tap to fill</span>
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -342,12 +446,14 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
 };
 
 // ─── Section header ──────────────────────────────────────────────────
-const SectionHeader = ({ label, count, icon }: { label: string; count: number; icon: React.ReactNode }) => (
+// `of` prints the badge as "filled/slots" — the IR header uses it so an
+// empty section still says how many slots the league has (audit R8).
+const SectionHeader = ({ label, count, of, icon }: { label: string; count: number; of?: number; icon: React.ReactNode }) => (
   <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-pastel-sage/20 via-pastel-sage/10 to-transparent border-b border-pastel-sage/25">
     {icon}
     <span className="text-sm font-varsity font-black text-pastel-cream uppercase tracking-wide">{label}</span>
-    <Badge variant="outline" className="text-[10px] font-display h-4 px-1.5 ml-auto border-pastel-sage/30 text-white/60">
-      {count}
+    <Badge variant="outline" className="text-[10px] font-display tabular-nums h-4 px-1.5 ml-auto border-pastel-sage/30 text-white/60">
+      {of == null ? count : `${count}/${of}`}
     </Badge>
   </div>
 );
@@ -366,9 +472,16 @@ const MobileRosterList = ({
   onSlotTap,
   onBenchTap,
   onCancelSelection,
+  onFillSlot,
+  swapHint = false,
   positionType = 'individual',
   rosterSlots,
+  irSlotCount = DEFAULT_IR_SLOT_COUNT,
 }: MobileRosterListProps) => {
+
+  // First-visit hint (audit R2) — once, and only when there is a roster to
+  // swap within. The hook owns the storage flag and the toast.
+  useSwapHint(swapHint && starters.length + bench.length > 0);
 
   // Build dynamic slot config from position type
   const slotConfig = buildSlotConfig(positionType, rosterSlots);
@@ -426,6 +539,13 @@ const MobileRosterList = ({
       const isSelected = player != null && player.id === tapSelectedPlayerId;
       const isTarget = tapSelectedPlayerId != null && tapEligibleSlots.has(slotId) && !isSelected;
 
+      // An empty row is a MOVE target while a player is selected and a
+      // FILL trigger otherwise — one gesture, read against the page's state.
+      const fillOrMove = () => {
+        if (tapSelectedPlayerId != null) onSlotTap?.(slotId);
+        else onFillSlot?.(slotId);
+      };
+
       const row = (
         <PlayerRow
           key={slotId}
@@ -435,18 +555,24 @@ const MobileRosterList = ({
           isLocked={player ? lockedPlayerIds.has(String(player.id)) : false}
           isSwapSelected={isSelected}
           isEligibleTarget={isTarget}
-          onPositionTap={() => {
-            if (player && onPlayerTap) onPlayerTap(player);
-            else if (!player && onSlotTap) onSlotTap(slotId);
-          }}
+          onPositionTap={() => { if (player) onPlayerTap?.(player); }}
           onNameTap={() => player && onPlayerNameTap?.(player)}
-          onEmptySlotTap={() => onSlotTap?.(slotId)}
+          onEmptySlotTap={fillOrMove}
         />
       );
       return row;
     });
 
   const benchIsTarget = tapSelectedPlayerId != null && tapEligibleSlots.has('bench-grid');
+
+  // The first OPEN IR slot the page judged legal for the selected player —
+  // `tapEligibleSlots` is Roster.tsx's and already carries the is_ir_eligible
+  // gate; this only skips slots someone is already lying in.
+  const openIrTarget = useMemo(() => {
+    if (tapSelectedPlayerId == null) return null;
+    const taken = new Set(Object.values(slotAssignments));
+    return irSlotIds(irSlotCount).find((id) => tapEligibleSlots.has(id) && !taken.has(id)) ?? null;
+  }, [tapSelectedPlayerId, tapEligibleSlots, slotAssignments, irSlotCount]);
 
   // CONTRAST (2026-08-13) — was `bg-card`, which resolves to the LIGHT
   // theme token (--card: 85 40% 90% => #E7F0DB). Every text token in
@@ -534,12 +660,17 @@ const MobileRosterList = ({
         })}
       </div>
 
-      {/* IR */}
-      {ir.length > 0 && (
+      {/* IR — always on the page (audit R8). The section used to render only
+          once someone was hurt, so a manager with a healthy roster had no way
+          to learn the league even had IR slots. Now it is headed "Injured
+          Reserve n/N" from the league's real slot count, with an empty-state
+          row until it is needed. */}
+      {irSlotCount > 0 && (
         <>
           <SectionHeader
             label="Injured Reserve"
             count={ir.length}
+            of={irSlotCount}
             icon={<Skull className="w-4 h-4 text-red-400" />}
           />
           {ir.map(player => {
@@ -559,6 +690,30 @@ const MobileRosterList = ({
             );
             return row;
           })}
+          {openIrTarget ? (
+            /* A selected IR-eligible player: the open slot is a move target,
+               the same gesture the empty starter rows offer. */
+            <div
+              role="button"
+              aria-label="Move here: IR"
+              data-testid="ir-move-target"
+              className="flex items-center px-3 py-2 min-h-[44px] cursor-pointer bg-pastel-sage/10 border-b border-pastel-sage/30 active:bg-pastel-sage/15"
+              onClick={() => onSlotTap?.(openIrTarget)}
+            >
+              <div className="flex-1 flex items-center justify-center py-1.5 rounded-md border border-dashed border-pastel-sage bg-pastel-sage/5">
+                <span className="text-xs font-display text-pastel-sage font-bold">Tap to move to IR</span>
+              </div>
+            </div>
+          ) : ir.length === 0 ? (
+            <div
+              data-testid="ir-empty"
+              className="flex items-center px-3 py-2 min-h-[44px] border-b border-pastel-sage/10"
+            >
+              <div className="flex-1 flex items-center justify-center py-1.5 rounded-md border border-dashed border-white/10 bg-white/[0.03]">
+                <span className="text-xs font-display text-white/55">No one on IR</span>
+              </div>
+            </div>
+          ) : null}
         </>
       )}
 

@@ -243,7 +243,7 @@ export default function CapPlayerCard({ player, maxCapHit }: CapPlayerCardProps)
     </div>
   );
 
-  const popoverClasses = "bg-citrus-forest/95 backdrop-blur-md text-citrus-cream p-4 max-w-[280px] rounded-2xl border-2 border-citrus-sage/40 shadow-varsity !z-[9999]";
+  const popoverClasses = "bg-citrus-forest/95 backdrop-blur-md text-citrus-cream p-4 max-w-[280px] rounded-2xl border-2 border-citrus-sage/40 shadow-varsity !z-popover";
 
   // Mobile: Use Popover (tap to open, tap outside to close)
   if (isMobile) {

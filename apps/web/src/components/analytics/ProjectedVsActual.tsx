@@ -112,7 +112,7 @@ export function ProjectedVsActual({ totals, players, className }: ProjectedVsAct
           </p>
           <h3 className="font-calistoga text-xl text-pastel-cream mt-0.5">Are you beating the model?</h3>
           <p className="text-[11px] text-white/55 mt-1 max-w-sm leading-relaxed">
-            The ring is what a roster projected like yours <em>typically</em> returns — not the raw
+            The ring is what a roster projected like yours <em>typically</em> returns, not the raw
             projection, which runs hot. Outside the ring is genuine outperformance.
           </p>
         </div>
@@ -171,8 +171,8 @@ export function ProjectedVsActual({ totals, players, className }: ProjectedVsAct
               }}
               labelStyle={{ color: '#FFF8F0', fontWeight: 700 }}
               formatter={(v: number, n: string, item: { payload?: { raw?: CategoryPair } }) => {
-                if (n === 'Expected') return [`100% (${item?.payload?.raw?.projected.toFixed(1) ?? '—'} proj)`, 'Expected'];
-                return [`${v}% (${item?.payload?.raw?.actual.toFixed(1) ?? '—'} actual)`, 'Actual'];
+                if (n === 'Expected') return [`100% (${item?.payload?.raw?.projected.toFixed(1) ?? '-'} proj)`, 'Expected'];
+                return [`${v}% (${item?.payload?.raw?.actual.toFixed(1) ?? '-'} actual)`, 'Actual'];
               }}
             />
           </RadarChart>
@@ -194,7 +194,7 @@ export function ProjectedVsActual({ totals, players, className }: ProjectedVsAct
             </>
           )}
           <p className="mt-3 text-[10px] leading-relaxed text-white/55">
-            Ranked by ratio to expectation, not by raw points — the model's error grows with the
+            Ranked by ratio to expectation, not by raw points. The model's error grows with the
             size of a projection, and a ratio is the only comparison that survives it.
           </p>
         </div>

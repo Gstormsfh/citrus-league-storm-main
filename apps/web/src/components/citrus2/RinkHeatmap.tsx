@@ -399,8 +399,8 @@ export function RinkHeatmap({
     <section
       aria-label={
         playerName
-          ? `Shot heatmap for ${playerName} — ${shots.length} shots in ${mode} view`
-          : `Shot heatmap — ${shots.length} shots in ${mode} view`
+          ? `Shot heatmap for ${playerName}: ${shots.length} shots in ${mode} view`
+          : `Shot heatmap: ${shots.length} shots in ${mode} view`
       }
       className={cn(
         'relative w-full max-w-[1100px] mx-auto overflow-hidden',

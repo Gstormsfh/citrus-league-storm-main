@@ -131,7 +131,7 @@ export function CompletionMomentBanner({
               : 'Rosters are set'}
           </h2>
           <p className="mt-2 text-sm text-white/70">
-            All {totalPicks} picks are in. Screenshot the board — it's your league's opening-day photo.
+            All {totalPicks} picks are in. Screenshot the board. It's your league's opening-day photo.
           </p>
 
           <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-3">

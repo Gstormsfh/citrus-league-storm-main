@@ -35,6 +35,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { structuredLogger, getProjectionsSeason } from '@citrus/shared';
+import { readAllPaged } from '../lib/pagedRead';
 
 /** Input to every auction auto-nominate strategy. */
 export interface AuctionAutoNominateInput {
@@ -149,13 +150,47 @@ export const projectionsAuctionStrategy: AuctionAutoNominateStrategy = async ({
   // for determinism (snake/linear `projectionsStrategy` doesn't
   // explicitly tiebreak, but auction wants determinism for
   // reproducible bootstrap behavior).
-  const { data: projections, error: projErr } = await supabase
-    .from('player_ros_projections')
-    .select('player_id, total_projected_points')
+  //
+  // PAGED (2026-09-02 scale audit). This read was a single unbounded
+  // `.select()`. PostgREST clamps every response at `db-max-rows`
+  // (1,000 on this project) and returns HTTP 200 with a short body and
+  // no error — the exact defect `autopickStrategy.ts` documents at
+  // length under AUTOPICK-TRUNCATION and AUTOPICK-TRUNCATION-2, twice,
+  // on this same table. `player_ros_projections` already exceeds the
+  // clamp (1,055 rows for the projections season), and the note in the
+  // sibling file spells out why this matters on a DRAFT BOARD
+  // specifically: refresh projections from prod (1,361 rows) and the
+  // board silently loses the overflow.
+  //
+  // Ordering here is by projected points DESC, so today's dropped rows
+  // are the least valuable players and the nomination this returns is
+  // unlikely to change. That is luck, not design — it holds only while
+  // fewer than 1,000 players have been consumed, and it stops holding
+  // the moment the sort key or the strategy chain changes. Paging costs
+  // one extra round trip on a table that is 55 rows over the clamp and
+  // removes the trap.
+  //
+  // The cheaper alternative — `.limit(consumedSet.size + 1)`, valid
+  // because the first un-consumed row in this order is always the
+  // answer — is deliberately NOT taken: it couples the read to the
+  // strategy's current single-pass shape, and a second strategy in the
+  // chain would silently reintroduce truncation. Deferred with the
+  // per-lobby memoisation of this board (see
+  // docs/PERFORMANCE_AND_SCALE_2026-09-02.md).
+  const { data: projections, error: projErr } = await readAllPaged<{
+    player_id: number | string;
+    total_projected_points: number | null;
+  }>(supabase, {
+    table: 'player_ros_projections',
+    columns: 'player_id, total_projected_points',
     // Season-sweep 2026-08-24: see autopickStrategy — never mix seasons.
-    .eq('season', getProjectionsSeason())
-    .order('total_projected_points', { ascending: false, nullsFirst: false })
-    .order('player_id', { ascending: true });
+    filters: [['season', getProjectionsSeason()]],
+    // `player_id` is unique per row for a season and is the ONLY safe
+    // page key: paging on `total_projected_points` would overlap and
+    // skip across windows wherever two players share a projection.
+    // Points ordering is re-applied in memory below.
+    orderBy: ['player_id'],
+  });
   if (projErr) {
     structuredLogger.error(
       'auction.autonominate.projections_read_failed',
@@ -165,10 +200,25 @@ export const projectionsAuctionStrategy: AuctionAutoNominateStrategy = async ({
     return { ok: false, reason: 'no_eligible_players' };
   }
 
-  for (const row of (projections ?? []) as Array<{
-    player_id: number | string;
-    total_projected_points: number | null;
-  }>) {
+  // Re-apply the board's sort in memory. The read above pages on
+  // `player_id` (the only unique key), so the DESC-by-points ordering
+  // that used to come from PostgREST has to be restored here. This
+  // reproduces `order('total_projected_points', {ascending:false,
+  // nullsFirst:false}).order('player_id', {ascending:true})` exactly:
+  // points descending, NULLs last, `player_id` ascending as the
+  // deterministic tiebreaker the strategy relies on for reproducible
+  // bootstrap behaviour.
+  const board = [...(projections ?? [])].sort((a, b) => {
+    const av = a.total_projected_points;
+    const bv = b.total_projected_points;
+    const aNull = av === null || av === undefined;
+    const bNull = bv === null || bv === undefined;
+    if (aNull !== bNull) return aNull ? 1 : -1; // nulls last
+    if (!aNull && !bNull && av !== bv) return (bv as number) - (av as number);
+    return Number(a.player_id) - Number(b.player_id);
+  });
+
+  for (const row of board) {
     const pidStr = String(row.player_id);
     if (!consumedSet.has(pidStr)) {
       return {

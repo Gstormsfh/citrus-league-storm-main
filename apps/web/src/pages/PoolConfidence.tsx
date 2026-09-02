@@ -149,8 +149,8 @@ const PoolConfidence = () => {
     try {
       const r = await PoolService.submitConfidencePicks(activeLeagueId, user.id, currentWeek, arr);
       if (r.success) toast({ title: 'Picks Submitted', description: `${arr.length} picks saved.` });
-      else toast({ title: "Picks Didn't Submit", description: r.error || "Couldn't submit your picks — try again in a moment.", variant: 'destructive' });
-    } catch { toast({ title: "Picks Didn't Submit", description: "Couldn't reach the pool server — try again in a moment.", variant: 'destructive' }); }
+      else toast({ title: "Picks Didn't Submit", description: r.error || "Couldn't submit your picks. Try again in a moment.", variant: 'destructive' });
+    } catch { toast({ title: "Picks Didn't Submit", description: "Couldn't reach the pool server. Try again in a moment.", variant: 'destructive' }); }
     finally { setSubmitting(false); }
   };
 
@@ -177,7 +177,7 @@ const PoolConfidence = () => {
         <div className="flex-1 min-w-0 px-3 sm:px-4 lg:px-8 xl:px-12">
           {userLeagueState === 'logged-in-no-league' && (
             <div className="mb-8 max-w-3xl mx-auto">
-              <LeagueCreationCTA title="Join a Confidence Pool" description="Rank your picks by confidence — earn more points for correct high-confidence picks!" />
+              <LeagueCreationCTA title="Join a Confidence Pool" description="Rank your picks by confidence. The higher the confidence on a correct pick, the more it pays." />
             </div>
           )}
 
@@ -205,7 +205,7 @@ const PoolConfidence = () => {
           </div>
 
           {/* Header — STICKY below navbar */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 sticky top-[92px] z-30 bg-[#0F1F15]/95 backdrop-blur-md py-2 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 sticky top-[92px] z-section-header bg-[#0F1F15]/95 backdrop-blur-md py-2 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center bg-[#1A2A20] rounded-md ring-1 ring-white/10 overflow-hidden">
                 <Button variant="ghost" size="icon" aria-label="Previous week" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
@@ -249,7 +249,7 @@ const PoolConfidence = () => {
                       ✦ Between slates
                     </div>
                     <p className="font-bold text-lg text-pastel-cream">The board is dark tonight.</p>
-                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">This week's slate hasn't dropped yet — swing back Wednesday when the confidence rankings open.</p>
+                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">This week's slate hasn't dropped yet. Swing back Wednesday when the confidence rankings open.</p>
                   </div>
                 </GlowCard>
               ) : (
@@ -397,7 +397,7 @@ const PoolConfidence = () => {
                       ✦ Awaiting the first whistle
                     </div>
                     <p className="font-bold text-pastel-cream text-base">Standings light up after week 1 wraps.</p>
-                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Rank every game by confidence — high stakes on the ones you're sure about.</p>
+                    <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Rank every game by confidence. High stakes on the ones you're sure about.</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">

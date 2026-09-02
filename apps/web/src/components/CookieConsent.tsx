@@ -22,9 +22,9 @@ export function CookieConsent() {
   };
 
   return (
-    <div className="fixed bottom-[4.5rem] lg:bottom-0 inset-x-0 z-50 p-3 sm:p-4 bg-white/95 backdrop-blur border-t shadow-lg">
+    <div className="fixed bottom-[4.5rem] lg:bottom-0 inset-x-0 z-app-nav p-3 sm:p-4 bg-white/95 backdrop-blur border-t shadow-lg">
       <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-center gap-3 text-sm">
-        <p className="flex-1 text-gray-700">
+        <p className="flex-1 text-pastel-forest">
           We use analytics cookies to improve your experience. You can opt out anytime.
         </p>
         {/* 2026-08-19: this banner is one of the few LIGHT surfaces left

@@ -146,6 +146,104 @@ describe('PlayerService', () => {
 
       expect(callCount2).toBe(callCount1);
     });
+
+    // ── REGRESSION (2026-09-02 scale audit) ──────────────────────────
+    // These reads were `.range(0, 4999)` with no `.order()`. `.range()`
+    // is not an escape hatch: PostgREST clamps the ranged response
+    // server-side at db-max-rows (1,000 on this project) and returns
+    // HTTP 200 with a short body and no error. `player_directory`
+    // carries ~1.9k rows for a season, so this method — the one that
+    // feeds the DRAFT POOL and FREE AGENTS — was handing callers roughly
+    // half the league in physical-row order.
+    //
+    // That is the same defect that put a fringe player at the top of the
+    // draft board (docs/ARCHITECT_INBOX.md), fixed in
+    // usePreloadedPlayers.ts and twice in autopickStrategy.ts, and
+    // missed here.
+    //
+    // The mock clamps at 1,000 exactly like the server, so an unpaged
+    // read cannot pass.
+    it('pages past the PostgREST row clamp instead of silently truncating', async () => {
+      const PG_MAX_ROWS = 1000;
+      const TOTAL = 1900; // ~prod player_directory for one season
+
+      const directory = Array.from({ length: TOTAL }, (_, i) => ({
+        player_id: 8000000 + i,
+        full_name: `Player ${i}`,
+        position_code: 'C',
+        team_abbrev: 'TOR',
+        jersey_number: null,
+        headshot_url: null,
+        eligible_positions: ['C'],
+      }));
+
+      const rangeCalls: Array<[number, number]> = [];
+      const pagedDirectory: Record<string, any> = {};
+      for (const m of ['select', 'eq', 'order']) pagedDirectory[m] = vi.fn(() => pagedDirectory);
+      pagedDirectory.range = vi.fn((from: number, to: number) => {
+        rangeCalls.push([from, to]);
+        const requested = to - from + 1;
+        return Promise.resolve({
+          data: directory.slice(from, from + Math.min(requested, PG_MAX_ROWS)),
+          error: null,
+        });
+      });
+
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'player_directory') return pagedDirectory;
+        return createChain({ data: [], error: null });
+      });
+
+      const result = await service.getAllPlayers();
+
+      expect(result.error).toBeFalsy();
+      // Every player, not the first thousand.
+      expect(result.players).toHaveLength(TOTAL);
+      // No duplicates and no gaps across the page boundary.
+      expect(new Set(result.players.map((p: any) => p.id)).size).toBe(TOTAL);
+      // Paged, not one wide range: page 1, page 2, then a short page 3.
+      expect(rangeCalls[0]).toEqual([0, 999]);
+      expect(rangeCalls[1]).toEqual([1000, 1999]);
+      // And every page asked for a deterministic sort — paging without
+      // one lets adjacent windows overlap and skip.
+      expect(pagedDirectory.order).toHaveBeenCalledWith('player_id', { ascending: true });
+    });
+
+    // ── REGRESSION (2026-09-02 scale audit) ──────────────────────────
+    // Read-through cache with no single-flight: when the 2-minute TTL
+    // lapsed, every concurrent request missed and every one of them ran
+    // the same four table reads and the same merge. At draft-pool
+    // request rates that is a thundering herd against PostgREST once
+    // every two minutes.
+    it('collapses concurrent cache misses into a single load (no stampede)', async () => {
+      let resolveDirectory: (v: any) => void = () => {};
+      const gate = new Promise((resolve) => {
+        resolveDirectory = resolve;
+      });
+
+      const slowDirectory: Record<string, any> = {};
+      for (const m of ['select', 'eq', 'order']) slowDirectory[m] = vi.fn(() => slowDirectory);
+      slowDirectory.range = vi.fn(() => gate);
+
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'player_directory') return slowDirectory;
+        return createChain({ data: [], error: null });
+      });
+
+      // Fifty callers arrive while the first load is still in flight.
+      const inFlight = Array.from({ length: 50 }, () => service.getAllPlayers());
+      resolveDirectory({ data: [], error: null });
+      const results = await Promise.all(inFlight);
+
+      // One load, not fifty.
+      expect(slowDirectory.range).toHaveBeenCalledTimes(1);
+      expect(mockSupabase.from).toHaveBeenCalledTimes(4); // directory + stats + talent + gsax
+      // And every caller got the same answer.
+      for (const r of results) {
+        expect(r.error).toBeFalsy();
+        expect(r.players).toEqual(results[0].players);
+      }
+    });
   });
 
   describe('getPlayersByIds', () => {
