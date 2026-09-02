@@ -54,7 +54,7 @@ import { ScoringCalculator } from '@/utils/scoringUtils';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { DropPlayerForAddDialog } from '@/components/freeagents/DropPlayerForAddDialog';
 import { FreeAgentRow } from '@/components/freeagents/FreeAgentRow';
-import { FA_CHIP, FA_CHIP_ROW, freeAgentAction, sortByProjection, waiverClearsLabel } from '@/components/freeagents/freeAgentRow';
+import { FA_CHIP, FA_CHIP_ROW, FA_ROWS_ONLY, FA_TABLE_ONLY, freeAgentAction, sortByProjection, waiverClearsLabel } from '@/components/freeagents/freeAgentRow';
 import { cn } from '@/lib/utils';
 import { ArrowLeftRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -1428,7 +1428,7 @@ const FreeAgents = () => {
         * a `useIsMobile()` read — a CSS branch has no hydration flash and
         * no `window.innerWidth` on the render path.
         */}
-      <div className="lg:hidden sticky top-0 z-40 bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
         <div className="flex items-center justify-between h-12 px-4">
           <div className="w-10" />
           <h1 className="text-lg font-bold text-pastel-cream">Free Agents</h1>
@@ -1572,7 +1572,7 @@ const FreeAgents = () => {
                         {/* Phone list — the shared FreeAgentRow. The old rows
                             here carried a name, a position and an add count:
                             nothing you could pick a player WITH. */}
-                        <div className="lg:hidden">
+                        <div className={FA_ROWS_ONLY}>
                           {topTrending.map((player, i) => (
                             <FreeAgentRow
                               key={player.id}
@@ -1591,8 +1591,8 @@ const FreeAgents = () => {
                           ))}
                         </div>
 
-                        {/* Desktop Table View */}
-                        <div className="hidden lg:block">
+                        {/* The table, from `md` up — see FA_TABLE_ONLY. */}
+                        <div className={FA_TABLE_ONLY}>
                           <Table className="[&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5 [&_td]:tabular-nums">
                             <TableHeader>
                               <TableRow>
@@ -1697,7 +1697,7 @@ const FreeAgents = () => {
                           </div>
                         )}
                         {/* Phone list — the shared FreeAgentRow. */}
-                        <div className="lg:hidden">
+                        <div className={FA_ROWS_ONLY}>
                           {topProjected.map((player, i) => (
                             <FreeAgentRow
                               key={player.id}
@@ -1716,8 +1716,8 @@ const FreeAgents = () => {
                           ))}
                         </div>
 
-                        {/* Desktop Table View */}
-                        <div className="hidden lg:block">
+                        {/* The table, from `md` up — see FA_TABLE_ONLY. */}
+                        <div className={FA_TABLE_ONLY}>
                           <Table className="[&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5 [&_td]:tabular-nums">
                             <TableHeader>
                               <TableRow>
@@ -1820,11 +1820,18 @@ const FreeAgents = () => {
                         * `min-w-[600px]` table inside `overflow-x-auto`: on a
                         * 393px phone the decision column — the projection —
                         * was off the right edge, reachable only by dragging
-                        * the table sideways. Below `lg` it is a list of
-                        * FreeAgentRows ordered by that projection, and the
-                        * table stays for the desktop that has room for it.
+                        * the table sideways. Below the point where the table
+                        * FITS it is a list of FreeAgentRows ordered by that
+                        * projection instead.
+                        *
+                        * That point is `md`, not `lg`, and it is measured —
+                        * `FA_ROWS_ONLY` / `FA_TABLE_ONLY` in
+                        * `components/freeagents/freeAgentRow.ts` carry the
+                        * numbers. A 820px tablet was getting a 64px row with
+                        * 700px of empty space beside it and no sortable
+                        * column, on a screen where all twelve columns fit.
                         */}
-                      <div className="lg:hidden" data-testid="free-agents-phone-list">
+                      <div className={FA_ROWS_ONLY} data-testid="free-agents-phone-list">
                         {phoneRows.map((player, i) => (
                           <FreeAgentRow
                             key={player.id}
@@ -1842,7 +1849,7 @@ const FreeAgents = () => {
                           />
                         ))}
                       </div>
-                      <div className="hidden lg:block overflow-x-auto">
+                      <div className={`${FA_TABLE_ONLY} overflow-x-auto`}>
                         <Table className="min-w-[600px] [&_th]:px-2 [&_th]:py-2 [&_th]:text-xs [&_td]:px-2 [&_td]:py-1.5 [&_td]:tabular-nums">
                           <TableHeader>
                             <TableRow>

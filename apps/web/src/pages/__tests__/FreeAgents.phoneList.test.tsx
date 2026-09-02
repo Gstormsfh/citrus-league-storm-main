@@ -101,20 +101,71 @@ describe('every phone list is the shared row', () => {
     }
   });
 
-  it('the sideways table is desktop-only, and the phone list stands in its place', () => {
+  it('the sideways table is not the phone experience, and the row list stands in its place', () => {
     const list = blockFrom('data-testid="free-agents-phone-list"', 900);
     expect(list).toContain('<FreeAgentRow');
     // The wrapper that used to be the phone experience.
-    expect(PAGE).toContain('<div className="hidden lg:block overflow-x-auto">');
     expect(PAGE).not.toContain('<div className="overflow-x-auto">\n                        <Table className="min-w-[600px]');
   });
+});
 
-  it('the summary cards hand the phone the list and the desktop the table', () => {
-    // Both cards previously split at `md`, which left a 768–1023px tablet on
-    // the desktop table. The redesign is everything under `lg`.
-    expect(count('<div className="lg:hidden">')).toBeGreaterThanOrEqual(2);
-    expect(count('<div className="hidden md:block">')).toBe(0);
-    expect(count('<div className="md:hidden">')).toBe(0);
+/**
+ * WHERE THE ROW LIST STOPS (2026-09-02, tablet pass).
+ *
+ * Measured in Chromium on the real stylesheet with the pool table's own
+ * markup: the table's minimum content width is 722px, and the container
+ * below `lg` is `viewport - 18px` (the content column's `px-2` plus the
+ * card's 1px border on each side). So the table fits from 768px (750px of
+ * container, 28px of slack) and does not at 744 (726px, 4px — too thin to
+ * build on). Everything from 768 to 1023 was being handed a 64px row with
+ * ~700px of empty space beside it and no sortable columns.
+ *
+ * The switch is a CSS branch and a MEASUREMENT, not a fifth answer to "is
+ * this a phone" — that question still has exactly one (`useIsMobile.ts`,
+ * `MOBILE_BREAKPOINT = 1024`) and this page still asks it nowhere.
+ */
+describe('the row list gives way to the table where the table fits', () => {
+  const ROW_MODULE = readFileSync(
+    resolve(HERE, '..', '..', 'components', 'freeagents', 'freeAgentRow.ts'),
+    'utf8',
+  );
+
+  it('the pair is declared once, in freeAgentRow.ts, at md', () => {
+    expect(ROW_MODULE).toMatch(/export const FA_ROWS_ONLY = 'md:hidden'/);
+    expect(ROW_MODULE).toMatch(/export const FA_TABLE_ONLY = 'hidden md:block'/);
+    // The measurement that chose `md` has to travel with the constants, or
+    // the next sweep moves them back on instinct.
+    expect(ROW_MODULE).toContain('722px');
+  });
+
+  it('every list/table switch on the page uses that pair, and none is hand-typed', () => {
+    // Three surfaces: Trending, Top Projected, the pool.
+    expect(count('FA_ROWS_ONLY', BODY)).toBe(3);
+    expect(count('FA_TABLE_ONLY', BODY)).toBe(3);
+    expect(PAGE).toMatch(
+      /import \{[^}]*FA_ROWS_ONLY[^}]*FA_TABLE_ONLY[^}]*\} from '@\/components\/freeagents\/freeAgentRow'/,
+    );
+    // The literals the constants replaced. `hidden lg:block` still has two
+    // legitimate uses on this page (the desktop Navbar and the mascot
+    // portrait), so what is banned is an `lg` gate wrapping a <Table>.
+    expect(count('<div className="lg:hidden">')).toBe(0);
+    expect(count('<div className="hidden lg:block overflow-x-auto">')).toBe(0);
+    expect(PAGE).not.toMatch(/lg:(?:block|hidden)[^"]*"\s*>\s*<Table/);
+  });
+
+  it('the tablet keeps the mobile chrome — the breakpoints answer different questions', () => {
+    // The page header, the hero and the nav still split at `lg`, because
+    // "does this screen want app chrome" is not "does this table fit".
+    expect(PAGE).toContain('lg:hidden sticky top-0');
+    expect(PAGE).toContain('hidden lg:flex flex-col md:flex-row justify-between');
+    expect(PAGE).toContain('<div className="hidden lg:block"><Navbar /></div>');
+  });
+
+  it('the tap/click hint already split at md, and now agrees with the list', () => {
+    // "Tap a player row" vs "Click any column header to sort" — the second
+    // is only true where the sortable header is on screen.
+    expect(PAGE).toContain('<span className="md:hidden">Tap a player row');
+    expect(PAGE).toContain('<span className="hidden md:inline">Click any column header to sort.');
   });
 });
 

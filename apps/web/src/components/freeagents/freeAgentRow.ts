@@ -246,3 +246,52 @@ export const FA_CHIP_ROW =
 
 /** Every chip is atomic: it never shrinks and it never breaks mid-label. */
 export const FA_CHIP = 'shrink-0 whitespace-nowrap snap-start';
+
+/**
+ * WHERE THE ROW LIST STOPS AND THE TABLE STARTS (2026-09-02, tablet pass).
+ *
+ * These two strings are one decision, so they are one pair of constants
+ * rather than a class typed at six call sites. The decision is NOT "is this
+ * a phone" — that question has exactly one answer in this codebase
+ * (`hooks/useIsMobile.ts`, `MOBILE_BREAKPOINT = 1024`, Tailwind's `lg`) and
+ * nothing here adds a second one. The question is narrower and belongs to
+ * this page: DOES THE TABLE FIT?
+ *
+ * MEASURED, in Chromium on the real stylesheet, with the pool table's own
+ * markup (11 skater columns + the 100px action column):
+ *
+ *   the table's minimum content width .......... 722px
+ *   container below `lg` ....................... viewport - 18px
+ *                                                (`px-2` on the content
+ *                                                 column + the 1px card
+ *                                                 border on each side)
+ *
+ *   viewport   container   table fits?
+ *   393        375         no    → the row list, and this is why it exists
+ *   744        726         yes, by 4px — too thin to build on
+ *   768        750         yes, by 28px      ← Tailwind `md`
+ *   820        802         yes, by 80px      (iPad Air portrait)
+ *   1023       1005        yes, by 283px
+ *
+ * So the pool table fits from `md` up, and everything from 768 to 1023 was
+ * being handed a 64px row with ~700px of empty space beside it and no
+ * sortable columns at all — the row list's order is fixed by projection.
+ *
+ * WHY IT WAS `lg`. The 2026-09-02 phone pass moved every list/table switch
+ * on this page to `lg` in one sweep, on the reasoning that "both cards
+ * previously split at `md`, which left a 768-1023px tablet on the desktop
+ * table". That is the right instinct for a PHONE and the wrong breakpoint
+ * for the table: 768-1023 is precisely the band where it fits.
+ *
+ * A NOTE FOR WHOEVER LOOKS AT THE DESKTOP NEXT. At `lg` and up the page
+ * turns into `grid-cols-[200px_1fr_260px]` with `lg:px-4` and `lg:gap-4`,
+ * so the content column is `viewport - 524px` — 500px at 1024. The table
+ * needs 722. The widest container this table ever gets below ~1250px is a
+ * TABLET, and the desktop rails are what make it scroll sideways there.
+ * That is a real finding and a separate change; it is written up, not
+ * shipped here.
+ */
+export const FA_ROWS_ONLY = 'md:hidden';
+
+/** The other half of the pair above. Never one without the other. */
+export const FA_TABLE_ONLY = 'hidden md:block';
