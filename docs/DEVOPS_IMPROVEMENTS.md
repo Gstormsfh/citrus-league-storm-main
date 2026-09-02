@@ -2,6 +2,23 @@
 
 A running list of improvements to evaluate and implement. Items are not prioritized — order reflects discovery, not urgency.
 
+## Status (as of 2026-09-01)
+
+| # | Item | Status | Notes |
+|---|---|---|---|
+| 1 | main=staging, release/*=prod branching | Open | Not started. `master` still auto-deploys to production. |
+| 2 | Automated pg_dump → pg_restore staging bootstrap | Open | Not started. |
+| 3 | Apply new migrations to staging as a PR gate | Open | Not started. `validate-migrations` in `ci.yml` still never executes SQL. |
+| 4 | TypeScript type errors as a hard CI gate | **Partially done** | `ci.yml` has used a baseline ratchet (fails only when the count rises; `apps/web/.typecheck-baseline`) instead of `\|\| echo` since 2026-08-26. **2026-09-01 (`ops/delivery-script-and-ci-housekeeping`): `production-deploy.yml` now runs the identical ratchet instead of `\|\| echo`.** Still `\|\| echo`: `staging-deploy.yml`. Still open: the hard gate itself (fail on any error), which waits on the baseline reaching 0. |
+| 5 | Prod deploy env vars → Secret Manager | Open | Not started. `production-deploy.yml` still injects `env_vars:` from GitHub secrets. |
+| 6 | Move data pipeline off the Windows machine | Open | Not started. |
+| 7 | Audit `continue-on-error: true` | Open | 4 instances remain, all in `playoff-sync.yml` (lines 83, 89, 103, 119 as of this date). None removed or justified yet. |
+| 8 | `ci.yml` ran every PR push twice | **Done 2026-09-01** | `push` trigger restricted to `master` (was `['**']`, which with `pull_request: ['**']` produced two runs per PR push under different concurrency groups). PR runs unchanged. |
+| 9 | `data-invariants.yml` push trigger pointed at `main` | **Done 2026-09-01** | `branches: [main]` → `[master]`. The push path (migrations / pipeline / `scripts/utilities` changes) had never fired since the file landed on 2026-08-26. |
+| 10 | Committed bundle-to-PR delivery script | **Done 2026-09-01** (script + runbook) | `scripts/delivery/land-bundle.ps1` + `docs/RUNBOOKS/DELIVERY.md` + contract test (`npm run test:scripts`, CI job `Test (Scripts)`). Still needs Garrett once: branch protection on `master` + "Allow auto-merge" (`DELIVERY.md` §6) before `-AutoMerge` works; `-Merge` works today. |
+
+Items 8–10 were added on 2026-09-01 from that day's process audit; they are recorded here so the "done" column has somewhere to live. Items 1–7 keep their original text below.
+
 ---
 
 ## 1. Switch to main=staging, release/XXX=prod branching strategy
@@ -67,7 +84,9 @@ A running list of improvements to evaluate and implement. Items are not prioriti
 
 ## 4. Make TypeScript type errors a hard CI gate
 
-**Current state:** Both `ci.yml` and the deploy workflows run the web type check as `npx tsc --noEmit || echo "::warning::TypeScript found type errors — tracked for strict mode migration"`. Type errors warn but never fail the build or block a deploy.
+**Current state (original, now stale — see the status table):** Both `ci.yml` and the deploy workflows run the web type check as `npx tsc --noEmit || echo "::warning::TypeScript found type errors — tracked for strict mode migration"`. Type errors warn but never fail the build or block a deploy.
+
+**Current state (2026-09-01):** `ci.yml` and `production-deploy.yml` run a baseline ratchet against `apps/web/.typecheck-baseline` — the step fails when the error count rises, notices when it falls. Only `staging-deploy.yml` still has the `|| echo` form. The proposed change below (a true hard gate) remains open and still has the same pre-condition: the baseline must reach 0 first.
 
 **Proposed change:** Remove the `|| echo` fallback so `tsc --noEmit` failures exit non-zero and block the PR. The server type check already does this correctly — the web check should match it.
 

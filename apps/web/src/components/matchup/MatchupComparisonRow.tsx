@@ -52,19 +52,14 @@ export const MatchupComparisonRow = ({
         dailyStatsMap={dailyStatsMap}
       />
       
-      {/* Center Column - hidden on mobile, visible on desktop */}
-      {!isBench && (
-        <CenterColumn 
-          position={position}
-          userPlayer={userPlayer ? { projectedPoints: userProjectedPoints, position: userPlayer.position } : null}
-          opponentPlayer={opponentPlayer ? { projectedPoints: opponentProjectedPoints, position: opponentPlayer.position } : null}
-        />
-      )}
-      {isBench && (
-        <div className="matchup-center-column opacity-40 bg-muted/50 border-muted">
-          <span className="position-label text-muted-foreground/60">{position}</span>
-        </div>
-      )}
+      {/* Center Column — the slot label on desktop, the 32px slot chip on
+          mobile. Bench rows get the neutral BN chip. */}
+      <CenterColumn
+        position={position}
+        isBench={isBench}
+        userPlayer={userPlayer ? { projectedPoints: userProjectedPoints, position: userPlayer.position } : null}
+        opponentPlayer={opponentPlayer ? { projectedPoints: opponentProjectedPoints, position: opponentPlayer.position } : null}
+      />
       
       {/* Opponent Team Player Card */}
       <PlayerCard 

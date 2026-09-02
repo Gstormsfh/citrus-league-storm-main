@@ -1,8 +1,14 @@
 name: CI
 
+# push is master-only. It used to be `branches: ['**']`, which together with the
+# pull_request trigger ran every PR push twice under two different concurrency
+# groups (ci-refs/heads/<branch> and ci-refs/pull/<n>/merge) -- double the
+# minutes, and double what `gh pr checks --watch` had to wait on. PRs are still
+# checked on every push through the pull_request event; master is checked on
+# the squash commit itself.
 on:
   push:
-    branches: ['**']
+    branches: [master]
   pull_request:
     branches: ['**']
 
@@ -378,6 +384,26 @@ jobs:
 
       - name: Run server tests
         run: npm run test --workspace=server
+
+  # Contract tests for the repo's operational scripts (scripts/**/*.test.mjs).
+  # node:test only, no npm ci: they must stay dependency-free so they run
+  # anywhere node does. The first one pins scripts/delivery/land-bundle.ps1
+  # (refspec fetch, never a checkout, refuses master, $LASTEXITCODE after every
+  # git/gh call) -- PowerShell cannot run on this runner, so the script is
+  # checked as text.
+  test-scripts:
+    name: Test (Scripts)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Run script contract tests
+        run: npm run test:scripts
 
   validate-migrations:
     name: Validate Migrations

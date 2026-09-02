@@ -1,7 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { StatBreakdown } from "./types";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { X } from "lucide-react";
 
 /* 2026-08-19 visual audit: light "glass" surface on a dark page — see
@@ -24,17 +24,25 @@ const useIsMobile = () => {
   return isMobile;
 };
 
-export const PointsTooltip = ({ 
-  breakdown, 
-  totalPoints 
-}: { 
+export const PointsTooltip = ({
+  breakdown,
+  totalPoints,
+  children,
+}: {
   breakdown: StatBreakdown | undefined;
   totalPoints: number;
+  /**
+   * Optional custom trigger (same contract as ProjectionTooltip). The mobile
+   * matchup score stack passes its own styled number so the breakdown stays
+   * one tap away without this component dictating the number's colour.
+   */
+  children?: ReactNode;
 }) => {
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
-  
+
   if (!breakdown || Object.keys(breakdown).length === 0) {
+    if (children) return <>{children}</>;
     return (
       <span className="font-varsity font-black text-citrus-orange">
         {totalPoints.toFixed(1)}
@@ -97,14 +105,18 @@ export const PointsTooltip = ({
     return (
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button 
-            className="text-sm text-citrus-orange hover:text-pastel-cream cursor-pointer font-bold font-varsity transition-all touch-manipulation"
+          <button
+            className={
+              children
+                ? "touch-manipulation"
+                : "text-sm text-citrus-orange hover:text-pastel-cream cursor-pointer font-bold font-varsity transition-all touch-manipulation"
+            }
             onClick={(e) => {
               e.stopPropagation();
               // Don't prevent default - let Popover handle the click
             }}
           >
-            {totalPoints.toFixed(1)}
+            {children ?? totalPoints.toFixed(1)}
           </button>
         </PopoverTrigger>
         <PopoverContent 
@@ -124,15 +136,19 @@ export const PointsTooltip = ({
   return (
     <Tooltip open={open} onOpenChange={setOpen}>
       <TooltipTrigger asChild>
-        <button 
-          className="text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] hover:text-pastel-cream cursor-pointer transition-all"
+        <button
+          className={
+            children
+              ? "cursor-pointer"
+              : "text-xs font-varsity font-black text-citrus-orange bg-citrus-peach/30 px-1.5 py-0.5 rounded border border-citrus-peach/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] hover:text-pastel-cream cursor-pointer transition-all"
+          }
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
             setOpen(!open);
           }}
         >
-          {totalPoints.toFixed(1)} pts
+          {children ?? `${totalPoints.toFixed(1)} pts`}
         </button>
       </TooltipTrigger>
       <TooltipContent 
