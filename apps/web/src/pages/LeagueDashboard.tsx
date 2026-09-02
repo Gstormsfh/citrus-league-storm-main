@@ -20,6 +20,8 @@ import { StormyLoading } from '@/components/citrus2/StormyLoading';
 import { getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
+import { useSeasonStatus } from '@/hooks/useSeasonStatus';
+import { shortDateLabel } from '@/components/scores/scoresFormat';
 import { LeagueService, League, Team } from '@/services/LeagueService';
 import { WaiverService } from '@/services/WaiverService';
 import { leagueApi } from '@/api/leagues';
@@ -54,6 +56,7 @@ const LeagueDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: profile } = useProfile();
+  const { status: seasonStatus } = useSeasonStatus();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [simulating, setSimulating] = useState(false);
@@ -557,6 +560,26 @@ const LeagueDashboard = () => {
 
   // Determine if user is commissioner (needs to be before handler functions that use it)
   const isCommissioner = league?.commissioner_id === user?.id;
+
+  /**
+   * THERE IS NO WEEK (2026-09-02 offseason audit).
+   *
+   * The last game in `nhl_games` was 2026-06-14 and the next is 2026-09-29.
+   * On 2026-09-02 this page still linked to "This week's matchup" and told a
+   * manager with a completed draft to "Set your opening lineup" — two claims
+   * about a fantasy week that will not exist for another 27 days.
+   *
+   * The gate is deliberately narrow. `isDormant` alone would also catch the
+   * Christmas break and the Olympic break, where "this week's matchup" is
+   * perfectly true — a fantasy week runs Sunday to Saturday whether or not
+   * the NHL plays on Tuesday. Only the offseason removes the week itself, so
+   * only `phase === 'offseason'` may rewrite this copy. `phase` is 'unknown'
+   * while the schedule is loading and after a failed fetch, so a dead API
+   * renders exactly what it rendered before this change.
+   */
+  const inOffseason = seasonStatus.isDormant && seasonStatus.phase === 'offseason';
+  const seasonOpensOn =
+    inOffseason && seasonStatus.nextGameDate ? shortDateLabel(seasonStatus.nextGameDate) : null;
 
   // Category leagues (H2H categories / roto) edit their category list, not
   // point values — the settings dialog swaps the Scoring tab for a
@@ -1782,11 +1805,21 @@ const LeagueDashboard = () => {
                     </div>
                     <div className="min-w-0">
                       <CardTitle className="font-calistoga text-pastel-cream truncate">{userTeam.team_name}</CardTitle>
+                      {/* "Set your opening lineup" sends a manager to a lineup
+                          screen where every row reads "No Game". On 2026-09-02
+                          the first game is 2026-09-29, so the honest line is the
+                          date, not an instruction that cannot be carried out.
+                          Only the offseason branch changed; a manager whose
+                          roster we actually counted still reads "Roster set". */}
                       <CardDescription className="text-white/55 text-xs mt-0.5">
                         {league.draft_status === 'completed'
                           ? myRosterCount !== null && myRosterCount > 0
                             ? `Roster set · ${myRosterCount} players`
-                            : 'Draft complete. Set your opening lineup'
+                            : inOffseason
+                              ? seasonOpensOn
+                                ? `Draft complete. First puck drops ${seasonOpensOn}.`
+                                : 'Draft complete. Lineups wait on the new season.'
+                              : 'Draft complete. Set your opening lineup'
                           : 'Manage your roster, set lineups, scout the wire.'}
                       </CardDescription>
                     </div>
@@ -2025,10 +2058,27 @@ const LeagueDashboard = () => {
                     <RangeIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} aria-hidden="true" />
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">League quicklinks</div>
                   </div>
+                  {/* THE MATCHUP LINK IS SEASONAL (2026-09-02 audit). "This
+                      week's matchup" is a link to a week that does not exist
+                      between 2026-06-14 and 2026-09-29 — the matchup page in
+                      that gap prints "Final" over "0.0 - 0.0". A quicklink is a
+                      promise about where it goes, so in the offseason it goes
+                      to the Draft Kit, which is the thing there IS to do right
+                      now, and the week gets named as a date instead of linked
+                      to as a place. */}
                   <div className="space-y-1.5">
                     <Link to="/standings" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> Standings</Link>
-                    <Link to="/matchup" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> This week's matchup</Link>
+                    {inOffseason ? (
+                      <Link to="/draft-kit" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> Draft Kit</Link>
+                    ) : (
+                      <Link to="/matchup" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> This week's matchup</Link>
+                    )}
                     <Link to="/team-analytics" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> Team analytics</Link>
+                    {inOffseason && (
+                      <p className="text-[11px] text-white/55 pt-1.5 mt-0.5 border-t border-white/5">
+                        {seasonOpensOn ? `Matchups start ${seasonOpensOn}.` : 'Matchups start when the season does.'}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

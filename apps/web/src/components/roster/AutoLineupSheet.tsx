@@ -60,6 +60,20 @@ export interface AutoLineupSheetProps {
   weekError?: string | null;
   applying?: boolean;
   onApply: () => void;
+  /**
+   * No hockey today and none tomorrow (`SeasonStatus.isDormant`).
+   *
+   * OFFSEASON (2026-09-02). With zero moves this sheet said "Everyone with a
+   * game is already starting. Nothing to change tonight." Nobody had a game;
+   * the sentence asserted the opposite of the fact that produced it. The
+   * word "tonight" is hardcoded for the Today case, so it also promised a
+   * slate 27 days before one existed.
+   *
+   * A zero-move plan has two very different causes — the lineup is optimal,
+   * or there is nothing to optimise. This is what tells them apart.
+   */
+  seasonDormant?: boolean;
+
 }
 
 const fmt = (n: number) => (Number.isFinite(n) ? n.toFixed(1) : '0.0');
@@ -142,6 +156,7 @@ export function AutoLineupSheet({
   weekError = null,
   applying = false,
   onApply,
+  seasonDormant = false,
 }: AutoLineupSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -170,7 +185,9 @@ export function AutoLineupSheet({
     : !ready
       ? 'Checking the rest of the week…'
       : totalMoves === 0
-        ? isWeek ? 'Week already set' : 'Lineup already optimal'
+        ? seasonDormant
+          ? 'No games to set'
+          : isWeek ? 'Week already set' : 'Lineup already optimal'
         : `${plural(totalMoves, 'move', 'moves')} · proj `;
 
   const subline = !ready
@@ -178,7 +195,7 @@ export function AutoLineupSheet({
     : isWeek
       ? `${plural(weekPlans.length, 'day', 'days')} · ${fmt(summary.before)} → ${fmt(summary.after)}`
       : totalMoves === 0
-        ? `proj ${fmt(summary.after)} ${when}`
+        ? seasonDormant ? '' : `proj ${fmt(summary.after)} ${when}`
         : `${fmt(summary.before)} → ${fmt(summary.after)} ${when}`;
 
   const pinnedNote = (plan: AutoLineupPlan) =>
@@ -293,7 +310,9 @@ export function AutoLineupSheet({
               {pinnedNote(day)}
               {day.moves.length === 0 ? (
                 <p className="px-4 py-6 text-center text-xs font-display text-white/55">
-                  Everyone with a game is already starting. Nothing to change {when}.
+                  {seasonDormant
+                    ? 'No games scheduled, so there is nothing to set. Lineups matter again when the season opens.'
+                    : `Everyone with a game is already starting. Nothing to change ${when}.`}
                 </p>
               ) : (
                 <ul>

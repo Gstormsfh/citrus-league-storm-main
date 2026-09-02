@@ -29,6 +29,8 @@ import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { StormyService, fetchLeagueContext, fetchPlayoffPoolContext, type StormyMessage, type StormyContext } from '@/services/StormyService';
 import { isPlayoffPoolLeague, getLeagueTypeFromSettings } from '@/utils/leagueTypeHelpers';
+import { useSeasonStatus } from '@/hooks/useSeasonStatus';
+import { shortDateLabel } from '@/components/scores/scoresFormat';
 
 interface ChatMessage {
   id: string;
@@ -42,12 +44,41 @@ const WEEKLY_LIMIT = 3; // 3 questions per matchup week
 const StormyAssistant = () => {
   const { userLeagueState, activeLeagueId, activeLeague } = useLeague();
   const auth = useAuth();
+  const { status: seasonStatus } = useSeasonStatus();
+  /**
+   * STORMY IN THE OFFSEASON (2026-09-02 audit).
+   *
+   * The last NHL game was 2026-06-14 and the next is 2026-09-29, and this page
+   * had no idea. It offered a "Start/sit help" chip for a night nobody plays,
+   * told the reader it had "this week's matchup, and the live xG model ... all
+   * loaded before you hit send" when neither the matchup nor anything live
+   * exists, and metered the quota in "matchup weeks" during a 107-day gap
+   * between them.
+   *
+   * Gated on the offseason specifically, not on `isDormant`: over Christmas
+   * there IS a matchup in flight and a start/sit question is answerable on
+   * Friday, so a three-day break must not rewrite any of this. `phase` reads
+   * 'unknown' while the schedule loads and after a failed fetch, which leaves
+   * every string below exactly as it shipped.
+   */
+  const inOffseason = seasonStatus.isDormant && seasonStatus.phase === 'offseason';
+  const seasonOpensOn =
+    inOffseason && seasonStatus.nextGameDate ? shortDateLabel(seasonStatus.nextGameDate) : null;
   const [activeTab, setActiveTab] = useState("chat");
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [messagesUsed, setMessagesUsed] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const defaultGreeting = "Well boss, Stormy here. I already have your league, your roster and picks, and the live playoff bracket in front of me. Ask me for a roster review, a start/sit, a waiver target, or a read on any matchup, and I'll show you the numbers behind the call.";
+  /**
+   * The greeting is the loudest claim on the page and it fails the same way
+   * the chips do: "the live playoff bracket in front of me" describes a
+   * bracket that ended 2026-06-14, and "a start/sit" is a question with no
+   * answer until 2026-09-29. Same four subjects as the offseason chips, so
+   * the opening line and the chips under it agree.
+   */
+  const offseasonGreeting = `Well boss, Stormy here. The season is dark until ${seasonOpensOn ?? 'opening night'}, so there is no lineup to set and no matchup to read. What I do have is your league, your roster and picks, and the xG projections. Ask me about draft prep, keepers, or what any player is worth.`;
+  const greeting = inOffseason ? offseasonGreeting : defaultGreeting;
   const apiHistoryRef = useRef<StormyMessage[]>((() => {
     try {
       const saved = localStorage.getItem('stormyApiHistory');
@@ -78,6 +109,29 @@ const StormyAssistant = () => {
   useEffect(() => {
     try { localStorage.setItem('stormyApiHistory', JSON.stringify(apiHistoryRef.current.slice(-50))); } catch { /* quota */ }
   });
+
+  /**
+   * WHY THE GREETING IS SWAPPED AND NOT SEEDED.
+   *
+   * The schedule arrives over the network a beat after first paint, so at the
+   * moment `useState` runs the phase is still 'unknown'. Seeding from it would
+   * make a slow or failed fetch open the page with whichever greeting lost the
+   * race. The seed is therefore always the in-season text (the direction
+   * `useSeasonStatus` is built to fail in) and this corrects it once a real
+   * answer lands.
+   *
+   * The guard is the untouched opening message and nothing else: exactly one
+   * message, id '1', from Stormy. The moment the reader has said anything the
+   * transcript is theirs and this stops rewriting it. The id and timestamp are
+   * preserved, so the same swap runs in reverse when the season opens.
+   */
+  useEffect(() => {
+    setMessages((prev) =>
+      prev.length === 1 && prev[0].id === '1' && prev[0].sender === 'stormy' && prev[0].text !== greeting
+        ? [{ ...prev[0], text: greeting }]
+        : prev,
+    );
+  }, [greeting]);
 
   // Proactively warm the context as soon as the page loads so the user's
   // first message doesn't wait on a DB roundtrip.
@@ -390,14 +444,29 @@ const StormyAssistant = () => {
                     </Card>
 
                     {/* Quick suggestion chips — visible only when chat is empty-ish */}
+                    {/* A starter chip is a promise that the question has an
+                        answer. "Start/sit help" on 2026-09-02 does not: nobody
+                        plays for 27 days, so every chip Stormy could return is
+                        "no game". The offseason set asks the four questions that
+                        ARE live in September — the draft, keepers, roster shape
+                        and player value — which is the same ground the Draft Kit
+                        covers. */}
                     {messages.length <= 2 && (
                       <div className="max-w-3xl mx-auto mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {[
-                          { icon: CrossedSticksIcon, label: 'Review my roster' },
-                          { icon: ScoreboardIcon,    label: 'Start/sit help' },
-                          { icon: ShiftIcon,         label: 'Waiver targets' },
-                          { icon: PuckIcon,          label: 'Trade advice' },
-                        ].map(({ icon: Icon, label }) => (
+                        {(inOffseason
+                          ? [
+                              { icon: CrossedSticksIcon, label: 'Draft prep' },
+                              { icon: MaskIcon,          label: 'Keeper advice' },
+                              { icon: ShiftIcon,         label: 'Roster targets' },
+                              { icon: XGModelIcon,       label: 'Player research' },
+                            ]
+                          : [
+                              { icon: CrossedSticksIcon, label: 'Review my roster' },
+                              { icon: ScoreboardIcon,    label: 'Start/sit help' },
+                              { icon: ShiftIcon,         label: 'Waiver targets' },
+                              { icon: PuckIcon,          label: 'Trade advice' },
+                            ]
+                        ).map(({ icon: Icon, label }) => (
                           <button
                             key={label}
                             type="button"
@@ -421,16 +490,25 @@ const StormyAssistant = () => {
                         <CardHeader className="relative z-10">
                           <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
                             <Zap className="h-5 w-5 text-pastel-orange" />
-                            Matchup Week Usage
+                            {/* The quota really is a rolling 7 days (see the
+                                Resets row below), which only coincides with a
+                                matchup week while matchups are being played.
+                                Between 2026-06-14 and 2026-09-29 there are no
+                                matchup weeks to spend a question in. */}
+                            {inOffseason ? 'Question Usage' : 'Matchup Week Usage'}
                           </CardTitle>
-                          <CardDescription className="text-white/55">Questions remaining this week</CardDescription>
+                          <CardDescription className="text-white/55">
+                            {inOffseason ? 'Questions remaining before the next reset' : 'Questions remaining this week'}
+                          </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6 relative z-10">
                           <div className="text-center py-4">
                             <div className="font-calistoga text-6xl text-pastel-orange tabular-nums leading-none">
                               {messagesUsed}<span className="text-2xl text-white/55 ml-1">/{WEEKLY_LIMIT}</span>
                             </div>
-                            <p className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-white/55 font-bold mt-2">Questions Used This Week</p>
+                            <p className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-white/55 font-bold mt-2">
+                              {inOffseason ? 'Questions Used' : 'Questions Used This Week'}
+                            </p>
                           </div>
 
                           <div className="space-y-2">
@@ -540,8 +618,15 @@ const StormyAssistant = () => {
                     <RangeIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
                     <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">What I see</div>
                   </div>
+                  {/* The capability claim has to survive the calendar. In the
+                      offseason there is no matchup to load and nothing about the
+                      xG model is live — it is projecting a season that has not
+                      started. Naming what is missing, and the date it returns,
+                      costs one clause and keeps the tile honest. */}
                   <p className="text-[11px] text-white/70 leading-relaxed">
-                    Your active league, current roster, this week's matchup, and the live xG model. All loaded before you hit send.
+                    {inOffseason
+                      ? `Your active league, your roster and picks, and the xG projection model. No games until ${seasonOpensOn ?? 'the season opens'}, so there is no live matchup to read.`
+                      : "Your active league, current roster, this week's matchup, and the live xG model. All loaded before you hit send."}
                   </p>
                 </div>
               </div>
