@@ -34,6 +34,42 @@ renders "No matchup data available" because the harness stubs the three league G
 and not `MatchupService`, so the rows it exists to show never mount there. The rows
 themselves need only two arrays of players.
 
+## The roster is real
+
+Every surface above draws its players from `harness/players.ts`: **60 real NHL
+players** — real names, teams, sweater numbers, NHL player ids and 2025-26 stat
+lines, read out of the production `players` table on 2026-09-02. The first 18
+are a legal 18-man roster (5×C, 3×LW, 3×RW, 5×D, 2×G), so any entry point that
+slices the head of the list gets a lineup a manager could start.
+
+**Faces come from the NHL CDN**, at the exact URL shape production stores:
+
+```
+https://assets.nhle.com/mugs/nhl/20252026/<TEAM>/<nhlId>.png
+```
+
+**A machine with no route to `assets.nhle.com` still shows crests or
+initials.** `Mug` falls back headshot → team crest → initials on a forest
+disc, and the crest is served from the same host — so on a sandboxed or
+offline machine you will see initials discs, and that is the fallback working,
+not the fixture being empty. Check the request, not the pixels: every row asks
+for its own mug URL. If you need to prove it, open DevTools → Network and
+filter on `assets.nhle.com/mugs/`.
+
+Until 2026-09-02 the fixtures did the opposite. Three of them set
+`headshot_url: null` and the rest carried no face field at all, so every
+harness screenshot the repo has ever produced shows initials discs on every
+row — while production serves a headshot for all 801 rows in `players`. Two
+fixtures also synthesised names, wrapping a short list with a counter
+("Connor McDavid 2") or numbering rows outright ("Roster Player 01"). The
+regression test at `src/__tests__/harnessFixtureFaces.test.ts` fails the build
+if either comes back.
+
+The draft pool is the one place the roster CYCLES: it needs 240 rows and the
+roster has 60, so four rows read "Connor McDavid", each with its own id, rank
+and stat line. A fixture repeating is something a reviewer can see; a counter
+welded onto a name is not.
+
 ## What is stubbed, and what is not
 
 Only the **transport** is replaced. The state machine (`reduce`),
@@ -48,7 +84,7 @@ so what renders here is what renders in the app.
 | `@/lib/draftClient/runner` | scripted snapshot + events, no WebSocket |
 | `@/lib/draftClient/fetchDraftOrderMatrix` | 12-team snake matrix |
 | `@/lib/draftClient/submitPick` | always succeeds, advances the draft |
-| `@/hooks/usePreloadedPlayers` | 240-player canned directory |
+| `@/hooks/usePreloadedPlayers` | 240-player directory, the real roster cycled |
 
 Stub context values are **module-level constants**, deliberately. Returning a
 fresh object per render makes every consumer's dependency array compare unequal

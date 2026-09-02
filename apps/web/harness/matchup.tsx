@@ -20,6 +20,7 @@ import '../src/index.css';
 import { MatchupPositionGroup } from '../src/components/matchup/MatchupPositionGroup';
 import type { MatchupPlayer } from '../src/components/matchup/types';
 import type { NHLGame } from '../src/services/ScheduleService';
+import { harnessMug, harnessPlayer } from './players';
 
 const proj = (pts: number, over: Record<string, unknown> = {}) => ({
   total_projected_points: pts,
@@ -40,12 +41,29 @@ const proj = (pts: number, over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const skater = (over: Partial<MatchupPlayer>): MatchupPlayer =>
-  ({
+/**
+ * REAL PLAYERS, REAL FACES (2026-09-02). `MatchupPlayer` has carried an
+ * `image` field since the M4 audit and `PlayerCard` draws a 28px `Mug` from
+ * it on every mobile row — but every fixture here was a name typed into this
+ * file with no face, so the surface that exists to show those rows showed
+ * sixteen initials discs. Production carries an NHL CDN headshot on all 801
+ * rows of `players`.
+ *
+ * Identity and face come off the shared roster (harness/players.ts); the
+ * per-row STATE — live score, final score, IR, no game, goalie projection
+ * present or absent — stays written here, because the state is the fixture.
+ *
+ * TEAMS ARE LOAD-BEARING: `GameLogosBar` picks the opponent by matching the
+ * player's team against the game's home/away, so a row whose player is not in
+ * its own game renders the wrong "vs / @" and the wrong crest. Every
+ * substitution below keeps the player and the game on the same side.
+ */
+const skater = (who: string, over: Partial<MatchupPlayer>): MatchupPlayer => {
+  const p = harnessPlayer(who);
+  return {
     id: 1,
-    name: 'Connor McDavid',
-    position: 'C',
-    team: 'EDM',
+    ...harnessMug(p),
+    position: p.position,
     points: 0,
     gamesRemaining: 3,
     status: null,
@@ -55,7 +73,8 @@ const skater = (over: Partial<MatchupPlayer>): MatchupPlayer =>
     daily_projection: proj(6.2),
     games: [],
     ...over,
-  }) as MatchupPlayer;
+  } as MatchupPlayer;
+};
 
 const TODAY = new Date().toISOString().slice(0, 10);
 /**
@@ -77,34 +96,30 @@ const game = (home: string, away: string, over: Partial<NHLGame> = {}): NHLGame 
   }) as NHLGame;
 
 const USER: (MatchupPlayer | null)[] = [
-  skater({ id: 1, games: [game('EDM', 'TOR')] }),
-  skater({
+  skater('Connor McDavid', { id: 1, games: [game('EDM', 'TOR')] }),
+  // Was Auston Matthews, who is not on the harness roster. Tavares is the
+  // Leaf centre it has, so the live EDM@TOR game this row tests still holds.
+  skater('John Tavares', {
     id: 2,
-    name: 'Auston Matthews',
-    position: 'C',
-    team: 'TOR',
     total_points: 31.8,
     games: [game('EDM', 'TOR', { status: 'live', home_score: 2, away_score: 1, period: 'P2' })],
     daily_total_points: 8.4,
     daily_stats_breakdown: { Goals: { count: 1, points: 6 }, SOG: { count: 4, points: 2.4 } },
   }),
-  skater({ id: 3, name: 'Kirill Kaprizov', position: 'LW', team: 'MIN', total_points: 18.1, games: [game('MIN', 'STL')] }),
-  skater({ id: 4, name: 'Nikita Kucherov', position: 'RW', team: 'TBL', total_points: 27.6, games: [], daily_projection: undefined }),
-  skater({
+  skater('Kirill Kaprizov', { id: 3, total_points: 18.1, games: [game('MIN', 'STL')] }),
+  skater('Nikita Kucherov', { id: 4, total_points: 27.6, games: [], daily_projection: undefined }),
+  skater('Cale Makar', {
     id: 5,
-    name: 'Cale Makar',
-    position: 'D',
-    team: 'COL',
     total_points: 15.9,
     games: [game('COL', 'VGK', { status: 'final', home_score: 4, away_score: 2 })],
     daily_total_points: 11.2,
   }),
-  skater({ id: 6, name: 'Quinn Hughes', position: 'D', team: 'VAN', total_points: 12.3, games: [game('VAN', 'CGY')] }),
-  skater({
+  skater('Quinn Hughes', { id: 6, total_points: 12.3, games: [game('VAN', 'CGY')] }),
+  // Was Igor Shesterkin; the roster has no NYR goalie. Swayman is BOS, so the
+  // game moves with him — and he now faces the opponent's UTIL row (Marchand),
+  // which is what a real Sunday slate looks like.
+  skater('Jeremy Swayman', {
     id: 7,
-    name: 'Igor Shesterkin',
-    position: 'G',
-    team: 'NYR',
     isGoalie: true,
     total_points: 34.7,
     daily_projection: undefined,
@@ -122,23 +137,29 @@ const USER: (MatchupPlayer | null)[] = [
       calculation_method: 'harness',
     },
     goalieStats: { gamesPlayed: 55, wins: 36, saves: 1652, shutouts: 4, goalsAgainst: 142, gaa: 2.58, savePct: 0.9134 },
-    games: [game('NYR', 'NJD')],
+    games: [game('FLA', 'BOS')],
   }),
   null,
 ];
 
 const OPP: (MatchupPlayer | null)[] = [
-  skater({ id: 11, name: 'Nathan MacKinnon', team: 'COL', total_points: 29.9, games: [game('COL', 'VGK')] }),
-  skater({ id: 12, name: 'Jack Hughes', team: 'NJD', total_points: 9.4, roster_status: 'IR', games: [], daily_projection: undefined }),
-  skater({ id: 13, name: 'Alexander Wennberg-Nylander', position: 'LW', team: 'SEA', total_points: 6.7, games: [game('SEA', 'LAK')] }),
-  skater({ id: 14, name: 'Mitch Marner', position: 'RW', team: 'TOR', total_points: 24.2, games: [game('EDM', 'TOR')] }),
-  skater({ id: 15, name: 'Roman Josi', position: 'D', team: 'NSH', total_points: 17.5, games: [game('NSH', 'DAL')] }),
+  skater('Nathan MacKinnon', { id: 11, total_points: 29.9, games: [game('COL', 'VGK')] }),
+  // IR + no game is the STATE this row tests (was Jack Hughes, not on the
+  // roster). Celebrini is real and healthy; the injury is the fixture.
+  skater('Macklin Celebrini', { id: 12, total_points: 9.4, roster_status: 'IR', games: [], daily_projection: undefined }),
+  // Was the invented 27-character "Alexander Wennberg-Nylander". The name
+  // this row truncates is now one that can actually reach it.
+  skater('Cutter Gauthier', { id: 13, total_points: 6.7, games: [game('ANA', 'LAK')] }),
+  // Was Mitch Marner as a Leaf; he plays for VGK on this roster, and a row
+  // whose team does not appear in its own game renders the wrong opponent.
+  // Nylander is the Leaf winger in the EDM@TOR game.
+  skater('William Nylander', { id: 14, total_points: 24.2, games: [game('EDM', 'TOR')] }),
+  // Was Roman Josi, not on the roster. Fox is the defenceman it has; the game
+  // moves to his team so the "vs NSH" this row prints is still true.
+  skater('Adam Fox', { id: 15, total_points: 17.5, games: [game('NYR', 'NSH')] }),
   null,
-  skater({
+  skater('Jake Oettinger', {
     id: 17,
-    name: 'Jake Oettinger',
-    position: 'G',
-    team: 'DAL',
     isGoalie: true,
     total_points: 26.1,
     daily_projection: undefined,
@@ -146,7 +167,8 @@ const OPP: (MatchupPlayer | null)[] = [
     games: [game('NSH', 'DAL', { status: 'final', home_score: 1, away_score: 3 })],
     daily_total_points: 12.8,
   }),
-  skater({ id: 18, name: 'Sam Reinhart', position: 'RW', team: 'FLA', total_points: 21.0, games: [game('FLA', 'BOS')] }),
+  // UTIL. Was Sam Reinhart, not on the roster; Marchand is the Panther it has.
+  skater('Brad Marchand', { id: 18, total_points: 21.0, games: [game('FLA', 'BOS')] }),
 ];
 
 const SLOTS = ['C', 'C', 'LW', 'RW', 'D', 'D', 'G', 'UTIL'];

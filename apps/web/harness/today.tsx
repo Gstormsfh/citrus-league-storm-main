@@ -24,6 +24,7 @@ import { TodayStrip } from '../src/components/roster/TodayStrip';
 import { computeTodaySummary } from '../src/components/roster/todaySummary';
 import { Toaster } from '../src/components/ui/toaster';
 import type { HockeyPlayer } from '../src/components/roster/HockeyPlayerCard';
+import { harnessPlayer, harnessRowPlayer } from './players';
 
 declare global { interface Window { __log: string[] } }
 window.__log = [];
@@ -31,16 +32,28 @@ const log = (s: string) => { window.__log.push(s); };
 
 type Game = 'none' | 'scheduled' | 'live' | 'final';
 
-const mk = (id: string, name: string, position: string, team: string, proj: number, game: Game = 'scheduled', actual?: number): HockeyPlayer => {
-  const isG = position === 'G';
+/**
+ * REAL PLAYERS, REAL FACES (2026-09-02). The nine rows below used to be names
+ * typed into this file with no face field at all, so every one of them fell
+ * through `Mug` to an initials disc and every screenshot of the strip and the
+ * list under it showed a roster the app has never rendered — production
+ * carries an NHL CDN headshot on all 801 rows of `players`.
+ *
+ * Identity and face come off the shared roster (harness/players.ts). The
+ * per-row STATE — live, final, no game, locked, empty slot — is still
+ * written here, because the state is what this harness exists to show.
+ */
+const mk = (id: string, who: string, proj: number, game: Game = 'scheduled', actual?: number): HockeyPlayer => {
+  const p = harnessRowPlayer(harnessPlayer(who));
+  const isG = p.position === 'G';
   const projection = isG
     ? { goalieProjection: { total_projected_points: proj } }
     : { daily_projection: { total_projected_points: proj } };
   if (game === 'none') {
-    return { id, name, position, number: 9, starter: true, team, teamAbbreviation: team, stats: {}, projectedPoints: 0 } as HockeyPlayer;
+    return { id, ...p, starter: true, stats: {}, projectedPoints: 0 } as HockeyPlayer;
   }
   return {
-    id, name, position, number: 9, starter: true, team, teamAbbreviation: team, stats: {},
+    id, ...p, starter: true, stats: {},
     projectedPoints: proj,
     nextGame: {
       opponent: 'vs TOR', isToday: true,
@@ -54,15 +67,18 @@ const mk = (id: string, name: string, position: string, team: string, proj: numb
 };
 
 const P: Record<string, HockeyPlayer> = {
-  mcdavid: mk('1', 'Connor McDavid', 'C', 'EDM', 5.2, 'live', 6.9),
-  draisaitl: mk('2', 'Leon Draisaitl', 'C', 'EDM', 4.8, 'live', 2.5),
-  makar: mk('3', 'Cale Makar', 'D', 'COL', 4.1),
-  hughes: mk('4', 'Quinn Hughes', 'D', 'VAN', 3.9, 'none'),
-  shesterkin: mk('5', 'Igor Shesterkin', 'G', 'NYR', 6.0),
-  panarin: mk('6', 'Artemi Panarin', 'LW', 'NYR', 3.4),
-  kaprizov: mk('7', 'Kirill Kaprizov', 'LW', 'MIN', 4.5),
-  horvat: mk('8', 'Bo Horvat', 'C', 'NYI', 2.2, 'none'),
-  rantanen: mk('9', 'Mikko Rantanen', 'RW', 'DAL', 4.4, 'final', 8.1),
+  mcdavid: mk('1', 'Connor McDavid', 5.2, 'live', 6.9),
+  draisaitl: mk('2', 'Leon Draisaitl', 4.8, 'live', 2.5),
+  makar: mk('3', 'Cale Makar', 4.1),
+  hughes: mk('4', 'Quinn Hughes', 3.9, 'none'),
+  // The roster has no NYR goalie; Swayman is the goalie it has. This row's
+  // job — the only G in a starting G slot — is unchanged.
+  swayman: mk('5', 'Jeremy Swayman', 6.0),
+  panarin: mk('6', 'Artemi Panarin', 3.4),
+  kaprizov: mk('7', 'Kirill Kaprizov', 4.5),
+  // A bench centre with no game today (was Bo Horvat, not on the roster).
+  celebrini: mk('8', 'Macklin Celebrini', 2.2, 'none'),
+  rantanen: mk('9', 'Mikko Rantanen', 4.4, 'final', 8.1),
 };
 
 // LW1, LW2, RW1, RW2, D2..D4, G2, UTIL are EMPTY on purpose.

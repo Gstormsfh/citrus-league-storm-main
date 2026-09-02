@@ -14,35 +14,24 @@ import { ScheduleService } from '../src/services/ScheduleService';
 import { leagueApi } from '../src/api/leagues';
 import { rosterApi } from '../src/api/rosters';
 import { waiverApi } from '../src/api/waivers';
+import { HARNESS_PLAYERS, harnessDirectoryPlayer, harnessPlayer } from './players';
 
-const POS = ['C', 'LW', 'RW', 'D', 'D', 'C', 'RW', 'LW', 'D', 'C', 'G', 'G'];
-const NAMES = ['Connor McDavid','Nathan MacKinnon','Auston Matthews','Cale Makar','Quinn Hughes',
-  'Jack Hughes','Mitch Marner','Artemi Panarin','Roman Josi','Leon Draisaitl','Igor Shesterkin','Jake Oettinger',
-  'Kirill Kaprizov','Elias Pettersson','Tage Thompson','Adam Fox','Evan Bouchard','Brady Tkachuk'];
-
-const mkPlayer = (i: number) => {
-  const position = POS[i % POS.length];
-  const goalie = position === 'G';
-  return {
-    id: String(7000 + i),
-    full_name: NAMES[i % NAMES.length] + (i >= NAMES.length ? ` ${Math.floor(i / NAMES.length) + 1}` : ''),
-    position, eligible_positions: [position],
-    team: ['EDM','COL','TOR','BOS','TBL','NYR','VAN','MIN'][i % 8],
-    jersey_number: String(i + 9), status: 'active', roster_status: null, is_ir_eligible: false,
-    headshot_url: null, last_updated: null,
-    games_played: goalie ? 40 - (i % 12) : 70 - (i % 30),
-    goals: goalie ? 0 : 34 - i, assists: goalie ? 0 : 45 - i, points: goalie ? 0 : 79 - 2 * i,
-    plus_minus: 14 - i, shots: 210 - i, hits: 60 - i, blocks: 45 - i, pim: 22, ppp: 18, shp: 1,
-    icetime_seconds: goalie ? 140000 : 76000, xGoals: 24,
-    wins: goalie ? 26 : null, losses: goalie ? 14 : null, ot_losses: goalie ? 4 : null,
-    saves: goalie ? 1180 : null, shutouts: goalie ? 3 : null, shots_faced: goalie ? 1290 : null,
-    goals_against: goalie ? 110 : null,
-    goals_against_average: goalie ? 2.42 : null, save_percentage: goalie ? 0.915 : null,
-    highDangerSavePct: 0, goalsSavedAboveExpected: 0, goalie_gp: goalie ? 40 - (i % 12) : undefined,
-  } as never;
-};
-
-const PLAYERS = Array.from({ length: 60 }, (_, i) => mkPlayer(i));
+/**
+ * THE ROSTER IS REAL (2026-09-02). This file used to wrap an 18-name list to
+ * 60 by appending a counter -- "Connor McDavid 2", "Nathan MacKinnon 2" --
+ * and set `headshot_url: null` on every one of them, so `Mug` fell through
+ * headshot -> crest -> initials on every row and every review screenshot the
+ * repo has produced shows initials discs. Production is not like that:
+ * measured the same day, 801 of 801 rows in `players` carry a headshot_url,
+ * every one on the NHL CDN. See harness/players.ts.
+ *
+ * ID SCHEME IS LOAD-BEARING: `harnessDirectoryPlayer` numbers ids from 7000,
+ * and CLAIMS below references 7001, 7002, 7003, 7009 and 7012 by player id.
+ * Those five must keep pointing at five real, distinct players.
+ */
+const PLAYERS = HARNESS_PLAYERS.map((p, i) => harnessDirectoryPlayer(p, i));
+// The first 18 are a legal 18-man roster (5xC, 3xLW, 3xRW, 5xD, 2xG), so the
+// team this page renders is one a manager could actually start.
 const MY_ROSTER = PLAYERS.slice(0, 18);
 
 const CLAIMS = [
@@ -113,6 +102,29 @@ const PRIORITY = Array.from({ length: 10 }, (_, i) => ({
 // renders — which is exactly how it looked in the 2026-08-27 sweep.
 (LeagueService as any).getUserTeam = async () => ({ team: { id: 't1' }, error: null });
 
+/**
+ * The projected-vs-actual rank list. Six real players, positions preserved
+ * from the case that chose them (a C and a D who beat the model, two LWs who
+ * split, a G and a D who missed). `harnessPlayer` throws rather than render a
+ * blank name if one is ever renamed out of the roster.
+ */
+const ANALYTICS_ROWS = (
+  [
+    ['Connor McDavid', 128.4, 141.2, 22],
+    ['Cale Makar', 96.1, 112.8, 21],
+    ['Kirill Kaprizov', 74.5, 82.0, 20],
+    ['Jason Robertson', 81.0, 62.3, 22],
+    // Was Igor Shesterkin, who is not on the harness roster; Vasilevskiy is
+    // the goalie the roster has. The row's job -- a G the model over-projected
+    // -- is unchanged.
+    ['Andrei Vasilevskiy', 88.0, 61.5, 18],
+    ['Quinn Hughes', 70.2, 48.9, 19],
+  ] as const
+).map(([who, projectedPoints, actualPoints, games], i) => {
+  const p = harnessPlayer(who);
+  return { id: i + 1, name: p.name, position: p.position, projectedPoints, actualPoints, games };
+});
+
 // Stubbed on leagueApi rather than on the apiClient stub: src/api/leagues.ts
 // imports './client' RELATIVELY, so the @/api/client alias in the harness vite
 // config never applies to it and a stub there sends a real HTTP request.
@@ -130,14 +142,10 @@ const PRIORITY = Array.from({ length: 10 }, (_, i) => ({
       blocks:  { projected: 96.0, actual: 74.5 },
       hits:    { projected: 88.0, actual: 151.2 },
     },
-    players: [
-      { id: 1, name: 'Connor McDavid',  position: 'C',  projectedPoints: 128.4, actualPoints: 141.2, games: 22 },
-      { id: 2, name: 'Cale Makar',      position: 'D',  projectedPoints: 96.1,  actualPoints: 112.8, games: 21 },
-      { id: 3, name: 'Kirill Kaprizov', position: 'LW', projectedPoints: 74.5,  actualPoints: 82.0,  games: 20 },
-      { id: 4, name: 'Jason Robertson', position: 'LW', projectedPoints: 81.0,  actualPoints: 62.3,  games: 22 },
-      { id: 5, name: 'Igor Shesterkin', position: 'G',  projectedPoints: 88.0,  actualPoints: 61.5,  games: 18 },
-      { id: 6, name: 'Quinn Hughes',    position: 'D',  projectedPoints: 70.2,  actualPoints: 48.9,  games: 19 },
-    ],
+    // Names off the shared roster (harness/players.ts), so the rank list and
+    // the rows above it are the same people. The numbers are unchanged -- they
+    // are the case, the names are not.
+    players: ANALYTICS_ROWS,
     measuredPlayers: 6,
     rosterSize: 8,
   },

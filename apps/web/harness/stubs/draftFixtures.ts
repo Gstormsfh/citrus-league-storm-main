@@ -1,4 +1,6 @@
 /** Shared fixture data for the draft-room harness. Deterministic, no clock. */
+import { HARNESS_PLAYERS, harnessHeadshotUrl } from '../players';
+
 export const TEAM_COUNT = 12;
 export const ROUNDS = 14;
 
@@ -26,38 +28,44 @@ export function snakeMatrix(rounds = ROUNDS) {
   return out;
 }
 
-const NAMES = [
-  ['Connor McDavid', 'C', 'EDM'], ['Nathan MacKinnon', 'C', 'COL'],
-  ['Auston Matthews', 'C', 'TOR'], ['Cale Makar', 'D', 'COL'],
-  ['Leon Draisaitl', 'C', 'EDM'], ['Nikita Kucherov', 'RW', 'TBL'],
-  ['David Pastrnak', 'RW', 'BOS'], ['Quinn Hughes', 'D', 'VAN'],
-  ['Kirill Kaprizov', 'LW', 'MIN'], ['Mitch Marner', 'RW', 'TOR'],
-  ['Artemi Panarin', 'LW', 'NYR'], ['Jack Hughes', 'C', 'NJD'],
-  ['Igor Shesterkin', 'G', 'NYR'], ['Connor Hellebuyck', 'G', 'WPG'],
-  ['Roman Josi', 'D', 'NSH'], ['Adam Fox', 'D', 'NYR'],
-  ['Jake Oettinger', 'G', 'DAL'], ['Brady Tkachuk', 'LW', 'OTT'],
-  ['Elias Pettersson', 'C', 'VAN'], ['Tage Thompson', 'C', 'BUF'],
-  ['Evan Bouchard', 'D', 'EDM'], ['Matthew Tkachuk', 'LW', 'FLA'],
-  ['Sidney Crosby', 'C', 'PIT'], ['Aleksander Barkov', 'C', 'FLA'],
-] as const;
-
-/** 240 players, deterministic stats descending by rank. */
+/**
+ * THE POOL IS REAL (2026-09-02). This fixture used to build 240 rows out of
+ * 24 typed names by appending a counter — "Connor McDavid 2", "Cale Makar 3"
+ * — and set `headshot_url: null` on every one, so `PlayerPool` drew no face
+ * at all and the draft room, a review surface like any other, went out in
+ * screenshots as a list of blank rows with numbered names. Production is not
+ * like that: 801 of 801 rows in `players` carry a headshot_url and every one
+ * is on the NHL CDN.
+ *
+ * 240 rows out of a 60-player roster means the roster CYCLES four times: four
+ * rows read "Connor McDavid", each with its own id, rank and stat line. That
+ * is a fixture repeating, which a reviewer can see and reason about. A counter
+ * welded onto a name is a string the NHL cannot produce, and it is what put
+ * "Nathan MacKinnon 2" in front of reviewers for months.
+ *
+ * DEPTH IS THE POINT: 240 is what the pool's scrolling, filtering and search
+ * are sized against, so the count stays 240 rather than shrinking to 60.
+ *
+ * The stat lines stay synthetic and strictly descending by rank — the pool
+ * sorts on them, and four identical real stat lines would flatten the order
+ * the room is meant to show.
+ */
 export const PLAYERS = Array.from({ length: 240 }, (_, i) => {
-  const [name, position, team] = NAMES[i % NAMES.length];
-  const tier = Math.floor(i / NAMES.length);
+  const p = HARNESS_PLAYERS[i % HARNESS_PLAYERS.length];
+  const position = p.position;
   const goalie = position === 'G';
   const gp = 82 - (i % 14);
   return {
     id: String(8470000 + i),
-    full_name: tier === 0 ? name : `${name} ${tier + 1}`,
+    full_name: p.name,
     position,
     eligible_positions: [position],
-    team,
-    jersey_number: String((i % 88) + 1),
+    team: p.team,
+    jersey_number: p.jersey,
     status: null,
     roster_status: null,
     is_ir_eligible: false,
-    headshot_url: null,
+    headshot_url: harnessHeadshotUrl(p.team, p.nhlId),
     last_updated: null,
     games_played: goalie ? 0 : gp,
     goalie_gp: goalie ? 55 - (i % 20) : undefined,
