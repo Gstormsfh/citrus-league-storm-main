@@ -20,10 +20,18 @@ npx vite --config harness/vite.config.ts
 | `/harness/cards.html` | HockeyPlayerCard gallery + MobileRosterList |
 | `/harness/draft.html` | DraftRoomV2, live clock, scripted picks |
 | `/harness/tabs.html` | Roster tab bars |
+| `/harness/scores.html` | Scores page, real components, fixture days |
 
 `draft.html` accepts `?picks=N` to open the room N picks deep (default 5), and
 exposes `window.__harnessAdvance()` so a script can drive the draft forward one
 pick at a time.
+
+`scores.html` accepts `?case=slate|live|mine|empty`. `slate`, `mine` and
+`empty` are transcribed from production on 2026-09-02 (real games, real
+projections, real puck-drop times). `live` is **synthetic and labelled so on
+screen**: `nhl_games` has never held a live row, so the clock, the
+intermission marker and the final-minute treatment cannot be exercised by real
+data and this case exists to check them before the first live night.
 
 ## What is stubbed, and what is not
 

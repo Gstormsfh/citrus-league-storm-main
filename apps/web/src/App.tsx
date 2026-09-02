@@ -70,6 +70,7 @@ const Blog = lazyWithErrorHandling(() => import("./pages/Blog"));
 const Podcasts = lazyWithErrorHandling(() => import("./pages/Podcasts"));
 const Guides = lazyWithErrorHandling(() => import("./pages/Guides"));
 const Matchup = lazyWithErrorHandling(() => import("./pages/Matchup"));
+const Scores = lazyWithErrorHandling(() => import("./pages/Scores"));
 const PlayoffBracket = lazyWithErrorHandling(() => import("./pages/PlayoffBracket"));
 const FreeAgents = lazyWithErrorHandling(() => import("./pages/FreeAgents"));
 const Players = lazyWithErrorHandling(() => import("./pages/Players"));
@@ -205,6 +206,8 @@ const App = () => {
                     <Route path="/matchup/:leagueId/:weekId?" element={<ErrorBoundary><Matchup /></ErrorBoundary>} />
                     <Route path="/matchup" element={<ErrorBoundary><Matchup /></ErrorBoundary>} /> {/* Fallback for /matchup without params */}
                     <Route path="/league/:leagueId/playoffs" element={<ProtectedRoute><ErrorBoundary><PlayoffBracket /></ErrorBoundary></ProtectedRoute>} />
+                {/* Live NHL scoreboard. Auth-only: the Citrus panel reads league rosters. */}
+                <Route path="/scores" element={<ProtectedRoute><ErrorBoundary><Scores /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/free-agents" element={<ErrorBoundary><FreeAgents /></ErrorBoundary>} />
                 <Route path="/players" element={<ProtectedRoute><ErrorBoundary><Players /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/gm-office" element={<ProtectedRoute><ErrorBoundary><GMOffice /></ErrorBoundary></ProtectedRoute>} />
