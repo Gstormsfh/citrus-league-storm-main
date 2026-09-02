@@ -6,63 +6,19 @@ import { CitrusSparkle, CitrusLeaf } from "@/components/icons/CitrusIcons";
 import { generatePlayerWriteup } from "@/utils/playerWriteup";
 import { SlotPickerMenu } from "./SlotPickerMenu";
 import { useMemo, useState } from "react";
-
-// ─── Position helpers ────────────────────────────────────────────────
-const getPositionAbbr = (pos: string) => {
-  const p = pos?.toUpperCase() || '';
-  if (['C', 'CENTRE', 'CENTER'].includes(p)) return 'C';
-  if (['LW', 'LEFT WING', 'LEFTWING', 'L'].includes(p)) return 'LW';
-  if (['RW', 'RIGHT WING', 'RIGHTWING', 'R'].includes(p)) return 'RW';
-  if (['D', 'DEFENCE', 'DEFENSE'].includes(p)) return 'D';
-  if (['G', 'GOALIE'].includes(p)) return 'G';
-  return p.substring(0, 2);
-};
+// The chip (geometry, per-position colour + ring, raw-position -> key) lives
+// in its own module so the mobile Matchup rows wear the identical chip. The
+// contrast rationale for the colour pairs is documented there.
+import {
+  POSITION_CHIP_BASE,
+  POSITION_CHIP_FALLBACK,
+  POSITION_RING_FALLBACK,
+  posColor,
+  posRingColor,
+  positionChipKey,
+} from "./positionChip";
 
 import type { PositionType } from "@/utils/rosterUtils";
-
-/**
- * CONTRAST (2026-08-13) — text colour now travels WITH the background.
- *
- * The base badge class hard-coded `text-white`, but three of these
- * backgrounds are light. Measured on the live roster:
- *
- *   LW  bg-pastel-sage-soft #C8DCC4 + white .... 1.45:1  invisible
- *   C   bg-pastel-sage      #84A57D + white .... 2.75:1  marginal
- *   UTIL same as C ............................. 2.75:1  marginal
- *   D   #1A2A20 + white ....................... ~14:1    fine
- *
- * `G` already carried its own text colour, which is the pattern worth
- * generalising: a background and the text that survives on it are one
- * decision, not two. Pairing them here makes an unreadable combination
- * impossible to introduce by editing a single map entry.
- *
- * `pastel-forest` (#1B3022) is the design system's documented
- * "deep forest text" for light surfaces — ~5:1 on sage, ~9:1 on
- * sage-soft.
- *
- * RW (#FF6B1A + white, 2.85:1) is deliberately UNCHANGED: it is a brand
- * accent, it is legible at this weight, and inverting it would be a
- * visual redesign rather than a legibility fix. Flagged, not touched.
- */
-const posColor: Record<string, string> = {
-  LW: 'bg-pastel-sage-soft text-pastel-forest',
-  C: 'bg-pastel-sage text-pastel-forest',
-  RW: 'bg-pastel-orange text-white',
-  D: 'bg-[#1A2A20] text-white',
-  G: 'bg-pastel-sage/15 text-pastel-cream',
-  UTIL: 'bg-pastel-sage text-pastel-forest',
-  F: 'bg-emerald-600 text-white',
-};
-
-const posRingColor: Record<string, string> = {
-  LW: 'ring-pastel-sage-soft/30',
-  C: 'ring-pastel-sage/30',
-  RW: 'ring-pastel-orange/30',
-  D: 'ring-white/30',
-  G: 'ring-pastel-sage/50',
-  UTIL: 'ring-pastel-sage/30',
-  F: 'ring-emerald-600/30',
-};
 
 // ─── Interfaces ──────────────────────────────────────────────────────
 interface MobileRosterListProps {
@@ -230,15 +186,12 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
       {/* Position badge — tap to swap */}
       <div
         className={cn(
-          // No `text-white` here — posColor owns the text colour so it
-          // can never disagree with its own background (see the map).
-          "w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center font-varsity text-[11px] font-black tracking-wide",
-          "ring-1 active:scale-95 transition-transform cursor-pointer",
-          // 2026-08-19: the fallback chip was bg-white/40 (mid-grey once
-          // composited on the dark page) with pastel-forest text — the
-          // one combination in this map that failed its own rule above.
-          posColor[slotPosition] || 'bg-white/15 text-pastel-cream',
-          posRingColor[slotPosition] || 'ring-white/20',
+          // No `text-white` in the base — posColor owns the text colour so
+          // it can never disagree with its own background (see positionChip).
+          POSITION_CHIP_BASE,
+          "active:scale-95 transition-transform cursor-pointer",
+          posColor[slotPosition] || POSITION_CHIP_FALLBACK,
+          posRingColor[slotPosition] || POSITION_RING_FALLBACK,
           isEligibleTarget && !isSwapSelected && "!ring-pastel-sage !ring-2 animate-pulse",
           isSwapSelected && "!ring-pastel-orange !ring-2",
         )}
@@ -562,7 +515,7 @@ const MobileRosterList = ({
           </div>
         )}
         {bench.map(player => {
-          const pos = getPositionAbbr(player.position);
+          const pos = positionChipKey(player.position);
           const isSelected = player.id === tapSelectedPlayerId;
           const row = (
             <PlayerRow
@@ -590,7 +543,7 @@ const MobileRosterList = ({
             icon={<Skull className="w-4 h-4 text-red-400" />}
           />
           {ir.map(player => {
-            const pos = getPositionAbbr(player.position);
+            const pos = positionChipKey(player.position);
             const irSlot = slotAssignments[player.id] || 'ir-slot-1';
             const row = (
               <PlayerRow
