@@ -41,12 +41,35 @@ trigger rules. Verification procedure:
 | `player_directory` / `player_season_stats` / `player_talent_metrics` / `player_gar_components` / `player_ros_projections` | 938 / 1066 / 1012 / 935 / 926 | <1 MB each | various scripts/utilities |
 | `goalie_*` family | 82-197 | <200 KB each | `scripts/utilities/calculate_goalie_*.py` |
 | `ops_ci_runs` | 0 at creation (2026-09-01); ~20 rows per CI run | grows ~1 MB/month | `.github/actions/report-run` (every job in `ci.yml`, `production-deploy.yml`, `main.yml`, `data-invariants.yml`, `schema-snapshot.yml`) over PostgREST with the service-role key. Service-role only (RLS on, no policies). Read by Claude via MCP — `docs/RUNBOOKS/CI_TELEMETRY.md` |
+| `draft_kit_entitlements` / `draft_kit_blurbs` | 0 / 0 | negligible | **Migration written, NOT applied** (`supabase/migrations/20260902090000_draft_kit_entitlements_and_blurbs.sql`). Draft Kit paid section: who is entitled, and the human-written copy. Both service-role write only; see §1.3 |
 
 **Critical observations:**
 - `player_shifts_official` has a row-count discrepancy (pg_class says 198K, list_tables says 0). Worth investigating.
 - `raw_player_stats`, `staging_2024_*`, `staging_2025_*`, `team_stats`, `players` (the lowercase non-schema-qualified version), `2025_Skaters` — **all RLS-disabled** (advisory) and many appear unused in app queries. Candidates for orphan triage.
 - `public.public.players` — table literally named `public.players` inside the public schema (double-schema-prefix in the name). Almost certainly an artifact of a bad migration. Flagged.
 - See `apps/web/docs/DATA_ORGANIZATION_AUDIT.md` for orphan analysis details.
+
+### 1.3 Draft Kit tables (migration written, not yet applied)
+
+`supabase/migrations/20260902090000_draft_kit_entitlements_and_blurbs.sql`
+adds the two tables behind the paid `/draft-kit` section. Neither has been
+applied to prod or staging.
+
+| Table | Purpose | Write path | RLS |
+|---|---|---|---|
+| `draft_kit_entitlements` | One row per user per tier grant (`kit` \| `suite`), with `granted_at` / `expires_at` / `source`. FK to `auth.users` with ON DELETE CASCADE | service role only | Enabled. SELECT policy is `auth.uid() = user_id`; no write policy exists, so a client cannot grant itself access |
+| `draft_kit_blurbs` | Human-written kit copy. `author_name` is NOT NULL, `source_name` / `source_url` are CHECKed to travel as a pair, `is_published` gates visibility | service role only | Enabled. Free-tier rows readable by anon; paid rows gated on a live entitlement for `auth.uid()` |
+
+The migration also adds `public.citrus_draft_kit_tier()` — SECURITY DEFINER,
+`SET search_path = public`, and deliberately argument-less so there is no user
+id for a caller to forge. It returns the calling user's live tier or `'free'`.
+
+The section READS existing tables and adds none of its own data:
+`player_directory` (identity, club, headshot), `player_season_stats`
+(actuals, `x_goals`), `player_gar_components` (the impact decomposition),
+`player_talent_metrics.xg_per_60`, `player_ros_projections` (projected
+fantasy points), and `goalie_xg_season` (GSAx). Percentiles are computed
+server-side inside F / D / G cohorts and are not stored.
 
 ---
 

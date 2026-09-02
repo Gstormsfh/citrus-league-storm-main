@@ -6,7 +6,7 @@ import {
   Menu, X, Bell, Search, Users, LogOut, CircleUser,
   Trophy, ChevronDown, UserPlus, Calendar, BarChart3,
   Swords, Newspaper, Sparkles, Settings, DollarSign,
-  Target, Shield, TrendingUp, Radio
+  Target, Shield, TrendingUp, ClipboardList, Radio
 } from 'lucide-react';
 import { CitrusLogo } from '@/components/citrus2';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -349,8 +349,23 @@ const Navbar = () => {
               );
             })}
 
-            {/* Secondary links pushed right */}
+            {/* Secondary links pushed right.
+                Draft Kit lives here rather than in navTabs on purpose: the tab
+                row is a fixed six at lg and a seventh would push it past the
+                container at 1024px. */}
             <div className="ml-auto flex items-center gap-0">
+              <Link
+                to="/draft-kit"
+                className={cn(
+                  "flex items-center gap-2 px-4 h-11 text-[13px] font-bold transition-all border-b-2 whitespace-nowrap",
+                  isTabActive('/draft-kit')
+                    ? "border-pastel-orange text-pastel-cream"
+                    : "border-transparent text-white/55 hover:text-pastel-cream"
+                )}
+              >
+                <ClipboardList className="h-4 w-4" />
+                Draft Kit
+              </Link>
               <Link
                 to="/news"
                 className={cn(
@@ -561,6 +576,10 @@ const Navbar = () => {
               <Link to="/scores" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-md text-white/55 hover:text-pastel-cream hover:bg-white/5 transition-all">
                 <Radio className="h-4 w-4" />
                 <span className="text-[13px] font-bold">Scores</span>
+              </Link>
+              <Link to="/draft-kit" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-md text-white/55 hover:text-pastel-cream hover:bg-white/5 transition-all">
+                <ClipboardList className="h-4 w-4" />
+                <span className="text-[13px] font-bold">Draft Kit</span>
               </Link>
               <Link to="/news" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-md text-white/55 hover:text-pastel-cream hover:bg-white/5 transition-all">
                 <Newspaper className="h-4 w-4" />

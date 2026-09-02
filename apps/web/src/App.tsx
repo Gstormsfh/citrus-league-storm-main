@@ -75,6 +75,7 @@ const PlayoffBracket = lazyWithErrorHandling(() => import("./pages/PlayoffBracke
 const FreeAgents = lazyWithErrorHandling(() => import("./pages/FreeAgents"));
 const Players = lazyWithErrorHandling(() => import("./pages/Players"));
 const PlayerDashboard = lazyWithErrorHandling(() => import("./pages/PlayerDashboard"));
+const DraftKit = lazyWithErrorHandling(() => import("./pages/DraftKit"));
 const GMOffice = lazyWithErrorHandling(() => import("./pages/GMOffice"));
 const StormyAssistant = lazyWithErrorHandling(() => import("./pages/StormyAssistant"));
 const News = lazyWithErrorHandling(() => import("./pages/News"));
@@ -225,6 +226,10 @@ const App = () => {
                     own sign-in state, which is the honest version of the
                     same gate and the one that tells the visitor what to do. */}
                 <Route path="/players/:playerId" element={<ErrorBoundary><PlayerDashboard /></ErrorBoundary>} />
+                {/* Draft Kit — paid analytics section. Authed because the
+                    entitlement gate needs an identity to resolve; the free
+                    tier still gets a real preview from the server. */}
+                <Route path="/draft-kit" element={<ProtectedRoute><ErrorBoundary><DraftKit /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/gm-office" element={<ProtectedRoute><ErrorBoundary><GMOffice /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/gm-office/stormy" element={<ProtectedRoute><ErrorBoundary><StormyAssistant /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/news" element={<News />} />
