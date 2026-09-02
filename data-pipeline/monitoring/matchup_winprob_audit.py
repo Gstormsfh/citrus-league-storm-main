@@ -34,6 +34,7 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import dataclass, asdict
 from typing import Dict, List
@@ -41,11 +42,24 @@ from typing import Dict, List
 import numpy as np
 from scipy import stats as scipy_stats
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _bootstrap  # noqa: F401,E402
 
-# INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned; SHP/hits/PIM opt-in.
+from data_pipeline.scoring.scoring_defaults import SKATER_SHORT  # noqa: E402
+
+
+# Fantasy scoring weights keyed by this script's archetype stat names. The
+# values are the generated single source (scoring_defaults.py, built from
+# packages/shared/.../scoringDefaults.json); only the key spelling is local.
 SCORING = {
-    "g": 6.0, "a": 4.0, "ppp": 2.0, "shp": 0.0,
-    "sog": 0.9, "blk": 1.0, "hit": 0.0, "pim": 0.0,
+    "g": SKATER_SHORT["goals"],
+    "a": SKATER_SHORT["assists"],
+    "ppp": SKATER_SHORT["ppp"],
+    "shp": SKATER_SHORT["shp"],
+    "sog": SKATER_SHORT["sog"],
+    "blk": SKATER_SHORT["blocks"],
+    "hit": SKATER_SHORT["hits"],
+    "pim": SKATER_SHORT["pim"],
 }
 
 ARCHETYPES = {

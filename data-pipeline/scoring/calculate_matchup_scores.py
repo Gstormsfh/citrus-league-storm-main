@@ -34,6 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import _bootstrap  # noqa: F401
 
 from data_pipeline.utils.supabase_rest import SupabaseRest
+from data_pipeline.scoring import scoring_defaults
 import logging
 
 logger = logging.getLogger(__name__)
@@ -188,27 +189,12 @@ def load_league_scoring_settings(db: SupabaseRest, league_id: str) -> Dict[str, 
 def _get_default_scoring_settings() -> Dict[str, Any]:
     """Returns default scoring settings structure.
 
-    INDUSTRY-STANDARD DEFAULTS (2026-09-01): Yahoo-aligned
-    (help.yahoo.com/kb/SLN6815). SHP/hits/PIM are opt-in, 0 by default.
-    Must equal DEFAULT_SCORING in packages/shared.
+    The weights are the generated single source (scoring_defaults.py, built
+    from packages/shared/src/constants/scoringDefaults.json) — a fresh copy
+    per call, because callers merge league overrides into it.
     """
     return {
-        "skater": {
-            "goals": 6,
-            "assists": 4,
-            "power_play_points": 2,
-            "short_handed_points": 0,
-            "shots_on_goal": 0.9,
-            "blocks": 1,
-            "hits": 0,
-            "penalty_minutes": 0
-        },
-        "goalie": {
-            "wins": 5,
-            "shutouts": 5,
-            "saves": 0.6,
-            "goals_against": -3
-        },
+        **scoring_defaults.scoring_settings(),
         "advanced": {
             "use_fractional_scoring": False,
             "shooting_percentage_bonus": 0.0,
@@ -408,10 +394,10 @@ def calculate_fantasy_points(
         breakdown["saves"] = saves
         breakdown["goals_against"] = goals_against
         
-        points_from_wins = Decimal(str(wins)) * Decimal(str(scoring.get("wins", 5)))
-        points_from_shutouts = Decimal(str(shutouts)) * Decimal(str(scoring.get("shutouts", 5)))
-        points_from_saves = Decimal(str(saves)) * Decimal(str(scoring.get("saves", 0.6)))
-        points_from_ga = Decimal(str(goals_against)) * Decimal(str(scoring.get("goals_against", -3)))
+        points_from_wins = Decimal(str(wins)) * Decimal(str(scoring.get("wins", scoring_defaults.GOALIE["wins"])))
+        points_from_shutouts = Decimal(str(shutouts)) * Decimal(str(scoring.get("shutouts", scoring_defaults.GOALIE["shutouts"])))
+        points_from_saves = Decimal(str(saves)) * Decimal(str(scoring.get("saves", scoring_defaults.GOALIE["saves"])))
+        points_from_ga = Decimal(str(goals_against)) * Decimal(str(scoring.get("goals_against", scoring_defaults.GOALIE["goals_against"])))
         
         points_by_category["wins"] = points_from_wins
         points_by_category["shutouts"] = points_from_shutouts
@@ -446,14 +432,14 @@ def calculate_fantasy_points(
         breakdown["hits"] = hits
         breakdown["penalty_minutes"] = pim
         
-        points_from_goals = Decimal(str(goals)) * Decimal(str(scoring.get("goals", 6)))
-        points_from_assists = Decimal(str(assists)) * Decimal(str(scoring.get("assists", 4)))
-        points_from_ppp = Decimal(str(ppp)) * Decimal(str(scoring.get("power_play_points", 2)))
-        points_from_shp = Decimal(str(shp)) * Decimal(str(scoring.get("short_handed_points", 0)))
-        points_from_sog = Decimal(str(sog)) * Decimal(str(scoring.get("shots_on_goal", 0.9)))
-        points_from_blocks = Decimal(str(blocks)) * Decimal(str(scoring.get("blocks", 1.0)))
-        points_from_hits = Decimal(str(hits)) * Decimal(str(scoring.get("hits", 0.0)))
-        points_from_pim = Decimal(str(pim)) * Decimal(str(scoring.get("penalty_minutes", 0.0)))
+        points_from_goals = Decimal(str(goals)) * Decimal(str(scoring.get("goals", scoring_defaults.SKATER["goals"])))
+        points_from_assists = Decimal(str(assists)) * Decimal(str(scoring.get("assists", scoring_defaults.SKATER["assists"])))
+        points_from_ppp = Decimal(str(ppp)) * Decimal(str(scoring.get("power_play_points", scoring_defaults.SKATER["power_play_points"])))
+        points_from_shp = Decimal(str(shp)) * Decimal(str(scoring.get("short_handed_points", scoring_defaults.SKATER["short_handed_points"])))
+        points_from_sog = Decimal(str(sog)) * Decimal(str(scoring.get("shots_on_goal", scoring_defaults.SKATER["shots_on_goal"])))
+        points_from_blocks = Decimal(str(blocks)) * Decimal(str(scoring.get("blocks", scoring_defaults.SKATER["blocks"])))
+        points_from_hits = Decimal(str(hits)) * Decimal(str(scoring.get("hits", scoring_defaults.SKATER["hits"])))
+        points_from_pim = Decimal(str(pim)) * Decimal(str(scoring.get("penalty_minutes", scoring_defaults.SKATER["penalty_minutes"])))
         
         points_by_category["goals"] = points_from_goals
         points_by_category["assists"] = points_from_assists
