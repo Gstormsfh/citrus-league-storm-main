@@ -13,6 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { MatchupPlayer } from "./types";
 import { useState, useEffect, ReactNode } from "react";
 import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { opponentTint, opponentTierTooltipClass } from "./opponentTint";
 
 /* 2026-08-19 visual audit — muted-text correction.
    text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
@@ -52,6 +54,16 @@ export const ProjectionTooltip = ({ projection, children }: ProjectionTooltipPro
   const isMobile = useIsMobile();
 
   if (!projection) return null;
+
+  // Opponent difficulty (2026-09-01, audit M10): the multiplier the model
+  // applied for tonight's opponent, and the legend for the tint the row's
+  // `vs/@ OPP` label wears because of it. Shown only when the model
+  // supplied one — no number, no colour, nothing to explain.
+  const opponentAdj =
+    typeof projection.opponent_adjustment === 'number' && Number.isFinite(projection.opponent_adjustment)
+      ? projection.opponent_adjustment
+      : null;
+  const tint = opponentTint(opponentAdj);
 
   // ALWAYS show ALL 8 STATS for full transparency (even if 0)
   const stats = [
@@ -94,6 +106,31 @@ export const ProjectionTooltip = ({ projection, children }: ProjectionTooltipPro
           </div>
         ))}
       </div>
+
+      {/* Opponent difficulty + the one-line legend for the row's tint (M10) */}
+      {opponentAdj !== null && (
+        <div className="px-4 py-2 border-t border-citrus-sage/20" data-testid="projection-opponent">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-display font-semibold text-pastel-forest-soft uppercase">Opponent</span>
+            <span
+              data-testid="projection-opponent-tier"
+              data-opponent-tier={tint.tier}
+              className={cn('text-xs font-varsity font-black tabular-nums', opponentTierTooltipClass(tint.tier))}
+            >
+              {tint.label} · ×{opponentAdj.toFixed(2)}
+            </span>
+          </div>
+          <p
+            data-testid="projection-opponent-legend"
+            className="mt-0.5 text-[10px] font-display text-pastel-forest-soft leading-tight flex items-center gap-1 flex-wrap"
+          >
+            <span aria-hidden="true" className="inline-block w-1.5 h-1.5 rounded-full bg-pastel-sage" />
+            <span>sage = easier than average</span>
+            <span aria-hidden="true" className="inline-block w-1.5 h-1.5 rounded-full bg-pastel-orange-soft ml-1" />
+            <span>orange = tougher</span>
+          </p>
+        </div>
+      )}
 
       {/* Likely Range + Confidence (Citrus 3.1) */}
       {projection.likely_low != null && projection.likely_high != null && (

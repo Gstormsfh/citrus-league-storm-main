@@ -23,8 +23,23 @@ interface WeeklyScheduleProps {
    * already says which day is open. Day-state rings are unchanged: today =
    * orange, selected = sage (selected wins), otherwise white/10.
    */
+  chips?: boolean;
+  /**
+   * Phone chrome (2026-09-01, Sleeper parity audit M8). Below the lg
+   * breakpoint the "Week Overview" / "Viewing:" header row is dropped —
+   * the seven day cards say what they are, and on a phone that row was
+   * the third band of chrome between the sticky bar and the first player.
+   * The way back to the full week has to survive its removal, so in
+   * compact mode tapping the selected day again returns to the week, and
+   * a one-line "Full week" link sits under the strip while a day is
+   * selected. Desktop keeps the header row exactly as it was.
+   */
   compact?: boolean;
 }
+
+/** Below the lg breakpoint — the same line index.css's mobile block draws. */
+const isPhoneViewport = (): boolean =>
+  typeof window !== 'undefined' && window.innerWidth < 1024;
 
 export const WeeklySchedule = ({
   weekStart,
@@ -36,6 +51,7 @@ export const WeeklySchedule = ({
   calculatedDailyTotals,
   hideScores = false,
   compact = false,
+  chips = false,
 }: WeeklyScheduleProps) => {
   const todayStr = getTodayMST(); // Get today's date string in MST (YYYY-MM-DD)
 
@@ -109,9 +125,19 @@ export const WeeklySchedule = ({
     return selectedDate === dateStr;
   };
 
+  // Compact mode on a phone: the selected card is also the way back to the
+  // full week (the header row's "Full Week" button is hidden there).
+  const handleDayClick = (dateStr: string) => {
+    if (compact && isSelected(dateStr) && isPhoneViewport()) {
+      onDayClick(null);
+      return;
+    }
+    onDayClick(dateStr);
+  };
+
   const formatDayNumber = (dateStr: string): string => String(Number(dateStr.split('-')[2]));
 
-  if (compact) {
+  if (chips) {
     return (
       <div className="w-full" data-testid="weekly-schedule-compact">
         <div className="grid grid-cols-7 gap-1" role="group" aria-label="Day of the week">
@@ -168,9 +194,15 @@ export const WeeklySchedule = ({
   }
 
   return (
-    <div className="w-full">
-      {/* Header row with view indicator and Full Week button */}
-      <div className="flex items-center justify-between mb-1.5 md:mb-3 p-1 md:p-2 bg-white/5 rounded-xl ring-1 ring-white/10">
+    <div className="w-full" data-compact={compact || undefined}>
+      {/* Header row with view indicator and Full Week button. In compact
+          mode it is desktop-only chrome. */}
+      <div
+        className={cn(
+          'items-center justify-between mb-1.5 md:mb-3 p-1 md:p-2 bg-white/5 rounded-xl ring-1 ring-white/10',
+          compact ? 'hidden lg:flex' : 'flex',
+        )}
+      >
         <div className="text-[9px] md:text-sm font-varsity font-bold text-pastel-cream flex items-center gap-1 md:gap-2">
           {selectedDate ? (
             <span className="flex items-center gap-1 md:gap-2">
@@ -221,7 +253,7 @@ export const WeeklySchedule = ({
                 !isSelectedDate && !isTodayDate && "ring-1 ring-white/10",
                 isPastDate && "opacity-75"
               )}
-              onClick={() => onDayClick(date)}
+              onClick={() => handleDayClick(date)}
             >
               <CardContent className="p-1 md:p-2 relative">
                 <div className="flex flex-col items-center gap-0.5 md:gap-1 relative z-10">
@@ -287,6 +319,21 @@ export const WeeklySchedule = ({
           );
         })}
       </div>
+      {/* Compact + a day selected: the one line of chrome that earns its
+          place — the way back. Phone only; desktop has the header row. */}
+      {compact && selectedDate && (
+        <div className="lg:hidden flex justify-end mt-1">
+          <button
+            type="button"
+            data-testid="weekly-schedule-full-week"
+            onClick={() => onDayClick(null)}
+            className="focus-citrus inline-flex items-center gap-1 min-h-[32px] px-2.5 rounded-lg text-[10px] font-jbmono font-bold uppercase tracking-[0.22em] text-pastel-cream bg-pastel-sage/15 ring-1 ring-pastel-sage/40 active:bg-pastel-sage/25 transition-colors"
+          >
+            <span aria-hidden="true">←</span>
+            <span>Full week</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

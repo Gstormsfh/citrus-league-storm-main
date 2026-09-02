@@ -94,11 +94,11 @@ describe('week and day selectors share one row on phones', () => {
   const mobile = ROSTER.slice(branchStart, split);
   const desktop = ROSTER.slice(split, stripAt);
 
-  it('the phone branch mounts the compact week trigger beside the compact day chips', () => {
+  it('the phone branch mounts the compact week trigger beside the day chips', () => {
     expect(rowAt).toBeGreaterThan(-1);
     expect(branchStart).toBeGreaterThan(-1);
     expect(mobile).toMatch(/<MatchupScheduleSelector\s+compact/);
-    expect(mobile).toMatch(/<WeeklySchedule\s+compact/);
+    expect(mobile).toMatch(/<WeeklySchedule\s+chips/);
   });
 
   it('the phone branch carries no "Viewing:" line, no Read Only badge, no Lineup heading', () => {
@@ -109,7 +109,7 @@ describe('week and day selectors share one row on phones', () => {
 
   it('the desktop branch is the one that was there: varsity week bar, day card, Viewing line', () => {
     expect(desktop).not.toMatch(/<MatchupScheduleSelector\s+compact/);
-    expect(desktop).not.toMatch(/<WeeklySchedule\s+compact/);
+    expect(desktop).not.toMatch(/<WeeklySchedule\s+chips/);
     expect(desktop).toContain('Viewing:');
     expect(desktop).toContain('Read Only');
   });

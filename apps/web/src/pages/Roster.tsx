@@ -3524,7 +3524,7 @@ const Roster = () => {
                         />
                         <div className="min-w-0 flex-1">
                           <WeeklySchedule
-                            compact
+                            chips
                             weekStart={currentMatchup.week_start_date}
                             weekEnd={currentMatchup.week_end_date}
                             // loadRoster follows selectedDate through its own

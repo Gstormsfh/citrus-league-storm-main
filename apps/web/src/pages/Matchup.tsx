@@ -19,7 +19,8 @@ import { getCurrentSeason } from '@/utils/seasonConstants';
 import LeagueNotifications from "@/components/matchup/LeagueNotifications";
 import { MatchupSidebar } from "@/components/matchup/MatchupSidebar";
 import { ScoreboardStrip } from "@/components/matchup/ScoreboardStrip";
-import { anyGameLive } from "@/components/matchup/scoreboard";
+import { StickyScoreBar } from "@/components/matchup/StickyScoreBar";
+import { anyGameLive, type TeamAvatarMap } from "@/components/matchup/scoreboard";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MatchupPlayer, StatBreakdown } from "@/components/matchup/types";
@@ -287,6 +288,13 @@ const Matchup = () => {
   const [viewingTeamId, setViewingTeamId] = useState<string | null>(null);
   // Track user's actual matchup ID (for "(Your Matchup)" label)
   const [userMatchupId, setUserMatchupId] = useState<string | null>(null);
+  // Every team in the league, for the owner avatars on the header discs and
+  // the scoreboard chips (2026-09-01, audit M8). The league/teams response
+  // joins profiles.avatar_url by owner_id; nothing else on this page serves
+  // a picture (/my-team and the matchup rows carry ids and names only).
+  // LeagueService caches this read, so it costs the loader nothing extra —
+  // the opponent lookup below already requests the same list.
+  const [leagueTeams, setLeagueTeams] = useState<Team[]>([]);
   const [firstWeekStart, setFirstWeekStart] = useState<Date | null>(null);
   const [myTeam, setMyTeam] = useState<MatchupPlayer[]>([]);
   const [opponentTeamPlayers, setOpponentTeamPlayers] = useState<MatchupPlayer[]>([]);
@@ -3374,6 +3382,36 @@ const Matchup = () => {
     return viewingTeamId === userTeam.id;
   }, [userLeagueState, userTeam?.id, viewingTeamId]);
 
+  // Owner avatars for the discs (audit M8). Guests see the demo league,
+  // whose teams have no owners — the discs keep their initials.
+  useEffect(() => {
+    if (!league?.id || userLeagueState !== 'active-user') {
+      setLeagueTeams([]);
+      return;
+    }
+    let cancelled = false;
+    LeagueService.getLeagueTeams(league.id)
+      .then(({ teams }) => {
+        if (!cancelled) setLeagueTeams(teams);
+      })
+      .catch((err) => log('WARN: league teams for avatars unavailable:', err));
+    return () => {
+      cancelled = true;
+    };
+  }, [league?.id, userLeagueState]);
+
+  const teamAvatars = useMemo<TeamAvatarMap>(() => {
+    const map = new Map<string, string | null>();
+    for (const t of leagueTeams) map.set(t.id, t.avatar_url ?? null);
+    return map;
+  }, [leagueTeams]);
+
+  // Left side is the VIEWING team (see viewingTeamId), which is the user's
+  // own team only on their own matchup; the opponent object comes from the
+  // same league list and may already carry its picture.
+  const myTeamAvatarUrl = teamAvatars.get(viewingTeamId ?? userTeam?.id ?? '') ?? null;
+  const opponentTeamAvatarUrl = opponentTeam?.avatar_url ?? teamAvatars.get(opponentTeam?.id ?? '') ?? null;
+
   const opponentTeamPoints = useMemo(() => {
     if (!currentMatchup) {
       return '0.0';
@@ -3538,9 +3576,6 @@ const Matchup = () => {
   const projectedFinals = matchupOutlook && !matchupOutlook.settled
     ? { my: matchupOutlook.myExpectedFinal, opp: matchupOutlook.oppExpectedFinal }
     : null;
-  const winChanceLabel = matchupOutlook
-    ? (matchupOutlook.settled ? 'Final' : `${Math.round(matchupOutlook.probability * 100)}% win`)
-    : '—';
 
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   
@@ -5389,56 +5424,29 @@ const Matchup = () => {
         <Navbar />
       </div>
       
-      {/* MOBILE: Sticky scoreboard header — ESPN/Yahoo style */}
+      {/* MOBILE: the one-band sticky header (2026-09-01, audit M8) — ESPN
+          pins the scores while you scroll, Sleeper's header is one dense
+          band: disc · name · win chance · score · proj on BOTH sides, the
+          same numbers the ScoreCard shows at rest. Names follow the VIEWED
+          matchup (a stranger's pair from the scoreboard is not "My Team").
+          The hex-marker header string the menu guard keys on is the legacy
+          spelling of the same colour; this bar keeps the token. */}
       <div className="lg:hidden sticky top-0 z-40 bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-14 px-3">
-          {/* My team score — orange is the app-wide "this is you" signal
-              (Standings own-team row, ScoreCard's YOU pill). This bar used to
-              have it backwards: the OPPONENT wore orange and the user wore
-              cream, so the highlighted side was the one that wasn't yours. */}
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="flex flex-col items-start flex-shrink-0">
-              <span className="text-lg font-calistoga font-black text-pastel-orange tabular-nums leading-6">
-                {parseFloat(myTeamPoints || '0').toFixed(1)}
-              </span>
-              {projectedFinals && (
-                <span className="text-[10px] font-jbmono text-white/55 tabular-nums leading-none whitespace-nowrap">
-                  proj {projectedFinals.my.toFixed(1)}
-                </span>
-              )}
-            </div>
-            <span className="text-xs font-jbmono font-semibold text-pastel-orange-soft truncate">
-              {userLeagueState === 'active-user' ? (userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
-            </span>
-          </div>
-          {/* Week badge + win chance for the LEFT team (was a literal "—").
-              Plain fan language, same number the ScoreCard's bar shows. */}
-          <div className="flex flex-col items-center px-2 flex-shrink-0">
-            <span className="text-[10px] font-jbmono font-bold text-white/55 uppercase tracking-wider">
-              {currentMatchup ? `Wk ${selectedWeek}` : 'VS'}
-            </span>
-            <span className="text-xs font-jbmono font-bold text-pastel-cream tabular-nums whitespace-nowrap">
-              {winChanceLabel}
-            </span>
-          </div>
-          {/* Opponent score + menu — deliberately the muted side. */}
-          <div className="flex items-center gap-1 min-w-0 flex-1 justify-end">
-            <span className="text-xs font-jbmono font-semibold text-pastel-cream/70 truncate text-right">
-              {userLeagueState === 'active-user' ? (opponentTeam?.team_name || 'Opponent') : 'Thunder Titans'}
-            </span>
-            <div className="flex flex-col items-end flex-shrink-0">
-              <span className="text-lg font-calistoga font-black text-pastel-cream tabular-nums leading-6">
-                {parseFloat(opponentTeamPoints || '0').toFixed(1)}
-              </span>
-              {projectedFinals && (
-                <span className="text-[10px] font-jbmono text-white/55 tabular-nums leading-none whitespace-nowrap">
-                  proj {projectedFinals.opp.toFixed(1)}
-                </span>
-              )}
-            </div>
-            <MobileMenuButton />
-          </div>
-        </div>
+        <StickyScoreBar
+          menu={<MobileMenuButton />}
+          week={currentMatchup ? selectedWeek : undefined}
+          myTeamName={userLeagueState === 'active-user' ? (viewingTeamName || userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
+          myTeamPoints={parseFloat(myTeamPoints || '0').toFixed(1)}
+          myTeamExpectedFinal={projectedFinals?.my}
+          myTeamAvatarUrl={myTeamAvatarUrl}
+          opponentTeamName={userLeagueState === 'active-user' ? (viewingOpponentTeamName || opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
+          opponentTeamPoints={parseFloat(opponentTeamPoints || '0').toFixed(1)}
+          opponentTeamExpectedFinal={projectedFinals?.opp}
+          opponentTeamAvatarUrl={opponentTeamAvatarUrl}
+          winProbability={matchupOutlook ? matchupOutlook.probability * 100 : undefined}
+          settled={matchupOutlook?.settled ?? false}
+          isOwnTeam={isOwnTeamOnLeft}
+        />
       </div>
 
       {/* MOBILE: Full-screen scrollable content / DESKTOP: Grid layout */}
@@ -5598,6 +5606,7 @@ const Matchup = () => {
                   onSelect={handleMatchupSwitch}
                   week={selectedWeek}
                   live={scoreboardLive}
+                  teamAvatars={teamAvatars}
                 />
               )}
 
@@ -5664,6 +5673,8 @@ const Matchup = () => {
             opponentTeamRecord={userLeagueState === 'active-user' ? opponentTeamRecord : { wins: 9, losses: 1 }}
             myTeamPoints={myTeamPoints}
             opponentTeamPoints={opponentTeamPoints}
+            myTeamAvatarUrl={myTeamAvatarUrl}
+            opponentTeamAvatarUrl={opponentTeamAvatarUrl}
             myTeamGamesRemaining={myTeamGamesRemaining}
             opponentTeamGamesRemaining={opponentTeamGamesRemaining}
             myTeamProjection={myTotalProjection}
@@ -5679,7 +5690,10 @@ const Matchup = () => {
             isOwnTeam={isOwnTeamOnLeft}
           />
           
-          {/* Weekly Schedule - Show for both active users AND guests (the weekly date selector they love!) */}
+          {/* Weekly Schedule - Show for both active users AND guests (the weekly date selector they love!)
+              `compact`: on a phone the "Week Overview" header row is dropped
+              (audit M8) — the day cards are self-explanatory and the row was
+              the third band of chrome above the first player. */}
           {currentMatchup && (
             <div className="mb-6">
               <WeeklySchedule
@@ -5690,6 +5704,7 @@ const Matchup = () => {
                 team1Name={userLeagueState === 'active-user' ? (viewingTeamName || undefined) : 'Citrus Crushers'}
                 team2Name={userLeagueState === 'active-user' ? (viewingOpponentTeamName || undefined) : 'Thunder Titans'}
                 calculatedDailyTotals={calculatedDailyTotals}
+                compact
               />
             </div>
           )}
@@ -5843,6 +5858,7 @@ const Matchup = () => {
                     onSelect={handleMatchupSwitch}
                     week={selectedWeek}
                     live={scoreboardLive}
+                    teamAvatars={teamAvatars}
                   />
                 )}
                 <MatchupSidebar
