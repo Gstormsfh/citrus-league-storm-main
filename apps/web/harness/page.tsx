@@ -172,7 +172,12 @@ const Page = lazy(PAGES[which] ?? PAGES.waivers);
  */
 const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   league: { path: '/league/:leagueId', at: '/league/harness-league' },
-  matchup: { path: '/matchup/:leagueId?', at: '/matchup/harness-league' },
+  // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
+  // the week into the URL as soon as it resolves one. Under the old
+  // `/matchup/:leagueId?` the very first push ("/matchup/harness-league/1")
+  // matched nothing and the harness rendered a blank page — the surface could
+  // not be reviewed at all. Mirror the real route.
+  matchup: { path: '/matchup/:leagueId/:weekId?', at: '/matchup/harness-league' },
 };
 const routed = ROUTE_PATHS[which];
 

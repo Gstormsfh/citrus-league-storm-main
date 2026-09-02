@@ -11,6 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Mug } from "@/components/roster/Mug";
 import { opponentTint } from "./opponentTint";
 import { useIsMobile } from "@/hooks/useIsMobile";
+// The phone row type scale — the same four rungs the roster list and the
+// Free Agents rows wear. Everything it names below is inside a `lg:hidden`
+// block, so the desktop card is untouched.
+import { ROW_HEADLINE, ROW_HEADLINE_LABEL, ROW_META, ROW_MICRO } from "@/components/phoneRowScale";
 
 interface PlayerCardProps {
   player: MatchupPlayer | null;
@@ -51,8 +55,18 @@ const getPositionColorClasses = (position: string): string => {
   return '';
 };
 
-/** The big number in the mobile score stack: 15px JetBrains Mono, tabular. */
-const SCORE_ACTUAL_CLASS = 'player-score-value font-jbmono tabular-nums text-[15px] font-bold leading-none';
+/**
+ * The big number in the mobile score stack — the phone scale's HEADLINE
+ * rung (17px JetBrains Mono, tabular).
+ *
+ * 15px → 17px (2026-09-02). The audit measured this row at name 14px /
+ * score 15px: the number the row exists to show was one pixel bigger than
+ * the name beside it, which reads as one flat band rather than as a
+ * hierarchy. The column it sits in widened 38 → 42px in index.css to hold
+ * a four-figure week total at this size; the width came out of the card's
+ * screen-edge padding, not out of the name.
+ */
+const SCORE_ACTUAL_CLASS = `player-score-value ${ROW_HEADLINE}`;
 
 /**
  * "Auston Matthews" → "A. Matthews" when `compact` (the phone row), the
@@ -311,7 +325,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               {(player.roster_status && player.roster_status !== 'ACT') || player.is_ir_eligible ? (
                 <Badge 
                   variant="destructive" 
-                  className="ml-1 text-[9px] px-1 py-0"
+                  className="ml-1 text-[10px] leading-tight px-1 py-0"
                   title={`Roster Status: ${player.roster_status || 'IR'}`}
                 >
                   IR
@@ -321,7 +335,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               {player.wasDropped ? (
                 <Badge 
                   variant="secondary"
-                  className="ml-1 text-[9px] px-1 py-0 border-pastel-orange/40 bg-pastel-orange/20 text-pastel-orange font-semibold"
+                  className="ml-1 text-[10px] leading-tight px-1 py-0 border-pastel-orange/40 bg-pastel-orange/20 text-pastel-orange font-semibold"
                   title="Player was dropped but points still count from when they were in the lineup"
                 >
                   Dropped
@@ -355,12 +369,31 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                 const hasScores = homeScore > 0 || awayScore > 0;
 
                 return (
-                  <div className="lg:hidden flex items-center gap-1 flex-wrap">
+                  /* ONE LINE THAT TRUNCATES, NEVER WRAPS (2026-09-02).
+                     `flex-wrap` in an 85px name block put the live badge and
+                     the score on a second and third line — and the mobile
+                     card is `max-height: 64px; overflow: hidden`, so those
+                     lines were not shown small, they were CUT. Nowrap +
+                     min-w-0 + overflow-hidden makes the overflow an ellipsis
+                     on the one shrinkable child instead.
+
+                     TYPE (2026-09-02): the opponent label is the game's
+                     identity and rides the scale's META rung (12px), level
+                     with the team abbreviation beside it, which used to be
+                     11px against this label's 10px — two halves of one line
+                     disagreeing. Everything after it is a state qualifier
+                     that only some rows carry, and it stays on the MICRO
+                     rung: at 393px this column is 85px, the logo plus
+                     "vs TOR" at 12px already spends 55px of it, and
+                     promoting "TOR 1-2, P2" to 12px would push the score
+                     under the ellipsis on every live row. Small and present
+                     beats large and truncated. */
+                  <div className="lg:hidden flex items-center gap-1 min-w-0 overflow-hidden">
                     {/* Opponent logo + abbrev, tinted by expected difficulty (M10) */}
-                    <div className="flex items-center gap-0.5">
+                    <div className="flex items-center gap-0.5 shrink-0">
                       <img loading="lazy" decoding="async" src={logoUrl} alt={opponent || ''} className="w-3.5 h-3.5 object-contain" />
                       <span
-                        className={cn('player-opponent text-[10px] font-display font-semibold', oppTint.className)}
+                        className={cn('player-opponent', ROW_META, 'font-display font-semibold', oppTint.className)}
                         data-opponent-tier={oppTint.tier}
                       >
                         {opPrefix} {opponent}
@@ -368,13 +401,13 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                     </div>
                     {/* Live badge + score */}
                     {isLive && (
-                      <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1 py-0.5 rounded-sm leading-none bg-red-500/15 text-red-600 border border-red-500/30 animate-pulse">
+                      <span className={cn('inline-flex items-center gap-0.5 shrink-0 font-bold px-1 py-0.5 rounded-sm bg-red-500/15 text-red-600 border border-red-500/30 animate-pulse', ROW_MICRO, 'leading-none')}>
                         <span className="w-1 h-1 rounded-full bg-red-500" />
                         LIVE
                       </span>
                     )}
                     {isLive && hasScores && (
-                      <span className="text-[10px] font-display font-bold text-pastel-cream">
+                      <span className={cn(ROW_MICRO, 'font-display font-bold text-pastel-cream truncate')}>
                         {isHome
                           ? `${player.team} ${homeScore}-${awayScore}`
                           : `${player.team} ${awayScore}-${homeScore}`}
@@ -383,12 +416,12 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                     )}
                     {/* Final badge + score */}
                     {isFinal && (
-                      <span className="text-[9px] font-bold px-1 py-0.5 rounded-sm leading-none bg-white/10 text-white/60 border border-white/20">
+                      <span className={cn(ROW_MICRO, 'leading-none shrink-0 font-bold px-1 py-0.5 rounded-sm bg-white/10 text-white/60 border border-white/20')}>
                         F
                       </span>
                     )}
                     {isFinal && hasScores && (
-                      <span className="text-[10px] font-display font-semibold text-white/60">
+                      <span className={cn(ROW_MICRO, 'font-display font-semibold text-white/60 shrink-0')}>
                         {isHome
                           ? `${homeScore}-${awayScore}`
                           : `${awayScore}-${homeScore}`}
@@ -396,7 +429,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                     )}
                     {/* Scheduled: show game time */}
                     {!isLive && !isFinal && player.gameInfo?.time && (
-                      <span className="text-[10px] font-display text-white/55">
+                      <span className={cn(ROW_MICRO, 'font-display text-white/55 truncate')}>
                         {player.gameInfo.time}
                       </span>
                     )}
@@ -791,7 +824,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                 </ProjectionTooltip>
               )
             ) : (
-              <span className="player-score-label font-jbmono uppercase tracking-[0.22em] text-[10px] leading-none mt-1 text-white/55">
+              <span className={cn('player-score-label', ROW_HEADLINE_LABEL, 'mt-1 text-white/55')}>
                 {tonightLive ? 'live' : 'week'}
               </span>
             )}
@@ -823,12 +856,12 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               // Label over number: two flex-column lines; the whitespace
               // text node between them keeps the text "proj 4.2" for
               // copy/paste and assistive tech while rendering nothing.
-              <span className="player-score-proj font-jbmono tabular-nums text-[10px] leading-tight mt-1 text-white/55 flex flex-col">
-                <span className="uppercase tracking-[0.22em]">proj</span>{' '}
-                <span>{projectedPoints.toFixed(1)}</span>
+              <span className={cn('player-score-proj', ROW_HEADLINE_LABEL, 'tabular-nums mt-1 text-white/55 flex flex-col gap-px')}>
+                <span className="uppercase">proj</span>{' '}
+                <span className="normal-case">{projectedPoints.toFixed(1)}</span>
               </span>
             ) : (
-              <span className="player-score-label font-jbmono uppercase tracking-[0.22em] text-[10px] leading-none mt-1 text-white/55">
+              <span className={cn('player-score-label', ROW_HEADLINE_LABEL, 'mt-1 text-white/55')}>
                 {isGameLive || (gameHasStarted && !isGameFinal) ? 'live' : 'final'}
               </span>
             )}
@@ -849,17 +882,19 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                 </span>
               </ProjectionTooltip>
             )}
-            <span className="player-score-label font-jbmono uppercase tracking-[0.22em] text-[10px] leading-none mt-1 text-white/55">
+            <span className={cn('player-score-label', ROW_HEADLINE_LABEL, 'mt-1 text-white/55')}>
               proj
             </span>
           </>
         ) : (
-          // Has a game but no projection yet.
+          // Has a game but no projection yet. "TBD" is what this row's
+          // headline slot holds, so it wears the headline rung (13px was a
+          // third size in a column that only has two jobs).
           <>
-            <span className="player-score-tbd font-jbmono text-[13px] font-bold leading-none text-pastel-cream/80">
+            <span className={cn('player-score-tbd', ROW_HEADLINE, 'text-pastel-cream/80')}>
               TBD
             </span>
-            <span className="player-score-label font-jbmono uppercase tracking-[0.22em] text-[10px] leading-none mt-1 text-white/55">
+            <span className={cn('player-score-label', ROW_HEADLINE_LABEL, 'mt-1 text-white/55')}>
               proj
             </span>
           </>

@@ -26,6 +26,13 @@
  */
 import type { NHLGame } from '@/services/ScheduleService';
 import { ScheduleService } from '@/services/ScheduleService';
+// The phone row type scale. This row's 15px name and 17px projection were
+// tuned by eye here first; they were lifted into `phoneRowScale.ts` on
+// 2026-09-02 so the roster list and the matchup rows could climb the same
+// ladder instead of inventing a third and a fourth. Composing from it —
+// rather than restating the sizes — is what keeps the three surfaces from
+// drifting apart the next time one of them is edited.
+import { ROW_HEADLINE, ROW_MICRO, ROW_NAME } from '@/components/phoneRowScale';
 
 /**
  * What the row's right-hand button does. Three states, because a pickup is
@@ -192,21 +199,30 @@ export function statusChipFor(status: string | null | undefined) {
 export const FA_ROW =
   'flex items-center gap-2.5 px-3 py-2 min-h-[64px] border-b border-pastel-sage/10 transition-colors active:bg-white/5';
 
-/** Rank: tabular so the column edge stays straight from 1 to 100. */
-export const FA_RANK = 'w-5 shrink-0 text-right font-jbmono text-[11px] tabular-nums text-white/55';
+/**
+ * Rank: tabular so the column edge stays straight from 1 to 100.
+ *
+ * 11px -> the scale's MICRO rung (2026-09-02). It was the only size on this
+ * row that belonged to no rung, and a list index is the least of the six
+ * things the row says — it should sit UNDER the 12px game line, not between
+ * it and the name. 10px also keeps "100" (18px in JetBrains Mono) inside
+ * the 20px `w-5` column, which 12px would not.
+ */
+export const FA_RANK = `w-5 shrink-0 text-right font-jbmono ${ROW_MICRO} leading-none tabular-nums text-white/55`;
 
-/** The name. 15px is the phone scale a sibling branch settled on for names. */
-export const FA_NAME = 'font-display font-bold text-[15px] text-pastel-cream truncate leading-tight';
+/** The name — the scale's NAME rung. */
+export const FA_NAME = `${ROW_NAME} text-pastel-cream`;
 
 /**
- * The headline number. 17px + jbmono + right-aligned: it is the biggest
- * thing on the row on purpose, because it is the thing the decision turns
- * on, and tabular figures keep the column's decimal point in one place.
+ * The headline number — the scale's HEADLINE rung. Right-aligned and
+ * tabular: it is the biggest thing on the row on purpose, because it is the
+ * thing the decision turns on, and tabular figures keep the column's
+ * decimal point in one place.
  */
-export const FA_PROJ = 'font-jbmono font-bold text-[17px] leading-none tabular-nums text-pastel-sage-soft';
+export const FA_PROJ = `${ROW_HEADLINE} text-pastel-sage-soft`;
 
-/** Whatever sits under the projection — rostered %, games, adds. */
-export const FA_SUB = 'font-jbmono text-[10px] leading-none tabular-nums text-white/55 mt-1';
+/** Whatever sits under the projection — rostered %, games, adds. MICRO. */
+export const FA_SUB = `font-jbmono ${ROW_MICRO} leading-none tabular-nums text-white/55 mt-1`;
 
 /**
  * The game line's tint. Sage is the app's "live / good" colour and marks

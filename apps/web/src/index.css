@@ -1655,7 +1655,7 @@
     min-height: 64px !important;
     max-height: 64px !important;
     height: 64px !important;
-    padding: 6px 8px !important;
+    padding: 6px 6px !important;
     width: 100% !important;
     box-sizing: border-box !important;
     border-radius: 0 !important;
@@ -1676,9 +1676,18 @@
        chip on both sides. The width it needs comes from three places: the
        gutter-side padding drops 8→6px (the chip already has 2px of its own
        column on each side), the gaps drop 8→6px, and the score stack
-       becomes a fixed 38px column (below). At 393px that leaves the name
-       block ~86px — "C. McDavid" in 14px Montserrat Bold — where the
-       one-line "proj 12.3" stack left it ~92px before the mug existed. */
+       becomes a fixed 42px column (below). At 393px that leaves the name
+       block ~85px — "C. McDavid" in 15px Montserrat Bold — where the
+       one-line "proj 12.3" stack left it ~92px before the mug existed.
+
+       TYPE SCALE (2026-09-02): the score column grew 38→42px to hold a
+       four-figure number at the phone scale's 17px HEADLINE rung
+       ("22.4" in JetBrains Mono = 40.8px). The 4px came out of the
+       SCREEN-EDGE padding — the shorthand's horizontal value drops 8→6px,
+       matching the gutter side — and NOT out of the name block, which is
+       the same rule the 2026-09-01 note above states. Net: the name column
+       is the 85px it already was, the number is 2px bigger than the name
+       instead of 1px, and the card is still exactly 64px tall. */
     flex-direction: row !important;
     align-items: center !important;
     gap: 6px !important;
@@ -1726,20 +1735,35 @@
     font-weight: 600 !important;
   }
   
-  /* Player name - BIGGER and more prominent on mobile */
+  /* Player name — the row's first read.
+     14px → 15px (2026-09-02, phone type scale). The audit measured this row
+     at name 14px / score 15px: one pixel apart, which is not a hierarchy,
+     it is one grey band. 15px is the NAME rung in
+     `src/components/phoneRowScale.ts` — the same size the roster list and
+     the Free Agents rows carry — and it is the largest this column can pay
+     for: "C. McDavid" in 15px Montserrat Bold is 83.6px inside an 85px
+     name block. (CSS cannot import the TS module; the module is the place
+     the ladder is explained, this is one of its three call sites.) */
   .player-card .player-name {
-    font-size: 0.875rem !important; /* 14px */
+    font-size: 0.9375rem !important; /* 15px */
     font-weight: 700 !important;
     color: #FFF8F0 !important;
     line-height: 1.2 !important;
+    /* The base rule tracks this +0.02em, which is a DISPLAY-type habit —
+       it belongs on the uppercase varsity labels, not on a mixed-case name
+       in an 83px column, where at 15px it costs 3px and pushed
+       "C. McDavid" (84px) past the box for no legibility gain. */
+    letter-spacing: 0 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
   }
 
-  /* Team name styling */
+  /* Team name — 11px → 12px, the scale's META rung, level with the
+     opponent label beside it (PlayerCard's `.player-opponent`, which was
+     10px, so the two halves of one line disagreed by a pixel). */
   .player-card .player-team-name {
-    font-size: 0.6875rem !important; /* 11px */
+    font-size: 0.75rem !important; /* 12px */
     color: #789561 !important;
     font-weight: 600 !important;
   }
@@ -1770,18 +1794,24 @@
      color:#F9A436 !important over the component, which is how "projected"
      and "actual" ended up the same orange on every phone.
 
-     A FIXED 38px column (audit M4): "12.3" in 15px JetBrains Mono is 36px,
-     the tracked "PROJ" label 33px, and the proj line stacks its label over
-     its number rather than beside it. With the stack the same width on
-     every row, the mug beside it lands on the same x on every row — a
-     ragged column of faces is worse than none. "No game" wraps to two
-     quiet lines. */
+     A FIXED 42px column (audit M4, widened 2026-09-02): with the stack the
+     same width on every row, the mug beside it lands on the same x on every
+     row — a ragged column of faces is worse than none. "No game" wraps to
+     two quiet lines.
+
+     38 → 42px because the score moved up to the phone scale's 17px HEADLINE
+     rung: a four-figure week total ("22.4") in JetBrains Mono is 4 × 0.6em
+     = 40.8px, where 38px clipped it. The label under it got NARROWER at the
+     same time (tracking 0.22em → 0.1em, so "WEEK" is 33px → 26px), which is
+     the point — a unit label as wide as the number it labels has the same
+     optical weight as the number. The 4px is paid for by the card's
+     screen-edge padding (8 → 6px), not by the name block. */
   .player-card .player-mobile-score {
     display: flex !important;
     flex-direction: column !important;
     justify-content: center !important;
-    flex: 0 0 38px !important;
-    width: 38px !important;
+    flex: 0 0 42px !important;
+    width: 42px !important;
     position: static !important;
     transform: none !important;
   }
@@ -1807,17 +1837,32 @@
     padding: 0 !important;
   }
   
-  /* Player header - compact */
+  /* Player header - compact.
+     width: 100% + min-width: 0 (2026-09-02) — the reason `.player-name`'s
+     ellipsis was never firing on the OPPONENT card. That card mirrors
+     itself with `align-items: flex-end` (the rule further up this block),
+     and `align-items` other than `stretch` in a column flex container sizes
+     children to their own content instead of to the container. The name is
+     `white-space: nowrap`, so the header's fit-content width IS the whole
+     name: measured on the matchup harness at 393x852, an 82.5px content
+     column held a 161px header, and "A. Wennberg-Nylander" printed straight
+     through the opponent's score. Pinning the width to the column is what
+     lets the ellipsis the name already asks for actually happen. Broken at
+     the old 14px name too — just 20px less visibly. */
   .player-card .player-card-header {
     display: flex !important;
     flex-direction: column !important;
     gap: 2px !important;
+    width: 100% !important;
+    min-width: 0 !important;
   }
-  
+
   .player-card .player-header-left {
     display: flex !important;
     flex-direction: column !important;
     gap: 1px !important;
+    width: 100% !important;
+    min-width: 0 !important;
   }
 }
 

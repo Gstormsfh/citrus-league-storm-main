@@ -4,6 +4,7 @@ import { Mug } from '@/components/roster/Mug';
 import { mugFromDirectory } from '@/components/roster/headshot';
 import { positionChipClasses, positionChipKey } from '@/components/roster/positionChip';
 import type { NHLGame } from '@/services/ScheduleService';
+import { ROW_META, ROW_MICRO } from '@/components/phoneRowScale';
 import {
   ACTION_GLYPH,
   FA_CHIP,
@@ -146,8 +147,13 @@ export function FreeAgentRow({
             {status && (
               <span
                 data-testid="fa-status-chip"
+                /* 8px -> the scale's MICRO rung (2026-09-02). This module's
+                   own note above says a saturated chip at 8px next to a 15px
+                   name reads as a smudge; the tint fixed the weight, 10px
+                   fixes the size. */
                 className={cn(
-                  'text-[8px] font-bold px-1 py-px rounded-sm leading-none whitespace-nowrap flex-shrink-0',
+                  ROW_MICRO,
+                  'leading-none font-bold px-1 py-px rounded-sm whitespace-nowrap flex-shrink-0',
                   status.cls,
                 )}
               >
@@ -156,7 +162,7 @@ export function FreeAgentRow({
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 mt-1 text-[12px] leading-none overflow-hidden">
+          <div className={cn(ROW_META, 'flex items-center gap-1.5 mt-1 overflow-hidden')}>
             {/* The roster's own position palette, shrunk to fit a second
                 line. `cn` is tailwind-merge, so the geometry classes here
                 replace the chip's 32px box while every colour and ring in

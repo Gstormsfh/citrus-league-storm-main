@@ -24,6 +24,18 @@ import {
   positionChipKey,
 } from "./positionChip";
 
+// The phone row type scale (name / headline number / meta / micro). Lives in
+// its own module because the matchup rows and the Free Agents rows wear the
+// SAME four rungs — the audit finding was that this row is flat, not that it
+// is small, and a ladder only exists if every row climbs the same one.
+import {
+  ROW_HEADLINE,
+  ROW_HEADLINE_LABEL,
+  ROW_META,
+  ROW_MICRO,
+  ROW_NAME,
+} from "@/components/phoneRowScale";
+
 import type { PositionType } from "@/utils/rosterUtils";
 
 // ─── Interfaces ──────────────────────────────────────────────────────
@@ -141,12 +153,20 @@ const formatStatLine = (player: HockeyPlayer): { text: string; isActual: boolean
 // squeeze and wrapped — "FINAL 4-2" rendered as "FINAL 4-" over "2", which
 // doubled the row height and broke the list's rhythm. A status chip is
 // atomic: it is either shown whole or the row truncates something else.
+//
+// 9px -> 10px + leading-none (2026-09-02, type-scale pass): 10px is the
+// scale's MICRO floor, and `leading-none` is what pays for the extra pixel
+// — the chip's own line box, not the 12px text beside it, sets the height
+// of the meta line, so at 9px/normal leading it made that line 17.5px and
+// at 10px/none it makes it 14px. Bigger chip, shorter row. The class lists
+// stay literal strings: MobileRosterList.statusChip.test.ts parses this
+// block for `<span className="...">` and reads the guards out of it.
 const GameStatusBadge = ({ status, score }: { status?: string; score?: string }) => {
   if (!status || status === 'scheduled') return null;
 
   if (status === 'final') {
     return (
-      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-white/10 text-white/70 uppercase whitespace-nowrap flex-shrink-0">
+      <span className="text-[10px] leading-none font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-white/10 text-white/70 uppercase whitespace-nowrap flex-shrink-0">
         Final{score ? ` ${score}` : ''}
       </span>
     );
@@ -154,7 +174,7 @@ const GameStatusBadge = ({ status, score }: { status?: string; score?: string })
 
   if (status === 'live' || status === 'intermission') {
     return (
-      <span className="text-[9px] font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-red-500/15 text-red-400 uppercase animate-pulse whitespace-nowrap flex-shrink-0">
+      <span className="text-[10px] leading-none font-varsity font-black tracking-wider px-1.5 py-0.5 rounded-sm bg-red-500/15 text-red-400 uppercase animate-pulse whitespace-nowrap flex-shrink-0">
         {status === 'intermission' ? 'INT' : 'LIVE'}{score ? ` ${score}` : ''}
       </span>
     );
@@ -265,19 +285,27 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
 
           {/* Player info — 2 lines max, tap to open card */}
           <div className="flex-1 min-w-0 cursor-pointer" onClick={(e) => { e.stopPropagation(); onNameTap?.(); }}>
-            {/* Line 1: Name + status badge */}
+            {/* Line 1: Name + status badge. 13px -> the scale's NAME rung
+                (15px): this is the row's first read and it was two pixels
+                off the number it sits beside. */}
             <div className="flex items-center gap-1.5">
-              <span className="font-display font-bold text-[13px] text-pastel-cream truncate leading-tight">
+              <span className={cn(ROW_NAME, "text-pastel-cream")}>
                 {player.name}
               </span>
               {statusBadge && (
-                <span className={cn("text-[8px] font-bold px-1 py-px rounded-sm leading-none flex-shrink-0", statusBadge.cls)}>
+                /* 8px -> the MICRO rung. A solid saturated fill at 8px beside
+                   a 15px name is a smudge rather than a word (the same note
+                   freeAgentRow.ts makes about its own status chip). */
+                <span className={cn(ROW_MICRO, "leading-none font-bold px-1 py-px rounded-sm flex-shrink-0", statusBadge.cls)}>
                   {statusBadge.label}
                 </span>
               )}
             </div>
-            {/* Line 2: Team · Opponent · Game status/time · Stats (single line, truncated) */}
-            <div className="flex items-center gap-1 text-[11px] text-white/55 font-display leading-tight mt-0.5 overflow-hidden">
+            {/* Line 2: Team · Opponent · Game status/time · Stats (single line,
+                truncated). 11px -> the META rung (12px), and `mt-0.5`/
+                `leading-tight` -> `mt-px`/`leading-none`, which is what keeps
+                the three-line row at 62px instead of 67 (see ROW_META). */}
+            <div className={cn(ROW_META, "flex items-center gap-1 text-white/55 font-display mt-px overflow-hidden")}>
               <span className="font-semibold flex-shrink-0">{teamAbbr}</span>
               {player.nextGame?.opponent && (
                 <>
@@ -299,7 +327,13 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                         return (
                           <>
                             <span className="text-white/25 flex-shrink-0">·</span>
-                            <span className="text-emerald-700 font-semibold truncate">
+                            {/* text-emerald-700 (#047857) measured 2.71:1 on
+                                the #1A2A20 tile — dark ink on a dark page,
+                                and the one line of the row that only appears
+                                once a game is LIVE. pastel-sage is the app's
+                                own "this has happened" green and measures
+                                5.5:1 on the same tile. */}
+                            <span className="text-pastel-sage font-semibold truncate">
                               {statInfo.text}
                             </span>
                           </>
@@ -321,7 +355,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 Availability (IR/GTD/SUSP) wins this line when it applies, since
                 that is the decision the manager is actually making. */}
             {writeup?.cardNote && (
-              <div className="flex items-center gap-1 mt-0.5 overflow-hidden">
+              <div className="flex items-center gap-1 mt-px overflow-hidden">
                 <span
                   className={cn(
                     'w-1 h-1 rounded-full flex-shrink-0',
@@ -333,32 +367,58 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                   )}
                   aria-hidden="true"
                 />
-                <span className="text-[10px] font-display text-white/55 truncate leading-tight">
+                {/* HELD AT THE MICRO RUNG, on purpose. This is the row's
+                    fourth line and its only optional one — an aside, not a
+                    fact the lineup decision turns on. Promoting it to 12px
+                    would put it level with the game line and cost every
+                    three-line row ~3px of height; holding it at 10px is what
+                    makes the 12px game line above it read as a rung up. */}
+                <span className={cn(ROW_MICRO, "font-display text-white/55 truncate")}>
                   {writeup.cardNote}
                 </span>
               </div>
             )}
           </div>
 
-          {/* Points column */}
+          {/* Points column — the number the row exists to show.
+              15px font-varsity black -> the scale's HEADLINE rung (17px
+              JetBrains Mono, tabular). Three things changed at once because
+              they were one defect:
+                * SIZE: 15px against a 13px name is not a hierarchy.
+                * FAMILY: `font-varsity` put this number under index.css's
+                  `h1, h2, .font-varsity:not(button) { text-pastel-cream }`
+                  (specificity 0-1-1), which beat both utilities below it —
+                  every points figure on the phone roster rendered CREAM, so
+                  a final score and a projection were the same colour and the
+                  row's only state signal was absent. Measured in the harness
+                  at 393x852: rgb(255,248,240) on a row whose class said
+                  text-pastel-orange.
+                * FIGURES: tabular-nums holds the decimal point on one x down
+                  a forty-row list.
+              "12.3" at 17px JetBrains Mono is 40.8px, inside this column's
+              52px, so nothing moved sideways. */}
           <div className="flex-shrink-0 w-[52px] text-right">
             {hasGame ? (
               <div className="flex flex-col items-end">
                 <span className={cn(
-                  "font-varsity text-[15px] font-black leading-none",
-                  isLiveOrFinal ? "text-emerald-700" : "text-pastel-orange"
+                  ROW_HEADLINE,
+                  // sage = a number that has happened, orange = a forecast.
+                  // The same pair the matchup score stack uses, app-wide.
+                  isLiveOrFinal ? "text-pastel-sage" : "text-pastel-orange"
                 )}>
                   {displayPts.toFixed(1)}
                 </span>
-                <span className={cn(
-                  "text-[9px] font-display font-semibold uppercase leading-tight mt-0.5",
-                  isLiveOrFinal ? "text-emerald-600/70" : "text-white/55"
-                )}>
+                {/* One muted colour for the unit in BOTH states: the number
+                    above carries the state, and a label that also changed
+                    colour was a second signal saying the same thing at a
+                    tenth of the size. (The old live/final variant was
+                    text-emerald-600/70 — 3.4:1 on this tile.) */}
+                <span className={cn(ROW_HEADLINE_LABEL, "font-semibold text-white/55 mt-1")}>
                   {isLiveOrFinal ? (gameStatus === 'final' ? 'final' : 'live') : 'proj'}
                 </span>
               </div>
             ) : (
-              <span className="text-[11px] text-white/55 font-display">—</span>
+              <span className={cn(ROW_META, "text-white/55 font-display")}>—</span>
             )}
           </div>
         </>

@@ -143,9 +143,16 @@ describe('index.css mobile block — the mug column (audit M4)', () => {
   // must be the same width on every row, and nothing may let the mug
   // shrink; the width both need comes out of the gutter padding and gaps,
   // not the name block.
-  it('the score stack is a fixed 38px column, not a percentage', () => {
-    expect(declares('.player-card .player-mobile-score', 'width', /38px/)).toBe(true);
-    expect(declares('.player-card .player-mobile-score', 'flex', /0 0 38px/)).toBe(true);
+  //
+  // 2026-09-02, phone type scale: the score column went 38 -> 42px because
+  // the number moved up to the 17px HEADLINE rung and a four-figure week
+  // total in JetBrains Mono is 4 x 0.6em = 40.8px. The 4px came out of the
+  // SCREEN-EDGE padding (the shorthand's horizontal value, 8 -> 6px), which
+  // is the same rule this block already enforced — the name block keeps its
+  // ~85px either way. The pins move with the geometry; they do not relax.
+  it('the score stack is a fixed 42px column, not a percentage', () => {
+    expect(declares('.player-card .player-mobile-score', 'width', /42px/)).toBe(true);
+    expect(declares('.player-card .player-mobile-score', 'flex', /0 0 42px/)).toBe(true);
     expect(declares('.player-card .player-mobile-score', 'max-width', /45%/)).toBe(false);
   });
 
@@ -155,12 +162,29 @@ describe('index.css mobile block — the mug column (audit M4)', () => {
     expect(declares('.player-card .player-mug', 'align-self', /center/)).toBe(true);
   });
 
-  it('the row gives the face its width from the gutter side, not the name', () => {
+  it('the row gives the face and the number their width from the edges, not the name', () => {
     expect(declares('.player-card', 'gap', /6px/)).toBe(true);
     expect(declares('.player-card.user-team', 'padding-right', /6px/)).toBe(true);
     expect(declares('.player-card.opponent-team', 'padding-left', /6px/)).toBe(true);
-    // The screen-edge padding is untouched (the shorthand still says 8px).
-    expect(declares('.player-card', 'padding', /6px 8px/)).toBe(true);
+    // Both horizontal paddings are now 6px: the gutter side always was, the
+    // screen-edge side paid the score column's extra 4px.
+    expect(declares('.player-card', 'padding', /6px 6px/)).toBe(true);
+    expect(declares('.player-card', 'padding', /6px 8px/)).toBe(false);
+  });
+
+  // THE NAME MUST BE ABLE TO SHRINK (2026-09-02). `.player-name` is
+  // `white-space: nowrap` with an ellipsis, but the opponent card mirrors
+  // itself with `align-items: flex-end`, and a column flex container whose
+  // align-items is not `stretch` sizes its children to their own content.
+  // Measured at 393x852 before the fix: an 82.5px content column held a
+  // 161px header and "A. Wennberg-Nylander" printed straight over the
+  // opponent's score. Without these two declarations the ellipsis never
+  // fires and every long name collides with the number beside it.
+  it('the name column is pinned to the card, so the name ellipsis can fire', () => {
+    for (const sel of ['.player-card .player-card-header', '.player-card .player-header-left']) {
+      expect(declares(sel, 'width', /100%/), `${sel} must not size to its own content`).toBe(true);
+      expect(declares(sel, 'min-width', /0/), `${sel} must be allowed to shrink`).toBe(true);
+    }
   });
 });
 
