@@ -164,6 +164,21 @@ let indexCache: { season: number; data: DashboardIndexEntry[]; timestamp: number
 const CACHE_TTL_MS = 2 * 60 * 1000;
 
 /**
+ * STAMPEDE GUARD (2026-09-02 scale audit).
+ *
+ * `getDashboardIndex` is the most expensive read in the app: five paged
+ * table fan-outs plus a four-Map merge over every player in the
+ * directory. Behind a plain check-then-fetch cache, the two-minute
+ * expiry is a synchronised miss — every request in flight at that
+ * instant does all five reads and the whole merge, concurrently.
+ *
+ * One shared promise per season collapses that back to one load. Callers
+ * that arrive while a load is running await the same promise; nobody sees
+ * a different answer than they would have.
+ */
+let indexInFlight: { season: number; promise: Promise<{ players: DashboardIndexEntry[]; error: Error | null }> } | null = null;
+
+/**
  * PostgREST silently clamps an unbounded `.select()` to the project's
  * `max-rows` setting and returns a 200 with a truncated body — no error,
  * no warning. This project has been bitten by exactly that on exactly
@@ -261,6 +276,7 @@ async function selectAllPaged<T>(
 /** Test hook — clears the module-level cache between tests. */
 export function clearDashboardIndexCache(): void {
   indexCache = null;
+  indexInFlight = null;
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -636,6 +652,23 @@ export class PlayerDashboardService {
       return { players: indexCache.data, error: null };
     }
 
+    // A load for this season is already running — join it. See the
+    // `indexInFlight` note above.
+    if (indexInFlight && indexInFlight.season === season) return indexInFlight.promise;
+
+    const promise = this.loadDashboardIndex(season);
+    indexInFlight = { season, promise };
+    try {
+      return await promise;
+    } finally {
+      if (indexInFlight?.promise === promise) indexInFlight = null;
+    }
+  }
+
+  /** The uncached five-table fan-out and merge behind `getDashboardIndex`. */
+  private async loadDashboardIndex(
+    season: number,
+  ): Promise<{ players: DashboardIndexEntry[]; error: Error | null }> {
     // Parallel fan-out — these tables have no FKs between them, so
     // this is 5 independent index-only scans, not an N+1. Each one is
     // PAGED (see selectAllPaged) because an unbounded select would be

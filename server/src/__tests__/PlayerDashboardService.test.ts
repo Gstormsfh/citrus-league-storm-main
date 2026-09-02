@@ -202,6 +202,45 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     expect(mockSupabase.from.mock.calls.length).toBe(calls1);
   });
 
+  // REGRESSION (2026-09-02 scale audit): this was a plain check-then-fetch
+  // cache. When the 2-minute TTL lapsed, every concurrent request missed
+  // and every one of them ran all five paged fan-outs and the whole
+  // four-Map merge — the single most expensive read in the app, multiplied
+  // by however many requests were in flight at that instant. One shared
+  // promise per season collapses that back to one load.
+  it('collapses concurrent cache misses into a single load (no stampede)', async () => {
+    let releaseDirectory: (v: unknown) => void = () => {};
+    const gate = new Promise((resolve) => {
+      releaseDirectory = resolve;
+    });
+
+    const slowDirectory: Record<string, any> = {};
+    for (const m of ['select', 'eq', 'order']) slowDirectory[m] = vi.fn(() => slowDirectory);
+    slowDirectory.range = vi.fn(() => gate);
+
+    mockSupabase.from = vi.fn((table: string) => {
+      if (table === 'player_directory') return slowDirectory;
+      if (table === 'player_season_stats') return createChain({ data: STATS, error: null });
+      if (table === 'player_gar_components') return createChain({ data: GAR, error: null });
+      if (table === 'player_talent_metrics') return createChain({ data: TALENT, error: null });
+      if (table === 'player_ros_projections') return createChain({ data: ROS, error: null });
+      return createChain({ data: [], error: null });
+    });
+
+    // Fifty callers arrive while the first fan-out is still outstanding.
+    const inFlight = Array.from({ length: 50 }, () => service.getDashboardIndex());
+    releaseDirectory({ data: DIR, error: null });
+    const results = await Promise.all(inFlight);
+
+    // One fan-out, not fifty: five tables, one read each.
+    expect(slowDirectory.range).toHaveBeenCalledTimes(1);
+    expect(mockSupabase.from).toHaveBeenCalledTimes(5);
+    for (const r of results) {
+      expect(r.error).toBeNull();
+      expect(r.players).toEqual(results[0].players);
+    }
+  });
+
   it('propagates the first table error and returns an empty list', async () => {
     mockTables(mockSupabase, {
       player_gar_components: { data: null, error: { message: 'permission denied' } },
