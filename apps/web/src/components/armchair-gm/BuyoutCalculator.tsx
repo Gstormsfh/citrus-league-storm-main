@@ -432,7 +432,8 @@ function PlayerHeadshot({ player, size = 'md' }: { player: PlayerContract; size?
     <PlayerAvatar
       name={player.name}
       position={player.position}
-      jerseyNumber={player.jerseyNumber}
+      image={player.headshot}
+      team={player.team}
       size={size === 'lg' ? 'lg' : 'md'}
     />
   );

@@ -42,7 +42,7 @@ function isCredentialFailure(err: unknown): boolean {
     // revoked session and for "user from sub claim does not exist" — both
     // are unambiguously about the credential, not provider health. Under
     // the old 400/401-only test they fell through to the 503 default and
-    // surfaced as "Cannot verify your session right now — please retry",
+    // surfaced as "Cannot verify your session right now. Please retry.",
     // which the client then RETRIED with backoff. Garrett hit exactly this
     // after signing out mid-draft-night: a permanent condition presented
     // as a transient one, with no path to sign-in.
@@ -149,7 +149,7 @@ export async function authMiddleware(c: Context<Env>, next: Next) {
         {
           error: {
             code: 'AUTHENTICATION_REQUIRED',
-            message: 'Your session expired — please sign in again',
+            message: 'Your session expired. Please sign in again.',
           },
         },
         401,
@@ -184,7 +184,7 @@ export async function authMiddleware(c: Context<Env>, next: Next) {
       {
         error: {
           code: 'AUTH_PROVIDER_UNREACHABLE',
-          message: 'Cannot verify your session right now — please retry',
+          message: 'Cannot verify your session right now. Please retry.',
         },
       },
       503,

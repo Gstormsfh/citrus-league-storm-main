@@ -21,16 +21,26 @@
 //
 // Deep-link: /players?player=<id> selects that player on load;
 // selection writes the param back so any player view is shareable.
+//
+// 2026-09-03: every row also carries an anchor to /players/<id>, the full
+// dashboard page, and the panel repeats it as a labelled button. That page
+// had exactly one route in from the UI (a player modal -> its Detailed tab
+// -> a link at the bottom that renders only when the payload is complete),
+// which made a substantial, ungated, shareable page effectively unreachable.
+// Row CLICK is unchanged and still opens the inline panel.
 
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Search, ShieldAlert } from 'lucide-react';
+import { ArrowUpRight, Loader2, Search, ShieldAlert } from 'lucide-react';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
+import { Mug } from '@/components/roster/Mug';
+import type { MugPlayer } from '@/components/roster/headshot';
+import { playerDashboardHref } from '@/components/player/playerAdvancedMetrics';
 import {
   usePlayerDashboardIndex,
   type DashboardIndexEntry,
@@ -63,39 +73,38 @@ function percentile(arr: number[], val: number): number {
   return Math.round((100 * c) / arr.length);
 }
 
-function initials(name: string): string {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-}
-
-function Headshot({ player, size }: { player: DashboardPlayer; size: 'sm' | 'lg' }) {
-  const [broken, setBroken] = useState(false);
-  const cls =
-    size === 'lg'
-      ? 'h-24 w-24 rounded-2xl border-2 border-white/20'
-      : 'h-9 w-9 rounded-lg border border-white/10';
-  if (!player.headshot_url || broken) {
-    return (
-      <div className={`${cls} flex items-center justify-center bg-white/10 text-xs font-bold text-white/70`}>
-        {initials(player.name)}
-      </div>
-    );
-  }
-  return (
-    <img
-      src={player.headshot_url}
-      alt={player.name}
-      loading="lazy"
-      onError={() => setBroken(true)}
-      className={`${cls} bg-white/10 object-cover`}
-    />
-  );
-}
+/**
+ * ONE FACE (2026-09-03 headshot audit).
+ *
+ * This page carried its OWN headshot component: a bare <img> whose onError
+ * swapped in a grey square of initials, with no team crest between the two
+ * and its own two box sizes. That is the third private fallback chain the
+ * audit found, and it is exactly what `roster/Mug` exists to stop: headshot
+ * -> team crest -> initials, a fixed box per size, a failure remembered per
+ * URL, and never a broken-image glyph left in the DOM.
+ *
+ * `DashboardIndexEntry` is not the directory shape `mugFromDirectory` takes
+ * (`name`/`headshot_url`/`team`, not `full_name`), so it gets its own
+ * one-line adapter rather than a rename upstream. Same object
+ * `PlayerAdvancedCard` builds from the same row.
+ *
+ * SIZES: the table row was h-9 w-9, which is `Mug`'s `sm` exactly. The panel
+ * header was 96px and is now `lg` (56px). Mug's sizes are NAMED, not
+ * className overrides, precisely so the crest and initials states stay sized
+ * for their box; a `h-24 w-24` override would leave both fallbacks drawn for
+ * a 56px circle at the moment the CDN is failing and nobody is watching.
+ *
+ * CREST BADGE: on, even though both surfaces print the team in text beside
+ * the face. `PlayerAdvancedCard` reads the same row and wears the badge, and
+ * that card renders in the modal that opens over this very table; the same
+ * player looking like two different players across one tap is the thing
+ * worth avoiding here.
+ */
+const mugOf = (p: DashboardPlayer): MugPlayer => ({
+  name: p.name,
+  image: p.headshot_url,
+  team: p.team,
+});
 
 /** Centered diverging bar for GAR-style values (negative = red left, positive = green right). */
 function DivergingBar({ value, scale }: { value: number; scale: number }) {
@@ -147,7 +156,7 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
   return (
     <Card className="p-5" data-testid="player-dashboard-panel">
       <div className="flex items-center gap-4">
-        <Headshot player={player} size="lg" />
+        <Mug p={mugOf(player)} size="lg" crest />
         <div className="min-w-0">
           <h2 className="truncate text-xl font-bold">{player.name}</h2>
           <p className="text-sm text-muted-foreground">
@@ -166,6 +175,23 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
           )}
         </div>
       </div>
+
+      {/* THE WAY OUT OF THE PANEL AND INTO THE PAGE (2026-09-03).
+          /players/:playerId is a real, ungated route carrying the shot map,
+          the career arc and the cohort percentiles, and until now the only
+          way a user could reach it was: open a player modal somewhere else,
+          switch to its Detailed tab, scroll to the bottom, and find a link
+          that renders only when the advanced payload is present. This panel
+          opens on a row tap on every breakpoint, so the link belongs here,
+          above the fold, unconditional. */}
+      <Link
+        to={playerDashboardHref(player.id)}
+        data-testid="players-panel-dashboard-link"
+        className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-pastel-orange/50 bg-white/5 px-3 py-2 text-xs font-bold uppercase tracking-wider text-pastel-orange transition-colors hover:bg-pastel-orange/10"
+      >
+        Full dashboard
+        <ArrowUpRight className="h-3.5 w-3.5" />
+      </Link>
 
       <div className="mt-4 grid grid-cols-4 gap-2 text-center">
         {(player.is_goalie
@@ -530,13 +556,30 @@ const Players = () => {
                       >
                         <td className={`sticky left-0 z-sticky-base px-3 py-2 ${selected?.id === p.id ? 'bg-muted' : 'bg-card'}`}>
                           <div className="flex items-center gap-2.5">
-                            <Headshot player={p} size="sm" />
+                            <Mug p={mugOf(p)} size="sm" crest />
                             <div className="min-w-0 max-w-[160px]">
                               <div className="truncate font-medium">{p.name}</div>
                               <div className="text-xs text-muted-foreground">
                                 {p.team} · #{p.jersey ?? '-'} · {p.position}
                               </div>
                             </div>
+                            {/* The row itself still SELECTS (the panel beside
+                                it, or the sheet below lg) because that is the
+                                scanning gesture this table was built for and
+                                people use it. This is the additional, explicit
+                                way through to the full page: a real anchor, so
+                                it is keyboard reachable and openable in a new
+                                tab, and stopPropagation so it never doubles as
+                                a selection. */}
+                            <Link
+                              to={playerDashboardHref(p.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label={`Open the full dashboard for ${p.name}`}
+                              data-testid="players-row-dashboard-link"
+                              className="ml-auto shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-pastel-orange"
+                            >
+                              <ArrowUpRight className="h-4 w-4" />
+                            </Link>
                           </div>
                         </td>
                         <td className="px-2 py-2 text-right tabular-nums">{p.gp}</td>

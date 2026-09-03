@@ -664,7 +664,7 @@ export default function PlayerDashboard() {
       <MessageState
         eyebrow="Player dashboard"
         title="That is not a player id"
-        body="Player dashboards live at /players/<nhl player id>. Open one from the Players table and the link will be right."
+        body="Player dashboards live at /players/<nhl player id>. Open the Players table, find the player, and use the arrow on their row or the Full dashboard button on their card."
         action={
           <CitrusButton to="/players" variant="primary">
             Browse players

@@ -1,0 +1,54 @@
+{
+  "$comment": [
+    "THE ANTI-TELL VOCABULARY — one list, read by every surface that ships prose.",
+    "",
+    "Extracted from apps/web/src/__tests__/aiVoiceGuard.test.ts on 2026-09-03, when a",
+    "second reader appeared. The guard scans SOURCE STRINGS: UI copy and Stormy's",
+    "system prompt. Draft Kit blurbs are database rows written through",
+    "data-pipeline/draftkit/load_blurbs.py, so they walked straight past it — the one",
+    "body of prose in the product that is sold rather than shipped had no voice rule",
+    "on it at all.",
+    "",
+    "A Python copy of this list would drift from the TypeScript one inside a month.",
+    "This is the same problem scoringDefaults.json solves, and the same answer, with",
+    "one simplification: every pattern below uses only syntax that means the same",
+    "thing in JS and Python (\\b, \\s, \\w, \\d, (?:...), bounded {n,m}), so both",
+    "languages compile these strings directly and no generation step is needed.",
+    "Keep it that way — no lookbehind, no named groups, no \\p{...}.",
+    "",
+    "Patterns are matched case-insensitively by both readers."
+  ],
+
+  "bannedPhrases": [
+    { "name": "it's not just X, it's Y", "pattern": "\\b(?:it'?s|this is|that'?s|we'?re)\\s+not\\s+(?:just|only)\\b" },
+    { "name": "not just X, Y (rule-of-two padding)", "pattern": "\\bnot just\\b[^.?!]{0,80},\\s*it'?s\\b" },
+    { "name": "let's dive in", "pattern": "\\b(?:let'?s\\s+)?dive\\s+in\\b" },
+    { "name": "in today's fast-paced world", "pattern": "\\bfast[- ]paced\\b" },
+    { "name": "game-changer", "pattern": "\\bgame[-\\s]?chang(?:er|ers|ing)\\b" },
+    { "name": "unlock", "pattern": "\\bunlock(?:s|ed|ing)?\\b" },
+    { "name": "leverage (as a verb)", "pattern": "\\bleverag(?:e|es|ed|ing)\\b" },
+    { "name": "delve", "pattern": "\\bdelv(?:e|es|ed|ing)\\b" },
+    { "name": "tapestry", "pattern": "\\btapestry\\b" },
+    { "name": "landscape (as metaphor)", "pattern": "\\blandscape\\b" },
+    { "name": "testament to", "pattern": "\\btestament\\s+to\\b" },
+    { "name": "navigate the complexities", "pattern": "\\bnavigat\\w*\\s+the\\s+complexit" }
+  ],
+
+  "accuracyClaims": [
+    { "name": "most/wildly accurate", "pattern": "\\b(?:most|wildly|insanely|scary|freakishly)\\s+accurate\\b" },
+    { "name": "a numeric accuracy figure", "pattern": "\\d\\s*%\\s*accura|accuracy\\s*[:=]?\\s*\\d" },
+    { "name": "beats a named competitor", "pattern": "\\bbeat(?:s|ing)?\\s+(?:espn|yahoo|sleeper|fantrax)\\b" },
+    { "name": "accuracy superlative", "pattern": "\\baccura\\w*\\s+(?:than|projections\\s+on\\s+earth)\\b" }
+  ],
+
+  "moatOverstatement": {
+    "name": "overstates pass-context coverage",
+    "pattern": "\\b(?:every|all|each)\\s+(?:single\\s+)?shots?\\b[^.!?]{0,60}\\b(?:pass[- ]context|moat|proprietary)\\b|\\b(?:pass[- ]context|moat|proprietary)\\b[^.!?]{0,60}\\b(?:every|all)\\s+shots?\\b",
+    "$comment": "The pass-context features cover 10,047 of the 118,975 shots scored in 2025, about 8%. Any sentence pairing them with every/all shots is false."
+  },
+
+  "emDash": {
+    "char": "—",
+    "$comment": "U+2014. Commas, periods and parentheses all exist. This is the single loudest tell and it is banned outright in anything a reader sees."
+  }
+}

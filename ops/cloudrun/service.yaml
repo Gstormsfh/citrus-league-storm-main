@@ -57,6 +57,24 @@ spec:
                 secretKeyRef:
                   key: latest
                   name: SUPABASE_SERVICE_ROLE_KEY
+            # WHERE THE DRAFT ENGINE LIVES (2026-09-03).
+            #
+            # `gcloud run services replace` is DECLARATIVE: it deletes every
+            # variable this file does not name. PRE_DRAFT_CHECKLIST.md tells
+            # the on-call engineer to run exactly that command when scaling
+            # looks wrong, so before these two lines existed, following the
+            # checklist an hour before a draft would silently remove the only
+            # thing telling browsers where to open a WebSocket.
+            #
+            # Unset, `server/src/routes/drafts.ts:151` falls back to
+            # `localhost`, discovery still answers 200, and every draft room
+            # in production spins on "Waiting for draft state..." behind a
+            # reconnect banner. Keep these in sync with the `env_vars` block
+            # in .github/workflows/production-deploy.yml.
+            - name: DRAFT_WS_HOST
+              value: "draft.citrusfantasysports.com"
+            - name: DRAFT_WS_PORT
+              value: "443"
           startupProbe:
             httpGet:
               path: /api/health

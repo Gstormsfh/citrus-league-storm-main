@@ -13,7 +13,9 @@ import {
   parseToiToMinutes,
   normalizeSavePct,
 } from '../playerWriteup';
+import type { PlayerWriteup } from '../playerWriteup';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import aiVoice from '@citrus/shared/constants/aiVoice.json';
 
 const skater = (overrides: Partial<HockeyPlayer> = {}, stats: Record<string, unknown> = {}): HockeyPlayer =>
   ({
@@ -186,9 +188,9 @@ describe('generatePlayerWriteup — goalies', () => {
 
   it('reports goals saved above expected in both directions', () => {
     const good = generatePlayerWriteup(goalie({ goalsSavedAboveExpected: 12.4 }));
-    expect(good.summary).toMatch(/stopped 12\.4 goals more/);
+    expect(good.summary).toMatch(/Citrus GSAx has him stopping 12\.4 goals more/);
     const bad = generatePlayerWriteup(goalie({ goalsSavedAboveExpected: -8.2 }));
-    expect(bad.summary).toMatch(/conceded 8\.2 goals more/);
+    expect(bad.summary).toMatch(/Citrus GSAx has him conceding 8\.2 goals more/);
     expect(bad.tags.map((t) => t.label)).toContain('Underperforming xG');
   });
 
@@ -251,7 +253,7 @@ describe('cardNote — the one-liner roster cards render', () => {
   it('gives the line to availability when the player cannot play', () => {
     expect(generatePlayerWriteup(skater({ status: 'IR' })).cardNote).toBe('On injured reserve');
     expect(generatePlayerWriteup(skater({ status: 'GTD' })).cardNote).toBe('Game-time decision');
-    expect(generatePlayerWriteup(skater({ status: 'SUSP' })).cardNote).toBe('Suspended — unavailable');
+    expect(generatePlayerWriteup(skater({ status: 'SUSP' })).cardNote).toBe('Suspended, unavailable');
     for (const status of ['IR', 'GTD', 'SUSP'] as const) {
       expect(generatePlayerWriteup(skater({ status })).cardTone).toBe('caution');
     }
@@ -293,16 +295,16 @@ describe('analysis paragraph — the "what should I do" half', () => {
     const w = generatePlayerWriteup(
       skater({}, { gamesPlayed: 70, goals: 30, assists: 20, points: 50, xGoals: 15 }),
     );
-    expect(w.analysis).toMatch(/30 goals on 15 expected/);
-    expect(w.analysis).toMatch(/sell-high/i);
+    expect(w.analysis).toMatch(/Citrus xG has him at 30 goals on 15 expected/);
+    expect(w.analysis).toMatch(/sell high/i);
   });
 
   it('calls out unlucky finishers as buy-low rather than drop', () => {
     const w = generatePlayerWriteup(
       skater({}, { gamesPlayed: 70, goals: 8, assists: 30, points: 38, xGoals: 18 }),
     );
-    expect(w.analysis).toMatch(/8 goals on 18 expected/);
-    expect(w.analysis).toMatch(/buy-low/i);
+    expect(w.analysis).toMatch(/Citrus xG has him at 8 goals on 18 expected/);
+    expect(w.analysis).toMatch(/buy low/i);
   });
 
   it('stays silent on finishing luck when xG is missing or a tiny sample', () => {
@@ -338,5 +340,190 @@ describe('generatePlayerWriteup — determinism', () => {
   it('returns identical output for identical input (safe to call per render)', () => {
     const p = skater();
     expect(generatePlayerWriteup(p)).toEqual(generatePlayerWriteup(p));
+  });
+});
+
+// ── VOICE CONFORMANCE (2026-09-03) ───────────────────────────────────
+//
+// The tests above pin WHAT each branch says. This block pins HOW all of
+// them say it, across every branch at once, against the founder's copy
+// brief. It is the sibling of
+// `components/player/__tests__/writeupRegister.test.ts`, which does the
+// same job for the three dashboard verdict generators.
+//
+//   * no em dash;
+//   * none of the stock AI phrasebook;
+//   * no projection-accuracy claim, ever;
+//   * the Citrus source named in the sentence wherever a Citrus number is
+//     quoted. Expected goals are the xG v3 model's output, not a box-score
+//     figure, and a number a reader cannot attribute is a number they
+//     cannot check.
+//
+// `src/__tests__/aiVoiceGuard.test.ts` scans string LITERALS and now covers
+// `utils/`, so it catches an em dash typed into this module's source. What
+// it structurally cannot see is the FINISHED sentence: every line here is
+// assembled at runtime from template fragments plus numbers, and the
+// attribution rule is a property of the finished sentence. This block is
+// the half of the coverage a static scan cannot reach.
+//
+// The banned vocabulary is read from the one shared list rather than
+// restated, so a phrase added in `packages/shared/src/constants/aiVoice.json`
+// starts guarding these writeups the same day.
+
+const VOICE = aiVoice as {
+  bannedPhrases: Array<{ name: string; pattern: string }>;
+  accuracyClaims: Array<{ name: string; pattern: string }>;
+  emDash: { char: string };
+};
+
+const EM_DASH = new RegExp(VOICE.emDash.char);
+const BANNED_PHRASES = VOICE.bannedPhrases.map((p) => ({ name: p.name, re: new RegExp(p.pattern, 'i') }));
+const ACCURACY_CLAIMS = VOICE.accuracyClaims.map((p) => ({ name: p.name, re: new RegExp(p.pattern, 'i') }));
+
+/** Any of the names the copy brief allows for a Citrus number. */
+const CITRUS_SOURCE = /Citrus (?:xG|GAR|GSAx|ROS projection)|on the Citrus board/;
+
+/** A sentence that quotes expected goals, in either sport's shorthand. */
+const QUOTES_EXPECTED_GOALS = /\bexpected\b|\bxG\b|\bGSAx\b/;
+
+const testGoalie = (stats: Record<string, unknown> = {}, overrides: Partial<HockeyPlayer> = {}): HockeyPlayer =>
+  ({
+    id: 30, name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
+    stats: { gamesPlayed: 50, savePct: 0.925, gaa: 2.35, wins: 30, losses: 15, shutouts: 4, ...stats },
+    ...overrides,
+  }) as HockeyPlayer;
+
+/**
+ * Every prose branch of the generator, as finished writeups.
+ *
+ * The skater cases walk both headline curves, all three usage bands, the
+ * power-play and peripheral rules, both directions of the finishing gap,
+ * the fallback, and the three availability wrappers. The goalie cases walk
+ * all four save-rate bands, both GSAx signs, both workload verdicts and
+ * both thin-sample paths.
+ */
+function everyWriteup(): Array<{ label: string; w: PlayerWriteup }> {
+  return [
+    { label: 'star forward', w: generatePlayerWriteup(skater()) },
+    { label: 'thin-sample skater', w: generatePlayerWriteup(skater({}, { gamesPlayed: 2, points: 3, goals: 2, assists: 1 })) },
+    { label: 'skater with no games', w: generatePlayerWriteup(skater({}, { gamesPlayed: 0, points: 0, goals: 0, assists: 0 })) },
+    { label: 'elite defenceman', w: generatePlayerWriteup(skater({ position: 'D' }, { gamesPlayed: 70, points: 60, goals: 15, assists: 45, toi: '24:00' })) },
+    { label: 'two-way blueliner', w: generatePlayerWriteup(skater({ position: 'D' }, { gamesPlayed: 70, points: 25, goals: 5, assists: 20, toi: '19:00', shots: 90 })) },
+    { label: 'light-minutes forward', w: generatePlayerWriteup(skater({}, { gamesPlayed: 40, points: 8, goals: 3, assists: 5, toi: '9:30', shots: 20 })) },
+    { label: 'power-play dependent', w: generatePlayerWriteup(skater({}, { gamesPlayed: 70, points: 50, goals: 20, assists: 30, powerPlayPoints: 25 })) },
+    { label: 'peripheral specialist', w: generatePlayerWriteup(skater({}, { gamesPlayed: 70, points: 20, goals: 8, assists: 12, hits: 200, blockedShots: 90, toi: '15:00' })) },
+    { label: 'finishing above his chances', w: generatePlayerWriteup(skater({}, { gamesPlayed: 70, goals: 30, assists: 20, points: 50, xGoals: 15 })) },
+    { label: 'finishing below his chances', w: generatePlayerWriteup(skater({}, { gamesPlayed: 70, goals: 8, assists: 30, points: 38, xGoals: 18 })) },
+    { label: 'unremarkable forward', w: generatePlayerWriteup(skater({}, { gamesPlayed: 60, points: 18, goals: 7, assists: 11, toi: '15:00', shots: 80, hits: 20, blockedShots: 20, powerPlayPoints: 1 })) },
+    { label: 'on injured reserve', w: generatePlayerWriteup(skater({ status: 'IR' })) },
+    { label: 'game-time decision', w: generatePlayerWriteup(skater({ status: 'GTD' })) },
+    { label: 'suspended', w: generatePlayerWriteup(skater({ status: 'SUSP' })) },
+    { label: 'starting-calibre goalie', w: generatePlayerWriteup(testGoalie()) },
+    { label: 'steady starter goalie', w: generatePlayerWriteup(testGoalie({ savePct: 0.913, gaa: 2.7 })) },
+    { label: 'streaky goalie', w: generatePlayerWriteup(testGoalie({ savePct: 0.905, gaa: 2.95 })) },
+    { label: 'struggling goalie', w: generatePlayerWriteup(testGoalie({ savePct: 0.881, gaa: 3.61 })) },
+    { label: 'goalie beating GSAx', w: generatePlayerWriteup(testGoalie({ goalsSavedAboveExpected: 12.4 })) },
+    { label: 'goalie below GSAx', w: generatePlayerWriteup(testGoalie({ goalsSavedAboveExpected: -8.2 })) },
+    { label: 'goalie carrying a starter workload', w: generatePlayerWriteup(testGoalie({ gamesPlayed: 55 })) },
+    { label: 'backup goalie workload', w: generatePlayerWriteup(testGoalie({ gamesPlayed: 14, savePct: 0.915, gaa: 2.6, wins: 6, losses: 6 })) },
+    { label: 'thin-sample goalie', w: generatePlayerWriteup(testGoalie({ gamesPlayed: 2 })) },
+    { label: 'goalie with no appearances', w: generatePlayerWriteup(testGoalie({ gamesPlayed: 0, savePct: undefined })) },
+    { label: 'no player selected', w: generatePlayerWriteup(null) },
+  ];
+}
+
+/** Every string a reader can see, for one writeup. */
+function prose(w: PlayerWriteup): string[] {
+  return [w.headline, w.summary, w.analysis, w.cardNote, ...w.tags.map((t) => t.label)];
+}
+
+describe('player writeups: voice conformance', () => {
+  const CASES = everyWriteup();
+
+  it('covers every prose branch of the generator', () => {
+    // A refactor that quietly collapses a branch would leave this block
+    // testing fewer sentences than it claims to.
+    expect(CASES.length).toBe(25);
+    for (const c of CASES) {
+      expect(c.w.headline.length, c.label).toBeGreaterThan(0);
+      expect(c.w.summary.length, c.label).toBeGreaterThan(0);
+    }
+  });
+
+  it.each(CASES.map((c) => [c.label] as const))('%s: no em dash', (label) => {
+    const w = CASES.find((c) => c.label === label)!.w;
+    for (const text of prose(w)) {
+      expect(EM_DASH.test(text), `em dash in: ${text}`).toBe(false);
+    }
+  });
+
+  it.each(CASES.map((c) => [c.label] as const))('%s: no banned phrase', (label) => {
+    const w = CASES.find((c) => c.label === label)!.w;
+    for (const text of prose(w)) {
+      for (const p of BANNED_PHRASES) {
+        expect(p.re.test(text), `"${p.name}" in: ${text}`).toBe(false);
+      }
+    }
+  });
+
+  it.each(CASES.map((c) => [c.label] as const))('%s: no accuracy claim', (label) => {
+    const w = CASES.find((c) => c.label === label)!.w;
+    for (const text of prose(w)) {
+      for (const p of ACCURACY_CLAIMS) {
+        expect(p.re.test(text), `"${p.name}" in: ${text}`).toBe(false);
+      }
+    }
+  });
+
+  it.each(CASES.map((c) => [c.label] as const))('%s: no template hole', (label) => {
+    const w = CASES.find((c) => c.label === label)!.w;
+    for (const text of prose(w)) {
+      expect(text).not.toMatch(/undefined|NaN|Infinity/);
+    }
+  });
+
+  // The attribution rule, stated twice: once as a property of any sentence
+  // that reaches for expected goals, and once as a fixture-driven check on
+  // the four branches that actually quote one.
+  it.each(CASES.map((c) => [c.label] as const))(
+    '%s: any sentence quoting expected goals names the Citrus model behind it',
+    (label) => {
+      const w = CASES.find((c) => c.label === label)!.w;
+      for (const text of [w.summary, w.analysis]) {
+        if (!QUOTES_EXPECTED_GOALS.test(text)) continue;
+        expect(CITRUS_SOURCE.test(text), `no source named in: ${text}`).toBe(true);
+      }
+    },
+  );
+
+  it('the four branches built on a Citrus number all name it', () => {
+    const named = [
+      'finishing above his chances',
+      'finishing below his chances',
+      'goalie beating GSAx',
+      'goalie below GSAx',
+    ];
+    for (const label of named) {
+      const w = CASES.find((c) => c.label === label)!.w;
+      const text = `${w.summary} ${w.analysis}`;
+      expect(CITRUS_SOURCE.test(text), `${label} quotes a Citrus number without naming it: ${text}`).toBe(true);
+    }
+  });
+
+  it('the rules bite: the sentences this module used to ship fail them', () => {
+    // Proof the regexes work. Without this, a typo in one of them would
+    // leave a permanently-green block guarding nothing.
+    const oldSkater = "He's buried 30 goals on 15 expected — finishing well above the quality of his chances.";
+    expect(EM_DASH.test(oldSkater)).toBe(true);
+    expect(CITRUS_SOURCE.test(oldSkater)).toBe(false);
+    expect(QUOTES_EXPECTED_GOALS.test(oldSkater)).toBe(true);
+
+    const oldGoalie = "He's stopped 12.4 goals more than an average goalie would have on the same shots.";
+    expect(CITRUS_SOURCE.test(oldGoalie)).toBe(false);
+
+    expect(BANNED_PHRASES.find((p) => p.re.test('Unlock the upside'))?.name).toBe('unlock');
+    expect(ACCURACY_CLAIMS.find((p) => p.re.test('the most accurate model'))?.name).toBe(
+      'most/wildly accurate',
+    );
   });
 });
