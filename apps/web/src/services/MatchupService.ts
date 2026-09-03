@@ -1159,18 +1159,14 @@ export const MatchupService = {
     // getMatchupRosters (which already extracts it at :1492). Undefined
     // → DEFAULT_SCORING, so default leagues are numerically identical.
     leagueScoring?: import('@citrus/shared').ScoringSettings,
-    matchupStats?: { 
-      goals: number; 
-      assists: number; 
-      sog: number; 
-      blocks: number; 
-      xGoals: number;
-      // Goalie stats (optional, only present for goalies)
-      wins?: number;
-      saves?: number;
-      shutouts?: number;
-      goals_against?: number;
-    },
+    // MatchupWeekStats, not a hand-written subset. This parameter used to
+    // redeclare the shape inline and omitted ppp, shp, hits, pim and
+    // plus_minus -- five stats the body below reads and the caller does
+    // supply, because fetchMatchupStatsForPlayers returns
+    // Map<number, MatchupWeekStats>. The data was always there; only the
+    // compiler could not see it, which cost 14 of the 62 baseline type
+    // errors and made four SCORED categories look absent.
+    matchupStats?: MatchupWeekStats,
     garPercentage?: number,
     dailyProjection?: DailyProjectionRow
   ): MatchupPlayer {
@@ -2030,10 +2026,9 @@ export const MatchupService = {
             return await this.fetchMatchupStatsForPlayers(allPlayerIds, weekStart, weekEnd, skipAuthedReads);
           } catch (error: unknown) {
             logger.error('[MatchupService] ❌ Failed to fetch matchup stats:', error);
-            return new Map<number, {
-              goals: number; assists: number; sog: number; blocks: number; xGoals: number;
-              wins?: number; saves?: number; shutouts?: number; goals_against?: number;
-            }>();
+            // Same shape the successful path returns, so the union does not
+            // narrow to the subset on the error branch.
+            return new Map<number, MatchupWeekStats>();
           }
         })(),
 

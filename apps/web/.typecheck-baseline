@@ -9,7 +9,19 @@
 # 76 live in MatchupService.ts (29) and DraftService.ts (17), and DraftService
 # is not in that branch's diff at all.
 #
-# Progress so far: 151 -> 91 -> 76 -> 62.
+# Progress so far: 151 -> 91 -> 76 -> 62 -> 41.
+#
+# 62 -> 41 (2026-09-03): NO casts. Two narrow inline types were replaced by
+# the canonical ones they were stale copies of.
+#   * MatchupService declared `matchupStats?: {goals, assists, sog, blocks,
+#     xGoals, ...}` inline, omitting ppp, shp, hits, pim and plus_minus --
+#     five stats the body reads and the caller does supply, because
+#     fetchMatchupStatsForPlayers returns Map<number, MatchupWeekStats>.
+#     Using MatchupWeekStats cleared 19 errors and made four SCORED
+#     categories visible to the compiler again.
+#   * matchupApi.getDailyLineup / autoComplete had no type parameter, so
+#     `response.data` was unknown. Typed from the route handlers, with the
+#     row shape checked against get_daily_lineup's production signature.
 #
 # 76 -> 62 (2026-09-03): typing the draft API client. `apiClient.get`/`post`
 # declare `<T = unknown>`, so every call in api/draft.ts that omitted the type
@@ -22,4 +34,4 @@
 # LOWER THIS when armchair-gm lands after its visual review -- part of the
 # remaining gap is there. Lowering it is how a win gets locked in; the ratchet
 # only fails when the count RISES.
-62
+41

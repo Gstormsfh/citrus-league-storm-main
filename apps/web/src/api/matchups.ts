@@ -60,6 +60,47 @@ async function cached<T>(key: string, fetcher: () => Promise<T>, ttl: number): P
 // Public API
 // ---------------------------------------------------------------------------
 
+/**
+ * One row of `get_daily_lineup`, verified against the production catalog
+ * 2026-09-03:
+ *
+ *   TABLE(player_id integer, player_name text, player_position text,
+ *         nhl_team text, headshot_url text, slot_type text, slot_id text,
+ *         is_locked boolean, daily_points numeric, goals integer,
+ *         assists integer, shots_on_goal integer, blocks integer,
+ *         hits integer, pim integer, ppp integer, shp integer, wins integer,
+ *         saves integer, goals_against integer, shutouts integer,
+ *         is_goalie boolean)
+ *
+ * `daily_points` is `numeric`, which PostgREST can deliver as a string, hence
+ * `string | number`. The stat columns are optional here because the RPC leaves
+ * them null for the side of the roster they do not apply to.
+ */
+export interface DailyLineupRow {
+  player_id: number;
+  player_name: string;
+  player_position: string;
+  nhl_team: string;
+  headshot_url: string | null;
+  slot_type: 'active' | 'bench' | 'ir';
+  slot_id: string | null;
+  is_locked: boolean;
+  daily_points: string | number;
+  goals?: number;
+  assists?: number;
+  shots_on_goal?: number;
+  blocks?: number;
+  hits?: number;
+  pim?: number;
+  ppp?: number;
+  shp?: number;
+  wins?: number;
+  saves?: number;
+  goals_against?: number;
+  shutouts?: number;
+  is_goalie?: boolean;
+}
+
 export const matchupApi = {
   // ── League-scoped matchup queries ──────────────────────────────────────
 
@@ -199,7 +240,7 @@ export const matchupApi = {
     const key = `matchups:lineup:${matchupId}:${teamId}:${date}`;
     return cached(
       key,
-      () => apiClient.get(`/api/matchups/${matchupId}/daily-lineup?teamId=${teamId}&date=${date}`),
+      () => apiClient.get<DailyLineupRow[]>(`/api/matchups/${matchupId}/daily-lineup?teamId=${teamId}&date=${date}`),
       CACHE_TTL.MEDIUM,
     );
   },
@@ -241,7 +282,8 @@ export const matchupApi = {
 
   /** Auto-complete matchups */
   autoComplete() {
-    return apiClient.post('/api/matchups/auto-complete');
+    // `ok(c, { success })` -- server/src/routes/matchups.ts:498
+    return apiClient.post<{ success: boolean }>('/api/matchups/auto-complete');
   },
 
   /** Lock completed roster days */
