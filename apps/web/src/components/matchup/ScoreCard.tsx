@@ -54,6 +54,23 @@ interface ScoreCardProps {
    * stranger's team "YOU" is a lie.
    */
   isOwnTeam?: boolean;
+  /**
+   * The schedule has nothing to play right now — `SeasonStatus.isDormant`
+   * from `useSeasonStatus()`, which the PAGE reads and passes down.
+   *
+   * A prop, not a hook read, in all three matchup header components
+   * (ScoreCard, WinProbabilityBar, StickyScoreBar). They are handed
+   * pre-formatted strings and told what to draw; none of them fetches
+   * anything, and putting a React Query call inside one would make a
+   * presentational component fail to render outside a QueryClientProvider —
+   * which is exactly how every test in `__tests__/` mounts them. The page
+   * already owns the matchup's data; the schedule is one more fact it owns.
+   *
+   * Default false, so a caller that has not been wired up yet and a
+   * `phase === 'unknown'` schedule both behave exactly as before: only an
+   * affirmative `true` suppresses anything.
+   */
+  seasonDormant?: boolean;
 }
 
 /**
@@ -117,6 +134,7 @@ export const ScoreCard = ({
   matchupId,
   simulationPerspective,
   isOwnTeam = false,
+  seasonDormant = false,
 }: ScoreCardProps) => {
   const myPointsNum = parseFloat(myTeamPoints) || 0;
   const oppPointsNum = parseFloat(opponentTeamPoints) || 0;
@@ -141,6 +159,20 @@ export const ScoreCard = ({
           oppGamesLeft: opponentTeamGamesRemaining,
         }).probability * 100,
       );
+
+  // "0 LEFT" IS A FACT IN SEASON and noise outside one. Mid-week it says the
+  // week is spent and no starter has a game coming, which is the difference
+  // between a lead that is safe and one that is not. On 2026-09-02 the count
+  // is zero for an unrelated reason — the schedule holds nothing between
+  // 2026-06-14 and 2026-09-29 — and the card printed it four times (a chip
+  // per side on mobile, a badge per side on desktop) beside a matchup that
+  // cannot be played for another 27 days.
+  //
+  // Zero AND dormant is the only combination with nothing to say. Any
+  // non-zero count still renders, and every count renders while the season
+  // is live or the schedule is `unknown`, so nothing about the in-season
+  // card moves.
+  const showsGamesLeft = (count: number) => !(seasonDormant && count === 0);
 
   const isWinning = myPointsNum > oppPointsNum;
   const isLosing = myPointsNum < oppPointsNum;
@@ -197,13 +229,13 @@ export const ScoreCard = ({
             <div className="flex flex-col items-center gap-0.5">
               <div className={`font-varsity text-2xl tabular-nums leading-8 ${isWinning ? 'text-pastel-sage' : 'text-white/70'}`}>{myTeamPoints}</div>
               {hasExpectedFinals && <ProjectedFinal value={myTeamExpectedFinal} className="text-[10px]" />}
-              <GamesLeftChip count={myTeamGamesRemaining} own={isOwnTeam} />
+              {showsGamesLeft(myTeamGamesRemaining) && <GamesLeftChip count={myTeamGamesRemaining} own={isOwnTeam} />}
             </div>
             <span className="text-xs text-white/55 font-bold leading-8">vs</span>
             <div className="flex flex-col items-center gap-0.5">
               <div className={`font-varsity text-2xl tabular-nums leading-8 ${isLosing ? 'text-pastel-sage' : 'text-white/70'}`}>{opponentTeamPoints}</div>
               {hasExpectedFinals && <ProjectedFinal value={opponentTeamExpectedFinal} className="text-[10px]" />}
-              <GamesLeftChip count={opponentTeamGamesRemaining} />
+              {showsGamesLeft(opponentTeamGamesRemaining) && <GamesLeftChip count={opponentTeamGamesRemaining} />}
             </div>
           </div>
 
@@ -224,6 +256,7 @@ export const ScoreCard = ({
           team1Projected={myTeamProjection}
           team2Projected={opponentTeamProjection}
           simulationPerspective={simulationPerspective}
+          seasonDormant={seasonDormant}
           compact
         />
       </div>
@@ -240,19 +273,21 @@ export const ScoreCard = ({
                 {isOwnTeam && <YouPill className="text-[9px] px-1.5 py-0.5 tracking-wider" />}
               </div>
               <div className="font-mono text-xs text-white/55">{myTeamRecord.wins}-{myTeamRecord.losses}</div>
-              <div className="flex flex-col gap-0.5 mt-1">
-                {/* Games Remaining */}
-                <div className={`flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-md ring-1 ${isOwnTeam ? 'ring-pastel-orange/30' : 'ring-white/10'}`}>
-                  <Calendar className={`w-2.5 h-2.5 ${isOwnTeam ? 'text-pastel-orange' : 'text-pastel-sage'}`} aria-hidden="true" />
-                  <span className="text-[9px] font-varsity font-bold text-pastel-cream tabular-nums">
-                    {myTeamGamesRemaining}
-                  </span>
-                  <span className="text-[8px] font-display text-white/55">
-                    left
-                  </span>
-                  <CitrusWedge className={`w-2 h-2 opacity-60 ${isOwnTeam ? 'text-pastel-orange' : 'text-pastel-sage'}`} />
+              {showsGamesLeft(myTeamGamesRemaining) && (
+                <div className="flex flex-col gap-0.5 mt-1">
+                  {/* Games Remaining */}
+                  <div className={`flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-md ring-1 ${isOwnTeam ? 'ring-pastel-orange/30' : 'ring-white/10'}`}>
+                    <Calendar className={`w-2.5 h-2.5 ${isOwnTeam ? 'text-pastel-orange' : 'text-pastel-sage'}`} aria-hidden="true" />
+                    <span className="text-[9px] font-varsity font-bold text-pastel-cream tabular-nums">
+                      {myTeamGamesRemaining}
+                    </span>
+                    <span className="text-[8px] font-display text-white/55">
+                      left
+                    </span>
+                    <CitrusWedge className={`w-2 h-2 opacity-60 ${isOwnTeam ? 'text-pastel-orange' : 'text-pastel-sage'}`} />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
 
@@ -277,19 +312,21 @@ export const ScoreCard = ({
             <div>
               <div className="font-varsity text-sm text-pastel-cream uppercase text-right">{opponentTeamName}</div>
               <div className="font-mono text-xs text-white/55 text-right">{opponentTeamRecord.wins}-{opponentTeamRecord.losses}</div>
-              <div className="flex flex-col gap-0.5 mt-1 items-end">
-                {/* Games Remaining */}
-                <div className="flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-md ring-1 ring-white/10">
-                  <CitrusWedge className="w-2 h-2 text-pastel-sage opacity-60" />
-                  <span className="text-[8px] font-display text-white/55">
-                    left
-                  </span>
-                  <span className="text-[9px] font-varsity font-bold text-pastel-cream tabular-nums">
-                    {opponentTeamGamesRemaining}
-                  </span>
-                  <Calendar className="w-2.5 h-2.5 text-pastel-sage" aria-hidden="true" />
+              {showsGamesLeft(opponentTeamGamesRemaining) && (
+                <div className="flex flex-col gap-0.5 mt-1 items-end">
+                  {/* Games Remaining */}
+                  <div className="flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-md ring-1 ring-white/10">
+                    <CitrusWedge className="w-2 h-2 text-pastel-sage opacity-60" />
+                    <span className="text-[8px] font-display text-white/55">
+                      left
+                    </span>
+                    <span className="text-[9px] font-varsity font-bold text-pastel-cream tabular-nums">
+                      {opponentTeamGamesRemaining}
+                    </span>
+                    <Calendar className="w-2.5 h-2.5 text-pastel-sage" aria-hidden="true" />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
             <TeamDisc size="lg" name={opponentTeamName} avatarUrl={opponentTeamAvatarUrl} />
           </div>
@@ -304,6 +341,7 @@ export const ScoreCard = ({
           team1Projected={myTeamProjection}
           team2Projected={opponentTeamProjection}
           simulationPerspective={simulationPerspective}
+          seasonDormant={seasonDormant}
         />
       </div>
     </div>

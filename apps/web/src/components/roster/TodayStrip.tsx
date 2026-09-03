@@ -1,5 +1,6 @@
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { Lock, Wand2 } from 'lucide-react';
+import { CalendarOff, Lock, Wand2 } from 'lucide-react';
 import type { TodaySummary } from './todaySummary';
 
 /**
@@ -58,6 +59,39 @@ export interface TodayStripProps {
    * numbers, in the same segment style as the locked count.
    */
   readOnly?: boolean;
+  /**
+   * No hockey today and none tomorrow (`SeasonStatus.isDormant`).
+   *
+   * OFFSEASON (2026-09-02). Every number this strip prints is a claim about
+   * a slate. With no slate they are claims about nothing, and the strip said
+   * the loudest one: "0/13 starters play · 0 on bench with games · proj 0.0"
+   * — read as a broken lineup rather than an empty schedule, and directly
+   * contradicting the rows underneath, which each correctly said "No Game".
+   *
+   * The gate above this one is roster-shaped (`displayRoster.starters.length
+   * > 0`), so a drafted roster in September rendered the full row. The list
+   * was never the question; the schedule was. `pending` already covers the
+   * same lie in its transient form — this is the durable one.
+   *
+   * Deliberately not derived from `summary.startersPlaying === 0`: a manager
+   * whose thirteen starters genuinely all have the night off is a real,
+   * different state, and it deserves the zero.
+   */
+  seasonDormant?: boolean;
+  /**
+   * What to say instead, from `dormantHeadline()` — "Season opens in 27
+   * days" in the offseason, "No games today" during a break. Absent, the
+   * strip falls back to the shorter honest sentence rather than a number.
+   */
+  seasonHeadline?: string | null;
+  /**
+   * Somewhere to GO, rendered at the end of the dormant row. The bar is
+   * `components/scores/ScoresEmptyDay.tsx`, which offers one tap to the
+   * nearest day with games; a dead end that only says "no data" is not it.
+   * A slot rather than a route so this component stays presentational and
+   * its tests keep mounting it without a router.
+   */
+  action?: ReactNode;
   className?: string;
 }
 
@@ -74,10 +108,15 @@ export function TodayStrip({
   editable = false,
   onAutoLineup,
   readOnly = false,
+  seasonDormant = false,
+  seasonHeadline,
+  action,
   className,
 }: TodayStripProps) {
-  const attention = !pending && editable && summary.needsAttention;
-  const state = pending ? 'pending' : attention ? 'attention' : 'calm';
+  // Dormancy outranks everything below it. There is no amber state, no Auto
+  // Lineup and no arithmetic worth showing when nobody is playing.
+  const attention = !seasonDormant && !pending && editable && summary.needsAttention;
+  const state = seasonDormant ? 'dormant' : pending ? 'pending' : attention ? 'attention' : 'calm';
   const verb = tense === 'past' ? 'played' : 'play';
   const showAction = attention && typeof onAutoLineup === 'function';
   const wasted = summary.idleStarters + summary.emptySlots > 0;
@@ -109,7 +148,15 @@ export function TodayStrip({
         {dayLabel}
       </span>
 
-      {pending ? (
+      {seasonDormant ? (
+        <>
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <CalendarOff className="h-3 w-3 text-pastel-sage/50" aria-hidden="true" />
+            {seasonHeadline ?? 'No games scheduled'}
+          </span>
+          {action ? <span className="ml-auto self-center">{action}</span> : null}
+        </>
+      ) : pending ? (
         <span>Checking who plays…</span>
       ) : (
         <>

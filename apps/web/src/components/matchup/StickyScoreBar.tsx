@@ -57,8 +57,19 @@ export interface StickyScoreBarProps {
    * projections still loading) — the line is hidden, never "—".
    */
   winProbability?: number | null;
-  /** Nothing left to play: "Final" replaces the chances; projections are moot. */
+  /**
+   * Nothing left to play: the chances and the projections come down. Note
+   * what this does NOT mean on its own — see `seasonDormant` and the
+   * `showFinal` derivation below for why it stopped being enough to print
+   * the word "Final".
+   */
   settled?: boolean;
+  /**
+   * The schedule has nothing to play right now (`SeasonStatus.isDormant`),
+   * read by the page and passed down — same contract, and the same
+   * prop-not-a-hook reasoning, as ScoreCard's prop of the same name.
+   */
+  seasonDormant?: boolean;
   /** True only when the LEFT team is the viewer's own (see ScoreCard's prop note). */
   isOwnTeam?: boolean;
   /** The page's MobileMenuButton, rendered at the trailing edge. */
@@ -162,12 +173,32 @@ export function StickyScoreBar({
   opponentTeamAvatarUrl,
   winProbability,
   settled = false,
+  seasonDormant = false,
   isOwnTeam = false,
   menu,
   className,
 }: StickyScoreBarProps) {
   const my = toPoints(myTeamPoints);
   const opp = toPoints(opponentTeamPoints);
+
+  // "FINAL" MEANS PLAYED AND OVER — and `settled` alone stopped carrying
+  // that. It arrives from `winProbabilityFromTotals`, which sets
+  // `settled: true` on its `variance <= 0` branch: no games left to add
+  // variance. In-season that branch means the week is spent. On 2026-09-02
+  // it means no game was ever scheduled inside the week, and the band read
+  //
+  //     0.0    Wk 1 / Final    0.0
+  //
+  // over a matchup nobody has played.
+  //
+  // The distinction that holds in both directions is the scoreboard itself:
+  // a week that was played leaves points behind. So the word is withheld
+  // only when the schedule is dormant AND neither side has scored — which
+  // keeps February honest, where an All-Star break sets `isDormant` while a
+  // 96.1–88.4 week genuinely is final. `phase === 'unknown'` never reaches
+  // here: it leaves `isDormant` false and the bar behaves as it always has.
+  const neverPlayed = seasonDormant && my === 0 && opp === 0;
+  const showFinal = settled && !neverPlayed;
 
   const hasChance = !settled && typeof winProbability === 'number' && Number.isFinite(winProbability);
   const leftChance = hasChance ? Math.round(Math.min(100, Math.max(0, winProbability))) : null;
@@ -195,7 +226,7 @@ export function StickyScoreBar({
         <span className="font-jbmono text-[10px] font-bold text-white/55 uppercase tracking-wider whitespace-nowrap">
           {typeof week === 'number' && week > 0 ? `Wk ${week}` : 'VS'}
         </span>
-        {settled && (
+        {showFinal && (
           <span data-testid="sticky-score-final" className="font-jbmono text-[10px] font-bold text-pastel-cream uppercase tracking-wider">
             Final
           </span>

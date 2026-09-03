@@ -31,6 +31,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
+import { useSeasonStatus } from '@/hooks/useSeasonStatus';
+import { shortDateLabel } from '@/components/scores/scoresFormat';
 
 import { PlayoffService, type PlayoffPictureTeam, type PlayoffBracket as BracketType } from '@/services/PlayoffService';
 import { logger } from '@/utils/logger';
@@ -57,6 +59,7 @@ interface StandingsTeam {
 const Standings = () => {
   const { user } = useAuth();
   const { userLeagueState, activeLeagueId, activeLeague, isChangingLeague, loading: leaguesLoading } = useLeague();
+  const { status: seasonStatus } = useSeasonStatus();
   const { toast } = useToast();
   const [season, setSeason] = useState(String(getCurrentSeason()));
   const [loading, setLoading] = useState(true);
@@ -444,6 +447,59 @@ const Standings = () => {
     return b.points - a.points;
   }), [teams, isRoto, isSeasonPoints, isPPG]);
 
+  /**
+   * A SCOREBOARD FOR A SEASON WITH NO GAMES (2026-09-02 offseason audit).
+   *
+   * With teams present and nothing played, this page rendered a complete
+   * Record / Win % / PF / PA / Streak / Last 5 table of `0-0`, `0.0%` and
+   * `0.0` — one row per team, ranked 1..N with the playoff cut line drawn
+   * across it, on a season whose first game is 2026-09-29. The preseason cell that says so
+   * was already written and already good; it was gated on
+   * `sortedTeams.length === 0`, which goes false the moment a commissioner
+   * fills the league, so a drafted league never saw it.
+   *
+   * TWO facts must agree before the table is suppressed, because either one
+   * alone gets it wrong:
+   *
+   *   the SCHEDULE is dormant   there is no hockey that could have produced
+   *                             a row (see `useSeasonStatus`)
+   *   no team has a game        this league specifically has played nothing
+   *
+   * A league that drafts late into a live season keeps its zeros, and that is
+   * correct: hockey is being played, this league just has not played yet, and
+   * the table will fill in on Sunday. `isDormant` is false while the status
+   * query is in flight and false on a failed fetch, so the table can only
+   * ever disappear on a positive answer — never on a broken one.
+   */
+  const noTeamHasPlayed = useMemo(
+    () =>
+      teams.length > 0 &&
+      teams.every(
+        (t) =>
+          (t.gamesPlayed ?? 0) === 0 &&
+          t.record.wins === 0 &&
+          t.record.losses === 0 &&
+          t.record.ties === 0 &&
+          t.pointsFor === 0,
+      ),
+    [teams],
+  );
+  const beforeFirstGame = seasonStatus.isDormant && noTeamHasPlayed;
+
+  /**
+   * Where the season went, and one tap to get there — the contract
+   * `ScoresEmptyDay` sets for every dormant surface. `/scores?date=` is a real
+   * deep link (Scores.tsx reads the `date` param), so "Opening night Sep 29"
+   * lands on the opening slate rather than on today's nothing.
+   *
+   * The offseason and a mid-season break need different words: "the season
+   * opens Feb 25" would be a lie during the Olympic break, when the season is
+   * very much open and merely paused.
+   */
+  const dormantUntil = seasonStatus.isDormant ? seasonStatus.nextGameDate : null;
+  const dormantUntilLabel = dormantUntil ? shortDateLabel(dormantUntil) : null;
+  const isOffseasonGap = seasonStatus.phase === 'offseason';
+
   const selectedLeague = leagues.find(l => l.id === activeLeagueId);
   
   // Early return for loading - must be after all hooks are declared
@@ -657,15 +713,35 @@ const Standings = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5" style={{ visibility: 'visible', opacity: 1 }}>
-                  {sortedTeams.length === 0 ? (
+                  {sortedTeams.length === 0 || beforeFirstGame ? (
                     <tr style={{ visibility: 'visible', opacity: 1 }}>
                       <td colSpan={hasMatchups ? 8 : (isSeasonPoints ? 4 : 3)} className="px-3 sm:px-6 py-12 text-center" style={{ visibility: 'visible', opacity: 1 }}>
                         <div className="flex flex-col items-center gap-3">
                           <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">
                             ✦ Preseason
                           </div>
-                          <p className="text-pastel-cream font-bold text-base">The league is still filling up.</p>
-                          <p className="text-[13px] text-white/55 max-w-xs">Standings will light up as soon as the roster locks and week 1 puck drops.</p>
+                          {/* Two ways to have no standings, and they are not the
+                              same sentence. An empty league is still filling up;
+                              a drafted league in September is full and simply has
+                              not played. Telling twelve seated managers the league
+                              is filling up is its own small lie. */}
+                          <p className="text-pastel-cream font-bold text-base">
+                            {sortedTeams.length === 0 ? 'The league is still filling up.' : 'No games played yet.'}
+                          </p>
+                          <p className="text-[13px] text-white/55 max-w-xs">
+                            {dormantUntilLabel
+                              ? `Records, PF and PA fill in once ${isOffseasonGap ? 'the season opens' : 'games resume'} ${dormantUntilLabel}.`
+                              : 'Standings will light up as soon as the roster locks and week 1 puck drops.'}
+                          </p>
+                          {dormantUntil && (
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/scores?date=${dormantUntil}`)}
+                              className="mt-1 px-3.5 py-2 rounded-full bg-pastel-orange text-[#581E00] font-bold text-xs hover:bg-pastel-orange-soft transition-colors"
+                            >
+                              {isOffseasonGap ? 'Opening night' : 'Next games'} {dormantUntilLabel}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -842,7 +918,16 @@ const Standings = () => {
               <CardContent className="pt-6 bg-pastel-surface-tile">
                 <div className="space-y-2">
                   {/* Use playoff picture data if available, otherwise fall back to sorted teams */}
-                  {(playoffPictureLoaded && playoffPictureTeams.length > 0 ? playoffPictureTeams : sortedTeams.map((t, idx) => ({
+                  {/* 2026-09-02: that fallback ranks `sortedTeams` 1..N, so in
+                      the offseason this drew a full playoff race — seed numbers,
+                      the dashed cut line, sage highlighting on the top six — out
+                      of twelve identical 0-0-0 rows. A race nobody has skated.
+                      Same two-fact gate as the table above. */}
+                  {beforeFirstGame ? (
+                    <p className="py-4 text-center text-xs font-display text-white/55">
+                      No games played yet. {hasMatchups ? 'The race starts when the season does.' : 'Contenders appear after week 1.'}
+                    </p>
+                  ) : (playoffPictureLoaded && playoffPictureTeams.length > 0 ? playoffPictureTeams : sortedTeams.map((t, idx) => ({
                     team_id: t.id,
                     team_name: t.name,
                     rank: idx + 1,
@@ -941,7 +1026,12 @@ const Standings = () => {
                     component that failed to load, not as "the season has not
                     started" — the same shape as the roster's "Bench - Empty".
                     Say which it is. */}
-                {teams.length === 0 ? (
+                {/* 2026-09-02: `teams.length === 0` was the wrong question a
+                    second time. A drafted league in the offseason has twelve
+                    teams and zero points, so this ranked five of them at 0 —
+                    "Points Leaders" over a list of nothing. Same two-fact gate
+                    as the standings table above. */}
+                {teams.length === 0 || beforeFirstGame ? (
                   <p className="py-4 text-center text-xs font-display text-white/55">
                     No points scored yet. Leaders appear after week 1.
                   </p>

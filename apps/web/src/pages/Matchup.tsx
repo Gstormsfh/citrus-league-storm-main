@@ -44,6 +44,7 @@ import { useLoadCeiling } from '@/hooks/useLoadCeiling';
 import { readUntilPresent } from '@/utils/readUntilPresent';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { usePlayoffChampion } from '@/hooks/usePlayoffChampion';
+import { useSeasonStatus } from '@/hooks/useSeasonStatus';
 import { Card, CardContent } from '@/components/ui/card';
 import { Trophy } from 'lucide-react';
 import { matchupApi } from '@/api/matchups';
@@ -188,6 +189,15 @@ const Matchup = () => {
   const { user, loading: authLoading } = useAuth();
   const { data: profile } = useProfile();
   const { userLeagueState, loading: leagueContextLoading, activeLeagueId, activeLeagueFormat, isChangingLeague, setActiveLeagueId } = useLeague();
+
+  // OFFSEASON (2026-09-02). The win-chance bar, the "N left" chip and the word
+  // "Final" are all claims about a week being played. With no games on the
+  // schedule they are claims about nothing: on 2026-09-02 this page showed
+  // "Win chance 50%", "0 left" twice, and "Final" over "0.0 - 0.0" for a
+  // matchup 27 days from its first puck drop. See seasonPhase.ts for the
+  // audit. `unknown` is deliberately NOT dormant, so a failed schedule read
+  // leaves this page exactly as it renders today.
+  const { status: seasonStatus } = useSeasonStatus();
   const { leagueId: urlLeagueId, weekId: urlWeekId } = useParams<{ leagueId?: string; weekId?: string }>();
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -5445,6 +5455,7 @@ const Matchup = () => {
           winProbability={matchupOutlook ? matchupOutlook.probability * 100 : undefined}
           settled={matchupOutlook?.settled ?? false}
           isOwnTeam={isOwnTeamOnLeft}
+          seasonDormant={seasonStatus.isDormant}
         />
       </div>
 
@@ -5666,6 +5677,7 @@ const Matchup = () => {
             <>
           
           <ScoreCard
+            seasonDormant={seasonStatus.isDormant}
             myTeamName={userLeagueState === 'active-user' ? (viewingTeamName || userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
             myTeamRecord={userLeagueState === 'active-user' ? myTeamRecord : { wins: 7, losses: 3 }}
             opponentTeamName={userLeagueState === 'active-user' ? (viewingOpponentTeamName || opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
