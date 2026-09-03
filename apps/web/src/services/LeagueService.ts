@@ -523,7 +523,7 @@ async joinLeagueByCode(
     return getLeagueCachedOrFetch(`leagueTeams:${leagueId}`, async () => {
       try {
         const response = await leagueApi.getTeams(leagueId);
-        return { teams: (response.data || []) as Team[], error: null };
+        return { teams: response.data || [], error: null };
       } catch (error) {
         logger.error('Exception in getLeagueTeams:', error);
         return { teams: [], error };
@@ -551,7 +551,7 @@ async joinLeagueByCode(
   async getLeagueTeamsWithOwners(leagueId: string): Promise<{ teams: (Team & { owner_name?: string })[]; error: unknown }> {
     try {
       const response = await leagueApi.getTeams(leagueId, true);
-      return { teams: (response.data || []) as (Team & { owner_name?: string })[], error: null };
+      return { teams: response.data || [], error: null };
     } catch (error) {
       logger.error('Exception in getLeagueTeamsWithOwners:', error);
       return { teams: [], error };
@@ -570,7 +570,7 @@ async joinLeagueByCode(
     try {
       // Get ALL existing teams with their names to avoid duplicates
       const teamsResponse = await leagueApi.getTeams(leagueId);
-      const existingTeams = (teamsResponse.data || []) as Array<{ id: string; team_name: string; owner_id: string | null }>;
+      const existingTeams = teamsResponse.data || [];
 
       const existingCount = existingTeams.length;
 

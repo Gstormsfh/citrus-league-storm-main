@@ -299,7 +299,6 @@ describe('DR-3 — I5 invariant (per-event re-render scoping)', () => {
     expect(totalRenders).toBeGreaterThanOrEqual(rendersAfterSnapshot + 1);
     // Emit the ratio for triage — visible in the vitest output when
     // the test fails.
-    // eslint-disable-next-line no-console
     console.log(
       `[DR-3 I5] renders=${totalRenders} for N=${N} picks (rendersAfterSnapshot=${rendersAfterSnapshot}, per-pick avg=${((totalRenders - rendersAfterSnapshot) / N).toFixed(2)})`,
     );

@@ -252,8 +252,9 @@ describe('DraftService Interfaces', () => {
         picks: [],
         leagueSettings: { rounds: 10, draftOrder: 'snake', completedAt: '' },
       },
+      // No `created_by`: the route's projection (COLUMNS.DRAFT_SNAPSHOT) does
+      // not select it, so DraftSnapshot no longer declares it.
       created_at: '2025-01-01T00:00:00Z',
-      created_by: 'user-1',
     };
     expect(snapshot.id).toBe('snapshot-1');
     expect(snapshot.draft_session_id).toBe('session-1');

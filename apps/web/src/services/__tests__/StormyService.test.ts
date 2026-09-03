@@ -24,7 +24,7 @@ const mockFunctionsInvoke = vi.fn().mockResolvedValue({
   error: null,
 });
 
-const mockFrom = vi.fn(() => createChainMock());
+const mockFrom = vi.fn((_table: string) => createChainMock());
 
 // Chunk 11g.9 (2026-08-24): Stormy moved off the `stormy-chat` Edge
 // Function and onto POST /api/stormy/chat, so sendMessage is mocked at
@@ -70,7 +70,7 @@ vi.mock('@/api/client', () => ({
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
-    from: (...args: unknown[]) => mockFrom(...args),
+    from: (table: string) => mockFrom(table),
     rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
     auth: {
       getUser: (...args: unknown[]) => mockGetUser(...args),
@@ -237,7 +237,7 @@ describe('StormyService', () => {
       // Re-register mocks for the fresh module
       vi.doMock('@/integrations/supabase/client', () => ({
         supabase: {
-          from: (...args: unknown[]) => mockFrom(...args),
+          from: (table: string) => mockFrom(table),
           rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
           auth: {
             getUser: (...args: unknown[]) => mockGetUser(...args),

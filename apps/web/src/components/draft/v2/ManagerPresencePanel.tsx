@@ -14,7 +14,7 @@ import {
   usePresence,
   useObservedLeftUserIds,
 } from '@/stores/draftClientStore';
-import { computePresenceStatus } from './PresenceDot';
+import { computePresenceStatus } from './presenceStatus';
 
 export interface ManagerPresencePanelTeam {
   id: string;

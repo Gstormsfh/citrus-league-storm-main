@@ -117,7 +117,6 @@ describe('CompletionMomentBanner — prefers-reduced-motion', () => {
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
     }));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).matchMedia = matchMediaMock;
     render(<CompletionMomentBanner totalPicks={192} />);
     const banner = screen.getByTestId('completed-draft-banner');

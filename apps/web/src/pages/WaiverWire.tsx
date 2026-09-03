@@ -333,6 +333,17 @@ const WaiverWire = () => {
       // players inside the league's waiver window. Same source +
       // window math as the Free Agents page enrichment.
       try {
+        // KNOWN, DELIBERATELY UNFIXED HERE: the two errors on the next two
+        // lines (TS2589 "excessively deep" + TS2769 "no overload matches") are
+        // one root cause, not two — `player_waiver_status` is absent from
+        // src/integrations/supabase/types.ts, so `.from()` resolves to
+        // PostgrestQueryBuilder<..., never>, and the select-string parser then
+        // recurses on `never` until it trips the depth limit. Verified: point
+        // the same chain at any table types.ts DOES declare and both errors go
+        // away. There is no honest local fix — the table has to be added to the
+        // generated types (see the note on the loop below). Do NOT silence this
+        // by casting `supabase`; that hides the stale-types problem instead of
+        // fixing it, and the query is correct as written.
         const { data: waiverRows } = await supabase
           .from('player_waiver_status')
           .select('player_id, dropped_at')

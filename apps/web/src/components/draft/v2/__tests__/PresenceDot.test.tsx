@@ -5,7 +5,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { PresenceDot, computePresenceStatus } from '../PresenceDot';
+import { PresenceDot } from '../PresenceDot';
+import { computePresenceStatus } from '../presenceStatus';
 import { useDraftClientStore } from '@/stores/draftClientStore';
 
 beforeEach(() => {

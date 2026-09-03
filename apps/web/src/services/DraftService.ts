@@ -3,6 +3,7 @@ import { logger } from '@/utils/logger';
 import { Team, LeagueService } from './LeagueService';
 import { PlayerService } from './PlayerService';
 import { draftApi } from '@/api/draft';
+import type { DraftSnapshotRow } from '@/api/draft';
 import { leagueApi } from '@/api/leagues';
 
 export interface DraftPick {
@@ -56,14 +57,16 @@ export interface DraftSnapshotData {
   };
 }
 
-export interface DraftSnapshot {
-  id: string;
-  league_id: string;
-  draft_session_id: string;
-  snapshot_data: DraftSnapshotData;
-  created_at: string;
-  created_by: string | null;
-}
+/**
+ * A row of `draft_snapshots` as the API returns it.
+ *
+ * `created_by` used to be declared here as a required field. It is NOT in the
+ * route's projection (`COLUMNS.DRAFT_SNAPSHOT` — 'id, league_id,
+ * draft_session_id, snapshot_data, created_at'), so it was always `undefined`
+ * at runtime; nothing in the app reads it. It is dropped rather than made
+ * optional so the type keeps matching the wire.
+ */
+export type DraftSnapshot = DraftSnapshotRow;
 
 // ─── Request deduplication for draft fetches ─────────────────────
 const DRAFT_CACHE_TTL = 30_000; // 30 seconds
@@ -603,7 +606,7 @@ export const DraftService = {
       logger.log(`Initializing rosters for all teams in league ${leagueId}...`);
 
       const teamsResponse = await leagueApi.getTeams(leagueId);
-      const teams = teamsResponse.data as Team[] | undefined;
+      const teams = teamsResponse.data;
 
       if (!teams || teams.length === 0) {
         logger.log('No teams found in league');
@@ -688,7 +691,7 @@ export const DraftService = {
   async getDraftSnapshot(leagueId: string): Promise<{ snapshot: DraftSnapshot | null; error: unknown }> {
     try {
       const response = await draftApi.getSnapshot(leagueId);
-      return { snapshot: (response.data as DraftSnapshot | undefined) || null, error: null };
+      return { snapshot: response.data || null, error: null };
     } catch (error: unknown) {
       logger.error('Error getting draft snapshot:', error);
       return { snapshot: null, error };

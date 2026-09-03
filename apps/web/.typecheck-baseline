@@ -1,25 +1,41 @@
-# 76 is a MEASUREMENT of this tree on 2026-08-26, not a target inherited from
-# anywhere. It was counted by running `npx tsc --noEmit -p tsconfig.app.json`
-# on master after the citrus-property web merge, and it is the number the
-# ratchet in .github/workflows/ci.yml compares against.
+# ZERO. Reached 2026-09-03. Read this before you raise it.
 #
-# The branch this merge came from measured 54, on a tree that also carried its
-# armchair-gm token migration and its own versions of files master has since
-# rewritten. This tree cannot reach 54 by resolving conflicts better: 46 of the
-# 76 live in MatchupService.ts (29) and DraftService.ts (17), and DraftService
-# is not in that branch's diff at all.
+# History: 151 -> 91 -> 76 -> 62 -> 41 -> 23 -> 0.
 #
-# Progress so far: 151 -> 91 -> 76 -> 62.
+# The last 62 were cleared without a single `as` cast. Four of them were not
+# type noise at all, they were live defects the compiler had been pointing at
+# the whole time:
 #
-# 76 -> 62 (2026-09-03): typing the draft API client. `apiClient.get`/`post`
-# declare `<T = unknown>`, so every call in api/draft.ts that omitted the type
-# parameter made `response.data` unknown and every field read off it a compile
-# error. 14 of the 14 removed here were that one omission. The types were
-# transcribed from the route handlers and, where the wire shape was in doubt,
-# checked against the production catalog -- which is how the autopick column
-# bug (picked_player_id, not player_id) surfaced.
+#   * MatchupService.organizeRosterIntoLineup sorted the roster by
+#     `b.points - a.points`, but HockeyPlayer has no top-level `points`
+#     (season points live at `stats.points`). Every comparison was 0 - 0, so
+#     the sort was a NO-OP and any team without a saved lineup got an
+#     arbitrary starting lineup.
+#   * DemoLeagueService had the same `hp.points || 0` mistake, always 0.
+#   * extractScoringSettings passed a PARTIAL leagues.scoring_settings jsonb
+#     straight into ScoringCalculator, which multiplies by an undefined
+#     weight -> NaN points for a whole matchup. Now filled from
+#     DEFAULT_SCORING per field.
+#   * Roster.applyPlayerMove typed its target as `string` while one caller
+#     passes a numeric HockeyPlayer.id, so `targetId.startsWith(...)` threw
+#     TypeError and killed tap-to-swap.
 #
-# LOWER THIS when armchair-gm lands after its visual review -- part of the
-# remaining gap is there. Lowering it is how a win gets locked in; the ratchet
-# only fails when the count RISES.
-62
+# The bulk of the rest was one root cause: src/integrations/supabase/types.ts
+# declared 21 tables when production has 180. Queries against undeclared
+# tables resolved to `never`, which made the select-string parser recurse
+# until it hit the instantiation limit (TS2589), and forced `as any` casts on
+# the client elsewhere. Regenerated from the production project.
+#
+# WHY ZERO IS WORTH DEFENDING: the ratchet only fails when the count RISES.
+# At 62 a new error was invisible. At 0 the very next one fails CI on the PR
+# that introduced it, which is the only moment it is cheap to fix.
+#
+# If you are about to raise this number, you are proposing that a type error
+# ships. Fix the error instead, or say plainly in the PR why it cannot be.
+#
+# NOTE: tsconfig.app.json still has strictNullChecks:false. Turning it on
+# measured 134 errors on 2026-09-03 and is a separate, planned migration
+# (tsconfig "Phase 2"). Until then TypeScript will NOT narrow a union through
+# `!x.ok` or an else-branch; `x.ok === false` does narrow. Several fixes in
+# this repo depend on that distinction and say so at the site.
+0

@@ -138,12 +138,23 @@ export const leagueApi = {
     return apiClient.put(`/api/leagues/${leagueId}/category-settings`, { categories });
   },
 
-  /** Get all teams in a league */
+  /**
+   * Get all teams in a league.
+   *
+   * Transcribed from `server/src/routes/leagues.ts:288`, which has two exits:
+   * `ok(c, teams)` at :298 when `withOwners=true` (getLeagueTeamsWithOwners
+   * adds `owner_name`), and `ok(c, await service.attachOwnerAvatars(teams))`
+   * at :303 otherwise. BOTH carry the OWNER's `avatar_url` — null for AI
+   * teams and owners with no picture — so only `owner_name` is genuinely
+   * branch-dependent; both are optional here because one type covers both
+   * exits. Untyped, `.data` was `unknown`, which is what forced the `as
+   * Team[]` casts in LeagueService/DraftService and broke `snapshotTeams.map`.
+   */
   getTeams(leagueId: string, withOwners?: boolean) {
     const qs = withOwners ? '?withOwners=true' : '';
     return c.cached(
       `leagues:${leagueId}:teams:${withOwners ? 'owners' : 'basic'}`,
-      () => apiClient.get(`/api/leagues/${leagueId}/teams${qs}`),
+      () => apiClient.get<Array<Team & { owner_name?: string; avatar_url?: string | null }>>(`/api/leagues/${leagueId}/teams${qs}`),
       CACHE_TTL.MEDIUM,
     );
   },

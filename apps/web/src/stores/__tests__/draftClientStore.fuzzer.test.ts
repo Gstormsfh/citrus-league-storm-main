@@ -72,7 +72,11 @@ function makeSnapshot(): DraftSnapshot {
   } as DraftSnapshot;
 }
 
-function makePickEvent(seq: number, slot: typeof MATRIX[0], corrIndex: number): BufferedDraftEvent {
+function makePickEvent(
+  seq: number,
+  slot: typeof MATRIX[0],
+  corrIndex: number,
+): Extract<BufferedDraftEvent, { kind: 'pick_submitted' }> {
   return {
     kind: 'pick_submitted',
     seq,
@@ -310,10 +314,10 @@ describe('T2 store fuzzer — INV-D: recordPending + applyEvent(broadcast) remov
           events.push(ev);
           useDraftClientStore.getState().recordPending({
             correlationId: ev.correlationId,
-            teamId: (ev as { teamId: string }).teamId,
-            playerId: (ev as { playerId: number }).playerId,
-            pickNumber: (ev as { pickNumber: number }).pickNumber,
-            roundNumber: (ev as { roundNumber: number }).roundNumber,
+            teamId: ev.teamId,
+            playerId: ev.playerId,
+            pickNumber: ev.pickNumber,
+            roundNumber: ev.roundNumber,
             submittedAt: Date.now(),
           });
         }

@@ -229,15 +229,28 @@ const DraftRoomInner = () => {
     // during an active draft don't get stuck on the LOBBY screen while the
     // realtime subscription is still connecting. Tied to leagueId in the cache
     // key so switching leagues doesn't inherit another league's phase.
+    //
+    // 2026-09-03 — this used to `parseInt(cached, 10)`, range-check 0..3 and
+    // return `n as DraftPhase`. DraftPhase is a STRING enum and every writer
+    // stores its string value ('lobby' | 'active' | 'completed'), so the parse
+    // was always NaN and this branch could never fire. The cast is the only
+    // reason the compiler never said so. Match on the real values instead.
+    //
+    // NOT fixed here, deliberately: `lid` is read from the PATHNAME, but the
+    // v1 room is routed as `/draft-room?league=<id>` — the id is a QUERY
+    // param, so the regex never matches and this initializer still always
+    // falls through to LOBBY. Repointing it at the query param would change
+    // refresh behaviour in a room that is mid-retirement (the fence above
+    // redirects every league-scoped mount to /draft-v2, so DraftRoomInner
+    // only mounts on the !leagueId fall-through, where there is no phase to
+    // restore anyway). Left as-is on purpose; see the report.
     try {
       const match = window.location.pathname.match(/\/draft(?:-room)?\/([^/]+)/);
       const lid = match?.[1];
       if (lid) {
         const cached = sessionStorage.getItem(`draft_phase_${lid}`);
-        if (cached) {
-          const n = parseInt(cached, 10);
-          if (Number.isFinite(n) && n >= 0 && n <= 3) return n as DraftPhase;
-        }
+        const restored = Object.values(DraftPhase).find((phase) => phase === cached);
+        if (restored) return restored;
       }
     } catch { /* sessionStorage disabled (private browsing) — fall through */ }
     return DraftPhase.LOBBY;
@@ -381,7 +394,7 @@ const DraftRoomInner = () => {
       setError("Couldn't load your leagues. Give it a moment and try again.");
       setLoading(false);
     }
-  }, [user, navigate, searchParams, activeLeagueId]);
+  }, [user, navigate, activeLeagueId]);
 
   /**
    * Generate demo draft picks for all 10 demo teams

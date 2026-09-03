@@ -122,9 +122,11 @@ describe('reconcileOnResync (path 2)', () => {
         kind: 'auction_bid_placed',
         seq: 1,
         timestamp: 'x',
+        correlationId: 'idem-1',
         nominationId: 'nom-1',
-        teamId: 'team-1',
+        bidderTeamId: 'team-1',
         bidAmount: 25,
+        clockDeadline: '2026-08-08T00:00:30.000Z',
       },
     ];
     const after = reconcileOnResync(map, events);

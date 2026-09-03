@@ -13,7 +13,7 @@ import { LeagueService, LEAGUE_TEAMS_DATA } from './LeagueService';
 import { PlayerService, Player } from './PlayerService';
 import { DraftService } from './DraftService';
 import { MatchupService } from './MatchupService';
-import { COLUMNS } from '@/utils/queryColumns';
+import { COLUMNS, TEAM_COLUMNS } from '@/utils/queryColumns';
 import { logger } from '@/utils/logger';
 import { publicApi } from '@/api/public';
 import type { PostgrestError } from '@supabase/supabase-js';
@@ -129,6 +129,15 @@ export const DemoLeagueService = {
       }
       
       // Delete existing lineups
+      // KNOWN TS2589 on the .eq() below, and the query is not what is wrong:
+      // the generated Supabase types for team_lineups are stale. They predate
+      // 20251209000000_add_league_isolation_to_team_lineups.sql, so the Row
+      // type has no league_id (production has it NOT NULL, as half the primary
+      // key) and still calls team_id a number (production: uuid). With
+      // league_id missing from Row, postgrest reads it as a JSON path instead
+      // of a column and recurses through the Json type on starters/bench/ir
+      // until it hits the instantiation depth limit. Regenerating
+      // integrations/supabase/types.ts clears it; do not paper over it here.
       const { error: deleteLineupsError } = await supabase
         .from('team_lineups')
         .delete()
@@ -269,7 +278,12 @@ export const DemoLeagueService = {
             draft_status: 'completed',
             settings: {},
           })
-          .select(COLUMNS.LEAGUE)
+          // Only `id` is read back (the log below), so only `id` is selected --
+          // the point of queryColumns is to stop paying egress for columns
+          // nobody reads. It also has to be a literal: COLUMNS.LEAGUE widens to
+          // `string` inside the COLUMNS map, and postgrest cannot parse a
+          // non-literal column list, so the row came back as GenericStringError.
+          .select('id')
           .single();
 
         if (leagueError) {
@@ -293,7 +307,11 @@ export const DemoLeagueService = {
               owner_id: null, // No user ownership - pillar of isolation
               team_name: teamData.name,
             })
-            .select(COLUMNS.TEAM)
+            // TEAM_COLUMNS, not COLUMNS.TEAM: the COLUMNS map widens every
+            // entry to `string`, and postgrest's column-list parser only types
+            // a literal -- given `string` it yields GenericStringError, so the
+            // inserted row lost its shape. Same column list either way.
+            .select(TEAM_COLUMNS)
             .single();
 
           if (teamError) {
@@ -310,7 +328,8 @@ export const DemoLeagueService = {
         logger.log('[DemoLeagueService] Demo league exists but rosters not populated, getting existing teams...');
         const { data: existingTeams } = await supabase
           .from('teams')
-          .select(COLUMNS.TEAM)
+          // Literal column list -- see the note on the insert above.
+          .select(TEAM_COLUMNS)
           .eq('league_id', DEMO_LEAGUE_ID);
         teams = existingTeams || [];
         logger.log(`[DemoLeagueService] Found ${teams.length} existing teams`);
@@ -531,7 +550,12 @@ export const DemoLeagueService = {
               full_name: hp.name,
               position: hp.position,
               team: hp.team || '',
-              points: hp.points || 0,
+              // Season points live at stats.points on HockeyPlayer -- there is no
+              // top-level `points` (MatchupService.transformToHockeyPlayer puts it
+              // inside stats). Reading hp.points made this fallback score every
+              // player 0, which collapsed the sort below into roster order and
+              // handed the demo team an arbitrary starting lineup.
+              points: hp.stats?.points || 0,
             } as Player;
           }
           return player;

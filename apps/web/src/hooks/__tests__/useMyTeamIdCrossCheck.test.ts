@@ -27,10 +27,8 @@ vi.mock('@/api/client', () => ({
 import { useMyTeamIdCrossCheck } from '../useMyTeamIdCrossCheck';
 import { useDraftClientStore } from '@/stores/draftClientStore';
 import type { DraftOrderSlot } from '@/lib/draftClient/fetchDraftOrderMatrix';
-import type {
-  DerivedDraftState,
-  DraftSnapshot,
-} from '@citrus/shared';
+import type { DerivedDraftState } from '@/lib/draftClient/deriveDraftState';
+import type { DraftSnapshot } from '@citrus/shared';
 
 // Store setters we manipulate directly to construct the observed state.
 function primeStore(opts: {

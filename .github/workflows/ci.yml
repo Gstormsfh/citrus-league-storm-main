@@ -132,7 +132,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.10'
           cache: pip
@@ -675,7 +675,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # fetch-depth 0 so the SQL-content check below can diff against the base
+      # and look at the migrations THIS PR adds, rather than re-warning about
+      # every migration ever written.
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Validate migration file naming
         run: |
@@ -707,10 +712,30 @@ jobs:
           echo "No duplicate timestamps found."
 
       - name: Validate SQL syntax (basic)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           echo "=== Basic SQL Validation ==="
           errors=0
-          for file in supabase/migrations/*.sql; do
+          # CHANGED FILES ONLY (2026-09-03). This walked every migration in the
+          # repo on every run, so five DROP TABLE CASCADE warnings fired forever
+          # on files from 2025-12 through 2026-08 that are already applied to
+          # production and cannot be edited. A warning nobody can action, on
+          # every run, is how this job's real output got lost in its own noise.
+          # New and modified migrations still get the full check; the naming and
+          # duplicate-timestamp checks above still scan everything, because those
+          # are cheap and a rename genuinely can break the ordering.
+          if [ -n "${BASE_SHA:-}" ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            FILES=$(git diff --name-only --diff-filter=d "${BASE_SHA}...HEAD" -- 'supabase/migrations/*.sql' || true)
+            echo "Scanning migrations changed since ${BASE_SHA}."
+          else
+            FILES=$(ls supabase/migrations/*.sql 2>/dev/null || true)
+            echo "No PR base available (push build) -- scanning all migrations."
+          fi
+          if [ -z "$FILES" ]; then
+            echo "No migration files to check."
+          fi
+          for file in $FILES; do
             [ -f "$file" ] || continue
             name=$(basename "$file")
             # Check for common SQL issues
@@ -783,12 +808,41 @@ jobs:
           for dir in apps/web/src server/src packages/shared/src; do
             [ -d "$dir" ] || continue
             # Find console.log in non-test, non-config files
+            # structuredLogger.ts is excluded for the same reason logger.ts is:
+            # it IS the logger. Its own header says "the internal console.* use
+            # here is the ONLY permitted console.* call site", and every call
+            # carries an eslint-disable. Flagging it is a permanent false
+            # positive, and a scan that always fires teaches people to ignore
+            # every line it prints -- including the real one.
+            #
+            # deriveDraftState.ts is excluded deliberately, and this is the one
+            # exemption that is a judgement call rather than an obvious false
+            # positive. Its two `console.debug` calls are guarded browser
+            # diagnostics ("absorbing terminal state", "unknown event kind") in
+            # the client-side draft reducer. `logger` from @citrus/shared is a
+            # NOOP in the web app -- only server/src/index.ts and
+            # server/src/draft/index.ts call createConsoleLogger() -- so
+            # "fixing" this by swapping in logger.debug does not route the
+            # message anywhere, it deletes it. Those two lines are the most
+            # useful diagnostic in the draft client when a room misbehaves, and
+            # trading them for a green scan would be optimising the metric
+            # against the thing the metric is for. Revisit if the web app ever
+            # wires up a real logger.
+            #
+            # The last two greps drop JSDoc prose (` * 4. Emits via console.log`)
+            # and the defensive guard `typeof console.debug === 'function'`.
+            # Neither is a call site.
             matches=$(grep -rn "console\.\(log\|debug\|info\)" "$dir" \
               --include="*.ts" --include="*.tsx" \
               --exclude-dir="__tests__" \
-              --exclude="logger.ts" --exclude="vite-env.d.ts" \
+              --exclude="logger.ts" --exclude="structuredLogger.ts" \
+              --exclude="deriveDraftState.ts" \
+              --exclude="vite-env.d.ts" \
               --exclude="requestContext.ts" --exclude="app.ts" \
-              2>/dev/null | grep -v "// " | grep -v "test" || true)
+              2>/dev/null \
+              | grep -v "// " | grep -v "test" \
+              | grep -vE ':[[:space:]]*\*' \
+              | grep -vE "typeof console" || true)
             if [ -n "$matches" ]; then
               echo "$matches" | while read -r line; do
                 echo "::warning::$line"
