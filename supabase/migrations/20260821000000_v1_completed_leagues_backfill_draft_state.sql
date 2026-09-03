@@ -108,7 +108,13 @@ DECLARE
   v_target_count int;
   v_sample_ids uuid[];
 BEGIN
-  SELECT count(*), COALESCE(array_agg(id ORDER BY created_at LIMIT 20), '{}')
+  -- NOTE 2026-09-03: was `array_agg(id ORDER BY created_at LIMIT 20)`, which is
+  -- not valid Postgres - LIMIT is not permitted inside an aggregate's ORDER BY.
+  -- STEP 1 raised `syntax error at or near "LIMIT"` on every attempt, so this
+  -- migration had been unappliable since it was authored (2026-08-08) and was
+  -- found unapplied during the prod/repo reconciliation. Slicing the finished
+  -- array is the equivalent that parses.
+  SELECT count(*), COALESCE((array_agg(id ORDER BY created_at))[1:20], '{}')
     INTO v_target_count, v_sample_ids
     FROM public.leagues
    WHERE draft_status = 'completed'
