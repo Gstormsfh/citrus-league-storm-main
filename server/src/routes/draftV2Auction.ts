@@ -322,7 +322,7 @@ draftV2AuctionRoutes.post(
       if (body.bid_amount > maxAffordable) {
         throw AppError.badRequest(
           `insufficient_budget: max affordable bid is $${maxAffordable} ` +
-            `(reserve rule — every open roster slot must stay fundable)`,
+            `(reserve rule: every open roster slot must stay fundable)`,
         );
       }
 

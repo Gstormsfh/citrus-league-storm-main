@@ -41,14 +41,23 @@ import { fileURLToPath } from 'node:url';
  * exclusion: this repo comments heavily and in em dashes, and a guard that
  * fired on `// the roster — see below` would be deleted within a week.
  *
+ * Extracted text is then run through `decodeEscapes`, because `"\u2014"` is
+ * an em dash spelled in ASCII and a scanner that reads source rather than
+ * runtime values cannot otherwise tell. `DraftRoom.tsx` shipped its tab
+ * title that way, inside the scanned scope, unseen for the guard's life.
+ *
  * ── WHAT IS DELIBERATELY OUT OF SCOPE, AND WHY ───────────────────────
  *
  *   * `src/components/ui/**` — shadcn-managed. CLAUDE.md: "Do not modify".
  *     A rule we are forbidden to fix is a rule we must not enforce.
  *   * `__tests__/**` — fixtures deliberately contain offenders (this file
  *     included: the planted-offender test below is full of them).
- *   * `logger.*(…)` arguments — developer-facing, never rendered. Excluded by
- *     range, not by guessing at the text.
+ *   * `logger.*(…)`, `structuredLogger.*(…)`, `console.*(…)` arguments —
+ *     developer-facing, never rendered. Excluded by range, not by guessing at
+ *     the text. The match is on ANY `<name>Logger` receiver: the server's
+ *     logger is `structuredLogger`, and a rule that named only `logger`
+ *     reported eleven operator log lines in `LobbyManager` as user-facing
+ *     copy the moment `server/src/draft` entered the sweep.
  *   * import/export/`require`/`import()` specifiers — module paths.
  *   * Tailwind class strings — `className`/`class` attribute values and the
  *     arguments of `cn(`/`cva(`/`clsx(`/`twMerge(`.
@@ -380,10 +389,15 @@ export function jsxText(src: string, isCode: boolean[]): Extracted[] {
 /** Character ranges whose strings are developer-facing, not user-facing. */
 function excludedRanges(src: string): Array<[number, number]> {
   const ranges: Array<[number, number]> = [];
-  // `logger.debug(...)` / `console.warn(...)` and friends: matched by name,
-  // then closed by paren depth so multi-argument and multi-line calls are
-  // covered whole.
-  const call = /\b(?:logger|console)\s*\.\s*\w+\s*\(/g;
+  // `logger.debug(...)` / `structuredLogger.warn(...)` / `console.warn(...)`
+  // and friends: matched by name, then closed by paren depth so
+  // multi-argument and multi-line calls are covered whole.
+  //
+  // `\w*[Ll]ogger` rather than a literal `logger`, because the server's
+  // logger is `structuredLogger` and the web app's is `logger`. The `\s*\.`
+  // that follows keeps it tight: `loggerFactory.create(` does not match,
+  // because a receiver only qualifies when the call sits directly on it.
+  const call = /\b(?:\w*[Ll]ogger|console)\s*\.\s*\w+\s*\(/g;
   let m: RegExpExecArray | null;
   while ((m = call.exec(src))) {
     let i = m.index + m[0].length;
@@ -436,6 +450,47 @@ const URL_OR_PATH = /^(?:https?:|mailto:|tel:|data:|blob:|\/|\.{1,2}\/|@\/|#[\w-
 /** `player-dashboard`, `TEAM_ABBREV`, `sm:text-xs` — identifiers, not prose. */
 const IDENTIFIER = /^[\w$@./:%[\]#-]*$/;
 
+/**
+ * `"\\u2014"` is an em dash. The scanner reads SOURCE, so it sees six ASCII
+ * characters and waves it through, and `DraftRoom.tsx` has been shipping
+ * `document.title = "\\uD83D\\uDFE2 Your Turn \\u2014 Citrus Draft"` past this
+ * guard since the day it was written. An escape is a spelling of a
+ * character, not an exemption from it, so every rule below runs on the
+ * decoded text.
+ *
+ * `\\uXXXX`, `\\u{X...}` and `\\xNN` are decoded. Every other escape consumes
+ * its next character verbatim, which is what keeps `\\\\u2014` (an escaped
+ * backslash followed by the letter u) from being read as one.
+ */
+export function decodeEscapes(text: string): string {
+  const SIMPLE: Record<string, string> = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', '0': '\0' };
+  let out = '';
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== '\\') {
+      out += text[i];
+      continue;
+    }
+    const rest = text.slice(i);
+    const m =
+      /^\\u\{([0-9a-fA-F]{1,6})\}/.exec(rest) ||
+      /^\\u([0-9a-fA-F]{4})/.exec(rest) ||
+      /^\\x([0-9a-fA-F]{2})/.exec(rest);
+    if (m) {
+      out += String.fromCodePoint(parseInt(m[1], 16));
+      i += m[0].length - 1;
+      continue;
+    }
+    const next = text[i + 1];
+    if (next === undefined) {
+      out += '\\';
+      continue;
+    }
+    out += SIMPLE[next] ?? next;
+    i++;
+  }
+  return out;
+}
+
 /** Is this literal something a user could read on screen? */
 export function isUserFacing(text: string): boolean {
   const t = text.trim();
@@ -458,39 +513,58 @@ export const EM_DASH = /—/;
  * "not just" is only banned in the "it's not just X, it's Y" shape, because
  * "not just status" in a condition is ordinary English.
  */
-export const BANNED_PHRASES: Array<{ name: string; re: RegExp }> = [
-  { name: "it's not just X, it's Y", re: /\b(?:it'?s|this is|that'?s|we'?re)\s+not\s+(?:just|only)\b/i },
-  { name: 'not just X — Y (rule-of-two padding)', re: /\bnot just\b[^.?!]{0,80},\s*it'?s\b/i },
-  { name: "let's dive in", re: /\b(?:let'?s\s+)?dive\s+in\b/i },
-  { name: "in today's fast-paced world", re: /\bfast[- ]paced\b/i },
-  { name: 'game-changer', re: /\bgame[-\s]?chang(?:er|ers|ing)\b/i },
-  { name: 'unlock', re: /\bunlock(?:s|ed|ing)?\b/i },
-  { name: 'leverage (as a verb)', re: /\bleverag(?:e|es|ed|ing)\b/i },
-  { name: 'delve', re: /\bdelv(?:e|es|ed|ing)\b/i },
-  { name: 'tapestry', re: /\btapestry\b/i },
-  { name: 'landscape (as metaphor)', re: /\blandscape\b/i },
-  { name: 'testament to', re: /\btestament\s+to\b/i },
-  { name: 'navigate the complexities', re: /\bnavigat\w*\s+the\s+complexit/i },
-];
+/**
+ * THE VOCABULARY NOW LIVES IN ONE FILE, read by two languages.
+ *
+ * Moved to `packages/shared/src/constants/aiVoice.json` on 2026-09-03, when
+ * a second reader appeared: Draft Kit blurbs are database rows written by
+ * `data-pipeline/draftkit/load_blurbs.py`, so they never passed through this
+ * guard — the one body of prose in the product that is SOLD rather than
+ * shipped had no voice rule on it at all. A Python copy of the list below
+ * would have drifted from this one inside a month.
+ *
+ * The JSON stores patterns as strings restricted to syntax that means the
+ * same thing in JS and Python, so both compile them directly and there is no
+ * generation step to go stale. `patternsAreCrossLanguage` below pins that
+ * restriction.
+ */
+const VOICE = JSON.parse(
+  readFileSync(resolve(REPO, 'packages/shared/src/constants/aiVoice.json'), 'utf8'),
+) as {
+  bannedPhrases: Array<{ name: string; pattern: string }>;
+  accuracyClaims: Array<{ name: string; pattern: string }>;
+  moatOverstatement: { name: string; pattern: string };
+  emDash: { char: string };
+};
+
+const compile = (list: Array<{ name: string; pattern: string }>) =>
+  list.map(({ name, pattern }) => ({ name, re: new RegExp(pattern, 'i') }));
+
+export const BANNED_PHRASES: Array<{ name: string; re: RegExp }> = compile(VOICE.bannedPhrases);
+
+export const ACCURACY_CLAIMS: Array<{ name: string; re: RegExp }> = compile(VOICE.accuracyClaims);
+
+export const MOAT_OVERSTATEMENT = new RegExp(VOICE.moatOverstatement.pattern, 'i');
 
 /**
- * Claims about projection accuracy. No benchmark exists in this repo, so
- * every one of these is unfalsifiable marketing. `\d+% accurate` is included
- * because PreviewMockups shipped a literal "97.6% accuracy live".
+ * The JSON is read by `data-pipeline/draftkit/load_blurbs.py` as well, which
+ * compiles the same strings with Python's `re`. That only works while every
+ * pattern stays inside the syntax both engines agree on, and nothing about
+ * a JSON string makes that obvious to the next person adding a phrase. This
+ * is the test the JSON's header promises.
+ *
+ * Banned outright: lookbehind (`(?<=`), named groups (`(?<name>`), unicode
+ * property escapes (`\p{...}`), possessive/atomic groups, and the `/.../flags`
+ * wrapper (patterns are bare strings; flags are the reader's business).
  */
-export const ACCURACY_CLAIMS: Array<{ name: string; re: RegExp }> = [
-  { name: 'most/wildly accurate', re: /\b(?:most|wildly|insanely|scary|freakishly)\s+accurate\b/i },
-  { name: 'a numeric accuracy figure', re: /\d\s*%\s*accura|accuracy\s*[:=]?\s*\d/i },
-  { name: 'beats a named competitor', re: /\bbeat(?:s|ing)?\s+(?:espn|yahoo|sleeper|fantrax)\b/i },
-  { name: 'accuracy superlative', re: /\baccura\w*\s+(?:than|projections\s+on\s+earth)\b/i },
+export const CROSS_LANGUAGE_VIOLATIONS: Array<{ name: string; re: RegExp }> = [
+  { name: 'lookbehind', re: /\(\?<[=!]/ },
+  { name: 'named group', re: /\(\?<[A-Za-z_]/ },
+  { name: 'unicode property escape', re: /\\[pP]\{/ },
+  { name: 'atomic or possessive group', re: /\(\?>|[*+?}]\+/ },
+  { name: 'a slash-wrapped literal rather than a bare pattern', re: /^\/.*\/[a-z]*$/ },
 ];
 
-/**
- * The pass-context features cover 10,047 of 118,975 shots scored in 2025.
- * Any sentence pairing them with "every"/"all" shots is false.
- */
-export const MOAT_OVERSTATEMENT =
-  /\b(?:every|all|each)\s+(?:single\s+)?shots?\b[^.!?]{0,60}\b(?:pass[- ]context|moat|proprietary)\b|\b(?:pass[- ]context|moat|proprietary)\b[^.!?]{0,60}\b(?:every|all)\s+shots?\b/i;
 
 export interface Offender {
   file: string;
@@ -527,16 +601,18 @@ export function offendersIn(rel: string, src: string, phrases = true): Offender[
   const out: Offender[] = [];
   const quote = (t: string) => t.trim().replace(/\s+/g, ' ').slice(0, 120);
   for (const c of candidates) {
-    if (EM_DASH.test(c.text)) out.push({ file: rel, rule: 'em dash', text: quote(c.text) });
+    // Decoded, so an escaped em dash is the same offence as a typed one.
+    const text = decodeEscapes(c.text);
+    if (EM_DASH.test(text)) out.push({ file: rel, rule: 'em dash', text: quote(text) });
     if (!phrases) continue;
     for (const p of BANNED_PHRASES) {
-      if (p.re.test(c.text)) out.push({ file: rel, rule: `banned phrase: ${p.name}`, text: quote(c.text) });
+      if (p.re.test(text)) out.push({ file: rel, rule: `banned phrase: ${p.name}`, text: quote(text) });
     }
     for (const p of ACCURACY_CLAIMS) {
-      if (p.re.test(c.text)) out.push({ file: rel, rule: `accuracy claim: ${p.name}`, text: quote(c.text) });
+      if (p.re.test(text)) out.push({ file: rel, rule: `accuracy claim: ${p.name}`, text: quote(text) });
     }
-    if (MOAT_OVERSTATEMENT.test(c.text)) {
-      out.push({ file: rel, rule: 'overstates pass-context coverage', text: quote(c.text) });
+    if (MOAT_OVERSTATEMENT.test(text)) {
+      out.push({ file: rel, rule: 'overstates pass-context coverage', text: quote(text) });
     }
   }
   return out;
@@ -554,18 +630,165 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const SCOPED = [`${SRC}/pages`, `${SRC}/components`]
-  .flatMap((d) => walk(d))
-  .map((f) => f.replace(/\\/g, '/'))
-  .filter((f) => !f.includes('__tests__'))
-  // shadcn-managed, and CLAUDE.md forbids editing it.
-  .filter((f) => !f.startsWith(`${SRC}/components/ui/`))
-  .concat(PROSE_FILES.filter((f) => existsSync(f)));
+const SERVER_SRC = `${REPO}/server/src`;
+
+/**
+ * THE SCANNED SURFACE (widened 2026-09-03).
+ *
+ * It was `pages/` and `components/` plus the two prose files, and that was
+ * where the copy pass had run. It was also, quietly, the reason the guard
+ * stayed green: every remaining offender in the product lived one directory
+ * over. A hook writes the browser-tab title a drafter reads while the clock
+ * runs; a util writes the scouting line on every roster card; the server's
+ * middleware writes the sentence a user sees when their session dies. None
+ * of those are less user-facing than a page, and none of them were scanned.
+ *
+ * What each directory adds:
+ *
+ *   * `utils/`      — `playerWriteup.ts` alone ships on three screens
+ *                     (HockeyPlayerCard, MobileRosterList, PlayerStatsModal).
+ *   * `hooks/`      — toast copy, notification bodies, `document.title`.
+ *   * server `routes/`, `middleware/`, `lib/`, `draft/` — every API error
+ *                     message and every WebSocket error payload. `error.message`
+ *                     is rendered verbatim by the client's toast layer, so a
+ *                     dash typed there reaches the same reader as a dash typed
+ *                     in JSX.
+ *
+ * STILL OUT, and this is a measurement rather than a guess. Adding the rest
+ * of the source tree to SCANNED_DIRS on 2026-09-03 reported 23 offenders,
+ * every one an em dash in error copy, across eight files:
+ *
+ *     api/client.ts                        3
+ *     lib/draftClient/submitPick.ts        5
+ *     lib/draftClient/toasts.ts            2
+ *     lib/userMessage.ts                   3
+ *     contexts/LeagueContext.tsx           2
+ *     server/src/services/StormyAssistantService.ts   5
+ *     server/src/services/LineupService.ts            2
+ *     server/src/services/WaiverService.ts            1
+ *
+ * They are out because they were not this pass's to fix, not because they
+ * are excused: a guard that fails on arrival is a guard someone deletes.
+ * Fix those eight files and the four directories they live in can join the
+ * list in the same diff.
+ *
+ * `services/` and `stores/` on the web side measured CLEAN and are held back
+ * only to keep one directory per pass; `services/StormyService.ts` is already
+ * scanned by name through PROSE_FILES.
+ */
+const SCANNED_DIRS = [
+  `${SRC}/pages`,
+  `${SRC}/components`,
+  `${SRC}/utils`,
+  `${SRC}/hooks`,
+  `${SERVER_SRC}/routes`,
+  `${SERVER_SRC}/middleware`,
+  `${SERVER_SRC}/lib`,
+  `${SERVER_SRC}/draft`,
+];
+
+const SCOPED = Array.from(
+  new Set(
+    SCANNED_DIRS.filter((d) => existsSync(d))
+      .flatMap((d) => walk(d))
+      .map((f) => f.replace(/\\/g, '/'))
+      .filter((f) => !f.includes('__tests__'))
+      // shadcn-managed, and CLAUDE.md forbids editing it.
+      .filter((f) => !f.startsWith(`${SRC}/components/ui/`))
+      .concat(PROSE_FILES.filter((f) => existsSync(f))),
+  ),
+);
 
 const REL = (f: string) => (f.startsWith(SRC) ? f.slice(SRC.length + 1) : f.slice(REPO.length + 1));
 
 function report(offenders: Offender[]): string {
   return offenders.map((o) => `  ${o.file} [${o.rule}]\n      "${o.text}"`).join('\n');
+}
+
+/**
+ * QUARANTINE — known offenders in files the widening pass was not scoped to
+ * edit. THIS IS NOT THE ALLOWLIST, and the two must not be confused.
+ *
+ * `ALLOWED` below is for a string that has EARNED an exemption, and it is
+ * empty because no string ever has. This list is the opposite: eight strings
+ * that are wrong, are named here so nobody has to rediscover them, and are
+ * waiting on the pass that owns their file. Scanning `routes/`, `lib/` and
+ * `draft/` with these recorded is strictly more coverage than not scanning
+ * those directories at all, which was the only other way to keep the suite
+ * green on the day the scope widened.
+ *
+ * The invariant is that it only ever SHRINKS. Two tests enforce that: the
+ * sweep may not turn up an offender that is not on this list, and every
+ * entry must still match a real offender, so fixing a string forces its
+ * removal from here rather than letting the list rot into a permanent
+ * exemption.
+ *
+ * `text` is the offender's quoted form (trimmed, whitespace collapsed,
+ * clipped to 120 characters) exactly as `report` prints it, so a failure
+ * message can be pasted straight in.
+ */
+interface Quarantined {
+  file: string;
+  text: string;
+  /** Who reads this string, and what the fix is. */
+  why: string;
+}
+
+const QUARANTINE: Quarantined[] = [
+  {
+    file: 'server/src/routes/stormy.ts',
+    text: 'Stormy is resting — daily capacity reached. Try again tomorrow!',
+    why: 'User-facing. The daily-cap message Stormy answers with. Two sentences, no dash.',
+  },
+  {
+    file: 'server/src/routes/stormy.ts',
+    text: 'Stormy is busy right now — try again shortly.',
+    why: 'User-facing. The 429 AppError message; the client toasts it verbatim.',
+  },
+  {
+    file: 'server/src/routes/draftV2Offline.ts',
+    text: '— import is only for offline drafts',
+    why: 'User-facing. Tail of the offline_only AppError a commissioner sees on a bad import.',
+  },
+  {
+    file: 'server/src/routes/scheduled.ts',
+    text: '—',
+    why: 'User-facing. Joins the waiver-claim failure reason onto a notification body sent to the manager. A colon reads better than a dash there.',
+  },
+  {
+    file: 'server/src/lib/circuitBreaker.ts',
+    text: '" is OPEN — service unavailable',
+    why: 'CircuitOpenError message. resilientSupabase swaps it for its own copy, but nothing stops another caller surfacing it.',
+  },
+  {
+    file: 'server/src/lib/supabase.ts',
+    text: 'SUPABASE_SERVICE_ROLE_KEY not set — admin client unavailable',
+    why: 'Startup misconfiguration throw. Operator-facing in practice, but it is a thrown Error and not a log call, so the range exclusion cannot see it.',
+  },
+  {
+    file: 'server/src/draft/LobbyManager.ts',
+    text: '[lobby] enqueueAction called before init() — caller MUST await LobbyManager.init() lobbyId=',
+    why: 'Developer-facing. Bound to a const, then both logged and thrown, so it sits outside the logger-call range the exclusion covers.',
+  },
+  {
+    file: 'pages/DraftRoom.tsx',
+    text: '🟢 Your Turn — Citrus Draft',
+    why: 'User-facing browser-tab title, written as "\\u2014" and therefore invisible to this guard until decodeEscapes landed. The sibling title in hooks/useOnClockAlarm.ts now reads "⏰ YOUR PICK · Citrus"; this one wants the same dot.',
+  },
+];
+
+const QUARANTINED = new Set(QUARANTINE.map((q) => `${q.file}|${q.text}`));
+
+/** Every offender in the whole scanned surface. */
+function sweep(): Offender[] {
+  const offenders: Offender[] = [];
+  for (const f of SCOPED) {
+    // The system prompt quotes the phrase list in order to forbid it; see
+    // `offendersIn`. Everything else gets every rule.
+    const phrases = f !== PROSE_FILES[0];
+    offenders.push(...offendersIn(REL(f), readFileSync(f, 'utf8'), phrases));
+  }
+  return offenders;
 }
 
 describe('AI-voice guard', () => {
@@ -576,24 +799,59 @@ describe('AI-voice guard', () => {
       expect(existsSync(f), `${f} moved — the guard is no longer reading Stormy's prompt`).toBe(true);
       expect(SCOPED).toContain(f);
     }
+    // Every directory in the list must actually contribute files. A renamed
+    // or moved directory would otherwise drop out of the sweep in silence,
+    // which is exactly how this guard shipped scanning two directories while
+    // reading as though it covered the app.
+    for (const dir of SCANNED_DIRS) {
+      expect(existsSync(dir), `${dir} is gone — SCANNED_DIRS is stale`).toBe(true);
+      expect(
+        SCOPED.filter((f) => f.startsWith(`${dir}/`)).length,
+        `${dir} contributed no files to the sweep`,
+      ).toBeGreaterThan(0);
+    }
+    // The named prose files are also reached by the directory walk now
+    // (systemPrompt.ts lives under server/src/lib). Deduped, so nothing is
+    // scanned twice and the phrase-exemption still matches by path.
+    expect(new Set(SCOPED).size).toBe(SCOPED.length);
   });
 
   it('no em dash, banned phrase or accuracy claim in a user-facing string', () => {
-    const offenders: Offender[] = [];
-    for (const f of SCOPED) {
-      // The system prompt quotes the phrase list in order to forbid it; see
-      // `offendersIn`. Everything else gets every rule.
-      const phrases = f !== PROSE_FILES[0];
-      offenders.push(...offendersIn(REL(f), readFileSync(f, 'utf8'), phrases));
-    }
+    const offenders = sweep();
 
     // ALLOWLIST: empty, and it should stay that way. If a string genuinely
     // needs one of these, rewrite the string — that is the whole point of
-    // the branch this guard shipped on.
+    // the branch this guard shipped on. Known-bad strings awaiting the pass
+    // that owns their file go in QUARANTINE instead, which is checked below
+    // and may only shrink.
     const ALLOWED: string[] = [];
-    const real = offenders.filter((o) => !ALLOWED.includes(`${o.file}|${o.text}`));
+    const real = offenders.filter(
+      (o) => !ALLOWED.includes(`${o.file}|${o.text}`) && !QUARANTINED.has(`${o.file}|${o.text}`),
+    );
 
     expect(real.length, `AI tells in user-facing copy:\n${report(real)}`).toBe(0);
+  });
+
+  it('the quarantine only shrinks, and every entry in it is still real', () => {
+    const found = new Set(sweep().map((o) => `${o.file}|${o.text}`));
+
+    // A string someone fixed must be DELETED from the list. Without this the
+    // quarantine rots into a permanent exemption that nobody can audit,
+    // which is the failure mode allowlists always have.
+    const stale = QUARANTINE.filter((q) => !found.has(`${q.file}|${q.text}`));
+    expect(
+      stale.map((q) => `${q.file}: "${q.text}"`),
+      'these are no longer offenders — delete them from QUARANTINE',
+    ).toEqual([]);
+
+    // The list was eight when server/src entered the sweep and escape
+    // decoding landed, both on 2026-09-03. It may go down. It may not go up:
+    // a new offender belongs in the diff that introduced it, not in this file.
+    expect(QUARANTINE.length).toBeLessThanOrEqual(8);
+    expect(new Set(QUARANTINE.map((q) => `${q.file}|${q.text}`)).size).toBe(QUARANTINE.length);
+    for (const q of QUARANTINE) {
+      expect(q.why.length, `${q.file} has no hand-off note`).toBeGreaterThan(20);
+    }
   });
 
   it('the detector bites: planted offenders are caught', () => {
@@ -610,6 +868,11 @@ describe('AI-voice guard', () => {
     // ...and a string after an arrow is still a string, so `>` staying in the
     // opener test does not blind the scanner to `() => 'copy'` callbacks.
     expect(rules(`const f = () => 'Draft complete — set your lineup';`)).toContain('em dash');
+    // An escaped em dash is an em dash. This is DraftRoom.tsx's tab title,
+    // which sat inside the scanned scope and unseen for the guard's whole life.
+    expect(rules(`document.title = "\\uD83D\\uDFE2 Your Turn \\u2014 Citrus Draft";`)).toContain('em dash');
+    expect(rules(`const t = 'Ice time \\u2014 up 2:14 a night.';`)).toContain('em dash');
+    expect(rules(`const t = 'Ice time \\u{2014} up 2:14 a night.';`)).toContain('em dash');
 
     expect(rules(`const t = "It's not just a projection, it's an edge.";`)).toContain(
       "banned phrase: it's not just X, it's Y",
@@ -648,6 +911,15 @@ describe('AI-voice guard', () => {
     // Developer-facing.
     expect(rules(`logger.debug('[draft] stale pick — retrying');`)).toEqual([]);
     expect(rules(`logger.warn('queue save failed — falling back', err);`)).toEqual([]);
+    // The server's logger has a different name. Eleven LobbyManager log
+    // lines were reported as user copy until this receiver was covered.
+    expect(rules('structuredLogger.warn(`[lobby] backpressure exceeded — disconnecting`);')).toEqual([]);
+    expect(
+      rules(`structuredLogger.error('event.self_test_failed', { remediation: 'not pooled — see docs' });`),
+    ).toEqual([]);
+    // ...but only when the call sits directly on the logger. A factory that
+    // merely has "logger" in its name buys no exemption for its arguments.
+    expect(rules(`const t = loggerFactory.describe('Draft complete — set your lineup');`)).toContain('em dash');
     // Module paths and Tailwind.
     expect(rules(`import { x } from '@/components/ui/button';`)).toEqual([]);
     expect(rules(`<div className="text-white/55 border-white/10 sm:text-xs" />`)).toEqual([]);
@@ -657,6 +929,13 @@ describe('AI-voice guard', () => {
     expect(rules(`const key = 'season-outlook-2026';`)).toEqual([]);
     // A regex body is not prose.
     expect(rules('const re = /—/g;')).toEqual([]);
+    // The EN dash (U+2013) is the no-data mark in `utils/teamGrades.ts` and
+    // is not banned, written either way.
+    expect(rules(`const NO_DATA = '\\u2013';`)).toEqual([]);
+    expect(rules(`const NO_DATA = '–';`)).toEqual([]);
+    // An escaped backslash before a `u` is a backslash, not the start of an
+    // escape, so the decoder cannot invent a character nobody typed.
+    expect(rules(`const t = 'a path like C:\\\\users2014b, nothing more';`)).toEqual([]);
     // Clean copy stays clean.
     expect(rules(`const t = "Couldn't load your roster. Refresh and we'll pick it back up.";`)).toEqual([]);
     expect(rules('<p>Draft complete. Set your opening lineup.</p>')).toEqual([]);
@@ -729,5 +1008,52 @@ describe('AI-voice guard', () => {
     expect(offendersIn('Clean.tsx', src)).toEqual([]);
     const withDash = 'const t = `${player.name} — leads the group`;';
     expect(offendersIn('Planted.tsx', withDash).map((o) => o.rule)).toEqual(['em dash']);
+  });
+});
+
+describe('the shared vocabulary stays readable by both languages', () => {
+  const everyPattern = [
+    ...VOICE.bannedPhrases,
+    ...VOICE.accuracyClaims,
+    VOICE.moatOverstatement,
+  ];
+
+  it('has patterns', () => {
+    // A JSON that silently became empty would make every sweep below pass
+    // while guarding nothing at all.
+    expect(everyPattern.length).toBeGreaterThan(12);
+  });
+
+  it.each(everyPattern.map((p) => [p.name, p.pattern]))(
+    'uses only JS/Python-portable syntax: %s',
+    (name, pattern) => {
+      for (const v of CROSS_LANGUAGE_VIOLATIONS) {
+        expect(
+          v.re.test(pattern as string),
+          `${name} uses ${v.name}, which Python's re does not read the same way`,
+        ).toBe(false);
+      }
+    },
+  );
+
+  it('every pattern compiles as a regex', () => {
+    for (const p of everyPattern) {
+      expect(() => new RegExp(p.pattern, 'i')).not.toThrow();
+    }
+  });
+
+  // The detector is worthless if the portability rule never fires.
+  it('the portability rule bites', () => {
+    const offenders = ['(?<=foo)bar', '(?<year>\\d{4})', '\\p{Letter}+', '/already-a-literal/i'];
+    for (const bad of offenders) {
+      expect(CROSS_LANGUAGE_VIOLATIONS.some((v) => v.re.test(bad)), bad).toBe(true);
+    }
+  });
+
+  it('the em dash the JSON names is the real U+2014', () => {
+    expect(VOICE.emDash.char).toBe('\u2014');
+    // EM_DASH is the regex the sweep runs; the JSON is what Python reads.
+    // They must be the same character or the two languages ban different things.
+    expect(EM_DASH.test(VOICE.emDash.char)).toBe(true);
   });
 });

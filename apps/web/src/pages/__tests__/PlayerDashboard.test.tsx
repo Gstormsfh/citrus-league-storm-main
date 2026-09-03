@@ -304,6 +304,24 @@ describe('PlayerDashboard — the shipped page', () => {
     expect(apiGet).not.toHaveBeenCalledWith(expect.stringContaining('/dashboard?'));
   });
 
+  it('the bad-id screen sends the user somewhere that exists', async () => {
+    // 2026-09-03 audit. This copy used to read "Open one from the Players
+    // table and the link will be right" -- an instruction to do something
+    // that was not possible: the Players table rendered no link to any
+    // dashboard. The table now carries a per-row anchor and a Full dashboard
+    // button on the panel, and the sentence names them. If either affordance
+    // is ever removed, this string is a lie again, so it is pinned here.
+    serve(payload());
+    renderAt('not-a-player');
+    const body = await screen.findByText(/player dashboards live at/i);
+    expect(body.textContent).toMatch(/full dashboard/i);
+    expect(body.textContent).not.toMatch(/the link will be right/i);
+    expect(screen.getByRole('link', { name: /browse players/i })).toHaveAttribute(
+      'href',
+      '/players',
+    );
+  });
+
   it('a goalie gets the GSAx treatment and NO empty rink', async () => {
     serve(
       payload({

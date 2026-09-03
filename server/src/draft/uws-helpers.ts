@@ -75,7 +75,7 @@ export function handleClientMessage(
         timestamp: new Date().toISOString(),
         payload: {
           code: 'lobby_not_ready',
-          message: `Lobby ${userData.lobbyId} not registered yet — retry shortly.`,
+          message: `Lobby ${userData.lobbyId} is not registered yet. Retry shortly.`,
         },
       };
       try {

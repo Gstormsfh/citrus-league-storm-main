@@ -24,6 +24,31 @@
  * The failure mode that would matter is confidently describing a player we
  * know nothing about. Below MIN_GAMES_FOR_RATES the writeup says so plainly
  * instead of extrapolating a 2-game hot streak into "elite producer".
+ *
+ * VOICE (2026-09-03)
+ * ------------------
+ * These sentences ship on a roster card, in the mobile roster list and in
+ * the player stats modal, which makes them the most-read prose in the
+ * product. They are written to the same brief as
+ * `components/player/playerAdvancedMetrics.ts`: a beat writer's fantasy
+ * note, not a dashboard caption.
+ *
+ *   * NO EM DASH. `src/__tests__/aiVoiceGuard.test.ts` fails the build on
+ *     one. Twelve lines here used to hang a clause off an em dash, which is
+ *     the single most recognisable AI tell in the product.
+ *   * THE SOURCE IS NAMED IN THE SENTENCE wherever a Citrus number is
+ *     quoted. Expected goals come from `player_season_stats.x_goals`, the
+ *     xG v3 model's output, so the sentence says "Citrus xG"; the goalie
+ *     equivalent says "Citrus GSAx". A number a reader cannot attribute is
+ *     a number they cannot check, and every other figure on the card
+ *     (points, minutes, save percentage) is an NHL.com counting stat that
+ *     needs no such flag.
+ *   * THE FANTASY CALL GOES LAST where the data licenses one. "Buy low" and
+ *     "sell high" are the two the finishing gap actually supports, and they
+ *     are the calls `playerAdvancedMetrics` and `CitrusNewsService` already
+ *     make off the same number.
+ *
+ * `__tests__/playerWriteup.test.ts` pins all three across every branch.
  */
 
 // `import type`, NOT a value import. HockeyPlayerCard.tsx imports
@@ -150,7 +175,7 @@ function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
       headline: 'Not enough starts yet',
       summary:
         gp > 0
-          ? `${name} has only ${gp} appearance${gp === 1 ? '' : 's'} on the season — too small a sample to read anything into the numbers.`
+          ? `${name} has only ${gp} appearance${gp === 1 ? '' : 's'} on the season. Too small a sample to read anything into the numbers.`
           : `No games played yet this season, so there's nothing to judge ${name} on beyond his role.`,
       tags: [{ label: 'Limited sample', tone: 'neutral' }],
       hasEnoughData: false,
@@ -197,10 +222,14 @@ function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
   const gsax = s.goalsSavedAboveExpected;
   if (Number.isFinite(gsax as number) && Math.abs(gsax as number) >= 1) {
     if ((gsax as number) > 0) {
-      parts.push(`He's stopped ${fmt(gsax as number)} goals more than an average goalie would have on the same shots.`);
+      parts.push(
+        `Citrus GSAx has him stopping ${fmt(gsax as number)} goals more than an average goalie would have on the same shots.`,
+      );
       tags.push({ label: 'Beating expected', tone: 'positive' });
     } else {
-      parts.push(`He's conceded ${fmt(Math.abs(gsax as number))} goals more than the shot quality suggests he should have.`);
+      parts.push(
+        `Citrus GSAx has him conceding ${fmt(Math.abs(gsax as number))} goals more than the shot quality says he should have.`,
+      );
       tags.push({ label: 'Underperforming xG', tone: 'caution' });
     }
   }
@@ -213,7 +242,7 @@ function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
   const analysis: string[] = [];
   if (savePct >= 0.915) {
     analysis.push(
-      `The job looks secure — at this save rate the workload usually follows, and he's a weekly starter in every format.`,
+      `The job looks secure. At this save rate the workload usually follows, and he's a weekly starter in every format.`,
     );
   } else if (savePct >= 0.9) {
     analysis.push(
@@ -221,7 +250,7 @@ function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
     );
   } else {
     analysis.push(
-      `A save rate this far below league average puts the starts themselves at risk — a hot backup is usually all it takes for a crease to become a committee.`,
+      `A save rate this far below league average puts the starts themselves at risk. A hot backup is usually all it takes to turn a crease into a committee.`,
     );
   }
 
@@ -255,12 +284,12 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
       headline: 'Not enough games yet',
       summary:
         gp > 0
-          ? `${name} has ${points} point${points === 1 ? '' : 's'} in ${gp} game${gp === 1 ? '' : 's'} — too small a sample to call a trend either way.`
+          ? `${name} has ${points} point${points === 1 ? '' : 's'} in ${gp} game${gp === 1 ? '' : 's'}. Too small a sample to call a trend either way.`
           : `${name} hasn't played yet this season, so there's no production to judge.`,
       tags: [{ label: 'Limited sample', tone: 'neutral' }],
       hasEnoughData: false,
       analysis:
-        'Too early to draw conclusions in either direction. Watch the ice time over the next handful of games — where a coach deploys him will say more than the box score does at this sample size.',
+        'Too early to draw conclusions in either direction. Watch the ice time over the next handful of games. Where a coach deploys him will say more than the box score does at this sample size.',
       cardNote: gp > 0 ? `Only ${gp} game${gp === 1 ? '' : 's'} played` : 'No games played yet',
       cardTone: 'neutral',
     };
@@ -320,7 +349,7 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
 
   const parts: string[] = [];
   parts.push(
-    `${name} has ${points} point${points === 1 ? '' : 's'} (${goals}G, ${assists}A) in ${gp} games — ${fmt(ppg, 2)} per game.`,
+    `${name} has ${points} point${points === 1 ? '' : 's'} (${goals}G, ${assists}A) in ${gp} games, ${fmt(ppg, 2)} per game.`,
   );
 
   // Usage. Ice time is the single best predictor of opportunity, which is what
@@ -373,7 +402,7 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
       );
     } else if (light) {
       analysis.push(
-        `There's a hard ceiling here until the deployment changes — production can't outrun opportunity, and ${fmt(toiMinutes)} minutes a night isn't enough of it.`,
+        `There's a hard ceiling here until the deployment changes. Production can't outrun opportunity, and ${fmt(toiMinutes)} minutes a night isn't enough of it.`,
       );
     }
   }
@@ -384,19 +413,21 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
     );
   }
 
-  // Finishing luck. Comparing goals to expected goals is the single most
-  // useful regression signal available in this data, and it is exactly the
-  // kind of call a real analyst blurb makes.
+  // Finishing luck. `stats.xGoals` is `player_season_stats.x_goals`, the
+  // Citrus xG v3 model's output, so the sentence names it: comparing goals
+  // to Citrus xG is the single most useful regression signal available in
+  // this data, and attributing it is what separates a scouting note from a
+  // number floating on a card.
   const xg = s.xGoals;
   if (Number.isFinite(xg as number) && (xg as number) >= 5) {
     const expected = xg as number;
     if (goals >= expected * 1.3) {
       analysis.push(
-        `He's buried ${goals} goals on ${fmt(expected)} expected — finishing well above the quality of his chances, which historically doesn't hold across a full season. Sell-high territory if someone in your league is paying for the goal total.`,
+        `Citrus xG has him at ${goals} goals on ${fmt(expected)} expected, finishing well clear of the quality of his chances. That gap rarely holds across a full season. Sell high if someone in your league is paying for the goal total.`,
       );
     } else if (goals <= expected * 0.7) {
       analysis.push(
-        `He's got ${goals} goals on ${fmt(expected)} expected — the chances are there and the finishing hasn't been. That gap usually closes, which makes him a buy-low rather than a drop.`,
+        `Citrus xG has him at ${goals} goals on ${fmt(expected)} expected. The chances are there and the finishing hasn't been, and that gap usually closes. Buy low rather than drop him.`,
       );
     }
   }
@@ -410,7 +441,7 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
   if (analysis.length === 0) {
     analysis.push(
       ppg >= 0.5
-        ? `Nothing in the profile suggests a role change coming — a steady weekly starter in most formats.`
+        ? `Nothing in the profile suggests a role change coming. He's a steady weekly starter in most formats.`
         : `Better as a matchup-based streamer or depth piece than a set-and-forget starter.`,
     );
   }
@@ -463,7 +494,7 @@ export function generatePlayerWriteup(player: HockeyPlayer | null | undefined): 
     return {
       ...writeup,
       tags: [{ label: 'Game-time decision', tone: 'caution' }, ...writeup.tags],
-      summary: `Listed as a game-time decision — check status before puck drop. ${writeup.summary}`,
+      summary: `Listed as a game-time decision, so check his status before puck drop. ${writeup.summary}`,
       cardNote: 'Game-time decision',
       cardTone: 'caution',
     };
@@ -473,7 +504,7 @@ export function generatePlayerWriteup(player: HockeyPlayer | null | undefined): 
       ...writeup,
       tags: [{ label: 'Suspended', tone: 'caution' }, ...writeup.tags],
       summary: `Currently suspended and unavailable. ${writeup.summary}`,
-      cardNote: 'Suspended — unavailable',
+      cardNote: 'Suspended, unavailable',
       cardTone: 'caution',
     };
   }

@@ -158,7 +158,7 @@ mid-draft.
 1. https://betterstack.com → sign up (free tier: 10 monitors, 3-min checks).
 2. **Uptime** → **Create monitor**.
 3. Monitor 1 — API:
-   - URL: `https://api.citrusfantasy.com/api/health` (or Cloud Run URL)
+   - URL: `https://citrusfantasysports.com/api/health` (or Cloud Run URL)
    - Interval: 1 minute
    - Expected: status 200, body contains `"status":"ok"`
    - Alert on: 2 consecutive failures

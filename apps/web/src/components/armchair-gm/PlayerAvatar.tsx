@@ -1,87 +1,79 @@
 import { cn } from '@/lib/utils';
+import { Mug, type MugSize } from '@/components/roster/Mug';
+import {
+  posRingColor,
+  POSITION_RING_FALLBACK,
+  positionChipKey,
+} from '@/components/roster/positionChip';
 
-/* 2026-08-19 visual audit — muted-text correction.
-   text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
-   original CREAM theme. At 20-70% opacity on the dark #1A2A20 tiles it
-   composites to near-invisible (team codes on this page measured
-   1.47:1). Remapped to cream at the alpha that preserves the intended
-   hierarchy while clearing 4.5:1 on a dark tile. */
-
+/**
+ * THE ARMCHAIR GM FACE (2026-09-03 headshot audit).
+ *
+ * This component used to BE the founder's complaint. It drew a gradient
+ * disc, the player's initials and a jersey number, and it accepted no image
+ * prop at all: there was no code path anywhere in /armchair-gm where a face
+ * could appear. That page is reachable from the main nav, the mobile menu,
+ * the homepage hero CTA and the footer, so it was the loudest surviving
+ * instance of "little dots with initials" in the product.
+ *
+ * It is now a thin adapter onto `roster/Mug`, the one headshot component the
+ * roster, matchup, free-agent and draft rows already wear. Not a fourth
+ * fallback chain: `Mug` owns headshot -> team crest -> initials, remembers a
+ * failed URL per URL so a later enrichment gets its own try, keeps a fixed
+ * box per size so a 40-card cap sheet never reflows, and never leaves a
+ * broken <img> in the DOM.
+ *
+ * WHAT SURVIVED THE SWAP, AND WHAT DID NOT
+ *
+ *   * The position colour survived, as a ring. It is the `posRingColor` map
+ *     from the shared chip vocabulary rather than this file's old private
+ *     `positionColors`, so the cap sheet cannot drift from the roster on
+ *     what colour a centre is.
+ *   * The jersey number did not. `Mug` has one box and one picture in it,
+ *     and a face beats a number that every one of these call sites already
+ *     prints beside the name (CapPlayerCard) or does not need
+ *     (BuyoutCalculator's header, which carries name, position and age).
+ *
+ * WHERE THE PICTURE COMES FROM, AND WHY IT IS A CREST TODAY
+ *
+ * `image` and `team` are threaded from `PlayerContract`. `team` is always a
+ * real NHL abbreviation in that data, so every call site draws at least the
+ * team crest instead of initials. `PlayerContract.headshot` is DECLARED but
+ * never populated: the cap sheet is served from the static
+ * `data/nhlContracts.ts`, whose `c()` constructor writes `playerId: 0` and
+ * no headshot, and `NHLCapService` then overwrites `playerId` with the
+ * player's array index. There is no NHL player id in that dataset, and an
+ * NHL mug URL needs one. The moment `headshot` is populated upstream, every
+ * call site here starts drawing a face with no further change.
+ */
 
 interface PlayerAvatarProps {
   name: string;
   position: string;
-  jerseyNumber?: number;
-  size?: 'xs' | 'sm' | 'md' | 'lg';
+  /** NHL headshot URL when the caller has one. */
+  image?: string | null;
+  /** Team abbreviation ("TOR"), the crest behind a missing headshot. */
+  team?: string | null;
+  size?: MugSize;
   className?: string;
 }
 
-const positionColors: Record<string, { bg: string; border: string; text: string }> = {
-  C: { bg: 'from-citrus-sage/40 to-[#7CB518]/30', border: 'border-citrus-sage', text: 'text-pastel-cream' },
-  LW: { bg: 'from-[#7CB518]/40 to-citrus-sage/30', border: 'border-[#7CB518]/70', text: 'text-pastel-cream' },
-  RW: { bg: 'from-citrus-orange/30 to-citrus-peach/40', border: 'border-citrus-orange/60', text: 'text-pastel-cream' },
-  D: { bg: 'from-blue-200/50 to-blue-300/30', border: 'border-blue-400/60', text: 'text-pastel-cream' },
-  G: { bg: 'from-purple-200/50 to-purple-300/30', border: 'border-purple-400/60', text: 'text-pastel-cream' },
-};
-
-const sizeMap = {
-  xs: { container: 'w-6 h-6', initials: 'text-[8px]', number: 'text-[6px]' },
-  sm: { container: 'w-8 h-8', initials: 'text-[10px]', number: 'text-[7px]' },
-  md: { container: 'w-10 h-10', initials: 'text-xs', number: 'text-[8px]' },
-  lg: { container: 'w-14 h-14', initials: 'text-sm', number: 'text-[9px]' },
-};
-
-function getInitials(name: string): string {
-  const parts = name.split(' ');
-  if (parts.length >= 2) {
-    return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-  }
-  return name.substring(0, 2).toUpperCase();
-}
-
-function getPositionKey(position: string): string {
-  const p = position?.toUpperCase() || '';
-  if (['C', 'CENTRE', 'CENTER'].includes(p)) return 'C';
-  if (['LW', 'LEFT WING', 'L'].includes(p)) return 'LW';
-  if (['RW', 'RIGHT WING', 'R'].includes(p)) return 'RW';
-  if (['D', 'DEFENCE', 'DEFENSE', 'LD', 'RD'].includes(p)) return 'D';
-  if (['G', 'GOALIE'].includes(p)) return 'G';
-  return 'C';
-}
-
-export default function PlayerAvatar({ name, position, jerseyNumber, size = 'md', className }: PlayerAvatarProps) {
-  const posKey = getPositionKey(position);
-  const colors = positionColors[posKey] || positionColors.C;
-  const sizing = sizeMap[size];
-  const initials = getInitials(name);
+export default function PlayerAvatar({
+  name,
+  position,
+  image,
+  team,
+  size = 'md',
+  className,
+}: PlayerAvatarProps) {
+  const ring = posRingColor[positionChipKey(position)] || POSITION_RING_FALLBACK;
 
   return (
-    <div
-      className={cn(
-        sizing.container,
-        "rounded-full flex-shrink-0 flex flex-col items-center justify-center",
-        `bg-gradient-to-br ${colors.bg}`,
-        `border-2 ${colors.border}`,
-        "shadow-sm relative overflow-hidden",
-        className,
-      )}
-    >
-      {/* Subtle texture */}
-      <div className="absolute inset-0 opacity-10" style={{
-        backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.3) 2px, rgba(255,255,255,0.3) 4px)',
-      }} />
-
-      {/* Initials */}
-      <span className={cn(sizing.initials, colors.text, "font-varsity font-bold leading-none relative z-10")}>
-        {initials}
-      </span>
-
-      {/* Jersey number (only show on md and lg) */}
-      {jerseyNumber !== undefined && jerseyNumber > 0 && (size === 'md' || size === 'lg') && (
-        <span className={cn(sizing.number, "text-pastel-cream/65 font-display font-bold leading-none relative z-10 -mt-px")}>
-          #{jerseyNumber}
-        </span>
-      )}
-    </div>
+    <Mug
+      p={{ name, image: image ?? null, team: team ?? null }}
+      size={size}
+      crest
+      className={cn('rounded-full ring-2', ring, className)}
+    />
   );
 }

@@ -23,9 +23,39 @@ cheaper than a 40-minute outage in front of every owner in the league.
       Expected: `minScale=1, maxScale=10`, `cpu-throttling=false`,
       `startup-cpu-boost=true`. Memory = 2Gi, CPU = 2.
       If wrong: `gcloud run services replace ops/cloudrun/service.yaml --region=us-central1`
+      That command is DECLARATIVE and deletes any env var the file omits.
+      `DRAFT_WS_HOST` and `DRAFT_WS_PORT` are declared in it as of
+      2026-09-03; before running `replace`, confirm they are still there,
+      or you will take every draft room offline.
+
+- [ ] **The browser knows where the draft engine is.**
+      `gcloud run services describe citrus-api --region=us-central1 --format='value(spec.template.spec.containers[0].env)' | tr ',' '\\n' | grep -i draft`
+      Expected: `DRAFT_WS_HOST=draft.citrusfantasysports.com` and
+      `DRAFT_WS_PORT=443`. Empty output is the worst failure mode in this
+      document: discovery keeps returning HTTP 200, every server-side signal
+      stays green, and every manager sits behind a permanent reconnect
+      banner because the answer says `wss://localhost:3002`.
+
+- [ ] **The draft engine is alive.**
+      `curl -s -o /dev/null -w '%{http_code}\\n' https://draft.citrusfantasysports.com/`
+      Expected: **404**. That is the alive signal (Caddy reaches uWS, which
+      answers 404 for `/`). Anything else means the engine is down; see
+      `docs/RUNBOOKS/ENGINE_DEPLOY.md`.
+
+- [ ] **New drafts are not kill-switched.**
+      `select * from system_flags where key = 'no_new_drafts';`
+      Expected: absent or false. If true, `POST /api/drafts/:id/server`
+      returns 503 NEW_DRAFTS_DISABLED for anything not already in progress.
+
+- [ ] **The engine can hear an ignition.**
+      Read the newest `deployment.fingerprint` log line from the engine and
+      confirm its `envFingerprint` shows `SUPABASE_DB_URL` present. The
+      engine only warns and keeps running when it is missing, so a draft
+      would start in Postgres and the engine would never be told.
+      It must be a DIRECT connection string; pgbouncer drops LISTEN frames.
 
 - [ ] **Cloud Run is healthy.**
-      `curl -s https://api.citrusfantasy.com/api/health | jq .`
+      `curl -s https://citrusfantasysports.com/api/health | jq .`
       Expected: `{"status":"ok"}` in under 500ms. If slow or failing,
       roll back to the last known-good revision before the draft.
 

@@ -48,7 +48,7 @@ export const RIDER_1_USER_MESSAGES: Record<StartDraftV2Reason, string> = {
   illegal_combo:
     'Draft cannot start in its current state. Check league settings and try again.',
   not_startable:
-    'Draft cannot start — league configuration is incomplete. Verify team count and draft order.',
+    'Draft cannot start until the league configuration is complete. Check the team count and the draft order.',
   unexpected:
     'Something went wrong starting the draft. Please try again or contact support.',
 };

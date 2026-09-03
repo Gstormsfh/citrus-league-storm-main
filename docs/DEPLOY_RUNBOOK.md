@@ -1,5 +1,14 @@
 # Citrus Fantasy Sports — Deploy Runbook (Playoffs Readiness)
 
+> **The API has no separate subdomain.** `api.citrusfantasysports.com` does not
+> resolve (measured 2026-09-03: curl exit 000, no connection). The web app is
+> built with `VITE_API_URL` deliberately UNSET so `/api/*` stays relative, and
+> Firebase Hosting rewrites it to Cloud Run. The origin that answers is
+> `https://citrusfantasysports.com` (verified 200 in 0.36s), which is exactly
+> what `apps/web/scripts/build-native.mjs` accepts in `PRODUCTION_API_ORIGINS`
+> for the iOS build. Setting `VITE_API_URL` to an `api.` host breaks every
+> request in the native shell and the build guard refuses it.
+
 **Audience.** The human (you) who will execute the deploy. Assumes you
 have the repo cloned, `gcloud` + `firebase` + `git` + `k6` installed,
 and console access to GCP, Firebase, Supabase, GitHub, Sentry, and
@@ -98,7 +107,7 @@ values from the UI; if you're not sure, rotate and re-set.
 | `VITE_FIREBASE_APP_ID` | web build | same |
 | `VITE_FIREBASE_MEASUREMENT_ID` | web build | same |
 | `VITE_SENTRY_DSN` | web build | Sentry → Settings → Projects → citrus-web → Client Keys (DSN) |
-| `VITE_API_URL` | web build | `https://api.citrusfantasysports.com` |
+| `VITE_API_URL` | web build | **unset on web** (relative `/api/*` + Hosting rewrite). Native/iOS only: `https://citrusfantasysports.com` |
 | `FIREBASE_SERVICE_ACCOUNT` | hosting deploy | Firebase Console → Project Settings → Service accounts → Generate new private key (JSON, paste whole file) |
 | `GCP_SA_KEY` | Cloud Run deploy | GCP Console → IAM → Service Accounts → `citrus-deploy@...` → Keys → Add key (JSON, paste whole file) |
 
@@ -158,7 +167,7 @@ gcloud run services describe citrus-api \
 # Expect: {'cpu': '2', 'memory': '2Gi'}
 
 # Health check through the live URL
-curl -sS https://api.citrusfantasysports.com/api/health | jq .
+curl -sS https://citrusfantasysports.com/api/health | jq .
 # Expect: { "status": "ok", ... }
 ```
 
@@ -256,7 +265,7 @@ runs. If this fails, everything after it is moot.
 
 ```bash
 # From repo root
-TARGET_URL=https://api.citrusfantasysports.com \
+TARGET_URL=https://citrusfantasysports.com \
   k6 run scripts/load-test/scenarios/smoke.js
 ```
 
@@ -302,7 +311,7 @@ write data.
 ### 5a — Steady state (13 min, unauthenticated, no setup)
 
 ```bash
-TARGET_URL=https://api.citrusfantasysports.com \
+TARGET_URL=https://citrusfantasysports.com \
   k6 run scripts/load-test/scenarios/steady-state.js
 ```
 
@@ -492,7 +501,7 @@ we didn't know the site was down until users told us.
 
 1. **BetterStack → Monitors → Create monitor**
 2. Monitor 1: **API health**
-   - URL: `https://api.citrusfantasysports.com/api/health`
+   - URL: `https://citrusfantasysports.com/api/health`
    - Check type: HTTP(S)
    - Check interval: **60 seconds**
    - Timeout: 5 seconds

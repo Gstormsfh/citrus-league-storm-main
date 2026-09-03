@@ -608,7 +608,7 @@ function TradePlayerRow({
       </div>
 
       {/* Player Avatar */}
-      <PlayerAvatar name={player.name} position={player.position} jerseyNumber={player.jerseyNumber} size="xs" />
+      <PlayerAvatar name={player.name} position={player.position} image={player.headshot} team={player.team} size="xs" />
 
       {/* Name + Position */}
       <div className="flex-1 min-w-0">

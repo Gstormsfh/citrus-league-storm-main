@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils';
 import { Player } from '@/services/PlayerService';
 import { ScoringCalculator, ScoringSettings } from '@citrus/shared';
 import { DraftPoolRow } from './DraftPoolRow';
+import { Mug } from '@/components/roster/Mug';
+import { mugFromDirectory } from '@/components/roster/headshot';
 import type { DraftProjection, QualitySignal } from './draftDecision';
 
 interface PlayerPoolProps {
@@ -378,16 +380,13 @@ export const PlayerPool = memo(({
         </td>
         <td className="px-2 py-2 sticky left-[44px] bg-pastel-surface-tile z-sticky-base text-pastel-cream">
           <div className="flex items-center gap-1.5">
-            {player.headshot_url && (
-              <img
-                src={player.headshot_url}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                className="h-6 w-6 rounded-full object-cover ring-1 ring-white/15 bg-white/5 flex-shrink-0"
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-              />
-            )}
+            {/* 2026-09-03 headshot audit: this was a bare <img> that set
+                `display: none` on itself when the CDN failed, so a broken
+                headshot left the desktop row faceless and reflowed the name
+                column, while the phone row beside it (DraftPoolRow) already
+                drew the shared `Mug`. Same face, both breakpoints: headshot
+                -> team crest -> initials, in a box that never moves. */}
+            <Mug p={mugFromDirectory(player)} size="xs" crest />
             {isInQueue && (
               <Star className="h-3 w-3 fill-fantasy-tertiary text-fantasy-tertiary" />
             )}

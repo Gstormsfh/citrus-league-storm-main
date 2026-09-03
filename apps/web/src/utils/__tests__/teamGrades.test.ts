@@ -21,6 +21,7 @@ import {
   gradeForPct,
   gradeTone,
   calculateTeamGrades,
+  NO_DATA_GRADE,
   type TeamCategoryStats,
   type SkaterGroupStats,
 } from '../teamGrades';
@@ -76,11 +77,21 @@ describe('gradeForPct', () => {
     expect(gradeForPct(0)).toBe('F');
   });
 
-  it('shows an em dash — not an F — when there is nothing to grade', () => {
+  it('shows the no-data mark, not an F, when there is nothing to grade', () => {
     // A roster nobody has played has not earned a bad grade. Printing one is
     // the same species of dishonesty as printing a hardcoded A-.
-    expect(gradeForPct(null)).toBe('—');
-    expect(gradeForPct(NaN)).toBe('—');
+    expect(gradeForPct(null)).toBe(NO_DATA_GRADE);
+    expect(gradeForPct(NaN)).toBe(NO_DATA_GRADE);
+  });
+
+  it('marks no-data with an EN dash, which the AI-voice guard permits', () => {
+    // The glyph was U+2014 until 2026-09-03. `src/__tests__/aiVoiceGuard.test.ts`
+    // bans that character in every user-facing string and keeps an empty
+    // allowlist, so the fix was the character, not an exemption. Pinned here
+    // because the two look identical in a diff.
+    expect(NO_DATA_GRADE).toBe('\u2013');
+    expect(NO_DATA_GRADE).not.toBe('\u2014');
+    expect(NO_DATA_GRADE).toHaveLength(1);
   });
 
   it('is monotonic', () => {
@@ -126,12 +137,13 @@ describe('calculateTeamGrades', () => {
   });
 
   it('does not hand out grades before anyone has played', () => {
-    // The offseason. Every pct null, every grade an em dash, no F anywhere.
+    // The offseason. Every pct null, every grade the no-data mark, no F
+    // anywhere.
     const grades = calculateTeamGrades(emptyStats(), emptyStats());
     expect(grades).toHaveLength(4);
     for (const g of grades) {
       expect(g.pct).toBeNull();
-      expect(g.grade).toBe('—');
+      expect(g.grade).toBe(NO_DATA_GRADE);
     }
   });
 
@@ -192,7 +204,7 @@ describe('gradeTone', () => {
     // grades looked plausible. Colour now follows the letter.
     expect(gradeTone('A')).toContain('green');
     expect(gradeTone('F')).toContain('red');
-    expect(gradeTone('—')).toContain('white/10');
+    expect(gradeTone(NO_DATA_GRADE)).toContain('white/10');
     expect(gradeTone('A+')).toBe(gradeTone('A-'));
   });
 });

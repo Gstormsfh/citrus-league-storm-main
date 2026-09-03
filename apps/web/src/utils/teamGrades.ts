@@ -61,9 +61,31 @@ export type TeamCategoryStats = {
   G: GoalieGroupStats;
 };
 
+/**
+ * The mark for a category with nothing to grade yet (offseason, or a roster
+ * whose players have not logged a game).
+ *
+ * AN EN DASH, U+2013, not an em dash. This is typography rather than prose:
+ * the glyph fills a grade cell beside A+, B and F, so it is a value in a
+ * column, not a sentence. But `src/__tests__/aiVoiceGuard.test.ts` scans for
+ * U+2014 in every user-facing string and its allowlist is deliberately empty,
+ * and the right answer to a guard hit is to fix the string rather than widen
+ * the exemption. The en dash is also the mark a box score uses for "no value",
+ * which the em dash is not, so the correct character here was never the one
+ * that tripped the guard.
+ *
+ * The middle dot was the other candidate and was rejected: `·` is already the
+ * SEPARATOR in Citrus copy ("Star forward · 1.43 P/GP"), so a lone one in a
+ * badge reads as a stray bullet rather than an empty cell.
+ *
+ * Named rather than typed twice, because `gradeTone` matches on it and two
+ * loose literals one screen apart are two literals that eventually differ.
+ */
+export const NO_DATA_GRADE = '\u2013';
+
 /** Letter for a percentage of elite pace. 100% = elite starter pace. */
 export function gradeForPct(pct: number | null): string {
-  if (pct === null || !isFinite(pct)) return '—';
+  if (pct === null || !isFinite(pct)) return NO_DATA_GRADE;
   if (pct >= 110) return 'A+';
   if (pct >= 100) return 'A';
   if (pct >= 92) return 'A-';
@@ -155,7 +177,7 @@ export function calculateTeamGrades(starters: TeamCategoryStats, bench: TeamCate
 
 /** Badge colour by letter — green through red, no hardcoded per-category tint. */
 export function gradeTone(grade: string): string {
-  if (grade === '—') return 'bg-white/10 text-white/60 hover:bg-white/10';
+  if (grade === NO_DATA_GRADE) return 'bg-white/10 text-white/60 hover:bg-white/10';
   const head = grade[0];
   if (head === 'A') return 'bg-green-600 hover:bg-green-700 text-white';
   if (head === 'B') return 'bg-emerald-600 hover:bg-emerald-700 text-white';

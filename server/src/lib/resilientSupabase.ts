@@ -164,7 +164,7 @@ export async function withResilience<T>(
       return {
         data: null,
         error: {
-          message: 'Service temporarily unavailable — please retry in a moment',
+          message: 'Service temporarily unavailable. Please retry in a moment.',
           code: 'CIRCUIT_OPEN',
         },
       };

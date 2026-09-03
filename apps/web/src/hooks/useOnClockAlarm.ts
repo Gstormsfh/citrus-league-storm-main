@@ -4,7 +4,7 @@
 // window). Three channels, all stopped the instant the pick lands,
 // the clock expires, or the tab regains focus:
 //
-//   1. document.title flash — alternates "⏰ YOUR PICK — Citrus" with
+//   1. document.title flash — alternates "⏰ YOUR PICK · Citrus" with
 //      the original title while amIOnClock && document.hidden.
 //   2. Browser Notification — fires ONCE on the amIOnClock transition
 //      to true, if Notification.permission === 'granted'. If 'default',
@@ -20,7 +20,11 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-const TITLE_FLASH_TEXT = '⏰ YOUR PICK — Citrus';
+// A middle dot, not an em dash: the tab title is the first Citrus copy a
+// drafter reads with their attention elsewhere, and `src/__tests__/aiVoiceGuard.test.ts`
+// fails the build on the dash. A dot is also what a browser tab wants, since
+// the string is truncated to a few characters in a background tab.
+const TITLE_FLASH_TEXT = '⏰ YOUR PICK · Citrus';
 const TITLE_FLASH_INTERVAL_MS = 900;
 const MUTE_STORAGE_KEY = 'citrus.draft.alarm.muted';
 
@@ -106,7 +110,7 @@ export function useOnClockAlarm({ amIOnClock }: UseOnClockAlarmOptions) {
           Notification.permission === 'granted'
         ) {
           const n = new Notification('You’re on the clock', {
-            body: 'Head back to the draft — the timer is running.',
+            body: 'Head back to the draft. The timer is running.',
             tag: 'citrus-draft-on-clock',
             silent: false,
           });
