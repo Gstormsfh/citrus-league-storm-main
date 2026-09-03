@@ -49,16 +49,24 @@ trigger rules. Verification procedure:
 - `public.public.players` — table literally named `public.players` inside the public schema (double-schema-prefix in the name). Almost certainly an artifact of a bad migration. Flagged.
 - See `apps/web/docs/DATA_ORGANIZATION_AUDIT.md` for orphan analysis details.
 
-### 1.3 Draft Kit tables (migration written, not yet applied)
+### 1.3 Draft Kit tables
 
 `supabase/migrations/20260902090000_draft_kit_entitlements_and_blurbs.sql`
-adds the two tables behind the paid `/draft-kit` section. Neither has been
-applied to prod or staging.
+adds the two tables behind the paid `/draft-kit` section. **Applied to prod
+2026-09-02** (verified: RLS on, 0 write policies, `citrus_draft_kit_tier()`
+SECURITY DEFINER with `search_path` pinned). Not yet applied to staging.
 
 | Table | Purpose | Write path | RLS |
 |---|---|---|---|
 | `draft_kit_entitlements` | One row per user per tier grant (`kit` \| `suite`), with `granted_at` / `expires_at` / `source`. FK to `auth.users` with ON DELETE CASCADE | service role only | Enabled. SELECT policy is `auth.uid() = user_id`; no write policy exists, so a client cannot grant itself access |
 | `draft_kit_blurbs` | Human-written kit copy. `author_name` is NOT NULL, `source_name` / `source_url` are CHECKed to travel as a pair, `is_published` gates visibility | service role only | Enabled. Free-tier rows readable by anon; paid rows gated on a live entitlement for `auth.uid()` |
+
+`draft_kit_blurbs` is populated from Markdown files under
+`data-pipeline/draftkit/blurbs/` by `data-pipeline/draftkit/load_blurbs.py`
+(see §3.2). Each file's row id is `uuid5` of its path relative to that
+directory, so a re-run updates the row it came from rather than duplicating
+it; renaming a file orphans the old row, which `--prune-sql` reports and
+never deletes on its own.
 
 The migration also adds `public.citrus_draft_kit_tier()` — SECURITY DEFINER,
 `SET search_path = public`, and deliberately argument-less so there is no user
@@ -160,7 +168,7 @@ NPM scripts in `package.json` (root):
 - `validate-migration` / `validate-all-migrations` / `test-migrations` — wraps `scripts/validate-migration.ts` and `scripts/test-migrations.ts`
 - `gen:scoring` / `gen:scoring:check` — wraps `scripts/gen-scoring-defaults.mjs`: regenerates (or verifies) `data-pipeline/scoring/scoring_defaults.py` and `docs/generated/SCORING_DEFAULTS.md` from `packages/shared/src/constants/scoringDefaults.json`, the single source of the default scoring weights
 
-### 3.2 `data-pipeline/` directory (16 active production scripts)
+### 3.2 `data-pipeline/` directory (17 active production scripts)
 
 | Subdirectory | Files | Role |
 |---|---|---|
@@ -168,6 +176,7 @@ NPM scripts in `package.json` (root):
 | `projections/` | 9 files | Projection generation: `build_player_season_stats.py`, `calculate_daily_projections.py`, `fantasy_projection_pipeline.py`, **`nightly_projection_batch.py` (cron entry)**, `projection_uncertainty.py`, `quantify_monte_carlo_impact.py`, `quantify_uncertainty_impact.py`, `run_daily_projections.py`, `sync_ppp_from_gamelog.py` |
 | `scoring/` | 5 files | `calculate_matchup_scores.py`, `reconcile_player_stats.py`, `run_daily_pbp_processing.py`, `simulate_matchups.py`, **`scoring_defaults.py` (generated — do not edit; `npm run gen:scoring`)** |
 | `monitoring/` | 12 files | Health/freshness checks: `alerting.py`, `audit_projection_accuracy.py`, `check_data_freshness.py`, `draft_latency_scorecard.py` (weekly Mandate scorecard over the `draft_latency_scorecard` view), `health_check_server.py`, `monitor_data_scraping.py`, `monitor_proxy_health.py`, `run_midnight_update.py`, `verify_data_integrity.py`, `verify_projection_pipeline.py` + 2 test files |
+| `draftkit/` | 1 script + `blurbs/` | `load_blurbs.py` — validates hand-written Draft Kit copy and upserts `draft_kit_blurbs` through the service role. Dry-run by default; `--apply` writes. Every CHECK constraint in the migration is re-implemented locally so an error names the file and line instead of surfacing as a PostgREST 23514. `blurbs/` holds the source `.md` files plus `_TEMPLATE.md` and a README; files starting with `_` are skipped |
 | `utils/` | 4 files | `citrus_request.py` (NHL API throttle), `proxy_health.py`, `proxy_manager.py` (100-IP rotation), `supabase_rest.py` (DB client) |
 | `debug/` | 14 files | One-off `check_*.py` / `audit_*.py` / `find_*.py` / `fix_*.py` / `verify_*.py` McDavid-and-similar scripts. **Keep but reorganize** — these are the reference forensics scripts |
 | `tests/` | (count not enumerated) | Pipeline unit tests |
