@@ -11,6 +11,10 @@
  *    recent. The Monte Carlo result overrides the formula and unlocks the
  *    distribution details (CI, tail risk, sims count).
  *
+ * And one state with neither: when nothing can justify a number — a dormant
+ * schedule, or a fallback that is not one — the component renders null
+ * instead of a bar. See the `hasBasis` gate below.
+ *
  * The bar itself never clamps or reinterprets the number it is given: the
  * sage segment's width IS the probability (locked by WinProbabilityBar.test).
  *
@@ -53,6 +57,13 @@ interface WinProbabilityBarProps {
   simulationPerspective?: 'team1' | 'team2';
   /** Compact mode for mobile */
   compact?: boolean;
+  /**
+   * The schedule has nothing to play right now (`SeasonStatus.isDormant`).
+   * Arrives as a prop rather than a `useSeasonStatus()` read here for the
+   * reason spelled out on ScoreCard's prop of the same name: this component
+   * renders what it is handed and owns no data of its own.
+   */
+  seasonDormant?: boolean;
 }
 
 /** Mirror a team1-perspective simulation row so it speaks for team2. */
@@ -77,6 +88,7 @@ export const WinProbabilityBar = ({
   team2Projected = 0,
   simulationPerspective = 'team1',
   compact = false,
+  seasonDormant = false,
 }: WinProbabilityBarProps) => {
   const [fetchedSimulation, setFetchedSimulation] = useState<MatchupSimulation | null>(null);
   const [loading, setLoading] = useState(false);
@@ -127,6 +139,28 @@ export const WinProbabilityBar = ({
   const confidence = MatchupSimulationService.getConfidenceLevel(
     winProb / 100
   );
+
+  // NOTHING TO SAY IS NOT 50%.
+  //
+  // On 2026-09-02 — 80 days after the last game (2026-06-14), 27 before the
+  // next (2026-09-29) — both sides carry 0.0 points and zero games left, so
+  // the caller's `winProbabilityFromTotals` takes its `variance <= 0` branch
+  // and returns 0.5. That 0.5 means "the scoreboard is level", not "either
+  // team could win", but a half-filled sage bar under the words "Win chance"
+  // says the second. A bar at 50% is a claim; absence is not, so the whole
+  // block goes rather than getting an offseason caption.
+  //
+  // Dormancy outranks a stored simulation deliberately. A `matchup_simulations`
+  // row written for a week with no scheduled games is the same nothing with
+  // more decimal places on it, and the bar exists to report a real forecast or
+  // none at all.
+  //
+  // What does NOT suppress: `phase === 'unknown'`. A schedule that failed to
+  // load leaves `isDormant` false, and this renders exactly as it always has —
+  // guessing "offseason" from a failed fetch would tell every user in January
+  // that the season is over.
+  const hasBasis = !seasonDormant && (hasSimulation || Number.isFinite(fallbackWinProbability));
+  if (!hasBasis) return null;
 
   // ============================================================================
   // COMPACT MODE (Mobile)

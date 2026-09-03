@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
-import { useSearchParams, useLocation, Navigate } from 'react-router-dom';
+import { useSearchParams, useLocation, Navigate, Link } from 'react-router-dom';
 import { HockeyFooter, StormyLoading } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
+import { useSeasonStatus } from '@/hooks/useSeasonStatus';
 import { useLeague, isDemoLeague } from '@/contexts/LeagueContext';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import Navbar from '@/components/Navbar';
@@ -2114,6 +2115,15 @@ const Roster = () => {
 
   const stripDayLabel = useMemo(() => dayLabelFor(selectedDate || getTodayMST()), [selectedDate]);
 
+  // OFFSEASON (2026-09-02). The gate below is roster-shaped, so a drafted
+  // roster in September rendered the strip and it read "0/13 starters play ·
+  // 0 on bench with games · proj 0.0" — with 27 days to the season opener and
+  // every row beneath it correctly saying "No Game". The list was never the
+  // question. `unknown` is deliberately NOT dormant: a failed schedule read
+  // leaves this page exactly as it renders today.
+  const { status: seasonStatus, headline: seasonHeadline } = useSeasonStatus();
+  const seasonDormant = seasonStatus.isDormant;
+
   const showTodayStrip =
     !rosterDisplayLoading &&
     userLeagueState !== 'logged-in-no-league' &&
@@ -3411,13 +3421,15 @@ const Roster = () => {
                   <Button
                     onClick={handleAutoLineup}
                     variant="outline"
-                    disabled={!projectionsReadyForSelectedDate || isPastDate}
+                    disabled={!projectionsReadyForSelectedDate || isPastDate || seasonDormant}
                     title={
-                      isPastDate
-                        ? 'Past days are frozen'
-                        : projectionsReadyForSelectedDate
-                          ? 'Preview the best lineup for this date'
-                          : 'Loading projections for this date…'
+                      seasonDormant
+                        ? 'No games scheduled for this date'
+                        : isPastDate
+                          ? 'Past days are frozen'
+                          : projectionsReadyForSelectedDate
+                            ? 'Preview the best lineup for this date'
+                            : 'Loading projections for this date…'
                     }
                     className="flex gap-1.5 lg:gap-2 h-8 min-h-0 px-2.5 text-xs border-2 [&_svg]:size-4 lg:h-12 lg:min-h-[48px] lg:px-6 lg:text-base lg:border-4 lg:[&_svg]:size-5 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -3617,6 +3629,18 @@ const Roster = () => {
                     editable={canEditLineup && !isPastDate}
                     readOnly={isMobile && isPastDate}
                     onAutoLineup={handleAutoLineup}
+                    seasonDormant={seasonDormant}
+                    seasonHeadline={seasonHeadline}
+                    action={
+                      seasonDormant && seasonStatus.nextGameDate ? (
+                        <Link
+                          to={`/scores?date=${seasonStatus.nextGameDate}`}
+                          className="inline-flex items-center gap-1 rounded-md bg-pastel-orange/10 px-2 py-1 font-display text-[11px] font-bold leading-none text-pastel-orange-soft ring-1 ring-pastel-orange/40 transition-transform active:scale-95 hover:bg-pastel-orange/20"
+                        >
+                          Opening night
+                        </Link>
+                      ) : null
+                    }
                   />
                 )}
                 {/* "Lineup" + Season / Rest-of-Season: desktop only (audit R4).
@@ -4488,6 +4512,7 @@ const Roster = () => {
         scope={autoScope}
         onScopeChange={handleAutoScopeChange}
         dayLabel={stripDayLabel}
+        seasonDormant={seasonDormant}
         day={dayPlan}
         weekAvailable={autoWeekAvailable}
         week={autoWeek}
