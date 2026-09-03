@@ -377,4 +377,65 @@ describe('Schema definitions', () => {
       expect(result.success).toBe(true);
     });
   });
+
+  /**
+   * The silent-no-op class. Three call sites sent a body whose real field was
+   * an unknown key, zod stripped it, `body.settings` arrived undefined, and
+   * the server answered 200 having written nothing. None of the three had
+   * ever persisted a value, and nothing anywhere reported a failure.
+   *
+   * These assert the schema now REJECTS those exact bodies. Each one is the
+   * literal payload that shipped, not a paraphrase of it.
+   */
+  describe('leagueSettings rejects the bodies that used to be silently dropped', () => {
+    it('rejects a bare draftCompletedAt (DraftService draft completion)', () => {
+      const result = schemas.leagueSettings.safeParse({ draftCompletedAt: '2026-09-03T00:00:00.000Z' });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects a bare regularSeasonWeeks (DraftService schedule length)', () => {
+      expect(schemas.leagueSettings.safeParse({ regularSeasonWeeks: 22 }).success).toBe(false);
+    });
+
+    it('rejects draft_rounds smuggled alongside settings (DraftRoom ignition)', () => {
+      // The worst of the three: draft_rounds is a COLUMN with its own
+      // endpoint, and start_draft_v2 reads it at ignition. Stripped here, the
+      // commissioner's round count never reached the draft.
+      const result = schemas.leagueSettings.safeParse({
+        draft_rounds: 21,
+        settings: { pickTimeLimit: 90, draftOrder: 'snake' },
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('names the offending key so the 400 is actionable', () => {
+      const result = schemas.leagueSettings.safeParse({ draft_rounds: 21 });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(JSON.stringify(result.error.issues)).toContain('draft_rounds');
+      }
+    });
+
+    it('still accepts the shape every correct caller already sends', () => {
+      expect(
+        schemas.leagueSettings.safeParse({
+          settings: { pickTimeLimit: 90, draftOrder: 'snake', timerStartedAt: null },
+        }).success,
+      ).toBe(true);
+      expect(schemas.leagueSettings.safeParse({ scoring_settings: { goals: 3 } }).success).toBe(true);
+      expect(
+        schemas.leagueSettings.safeParse({ settings: {}, scoring_settings: {} }).success,
+      ).toBe(true);
+    });
+
+    it('still accepts an empty body, which is a legitimate no-op', () => {
+      expect(schemas.leagueSettings.safeParse({}).success).toBe(true);
+    });
+
+    it('draft_rounds is valid on draftSettings, the endpoint that owns it', () => {
+      // The paired half: the field was never invalid, it was on the wrong
+      // call. This pins that the fix has somewhere correct to go.
+      expect(schemas.draftSettings.safeParse({ draft_rounds: 21 }).success).toBe(true);
+    });
+  });
 });

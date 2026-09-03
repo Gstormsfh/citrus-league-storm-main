@@ -429,12 +429,35 @@ export class DraftService {
       return { playerId: null, playerName: null, position: null, pickId: null, error };
     }
 
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    // `autopick_next_player` is declared RETURNS TABLE (verified against prod
+    // 2026-09-03: `TABLE(picked_player_id integer, player_name text, "position"
+    // text, pick_id uuid)`), so PostgREST hands back an ARRAY of rows, and the
+    // player column is `picked_player_id` — not `player_id`.
+    //
+    // Both of those were wrong here. `result` was the array itself, so
+    // `result?.player_id` read a property off an Array and every one of the
+    // four fields resolved to null on every autopick. The pick still landed,
+    // because the RPC does the insert itself and nothing downstream needed the
+    // return value to commit it — which is exactly why this survived 391
+    // autopicks in production without anyone noticing.
+    //
+    // What it cost: routes/draft.ts guards the realtime fanout on
+    // `if (result.pickId && result.playerId)`, so the autopick broadcast NEVER
+    // fired. Every other manager's board stayed stale until something else
+    // refetched it. On a board where autopicks outnumber manual picks 391 to
+    // 68, that is most of the draft going out silently.
+    //
+    // The array unwrap is kept tolerant because a single-row RETURNS TABLE can
+    // arrive either way depending on how the call is made; the column name is
+    // NOT tolerant, because it was checked against the live catalog and
+    // accepting both spellings would just re-hide the next rename.
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    const row = Array.isArray(parsed) ? parsed[0] : parsed;
     return {
-      playerId: result?.player_id || null,
-      playerName: result?.player_name || null,
-      position: result?.position || null,
-      pickId: result?.pick_id || null,
+      playerId: row?.picked_player_id ?? null,
+      playerName: row?.player_name ?? null,
+      position: row?.position ?? null,
+      pickId: row?.pick_id ?? null,
       error: null,
     };
   }
