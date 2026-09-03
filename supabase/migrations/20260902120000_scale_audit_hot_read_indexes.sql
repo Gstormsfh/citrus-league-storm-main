@@ -1,7 +1,14 @@
 -- PERF (2026-09-02 scale audit, docs/PERFORMANCE_AND_SCALE_2026-09-02.md).
 --
 -- ─────────────────────────────────────────────────────────────────────
--- READ THIS BEFORE APPLYING. NOT APPLIED TO ANY DATABASE.
+-- SUPERSEDED 2026-09-03. Four of the six statements below were applied to
+-- prod after the catalog review this header demands; the other two were
+-- dropped as exact duplicates of an existing PRIMARY KEY. The record of
+-- what was applied, with the pg_indexes output and the before/after
+-- EXPLAIN, is 20260903031600_scale_audit_indexes_as_applied.sql. Read
+-- that file, not this one, for the current state.
+--
+-- READ THIS BEFORE APPLYING. WRITTEN WITHOUT DATABASE ACCESS.
 -- ─────────────────────────────────────────────────────────────────────
 -- This file was written WITHOUT database access. Every statement was
 -- derived by reading query code against the CREATE INDEX statements in
