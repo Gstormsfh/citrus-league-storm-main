@@ -127,6 +127,12 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('firebase') || id.includes('@firebase')) {
               return 'vendor-firebase';
             }
+            // Sentry — loaded lazily by initSentry(). Without its own chunk it
+            // rides in the eager `vendor` bundle and the lazy import buys nothing
+            // (+164 kB gzip on first paint for code that only runs on an error).
+            if (id.includes('@sentry')) {
+              return 'vendor-sentry';
+            }
             // Radix UI — separate chunk (UI primitives, loaded with first interaction)
             if (id.includes('@radix-ui')) {
               return 'vendor-radix';
