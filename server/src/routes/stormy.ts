@@ -54,6 +54,7 @@ import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { createUserClient, supabaseAdmin } from '../lib/supabase';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
+import { logger } from '@citrus/shared';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
 import { STORMY_SYSTEM_PROMPT } from '../lib/stormy/systemPrompt';
@@ -208,9 +209,11 @@ stormyRoutes.post('/chat', async (c) => {
     }
     messages.push({ role: 'user', content: message.substring(0, 1000) });
 
-    console.log(
-      `[stormy] ${CLAUDE_MODEL} | ${messages.length} msgs | ctx ${context ? Math.min(context.length, 8000) : 0} chars`,
-    );
+    logger.log('[stormy] upstream request', {
+      model: CLAUDE_MODEL,
+      messages: messages.length,
+      contextChars: context ? Math.min(context.length, 8000) : 0,
+    });
 
     const upstream = await fetch(ANTHROPIC_URL, {
       method: 'POST',
