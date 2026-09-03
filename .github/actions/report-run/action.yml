@@ -9,7 +9,11 @@ description: >-
 
 inputs:
   status:
-    description: success | failure | cancelled | skipped. Normally `${{ job.status }}`.
+    # Written without expression syntax on purpose: GitHub parses templating in
+    # a description too, and `job` is not a context a composite action can
+    # name, so quoting it here made the whole manifest fail to load. Callers
+    # pass the job.status expression from their workflow, where it is valid.
+    description: success | failure | cancelled | skipped. Callers normally pass job.status.
     required: true
   job:
     description: Job identifier stored in the row. Defaults to the job key (GITHUB_JOB).
@@ -27,10 +31,10 @@ inputs:
     required: false
     default: ''
   supabase-url:
-    description: Project URL. Pass `${{ secrets.VITE_SUPABASE_URL }}`.
+    description: Project URL. Callers pass the VITE_SUPABASE_URL secret.
     required: true
   service-role-key:
-    description: Service-role key. Pass `${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}`. Never echoed.
+    description: Service-role key. Callers pass the SUPABASE_SERVICE_ROLE_KEY secret. Never echoed.
     required: true
 
 runs:
