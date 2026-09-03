@@ -263,11 +263,23 @@ jobs:
           # own remediation is `gcloud run services replace`, which is
           # declarative and DELETES any variable the file omits.
           #
-          # Repository variables, not secrets: a hostname and a port are not
-          # sensitive, and `vars` renders empty rather than failing the deploy
-          # if it is missing, which is why `assertDeployDeclaresDraftEngine`
-          # in server/src/__tests__/deployConfig.test.ts fails CI when either
-          # name disappears from this file or from ops/cloudrun/service.yaml.
+          # LITERALS, NOT `vars.*` (2026-09-03, corrected within the hour).
+          #
+          # These first shipped as `${{ vars.DRAFT_WS_HOST }}`. No such
+          # repository variable existed, and GitHub renders a missing `vars.*`
+          # as the EMPTY STRING rather than failing the workflow, so the very
+          # deploy that added them set `DRAFT_WS_HOST=` and
+          # `process.env.DRAFT_WS_HOST || 'localhost'` fell straight through
+          # to localhost. The change written to prevent the outage caused it.
+          #
+          # A hostname and a port are not secrets, so indirection bought
+          # nothing and cost the one property that mattered: being unable to
+          # be empty. ops/cloudrun/service.yaml already carried literals; the
+          # two files now agree, and deployConfig.test.ts asserts the host
+          # here is one firebase.json's connect-src permits.
+          #
+          # Changing engines is now a tracked one-line PR, which is the
+          # correct weight for a change that repoints every draft room.
           #
           # These comments are deliberately ABOVE `env_vars: |` and not
           # inside it. See the 2026-08-24 note below.
@@ -281,8 +293,8 @@ jobs:
             APNS_TEAM_ID=${{ secrets.APNS_TEAM_ID }}
             APNS_PRIVATE_KEY=${{ secrets.APNS_PRIVATE_KEY }}
             APNS_PRODUCTION=true
-            DRAFT_WS_HOST=${{ vars.DRAFT_WS_HOST }}
-            DRAFT_WS_PORT=${{ vars.DRAFT_WS_PORT }}
+            DRAFT_WS_HOST=draft.citrusfantasysports.com
+            DRAFT_WS_PORT=443
           # ── Cloud Run scaling config ────────────────────────────────
           # These flags MUST stay in sync with ops/cloudrun/service.yaml.
           # The April 10 disaster (LIVE_DRAFT_DISASTER_POSTMORTEM.md §3)

@@ -113,6 +113,53 @@ describe('the deploy declares where the draft engine lives', () => {
     expect(declared[0]).toBe(declared[1]);
   });
 
+  /**
+   * THE CORRECTION THIS TEST EXISTS BECAUSE OF (2026-09-03).
+   *
+   * These two names first shipped in production-deploy.yml as
+   * `${{ vars.DRAFT_WS_HOST }}`. No such repository variable existed, and
+   * GitHub renders a missing `vars.*` as the EMPTY STRING rather than
+   * failing the workflow. So the deploy that introduced the fix set
+   * `DRAFT_WS_HOST=`, which is falsy, which falls through to `localhost` in
+   * routes/drafts.ts. The change written to prevent the outage caused it,
+   * and every check in this file still passed, because the NAME was present
+   * exactly as asserted. Only the value was gone.
+   *
+   * So presence is not the property that matters. A usable value is. A
+   * hostname and a port are not secrets; indirection bought nothing here and
+   * cost the one guarantee worth having.
+   */
+  it.each(REQUIRED_IN_DEPLOY)('%s has a literal value, not an interpolation that can render empty', (name) => {
+    const wf = read('.github/workflows/production-deploy.yml');
+    const line = withoutComments(wf)
+      .split('\n')
+      .find((l) => l.trim().startsWith(`${name}=`));
+
+    expect(line, `${name} is not assigned in the env_vars block`).toBeTruthy();
+    const value = (line as string).split('=').slice(1).join('=').trim();
+
+    expect(value.length, `${name} is assigned an empty value`).toBeGreaterThan(0);
+    expect(
+      value.includes('${{'),
+      `${name} is set from an expression (${value}). A missing vars.* or secret ` +
+        `renders as the empty string and the workflow still succeeds, so the ` +
+        `deploy silently sets no host and every draft room falls back to localhost. ` +
+        `Use a literal: this is a hostname, not a secret.`,
+    ).toBe(false);
+  });
+
+  it('the deploy and service.yaml name the same engine host', () => {
+    // Two files, two paths into production (a push, and a `replace` during an
+    // incident). If they disagree, which engine your browsers reach depends on
+    // which one ran last, and nothing announces the difference.
+    const wf = withoutComments(read('.github/workflows/production-deploy.yml'));
+    const yaml = read('ops/cloudrun/service.yaml');
+    const fromWf = (wf.split('\n').find((l) => l.trim().startsWith('DRAFT_WS_HOST=')) ?? '')
+      .split('=').slice(1).join('=').trim();
+    const fromYaml = (yaml.match(/name:\s*DRAFT_WS_HOST\s*\n\s*value:\s*"?([^"\n]+)"?/) ?? [])[1]?.trim();
+    expect(fromWf).toBe(fromYaml);
+  });
+
   it('the checklist warns that replace is destructive', () => {
     // The runbook told someone to run a declarative replace against a file
     // that omitted these names. If that instruction ever loses its warning,
