@@ -15,7 +15,7 @@ import { readUntilPresent } from '../readUntilPresent';
 
 describe('readUntilPresent', () => {
   it('reads once and returns when the value is already there', async () => {
-    const read = vi.fn().mockResolvedValue({ data: [1] });
+    const read = vi.fn<() => Promise<{ data: number[] }>>().mockResolvedValue({ data: [1] });
     const result = await readUntilPresent(read, (r) => r.data.length > 0);
     expect(read).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ data: [1] });
@@ -43,7 +43,9 @@ describe('readUntilPresent', () => {
   it('gives up after the attempt budget and returns the last read', async () => {
     // It must NOT throw or hang: the caller has its own "still nothing" error
     // path, and swallowing that would turn a clear message into a spinner.
-    const read = vi.fn().mockResolvedValue({ matchup: null });
+    const read = vi
+      .fn<() => Promise<{ matchup: { id: string } | null }>>()
+      .mockResolvedValue({ matchup: null });
     const result = await readUntilPresent(read, (r) => Boolean(r.matchup), { attempts: 4, delayMs: 1 });
     expect(read).toHaveBeenCalledTimes(4);
     expect(result).toEqual({ matchup: null });

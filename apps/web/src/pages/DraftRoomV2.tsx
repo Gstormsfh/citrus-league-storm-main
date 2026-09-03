@@ -31,8 +31,8 @@ import { ConnectionBanner } from '@/components/draft/v2/ConnectionBanner';
 import { CompletionMomentBanner } from '@/components/draft/v2/CompletionMomentBanner';
 import {
   DraftTimerV2,
-  useClockOffsetEstimator,
 } from '@/components/draft/v2/DraftTimerV2';
+import { useClockOffsetEstimator } from '@/components/draft/v2/useClockOffsetEstimator';
 import { OnClockActionBar } from '@/components/draft/v2/OnClockActionBar';
 import { AuctionPanel } from '@/components/draft/v2/AuctionPanel';
 import { OfflineDraftRoom } from '@/components/draft/v2/OfflineDraftRoom';
@@ -528,7 +528,19 @@ export default function DraftRoomV2() {
           onRetryTeams={retryTeamsFetch}
           playersById={playersById}
           playersLoading={playersLoading}
-          playersError={playersError}
+          /* OfflineDraftRoom takes `string | null` and renders it as a React
+             child. usePreloadedPlayers hands back an Error, so a failed
+             player_directory load put an Error OBJECT into JSX — "Objects are
+             not valid as a React child", i.e. the offline room crashed on the
+             exact path the error card exists to explain. Flatten to the
+             message here; the live room below takes Error and is unchanged. */
+          playersError={
+            playersError instanceof Error
+              ? playersError.message
+              : playersError
+                ? String(playersError)
+                : null
+          }
           onRetryPlayers={reloadPlayers}
           commissionerId={offlineMeta.commissionerId}
           draftRounds={offlineMeta.draftRounds}

@@ -2792,7 +2792,15 @@ const Roster = () => {
   // just to satisfy that type (tap-to-swap). It only ever read active.id and
   // over.id, so those are now just its two real parameters; tap-to-swap
   // calls it directly (see handleMobileTapPlayer/handleMobileTapSlot below).
-  const applyPlayerMove = (playerId: string | number, targetId: string) => {
+  // `target` is either a slot id ('slot-C', 'ir-slot-1', 'bench-grid') from the
+  // slot-tap paths, or a PLAYER id from handleMobileTapPlayer's swap path — and
+  // HockeyPlayer.id is `number | string`, so the parameter has to admit both.
+  // It was typed `string`, which made the player-tap call site a type error and
+  // left the unguarded `targetId.startsWith('ir-slot-')` below able to throw
+  // "startsWith is not a function" on a numeric id. Normalising once here keeps
+  // every downstream string operation safe regardless of caller.
+  const applyPlayerMove = (playerId: string | number, target: string | number) => {
+    const targetId = String(target);
     // Best Ball guard: lineups are auto-optimized, no manual changes
     if (bestBallEnabled) {
       toast({
@@ -2852,8 +2860,12 @@ const Roster = () => {
       return;
     }
 
-    // Identify if dropping onto a player or an empty slot
-    const droppedOnPlayer = allPlayers.find(p => p.id === targetId);
+    // Identify if dropping onto a player or an empty slot.
+    // Compare as strings on both sides (same normalisation the selectedPlayer
+    // sync above uses): targetId is now always a string, and p.id may be a
+    // number, so a raw `===` would silently miss a numeric-id player and leave
+    // finalTargetSlotId holding a player id instead of a slot id.
+    const droppedOnPlayer = allPlayers.find(p => String(p.id) === targetId);
 
     // The other half of a swap is a move too (2026-09-01, audit R6): landing
     // on a locked player's slot would send HIM to the bench. tapEligibleSlots
@@ -3568,11 +3580,15 @@ const Roster = () => {
                     {/* Date Selector */}
                     {currentMatchup && matchupWeekDates.length > 0 && (
                       <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-4">
+                        {/* myStarters / opponentStarters / dailyStatsByDate used to be
+                            passed here. WeeklyScheduleProps has never declared them (see
+                            the Matchup.tsx call site, which passes calculatedDailyTotals),
+                            all three were being handed empty values, and with hideScores
+                            the component reads no score data at all — so they are dropped
+                            rather than renamed. */}
                         <WeeklySchedule
                           weekStart={currentMatchup.week_start_date}
                           weekEnd={currentMatchup.week_end_date}
-                          myStarters={[]}
-                          opponentStarters={[]}
                           onDayClick={(date) => {
                             setSelectedDate(date);
                             // loadRoster is triggered automatically by the useEffect
@@ -3582,7 +3598,6 @@ const Roster = () => {
                             // condition with the useEffect-triggered reload.
                           }}
                           selectedDate={selectedDate}
-                          dailyStatsByDate={new Map()}
                           hideScores={true}
                         />
                         {selectedDate && (
@@ -4355,9 +4370,14 @@ const Roster = () => {
                       );
 
                       if (!dropSuccess) {
+                        // LeagueService.dropPlayer returns `error: unknown`, and
+                        // useUnknownInCatchVariables-era code can't read .message off it.
+                        // Narrowing to '' for non-Errors keeps the `||` fallback intact —
+                        // String(dropError) would surface "null"/"[object Object]" to the user.
+                        const dropMessage = dropError instanceof Error ? dropError.message : '';
                         toast({
                           title: "Drop Didn't Take",
-                          description: dropError?.message || "Couldn't drop the player. Try again in a moment.",
+                          description: dropMessage || "Couldn't drop the player. Try again in a moment.",
                           variant: "destructive"
                         });
                         return;

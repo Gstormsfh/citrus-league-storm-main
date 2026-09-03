@@ -19,8 +19,12 @@ import {
   useObservedLeftUserIds,
 } from '@/stores/draftClientStore';
 import { cn } from '@/lib/utils';
+// The pure status computation lives in a sibling module so this file
+// exports components ONLY — that is what lets fast refresh hot-swap the
+// dot instead of reloading the page (react-refresh/only-export-components).
+import { computePresenceStatus, type PresenceStatus } from './presenceStatus';
 
-export type PresenceStatus = 'connected' | 'away' | 'not_connected';
+export type { PresenceStatus };
 
 interface PresenceDotProps {
   /**
@@ -30,21 +34,6 @@ interface PresenceDotProps {
   userId?: string | null;
   /** Optional className passthrough for layout / sizing overrides. */
   className?: string;
-}
-
-/**
- * Compute the presence status for a userId given the current sets.
- * Pure — extracted so it can be unit-tested without React.
- */
-export function computePresenceStatus(
-  userId: string | null | undefined,
-  presentUserIds: ReadonlySet<string>,
-  observedLeftUserIds: ReadonlySet<string>,
-): PresenceStatus {
-  if (!userId) return 'not_connected';
-  if (presentUserIds.has(userId)) return 'connected';
-  if (observedLeftUserIds.has(userId)) return 'away';
-  return 'not_connected';
 }
 
 const STATUS_META: Record<

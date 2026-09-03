@@ -148,6 +148,21 @@ const normalizePos = (p: string): string => {
 
 const isForward = (pos: string) => ['C', 'LW', 'RW'].includes(normalizePos(pos));
 
+/**
+ * Goalie rate stats (save_pct, gaa, and their long-named twins) are Postgres
+ * `numeric` columns, and PostgREST hands numerics back as STRINGS — hence the
+ * `number | string | null` on PoolPlayer. Every other reader in this file
+ * already funnels them through `Number(...)` (the stat cells, the detail
+ * header, the card mapper); the sort comparator was the one place that did
+ * not, so it fed raw strings into a function declared to return `number`.
+ * Non-numeric or absent values collapse to 0 rather than NaN — NaN from a
+ * comparator makes Array.prototype.sort's ordering inconsistent.
+ */
+const statNum = (v: number | string | null | undefined): number => {
+  const n = Number(v ?? 0);
+  return Number.isFinite(n) ? n : 0;
+};
+
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export default function PoolPlayoffRosterEntry() {
@@ -444,11 +459,11 @@ export default function PoolPlayoffRosterEntry() {
             case 'hit': return p.hits;
             case 'blk': return p.blocks;
             case 'pm_svpct': {
-              if (normalizePos(p.position) === 'G') return (p.save_pct ?? p.save_percentage ?? 0);
+              if (normalizePos(p.position) === 'G') return statNum(p.save_pct ?? p.save_percentage);
               return p.plus_minus ?? 0;
             }
             case 'xg_gaa': {
-              if (normalizePos(p.position) === 'G') return (p.gaa ?? p.goals_against_average ?? 0);
+              if (normalizePos(p.position) === 'G') return statNum(p.gaa ?? p.goals_against_average);
               return p.xGoals ?? p.x_goals ?? 0;
             }
             case 'toi': return p.icetime_seconds && p.games_played ? p.icetime_seconds / p.games_played : 0;

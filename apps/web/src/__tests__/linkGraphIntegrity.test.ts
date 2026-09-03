@@ -274,7 +274,6 @@ describe('linkGraphIntegrity — orphan routes (informational)', () => {
     // returns to these), etc. Any orphan flagged here should be
     // reviewed on the Sunday UX walk.
     if (orphans.length > 0) {
-      // eslint-disable-next-line no-console
       console.log(
         `\n[linkGraphIntegrity] Orphan routes (${orphans.length}) — reachable only via direct URL or external callback:\n` +
           orphans.map((o) => `  • ${o}`).join('\n') +

@@ -457,7 +457,7 @@ describe('DraftRoomV2 (chunk 11g.5b)', () => {
       };
     }
     function markConnected() {
-      const subs = subscribeMock.mock.calls.map(([cb]) => cb as (s: unknown) => void);
+      const subs: Array<(s: unknown) => void> = subscribeMock.mock.calls.flat();
       for (const sub of subs) {
         act(() => {
           sub({ kind: 'connected' });
@@ -480,6 +480,8 @@ describe('DraftRoomV2 (chunk 11g.5b)', () => {
         seq: 1,
         timestamp: '2026-07-28T00:00:01.000Z',
         correlationId: 'corr-completed',
+        completedAt: '2026-07-28T00:00:01.000Z',
+        totalPicks: 36,
       };
       const completedSnapshot: DraftSnapshot = {
         lobbyId: 'lobby-completed',

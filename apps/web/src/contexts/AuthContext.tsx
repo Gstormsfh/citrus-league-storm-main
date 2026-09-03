@@ -239,11 +239,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Server returns session tokens — set them directly, no client-side signIn call
       const serverSession = json?.data?.session;
       if (serverSession?.access_token && serverSession?.refresh_token) {
-        const { data, error } = await supabase.auth.setSession({
+        // setSession already returns exactly `AuthResponse`, so hand its
+        // result straight back. The previous destructure-and-rebuild
+        // (`{ data: { user: data.user, session: data.session }, error }`)
+        // flattened the union into a shape that matched NEITHER arm — a
+        // non-null user paired with a non-null error — which is what the
+        // compiler was objecting to. Same runtime value, one fewer place
+        // for the success/failure pairing to drift out of sync.
+        return await supabase.auth.setSession({
           access_token: serverSession.access_token,
           refresh_token: serverSession.refresh_token,
         });
-        return { data: { user: data.user, session: data.session }, error: error || null };
       }
       // Fallback: server created user but didn't return session — sign in client-side
       return await supabase.auth.signInWithPassword({ email, password });

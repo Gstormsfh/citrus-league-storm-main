@@ -10,7 +10,7 @@ import { ScheduleService, NHLGame, GameInfo } from './ScheduleService';
 import { withTimeout } from '@/utils/promiseUtils';
 import { getTodayMST, getTodayMSTDate, formatDateToString, isDateInRange } from '@/utils/timezoneUtils';
 
-import { ScoringCalculator, DEFAULT_SCORING, extractScoringSettings } from '@/utils/scoringUtils';
+import { ScoringCalculator, DEFAULT_SCORING, type ScoringSettings } from '@/utils/scoringUtils';
 import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
 import { matchupApi } from '@/api/matchups';
@@ -463,14 +463,18 @@ export const MatchupService = {
       // Get league via API
       const { leagueApi } = await import('@/api/leagues');
       const leagueResponse = await leagueApi.getLeague(matchup.league_id);
-      const league = leagueResponse.data as Record<string, unknown> | null;
+      // `leagueApi.getLeague` is declared `apiClient.get<League>`, so `.data`
+      // is already a League. The old `as Record<string, unknown>` threw that
+      // away and then paid it back one property at a time (`updated_at as
+      // string`), which is how a typed endpoint ends up read as loose JSON.
+      const league = leagueResponse.data;
       if (!league) {
         return { data: null, error: new Error('League not found') };
       }
 
       // Get first week start date
       // WEEK-MATH FIX (2026-08-22): clamp to season start like generation does
-      const draftCompletionDate = league.updated_at ? new Date(league.updated_at as string) : new Date();
+      const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
       const firstWeekStart = clampToSeasonStart(getFirstWeekStartDate(draftCompletionDate));
       const scheduleLength = getScheduleLength(firstWeekStart);
       const isPlayoffWeek = matchup.week_number > scheduleLength;
@@ -636,13 +640,15 @@ export const MatchupService = {
       // Get league via API
       const { leagueApi } = await import('@/api/leagues');
       const leagueResponse = await leagueApi.getLeague(leagueId);
-      const league = leagueResponse.data as Record<string, unknown> | null;
+      // Same as getMatchupDataById above: getLeague is typed `<League>`, so the
+      // response needs no re-description here.
+      const league = leagueResponse.data;
       if (!league) {
         return { data: null, error: new Error('League not found') };
       }
 
       // Get first week start date
-      const draftCompletionDate = league.updated_at ? new Date(league.updated_at as string) : new Date();
+      const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
       const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
       const scheduleLength = getScheduleLength(firstWeekStart);
       const isPlayoffWeek = weekNumber > scheduleLength;
@@ -1328,7 +1334,33 @@ export const MatchupService = {
       }
 
       // isGoalie already checked above
-      
+
+      // SEASON skater line. `MatchupPlayer.stats` is REQUIRED, and this
+      // literal used to omit it and patch it on afterwards in both branches
+      // below -- so the object only became a MatchupPlayer somewhere after it
+      // was declared as one. Same values, same order of evaluation, computed
+      // once here where the type asks for them.
+      const seasonStats: MatchupPlayer['stats'] = isGoalie
+        ? {
+            // Zeroed for goalies (their numbers live on goalieStats), but the
+            // key is kept so consumers can read .stats.goals unconditionally.
+            goals: 0,
+            assists: 0,
+            sog: 0,
+            blk: 0,
+            gamesPlayed: 0,
+            xGoals: 0
+          }
+        : {
+            goals: player.stats?.goals || 0,
+            assists: player.stats?.assists || 0,
+            sog: player.stats?.shots || 0,  // Note: HockeyPlayer uses 'shots', not 'sog'
+            blk: player.stats?.blockedShots || 0,
+            gamesPlayed: player.stats?.gamesPlayed || 0,
+            xGoals: player.stats?.xGoals || 0,
+            powerPlayPoints: player.stats?.powerPlayPoints || 0
+          };
+
       // Base player object
       const basePlayer: MatchupPlayer = {
         id: typeof player.id === 'string' ? parseInt(player.id) || 0 : player.id || 0,
@@ -1350,7 +1382,8 @@ export const MatchupService = {
         games: weekGames,
         // IR Status fields from player object (populated from player_talent_metrics via PlayerService)
         roster_status: player.roster_status,
-        is_ir_eligible: player.is_ir_eligible
+        is_ir_eligible: player.is_ir_eligible,
+        stats: seasonStats
       };
       
       // Handle goalies separately
@@ -1399,27 +1432,8 @@ export const MatchupService = {
           };
         }
         
-        // Skater stats should be empty/zero for goalies (but keep structure for compatibility)
-        basePlayer.stats = {
-          goals: 0,
-          assists: 0,
-          sog: 0,
-          blk: 0,
-          gamesPlayed: 0,
-          xGoals: 0
-        };
       } else {
-        // Skater stats - USE SEASON STATS from player.stats (already populated by transformToHockeyPlayer)
-        basePlayer.stats = {
-          goals: player.stats?.goals || 0,
-          assists: player.stats?.assists || 0,
-          sog: player.stats?.shots || 0,  // Note: HockeyPlayer uses 'shots', not 'sog'
-          blk: player.stats?.blockedShots || 0,
-          gamesPlayed: player.stats?.gamesPlayed || 0,
-          xGoals: player.stats?.xGoals || 0,
-          powerPlayPoints: player.stats?.powerPlayPoints || 0
-        };
-        
+        // Season skater stats already set from `seasonStats` above.
         basePlayer.matchupStats = matchupStats ? (isGoalie ? {
           // Goalie matchup stats
           wins: matchupStats.wins || 0,
@@ -1579,7 +1593,18 @@ export const MatchupService = {
       } else {
         throw new Error('userId required for non-demo leagues');
       }
-      const scoringSettings = extractScoringSettings(league);
+      // `League.scoring_settings` (LeagueService.ts:37) declares every stat
+      // OPTIONAL -- it is a jsonb column, so a row can carry a partial object --
+      // while `ScoringSettings` requires all of them. `extractScoringSettings`
+      // does `league.scoring_settings || DEFAULT_SCORING`: present-but-partial
+      // is passed straight through, and ScoringCalculator then multiplies by an
+      // `undefined` weight, scoring the whole matchup NaN. Fill per field from
+      // DEFAULT_SCORING so a partial row degrades to defaults instead.
+      const rawScoring = league?.scoring_settings;
+      const scoringSettings: ScoringSettings = {
+        skater: { ...DEFAULT_SCORING.skater, ...(rawScoring?.skater || {}) },
+        goalie: { ...DEFAULT_SCORING.goalie, ...(rawScoring?.goalie || {}) }
+      };
       const scorer = new ScoringCalculator(scoringSettings);
 
       // Get week date range
@@ -1713,8 +1738,13 @@ export const MatchupService = {
         const slotAssignments: Record<string, string> = {};
         let irSlotIndex = 1;
         
-        // Sort players by points (best players first)
-        const sortedRoster = [...roster].sort((a, b) => (b.points || 0) - (a.points || 0));
+        // Sort players by points (best players first).
+        // `HockeyPlayer` has NO top-level `points` (HockeyPlayerCard.tsx:9) --
+        // season points live at `stats.points`, which transformToHockeyPlayer
+        // populates (:1055). `b.points - a.points` was `0 - 0` for every pair,
+        // so this sort was a no-op and the default lineup below filled its
+        // starting slots in whatever order the roster arrived in.
+        const sortedRoster = [...roster].sort((a, b) => (b.stats?.points || 0) - (a.stats?.points || 0));
         
         sortedRoster.forEach(p => {
           // Handle IR/SUSP players
@@ -1881,7 +1911,9 @@ export const MatchupService = {
       
       // Debug: Log conversion results
       // Normalize slot assignment keys to numeric NHL IDs (convert UUIDs if needed)
-      const rawTeam1SlotAssignments = team1Lineup.slotAssignments || {};
+      // Annotated: the `|| {}` fallback put a bare `{}` in the union, which
+      // left Object.entries below inferring its value type as `unknown`.
+      const rawTeam1SlotAssignments: Record<string, string> = team1Lineup.slotAssignments || {};
       const team1SlotAssignments: Record<string, string> = {};
       
       // Build UUID to numeric ID mapping for slot assignments
@@ -1929,7 +1961,7 @@ export const MatchupService = {
         ? new Set(Array.from(team2StartersNumeric).map(id => String(id)))
         : new Set();
       
-      const rawTeam2SlotAssignments = matchup.team2_id && team2Lineup
+      const rawTeam2SlotAssignments: Record<string, string> = matchup.team2_id && team2Lineup
         ? (team2Lineup.slotAssignments || {})
         : {};
       const team2SlotAssignments: Record<string, string> = {};

@@ -120,7 +120,16 @@ export function AuctionPanel({ leagueId, teams, playersById, myTeamId }: Auction
         nominationId: nomination.nominationId,
         bidAmount: amount,
       });
-      if (!result.ok) {
+      // `=== false`, not `!` or an `else`. AuctionActionResult is a properly
+      // discriminated union, but tsconfig.app.json still sets
+      // strictNullChecks:false, and without it TypeScript refuses to narrow a
+      // union through a negated boolean-literal discriminant or through the
+      // else-arm of a truthiness test. `result.message` then fails to resolve
+      // even though the error arm guarantees it. An explicit comparison
+      // narrows under both settings and is the identical expression at
+      // runtime. Revisit when the strictNullChecks migration lands
+      // (tsconfig.app.json "Phase 2").
+      if (result.ok === false) {
         toast({
           title: 'Bid Not Placed',
           description: result.message,
@@ -144,16 +153,25 @@ export function AuctionPanel({ leagueId, teams, playersById, myTeamId }: Auction
         playerName: nomPlayer.full_name,
         openingBid: opening,
       });
-      if (result.ok) {
-        setNomPlayer(null);
-        setNomSearch('');
-        setNomOpeningBid('1');
-      } else {
+      // `=== false`, not `!` or an `else`. AuctionActionResult is a properly
+      // discriminated union, but tsconfig.app.json still sets
+      // strictNullChecks:false, and without it TypeScript refuses to narrow a
+      // union through a negated boolean-literal discriminant or through the
+      // else-arm of a truthiness test. `result.message` then fails to resolve
+      // even though the error arm guarantees it. An explicit comparison
+      // narrows under both settings and is the identical expression at
+      // runtime. Revisit when the strictNullChecks migration lands
+      // (tsconfig.app.json "Phase 2").
+      if (result.ok === false) {
         toast({
           title: 'Nomination Failed',
           description: result.message,
           variant: 'destructive',
         });
+      } else {
+        setNomPlayer(null);
+        setNomSearch('');
+        setNomOpeningBid('1');
       }
     } finally {
       setSubmitting(false);

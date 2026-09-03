@@ -11,7 +11,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act, fireEvent } from '@testing-library/react';
-import { DraftTimerV2, useClockOffsetEstimator } from '../DraftTimerV2';
+import { DraftTimerV2 } from '../DraftTimerV2';
+import { useClockOffsetEstimator } from '../useClockOffsetEstimator';
 
 beforeEach(() => {
   vi.useFakeTimers();

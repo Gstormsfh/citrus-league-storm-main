@@ -68,7 +68,6 @@ describe('supabase-js auth client — network-failure contract', () => {
     // The expected error class is AuthRetryableFetchError. Log if it
     // ever isn't so a version bump surfaces immediately.
     if (!isAuthRetryableFetchError(result!.error)) {
-      // eslint-disable-next-line no-console
       console.warn(
         `[F19 contract] signInWithPassword() returned error.name=${errShape?.name} — expected AuthRetryableFetchError. ` +
           `Verify refreshTokenOnce discrimination still covers this shape.`,

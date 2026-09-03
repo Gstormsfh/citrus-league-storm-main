@@ -24,7 +24,7 @@
 import { apiClient } from './client';
 // Type-only: erased at compile time, so this does not create a runtime import
 // cycle with DraftService (which imports draftApi). Same approach as leagues.ts.
-import type { DraftPick, DraftOrder } from '@/services/DraftService';
+import type { DraftPick, DraftOrder, DraftSnapshotData } from '@/services/DraftService';
 
 /** `ok(c, { sessionId })` — draft.ts:68, 261. */
 interface SessionResponse {
@@ -91,6 +91,30 @@ interface FullAutopickResponse {
     playerId: number;
     playerName?: string;
   }>;
+}
+
+/**
+ * `ok(c, snapshot)` — draft.ts:373, where `snapshot` is the `.maybeSingle()`
+ * row from server DraftService.getDraftSnapshot (server DraftService.ts:516)
+ * selected with `COLUMNS.DRAFT_SNAPSHOT` =
+ * `'id, league_id, draft_session_id, snapshot_data, created_at'`
+ * (packages/shared/src/constants/columns.ts:146).
+ *
+ * NOTE the projection: there is no `created_by`. The client interface used to
+ * declare one as required, which is why the read at the call site had to be an
+ * `as` cast — the cast was covering a column the route has never sent.
+ *
+ * `snapshot_data` is the caller's own `DraftSnapshotData` round-tripped
+ * through jsonb; nothing on the server reshapes it.
+ *
+ * `maybeSingle()` → null when the league has no snapshot yet.
+ */
+export interface DraftSnapshotRow {
+  id: string;
+  league_id: string;
+  draft_session_id: string;
+  snapshot_data: DraftSnapshotData;
+  created_at: string;
 }
 
 /** `created(c, { snapshotId })` — draft.ts:397. Null when the insert returned no row. */
@@ -194,9 +218,7 @@ export const draftApi = {
 
   /** Get draft snapshot */
   getSnapshot(leagueId: string) {
-    // maybeSingle() on the server; the payload is the caller's own
-    // DraftSnapshotData round-tripped through jsonb, so it is not narrowed here.
-    return apiClient.get<Record<string, unknown> | null>(`/api/draft/league/${leagueId}/snapshot`);
+    return apiClient.get<DraftSnapshotRow | null>(`/api/draft/league/${leagueId}/snapshot`);
   },
 
   /** Save draft snapshot */

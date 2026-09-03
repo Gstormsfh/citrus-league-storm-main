@@ -150,7 +150,13 @@ export class BestBallService {
         lineup?: { starters?: string[]; bench?: string[]; ir?: string[] };
         playerIds?: number[];
         players?: Array<{ player_id: number; position_code: string | null; eligible_positions: string | null }>;
-        weeklyStats?: Array<Record<string, unknown>>;
+        // Every column /weekly-data selects out of player_weekly_stats is an
+        // integer (player_id, goals, assists, shots_on_goal, blocks, hits, pim,
+        // ppp, shp, plus_minus, wins, saves, shutouts, goals_against), which is
+        // also exactly what ScoringCalculator.calculatePoints takes. Declaring
+        // these `unknown` did not make the data safer, it just moved the
+        // mismatch to the callback below.
+        weeklyStats?: Array<Record<string, number>>;
       } | undefined;
       if (!bbData) return emptyResult;
 
@@ -314,7 +320,18 @@ export class BestBallService {
   ): Promise<{ daysOptimized: number; error?: string }> {
     try {
       const response = await bestballApi.triggerWeekOptimization(leagueId, { weekStartDate, weekEndDate });
-      return { daysOptimized: response.data?.daysOptimized || 0 };
+      // POST /api/bestball/league/:id/optimize-week answers { daysOptimized: number }
+      // (server/src/routes/bestball.ts), but apiClient is generic and bestballApi
+      // asks for no type argument, so `data` arrives as `unknown`. Check the shape
+      // rather than assert it: this crosses a network boundary, and a server that
+      // answers something else should read as 0 days optimized, not as NaN.
+      const data = response.data;
+      const daysOptimized =
+        typeof data === 'object' && data !== null &&
+        'daysOptimized' in data && typeof data.daysOptimized === 'number'
+          ? data.daysOptimized
+          : 0;
+      return { daysOptimized };
     } catch (error: unknown) {
       logger.error('[BestBallService] triggerWeekOptimization error:', error);
       return { daysOptimized: 0, error: error instanceof Error ? error.message : String(error) };

@@ -263,7 +263,7 @@ describe('S2 fuzzer — INV-2: foldEvents is idempotent under duplicate replay',
           MATRIX,
         ).state;
         const eq = statesEqual(s1, s2);
-        if (!eq.ok) {
+        if (eq.ok === false) {
           violations++;
           if (violationsSample.length < 5) {
             violationsSample.push({ seed, diff: eq.diff });
@@ -362,7 +362,7 @@ describe('S2 fuzzer — INV-4: fold associative on monotonic-seq streams (narrow
         const stepA = foldEvents(emptyDerivedState(SEED_12x3), A, MATRIX).state;
         const stepAB = foldEvents(stepA, B, MATRIX).state;
         const eq = statesEqual(combined, stepAB);
-        if (!eq.ok) {
+        if (eq.ok === false) {
           violations++;
           if (violationsSample.length < 5) {
             violationsSample.push({ seed, diff: eq.diff, split });
