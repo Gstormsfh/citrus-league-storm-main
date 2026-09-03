@@ -3127,15 +3127,36 @@ const DraftRoomInner = () => {
       // during its Rider-1 preflight + first_pick_deadline computation
       // (migration 20260807000000_start_draft_v2.sql:264). draft_status
       // flip is INTENTIONALLY absent here — start_draft_v2 owns it.
+      // TWO endpoints, because these are two different homes and only one of
+      // them accepts each field.
+      //
+      // `draft_rounds` is a COLUMN on `leagues`; `pickTimeLimit`/`draftOrder`
+      // live inside the `settings` JSONB. PUT /settings validates against
+      // `schemas.leagueSettings`, which declares only `settings` and
+      // `scoring_settings`. Zod strips unknown keys rather than rejecting
+      // them, so the `draft_rounds` sent here was silently dropped and the
+      // request still returned 200 — and `as Record<string, unknown>` is what
+      // let that compile. The cast defeated the one check that would have said
+      // this key does not belong on this call.
+      //
+      // The consequence is the line directly above: start_draft_v2 reads
+      // `league.draft_rounds` during its preflight, so every draft ignited
+      // from this screen used the PREVIOUS round count. Changing rounds in the
+      // settings modal appeared to save and never did.
+      //
+      // `draft_rounds` goes to PUT /draft-settings, which has always been the
+      // endpoint that writes that column (LeagueService.updateDraftSettings).
+      // Both must land before ignition, so neither is fire-and-forget; the
+      // shared catch below still aborts the start if either fails.
       try {
+        await leagueApi.updateDraftSettings(leagueId, { draft_rounds: settings.rounds });
         await leagueApi.updateSettings(leagueId, {
-          draft_rounds: settings.rounds,
           settings: {
             ...(league?.settings || {}),
             pickTimeLimit: settings.pickTimeLimit,
             draftOrder: settings.draftOrder,
           },
-        } as Record<string, unknown>);
+        });
       } catch (settingsErr) {
         const msg = settingsErr instanceof Error ? settingsErr.message : 'Unknown error';
         toast({

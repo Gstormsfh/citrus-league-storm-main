@@ -149,15 +149,106 @@ describe('DraftService', () => {
   });
 
   describe('autopickForTeam', () => {
-    it('calls autopick RPC and returns result', async () => {
-      mockSupabase.rpc = vi.fn().mockResolvedValue({
-        data: { player_id: 100, player_name: 'Connor McDavid', position: 'C', pick_id: 'pick-1' },
-        error: null,
-      });
+    /**
+     * THE SHAPE THIS RPC ACTUALLY RETURNS.
+     *
+     * Verified against the production catalog on 2026-09-03:
+     *
+     *   autopick_next_player -> TABLE(picked_player_id integer,
+     *                                 player_name text,
+     *                                 "position" text,
+     *                                 pick_id uuid)
+     *
+     * Two things follow and BOTH were got wrong by the code this suite was
+     * meant to protect. `RETURNS TABLE` means PostgREST sends an ARRAY of
+     * rows, so the payload has to be unwrapped before any field is read. And
+     * the player column is `picked_player_id`, not `player_id`.
+     *
+     * The previous version of this test mocked
+     *   `data: { player_id: 100, ... }`
+     * — a bare object, with a column name the function does not have. That
+     * shape exists nowhere except in this file. It was invented to match the
+     * implementation instead of the database, so the test and the bug agreed
+     * with each other and the suite stayed green through 391 production
+     * autopicks, every one of which returned four nulls.
+     *
+     * Everything below is built from this constant so the fake can never
+     * drift back toward whatever the implementation happens to read.
+     */
+    const RPC_ROW = {
+      picked_player_id: 100,
+      player_name: 'Connor McDavid',
+      position: 'C',
+      pick_id: 'pick-1',
+    };
+
+    it('unwraps the RETURNS TABLE array and reads picked_player_id', async () => {
+      mockSupabase.rpc = vi.fn().mockResolvedValue({ data: [RPC_ROW], error: null });
 
       const result = await service.autopickForTeam('league-1', 'team-1', 'session-1', 1, 1);
       expect(result.playerId).toBe(100);
       expect(result.playerName).toBe('Connor McDavid');
+      expect(result.position).toBe('C');
+      expect(result.pickId).toBe('pick-1');
+      expect(result.error).toBeNull();
+    });
+
+    /**
+     * The regression proper. routes/draft.ts fans the pick out to every other
+     * connected manager behind
+     *
+     *     if (result.pickId && result.playerId) { broadcastDraftPick(...) }
+     *
+     * so a null playerId is not a cosmetic wrong field — it silently disables
+     * the realtime broadcast for the entire autopick path. This asserts the
+     * guard's own condition, not just the field, because the field being
+     * populated is only interesting for the reason the guard exists.
+     */
+    it('returns a payload that satisfies the broadcast guard in routes/draft.ts', async () => {
+      mockSupabase.rpc = vi.fn().mockResolvedValue({ data: [RPC_ROW], error: null });
+
+      const result = await service.autopickForTeam('league-1', 'team-1', 'session-1', 1, 1);
+      expect(
+        Boolean(result.pickId && result.playerId),
+        'routes/draft.ts skips broadcastDraftPick when either is falsy, so every ' +
+          'other manager board goes stale for the whole autopick path',
+      ).toBe(true);
+    });
+
+    it('tolerates a single row arriving unwrapped', async () => {
+      // A one-row RETURNS TABLE can come back either way depending on how the
+      // call is made. The array unwrap is deliberately tolerant; the column
+      // name is not.
+      mockSupabase.rpc = vi.fn().mockResolvedValue({ data: RPC_ROW, error: null });
+
+      const result = await service.autopickForTeam('league-1', 'team-1', 'session-1', 1, 1);
+      expect(result.playerId).toBe(100);
+    });
+
+    it('does not read a player_id column, which this RPC does not have', async () => {
+      // Planted offender: the exact payload the old test asserted against. If
+      // someone reintroduces `result?.player_id`, this row would satisfy it
+      // and the assertion below fails.
+      mockSupabase.rpc = vi.fn().mockResolvedValue({
+        data: [{ player_id: 999, player_name: 'Wrong Column', position: 'C', pick_id: 'pick-9' }],
+        error: null,
+      });
+
+      const result = await service.autopickForTeam('league-1', 'team-1', 'session-1', 1, 1);
+      expect(result.playerId).toBeNull();
+    });
+
+    it('returns a player id of 0 rather than null, if the RPC ever sends one', async () => {
+      // `|| null` collapsed a falsy-but-valid id to null. `?? null` does not.
+      // No real player has id 0 today; the point is that the null path means
+      // "absent", and only absent.
+      mockSupabase.rpc = vi.fn().mockResolvedValue({
+        data: [{ ...RPC_ROW, picked_player_id: 0 }],
+        error: null,
+      });
+
+      const result = await service.autopickForTeam('league-1', 'team-1', 'session-1', 1, 1);
+      expect(result.playerId).toBe(0);
     });
 
     it('returns nulls on RPC error', async () => {
@@ -166,6 +257,15 @@ describe('DraftService', () => {
       const result = await service.autopickForTeam('league-1', 'team-1', 'session-1', 1, 1);
       expect(result.playerId).toBeNull();
       expect(result.error).toBeTruthy();
+    });
+
+    it('returns nulls, not a crash, when the RPC returns no rows', async () => {
+      mockSupabase.rpc = vi.fn().mockResolvedValue({ data: [], error: null });
+
+      const result = await service.autopickForTeam('league-1', 'team-1', 'session-1', 1, 1);
+      expect(result.playerId).toBeNull();
+      expect(result.pickId).toBeNull();
+      expect(result.error).toBeNull();
     });
   });
 

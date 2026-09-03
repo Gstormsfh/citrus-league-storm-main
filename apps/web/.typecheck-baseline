@@ -9,9 +9,17 @@
 # 76 live in MatchupService.ts (29) and DraftService.ts (17), and DraftService
 # is not in that branch's diff at all.
 #
-# Progress so far: 151 -> 91 -> 76.
+# Progress so far: 151 -> 91 -> 76 -> 62.
+#
+# 76 -> 62 (2026-09-03): typing the draft API client. `apiClient.get`/`post`
+# declare `<T = unknown>`, so every call in api/draft.ts that omitted the type
+# parameter made `response.data` unknown and every field read off it a compile
+# error. 14 of the 14 removed here were that one omission. The types were
+# transcribed from the route handlers and, where the wire shape was in doubt,
+# checked against the production catalog -- which is how the autopick column
+# bug (picked_player_id, not player_id) surfaced.
 #
 # LOWER THIS when armchair-gm lands after its visual review -- part of the
 # remaining gap is there. Lowering it is how a win gets locked in; the ratchet
 # only fails when the count RISES.
-76
+62

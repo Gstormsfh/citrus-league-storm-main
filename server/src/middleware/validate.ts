@@ -276,10 +276,37 @@ export const schemas = {
   }),
 
   // League settings schemas (commissioner-only)
+  /**
+   * STRICT ON PURPOSE (2026-09-03).
+   *
+   * Zod's default is to STRIP unknown keys, not reject them. For a PUT whose
+   * every field is `.optional()`, that is indistinguishable from success: a
+   * body of `{ draftCompletedAt: '...' }` validates to `{}`, `body.settings`
+   * arrives undefined, LeagueService.updateSettings skips the column, and the
+   * caller gets HTTP 200 having written nothing.
+   *
+   * Three call sites were doing exactly that, and none of them had ever
+   * persisted a single value:
+   *
+   *   DraftService  { draftCompletedAt }      — draft completion timestamp
+   *   DraftService  { regularSeasonWeeks }    — schedule length
+   *   DraftRoom     { draft_rounds, settings } — round count, read by
+   *                                             start_draft_v2 at ignition
+   *
+   * The last one is the reason this is `.strict()` rather than a comment.
+   * `draft_rounds` is a COLUMN with its own endpoint (PUT /draft-settings),
+   * so the field was not merely misplaced, it was silently discarded on the
+   * path that starts every draft — the commissioner's round count never
+   * reached the engine, and the UI showed a successful save.
+   *
+   * With `.strict()` the same mistake returns 400 with the offending key
+   * named. A loud failure on a wrong-shaped body is always better than a
+   * 200 that wrote nothing, because only one of the two gets reported.
+   */
   leagueSettings: z.object({
     settings: z.record(z.unknown()).optional(),
     scoring_settings: z.record(z.unknown()).optional(),
-  }),
+  }).strict(),
 
   waiverSettings: z.object({
     waiver_process_time: z.string().optional(),

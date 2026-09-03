@@ -206,6 +206,11 @@ export const DraftService = {
         const draftCompletedAt = new Date().toISOString();
         const targetSessionId = sessionId || pick?.draft_session_id || '';
 
+        // Collected by task 3 below, written once AFTER allSettled together
+        // with draftCompletedAt. See the note on that write for why these two
+        // fields cannot be saved from inside the parallel block.
+        let computedRegularSeasonWeeks: number | undefined;
+
         const results = await Promise.allSettled([
           // 1. Initialize rosters
           (async () => {
@@ -245,13 +250,7 @@ export const DraftService = {
             }
           })(),
 
-          // 3. Save draftCompletedAt
-          (async () => {
-            await leagueApi.updateSettings(leagueId, { draftCompletedAt });
-            logger.log('Saved draftCompletedAt:', draftCompletedAt);
-          })(),
-
-          // 4. Generate matchups
+          // 3. Generate matchups
           (async () => {
             logger.log('Generating matchups for the entire season...');
             const { MatchupService } = await import('./MatchupService');
@@ -289,12 +288,12 @@ export const DraftService = {
                 }
 
                 if (regularSeasonWeeks && regularSeasonWeeks > 0) {
-                  try {
-                    await leagueApi.updateSettings(leagueId, { regularSeasonWeeks });
-                    logger.log(`Persisted regularSeasonWeeks=${regularSeasonWeeks} (totalWeeks=${totalWeeks}, playoffWeeks=${playoffWeeks})`);
-                  } catch (persistErr) {
-                    logger.error('Error persisting regularSeasonWeeks (non-critical):', persistErr);
-                  }
+                  // Handed to the single settings write after allSettled
+                  // rather than written here — two concurrent tasks each
+                  // doing read-modify-write on the same JSONB column is how
+                  // one of them gets clobbered.
+                  computedRegularSeasonWeeks = regularSeasonWeeks;
+                  logger.log(`Computed regularSeasonWeeks=${regularSeasonWeeks} (totalWeeks=${totalWeeks}, playoffWeeks=${playoffWeeks})`);
                 }
 
                 await MatchupService.generateMatchupsForLeague(leagueId, teams, firstWeekStart, false, regularSeasonWeeks);
@@ -305,12 +304,57 @@ export const DraftService = {
         ]);
 
         // Log any failures (non-blocking — each task is independent)
-        const taskNames = ['roster init', 'snapshot', 'settings', 'matchup gen'];
+        const taskNames = ['roster init', 'snapshot', 'matchup gen'];
         results.forEach((r, i) => {
           if (r.status === 'rejected') {
             logger.error(`Post-draft task "${taskNames[i]}" failed (non-critical):`, r.reason);
           }
         });
+
+        // ── The settings write: ONE call, after everything else ────────────
+        //
+        // Both fields used to be written from inside the parallel block, and
+        // both were written WRONG in the same way:
+        //
+        //     leagueApi.updateSettings(leagueId, { draftCompletedAt })
+        //
+        // PUT /api/leagues/:id/settings validates against
+        // `schemas.leagueSettings`, which declares only `settings` and
+        // `scoring_settings`. Zod strips unknown keys instead of rejecting
+        // them, so a bare `{ draftCompletedAt }` passed validation as `{}`,
+        // `body.settings` came through undefined, and LeagueService.updateSettings
+        // skipped the column entirely — HTTP 200, nothing written. Neither
+        // field has ever persisted. Every other caller in the app already
+        // passes the `{ settings: { ...current, field } }` shape; these two
+        // did not, and nothing failed loudly enough to say so.
+        //
+        // It is one call rather than two because `updateSettings` REPLACES the
+        // settings JSONB wholesale. Two concurrent read-modify-writes on the
+        // same column mean whichever reads first and writes last silently
+        // drops the other's field — so restoring these two writes naively
+        // would have traded "never saves" for "saves, then gets wiped."
+        //
+        // The league is re-read here, after allSettled, so the base is the
+        // freshest server state rather than a copy captured before the
+        // concurrent tasks ran.
+        try {
+          const { LeagueService: LSForSettings } = await import('./LeagueService');
+          const { league: freshLeague } = await LSForSettings.getLeague(leagueId);
+          const baseSettings = (freshLeague?.settings as Record<string, unknown>) || {};
+
+          await leagueApi.updateSettings(leagueId, {
+            settings: {
+              ...baseSettings,
+              draftCompletedAt,
+              ...(computedRegularSeasonWeeks && computedRegularSeasonWeeks > 0
+                ? { regularSeasonWeeks: computedRegularSeasonWeeks }
+                : {}),
+            },
+          });
+          logger.log('Saved draftCompletedAt:', draftCompletedAt);
+        } catch (settingsErr) {
+          logger.error('Post-draft task "settings" failed (non-critical):', settingsErr);
+        }
       }
 
       return { pick, error: null, isComplete };
@@ -691,7 +735,12 @@ export const DraftService = {
    */
   async runFullAutopickDraft(
     leagueId: string
-  ): Promise<{ picks: Array<{ round: number; pick: number; teamId: string; playerId: number; playerName: string }>; error: unknown }> {
+  // `playerName` is optional because it is: run_full_autopick_draft is
+  // declared RETURNS TABLE(..., player_name text) with no NOT NULL, so the
+  // server maps a possibly-absent value (verified against the production
+  // catalog 2026-09-03). Promising `string` here would push the null onto a
+  // caller that has no way to know it can arrive.
+  ): Promise<{ picks: Array<{ round: number; pick: number; teamId: string; playerId: number; playerName?: string }>; error: unknown }> {
     try {
       const response = await draftApi.fullAutopick(leagueId);
       return { picks: response.data?.picks || [], error: null };
