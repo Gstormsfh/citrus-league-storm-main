@@ -55,7 +55,7 @@ cheaper than a 40-minute outage in front of every owner in the league.
       It must be a DIRECT connection string; pgbouncer drops LISTEN frames.
 
 - [ ] **Cloud Run is healthy.**
-      `curl -s https://api.citrusfantasy.com/api/health | jq .`
+      `curl -s https://citrusfantasysports.com/api/health | jq .`
       Expected: `{"status":"ok"}` in under 500ms. If slow or failing,
       roll back to the last known-good revision before the draft.
 
