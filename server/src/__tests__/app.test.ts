@@ -109,6 +109,15 @@ describe('API App — Auth Required Routes', () => {
     expect(res.status).toBe(401);
   });
 
+  // 2026-09-03: the career xG history read (nine seasons of player_xg_season
+  // for the card's trend band) sits behind the same middleware. Pinned here
+  // for the same reason as the dashboard: playerDashboardRoute.test.ts stubs
+  // auth out, so only this file proves the gate is real.
+  it('returns 401 for unauthenticated player xG history requests', async () => {
+    const res = await app.request('/api/players/8478402/xg-history');
+    expect(res.status).toBe(401);
+  });
+
   it('returns 401 for invalid Authorization header format', async () => {
     const res = await app.request('/api/leagues', {
       headers: { Authorization: 'InvalidFormat' },

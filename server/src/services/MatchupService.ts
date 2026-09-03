@@ -1,7 +1,298 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { resolveSlotConfig } from '../lib/leagueRules';
-import { COLUMNS, getCurrentSeason, logger, getTodayMST } from '@citrus/shared';
+import {
+  COLUMNS,
+  getCurrentSeason,
+  logger,
+  getTodayMST,
+  isIntermission,
+  normalizeGameState,
+  periodOrdinal,
+  secondsRemaining,
+} from '@citrus/shared';
+import type { LeagueScoreboardMatchup } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
+import { pagedSelect } from '../lib/pagedSelect';
+
+// ============================================================================
+// LEAGUE SCOREBOARD PROJECTIONS (2026-09-03, Sleeper parity audit M7)
+// ============================================================================
+//
+// The league scoreboard strip used to show banked points only, because the
+// league endpoint served `team1_score` / `team2_score` and nothing that
+// could honestly project a stranger's matchup. This section computes, for
+// every matchup of one league-week, the same "proj" the matchup page prints
+// in its sticky bar: points banked + every remaining starter-game's
+// projection, scaled by how much of the game is still unplayed.
+//
+// ONE SOURCE OF TRUTH. The page assembles that number in the browser from
+// three reads it already makes -- the frozen daily rosters
+// (`fantasy_daily_rosters`, slot_type = 'active', else the current
+// `team_lineups.starters`), `get_daily_projections` (a straight read of
+// `player_projected_stats` by player and projection_date), and the game's
+// `nhl_games` row for the clock -- and sums them in
+// `apps/web/src/utils/winProbability.ts` (`collectRemainingGames` +
+// `projectTeam`). The functions below read the same three tables and apply
+// the same fraction rule, so the strip's number for a matchup and the
+// page's number for that matchup are two evaluations of one formula over
+// one dataset. What they cannot share is a module: the page's copy lives
+// under apps/web and the server cannot import it, so the fraction rule is
+// restated here against `@citrus/shared`'s game-state vocabulary and pinned
+// by the same fixtures (MatchupService.leagueScoreboard.test.ts).
+//
+// Pure functions first, so the arithmetic is testable without a database;
+// the class method (`getLeagueScoreboard`) only fetches and hands them rows.
+
+/** The slice of an `nhl_games` row the fraction rule reads. */
+export interface ScoreboardGameRow {
+  status?: string | null;
+  period?: string | null;
+  period_time?: string | null;
+  home_score?: number | null;
+  away_score?: number | null;
+}
+
+/** One `player_projected_stats` row with its `nhl_games` row embedded. */
+export interface ScoreboardProjectionRow {
+  player_id: number | string;
+  /** YYYY-MM-DD */
+  projection_date: string;
+  total_projected_points: number | string | null;
+  /** TIMESTAMPTZ of puck drop; the fallback clock when the game row is missing. */
+  game_start_time?: string | null;
+  /** PostgREST embeds a to-one relation as an object; tolerate an array too. */
+  game?: ScoreboardGameRow | ScoreboardGameRow[] | null;
+}
+
+/** One frozen starter row of `fantasy_daily_rosters` (slot_type = 'active'). */
+export interface ScoreboardRosterRow {
+  matchup_id: string;
+  team_id: string;
+  /** YYYY-MM-DD */
+  roster_date: string;
+  player_id: number | string;
+}
+
+/** One `team_lineups` row: the current lineup, the fallback for a day with no frozen row. */
+export interface ScoreboardLineupRow {
+  team_id: string;
+  /** JSONB array of player ids, numbers or numeric strings. */
+  starters: unknown;
+}
+
+/** The slice of a `matchups` row the projection reads. */
+export interface ScoreboardMatchupRow {
+  id: string;
+  team1_id: string;
+  team2_id: string | null;
+  team1_score: number | string | null;
+  team2_score: number | string | null;
+  status?: string | null;
+  week_start_date: string;
+  week_end_date: string;
+}
+
+export interface ScoreboardProjectionInput {
+  matchups: ScoreboardMatchupRow[];
+  rosters: ScoreboardRosterRow[];
+  lineups: ScoreboardLineupRow[];
+  projections: ScoreboardProjectionRow[];
+  /** YYYY-MM-DD in Mountain Time. */
+  today: string;
+  /** Wall clock, for the no-schedule-row fallback. */
+  nowMs: number;
+}
+
+export interface ScoreboardSideTotals {
+  team1: number | null;
+  team2: number | null;
+}
+
+const REGULATION_PERIODS = 3;
+/** Overtime or a shootout: almost nothing left, but not nothing. */
+const OVERTIME_FRACTION = 0.05;
+/** Wall-clock length of an NHL game, for the no-schedule-row fallback. */
+const GAME_DURATION_MS = 2.5 * 60 * 60 * 1000;
+
+const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
+
+const toPoints = (value: unknown): number => {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+const toPlayerId = (value: unknown): number | null => {
+  const n = typeof value === 'number' ? value : parseInt(String(value ?? ''), 10);
+  return Number.isInteger(n) && n > 0 ? n : null;
+};
+
+/**
+ * Share of a game still unplayed, from its schedule row. The same rule as
+ * `gameFractionRemaining` in apps/web/src/utils/winProbability.ts:
+ *   final / postponed -> 0 . not started -> 1 . OT / SO -> 0.05 .
+ *   period p with mm:ss on the clock -> ((3 - p) * 20 + mm:ss) / 60 .
+ *   intermission after period p -> (3 - p) / 3 . period known, clock
+ *   unknown -> mid-period . started but nothing parseable -> 0.5
+ */
+export function scoreboardGameFraction(game: ScoreboardGameRow): number {
+  const state = normalizeGameState(game.status);
+  if (state === 'final' || state === 'postponed') return 0;
+
+  const scored = toPoints(game.home_score) + toPoints(game.away_score) > 0;
+  const hasPeriod = typeof game.period === 'string' && game.period.trim() !== '';
+  if (state !== 'live' && !scored && !hasPeriod) return 1;
+
+  const ordinal = periodOrdinal(game.period);
+  if (ordinal === null) return 0.5;
+  if (ordinal > REGULATION_PERIODS) return OVERTIME_FRACTION;
+
+  const fullPeriodsLeft = REGULATION_PERIODS - ordinal;
+  if (isIntermission(game.period_time)) return clamp01(fullPeriodsLeft / REGULATION_PERIODS);
+  const seconds = secondsRemaining(game.period_time);
+  if (seconds !== null) return clamp01((fullPeriodsLeft * 20 + seconds / 60) / 60);
+  return clamp01((fullPeriodsLeft + 0.5) / REGULATION_PERIODS);
+}
+
+/** No schedule row: fall back to wall-clock time since the listed puck drop. */
+export function scoreboardFractionFromStartTime(startTime: string | null | undefined, nowMs: number): number {
+  if (!startTime) return 1;
+  const startMs = Date.parse(startTime);
+  if (!Number.isFinite(startMs)) return 1;
+  if (nowMs < startMs) return 1;
+  return clamp01(1 - (nowMs - startMs) / GAME_DURATION_MS);
+}
+
+/** YYYY-MM-DD strings from `start` to `end` inclusive (date-only, DST-safe). */
+export function scoreboardWeekDates(start: string, end: string, maxDays = 10): string[] {
+  const dates: string[] = [];
+  if (!start || !end) return dates;
+  const cursor = new Date(`${start.slice(0, 10)}T12:00:00Z`);
+  const last = new Date(`${end.slice(0, 10)}T12:00:00Z`);
+  if (Number.isNaN(cursor.getTime()) || Number.isNaN(last.getTime())) return dates;
+  while (cursor <= last && dates.length < maxDays) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
+}
+
+/**
+ * A matchup still has something to project: not closed by the scorer, not a
+ * bye, and its week has not ended on the calendar. The same reading as the
+ * strip's `isFinal` (components/matchup/scoreboard.ts), so a chip that says
+ * FINAL never carries a projection.
+ */
+export function isOpenScoreboardMatchup(row: ScoreboardMatchupRow, today: string): boolean {
+  if (row.status === 'completed') return false;
+  if (!row.team2_id) return false;
+  const end = String(row.week_end_date ?? '').slice(0, 10);
+  return end.length === 10 && end >= today;
+}
+
+/**
+ * Projected finals for every open matchup of one league-week.
+ *
+ * For each side: points banked (the stored score) + for every remaining
+ * day, for every starter that day, that starter's projected points scaled by
+ * the share of the game still unplayed. Starters for a day are the frozen
+ * `fantasy_daily_rosters` rows when any exist, else the current lineup --
+ * the matchup page's own precedence. A starter with no projection row that
+ * day is a day off and adds nothing, which is also what the page adds.
+ *
+ * null, never 0, when the number cannot honestly be said: a closed matchup
+ * or a bye; a matchup where either side has no starters on any remaining
+ * day (the page says nothing until both lineups are in hand); or a week
+ * for which no projection row exists at all, when a "projection" would only
+ * restate the live score.
+ */
+export function projectLeagueWeek(input: ScoreboardProjectionInput): Map<string, ScoreboardSideTotals> {
+  const out = new Map<string, ScoreboardSideTotals>();
+  const nothing: ScoreboardSideTotals = { team1: null, team2: null };
+  const noProjections = input.projections.length === 0;
+
+  const frozen = new Map<string, Set<number>>();
+  for (const r of input.rosters) {
+    const pid = toPlayerId(r.player_id);
+    if (pid === null) continue;
+    const key = `${r.matchup_id}|${r.team_id}|${String(r.roster_date).slice(0, 10)}`;
+    let set = frozen.get(key);
+    if (!set) {
+      set = new Set<number>();
+      frozen.set(key, set);
+    }
+    set.add(pid);
+  }
+
+  const current = new Map<string, Set<number>>();
+  for (const l of input.lineups) {
+    const ids = Array.isArray(l.starters) ? l.starters : [];
+    const set = new Set<number>();
+    for (const raw of ids) {
+      const pid = toPlayerId(raw);
+      if (pid !== null) set.add(pid);
+    }
+    if (set.size > 0) current.set(l.team_id, set);
+  }
+
+  const projections = new Map<string, ScoreboardProjectionRow>();
+  for (const p of input.projections) {
+    const pid = toPlayerId(p.player_id);
+    if (pid === null) continue;
+    projections.set(`${pid}|${String(p.projection_date).slice(0, 10)}`, p);
+  }
+
+  const gameOf = (p: ScoreboardProjectionRow): ScoreboardGameRow | null => {
+    const g = p.game;
+    if (!g) return null;
+    return Array.isArray(g) ? (g[0] ?? null) : g;
+  };
+
+  for (const m of input.matchups) {
+    if (!isOpenScoreboardMatchup(m, input.today) || noProjections) {
+      out.set(m.id, nothing);
+      continue;
+    }
+    const remainingDates = scoreboardWeekDates(m.week_start_date, m.week_end_date).filter((d) => d >= input.today);
+
+    const side = (teamId: string): { hasLineup: boolean; remaining: number } => {
+      let hasLineup = false;
+      let remaining = 0;
+      for (const date of remainingDates) {
+        const saved = frozen.get(`${m.id}|${teamId}|${date}`);
+        const starters = saved && saved.size > 0 ? saved : current.get(teamId);
+        if (!starters || starters.size === 0) continue;
+        hasLineup = true;
+        for (const pid of starters) {
+          const projection = projections.get(`${pid}|${date}`);
+          if (!projection) continue;
+          const game = gameOf(projection);
+          const fraction = game
+            ? scoreboardGameFraction(game)
+            : scoreboardFractionFromStartTime(projection.game_start_time, input.nowMs);
+          if (fraction <= 0) continue;
+          remaining += fraction * toPoints(projection.total_projected_points);
+        }
+      }
+      return { hasLineup, remaining };
+    };
+
+    const one = side(m.team1_id);
+    const two = side(m.team2_id as string);
+    if (!one.hasLineup || !two.hasLineup) {
+      out.set(m.id, nothing);
+      continue;
+    }
+    out.set(m.id, {
+      team1: toPoints(m.team1_score) + one.remaining,
+      team2: toPoints(m.team2_score) + two.remaining,
+    });
+  }
+  return out;
+}
 
 /**
  * MatchupService — Server-side matchup management with DI Supabase client.
@@ -33,6 +324,132 @@ export class MatchupService {
 
     const { data, error } = await query;
     return { matchups: data || [], error };
+  }
+
+  /**
+   * The league scoreboard for one week: `getLeagueMatchups(leagueId, week)`
+   * plus a projected final per side (see the section above the class).
+   *
+   * Query shape, one league at a time and never per team or per player:
+   *   1. matchups for the league-week (the read the endpoint already made);
+   *   2. in parallel, the frozen active rosters for those matchups over the
+   *      remaining days (idx_fantasy_daily_rosters_active) and the league's
+   *      current lineups (team_lineups by league_id);
+   *   3. the projections for every starter named by 1-2 over the remaining
+   *      days, with each game's clock embedded through the
+   *      player_projected_stats.game_id -> nhl_games FK
+   *      (idx_proj_player_date_fast + idx_nhl_games_game_id).
+   * Measured on production for a 4-matchup week (2026-09-03): 2.3ms for
+   * step 2's roster read and 1.2ms for step 3, both index scans. Reads 2 and
+   * 3 page at PostgREST's 1000-row clamp so a fully backfilled 12-team week
+   * (~1,200 roster rows) is not silently cut.
+   *
+   * Every read goes through the caller's user-scoped client: matchups,
+   * fantasy_daily_rosters and team_lineups are all league-visible under RLS
+   * to a member of the league (AI teams included, since those policies key
+   * on league membership, not team ownership), and the projection tables are
+   * public reads. A read that fails ships the live scores with null
+   * projections and a warning; it never fails the scoreboard.
+   */
+  async getLeagueScoreboard(
+    leagueId: string,
+    weekNumber: number,
+    today: string = getTodayMST(),
+    nowMs: number = Date.now(),
+  ): Promise<{ matchups: LeagueScoreboardMatchup[]; error: unknown }> {
+    const { matchups, error } = await this.getLeagueMatchups(leagueId, weekNumber);
+    if (error) return { matchups: [], error };
+
+    // getLeagueMatchups selects through a template string, so supabase-js
+    // types its rows as a ParserError; the shape is pinned by
+    // MatchupService.leagueScoreboard.test.ts, not by the select's type.
+    const rows = (matchups || []) as unknown as Array<ScoreboardMatchupRow & Record<string, unknown>>;
+    const withProjections = (totals: Map<string, ScoreboardSideTotals>): LeagueScoreboardMatchup[] =>
+      rows.map((row) => ({
+        ...(row as unknown as LeagueScoreboardMatchup),
+        team1_projected_total: totals.get(row.id)?.team1 ?? null,
+        team2_projected_total: totals.get(row.id)?.team2 ?? null,
+      }));
+    const none = new Map<string, ScoreboardSideTotals>();
+
+    const open = rows.filter((row) => isOpenScoreboardMatchup(row, today));
+    if (open.length === 0) return { matchups: withProjections(none), error: null };
+
+    const weekStart = open.map((r) => String(r.week_start_date).slice(0, 10)).sort()[0];
+    const weekEnd = open.map((r) => String(r.week_end_date).slice(0, 10)).sort().slice(-1)[0];
+    const firstDay = weekStart > today ? weekStart : today;
+    const matchupIds = open.map((r) => r.id);
+    const teamIds = Array.from(new Set(open.flatMap((r) => [r.team1_id, r.team2_id]).filter((id): id is string => !!id)));
+
+    const [rostersRead, lineupsRead] = await Promise.all([
+      pagedSelect<ScoreboardRosterRow>(this.supabase, {
+        table: 'fantasy_daily_rosters',
+        columns: 'matchup_id, team_id, roster_date, player_id',
+        filters: [['slot_type', 'active']],
+        inFilters: [['matchup_id', matchupIds]],
+        rangeFilters: [['roster_date', 'gte', firstDay], ['roster_date', 'lte', weekEnd]],
+        orderBy: ['team_id', 'matchup_id', 'player_id', 'roster_date'],
+      }),
+      this.supabase
+        .from('team_lineups')
+        .select('team_id, starters')
+        .eq('league_id', leagueId)
+        .in('team_id', teamIds),
+    ]);
+
+    if (rostersRead.error || lineupsRead.error) {
+      logger.warn('[getLeagueScoreboard] roster read failed; shipping live scores without projections', {
+        leagueId,
+        weekNumber,
+        rosters: rostersRead.error?.message,
+        lineups: lineupsRead.error?.message,
+      });
+      return { matchups: withProjections(none), error: null };
+    }
+
+    const rosters = rostersRead.data;
+    const lineups = (lineupsRead.data || []) as ScoreboardLineupRow[];
+    const playerIds = new Set<number>();
+    for (const r of rosters) {
+      const pid = toPlayerId(r.player_id);
+      if (pid !== null) playerIds.add(pid);
+    }
+    for (const l of lineups) {
+      for (const raw of Array.isArray(l.starters) ? l.starters : []) {
+        const pid = toPlayerId(raw);
+        if (pid !== null) playerIds.add(pid);
+      }
+    }
+    if (playerIds.size === 0) return { matchups: withProjections(none), error: null };
+
+    const projectionsRead = await pagedSelect<ScoreboardProjectionRow>(this.supabase, {
+      table: 'player_projected_stats',
+      columns:
+        'player_id, projection_date, game_id, total_projected_points, game_start_time, ' +
+        'game:nhl_games!game_id(status, period, period_time, home_score, away_score)',
+      inFilters: [['player_id', Array.from(playerIds)]],
+      rangeFilters: [['projection_date', 'gte', firstDay], ['projection_date', 'lte', weekEnd]],
+      orderBy: ['player_id', 'projection_date', 'game_id'],
+    });
+
+    if (projectionsRead.error) {
+      logger.warn('[getLeagueScoreboard] projection read failed; shipping live scores without projections', {
+        leagueId,
+        weekNumber,
+        error: projectionsRead.error.message,
+      });
+      return { matchups: withProjections(none), error: null };
+    }
+
+    const totals = projectLeagueWeek({
+      matchups: open,
+      rosters,
+      lineups,
+      projections: projectionsRead.data,
+      today,
+      nowMs,
+    });
+    return { matchups: withProjections(totals), error: null };
   }
 
   /** Get a single matchup by ID */

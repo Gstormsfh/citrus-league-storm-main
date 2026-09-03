@@ -7,6 +7,7 @@ import type { HockeyPlayer } from './HockeyPlayerCard';
 import { slotLabel } from './slotLabel';
 import { chipClassFor } from './slotChip';
 import { Mug } from './Mug';
+import { multiPositionLabel } from './positions';
 import { tonight } from './tonight';
 
 /**
@@ -209,6 +210,14 @@ export function SlotPickerMenu({
                   onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                 />
                 <span className="font-semibold">{teamAbbr}</span>
+                {/* His own positions, when there is more than one: the
+                    reason the sheet lists LW spots for a centre (gap A). */}
+                {player && multiPositionLabel(player) && (
+                  <>
+                    <span className="text-white/25">·</span>
+                    <span data-testid="player-positions" className="font-semibold text-pastel-cream/80">{multiPositionLabel(player)}</span>
+                  </>
+                )}
                 {fromLabel && (
                   <>
                     <span className="text-white/25">·</span>

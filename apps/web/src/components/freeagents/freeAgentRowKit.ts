@@ -1,3 +1,15 @@
+// RENAMED 2026-09-03 from `freeAgentRow.ts`.
+//
+// That name differed from the component `FreeAgentRow.tsx` only in the case of
+// one letter. macOS and the CI runner disagree about whether those are two
+// files: on a case-insensitive filesystem Rollup resolved BOTH import
+// specifiers to this module and the build died with
+//   "FreeAgentRow" is not exported by "src/components/freeagents/freeAgentRow.ts"
+// after an unrelated edit invalidated its resolver cache. Vite's default
+// extension order puts `.ts` ahead of `.tsx`, so the collision always favoured
+// this file. Two modules whose names differ only by case is a latent build
+// break; the "kit" suffix removes it. Do not rename this back.
+
 /**
  * Pure helpers and class geometry behind `FreeAgentRow` — kept out of the
  * .tsx because a module that exports a component AND plain values breaks
@@ -283,15 +295,134 @@ export const FA_CHIP = 'shrink-0 whitespace-nowrap snap-start';
  * table". That is the right instinct for a PHONE and the wrong breakpoint
  * for the table: 768-1023 is precisely the band where it fits.
  *
- * A NOTE FOR WHOEVER LOOKS AT THE DESKTOP NEXT. At `lg` and up the page
- * turns into `grid-cols-[200px_1fr_260px]` with `lg:px-4` and `lg:gap-4`,
- * so the content column is `viewport - 524px` — 500px at 1024. The table
- * needs 722. The widest container this table ever gets below ~1250px is a
- * TABLET, and the desktop rails are what make it scroll sideways there.
- * That is a real finding and a separate change; it is written up, not
- * shipped here.
+ * A NOTE FOR WHOEVER LOOKS AT THE DESKTOP NEXT (2026-09-02, kept as
+ * history; the desktop half shipped on 2026-09-03, see FA_PAGE_GRID below).
+ * At `lg` and up the page turned into `grid-cols-[200px_1fr_260px]` with
+ * `lg:px-4` and `lg:gap-4`, so the content column was `viewport - 524px`,
+ * 500px at 1024. The table needs 722. The widest container this table ever
+ * got below ~1250px was a TABLET, and the desktop rails were what made it
+ * scroll sideways there. (The 500 was the grid column; the card inside it
+ * was 50px narrower still, because the column carried `lg:px-6` and the
+ * card a 1px border. The full arithmetic is under FA_PAGE_GRID.)
  */
 export const FA_ROWS_ONLY = 'md:hidden';
 
 /** The other half of the pair above. Never one without the other. */
 export const FA_TABLE_ONLY = 'hidden md:block';
+
+/**
+ * THE DESKTOP GRID, AND WHY THE RIGHT RAIL WAITS FOR 1400px (2026-09-03).
+ *
+ * The pair above decides where the row list gives way to the table: `md`,
+ * because from 768 the table fits. What it could not decide was whether the
+ * table STILL fit once the desktop rails arrived at `lg`, and it did not.
+ * The page grid was `lg:grid-cols-[200px_1fr_260px]` with `lg:px-4` and
+ * `lg:gap-4`, then `xl:grid-cols-[220px_1fr_280px]` with `xl:px-6` and
+ * `xl:gap-6`; the content column carried `lg:px-6` and the pool card a 1px
+ * border on each side. So the card was:
+ *
+ *   `lg` (1024-1279)   viewport - 32 - 200 - 260 - 2x16 - 48 - 2 = viewport - 574
+ *   `xl` (1280 and up) viewport - 48 - 220 - 280 - 2x24 - 48 - 2 = viewport - 646
+ *
+ * against a table whose minimum content width is 722px (measured above):
+ *
+ *   viewport   card    table fits?   (HISTORY: the 2026-09-02 grid)
+ *   1023       1005    yes, by 283px   the last tablet width
+ *   1024        450    no, short 272   the `lg` floor
+ *   1279        705    no, short 17    the top of the `lg` band
+ *   1280        634    no, short 88    `xl`, and the rails grew with it
+ *   1366        720    no, short 2
+ *   1368        722    exactly         the first desktop width that fit
+ *   1440        794    yes, by 72px    the repo's other Chromium width
+ *                                      (stickyScrollContainerGuard)
+ *
+ * Every laptop narrower than 1368 was scrolling the decision column off
+ * the right edge, and a 1023px tablet had 555px more room for this table
+ * than a 1024px laptop did. Sleeper, Yahoo and ESPN all keep the
+ * projection column on screen on a tablet; this page was hiding it on a
+ * laptop, behind a notifications feed that the Navbar bell already opens
+ * as a slide-over on every viewport (Navbar.tsx).
+ *
+ * THE FIX IS THE RAIL, NOT THE TABLE. The notifications rail is the
+ * column the page can do without (its content is one click away), and
+ * the codebase already has the two-column shape for pages that render no
+ * rail (`lg:grid-cols-[200px_1fr] xl:grid-cols-[220px_1fr]` on Matchup,
+ * Standings, GMOffice and PlayoffBracket). So:
+ *
+ *   * `lg` and `xl` use that two-column grid, and the content column's
+ *     desktop padding starts at `lg:px-4` (Matchup's rung) and grows to
+ *     `xl:px-6` where there is room;
+ *   * the rail, and the third grid column that holds it, arrive together
+ *     at `min-[1400px]`. Both strings spell the number out in full because
+ *     Tailwind's scanner only generates a class it can read verbatim from
+ *     the source; a template-built class name produces no CSS. The test
+ *     pins that the two literals and FA_RAIL_MIN_VIEWPORT agree.
+ *
+ * MEASURED, by the same arithmetic (Tailwind's default screens, none of
+ * which tailwind.config.ts overrides; `px-2`/`px-4`/`px-6` = 8/16/24px a
+ * side, `gap-4`/`gap-6` = 16/24px, `border` = 1px). The card is:
+ *
+ *   below `lg`            viewport - 16 - 2                          = viewport - 18
+ *   `lg` (1024-1279)      viewport - 32 - 200 - 16 - 32 - 2          = viewport - 282
+ *   `xl` (1280-1399)      viewport - 48 - 220 - 24 - 48 - 2          = viewport - 342
+ *   1400 up, with rail    viewport - 48 - 220 - 280 - 2x24 - 48 - 2  = viewport - 646
+ *   1400 up, no rail      viewport - 342 (a guest, or no active league)
+ *
+ *   viewport   card    table fits?
+ *   768        750     yes, by 28px    Tailwind `md`, unchanged
+ *   1023       1005    yes, by 283px   unchanged
+ *   1024       742     yes, by 20px    the `lg` floor; was 450
+ *   1279       997     yes, by 275px
+ *   1280       938     yes, by 216px   `xl`; was 634
+ *   1366       1024    yes, by 302px   was 720
+ *   1399       1057    yes, by 335px   the last width without the rail
+ *   1400       754     yes, by 32px    the rail returns; was 754 too
+ *   1440       794     yes, by 72px    unchanged
+ *   1536       890     yes, by 168px   Tailwind `2xl`, unchanged
+ *
+ * WHY 1400 AND NOT 1368 OR `2xl`. 1368 is where the three-column grid
+ * fits by 0px; 1400 gives it the same order of slack `md` has (32 vs 28)
+ * and is a width the design already thinks in (tailwind.config.ts sets
+ * the `.container` cap there). `2xl` is 1536, which would take the rail
+ * off every laptop between 1440 and 1535 wide for no reason. The widths
+ * between 1368 and 1399 are given up knowingly: 32px of viewports.
+ *
+ * `FreeAgents.desktopRail.test.tsx` computes this table from the class
+ * strings below and fails if any breakpoint where FA_TABLE_ONLY shows the
+ * table hands it fewer than FA_TABLE_MIN_WIDTH pixels. The numbers above
+ * are the numbers it asserts; change one, and you change the other.
+ *
+ * Caveats the arithmetic does not cover: `lg:w-screen` is 100vw, which on
+ * a browser with a classic (non-overlay) scrollbar is wider than the
+ * layout viewport by the scrollbar; and the 722 was measured with the
+ * eleven skater columns, so a pool that shows the three goalie columns
+ * beside them (position filter ALL, goalies present) is wider than 722
+ * and is measured nowhere yet.
+ */
+export const FA_TABLE_MIN_WIDTH = 722;
+
+/** The viewport width, in px, from which the three-column grid holds the table. */
+export const FA_RAIL_MIN_VIEWPORT = 1400;
+
+/**
+ * The page grid without the notifications rail: a flex column on a phone,
+ * two columns from `lg`. The `w-screen`/`left-1/2`/`-translate-x-1/2` trio
+ * is what every three-rail page in the app does to escape its container.
+ */
+export const FA_PAGE_GRID =
+  'flex flex-col lg:grid lg:grid-cols-[200px_1fr] xl:grid-cols-[220px_1fr] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2';
+
+/**
+ * Added to FA_PAGE_GRID only when the notifications rail renders, so a
+ * guest never gets an empty 280px column. One breakpoint, spelled out.
+ */
+export const FA_PAGE_GRID_WITH_RAIL = 'min-[1400px]:grid-cols-[220px_1fr_280px]';
+
+/** The content column. `lg:px-4` is what buys the 20px at 1024. */
+export const FA_CONTENT_COLUMN = 'min-w-0 px-2 lg:px-4 xl:px-6 order-1 lg:order-2';
+
+/** The notifications rail. Same breakpoint as FA_PAGE_GRID_WITH_RAIL, always. */
+export const FA_NOTIFICATIONS_RAIL = 'hidden min-[1400px]:block order-3';
+
+/** The pool card. Its `border` is the 2px in every line of the table above. */
+export const FA_POOL_CARD = 'border rounded-lg overflow-hidden';

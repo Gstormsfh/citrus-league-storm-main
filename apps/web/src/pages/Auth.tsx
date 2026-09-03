@@ -1,6 +1,7 @@
 import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { useAuth } from '@/contexts/AuthContext';
 import { interceptExternal } from '@/lib/openExternal';
 import { supabase } from '@/integrations/supabase/client';
@@ -60,6 +61,81 @@ const Auth = () => {
       navigate(redirect && redirect.startsWith('/') ? redirect : '/', { replace: true });
     }
   }, [user, authLoading, navigate]);
+
+  // OAUTH RESUME (2026-09-03), found on device, submission-blocking.
+  // handleOAuthSignIn sets oauthLoading on tap and cleared it only when
+  // signInWithOAuth returned an error or threw. In the iOS shell that call
+  // succeeds the moment the system browser sheet is up (nativeAuth.ts,
+  // beginNativeOAuth), and the only thing that ever fired afterwards was the
+  // citrussports://auth-callback deep link. Cancel the sheet, or fail inside
+  // it, and nothing fires: oauthLoading stays 'google' or 'apple', every
+  // button on this screen is disabled on it (the email form's submit
+  // included), and only a force-quit clears it. Two symptoms, one cause:
+  // after a Google attempt the email form is dead, and a cancelled Apple or
+  // Google attempt freezes the screen.
+  //
+  // The fix treats "the app came back with no session" as a first-class
+  // path: any signal that the user is looking at this screen again clears
+  // the flag. Clearing is harmless on the success path, where the deep-link
+  // handler mints the session and the user effect above navigates away.
+  //   - browserFinished: the user closed the sheet. The iOS Browser plugin
+  //     fires it from safariViewControllerDidFinish and
+  //     presentationControllerDidDismiss (tap Done, or swipe the sheet
+  //     away), and not from the programmatic Browser.close() the callback
+  //     path uses.
+  //   - appUrlOpen: the callback itself arrived, with a code or with
+  //     ?error=. nativeAuth.ts closes the sheet programmatically on this
+  //     path, so browserFinished never fires for a provider-side failure.
+  //   - appStateChange (isActive): the app regained focus. Android Custom
+  //     Tabs cover the activity, so this is the resume signal there, and it
+  //     covers a user who left for another app mid-flow and came back.
+  //   - visibilitychange / pageshow: the web analogue. Back from the
+  //     provider page restores this document from bfcache with the flag
+  //     still set.
+  // Locked by __tests__/Auth.oauthCancel.test.tsx.
+  useEffect(() => {
+    const clearStuckOAuth = () => setOauthLoading(null);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') clearStuckOAuth();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pageshow', clearStuckOAuth);
+
+    // The plugins are dynamic imports, as in nativeAuth.ts, so registration
+    // is asynchronous. `removed` covers an unmount that lands before it
+    // resolves, which is how StrictMode's double mount would otherwise leak
+    // a listener.
+    let removed = false;
+    const handles: PluginListenerHandle[] = [];
+    if (Capacitor.isNativePlatform()) {
+      (async () => {
+        const [{ App }, { Browser }] = await Promise.all([
+          import('@capacitor/app'),
+          import('@capacitor/browser'),
+        ]);
+        const registered = await Promise.all([
+          Browser.addListener('browserFinished', clearStuckOAuth),
+          App.addListener('appUrlOpen', clearStuckOAuth),
+          App.addListener('appStateChange', ({ isActive }) => {
+            if (isActive) clearStuckOAuth();
+          }),
+        ]);
+        for (const handle of registered) {
+          if (removed) handle.remove();
+          else handles.push(handle);
+        }
+      })().catch(() => {
+        /* plugin unavailable: the document listeners above still apply */
+      });
+    }
+
+    return () => {
+      removed = true;
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pageshow', clearStuckOAuth);
+      for (const handle of handles) handle.remove();
+    };
+  }, []);
 
   const validateEmail = (email: string): boolean => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -192,6 +268,10 @@ const Auth = () => {
     const providerLabel = provider === 'apple' ? 'Apple' : 'Google';
     try {
       const { error } = await signInWithOAuth(provider);
+      // No error means "the hand-off happened", not "signed in": on native
+      // the sheet is up and the session arrives by deep link, on web the tab
+      // is navigating away. oauthLoading is cleared here only on failure; a
+      // cancelled or abandoned attempt is cleared by the OAUTH RESUME effect.
       // Route through getBetterErrorMessage so a provider that is not yet
       // enabled in Supabase degrades to warm copy ("That sign-in method
       // isn't hooked up yet…") instead of a raw API string.

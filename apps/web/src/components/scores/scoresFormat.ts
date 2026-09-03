@@ -23,12 +23,15 @@ import { formatTimeMST, getTodayMST } from '@/utils/timezoneUtils';
  * Everything else defers to `gameStateLabel`, the shared vocabulary, so the
  * server and the browser cannot drift on what "Final/OT" means.
  *
- * A scheduled game with no `game_time` prints "Scheduled" rather than a
- * fabricated puck drop.
+ * A scheduled game with no `game_time` prints the shared vocabulary's word
+ * for that state rather than a fabricated puck drop, so the wording cannot
+ * drift from what the server believes.
  */
 export function rowStatusText(game: ScoreboardGame): string {
   if (game.state === 'scheduled') {
-    return game.startsAt ? formatTimeMST(game.startsAt) : 'Scheduled';
+    return game.startsAt
+      ? formatTimeMST(game.startsAt)
+      : gameStateLabel(game.state, game.period, game.periodTime);
   }
   return gameStateLabel(game.state, game.period, game.periodTime);
 }

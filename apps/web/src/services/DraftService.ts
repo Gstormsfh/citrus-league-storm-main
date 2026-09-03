@@ -223,7 +223,7 @@ export const DraftService = {
           (async () => {
             logger.log('Saving draft snapshot...');
             const teamsResponse = await leagueApi.getTeams(leagueId, true);
-            const snapshotTeams = teamsResponse.data;
+            const snapshotTeams = teamsResponse.data as Team[] | undefined;
             const { picks: snapshotPicks } = await this.getDraftPicks(leagueId, '', targetSessionId);
             if (snapshotTeams && snapshotPicks) {
               const playerIds = snapshotPicks.map(p => p.player_id);
@@ -688,7 +688,11 @@ export const DraftService = {
   async getDraftSnapshot(leagueId: string): Promise<{ snapshot: DraftSnapshot | null; error: unknown }> {
     try {
       const response = await draftApi.getSnapshot(leagueId);
-      return { snapshot: (response.data as DraftSnapshot | undefined) || null, error: null };
+      // The client types the snapshot body as a bare record. DraftSnapshot is an
+      // interface, so it has no implicit index signature; intersecting it with that
+      // record type keeps the two comparable without widening through `unknown`.
+      const snapshot = response.data as (DraftSnapshot & Record<string, unknown>) | null | undefined;
+      return { snapshot: snapshot || null, error: null };
     } catch (error: unknown) {
       logger.error('Error getting draft snapshot:', error);
       return { snapshot: null, error };

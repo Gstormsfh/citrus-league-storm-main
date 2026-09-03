@@ -29,8 +29,14 @@ export type GenericNotificationKind = Extract<
  * What a status pill MEANS, not what colour it is. Call sites name the
  * meaning; this module owns the paint, so a colour can be re-tuned in one
  * place without a sweep through 35 files.
+ *
+ * `neutral` (2026-09-03) is for a state that is a fact and not a verdict: a
+ * drop, a lineup lock. Painting those sage would say "good for you" and
+ * orange would say "act now", and a card that asserts a valence the event
+ * does not have is the leak the matchup's identity-vs-standing rule exists
+ * to stop (StickyScoreBar.tsx: orange is YOU, sage is AHEAD, nothing else).
  */
-export type StatusTone = 'good' | 'attention' | 'bad';
+export type StatusTone = 'good' | 'attention' | 'bad' | 'neutral';
 
 export interface ToastStatus {
   label: string;
@@ -63,6 +69,14 @@ export const STATUS_TONE_CLASSES: Record<StatusTone, string> = {
   good: 'bg-pastel-sage text-pastel-forest',
   attention: 'bg-pastel-orange text-premium-orange-deep',
   bad: 'bg-fantasy-grapefruit-red text-pastel-forest',
+  // `sage-soft` is the token tailwind.config.ts labels "pale sage for
+  // chips/borders" -- the sanctioned chip fill. Computed with the WCAG 2.x
+  // formula from the config hexes (2026-09-03), not photographed:
+  //   neutral   #C8DCC4 + #1B3022 (pastel-forest) ......... 9.71:1  pass
+  // The dark surface tokens were tried first and rejected: every one of
+  // them sits at 1.0-1.3:1 against the #1A2A20 tile, which is not a pill,
+  // it is the tile.
+  neutral: 'bg-pastel-sage-soft text-pastel-forest',
 };
 
 /** Geometry and type of the pill. No `text-*` here — the tone map owns it. */

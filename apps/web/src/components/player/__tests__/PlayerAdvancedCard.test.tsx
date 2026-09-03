@@ -13,11 +13,13 @@ import { MemoryRouter } from 'react-router-dom';
 const { getMock } = vi.hoisted(() => ({ getMock: vi.fn() }));
 vi.mock('@/api/client', () => ({ apiClient: { get: getMock } }));
 
+import type { XgHistoryPoint } from '@citrus/shared';
 import { PlayerAdvancedCard } from '../PlayerAdvancedCard';
-import { resetPlayerDashboardIndex, type DashboardIndexEntry } from '@/hooks/usePlayerDashboardIndex';
+import { type CardEntry } from '../playerAdvancedMetrics';
+import { resetPlayerDashboardIndex } from '@/hooks/usePlayerDashboardIndex';
 
 let seq = 900;
-function entry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntry {
+function entry(over: Partial<CardEntry> = {}): CardEntry {
   return {
     id: seq++,
     name: 'Connor McDavid',
@@ -50,6 +52,15 @@ function entry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntry {
     gar_ppo: 0.14,
     gar_ppd: 0.0,
     gar_pen: 0.03,
+    toi_total_minutes: null,
+    avg_toi_per_game: null,
+    vopa_score: null,
+    gsax_raw: null,
+    gsax_regressed: null,
+    gsax_shots_faced: null,
+    gsax_xga: null,
+    gsax_ga: null,
+    as_of: null,
     proj_gp: 42,
     proj_fantasy_points: 318.4,
     proj_fantasy_ppg: 7.58,
@@ -66,7 +77,7 @@ function entry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntry {
   };
 }
 
-function goalieEntry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntry {
+function goalieEntry(over: Partial<CardEntry> = {}): CardEntry {
   return entry({
     name: 'Andrei Vasilevskiy',
     team: 'TBL',
@@ -99,7 +110,7 @@ function goalieEntry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEnt
 }
 
 /** A believable cohort so percentiles have something to be measured against. */
-function league(): DashboardIndexEntry[] {
+function league(): CardEntry[] {
   const forwards = [0.6, 0.7, 0.8, 0.9, 1.0, 1.05, 1.1, 1.15, 1.2, 1.3].map((xg, i) =>
     entry({ name: `Forward ${i}`, xg_per_60: xg, gar_per_60: xg / 2, goals: 10 + i, x_goals: 12 + i }),
   );
@@ -107,10 +118,37 @@ function league(): DashboardIndexEntry[] {
     entry({ name: `Dman ${i}`, position: 'D', xg_per_60: xg, gar_per_60: xg, goals: 3 + i, x_goals: 4 + i }),
   );
   const tendies = [0.895, 0.902, 0.908, 0.912, 0.918].map((sv, i) =>
-    goalieEntry({ name: `Tendy ${i}`, save_pct: sv, gaa: 3.2 - i * 0.2, wins: 10 + i, shutouts: i }),
+    goalieEntry({
+      name: `Tendy ${i}`,
+      save_pct: sv,
+      gaa: 3.2 - i * 0.2,
+      wins: 10 + i,
+      shutouts: i,
+      gsax_raw: -6 + i * 3,
+      gsax_regressed: -4 + i * 2,
+      gsax_shots_faced: 900 + i * 100,
+      gsax_xga: 90,
+      gsax_ga: 94 - i * 3,
+    }),
   );
   return [...forwards, ...dmen, ...tendies];
 }
+
+/** A career arc of the given seasons, regular season, ascending xG. */
+function arc(seasons: number[]): XgHistoryPoint[] {
+  return seasons.map((season, i): XgHistoryPoint => ({
+    season,
+    game_type: 'regular',
+    shots: 200 + i,
+    sog: 120 + i,
+    goals: 20 + i,
+    xg: 18 + i * 2.5,
+    finishing: 2 - i * 1.5,
+    teams: 1,
+  }));
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function renderCard(props: Parameters<typeof PlayerAdvancedCard>[0]) {
   return render(
@@ -311,5 +349,145 @@ describe('PlayerAdvancedCard — goalie', () => {
   it('projects wins, saves and shutouts rather than goals and assists', () => {
     renderCard({ playerId: 8476883, indexOverride: index, variant: 'expanded' });
     expect(screen.getByText(/18.0 W · 760.0 SV · 3.0 SO/)).toBeInTheDocument();
+  });
+
+  // ── GSAx (2026-09-03) ─────────────────────────────────────────────
+
+  it('leads the goalie card with GSAx, on the compact variant too', () => {
+    const vasy = goalieEntry({ id: 8476883, gsax_raw: 11.2, gsax_regressed: 8.2, gsax_shots_faced: 1204, gsax_xga: 96.2, gsax_ga: 85 });
+    renderCard({ playerId: 8476883, indexOverride: [...league(), vasy] });
+    expect(screen.getByText('GSAx')).toBeInTheDocument();
+    // The REGRESSED value, which is the number the modal's own GSAx cell
+    // under this card prints. Raw would put +11.2 above a +8.2.
+    expect(screen.getByText('+8.2')).toBeInTheDocument();
+    expect(screen.queryByText('+11.2')).not.toBeInTheDocument();
+    // Measured inside G: the best regressed GSAx among the six goalies.
+    // Read off the bullet's own accessible name, because wins and shutouts
+    // also sit at 100th for this fixture and a bare text query would be
+    // ambiguous.
+    expect(screen.getByRole('img', { name: /^GSAx/ })).toHaveAccessibleName(
+      /100th percentile, value \+8\.2/,
+    );
+  });
+
+  it('says the GSAx read in prose, naming the source and the shot sample', () => {
+    const vasy = goalieEntry({ id: 8476883, gsax_regressed: 8.2, gsax_shots_faced: 1204 });
+    renderCard({ playerId: 8476883, indexOverride: [...league(), vasy] });
+    const verdict = screen.getByTestId('advanced-card-verdict');
+    expect(verdict).toHaveTextContent('Citrus GSAx');
+    expect(verdict).toHaveTextContent('1,204 primary shots');
+    expect(verdict).toHaveTextContent('among goalies');
+  });
+
+  it('shows no GSAx row and falls back to the save-rate verdict when the join is empty', () => {
+    // `subject` carries no GSAx. The row is dropped, not printed as 0.0,
+    // and the compact card still fills its four rows from what IS there
+    // rather than leaving the slot empty.
+    renderCard({ playerId: 8476883, indexOverride: index });
+    expect(screen.queryByText('GSAx')).not.toBeInTheDocument();
+    for (const label of ['Save rate', 'Goals against', 'Wins', 'Shutouts']) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    expect(screen.getByTestId('advanced-card-verdict')).toHaveTextContent('save rate');
+  });
+
+  it('never shows a skater a GSAx row', () => {
+    renderCard({ playerId: 8478402, indexOverride: [...league(), entry({ id: 8478402 })], variant: 'expanded' });
+    expect(screen.queryByText('GSAx')).not.toBeInTheDocument();
+  });
+});
+
+// ── The career trend (2026-09-03) ───────────────────────────────────
+
+describe('PlayerAdvancedCard: career trend', () => {
+  const subject = entry({ id: 8478402 });
+  const index = [...league(), subject];
+
+  it('draws the sparkline on the expanded card when two or more seasons are on record', () => {
+    renderCard({ playerId: 8478402, indexOverride: index, variant: 'expanded', historyOverride: arc([2023, 2024, 2025]) });
+    const band = screen.getByTestId('advanced-card-trend');
+    expect(band).toHaveTextContent('Citrus xG by season');
+    expect(band).toHaveTextContent('2023-24 to 2025-26 · 3 seasons');
+    // The newest season's value, to the two decimals the dashboard prints.
+    expect(band).toHaveTextContent('23.00');
+  });
+
+  it('renders NOTHING for a one-season player: not a tile, not a one-point line', () => {
+    // 413 of the 1,900 players in player_xg_season have exactly one regular
+    // season (production, 2026-09-03). They get the card they always got.
+    renderCard({ playerId: 8478402, indexOverride: index, variant: 'expanded', historyOverride: arc([2025]) });
+    expect(screen.queryByTestId('advanced-card-trend')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Not enough data/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/xG by season/i)).not.toBeInTheDocument();
+  });
+
+  it('renders nothing when the history is absent or empty', () => {
+    for (const history of [null, []]) {
+      const { unmount } = renderCard({ playerId: 8478402, indexOverride: index, variant: 'expanded', historyOverride: history });
+      expect(screen.queryByTestId('advanced-card-trend')).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it('never draws on the compact card, whatever the history says', () => {
+    // The compact card has a height budget and mounts on list surfaces.
+    renderCard({ playerId: 8478402, indexOverride: index, variant: 'compact', historyOverride: arc([2021, 2022, 2023, 2024, 2025]) });
+    expect(screen.queryByTestId('advanced-card-trend')).not.toBeInTheDocument();
+  });
+
+  it('does not fetch the history when one is injected, or when the index is', () => {
+    renderCard({ playerId: 8478402, indexOverride: index, variant: 'expanded', historyOverride: arc([2024, 2025]) });
+    renderCard({ playerId: 8478402, indexOverride: index, variant: 'expanded' });
+    expect(getMock).not.toHaveBeenCalled();
+  });
+});
+
+// ── Freshness and the sample (2026-09-03) ──────────────────────────
+
+describe('PlayerAdvancedCard: freshness badge', () => {
+  it('wears the badge only when the row carries a real, stale timestamp', () => {
+    const stale = entry({ id: 4141, as_of: new Date(Date.now() - 30 * DAY_MS).toISOString() });
+    renderCard({ playerId: 4141, indexOverride: [...league(), stale] });
+    const badge = screen.getByTestId('advanced-card-freshness');
+    expect(badge).toHaveTextContent(/Outdated/);
+    expect(badge).toHaveTextContent(/30 days ago/);
+  });
+
+  it('shows nothing for a fresh row: the badge is a warning, not furniture', () => {
+    const fresh = entry({ id: 4242, as_of: new Date().toISOString() });
+    renderCard({ playerId: 4242, indexOverride: [...league(), fresh] });
+    expect(screen.queryByTestId('advanced-card-freshness')).not.toBeInTheDocument();
+  });
+
+  it('shows nothing when there is no timestamp, and never claims one is unavailable', () => {
+    // Passing null to StaleDataBadge renders "Very outdated / Update
+    // timestamp unavailable", which is the false claim the first cut of
+    // this card refused to ship. The badge is not mounted at all.
+    const unstamped = entry({ id: 4343, as_of: null });
+    renderCard({ playerId: 4343, indexOverride: [...league(), unstamped] });
+    expect(screen.queryByTestId('advanced-card-freshness')).not.toBeInTheDocument();
+    expect(screen.queryByText(/timestamp unavailable/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Very outdated/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('PlayerAdvancedCard: the sample behind the rates', () => {
+  it('prints games and the minutes the per-60 rows are divided by', () => {
+    const mcdavid = entry({ id: 8478402, gp: 82, toi_total_minutes: 1884.8 });
+    renderCard({ playerId: 8478402, indexOverride: [...league(), mcdavid] });
+    expect(screen.getByTestId('advanced-card-deployment')).toHaveTextContent('82 GP · 1,885 min');
+  });
+
+  it('prints minutes a night and VOPA only when the table carries them', () => {
+    const filled = entry({ id: 5151, gp: 82, toi_total_minutes: 1884.8, avg_toi_per_game: 22.98, vopa_score: 3.114 });
+    const { unmount } = renderCard({ playerId: 5151, indexOverride: [...league(), filled] });
+    expect(screen.getByTestId('advanced-card-deployment')).toHaveTextContent('82 GP · 1,885 min · 23.0 min/GP · VOPA +3.11');
+    unmount();
+
+    // A goalie has no GAR row, so no minutes: the line is games alone.
+    const tendy = goalieEntry({ id: 5252, gp: 58 });
+    renderCard({ playerId: 5252, indexOverride: [...league(), tendy] });
+    expect(screen.getByTestId('advanced-card-deployment')).toHaveTextContent('58 GP');
+    expect(screen.getByTestId('advanced-card-deployment')).not.toHaveTextContent('min');
   });
 });

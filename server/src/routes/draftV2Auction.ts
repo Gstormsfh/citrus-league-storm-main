@@ -229,7 +229,12 @@ draftV2AuctionRoutes.post(
         .select('id, status')
         .eq('league_id', leagueId)
         .eq('player_id', body.player_id)
-        .in('status', ['active', 'closed']);
+        // The RPC's statuses are active / sold / no_sale / cancelled
+        // (20260722000000_staging_schema_alignment.sql:131). 'closed' was
+        // never written, so a sold player passed this check, could be
+        // nominated again, and the lot close then hit the unique-pick index
+        // and left the engine with no deadline to re-arm. Found 2026-09-03.
+        .in('status', ['active', 'sold']);
       if ((priorNoms ?? []).length > 0) {
         throw AppError.badRequest('player_taken: that player has already been nominated or won');
       }

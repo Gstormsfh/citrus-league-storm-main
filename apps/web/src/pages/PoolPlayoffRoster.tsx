@@ -444,11 +444,14 @@ export default function PoolPlayoffRosterEntry() {
             case 'hit': return p.hits;
             case 'blk': return p.blocks;
             case 'pm_svpct': {
-              if (normalizePos(p.position) === 'G') return (p.save_pct ?? p.save_percentage ?? 0);
+              // save_pct / gaa are numeric columns PostgREST can hand back as
+              // text, so the sort key is coerced the same way the goalie stat
+              // cells below already do it.
+              if (normalizePos(p.position) === 'G') return Number(p.save_pct ?? p.save_percentage ?? 0);
               return p.plus_minus ?? 0;
             }
             case 'xg_gaa': {
-              if (normalizePos(p.position) === 'G') return (p.gaa ?? p.goals_against_average ?? 0);
+              if (normalizePos(p.position) === 'G') return Number(p.gaa ?? p.goals_against_average ?? 0);
               return p.xGoals ?? p.x_goals ?? 0;
             }
             case 'toi': return p.icetime_seconds && p.games_played ? p.icetime_seconds / p.games_played : 0;

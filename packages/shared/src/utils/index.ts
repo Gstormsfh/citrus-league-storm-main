@@ -10,3 +10,4 @@ export * from './draftGuide';
 export * from './practiceDraft';
 export * from './gameState';
 export * from './seasonPhase';
+export * from './positionEligibility';

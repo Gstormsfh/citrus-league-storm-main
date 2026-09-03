@@ -771,7 +771,7 @@ const TradeAnalyzer = () => {
                   })}
                   {filteredMyTeam.length === 0 && (
                     <div className="text-center p-4 text-white/55 text-sm">
-                      {loading ? "Loading roster…" : "No players found"}
+                      {loading ? "Loading roster…" : searchMyTeam ? "Nobody matches that search" : "This roster is empty"}
                     </div>
                   )}
                 </div>
@@ -1011,7 +1011,9 @@ const TradeAnalyzer = () => {
                         );
                       })}
                       {filteredTheirTeam.length === 0 && (
-                        <div className="text-center p-4 text-white/55 text-sm">No players found</div>
+                        <div className="text-center p-4 text-white/55 text-sm">
+                          {searchTheirTeam ? "Nobody matches that search" : "This roster is empty"}
+                        </div>
                       )}
                     </div>
                   </ScrollArea>

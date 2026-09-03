@@ -571,7 +571,20 @@ async function loadAuctionConfig(
   // Active nomination (informational; replay is authoritative).
   const { data: activeNom } = await supabaseAdmin
     .from('auction_nominations')
-    .select('id, player_id, nominator_team_id, leading_bidder_id, leading_bid, expires_at')
+    // COLUMN NAMES (fixed 2026-09-03). This select named three
+    // columns that do not exist on `auction_nominations`
+    // (nominator_team_id / leading_bidder_id / leading_bid). Every
+    // auction lobby construction therefore logged
+    // "column auction_nominations.nominator_team_id does not exist"
+    // in postgres_logs (first hit 2026-09-01T17:15:22.398Z, one
+    // second after league a1a125c8 ignited, then once every ~3s from
+    // 18:08 on). The error is swallowed because only `data` is
+    // destructured, so `activeNom` silently came back null forever.
+    // Real columns per information_schema: nominated_by_team_id,
+    // current_high_bidder_team_id, current_high_bid.
+    .select(
+      'id, player_id, nominated_by_team_id, current_high_bidder_team_id, current_high_bid, expires_at',
+    )
     .eq('league_id', leagueId)
     .eq('status', 'active')
     .order('id', { ascending: false })
@@ -581,9 +594,9 @@ async function loadAuctionConfig(
     ? {
         nominationId: String(activeNom.id),
         playerId: String(activeNom.player_id),
-        nominatorTeamId: String(activeNom.nominator_team_id),
-        leadingBidderId: String(activeNom.leading_bidder_id),
-        leadingBid: Number(activeNom.leading_bid),
+        nominatorTeamId: String(activeNom.nominated_by_team_id),
+        leadingBidderId: String(activeNom.current_high_bidder_team_id),
+        leadingBid: Number(activeNom.current_high_bid),
         expiresAt: new Date(activeNom.expires_at as string),
       }
     : null;

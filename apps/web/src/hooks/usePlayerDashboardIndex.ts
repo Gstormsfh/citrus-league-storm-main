@@ -68,75 +68,13 @@ import { logger } from '@/utils/logger';
 /**
  * One row of `/api/players/dashboard-index`.
  *
- * Mirrors `DashboardIndexEntry` in `server/src/services/PlayerDashboardService.ts`.
- * The two are hand-kept in sync because the web app does not import from the
- * server workspace; if you add a column there, add it here.
- *
- * NOT in this payload today, and deliberately not added on this branch:
- * `goalie_gsax_primary` (GSAx — 98 goalies carry it in prod for 2025),
- * `player_talent_metrics.vopa_score` / `avg_toi_per_game`,
- * `player_gar_components.toi_total_minutes` (selected server-side, dropped
- * before the response), and any multi-season history — `player_xg_season`
- * holds 2017–2025 but the endpoint only ever reads the current season. Each
- * is a server change; see the follow-ups noted in
- * `components/player/playerAdvancedMetrics.ts`.
+ * The wire contract lives in `@citrus/shared` (packages/shared/src/types/
+ * playerDashboard.ts) and the server imports the same type, so a column added
+ * on one side is a type error on the other rather than a silent mismatch. It
+ * used to be hand-copied here and kept in sync by comment; the copy is gone.
  */
-export interface DashboardIndexEntry {
-  id: number;
-  name: string;
-  team: string;
-  position: string;
-  jersey: number | null;
-  headshot_url: string | null;
-  is_goalie: boolean;
-  roster_status: string | null;
-  // season actuals
-  gp: number;
-  goals: number;
-  assists: number;
-  points: number;
-  sog: number;
-  hits: number;
-  blocks: number;
-  ppp: number;
-  plus_minus: number;
-  x_goals: number;
-  // goalie actuals
-  wins: number;
-  saves: number;
-  save_pct: number;
-  gaa: number;
-  shutouts: number;
-  // advanced
-  xg_per_60: number | null;
-  xg_rating: string | null;
-  gar_per_60: number | null;
-  gar_evo: number | null;
-  gar_evd: number | null;
-  gar_ppo: number | null;
-  gar_ppd: number | null;
-  gar_pen: number | null;
-  // rolled-forward projection
-  proj_gp: number | null;
-  proj_fantasy_points: number | null;
-  proj_fantasy_ppg: number | null;
-  proj_goals: number | null;
-  proj_assists: number | null;
-  proj_sog: number | null;
-  proj_ppp: number | null;
-  /**
-   * Projected blocks and hits (2026-09-02). Both are columns on
-   * `player_ros_projections` that `PlayerDashboardService` selected and then
-   * dropped; the draft room needs them to score a rest-of-season projection
-   * through a league's own categories (blocks are 1 point in the default
-   * set). Null for a player with no projection row.
-   */
-  proj_blocks: number | null;
-  proj_hits: number | null;
-  proj_wins: number | null;
-  proj_saves: number | null;
-  proj_shutouts: number | null;
-}
+import type { DashboardIndexEntry } from '@citrus/shared';
+export type { DashboardIndexEntry };
 
 export type DashboardIndexStatus = 'idle' | 'loading' | 'ready' | 'error';
 

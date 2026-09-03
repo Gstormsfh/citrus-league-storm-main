@@ -243,7 +243,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           access_token: serverSession.access_token,
           refresh_token: serverSession.refresh_token,
         });
-        return { data: { user: data.user, session: data.session }, error: error || null };
+        // AuthResponse is a discriminated union: success carries error: null,
+        // failure carries data: { user: null, session: null }. setSession
+        // already returns nulls in data on failure, so this only reshapes the
+        // return into a legal member; callers see the same values.
+        if (error) {
+          return { data: { user: null, session: null }, error };
+        }
+        return { data: { user: data.user, session: data.session }, error: null };
       }
       // Fallback: server created user but didn't return session — sign in client-side
       return await supabase.auth.signInWithPassword({ email, password });

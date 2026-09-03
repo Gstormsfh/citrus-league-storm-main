@@ -15,13 +15,21 @@
  *     from another. Nothing errors; the data is just wrong.
  *  4. Built with the AdSense loader still in index.html — prohibited by App
  *     Store policy inside a native app.
+ *  5. Built with a stale VITE_APP_VERSION, every binary reports the SAME
+ *     Sentry release. Build 2's errors and build 3's errors land in one
+ *     bucket and nobody can tell which binary is crashing.
+ *  6. Built with the PWA service worker, the shell precaches one build's
+ *     hashed assets. Capacitor already ships those assets inside the .ipa,
+ *     and a worker on top can keep serving the previous build's files after
+ *     an App Store update has replaced them underneath.
  *
- * So: set VITE_NATIVE=1 (index.html transforms key off it), build, then ASSERT
- * the output. A bundle with any of the above defects is refused here rather
- * than discovered by a tester.
+ * So: set VITE_NATIVE=1 (index.html transforms and the VitePWA `disable`
+ * flag key off it), compute VITE_APP_VERSION from package.json plus the
+ * Xcode build number, build, then ASSERT the output. A bundle with any of
+ * the above defects is refused here rather than discovered by a tester.
  */
 import { spawnSync } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -100,10 +108,76 @@ const envHelp =
   `  For mode "${MODE}" it reads, lowest priority first:\n` +
   ENV_FILES.map((f) => `    ${join(ENV_DIR, f)}`).join('\n');
 
+// ---------------------------------------------------------------------------
+// RELEASE VERSION  (added 2026-09-03)
+//
+// apps/web/src/integrations/sentry/config.ts tags every event with
+//     release: `citrus-fantasy@${import.meta.env.VITE_APP_VERSION}`
+// A hardcoded VITE_APP_VERSION in root .env goes stale the moment the next
+// binary ships, and then build 2 and build 3 report the SAME release: their
+// errors land in one Sentry bucket and nobody can tell which binary crashes.
+//
+// So the native build computes it instead:
+//     <apps/web/package.json version>+<CURRENT_PROJECT_VERSION>
+// where CURRENT_PROJECT_VERSION is the Xcode build number in
+// ios/App/App.xcodeproj/project.pbxproj (Info.plist resolves CFBundleVersion
+// from it, so it is exactly the build number App Store Connect shows).
+//
+// It reaches Vite through process.env, the same way VITE_NATIVE does below.
+// Vite's loadEnv() first collects VITE_* keys from the .env files and then
+// copies every VITE_* key found in process.env over them (the final
+// `for (const key in process.env)` loop in loadEnv, vite 5.4), so this value
+// beats root .env. Plain `vite build` never runs this script and keeps the
+// .env value as its fallback.
+// ---------------------------------------------------------------------------
+const PBXPROJ = join(WEB_DIR, 'ios', 'App', 'App.xcodeproj', 'project.pbxproj');
+
+const readPackageVersion = () => {
+  const pkgPath = join(WEB_DIR, 'package.json');
+  const version = JSON.parse(readFileSync(pkgPath, 'utf8')).version;
+  if (!version) fail(`${pkgPath} has no "version" field; the Sentry release needs one.`);
+  return version;
+};
+
+const readIosBuildNumber = () => {
+  let pbx = '';
+  try {
+    pbx = readFileSync(PBXPROJ, 'utf8');
+  } catch {
+    fail(`cannot read the Xcode project at ${PBXPROJ}`);
+  }
+  const values = [...pbx.matchAll(/^\s*CURRENT_PROJECT_VERSION\s*=\s*"?([^";]+)"?\s*;/gm)].map((m) => m[1].trim());
+  // The App target carries the build number once per build configuration
+  // (Debug and Release). Xcode's General tab edits both; a hand edit may not,
+  // and a Release binary tagged with the Debug number is worse than no tag.
+  if (values.length < 2)
+    fail(
+      'expected CURRENT_PROJECT_VERSION in both the Debug and Release configurations of\n' +
+        `${PBXPROJ}, found ${values.length}.`
+    );
+  if (new Set(values).size !== 1)
+    fail(
+      `CURRENT_PROJECT_VERSION disagrees between build configurations (${values.join(', ')}) in\n` +
+        `${PBXPROJ}. Set the same build number on every configuration before building.`
+    );
+  return values[0];
+};
+
+const APP_VERSION = `${readPackageVersion()}+${readIosBuildNumber()}`;
+// MUST match the template in apps/web/src/integrations/sentry/config.ts.
+const SENTRY_RELEASE = `citrus-fantasy@${APP_VERSION}`;
+
+console.log(`\n▸ native build: VITE_APP_VERSION=${APP_VERSION}  (Sentry release ${SENTRY_RELEASE})\n`);
+
 const run = spawnSync('npx', ['vite', 'build', '--mode', MODE], {
   stdio: 'inherit',
   cwd: WEB_DIR,
-  env: { ...process.env, VITE_NATIVE: '1' },
+  // NODE_ENV is forced here because the repo root .env carries
+  // NODE_ENV=development and Vite 5 honours it on `vite build` when the
+  // shell has not set one: the bundle then ships react-dom.development and
+  // import.meta.env.PROD is false. That happened on 2026-09-03 (the
+  // device build carried the dev warnings). Assertion 8 below refuses it.
+  env: { ...process.env, NODE_ENV: 'production', VITE_NATIVE: '1', VITE_APP_VERSION: APP_VERSION },
   shell: process.platform === 'win32',
 });
 if (run.status !== 0) process.exit(run.status ?? 1);
@@ -174,11 +248,63 @@ if (!dbIsProd && process.env.ALLOW_NON_PROD_NATIVE !== '1')
 if (indexHtml.includes('adsbygoogle'))
   fail('AdSense loader survived into the native build — the VITE_NATIVE strip did not run.');
 
+// --- 6. The Sentry release tag is this build's, not the stale .env value ---
+// config.ts writes `citrus-fantasy@${import.meta.env.VITE_APP_VERSION}` and
+// esbuild folds the template into one string literal, so the exact tag has
+// to be in the JS verbatim. If only the .env value got in, the process.env
+// override above never reached Vite and every build would report the same
+// release.
+if (!blob.includes(SENTRY_RELEASE))
+  fail(
+    `Sentry release "${SENTRY_RELEASE}" is not in the bundle.\n\n` +
+      'VITE_APP_VERSION did not reach Vite (or integrations/sentry/config.ts changed the\n' +
+      'release template). Errors from this build would be filed under whatever release\n' +
+      'the .env fallback produced, indistinguishable from the previous binary.'
+  );
+
+// --- 7. No service worker inside the native shell --------------------------
+// vite.config.ts passes `disable: process.env.VITE_NATIVE === '1'` to VitePWA.
+// Capacitor serves dist straight from the .ipa, so there is nothing for a
+// worker to speed up, and its precache is a liability: it stores one build's
+// hashed assets and can keep serving them after the App Store has replaced
+// the files underneath (the .ipa swaps the bundle, the cache does not know).
+const distDir = join(WEB_DIR, 'dist');
+const swFiles = [
+  'sw.js',
+  'registerSW.js',
+  ...readdirSync(distDir).filter((f) => /^workbox-.*\.js$/.test(f)),
+].filter((f) => existsSync(join(distDir, f)));
+if (swFiles.length > 0)
+  fail(
+    `service worker files survived into the native build: ${swFiles.join(', ')}.\n` +
+      'VitePWA must be disabled when VITE_NATIVE=1 (see the VitePWA call in apps/web/vite.config.ts).'
+  );
+if (indexHtml.includes('registerSW') || indexHtml.includes('vite-plugin-pwa'))
+  fail('index.html still injects the service worker registration script (vite-plugin-pwa:register-sw).');
+
+// --- 8. A production bundle, not a development one ---------------------------
+// The repo root .env sets NODE_ENV=development. Vite 5 copies a NODE_ENV it
+// finds in an env file onto process.env when the shell has not set one, and
+// then resolves package export conditions and process.env.NODE_ENV inlining
+// against it. Measured 2026-09-03 on the device build: vendor chunk carried
+// react-dom.development and the "Each child in a list should have a unique
+// key" warning text; config.ts's `import.meta.env.PROD ? 0.1 : 1.0` had folded
+// to 1. The spawn above forces NODE_ENV=production; this proves it took.
+const devMarkers = ['react-dom.development', 'react.development', 'should have a unique "key" prop'];
+const devHit = devMarkers.find((m) => blob.includes(m));
+if (devHit)
+  fail(
+    `development bundle detected: "${devHit}" is in dist.\n` +
+      'NODE_ENV must be "production" for the vite build (forced in the spawn env in this script).'
+  );
+
 console.log(
   '\n✓ native bundle verified\n' +
     `    backend    : ${dbIsProd ? 'PRODUCTION' : 'NON-PRODUCTION'}\n` +
     `    api origin : ${apiUrl}\n` +
     `    supabase   : ${supabaseRef}.supabase.co\n` +
     `    vite mode  : ${MODE}\n` +
-    '    ads        : stripped\n'
+    `    release    : ${SENTRY_RELEASE}\n` +
+    '    ads        : stripped\n' +
+    '    sw         : none (VitePWA disabled for native)\n'
 );

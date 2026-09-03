@@ -128,6 +128,9 @@ function dashboardRow(p: HarnessPlayer, index: number): DashboardIndexEntry {
     proj_wins: isGoalie ? Math.round((p.wins ?? 0) * 1.6) : null,
     proj_saves: isGoalie ? 780 : null,
     proj_shutouts: isGoalie ? 2 : null,
+    toi_total_minutes: null, avg_toi_per_game: null, vopa_score: null,
+    gsax_raw: null, gsax_regressed: null, gsax_shots_faced: null, gsax_xga: null, gsax_ga: null,
+    as_of: null,
   };
 }
 

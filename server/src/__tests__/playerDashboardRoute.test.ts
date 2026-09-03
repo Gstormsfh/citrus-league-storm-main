@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import { createChain, createMockSupabase } from './helpers';
-import { clearPlayerDashboardCache } from '../services/PlayerDashboardService';
+import { clearPlayerDashboardCache, clearPlayerXgHistoryCache } from '../services/PlayerDashboardService';
 
 /**
  * GET /api/players/:playerId/dashboard — COMPONENT 6.5.
@@ -61,6 +61,7 @@ afterEach(() => {
   vi.clearAllMocks();
   adminThrows = false;
   clearPlayerDashboardCache();
+  clearPlayerXgHistoryCache();
 });
 
 const MCDAVID = 8478402;
@@ -309,5 +310,95 @@ describe('GET /api/players/:playerId/dashboard', () => {
     const res = await get(app, '/api/players/dashboard-index');
     expect(res.status).toBe(200);
     expect(user.from).toHaveBeenCalledWith('player_directory');
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// GET /api/players/:playerId/xg-history (2026-09-03). The career arc on
+// its own, for the condensed card's sparkline: the same `player_xg_season`
+// read the dashboard makes, merged per season, and NOTHING on the
+// service-role client. Two things are pinned here:
+//
+//  1. The same validator gates it, so the same junk ids 400 before a query.
+//  2. The admin client is never constructed, let alone used: this route
+//     takes the caller's RLS-scoped client and nothing else.
+
+describe('GET /api/players/:playerId/xg-history', () => {
+  const TRADED_ROWS = [
+    { ...XG_SEASON_ROW, season: 2024, team_id: 22, shots: 150, sog: 90, goals: 12, xg: 14.25 },
+    { ...XG_SEASON_ROW, season: 2024, team_id: 10, shots: 140, sog: 85, goals: 11, xg: 12.5 },
+    { ...XG_SEASON_ROW, season: 2025, team_id: 22 },
+  ];
+
+  it('returns the merged arc in one response', async () => {
+    const { createUserClient } = await import('../lib/supabase');
+    const user = createMockSupabase();
+    user.from = vi.fn((table: string) => {
+      if (table === 'player_xg_season') return createChain({ data: TRADED_ROWS, error: null });
+      return createChain({ data: [], error: null });
+    });
+    (createUserClient as any).mockReturnValue(user);
+    const { app } = await import('../app');
+
+    const res = await get(app, `/api/players/${MCDAVID}/xg-history`);
+    expect(res.status).toBe(200);
+    const { data } = await res.json();
+    expect(data.player_id).toBe(MCDAVID);
+    // Two 2024 team rows became one point; the wire says so.
+    expect(data.points.map((p: { season: number }) => p.season)).toEqual([2024, 2025]);
+    expect(data.points[0].teams).toBe(2);
+    expect(data.points[0].xg).toBeCloseTo(26.75);
+    expect(data.points[1].teams).toBe(1);
+    expect(data.as_of).toBe('2026-09-01T06:00:00.000Z');
+    expect(user.from.mock.calls.map((c: unknown[]) => c[0])).toEqual(['player_xg_season']);
+  });
+
+  it('never reaches for the service-role client', async () => {
+    await wire();
+    const { app } = await import('../app');
+    const res = await get(app, `/api/players/${MCDAVID}/xg-history`);
+    expect(res.status).toBe(200);
+    expect(adminFrom).not.toHaveBeenCalled();
+  });
+
+  it('is a 200 with an empty arc for a player with no seasons on record', async () => {
+    const { createUserClient } = await import('../lib/supabase');
+    const user = createMockSupabase();
+    user.from = vi.fn(() => createChain({ data: [], error: null }));
+    (createUserClient as any).mockReturnValue(user);
+    const { app } = await import('../app');
+
+    const res = await get(app, `/api/players/${MCDAVID}/xg-history`);
+    expect(res.status).toBe(200);
+    const { data } = await res.json();
+    expect(data.points).toEqual([]);
+    expect(data.as_of).toBeNull();
+  });
+
+  it.each([
+    ['abc', 'letters'],
+    ['1e9', 'exponent notation'],
+    ['-1', 'a negative'],
+    ['8478402.5', 'a decimal'],
+    ['1234567890123', 'an oversized id'],
+  ])('400s on a junk playerId %j (%s) without touching the database', async (raw) => {
+    const user = await wire();
+    const { app } = await import('../app');
+
+    const res = await get(app, `/api/players/${encodeURIComponent(raw)}/xg-history`);
+    expect(res.status).toBe(400);
+    expect(user.from).not.toHaveBeenCalled();
+    expect(adminFrom).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a read failure as an error status', async () => {
+    const { createUserClient } = await import('../lib/supabase');
+    const user = createMockSupabase();
+    user.from = vi.fn(() => createChain({ data: null, error: { message: 'permission denied' } }));
+    (createUserClient as any).mockReturnValue(user);
+    const { app } = await import('../app');
+
+    const res = await get(app, `/api/players/${MCDAVID}/xg-history`);
+    expect(res.status).toBeGreaterThanOrEqual(400);
   });
 });

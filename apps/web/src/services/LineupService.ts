@@ -21,19 +21,48 @@ import { RosterCacheService } from "./RosterCacheService";
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from "./DemoLeagueService";
 import { logger } from "@/utils/logger";
 
+/**
+ * The HTTP status a thrown ApiError carries (api/client.ts), or 0 for a
+ * request that never got an answer: fetch's TypeError, a TimeoutError or
+ * AbortError, or the client's own status-0 ApiError once its retries are
+ * spent. Read structurally rather than with instanceof: an ApiError is not
+ * the only shape that lands here, and importing api/client would pull the
+ * Supabase client into every module that imports this one.
+ */
+function httpStatusOf(error: unknown): number {
+  const status = (error as { status?: unknown } | null)?.status;
+  return typeof status === 'number' && Number.isFinite(status) ? status : 0;
+}
+
+/** The server answered and said no: any 4xx. */
+function isServerRefusal(error: unknown): boolean {
+  const status = httpStatusOf(error);
+  return status >= 400 && status < 500;
+}
+
 export const LineupService = {
   /**
    * Save lineup configuration via API server (with localStorage fallback)
    * Server handles: validation against roster_assignments, roster protection, daily snapshots.
    * @param leagueId - Required for league isolation
    * @param targetDate - Optional: If set, only save to this specific date (Yahoo-style per-day rosters)
+   * @param options.allowPlayerRemoval - Let the save drop players the current lineup holds.
+   * @param options.rejectOnRefusal - When the server REFUSES the lineup (a 4xx: a
+   *   position mismatch, the IR rule, a locked player, ownership), reject with the
+   *   server's own sentence instead of resolving. The roster page passes this so a
+   *   refusal reaches the manager rather than a success toast (2026-09-03). Off by
+   *   default because the background initialisers that write a team's FIRST lineup
+   *   through this method do not catch: MatchupService.getMatchupRosters writes one
+   *   for both teams of a matchup and the opponent's comes back 403, and a throw
+   *   there would empty the matchup page. A refusal writes nothing to localStorage
+   *   in either mode; the fallback below is for a request the server never answered.
    */
   async saveLineup(teamId: string | number, leagueId: string, lineup: {
     starters: (string | number)[],
     bench: (string | number)[],
     ir: (string | number)[],
     slotAssignments: Record<string, string>
-  }, targetDate?: string, options?: { allowPlayerRemoval?: boolean }) {
+  }, targetDate?: string, options?: { allowPlayerRemoval?: boolean; rejectOnRefusal?: boolean }) {
     logger.debug('[LineupService.saveLineup] Called with teamId:', teamId, 'leagueId:', leagueId, 'lineup:', {
       starters: lineup.starters?.length || 0,
       bench: lineup.bench?.length || 0,
@@ -67,7 +96,24 @@ export const LineupService = {
       MatchupService.clearRosterCache(String(teamId), leagueId);
       RosterCacheService.clearCache(String(teamId), leagueId);
     } catch (error) {
-      // Fallback to localStorage if API fails (offline mode, errors, etc.)
+      // THE SERVER SAID NO (2026-09-03). A 4xx is a judgement on THIS lineup:
+      // 400 from the server's LineupService.saveLineup (slot, position and IR
+      // rules), 409 from the game-lock check, 403 for a team that is not the
+      // caller's. The sentence in it is written for the manager. This block
+      // used to stash the refused lineup in localStorage and resolve, exactly
+      // as it does for a dead network, so the page toasted "Lineup Updated"
+      // while the server kept a different lineup. A refused lineup is not a
+      // saved one: nothing is written, the caches keep the lineup the server
+      // still holds, and the caller that asked to know is told.
+      if (isServerRefusal(error)) {
+        logger.warn('[LineupService.saveLineup] The server refused the lineup:', error);
+        if (options?.rejectOnRefusal) throw error;
+        return;
+      }
+
+      // The API never answered (offline, a timeout, a 5xx after the client's
+      // retries): keep the lineup on this device so getLineup can show it
+      // while the API is unreachable.
       try {
         const key = `lineup_team_${teamId}`;
         localStorage.setItem(key, JSON.stringify({

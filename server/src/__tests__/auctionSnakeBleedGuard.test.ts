@@ -21,11 +21,25 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const LOBBY = readFileSync(resolve(here, '../draft/LobbyManager.ts'), 'utf-8');
 
+/**
+ * The source of one class method: from its declaration to the next member
+ * declaration at class indentation. A fixed character window did this job
+ * until 2026-09-03, when a root-cause comment inside closeNominationWithRetry
+ * pushed the line under test past offset 1600 and the guard went red on a
+ * body that satisfied every contract it pins. Comments are allowed to grow;
+ * the extraction has to follow the code, not a byte count.
+ */
+function methodSource(marker: string): string {
+  const at = LOBBY.indexOf(marker);
+  expect(at, `${marker} not found in LobbyManager.ts`).toBeGreaterThan(-1);
+  const rest = LOBBY.slice(at + marker.length);
+  const next = rest.search(/\n {2}(?:private|public|protected|static|readonly|async|get|set) [A-Za-z_]/);
+  return next === -1 ? LOBBY.slice(at) : LOBBY.slice(at, at + marker.length + next);
+}
+
 describe('the snake clock never runs in an auction lobby', () => {
   it('armPickDeadline carries the format fence', () => {
-    const fnAt = LOBBY.indexOf('private armPickDeadline');
-    expect(fnAt).toBeGreaterThan(-1);
-    const body = LOBBY.slice(fnAt, fnAt + 1400);
+    const body = methodSource('private armPickDeadline');
     const fence = body.indexOf("this.format === 'auction'");
     const arm = body.indexOf('setPickDeadline');
     expect(fence, 'auction fence missing from armPickDeadline').toBeGreaterThan(-1);
@@ -36,17 +50,18 @@ describe('the snake clock never runs in an auction lobby', () => {
 
 describe('a lot close survives one transient failure', () => {
   it('handleNominationTimeout closes through the retry wrapper', () => {
-    const timeoutAt = LOBBY.indexOf('private async handleNominationTimeout');
-    const body = LOBBY.slice(timeoutAt, timeoutAt + 1200);
+    const body = methodSource('private async handleNominationTimeout');
     expect(body).toContain('closeNominationWithRetry');
   });
 
   it('the wrapper retries exactly once on the same idempotency key', () => {
-    const wrapAt = LOBBY.indexOf('private async closeNominationWithRetry');
-    expect(wrapAt).toBeGreaterThan(-1);
-    const body = LOBBY.slice(wrapAt, wrapAt + 1600);
+    const body = methodSource('private async closeNominationWithRetry');
     expect(body).toContain('retrying once');
-    expect((body.match(/idempotencyKey: `close-\$\{nominationId\}`/g) ?? []).length).toBe(1);
+    // 2026-09-03: the key was a prefixed literal fed to a `uuid` RPC
+    // parameter, so close_nomination_v2 raised 22P02 and the auction died
+    // after one nomination. It is now derived, and still deterministic so
+    // the retry replays onto the same idempotency row.
+    expect((body.match(/idempotencyKey: md5UuidFromSeed\(`close:\$\{nominationId\}`\)/g) ?? []).length).toBe(1);
     expect(body).toContain('return await call();');
   });
 });

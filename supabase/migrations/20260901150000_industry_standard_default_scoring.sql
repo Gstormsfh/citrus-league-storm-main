@@ -43,6 +43,22 @@
 -- has a complete snapshot (asserted above and enforced by all three creation
 -- paths). Regenerating four scoring-critical functions for dead branches is
 -- risk without benefit.
+--
+-- ADDENDUM 2026-09-03 (read before writing the hygiene migration): the
+-- CURRENT production bodies of those four functions are not in this
+-- directory. Production's schema_migrations shows they were last rewritten by
+-- prod-only versions (20260806165042, 20260806182816, 20260812034614,
+-- 20260812044603, 20260812161109) whose files never landed in the repo; the
+-- latest repo versions (20260418230000, 20260514150000) are not in prod's
+-- history table. A CREATE OR REPLACE authored from the repo bodies would
+-- silently revert the 0F-SCORE LEFT JOIN / season-from-game_id fixes and the
+-- best-ball date scoping. Staging is behind in the other direction: it has
+-- not received this migration at all (stat_catalog still carries the old
+-- multipliers). The only faithful text of the live functions is
+-- supabase/schema/production_snapshot_20260813.sql. Author the literal swap
+-- from a fresh pg_get_functiondef capture at apply time, per
+-- docs/PROD_CHANGE_LEDGER.md Rules 1-2, after bringing staging to parity.
+-- The "4 NULL" above was measured 2026-09-01; on 2026-09-03 it was 0 of 55.
 -- ============================================================================
 
 -- ── 1. stat_catalog: the authoritative default multipliers ──────────────────

@@ -100,6 +100,86 @@ def _safe_int(v, default=0) -> int:
     return default
 
 
+# ---------------------------------------------------------------------------
+# NHL PLAYER-ID RANGE
+#
+# Discovery reads player_id / passer_id / goalie_id straight out of raw_shots
+# and player_toi_by_situation, then asks the NHL API for a bio for every id it
+# does not already hold. Anything that is not an NHL player id is a guaranteed
+# 404 plus 0.2s of rate-limit budget burnt, every day, forever.
+#
+# raw_shots.passer_id is populated with NHL *TEAM* ids, not player ids. See
+# data-pipeline/acquisition/data_acquisition.py:323-327, which falls back to
+# `eventOwnerTeamId` whenever the preceding play carries no
+# `details.playerId`. Measured against production on 2026-09-03: all 63,069
+# non-null passer_id values across seasons 2017-2025 sit in [1, 68], and for
+# season=2025 every one of the 10,047 equals that row's event_owner_team_id
+# (1=NJD, 2=NYI, ... 68=UTA). That is the whole source of the
+# "Error fetching details for player 1: 404" spam in this job's log.
+#
+# The bound below is derived from production, not guessed. On 2026-09-03 the
+# minimum player_id in each player-keyed table was:
+#     player_directory         8470613  (1,909 rows)
+#     player_toi_by_situation  8448208  (1,105,954 rows)
+#     player_game_stats        8448208  (474,720 rows)
+#     raw_shots.player_id      0 for 57 sentinel rows, then 8448208 and up
+# so the real floor observed anywhere in production is 8448208 and the
+# ceiling is 8486169. NHL ids occupy a 7-digit space and are assigned
+# monotonically upward with each draft class, so a newly debuting player's id
+# is always ABOVE the current maximum, never below the floor. 8_000_000 sits
+# comfortably under the observed floor while still excluding every value the
+# passer_id defect can produce. (The same 8_000_000 base is already used as
+# the synthetic player-id origin in server/src/__tests__/PlayerService.test.ts.)
+#
+# This filter is a blast shield for THIS job. It is not the fix: the fix
+# belongs in the ingest that writes passer_id.
+# ---------------------------------------------------------------------------
+NHL_PLAYER_ID_MIN = 8_000_000
+NHL_PLAYER_ID_MAX = 9_999_999
+
+
+def _is_nhl_player_id(value) -> bool:
+  """True only for values inside the NHL's 7-digit player-id space."""
+  try:
+    n = int(value)
+  except (TypeError, ValueError):
+    return False
+  return NHL_PLAYER_ID_MIN <= n <= NHL_PLAYER_ID_MAX
+
+
+def _roster_player_name(roster_player: dict) -> str:
+  """Resolve a display name from an api-web ROSTER entry, or "" if there is none.
+
+  /v1/roster/{team}/current nests names as localized objects:
+
+      {"firstName": {"default": "Leo"}, "lastName": {"default": "Carlsson"}}
+
+  There is no flat "fullName" key on this endpoint. sync_rosters.py:132-134
+  parses the same payload exactly this way; the two readers must stay
+  identical, since they write the same column of the same table.
+
+  Returns "" rather than raising, because the caller SKIPS a nameless player.
+  A row without a name must never reach player_directory: full_name is
+  NOT NULL with no default (verified against production information_schema
+  on 2026-09-03).
+  """
+  def _part(key: str) -> str:
+    v = roster_player.get(key)
+    if isinstance(v, dict):
+      v = v.get("default")
+    return v.strip() if isinstance(v, str) else ""
+
+  full = f"{_part('firstName')} {_part('lastName')}".strip()
+  if full:
+    return full
+  # Defensive: some NHL payload variants carry a flat name field instead.
+  for key in ("fullName", "name"):
+    v = _part(key)
+    if v:
+      return v
+  return ""
+
+
 def fetch_team_roster(team_abbrev: str) -> list:
   """Fetch team roster from NHL API."""
   try:
@@ -146,7 +226,25 @@ def discover_players_from_our_data(db: SupabaseRest, season: int) -> Set[int]:
       so discovery returns instantly.
   """
   discovered_ids: Set[int] = set()
+  rejected_ids: Set[int] = set()
+  rejected_count = 0
   season_filter = ("season", "eq", season)
+
+  def _consider(raw_value, target: Set[int]) -> None:
+    """Admit an id into discovery ONLY if it can be an NHL player id.
+
+    Everything else is counted and dropped here, before it can become an NHL
+    API request. See the NHL PLAYER-ID RANGE note above for why this is
+    needed and where the bad ids come from.
+    """
+    nonlocal rejected_count
+    if raw_value is None:
+      return
+    if _is_nhl_player_id(raw_value):
+      target.add(int(raw_value))
+      return
+    rejected_count += 1
+    rejected_ids.add(_safe_int(raw_value, -1))
 
   print(f"[populate_player_directory] Discovering players from our data sources for season={season}...")
 
@@ -171,12 +269,9 @@ def discover_players_from_our_data(db: SupabaseRest, season: int) -> Set[int]:
 
       for shot in shots:
         shot_count += 1
-        if shot.get("player_id"):
-          discovered_ids.add(_safe_int(shot["player_id"], 0))
-        if shot.get("passer_id"):
-          discovered_ids.add(_safe_int(shot["passer_id"], 0))
-        if shot.get("goalie_id"):
-          discovered_ids.add(_safe_int(shot["goalie_id"], 0))
+        _consider(shot.get("player_id"), discovered_ids)
+        _consider(shot.get("passer_id"), discovered_ids)
+        _consider(shot.get("goalie_id"), discovered_ids)
 
         # Progress every 15 seconds during discovery
         current_time = time.time()
@@ -217,8 +312,7 @@ def discover_players_from_our_data(db: SupabaseRest, season: int) -> Set[int]:
 
       for t in toi_players:
         toi_count += 1
-        if t.get("player_id"):
-          toi_ids.add(_safe_int(t.get("player_id"), 0))
+        _consider(t.get("player_id"), toi_ids)
 
         # Progress every 15 seconds during discovery
         current_time = time.time()
@@ -238,9 +332,26 @@ def discover_players_from_our_data(db: SupabaseRest, season: int) -> Set[int]:
     import traceback
     traceback.print_exc()
   
-  # Remove invalid IDs (0 or None)
+  # _consider() already refused everything outside the NHL id space. These two
+  # discards are kept as belt-and-braces for the 0 sentinel in raw_shots
+  # (57 rows in production on 2026-09-03).
   discovered_ids.discard(0)
   discovered_ids.discard(None)
+
+  if rejected_count:
+    sample = sorted(rejected_ids)[:12]
+    print(
+      f"  [WARN] {rejected_count:,} discovered values were not NHL player ids and "
+      f"were dropped BEFORE any API call ({len(rejected_ids)} distinct, "
+      f"sample={sample}). Accepted range is "
+      f"[{NHL_PLAYER_ID_MIN:,}, {NHL_PLAYER_ID_MAX:,}]."
+    )
+    print(
+      "  [WARN] Root cause is upstream of this job: raw_shots.passer_id is "
+      "written with eventOwnerTeamId (an NHL TEAM id) whenever the preceding "
+      "play carries no details.playerId. See "
+      "data-pipeline/acquisition/data_acquisition.py:323-327."
+    )
   
   print(f"  Total unique player IDs discovered: {len(discovered_ids)}")
   return discovered_ids
@@ -371,6 +482,54 @@ def process_player_from_api(player_id: int, season: int, team_abbrev: Optional[s
   return player_data
 
 
+# Columns player_directory declares NOT NULL with NO usable default. Verified
+# against production information_schema.columns on 2026-09-03:
+#     full_name  text     is_nullable=NO  column_default=NULL
+#     season     integer  is_nullable=NO  column_default=NULL
+#     player_id  integer  is_nullable=NO  column_default=NULL
+# is_goalie, created_at and updated_at are also NOT NULL but DO carry
+# defaults, so omitting those keys is legal.
+REQUIRED_DIRECTORY_COLUMNS = ("season", "player_id", "full_name")
+
+
+def _assert_rows_upsertable(rows: list, label: str) -> None:
+  """Refuse a batch that cannot legally become a row.
+
+  House style, same shape as apps/web/scripts/build-native.mjs: assert the
+  output, refuse a bad one, and name the offender.
+
+  Why this specific assertion exists. db.upsert(..., on_conflict=
+  "season,player_id") is PostgREST `resolution=merge-duplicates`, which
+  compiles to INSERT ... ON CONFLICT (season, player_id) DO UPDATE.
+  PostgreSQL validates NOT NULL against the tuple it is ABOUT TO INSERT
+  before it ever looks for the conflicting row, so a payload that merely
+  OMITS full_name is a 23502 even when the row it means to update is already
+  there. That is exactly how the 2026-09-03 run died on ANA, the first entry
+  in TEAMS, upserting season=2025 player_id=8484153 (Leo Carlsson) whose
+  directory row has existed since 2025-12-18.
+
+  The check is local and costs nothing, and it fails with the player id
+  instead of a Postgres tuple dump.
+  """
+  offenders = []
+  for row in rows:
+    for col in REQUIRED_DIRECTORY_COLUMNS:
+      value = row.get(col)
+      if value is None or (isinstance(value, str) and not value.strip()):
+        offenders.append((row.get("player_id"), row.get("season"), col))
+        break
+  if offenders:
+    preview = ", ".join(
+      f"player_id={pid} season={s} missing={col}" for pid, s, col in offenders[:5]
+    )
+    raise RuntimeError(
+      f"[populate_player_directory] REFUSING upsert batch '{label}': "
+      f"{len(offenders)} of {len(rows)} rows lack a NOT NULL column "
+      f"({', '.join(REQUIRED_DIRECTORY_COLUMNS)}). First offenders: {preview}. "
+      f"A row without a name must never reach player_directory."
+    )
+
+
 def _flush_batch(db: SupabaseRest, batch: Dict[int, dict], label: str) -> int:
   """UPSERT a small batch immediately so a subsequent timeout still lands
   the rows we already fetched. Returns the count written; empties `batch`
@@ -379,6 +538,7 @@ def _flush_batch(db: SupabaseRest, batch: Dict[int, dict], label: str) -> int:
   if not batch:
     return 0
   rows = list(batch.values())
+  _assert_rows_upsertable(rows, label)
   db.upsert("player_directory", rows, on_conflict="season,player_id")
   n = len(rows)
   print(f"  [FLUSH {label}] upserted {n} players")
@@ -412,6 +572,7 @@ def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
   if missing_ids:
     print(f"[populate_player_directory][season={season}] Fetching {len(missing_ids)} missing players from NHL API...")
     processed_count = 0
+    discovery_unresolved = 0
     pending: Dict[int, dict] = {}
     last_progress_time = time.time()
     for idx, player_id in enumerate(sorted(missing_ids), 1):
@@ -422,6 +583,10 @@ def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
         seen[player_id] = player_data
         pending[player_id] = player_data
         processed_count += 1
+      else:
+        # No landing page, or a landing page with no resolvable name. Counted
+        # and skipped; never upserted with a null full_name.
+        discovery_unresolved += 1
       # Flush every 25 to bound the loss window on timeout.
       if len(pending) >= 25:
         total_upserted += _flush_batch(db, pending, f"discovery season={season}")
@@ -430,11 +595,18 @@ def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
         print(f"  [PROGRESS] Processed {idx}/{len(missing_ids)} discovery-players ({processed_count} successful)...")
         last_progress_time = current_time
     total_upserted += _flush_batch(db, pending, f"discovery-tail season={season}")
+    if discovery_unresolved:
+      print(
+        f"[populate_player_directory][season={season}] WARNING: "
+        f"{discovery_unresolved} of {len(missing_ids)} discovered players could not "
+        f"be resolved to a name via the NHL API and were SKIPPED (not upserted)."
+      )
 
   print(f"[populate_player_directory][season={season}] Step 3: Fetching rosters for {len(TEAMS)} teams...")
   total_roster_players = 0
   roster_processed = 0
   roster_skipped_existing = 0
+  roster_skipped_no_name = 0
   last_progress_time = time.time()
   for team_idx, team_abbrev in enumerate(TEAMS, 1):
     roster = fetch_team_roster(team_abbrev)
@@ -463,9 +635,26 @@ def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
         elif position == "R":
           position = "RW"
         jersey = roster_player.get("sweaterNumber")
+        # full_name is NOT optional here, even though this branch only means
+        # to UPDATE an existing row. db.upsert() is INSERT ... ON CONFLICT
+        # DO UPDATE, and PostgreSQL checks NOT NULL on the proposed insert
+        # tuple BEFORE it resolves the conflict, so a refresh row without a
+        # name is a 23502 regardless of whether the target row exists. The
+        # roster payload already carries the name, so read it from there:
+        # zero extra API calls, same parse as sync_rosters.py:132-134.
+        full_name = _roster_player_name(roster_player)
+        if not full_name:
+          roster_skipped_no_name += 1
+          print(
+            f"  [WARN] roster {team_abbrev}: player_id={player_id} has no "
+            f"resolvable name in the roster payload. SKIPPED rather than "
+            f"upserted with a null full_name."
+          )
+          continue
         refresh_row = {
           "season": season,
           "player_id": player_id,
+          "full_name": full_name,
           "team_abbrev": team_abbrev,
           "updated_at": _now_iso(),
         }
@@ -493,7 +682,8 @@ def _run_for_season(db: SupabaseRest, season: int) -> tuple[int, int]:
     total_upserted += _flush_batch(db, team_refresh_pending, f"roster team={team_abbrev} season={season} REFRESH")
 
   print(f"[populate_player_directory][season={season}] Fetched {total_roster_players} roster players across {len(TEAMS)} teams "
-        f"({roster_processed} new, {roster_skipped_existing} refreshed-existing)")
+        f"({roster_processed} new, {roster_skipped_existing} refreshed-existing, "
+        f"{roster_skipped_no_name} skipped-no-name)")
 
   if total_upserted:
     print(f"[populate_player_directory][season={season}] OK: total upserted this season = {total_upserted}")

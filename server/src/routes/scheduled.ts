@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../app';
 import { getSupabaseAdmin } from '../lib/supabase';
+import { readAllPaged } from '../lib/pagedRead';
 import { MatchupService } from '../services/MatchupService';
 import { AppError } from '../lib/errors';
 import { ok, fail } from '../lib/responses';
@@ -116,24 +117,40 @@ scheduledRoutes.post('/roster-snapshot-today', async (c) => {
  * commissioner manually hit process-all. Industry standard is automatic
  * processing at the league's configured time (~3 AM at ESPN).
  *
- * Called hourly by .github/workflows/daily-waiver-process.yml. Honors
- * each league's `waiver_process_time` to the hour via the existing
- * `should_process_waivers_now` DB function where present, falling back
- * to processing any league with pending claims (better processed at the
- * wrong hour than never).
+ * Called hourly by .github/workflows/daily-waiver-process.yml (cron
+ * "10 * * * *"). Honors each league's `waiver_process_time` via
+ * `should_process_waivers_now(p_league_id)`, which is true when the
+ * league holds a claim that was already pending at its last due moment
+ * and nothing in that league has been processed since. Falls back to
+ * processing (loudly) if that RPC errors: better processed at the wrong
+ * hour than never.
  */
 scheduledRoutes.post('/waiver-process', async (c) => {
   const admin = getSupabaseAdmin();
   try {
-    const { data: pending } = await admin
-      .from('waiver_claims')
-      .select('league_id')
-      .eq('status', 'pending');
-    const leagueIds = [...new Set((pending ?? []).map((r) => r.league_id as string))];
+    // PAGED (2026-09-03). This drives WHICH leagues get their waivers
+    // processed at all, and pending claims are platform-wide: a few
+    // thousand leagues each carrying a handful of pending claims puts
+    // this read past PostgREST's 1,000-row clamp on an ordinary
+    // Tuesday. Clamped, the endpoint returned HTTP 200, derived a
+    // short league list, and reported success - the leagues outside
+    // the window simply never had their waivers run, with no error
+    // anywhere. `id` is the primary key and is selected so the paging
+    // sort is unique per row; only `league_id` is read below, exactly
+    // as before.
+    const { data: pending } = await readAllPaged<{ id: string; league_id: string }>(
+      admin,
+      {
+        table: 'waiver_claims',
+        columns: 'id, league_id',
+        filters: [['status', 'pending']],
+        orderBy: ['id'],
+      },
+    );
+    const leagueIds = [...new Set((pending ?? []).map((r) => r.league_id))];
     if (leagueIds.length === 0) return ok(c, { processed: 0, leagues: [] });
 
     const results: Array<Record<string, unknown>> = [];
-    let ranGlobalRolling = false;
 
     for (const leagueId of leagueIds) {
       const { data: league } = await admin
@@ -142,17 +159,28 @@ scheduledRoutes.post('/waiver-process', async (c) => {
         .eq('id', leagueId)
         .single();
 
-      // Honor the commissioner's processing hour when the gate fn exists.
-      try {
-        const { data: due, error: dueErr } = await admin.rpc('should_process_waivers_now', {
-          p_league_id: leagueId,
-        });
-        if (!dueErr && due === false) {
-          results.push({ leagueId, skipped: 'not_due_yet' });
-          continue;
-        }
-      } catch {
-        /* gate unavailable → process anyway */
+      // WAIVER-SCHEDULING (2026-09-03) - this gate was dead twice over.
+      // It passed { p_league_id } to should_process_waivers_now(), which
+      // takes NO arguments in production, so PostgREST answered PGRST202
+      // and `!dueErr` was always false; and that function returns SETOF a
+      // row, so `due === false` could never be true for the array
+      // supabase-js hands back. Every league with a pending claim was
+      // processed on every hourly run, at any hour of the day.
+      // Migration 20260903191000 adds the scalar per-league overload.
+      const { data: due, error: dueErr } = await admin.rpc('should_process_waivers_now', {
+        p_league_id: leagueId,
+      });
+      if (dueErr) {
+        // Fail OPEN, as before: a claim processed at the wrong hour beats a
+        // claim never processed. But say so - the silent version of this
+        // fallback is exactly what hid the defect.
+        logger.error(
+          `[scheduled.waiver-process] due-gate unavailable for league ${leagueId}, processing anyway:`,
+          dueErr.message,
+        );
+      } else if (due !== true) {
+        results.push({ leagueId, skipped: 'not_due_yet' });
+        continue;
       }
 
       if (league?.waiver_type === 'faab') {
@@ -160,12 +188,19 @@ scheduledRoutes.post('/waiver-process', async (c) => {
           p_league_id: leagueId,
         });
         results.push({ leagueId, type: 'faab', error: error?.message ?? null, claims: data ?? null });
-      } else if (!ranGlobalRolling) {
-        // rolling / reverse_standings share the global processor; it is
-        // idempotent for leagues with nothing pending. Run it once.
-        const { data, error } = await admin.rpc('process_all_pending_waivers');
-        ranGlobalRolling = true;
-        results.push({ type: 'rolling_global', error: error?.message ?? null, leagues: data ?? null });
+      } else {
+        // WAIVER-SCHEDULING (2026-09-03) - was process_all_pending_waivers(),
+        // which loops over EVERY non-faab league holding a pending claim and
+        // has no time predicate of its own. One league coming due therefore
+        // dragged every other league's waivers through with it, at that
+        // league's hour. process_waiver_claims(uuid) is the per-league body
+        // that global wrapper already calls in its loop.
+        // The wrapper also expires player_waiver_status rows; that
+        // housekeeping still runs daily as pg_cron job 2.
+        const { data, error } = await admin.rpc('process_waiver_claims', {
+          p_league_id: leagueId,
+        });
+        results.push({ leagueId, type: 'rolling', error: error?.message ?? null, claims: data ?? null });
       }
     }
     // NOTIFICATIONS (2026-08-16) — waiver RESULTS were silent: claims
@@ -303,10 +338,25 @@ scheduledRoutes.post('/matchup-sweep', async (c) => {
     // matchup-less leagues no-op inside the RPCs. Deliberately NOT
     // derived from a matchups select — that read caps at db-max-rows
     // (1000) and would silently drop leagues as the table grows.
-    const { data: leagues, error: lErr } = await admin
-      .from('leagues')
-      .select('id')
-      .eq('draft_status', 'completed');
+    //
+    // PAGED (2026-09-03). The comment above was right about the
+    // mechanism and the replacement read had the same defect: this
+    // population is `draft_status='completed'`, which only ever
+    // GROWS - every league that has ever finished a draft stays in
+    // it. Past 1,000 of them PostgREST returned the first 1,000 with
+    // HTTP 200 and the sweep stopped scoring the rest, with nothing
+    // in the response to say so. `orderBy: ['id']` is the primary key
+    // (the paging contract needs a sort unique per row); the filter
+    // is unchanged.
+    const { data: leagues, error: lErr } = await readAllPaged<{ id: string }>(
+      admin,
+      {
+        table: 'leagues',
+        columns: 'id',
+        filters: [['draft_status', 'completed']],
+        orderBy: ['id'],
+      },
+    );
     if (lErr) return fail(c, AppError.internal(lErr.message));
 
     const scored: Array<Record<string, unknown>> = [];

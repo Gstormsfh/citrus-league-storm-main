@@ -333,7 +333,28 @@ const WaiverWire = () => {
       // players inside the league's waiver window. Same source +
       // window math as the Free Agents page enrichment.
       try {
-        const { data: waiverRows } = await supabase
+        // player_waiver_status EXISTS in the database but is absent from
+        // src/integrations/supabase/types.ts, which declares 21 of production's
+        // ~130 public tables. A missing table makes the generated client
+        // resolve .select() to SelectQueryError<"column 'player_id' does not
+        // exist on 'players'."> and the chain then exceeds the type
+        // instantiation budget (TS2589). The query is correct and works at
+        // runtime; the real fix is regenerating types.ts. Until then this one
+        // read goes through an explicit row type and a minimal description of
+        // the three builder methods it actually calls.
+        interface WaiverStatusRow {
+          player_id: number | string;
+          dropped_at: string;
+        }
+        interface WaiverStatusFilter {
+          eq(column: string, value: string): WaiverStatusFilter;
+          is(column: string, value: null): PromiseLike<{ data: WaiverStatusRow[] | null }>;
+        }
+        // Supabase client boundary: table absent from the generated Database type.
+        const waiverStatusDb = supabase as unknown as {
+          from(table: 'player_waiver_status'): { select(columns: string): WaiverStatusFilter };
+        };
+        const { data: waiverRows } = await waiverStatusDb
           .from('player_waiver_status')
           .select('player_id, dropped_at')
           .eq('league_id', activeLeagueId)
@@ -348,14 +369,7 @@ const WaiverWire = () => {
             ?.waiver_period_hours) ?? 48) * 60 * 60 * 1000;
         const nowMs = Date.now();
         const map = new Map<string, string>();
-        // Cast through unknown: player_waiver_status EXISTS in the database
-        // but is absent from src/integrations/supabase/types.ts, which declares
-        // 21 of production's ~130 public tables. Missing a table makes the
-        // client resolve .select() to SelectQueryError<"column 'player_id' does
-        // not exist on 'players'."> and friends, so a direct assertion is
-        // rejected. The query itself is correct and works at runtime; the fix
-        // is regenerating types.ts, not changing this line.
-        for (const r of (waiverRows ?? []) as unknown as Array<{ player_id: number | string; dropped_at: string }>) {
+        for (const r of waiverRows ?? []) {
           const droppedMs = new Date(r.dropped_at).getTime();
           if (nowMs - droppedMs < windowMs) {
             map.set(String(r.player_id), new Date(droppedMs + windowMs).toISOString());

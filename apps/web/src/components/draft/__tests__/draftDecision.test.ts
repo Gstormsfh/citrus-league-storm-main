@@ -70,6 +70,9 @@ function entry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntry {
     proj_wins: null,
     proj_saves: null,
     proj_shutouts: null,
+    toi_total_minutes: null, avg_toi_per_game: null, vopa_score: null,
+    gsax_raw: null, gsax_regressed: null, gsax_shots_faced: null, gsax_xga: null, gsax_ga: null,
+    as_of: null,
     ...over,
   };
 }
@@ -402,11 +405,78 @@ describe('qualitySignalFor', () => {
     expect(s.percentile).toBe(100);
   });
 
-  it('gives a goalie save rate, because the payload has no xG or GAR for him', () => {
+  it('falls back to save rate for a goalie the GSAx table does not hold', () => {
+    // Every goalie in this pool carries gsax_regressed: null, so the GSAx
+    // scale is empty and the only honest cohort read is save rate.
     const s = qualitySignalFor(goalies[0], scales)!;
     expect(s.metric).toBe('SV%');
     expect(s.cohortNoun).toBe('goalies');
     expect(s.value).toBe('.880');
+  });
+
+  describe('a goalie with GSAx on the payload', () => {
+    /** Twenty keepers with the 2026-09-03 `goalie_gsax_primary` join populated. */
+    const keepers = Array.from({ length: 20 }, (_, i) =>
+      entry({
+        id: 400 + i,
+        position: 'G',
+        is_goalie: true,
+        save_pct: 0.9,
+        xg_per_60: null,
+        gar_per_60: null,
+        gsax_raw: -12 + i * 1.3,
+        gsax_regressed: -10 + i * 1.1,
+        gsax_shots_faced: 600 + i * 40,
+      }),
+    );
+    const keeperScales = buildQualityScales([...forwards, ...defence, ...keepers]);
+
+    it('leads with GSAx, the one goalie number that is ours', () => {
+      const s = qualitySignalFor(keepers[19], keeperScales)!;
+      expect(s.metric).toBe('GSAx');
+      expect(s.shortMetric).toBe('GSAx');
+      expect(s.cohortNoun).toBe('goalies');
+      expect(s.cohortSize).toBe(20);
+      expect(s.percentile).toBe(100);
+    });
+
+    it('prints the REGRESSED value, signed to one decimal, like the advanced card', () => {
+      // keepers[19]: gsax_regressed = -10 + 19 * 1.1 = 10.9; gsax_raw is 12.7.
+      expect(qualitySignalFor(keepers[19], keeperScales)!.value).toBe('+10.9');
+      // keepers[0]: gsax_regressed = -10.
+      expect(qualitySignalFor(keepers[0], keeperScales)!.value).toBe('-10.0');
+      expect(qualitySignalLine(qualitySignalFor(keepers[19], keeperScales))).toBe(
+        'GSAx +10.9 · 100th of goalies',
+      );
+    });
+
+    it('never prints -0.0 for a goalie sitting on expected', () => {
+      const level = entry({ id: 499, position: 'G', is_goalie: true, save_pct: 0.9, gsax_regressed: -0.04 });
+      expect(qualitySignalFor(level, keeperScales)!.value).toBe('0.0');
+    });
+
+    it('places a goalie against goalies only, never against the skater scales', () => {
+      // Every skater in the pool has xg_per_60 set; a goalie row never reads it.
+      const s = qualitySignalFor(keepers[10], keeperScales)!;
+      expect(s.metric).toBe('GSAx');
+      expect(s.cohortSize).toBe(20);
+      expect(s.cohortSize).not.toBe(forwards.length);
+    });
+
+    it('still falls back to save rate for the one goalie in the pool with no GSAx row', () => {
+      const unjoined = entry({ id: 498, position: 'G', is_goalie: true, save_pct: 0.925, gsax_regressed: null });
+      const s = qualitySignalFor(unjoined, keeperScales)!;
+      expect(s.metric).toBe('SV%');
+      expect(s.value).toBe('.925');
+    });
+
+    it('flags a thin sample on the GSAx read too', () => {
+      const callUp = entry({ id: 497, position: 'G', is_goalie: true, gp: 4, save_pct: 0.95, gsax_regressed: 3.2 });
+      const s = qualitySignalFor(callUp, keeperScales)!;
+      expect(s.metric).toBe('GSAx');
+      expect(s.lowSample).toBe(true);
+      expect(qualitySignalLine(s)).toContain('thin sample');
+    });
   });
 
   it('falls back to GAR/60 when the talent table has no xG row', () => {

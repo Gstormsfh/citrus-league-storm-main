@@ -78,6 +78,15 @@ jobs:
       - name: Build shared
         run: npm run build --workspace=packages/shared
 
+      # Sentry tags every event with a release. Without this the hosted web
+      # build reports as citrus-fantasy@0.0.0 (config.ts falls back when
+      # VITE_APP_VERSION is unset; no .env is materialised in CI), so a
+      # regression could never be pinned to a deploy. The native shell
+      # computes its own from package.json + the iOS build number in
+      # apps/web/scripts/build-native.mjs; the web uses the short SHA.
+      - name: Compute web release tag
+        run: echo "VITE_APP_VERSION=$(node -p "require('./apps/web/package.json').version")+${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
       - name: Build web
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}

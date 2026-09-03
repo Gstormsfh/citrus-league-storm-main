@@ -8,6 +8,7 @@ import { slotLabel } from './slotLabel';
 import { chipClassFor, LOCKED_CHIP } from './slotChip';
 import { Mug } from './Mug';
 import { tonight } from './tonight';
+import { multiPositionLabel } from './positions';
 
 /**
  * FILL SHEET (2026-09-01, Sleeper parity audit R2)
@@ -144,6 +145,9 @@ export function FillSlotSheet({
               const locked = lockedPlayerIds?.has(String(p.id)) ?? false;
               const t = tonight(p);
               const hasGame = p.nextGame?.isToday === true;
+              // Why a bench LW is offered for a C spot: he is C/LW. Printed
+              // only for a player with more than one position (gap A).
+              const positions = multiPositionLabel(p);
               return (
                 <button
                   key={p.id}
@@ -175,6 +179,12 @@ export function FillSlotSheet({
                       {p.name}
                     </span>
                     <span className="flex items-center gap-1 truncate text-[11px] font-display text-white/55">
+                      {positions && (
+                        <>
+                          <span data-testid="candidate-positions" className="font-semibold text-pastel-cream/80">{positions}</span>
+                          <span className="text-white/25" aria-hidden="true">·</span>
+                        </>
+                      )}
                       <span className="font-semibold">{teamOf(p)}</span>
                       {locked ? (
                         <>

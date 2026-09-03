@@ -233,3 +233,22 @@ describe('AutoLineupSheet — dismissal', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });
+
+describe('AutoLineupSheet: a move row names both positions of a dual-eligible player (gap A, 2026-09-03)', () => {
+  it('prints "C/LW" on his row, so "BN to LW2" for a centre reads as the plan it is', () => {
+    const DUAL = mk('12', 'Ryan Nugent-Hopkins', 'C', {
+      eligible_positions: ['C', 'LW'],
+      projectedPoints: 3.9,
+      nextGame: { opponent: 'vs TOR', isToday: true },
+    });
+    renderSheet({ day: plan([{ player: DUAL, from: 'bench-grid', to: 'slot-LW-2' }], 40.0, 43.9) });
+    const row = screen.getAllByTestId('auto-move')[0];
+    expect(within(row).getByTestId('move-positions')).toHaveTextContent('C/LW');
+    expect(row).toHaveAttribute('data-to', 'slot-LW-2');
+  });
+
+  it('prints nothing new for single-position players', () => {
+    renderSheet();
+    expect(screen.queryAllByTestId('move-positions')).toHaveLength(0);
+  });
+});

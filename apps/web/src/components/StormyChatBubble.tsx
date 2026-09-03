@@ -53,7 +53,7 @@ const getContextGreeting = (pathname: string): string => {
     return "Looking at the standings? Ask me about playoff scenarios or trade targets.";
   if (pathname.includes('/draft-room'))
     return "In the draft room! Want me to suggest the best available pick based on our projections?";
-  return "Well boss, Stormy here. Your roster, your scoring settings and your matchup are already loaded. Ask me about a start/sit, a trade, or a waiver target.";
+  return "Stormy here. Your roster, your scoring settings and your matchup are already loaded. Ask me about a start/sit, a trade, or a waiver target.";
 };
 
 // ── Types ────────────────────────────────────────────────────────

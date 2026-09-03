@@ -1,9 +1,11 @@
 /**
  * FIRST-RUN SWAP HINT (2026-09-01, Sleeper parity audit R2)
  *
- * Contract: the "Tap a position to swap" toast fires ONCE — on the first
- * editable roster a manager ever sees — and never again, across re-renders,
+ * Contract: the "Line Change" hint toast fires ONCE, on the first
+ * editable roster a manager ever sees, and never again, across re-renders,
  * remounts and reloads. And a broken localStorage never breaks the roster.
+ * Its copy is pinned too: the title is a state inside COPY_VOICE's four-word
+ * budget, and the instruction lives in the body (2026-09-03).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
@@ -31,13 +33,25 @@ describe('useSwapHint', () => {
       initialProps: { on: true },
     });
     expect(toastSpy).toHaveBeenCalledTimes(1);
-    expect(toastSpy.mock.calls[0][0]).toMatchObject({ title: 'Tap a position to swap' });
+    expect(toastSpy.mock.calls[0][0]).toMatchObject({
+      title: 'Line Change',
+      description: 'Tap the coloured chip on any row to swap a position. Empty spots fill from the bench.',
+    });
     expect(localStorage.getItem(SWAP_HINT_STORAGE_KEY)).toBe('1');
 
     rerender({ on: true });
     rerender({ on: false });
     rerender({ on: true });
     expect(toastSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the title inside the four-word budget and the body to two sentences', () => {
+    renderHook(() => useSwapHint(true));
+    const { title, description } = toastSpy.mock.calls[0][0] as { title: string; description: string };
+    expect(title.trim().split(/\s+/).length).toBeLessThanOrEqual(4);
+    expect(description.split(/[.!?]\s+(?=[A-Z])/).length).toBeLessThanOrEqual(2);
+    expect(title).not.toMatch(/\u2014/);
+    expect(description).not.toMatch(/\u2014/);
   });
 
   it('does nothing while disabled, then fires when the list becomes editable', () => {

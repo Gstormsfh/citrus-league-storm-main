@@ -73,7 +73,7 @@ describe('the compact phone chrome carries the search', () => {
 describe('the position filters are one row, never three', () => {
   it('the Available tab applies the shared scroller class, not flex-wrap', () => {
     expect(PAGE).toContain('className={FA_CHIP_ROW}');
-    expect(PAGE).toMatch(/import \{[^}]*FA_CHIP_ROW[^}]*\} from '@\/components\/freeagents\/freeAgentRow'/);
+    expect(PAGE).toMatch(/import \{[^}]*FA_CHIP_ROW[^}]*\} from '@\/components\/freeagents\/freeAgentRowKit'/);
     // The exact class string this replaced. Its return is the regression.
     expect(PAGE).not.toContain('<div className="flex flex-wrap gap-2">');
     expect(PAGE).not.toContain('<div className="flex flex-wrap gap-2 mb-4">');
@@ -126,11 +126,11 @@ describe('every phone list is the shared row', () => {
  */
 describe('the row list gives way to the table where the table fits', () => {
   const ROW_MODULE = readFileSync(
-    resolve(HERE, '..', '..', 'components', 'freeagents', 'freeAgentRow.ts'),
+    resolve(HERE, '..', '..', 'components', 'freeagents', 'freeAgentRowKit.ts'),
     'utf8',
   );
 
-  it('the pair is declared once, in freeAgentRow.ts, at md', () => {
+  it('the pair is declared once, in freeAgentRowKit.ts, at md', () => {
     expect(ROW_MODULE).toMatch(/export const FA_ROWS_ONLY = 'md:hidden'/);
     expect(ROW_MODULE).toMatch(/export const FA_TABLE_ONLY = 'hidden md:block'/);
     // The measurement that chose `md` has to travel with the constants, or
@@ -143,7 +143,7 @@ describe('the row list gives way to the table where the table fits', () => {
     expect(count('FA_ROWS_ONLY', BODY)).toBe(3);
     expect(count('FA_TABLE_ONLY', BODY)).toBe(3);
     expect(PAGE).toMatch(
-      /import \{[^}]*FA_ROWS_ONLY[^}]*FA_TABLE_ONLY[^}]*\} from '@\/components\/freeagents\/freeAgentRow'/,
+      /import \{[^}]*FA_ROWS_ONLY[^}]*FA_TABLE_ONLY[^}]*\} from '@\/components\/freeagents\/freeAgentRowKit'/,
     );
     // The literals the constants replaced. `hidden lg:block` still has two
     // legitimate uses on this page (the desktop Navbar and the mascot
@@ -172,7 +172,7 @@ describe('the row list gives way to the table where the table fits', () => {
 describe('the phone list leads with the projection', () => {
   it('its default order is sortByProjection, not the fetch order', () => {
     expect(PAGE).toContain('sortByProjection(filteredPlayers.map(withProjection))');
-    expect(PAGE).toMatch(/import \{[^}]*sortByProjection[^}]*\} from '@\/components\/freeagents\/freeAgentRow'/);
+    expect(PAGE).toMatch(/import \{[^}]*sortByProjection[^}]*\} from '@\/components\/freeagents\/freeAgentRowKit'/);
   });
 
   it('it pages with the same visibleCount the desktop table does', () => {

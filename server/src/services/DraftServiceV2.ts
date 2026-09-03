@@ -22,6 +22,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { AppError, type ErrorCode } from '../lib/errors';
+import { pagedSelect } from '../lib/pagedSelect';
 import { structuredLogger, computePickPayloadHash } from '@citrus/shared';
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -363,20 +364,42 @@ export class DraftServiceV2 {
     leagueId: string,
     sinceSeq?: number,
   ): Promise<DraftEventRow[]> {
-    let query = this.supabase
-      .from('draft_events')
-      .select(
+    // PAGED (2026-09-03). This was an unbounded select. PostgREST
+    // clamps an unbounded response at `db-max-rows` (1,000 on this
+    // project) and answers HTTP 200 with a short body - no error, no
+    // warning. That is catastrophic HERE and nowhere else in this
+    // service, because the rows come back in `seq` ASC order: the
+    // clamp drops the TAIL, i.e. the NEWEST events. A league past
+    // 1,000 events would bootstrap into a lobby that has replayed
+    // only the first 1,000, so its in-memory board is missing the
+    // most recent picks - `pickNumber` rewinds, the clock re-arms on
+    // a slot already taken, and the drafted-set no longer contains
+    // players who are already on a roster, which is how a player gets
+    // handed out twice.
+    //
+    // 1,000 events per league is not hypothetical: `draft_picks` are
+    // bounded (32 teams x 30 rounds = 960 by the createLeague /
+    // numTeams validators), but `auction_bid_placed` and
+    // `auction_bid_extends_timer` are durable event types too (see
+    // draft_events_event_type_chk) and an auction emits one row per
+    // BID, not per lot. A single contested auction clears 1,000
+    // easily.
+    //
+    // `orderBy: ['seq']` preserves the original sort and satisfies the
+    // paging contract's uniqueness requirement: `draft_events_league_
+    // seq_uniq` makes seq unique per league, and league_id is pinned
+    // by the equality filter above it.
+    const { data, error } = await pagedSelect<DraftEventRow>(this.supabase, {
+      table: 'draft_events',
+      columns:
         'id, league_id, seq, event_type, payload, payload_hash, ' +
-          'idempotency_key, actor, correlation_id, created_at',
-      )
-      .eq('league_id', leagueId)
-      .order('seq', { ascending: true });
-
-    if (sinceSeq !== undefined) {
-      query = query.gt('seq', sinceSeq);
-    }
-
-    const { data, error } = await query;
+        'idempotency_key, actor, correlation_id, created_at',
+      filters: [['league_id', leagueId]],
+      // Exclusive, exactly as the `.gt('seq', sinceSeq)` it replaces.
+      rangeFilters:
+        sinceSeq === undefined ? undefined : [['seq', 'gt', sinceSeq]],
+      orderBy: ['seq'],
+    });
     if (error) {
       throw new AppError(
         `Failed to read draft_events: ${error.message}`,
@@ -385,7 +408,7 @@ export class DraftServiceV2 {
         error.code,
       );
     }
-    return (data ?? []) as unknown as DraftEventRow[];
+    return data;
   }
 
   /**

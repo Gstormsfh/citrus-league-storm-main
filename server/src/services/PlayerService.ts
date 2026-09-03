@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, getCurrentSeason } from '@citrus/shared';
+import { COLUMNS, getCurrentSeason, parseEligiblePositions, type EligiblePositionsRaw } from '@citrus/shared';
 import { readAllPaged } from '../lib/pagedRead';
 
 /**
@@ -16,7 +16,11 @@ interface PlayerDirectoryRow {
   team_abbrev: string;
   jersey_number: string | null;
   headshot_url: string | null;
-  eligible_positions: string[] | null;
+  // `player_directory.eligible_positions` is a comma-separated TEXT cell
+  // ("C,LW"), not an array. Typing it string[] here made `.length` read a
+  // character count and the client's Array.isArray guard drop it, so a
+  // dual-eligible player never reached the roster as one. Parsed below.
+  eligible_positions: EligiblePositionsRaw;
 }
 
 interface PlayerStatsRow {
@@ -179,7 +183,7 @@ function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talen
     status: rosterStatus === 'IR' || rosterStatus === 'LTIR' ? 'injured' : 'active',
     roster_status: rosterStatus,
     is_ir_eligible: talent?.is_ir_eligible || false,
-    eligible_positions: (p.eligible_positions && p.eligible_positions.length > 0) ? p.eligible_positions : [p.position_code],
+    eligible_positions: parseEligiblePositions(p.eligible_positions, p.position_code),
     games_played: gamesPlayed,
     goals: stat.nhl_goals || 0,
     assists: stat.nhl_assists || 0,

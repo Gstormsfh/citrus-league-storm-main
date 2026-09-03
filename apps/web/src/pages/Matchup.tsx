@@ -834,7 +834,7 @@ const Matchup = () => {
             setSelectedWeek(weekToShow);
             log(' Using fallback matchup from week', weekToShow);
           } else {
-            throw new Error(`No matchups found in demo league. Please verify the migration ran successfully.`);
+            throw new Error(`The demo league has no matchups yet. Refresh to try again.`);
           }
         }
 
@@ -1653,7 +1653,7 @@ const Matchup = () => {
 
         if (!data) {
           logger.error('[Matchup] No data returned from getDailyGameStats');
-          throw new Error('No data returned');
+          throw new Error('Daily stats came back empty');
         }
         
         const statsDataArr = (data || []) as any[];
@@ -4373,7 +4373,7 @@ const Matchup = () => {
             return;
           } else {
             // Original error handling for user's matchup
-            if (matchupError?.message?.includes('No matchup found') || matchupError?.message?.includes('timed out')) {
+            if (matchupError?.message?.includes('has no matchup yet') || matchupError?.message?.includes('No matchup found') || matchupError?.message?.includes('timed out')) {
               log(' No matchup found or timeout for week', weekToShow);
               setError(`Failed to load matchup for week ${weekToShow}. ${matchupError.message?.includes('timed out') ? 'Request timed out.' : 'Matchup may need to be generated.'} Please try refreshing the page.`);
               setLoading(false);
@@ -4399,7 +4399,7 @@ const Matchup = () => {
             loadingRef.current = false;
             return;
           } else {
-            setError(`No matchup found for week ${weekToShow}`);
+            setError(`Week ${weekToShow} has no matchup yet. Retry, or pick another week.`);
             setLoading(false);
             loadingRef.current = false;
             return;

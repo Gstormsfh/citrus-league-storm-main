@@ -54,7 +54,20 @@ Today the only way to see the draft experience is to start a real league — pol
 
 ## §4 — Feature flag
 
-Pre-ratified: UI button is a **stub, disabled by default**. Flag:
+> **Amended 2026-09-03.** `FEATURE_PRACTICE_DRAFT` now gates the League HQ
+> entry to the existing, fully client-side Mock Draft Simulator
+> (`/armchair-gm?tab=mockdraft`), and it is `true`. It does NOT gate the
+> server-side practice league described in this document, which is still
+> design-only: `createPracticeLeague`, its route, the janitor and the
+> aggregation guardrail audit in §3/§5 are not written, and a test
+> (`apps/web/src/lib/__tests__/featureFlags.test.ts`) trips the moment any of
+> them appears without its own flag. When the server-side mode is built it
+> gets a new flag (suggested `FEATURE_PRACTICE_LEAGUE`) and the rest of this
+> section applies to that flag, not this one. A disabled "Coming soon" button
+> on HQ was rejected: the HQ composition guard's reasoning is that the next
+> real action must not be a ghost, and a dead CTA beside it is worse.
+
+Original pre-ratified text follows. Flag:
 
 ```
 apps/web/src/lib/featureFlags.ts (NEW)

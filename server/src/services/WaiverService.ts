@@ -19,8 +19,36 @@ export class WaiverService {
     this.membership = new LeagueMembershipService(supabase);
   }
 
-  /** Check if a team has exceeded add limits */
-  async checkTransactionLimits(leagueId: string, teamId: string) {
+  /**
+   * Check if a team has exceeded add limits.
+   *
+   * WAIVER-SCHEDULING (2026-09-03) - both counts filtered on
+   * transaction_ledger.transaction_type, a column that does not exist.
+   * The real column is `type` ('ADD' / 'DROP' / 'TRADE'); the write side
+   * of this same file has always inserted `type`. PostgREST answered
+   * 42703 "column transaction_ledger.transaction_type does not exist",
+   * `count` came back null, `seasonCount || 0` turned that into 0, and
+   * the `error` field was never destructured - so every team read as
+   * having made zero adds and no add limit could ever be reached.
+   * Verified against production: information_schema.columns for
+   * public.transaction_ledger lists id, league_id, user_id, team_id,
+   * type, player_id, source, created_at.
+   *
+   * The error is now surfaced. On a count failure this still fails OPEN
+   * (a lookup hiccup must not block a legitimate add, same posture as
+   * the game-lock check further down this file), but it logs and flags
+   * itself instead of silently reporting zero adds.
+   */
+  async checkTransactionLimits(
+    leagueId: string,
+    teamId: string,
+  ): Promise<{
+    allowed: boolean;
+    reason?: string;
+    weeklyAdds: number;
+    seasonAdds: number;
+    limitCheckDegraded?: boolean;
+  }> {
     const { data: league } = await this.supabase
       .from('leagues')
       .select('settings')
@@ -39,14 +67,26 @@ export class WaiverService {
     let seasonAdds = 0;
 
     if (weeklyLimit || seasonLimit) {
-      const { count: seasonCount } = await this.supabase
+      // NOTE: transaction_ledger has no season column, so this "season"
+      // count is all-time. Harmless today (no live league carries a
+      // non-zero seasonAddLimit) but it will over-count once one does.
+      // Scoping it needs a schema decision; see the handover report.
+      const { count: seasonCount, error: seasonErr } = await this.supabase
         .from('transaction_ledger')
         .select('id', { count: 'exact', head: true })
         .eq('league_id', leagueId)
         .eq('team_id', teamId)
-        .eq('transaction_type', 'ADD');
+        .eq('type', 'ADD');
 
-      seasonAdds = seasonCount || 0;
+      if (seasonErr) {
+        logger.error(
+          `[waivers] add-limit season count failed for team ${teamId}; allowing the add:`,
+          seasonErr.message,
+        );
+        return { allowed: true, weeklyAdds, seasonAdds, limitCheckDegraded: true };
+      }
+
+      seasonAdds = seasonCount ?? 0;
 
       if (seasonLimit && seasonAdds >= seasonLimit) {
         return { allowed: false, reason: 'Season add limit reached', weeklyAdds, seasonAdds };
@@ -57,15 +97,23 @@ export class WaiverService {
         weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Sunday
         weekStart.setHours(0, 0, 0, 0);
 
-        const { count: weekCount } = await this.supabase
+        const { count: weekCount, error: weekErr } = await this.supabase
           .from('transaction_ledger')
           .select('id', { count: 'exact', head: true })
           .eq('league_id', leagueId)
           .eq('team_id', teamId)
-          .eq('transaction_type', 'ADD')
+          .eq('type', 'ADD')
           .gte('created_at', weekStart.toISOString());
 
-        weeklyAdds = weekCount || 0;
+        if (weekErr) {
+          logger.error(
+            `[waivers] add-limit weekly count failed for team ${teamId}; allowing the add:`,
+            weekErr.message,
+          );
+          return { allowed: true, weeklyAdds, seasonAdds, limitCheckDegraded: true };
+        }
+
+        weeklyAdds = weekCount ?? 0;
 
         if (weeklyAdds >= weeklyLimit) {
           return { allowed: false, reason: 'Weekly add limit reached', weeklyAdds, seasonAdds };

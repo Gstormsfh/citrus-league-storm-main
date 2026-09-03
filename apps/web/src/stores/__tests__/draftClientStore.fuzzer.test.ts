@@ -72,7 +72,10 @@ function makeSnapshot(): DraftSnapshot {
   } as DraftSnapshot;
 }
 
-function makePickEvent(seq: number, slot: typeof MATRIX[0], corrIndex: number): BufferedDraftEvent {
+// Returns the `pick_submitted` variant specifically (not the whole union),
+// so callers can read teamId / playerId / correlationId without narrowing.
+type PickSubmittedEvent = Extract<BufferedDraftEvent, { kind: 'pick_submitted' }>;
+function makePickEvent(seq: number, slot: typeof MATRIX[0], corrIndex: number): PickSubmittedEvent {
   return {
     kind: 'pick_submitted',
     seq,

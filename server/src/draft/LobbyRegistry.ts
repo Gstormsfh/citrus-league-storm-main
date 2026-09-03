@@ -44,6 +44,7 @@ import { structuredLogger } from '@citrus/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { WebSocket } from 'uWebSockets.js';
 import type { DraftServiceV2 } from '../services/DraftServiceV2';
+import { readAllPaged } from '../lib/pagedRead';
 import { readSystemFlag } from '../lib/systemFlags';
 import { LobbyManager } from './LobbyManager';
 import type {
@@ -485,18 +486,33 @@ export class LobbyRegistry {
     let failed = 0;
 
     try {
-      // Cast the fluent-chain through `any` for THIS query only —
-      // Supabase's generated Database types push the .from → .select
-      // → .in inference chain deep enough to trip the instantiation
-      // cap on the `leagues` type (wide settings JSONB). The scan
-      // only needs id column.
+      // PAGED (2026-09-03). This read used to be an unbounded
+      // `.select('id').eq('draft_status','in_progress')`. PostgREST
+      // clamps every unbounded response at `db-max-rows` (1,000 on
+      // this project) and answers HTTP 200 with a short body - no
+      // error, no warning. Past 1,000 concurrent in-progress drafts
+      // the boot scan would resume the first 1,000 leagues PostgREST
+      // happened to hand back and leave the rest with no lobby, no
+      // clock and no log line saying so. `readAllPaged` carries the
+      // full write-up; `orderBy: ['id']` is the primary key, which is
+      // the paging contract's requirement (a non-unique sort lets
+      // adjacent windows overlap and skip).
       //
-      // E109 lesson: cast the *result* of `.from()`, NOT the method
-      // itself. `const untypedFrom = supabaseAdmin.from` extracts
-      // the method as a free function → `this` is undefined at call
-      // time → real supabase-js reads `this.rest` → TypeError. The
-      // Proxy at server/src/lib/supabase.ts:40 makes accidental
-      // rebinding impossible.
+      // The `as any` cast this replaced is gone with it: the helper
+      // takes an untyped `SupabaseClient`, so the `.from -> .select`
+      // inference chain that used to trip the instantiation cap on
+      // the wide `leagues` type never forms here.
+      //
+      // E109 lesson, still binding on whatever replaces this: pass
+      // the CLIENT, or cast the *result* of `.from()`. Never extract
+      // the method - `const untypedFrom = supabaseAdmin.from` makes
+      // it a free function, `this` is undefined at call time, real
+      // supabase-js reads `this.rest` and throws TypeError. The Proxy
+      // at server/src/lib/supabase.ts:40 makes accidental rebinding
+      // impossible. `readAllPaged` satisfies this by construction:
+      // it receives the client as a value and calls
+      // `supabase.from(t).select(c)` in a single expression.
+      //
       // E111 lesson: `draft_status` enum in the DB is
       //   ('not_started', 'queued', 'in_progress', 'completed')
       // per supabase/migrations/20250101000001 + 20260206000000
@@ -514,10 +530,15 @@ export class LobbyRegistry {
       // 'paused'; that is a client-facing type-drift docket for
       // another cycle and is why the enum-domain mismatch survived
       // 1031 offline tests.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabaseAdmin.from('leagues') as any)
-        .select('id')
-        .eq('draft_status', 'in_progress');
+      const { data: rows, error } = await readAllPaged<{ id: string }>(
+        supabaseAdmin,
+        {
+          table: 'leagues',
+          columns: 'id',
+          filters: [['draft_status', 'in_progress']],
+          orderBy: ['id'],
+        },
+      );
       if (error) {
         structuredLogger.error(
           'registry.boot_scan_query_failed',
@@ -526,7 +547,6 @@ export class LobbyRegistry {
         );
         return { scanned: 0, resumed: 0, failed: 0 };
       }
-      const rows = (data ?? []) as Array<{ id: string }>;
       scanned = rows.length;
       structuredLogger.info('registry.boot_scan_started', {
         activeLeagues: scanned,
@@ -927,11 +947,23 @@ export class LobbyRegistry {
       // Fire-and-forget shutdown; the promise resolves after
       // internal teardown but the map-delete can happen immediately
       // since no new lookup will find this lobbyId post-delete.
+      // 2026-09-03: this catch used to log at `debug` and then throw
+      // the error away with a bare `void` statement. `debug` is
+      // dropped outright under the default LOG_LEVEL=INFO, so a lobby
+      // whose shutdown threw left no trace at all: the timers,
+      // snapshot loop and heartbeat that shutdown was supposed to
+      // stop stayed armed on a lobby already removed from the map,
+      // and the only evidence was a slow leak.
+      //
+      // Control flow is unchanged (still fire-and-forget; the map
+      // delete below still happens). The error is now carried, at a
+      // level that is actually emitted, using the same fold-err-into-
+      // ctx idiom as `registry.evict_connection_close_threw` above.
       void lobby.shutdown().catch((err: unknown) => {
-        structuredLogger.debug('registry.idle_eviction_shutdown_threw', {
+        structuredLogger.warn('registry.idle_eviction_shutdown_threw', {
           lobbyId,
+          err: err instanceof Error ? err.message : String(err),
         });
-        void err;
       });
       this.lobbies.delete(lobbyId);
       evicted += 1;

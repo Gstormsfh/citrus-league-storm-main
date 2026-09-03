@@ -9,20 +9,26 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { MASCOT_LIST } from '@/constants/mascots';
+// Siblings are imported by module, not through '@/components/citrus2'. The
+// barrel (index.ts) re-exports this file, so importing the barrel from here
+// makes Homepage <-> index a cycle. Rollup reported it as a cyclic cross-chunk
+// re-export whenever a lazily loaded page reached Homepage through the barrel,
+// and warned that execution order may break. Direct imports keep the barrel
+// one-way.
+import { DarkLayout } from './DarkLayout';
+import { HockeyFooter } from './HockeyFooter';
+import { RotatingHero, type HeroSlide } from './RotatingHero';
+import { SectionHeader } from './SectionHeader';
+import { CtaBanner } from './CtaBanner';
+import { Faq, type FaqEntry } from './Faq';
+import { GameModeCard } from './GameModeCard';
+import { OnboardingCard } from './OnboardingCard';
+import { FeatureCard } from './FeatureCard';
+import { MascotCard } from './MascotCard';
+import { StormyChatTile } from './StormyChatTile';
+import { MascotAvatar } from './MascotAvatar';
+// Real hockey iconography, replacing generic lucide
 import {
-  DarkLayout,
-  HockeyFooter,
-  RotatingHero,
-  SectionHeader,
-  CtaBanner,
-  Faq,
-  GameModeCard,
-  OnboardingCard,
-  FeatureCard,
-  MascotCard,
-  StormyChatTile,
-  MascotAvatar,
-  // Real hockey iconography — replaces generic lucide
   CupIcon,
   PickemIcon,
   SurvivorIcon,
@@ -34,10 +40,8 @@ import {
   ShiftIcon,
   ScoreboardIcon,
   RangeIcon,
-  type HeroSlide,
-  type FaqEntry,
-  type AccentName,
-} from '@/components/citrus2';
+} from './HockeyIcons';
+import type { AccentName } from './tokens';
 
 // =============================================================================
 // HERO SLIDES — playoffs front and center, fantasy as off-season tease
@@ -179,7 +183,7 @@ const GAME_MODES: Array<{
   {
     label: 'Mock Draft',
     scene: '/mascots/scene-draft.webp',
-    sub: 'Spin up a 12-team mock against AI managers. No signup, instant draft room.',
+    sub: 'Spin up a 12-team mock against AI managers. No signup, instant board.',
     badge: 'Anytime',
     accent: 'sage',
     icon: DraftIcon,
@@ -207,7 +211,7 @@ const ONBOARDING_CARDS: Array<{
   },
   {
     title: 'Run a Mock',
-    body: 'A 12-team mock against AI managers. No signup, instant draft room, and the projections run live while you pick.',
+    body: 'A 12-team mock against AI managers. No signup, instant board, and the projections run live while you pick.',
     cta: 'Mock now',
     icon: DraftIcon,
     accent: 'sage',

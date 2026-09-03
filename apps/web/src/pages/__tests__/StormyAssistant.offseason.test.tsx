@@ -182,7 +182,7 @@ describe('StormyAssistant — the offseason', () => {
     localStorage.setItem(
       'stormyMessages',
       JSON.stringify([
-        { id: '1', text: 'Well boss, Stormy here. I already have your league, your roster and picks, and the live playoff bracket in front of me.', sender: 'stormy', timestamp: new Date().toISOString() },
+        { id: '1', text: 'Stormy here. I already have your league, your roster and picks, and the live playoff bracket in front of me.', sender: 'stormy', timestamp: new Date().toISOString() },
         { id: '2', text: 'Who should I keep?', sender: 'user', timestamp: new Date().toISOString() },
       ]),
     );

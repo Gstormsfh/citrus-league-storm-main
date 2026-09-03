@@ -30,6 +30,7 @@ import { waiverApi } from '@/api/waivers';
 import Navbar from '@/components/Navbar';
 import MobileMenuButton from '@/components/MobileMenuButton';
 import { LeagueTimelineCard } from '@/components/dashboard/LeagueTimelineCard';
+import { FEATURE_PRACTICE_DRAFT } from '@/lib/featureFlags';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -1781,6 +1782,35 @@ const LeagueDashboard = () => {
                     <p className="text-xs text-white/55 mt-2 text-center">
                       You'll be able to participate once the commissioner starts the draft
                     </p>
+                  )}
+                  {/* THE RITUAL (2026-09-03, Sleeper-gap 4). A mock draft is how a
+                      league learns to draft before the real night, so the entry
+                      sits in the same card as the real action: a tertiary ghost
+                      under it, never a second orange verb (DESIGN_DIRECTION.md
+                      rule 3), and only while the draft has not started. Once the
+                      room is live the only thing to do here is join it.
+
+                      It goes to the client-side Mock Draft Simulator on
+                      /armchair-gm (React state only, one player read, no league
+                      writes), which is the one practice surface that exists.
+                      The T15 throwaway-league mode is design-only; see
+                      lib/featureFlags.ts for what this flag does and does not
+                      gate. The sentence under the button is load-bearing: a
+                      manager must never wonder whether a practice pick counted. */}
+                  {FEATURE_PRACTICE_DRAFT && league.draft_status === 'not_started' && (
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <Button
+                        asChild
+                        className="w-full h-10 normal-case font-sans tracking-normal text-sm bg-transparent border border-pastel-cream/25 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold rounded-xl"
+                      >
+                        <Link to="/armchair-gm?tab=mockdraft">
+                          <DraftIcon className="mr-1.5 h-4 w-4" strokeWidth={2} aria-hidden="true" /> Run a mock draft
+                        </Link>
+                      </Button>
+                      <p className="text-xs text-white/55 mt-2 text-center">
+                        Practice your picks against the computer. Nothing there touches this league.
+                      </p>
+                    </div>
                   )}
                 </CardContent>
               </Card>

@@ -120,7 +120,7 @@ export function AuctionPanel({ leagueId, teams, playersById, myTeamId }: Auction
         nominationId: nomination.nominationId,
         bidAmount: amount,
       });
-      if (!result.ok) {
+      if (result.ok === false) {
         toast({
           title: 'Bid Not Placed',
           description: result.message,
@@ -144,7 +144,7 @@ export function AuctionPanel({ leagueId, teams, playersById, myTeamId }: Auction
         playerName: nomPlayer.full_name,
         openingBid: opening,
       });
-      if (result.ok) {
+      if (result.ok === true) {
         setNomPlayer(null);
         setNomSearch('');
         setNomOpeningBid('1');

@@ -12,6 +12,14 @@ interface NotificationState {
   
   // Active subscriptions: leagueId -> unsubscribe function
   subscriptions: Map<string, () => void>;
+  // How many mounted consumers hold each league's channel. The Navbar holds
+  // it app-wide; the matchup rail (LeagueNotifications) holds it while
+  // mounted. Before 2026-09-03 the rail's unmount called unsubscribe() and
+  // tore down the single shared channel, so after the first visit to the
+  // matchup page no realtime notification (and no card) arrived until a
+  // league switch or a reload. The channel now closes only when the last
+  // holder lets go.
+  subscriberCounts: Map<string, number>;
   
   // Actions
   loadNotifications: (leagueId: string, userId: string) => Promise<void>;
@@ -30,6 +38,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   loading: new Map(),
   errors: new Map(),
   subscriptions: new Map(),
+  subscriberCounts: new Map(),
 
   // Load notifications for a league
   loadNotifications: async (leagueId: string, userId: string) => {
@@ -192,7 +201,17 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   // Subscribe to real-time updates
   subscribe: (leagueId: string, userId: string) => {
-    // Unsubscribe from existing subscription if any
+    // A second holder of a live channel shares it; only the first opens one.
+    const holders = get().subscriberCounts.get(leagueId) || 0;
+    set((state) => {
+      const counts = new Map(state.subscriberCounts);
+      counts.set(leagueId, holders + 1);
+      return { subscriberCounts: counts };
+    });
+    if (holders > 0 && get().subscriptions.get(leagueId)) {
+      return;
+    }
+    // Defensive: a stale unsubscribe with no holders is replaced, never leaked
     const existingUnsubscribe = get().subscriptions.get(leagueId);
     if (existingUnsubscribe) {
       existingUnsubscribe();
@@ -254,6 +273,17 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   // Unsubscribe from real-time updates
   unsubscribe: (leagueId: string) => {
+    const holders = get().subscriberCounts.get(leagueId) || 0;
+    const remaining = Math.max(0, holders - 1);
+    set((state) => {
+      const counts = new Map(state.subscriberCounts);
+      if (remaining === 0) counts.delete(leagueId);
+      else counts.set(leagueId, remaining);
+      return { subscriberCounts: counts };
+    });
+    if (remaining > 0) {
+      return;
+    }
     const unsubscribe = get().subscriptions.get(leagueId);
     if (unsubscribe) {
       unsubscribe();

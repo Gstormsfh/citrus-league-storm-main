@@ -75,6 +75,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { structuredLogger } from '@citrus/shared';
+import { readAllPaged } from '../lib/pagedRead';
 import type { LobbyRegistry } from './LobbyRegistry';
 
 /**
@@ -211,23 +212,38 @@ export class OrphanedDraftScanner {
       failed: 0,
     };
 
-    // Same cast rationale as performBootScan (E109/E111): cast the
-    // RESULT of .from(), never the method itself, and query only
-    // `draft_status='in_progress'` — `paused` is NOT a member of the
-    // draft_status enum (pause lives on leagues.draft_state), and a
-    // .in() list containing a non-member literal is rejected whole
-    // with 22P02, silently returning zero rows.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (this.supabaseAdmin.from('leagues') as any)
-      .select('id')
-      .eq('draft_status', 'in_progress');
+    // PAGED (2026-09-03), for the same reason performBootScan is:
+    // PostgREST clamps an unbounded select at `db-max-rows` (1,000
+    // here) and returns HTTP 200 with a short body. This scanner is
+    // the LAST line of defence for a draft whose lobby was evicted -
+    // if its league falls outside the clamp window it is never
+    // adopted, its clock stays stopped, and `result.scanned` reads
+    // 1000 forever while the real number climbs. A watchdog that
+    // silently stops covering the tail of its own population is
+    // exactly the F20 failure mode this module was written against.
+    // `orderBy: ['id']` is the primary key - the paging contract
+    // requires a sort that is unique per row.
+    //
+    // Filter unchanged: query only `draft_status='in_progress'` -
+    // `paused` is NOT a member of the draft_status enum (pause lives
+    // on leagues.draft_state), and a .in() list containing a
+    // non-member literal is rejected whole with 22P02, silently
+    // returning zero rows.
+    const { data: rows, error } = await readAllPaged<{ id: string }>(
+      this.supabaseAdmin,
+      {
+        table: 'leagues',
+        columns: 'id',
+        filters: [['draft_status', 'in_progress']],
+        orderBy: ['id'],
+      },
+    );
 
     if (error) {
       structuredLogger.error('registry.orphan_scan_query_failed', {}, error);
       return result;
     }
 
-    const rows = (data ?? []) as Array<{ id: string }>;
     result.scanned = rows.length;
     const now = Date.now();
     const liveLeagueIds = new Set<string>();

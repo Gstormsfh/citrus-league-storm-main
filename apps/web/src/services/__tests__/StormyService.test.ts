@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // =============================================================================
 // Mock Supabase client
@@ -24,7 +27,10 @@ const mockFunctionsInvoke = vi.fn().mockResolvedValue({
   error: null,
 });
 
-const mockFrom = vi.fn(() => createChainMock());
+// Declared with rest parameters so the mock-module factories below can
+// forward `(...args: unknown[])` into it: supabase.from is called with a
+// table name, and a zero-argument spy cannot be spread into.
+const mockFrom = vi.fn((..._args: unknown[]) => createChainMock());
 
 // Chunk 11g.9 (2026-08-24): Stormy moved off the `stormy-chat` Edge
 // Function and onto POST /api/stormy/chat, so sendMessage is mocked at
@@ -104,6 +110,11 @@ vi.mock('@/utils/weekCalculator', () => ({
   getWeekEndDate: vi.fn().mockReturnValue(new Date('2024-12-14')),
   getWeekLabel: vi.fn().mockReturnValue('Week 10'),
   getScheduleLength: vi.fn().mockReturnValue(20),
+  // fetchLeagueContext calls this on the draft date before any of the
+  // above. It was missing from this mock for as long as no test reached
+  // the fetcher; the fetcher's own try/catch would have swallowed the
+  // resulting throw and returned an almost empty context.
+  clampToSeasonStart: vi.fn((d: Date) => d),
 }));
 
 vi.mock('@/utils/scheduleMaximizer', () => ({
@@ -114,12 +125,33 @@ vi.mock('@/utils/projectionHelper', () => ({
   getWeeklyProjections: vi.fn().mockResolvedValue(new Map()),
 }));
 
+// fetchLeagueContext reaches its data through dynamic imports of the API
+// modules and PlayerService. vi.mock applies to those too, and hoisting
+// means the mocks below have to be built inside vi.hoisted like ApiError.
+const { mockLeagueApi, mockRosterApi, mockMatchupApi, mockPlayerApi, mockGetPlayersByIds } = vi.hoisted(() => ({
+  mockLeagueApi: { getTeams: vi.fn(), getLeague: vi.fn() },
+  mockRosterApi: { getLeagueRosters: vi.fn(), getLineup: vi.fn() },
+  mockMatchupApi: { getLeagueMatchups: vi.fn() },
+  mockPlayerApi: { getRosProjections: vi.fn() },
+  mockGetPlayersByIds: vi.fn(),
+}));
+
+vi.mock('@/api/leagues', () => ({ leagueApi: mockLeagueApi }));
+vi.mock('@/api/rosters', () => ({ rosterApi: mockRosterApi }));
+vi.mock('@/api/matchups', () => ({ matchupApi: mockMatchupApi }));
+vi.mock('@/api/players', () => ({ playerApi: mockPlayerApi }));
+vi.mock('@/services/PlayerService', () => ({
+  PlayerService: { getPlayersByIds: (...args: unknown[]) => mockGetPlayersByIds(...args) },
+}));
+
 // =============================================================================
 // Import after mocks
 // =============================================================================
 
-import { StormyService } from '../StormyService';
+import { StormyService, fetchLeagueContext } from '../StormyService';
 import type { StormyContext, StormyMessage } from '../StormyService';
+import { getWeeklyProjections } from '@/utils/projectionHelper';
+import { fetchGamesForTeams } from '@/utils/scheduleMaximizer';
 
 // =============================================================================
 // Tests
@@ -360,6 +392,228 @@ describe('StormyService', () => {
       expect(summary).toContain('Week 10 (in_progress)');
       expect(summary).toContain('My Team: 120 pts');
       expect(summary).toContain('Rival Team: 105 pts');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // The failure copy (COPY_VOICE: a naked "Something went wrong." is banned)
+  // ---------------------------------------------------------------------------
+  describe('failure copy', () => {
+    it('names Stormy and offers the door when the thrown value carries no message', async () => {
+      // A thrown string is the case where userMessage falls back to the
+      // caller's copy; an Error's own message passes through (tested above).
+      mockApiPost.mockRejectedValue('boom');
+
+      const result = await StormyService.sendMessage('Hello', []);
+
+      expect(result.response).toBe('');
+      expect(result.error).toBe('Stormy could not answer that one. Try again in a moment.');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Context-line tokens (2026-09-03 voice rewrite 2)
+  //
+  // The prompt documents these shapes literally under "What Data You Have"
+  // and server/src/lib/stormy/__tests__/systemPrompt.test.ts pins them
+  // there. This side pins the code that writes them.
+  // ---------------------------------------------------------------------------
+  describe('context-line tokens', () => {
+    const Impl = (StormyService as any).constructor;
+
+    it('xgPair writes goals against expected, and nothing when there is no xG', () => {
+      expect(Impl.xgPair(30, 21.4)).toBe(' xG:21.4 G-xG:+8.6');
+      expect(Impl.xgPair(18, 22.25)).toBe(' xG:22.3 G-xG:-4.3');
+      expect(Impl.xgPair(30, 0)).toBe('');
+      expect(Impl.xgPair(30, null)).toBe('');
+      expect(Impl.xgPair(30, undefined)).toBe('');
+    });
+
+    it('toiPerGame writes minutes a night, and nothing without ice time or games', () => {
+      expect(Impl.toiPerGame(62 * 18.4 * 60, 62)).toBe(' TOI/GP:18.4');
+      expect(Impl.toiPerGame(0, 62)).toBe('');
+      expect(Impl.toiPerGame(undefined, 62)).toBe('');
+      expect(Impl.toiPerGame(5000, 0)).toBe('');
+    });
+
+    it('gsaxToken keeps the bare shape and adds the sample only when the row carries it', () => {
+      expect(
+        Impl.gsaxToken({ goalie_id: 1, regressed_gsax: 8.2, total_shots_faced: 1204, total_xga: 92.4, total_ga: 84 }),
+      ).toBe(' GSAx:+8.2[primary shots:1204 xGA:92.4 GA:84]');
+      expect(
+        Impl.gsaxToken({ goalie_id: 1, regressed_gsax: -4.8, total_shots_faced: null, total_xga: null, total_ga: null }),
+      ).toBe(' GSAx:-4.8');
+      expect(Impl.gsaxToken({ goalie_id: 1, regressed_gsax: null, total_shots_faced: 10, total_xga: 1, total_ga: 1 })).toBe('');
+      expect(Impl.gsaxToken(undefined)).toBe('');
+    });
+
+    it('rosToken mirrors the free-agent list shape', () => {
+      expect(
+        Impl.rosToken({ player_id: 1, player_name: 'x', position: 'C', team_abbrev: 'NJD', total_projected_points: 412.49, avg_points_per_game: 5.1, games_remaining: 61 }),
+      ).toBe(' ROS:412.5pts 61GR');
+      expect(Impl.rosToken(undefined)).toBe('');
+    });
+
+    it('scoreGapLine states the gap from his side, and stays silent before there is a score', () => {
+      expect(Impl.scoreGapLine(120.5, 105.2)).toBe('Gap: you lead by 15.3');
+      expect(Impl.scoreGapLine(105.5, 117.8)).toBe('Gap: you trail by 12.3');
+      expect(Impl.scoreGapLine(100, 100)).toBe('Gap: level');
+      expect(Impl.scoreGapLine(null, 100)).toBeNull();
+      expect(Impl.scoreGapLine(100, undefined)).toBeNull();
+    });
+
+    it('weeklyProjectionLine labels the opponent figure as a whole roster', () => {
+      expect(Impl.weeklyProjectionLine(84.2, 22.1, 91.0)).toBe(
+        'Projected this week: your starters 84.2, your bench 22.1, their whole roster 91.0 (their lineup is not visible)',
+      );
+      expect(Impl.weeklyProjectionLine(84.2, 22.1, null)).toBe(
+        'Projected this week: your starters 84.2, your bench 22.1',
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // fetchLeagueContext: the whole serialised context, line by line
+  // ---------------------------------------------------------------------------
+  describe('fetchLeagueContext', () => {
+    const skater = (over: Record<string, unknown>) => ({
+      position: 'C', games_played: 0, goals: 0, assists: 0, points: 0, plus_minus: 0,
+      shots: 0, hits: 0, blocks: 0, pim: 0, ppp: 0, shp: 0, icetime_seconds: 0, xGoals: 0,
+      wins: null, losses: null, ot_losses: null, saves: null, goals_against_average: null,
+      save_percentage: null, highDangerSavePct: 0, goalsSavedAboveExpected: 0,
+      eligible_positions: ['C'], jersey_number: null, status: 'active', headshot_url: null,
+      last_updated: null, roster_status: 'ACT',
+      ...over,
+    });
+    const goalie = (over: Record<string, unknown>) => skater({ position: 'G', eligible_positions: ['G'], ...over });
+
+    beforeEach(() => {
+      mockLeagueApi.getTeams.mockResolvedValue({
+        data: [
+          { id: 't1', team_name: 'Lime', owner_id: 'auth-user-1' },
+          { id: 't2', team_name: 'Rival', owner_id: 'someone-else' },
+        ],
+      });
+      mockLeagueApi.getLeague.mockResolvedValue({
+        data: {
+          draft_status: 'completed', updated_at: '2024-10-01T00:00:00Z',
+          roster_slots: { C: 2, G: 1 }, league_size: 2, roster_size: 3,
+        },
+      });
+      mockRosterApi.getLeagueRosters.mockResolvedValue({
+        data: [
+          { team_id: 't1', player_id: '1' }, { team_id: 't1', player_id: '2' }, { team_id: 't1', player_id: '3' },
+          { team_id: 't2', player_id: '9' },
+        ],
+      });
+      mockRosterApi.getLineup.mockResolvedValue({ data: { starters: ['1', '3'], bench: ['2'], ir: [] } });
+      mockMatchupApi.getLeagueMatchups.mockResolvedValue({
+        data: [{ week_number: 10, team1_id: 't1', team2_id: 't2', team1_score: 105.5, team2_score: 117.8, status: 'in_progress' }],
+      });
+      mockPlayerApi.getRosProjections.mockResolvedValue({
+        data: [
+          { player_id: 1, player_name: 'Marchetti', position: 'C', team_abbrev: 'NJD', total_projected_points: 412.5, avg_points_per_game: 5.1, games_remaining: 61 },
+          { player_id: 77, player_name: 'Reyes', position: 'G', team_abbrev: 'SEA', total_projected_points: 168.4, avg_points_per_game: 3.2, games_remaining: 52 },
+        ],
+      });
+      mockGetPlayersByIds.mockResolvedValue([
+        skater({ id: '1', full_name: 'Marchetti', team: 'NJD', games_played: 62, goals: 30, assists: 40, points: 70, ppp: 20, shots: 210, hits: 15, blocks: 20, pim: 12, xGoals: 21.4, icetime_seconds: 62 * 18.4 * 60 }),
+        skater({ id: '2', full_name: 'Okafor', team: 'SEA', games_played: 60, goals: 10, assists: 12, points: 22, roster_status: 'IR' }),
+        goalie({ id: '3', full_name: 'Brannigan', team: 'NJD', goalie_gp: 41, wins: 20, saves: 1100, goals_against: 98, shutouts: 2, save_percentage: 0.912 }),
+        skater({ id: '9', full_name: 'Lindahl', team: 'SEA', games_played: 61, goals: 30, assists: 25, points: 55, xGoals: 21.4 }),
+      ]);
+      // Rest parameters, matching mockFrom's declared (...args: unknown[])
+      // signature; the table name arrives as args[0].
+      mockFrom.mockImplementation((...args: unknown[]) => {
+        const table = args[0] as string;
+        const chain = createChainMock();
+        if (table === 'player_talent_metrics') {
+          chain.in = vi.fn().mockResolvedValue({ data: [{ player_id: 1, xg_per_60: 1.42, xg_rating: 'Elite' }] });
+        }
+        if (table === 'goalie_gsax_primary') {
+          chain.in = vi.fn().mockResolvedValue({
+            data: [{ goalie_id: 3, regressed_gsax: -4.8, total_shots_faced: 1204, total_xga: 92.4, total_ga: 98 }],
+          });
+        }
+        return chain;
+      });
+      vi.mocked(getWeeklyProjections).mockResolvedValue(new Map([[1, 8.4], [2, 3.1], [3, 4.2], [9, 6.0]]));
+      // 2024-12-09 is a Monday. Dates are parsed as local midnight by the
+      // serialiser, so the day names do not depend on the runner's zone.
+      vi.mocked(fetchGamesForTeams).mockResolvedValue(new Map([
+        ['NJD', [{ game_date: '2024-12-09' }, { game_date: '2024-12-11' }, { game_date: '2024-12-14' }]],
+        ['SEA', [{ game_date: '2024-12-10' }, { game_date: '2024-12-12' }]],
+      ]) as any);
+    });
+
+    it('writes goals against expected, ice time and ROS on his lines, and the GSAx sample on his goalie', async () => {
+      const ctx = await fetchLeagueContext('L1', 'auth-user-1');
+
+      expect(ctx.rosterSummary).toContain(
+        'START C Marchetti (NJD) 62GP 30G 40A 70PTS 1.1PPG 20PPP 210SOG 15HIT 20BLK 12PIM xG:21.4 G-xG:+8.6 TOI/GP:18.4 xG/60:1.42[Elite] 3GP/wk[Mon,Wed,Sat] wkProj:8.4 ROS:412.5pts 61GR',
+      );
+      expect(ctx.rosterSummary).toContain(
+        'START G Brannigan (NJD) 41GP 20W 1100SV 98GA 2SO 0.912SV% GSAx:-4.8[primary shots:1204 xGA:92.4 GA:98] 3GP/wk[Mon,Wed,Sat] wkProj:4.2',
+      );
+      // No xG, no ice time, no talent row, no ROS row: the tokens are absent,
+      // not zero. The NHL roster status still lands as a tag.
+      expect(ctx.rosterSummary).toContain(
+        'BENCH C Okafor (SEA) 60GP 10G 12A 22PTS 0.4PPG 0SOG 0HIT 0BLK 0PIM [IR] 2GP/wk[Tue,Thu] wkProj:3.1',
+      );
+      expect(ctx.rosterSummary).not.toMatch(/Okafor[^\n]*(xG:|TOI\/GP:|ROS:)/);
+    });
+
+    it('writes the gap, the projection on both sides, and the opponent with the same tokens', async () => {
+      const ctx = await fetchLeagueContext('L1', 'auth-user-1');
+
+      expect(ctx.matchupSummary).toContain('Week 10 (in_progress)\nLime: 105.5 pts\nRival: 117.8 pts\nGap: you trail by 12.3');
+      expect(ctx.matchupSummary).toContain(
+        'Projected this week: your starters 12.6, your bench 3.1, their whole roster 6.0 (their lineup is not visible)',
+      );
+      expect(ctx.matchupSummary).toContain('  C Lindahl (SEA) 61GP 30G 55PTS 0.9PPG xG:21.4 G-xG:+8.6 2GP/wk wkProj:6.0');
+    });
+
+    it('folds the opponent into the projection and schedule requests it already makes', async () => {
+      await fetchLeagueContext('L1', 'auth-user-1');
+
+      expect(vi.mocked(getWeeklyProjections)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(getWeeklyProjections).mock.calls[0][0]).toEqual([1, 2, 3, 9]);
+      expect(vi.mocked(fetchGamesForTeams)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(fetchGamesForTeams).mock.calls[0][0]).toEqual(['NJD', 'SEA']);
+      // The wider GSAx select rides on the one goalie_gsax_primary query.
+      const gsaxCalls = mockFrom.mock.calls.filter((call) => (call as unknown[])[0] === 'goalie_gsax_primary');
+      expect(gsaxCalls).toHaveLength(1);
+    });
+
+    it('keeps the free-agent list, so a roster ROS can be read against a free agent ROS', async () => {
+      const ctx = await fetchLeagueContext('L1', 'auth-user-1');
+
+      expect(ctx.extra).toContain('Top Available Free Agents:\nG Reyes (SEA) ROS:168.4pts 3.2PPG 52GR');
+      expect(ctx.extra).not.toContain('Marchetti');
+      expect(ctx.extra).toContain('Roster slots: C:2 G:1 (3 total)');
+    });
+
+    it('serialises nothing the AI-voice guard bans, at runtime as well as in source', async () => {
+      // aiVoiceGuard.test.ts scans this file's literals; the assembled
+      // context is what the model actually reads, and this is the check
+      // on that. The vocabulary is the shared JSON, not a copy.
+      const here = resolve(fileURLToPath(import.meta.url), '..');
+      const voice = JSON.parse(
+        readFileSync(resolve(here, '../../../../../packages/shared/src/constants/aiVoice.json'), 'utf8'),
+      ) as {
+        bannedPhrases: Array<{ name: string; pattern: string }>;
+        accuracyClaims: Array<{ name: string; pattern: string }>;
+        moatOverstatement: { name: string; pattern: string };
+        emDash: { char: string };
+      };
+      const ctx = await fetchLeagueContext('L1', 'auth-user-1');
+      const Impl = (StormyService as any).constructor;
+      const text = Impl.buildContextString({ page: 'matchup', ...ctx });
+
+      expect(text.includes(voice.emDash.char)).toBe(false);
+      for (const p of [...voice.bannedPhrases, ...voice.accuracyClaims, voice.moatOverstatement]) {
+        expect(new RegExp(p.pattern, 'i').test(text), `${p.name} in the serialised context`).toBe(false);
+      }
     });
   });
 });

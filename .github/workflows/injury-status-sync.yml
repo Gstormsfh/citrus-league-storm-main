@@ -56,6 +56,17 @@ name: Injury Status Sync
 # and confirm the assertion step passes, then uncomment the two `schedule`
 # lines below. The script itself refuses to start without the column and says
 # so by name, so a premature manual run is legible rather than cryptic.
+#
+# STATUS 2026-09-03 (verified read-only against production): the column and
+# its index exist. Prod recorded the change as history version 20260827155703
+# (name roster_status_provenance), not as the repo's 20260827030000; same
+# statements, different ledger (see scripts/ops/dump-prod-schema.sh 4b). The
+# remaining gate is one green manual run. Note the second reason this column
+# stayed NULL: pg_cron job 33 (rebuild-talent-metrics, 08:58 UTC) deleted the
+# whole season nightly and re-inserted only the xG columns, so anything this
+# job wrote survived at most until the next morning. Fixed by migration
+# 20260903180000_talent_metrics_rebuild_preserves_columns; enable this
+# schedule only after that migration is applied, or the writes will not stick.
 
 on:
   # schedule:
@@ -90,6 +101,9 @@ jobs:
       # log — the 2026-08-07 kill showed only "Script starting..." across
       # 19m43s because Python block-buffers 8 KiB under Actions' log capture.
       - name: Fetch and resolve injury designations
+        # `shell: bash` is `bash -eo pipefail`, so the tee below cannot mask a
+        # non-zero exit from the script (the default shell has no pipefail).
+        shell: bash
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -113,7 +127,7 @@ jobs:
           CITRUS_PROXY_USERNAME: ${{ secrets.CITRUS_PROXY_USERNAME }}
           CITRUS_PROXY_PASSWORD: ${{ secrets.CITRUS_PROXY_PASSWORD }}
           CITRUS_PROXY_API_URL: ${{ secrets.CITRUS_PROXY_API_URL }}
-        run: python -u data-pipeline/acquisition/fetch_injury_status.py
+        run: python -u data-pipeline/acquisition/fetch_injury_status.py 2>&1 | tee /tmp/injury.log
 
       # POST-RUN ASSERTION.
       #
@@ -168,3 +182,17 @@ jobs:
               sys.exit(1)
           print('OK: a write from this run is present')
           "
+
+      # One row in public.ops_ci_runs so the outcome of each sync is readable
+      # through the Supabase MCP (docs/RUNBOOKS/CI_TELEMETRY.md). Matters
+      # doubly here: the schedule is off until one manual run is green, and
+      # "was it green" should be a query, not a screenshot.
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          log-file: /tmp/injury.log
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

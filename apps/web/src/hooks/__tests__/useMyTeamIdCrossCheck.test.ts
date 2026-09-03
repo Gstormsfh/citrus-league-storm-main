@@ -27,10 +27,10 @@ vi.mock('@/api/client', () => ({
 import { useMyTeamIdCrossCheck } from '../useMyTeamIdCrossCheck';
 import { useDraftClientStore } from '@/stores/draftClientStore';
 import type { DraftOrderSlot } from '@/lib/draftClient/fetchDraftOrderMatrix';
-import type {
-  DerivedDraftState,
-  DraftSnapshot,
-} from '@citrus/shared';
+import type { DraftSnapshot } from '@citrus/shared';
+// DerivedDraftState is the client-side fold's own shape and lives with the
+// reducer, not on the wire-protocol package.
+import type { DerivedDraftState } from '@/lib/draftClient/deriveDraftState';
 
 // Store setters we manipulate directly to construct the observed state.
 function primeStore(opts: {

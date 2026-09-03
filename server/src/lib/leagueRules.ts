@@ -165,6 +165,76 @@ export function validateSlotAssignments(
 }
 
 /**
+ * IR ELIGIBILITY (2026-09-03, WORLD_CLASS_READINESS.md §1 gap B).
+ *
+ * `validateSlotAssignments` caps `ir-slot-N` at the league's count and never
+ * asked whether the player is hurt. And the cap only ever saw slot ids: the
+ * `ir` LIST the snapshot writer stores is unbounded, so a direct API call could
+ * park a healthy player, or six of them, on IR and free the roster spots.
+ * Yahoo refuses the placement outright: only a player the NHL lists IR or LTIR
+ * may enter an IR slot. The roster page has gated its IR slots on
+ * `is_ir_eligible` since the column arrived (migration 20260103151931); this
+ * makes the server the gate.
+ *
+ * Two deliberate softenings, both Yahoo's own behaviour:
+ *   - a player placed while injured who has since been activated is
+ *     TOLERATED. Yahoo flags that roster and blocks ADDS until it is fixed; it
+ *     does not refuse every lineup change in between, and neither do we. The
+ *     service hands us who is on IR on record; anyone in that set is not a
+ *     new placement and is not re-checked.
+ *   - lookup gaps fail OPEN, exactly like `eligibleById`: no map, or no entry
+ *     for the player, means "the read did not answer", never "he is healthy".
+ *     The service writes an entry for EVERY id it was asked about when the
+ *     read succeeds, so an absent entry can only be a gap.
+ */
+export interface IrPlacementCheck {
+  /** Every player the save puts on IR: the `ir` list plus any `ir-slot-N` assignment. */
+  irPlayerIds: string[];
+  /**
+   * player id -> the NHL lists him IR/LTIR (player_talent_metrics.is_ir_eligible,
+   * the flag the roster page gates on). Absent map or entry = lookup gap.
+   */
+  irEligibleById?: Record<string, boolean>;
+  /** Players on IR in the lineup on record; not new placements, not re-checked. */
+  alreadyOnIr?: ReadonlySet<string>;
+  /** Names for the refusal, keyed by player id. */
+  nameOf?: Record<string, string>;
+}
+
+export interface IrPlacementResult {
+  ok: boolean;
+  error?: string;
+}
+
+export function validateIrPlacements(check: IrPlacementCheck, config: RosterSlotConfig): IrPlacementResult {
+  const ids = [...new Set(check.irPlayerIds)];
+  const fresh = ids.filter((id) => !check.alreadyOnIr?.has(id));
+  if (fresh.length === 0) return { ok: true };
+
+  const nameOf = (id: string): string => check.nameOf?.[id]?.trim() || 'That player';
+
+  for (const id of fresh) {
+    if (check.irEligibleById?.[id] === false) {
+      return {
+        ok: false,
+        error: `${nameOf(id)} isn't listed IR or LTIR, so an IR slot can't hold him. Bench him, or move a player with official IR/LTIR status there.`,
+      };
+    }
+  }
+
+  if (config.irCount <= 0) {
+    return { ok: false, error: `This league has no IR slots, so ${nameOf(fresh[0])} can't go there. Bench him instead.` };
+  }
+  if (ids.length > config.irCount) {
+    return {
+      ok: false,
+      error: `This league has ${config.irCount} IR slot${config.irCount === 1 ? '' : 's'} and ${ids.length} players are headed there. Bench one first.`,
+    };
+  }
+  return { ok: true };
+}
+
+/**
  * Add-limit resolution. The reader historically looked only at
  * `weekly_add_limit`/`season_add_limit`; CreateLeague has always written
  * `weeklyAddLimit`/`seasonAddLimit`. Accept both spellings — existing

@@ -544,7 +544,9 @@ function TradePanel({
               {/* Player list */}
               <div className="flex-1 max-h-80 overflow-y-auto">
                 {players.length === 0 ? (
-                  <div className="text-center py-8 text-xs text-pastel-cream/65 font-display">No players found</div>
+                  <div className="text-center py-8 text-xs text-pastel-cream/65 font-display">
+                    {search ? 'Nobody matches that search.' : 'No contracts on file for this team.'}
+                  </div>
                 ) : (
                   players.map(p => (
                     <TradePlayerRow

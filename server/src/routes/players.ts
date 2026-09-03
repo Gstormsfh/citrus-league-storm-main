@@ -330,6 +330,42 @@ playerRoutes.get('/:playerId/dashboard', authMiddleware, async (c) => {
   }
 });
 
+// GET /api/players/:playerId/xg-history (2026-09-03). One player's whole
+// `player_xg_season` career arc, merged per season, for the condensed
+// card's sparkline. Everything `/:playerId/dashboard` carries EXCEPT the
+// shots: the card opens inside PlayerStatsModal on ten host surfaces
+// (one of them a live draft room), and reading up to SHOT_CAP shot rows
+// through the service-role client to draw a nine-point line is the wrong
+// trade. No elevated client here at all; `player_xg_season` has an
+// authenticated read policy and the request stays on the caller's own.
+//
+// Same validator as the dashboard route, so the same junk playerIds are
+// refused before a query is built; season and gameType are not inputs
+// here (the arc is every season on record, both game types, and the
+// client picks what to plot).
+//
+// Registered ABOVE `/:playerId` with the other literal-suffixed routes.
+playerRoutes.get('/:playerId/xg-history', authMiddleware, async (c) => {
+  const parsed = parsePlayerDashboardRequest(c.req.param('playerId'), undefined, undefined);
+  if (!parsed.value) {
+    return fail(c, AppError.badRequest(parsed.message || 'Invalid player id'));
+  }
+
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new PlayerDashboardService(supabase);
+
+  try {
+    const { payload, error } = await service.getXgHistory(parsed.value.playerId);
+    if (error || !payload) {
+      return handleError(c, error, 'Failed to fetch player xG history');
+    }
+    return ok(c, payload);
+  } catch (err) {
+    logger.error('[players/:id/xg-history] Unexpected error:', err);
+    return handleError(c, err, 'Failed to fetch player xG history');
+  }
+});
+
 // POST /api/players/transaction — record an add/drop for platform-wide
 // trending analytics.
 //

@@ -15,6 +15,15 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 
+// The toaster mounts the realtime bridge, whose store import chain reaches
+// the Supabase client (throws at module scope under the empty test env).
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: { from: vi.fn(), rpc: vi.fn(), channel: vi.fn(), removeChannel: vi.fn(), auth: { getSession: vi.fn() } },
+}));
+vi.mock('@/services/PlayerService', () => ({
+  PlayerService: { getPlayersByIds: vi.fn().mockResolvedValue([]) },
+}));
+
 import { CitrusToaster } from '../CitrusToaster';
 import { toast } from '@/hooks/use-toast';
 import { TOAST_MOTION_CLASSES, TOAST_SWIPE_CLASSES } from '../notificationKind';

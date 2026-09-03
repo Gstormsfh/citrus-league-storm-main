@@ -36,8 +36,14 @@ export interface PagedRead {
   filters?: Array<[column: string, value: string | number | boolean]>;
   /** `IN (...)` filters, applied after the equality filters. */
   inFilters?: Array<[column: string, values: Array<string | number>]>;
-  /** Inclusive lower / upper bounds, applied after the `IN` filters. */
-  rangeFilters?: Array<[column: string, op: 'gte' | 'lte', value: string | number]>;
+  /**
+   * Bounds, applied after the `IN` filters. `gt` is EXCLUSIVE, `gte` /
+   * `lte` inclusive. `gt` exists so a caller paging a monotonic cursor
+   * (`seq > lastApplied`) keeps its exact original predicate instead of
+   * open-coding `gte: cursor + 1`, which is only equivalent on integer
+   * columns and silently wrong on anything else.
+   */
+  rangeFilters?: Array<[column: string, op: 'gt' | 'gte' | 'lte', value: string | number]>;
   /**
    * Sort columns, applied in order. Pass a key that is UNIQUE per row — a
    * primary key, or a tuple that is one. Anything less and two adjacent
@@ -54,7 +60,13 @@ export interface PagedRead {
 
 export interface PagedResult<T> {
   data: T[];
-  error: { message: string } | null;
+  /**
+   * The PostgREST error, verbatim. `code` is surfaced because callers
+   * that re-throw as a typed application error want to keep the
+   * SQLSTATE / PostgREST code they used to get from the raw client;
+   * dropping it turns a diagnosable `22P02` into "something failed".
+   */
+  error: { message: string; code?: string } | null;
   truncated: boolean;
 }
 
@@ -71,7 +83,9 @@ export async function pagedSelect<T>(
     for (const [column, value] of read.filters ?? []) query = query.eq(column, value);
     for (const [column, values] of read.inFilters ?? []) query = query.in(column, values);
     for (const [column, op, value] of read.rangeFilters ?? []) {
-      query = op === 'gte' ? query.gte(column, value) : query.lte(column, value);
+      if (op === 'gt') query = query.gt(column, value);
+      else if (op === 'gte') query = query.gte(column, value);
+      else query = query.lte(column, value);
     }
     for (const column of read.orderBy) query = query.order(column, { ascending: true });
 

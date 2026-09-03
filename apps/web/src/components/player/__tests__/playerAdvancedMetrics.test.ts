@@ -7,31 +7,37 @@
  * coalesced zero from being printed as a measurement.
  */
 import { describe, it, expect } from 'vitest';
-import type { DashboardIndexEntry } from '@/hooks/usePlayerDashboardIndex';
+import type { DashboardIndexEntry, XgHistoryPoint } from '@citrus/shared';
 import {
   COHORT_NOUN,
   COMPACT_METRIC_COUNT,
   GOALIE_METRICS,
+  MIN_TREND_SEASONS,
   SKATER_METRICS,
   buildAdvancedCardData,
+  deploymentParts,
   deriveVerdict,
   findDashboardPlayer,
   finishing,
   fmt1,
   fmt2,
+  fmtInt,
   fmtSavePct,
   fmtSigned1,
+  fmtSigned2,
   metricsFor,
   normalizeSavePct,
   ordinal,
   playerDashboardHref,
+  xgTrend,
   VERDICT_MAX_CHARS,
+  type CardEntry,
 } from '../playerAdvancedMetrics';
 
 // ── Fixtures ────────────────────────────────────────────────────────
 
 let nextId = 1;
-function entry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntry {
+function entry(over: Partial<CardEntry> = {}): CardEntry {
   return {
     id: nextId++,
     name: 'Test Player',
@@ -64,6 +70,18 @@ function entry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntry {
     gar_ppo: 0.08,
     gar_ppd: 0.0,
     gar_pen: 0.02,
+    // The 2026-09-03 server columns. Null by default: a fixture that
+    // silently carried a GSAx or a VOPA would hide a guard that fails
+    // open.
+    toi_total_minutes: null,
+    avg_toi_per_game: null,
+    vopa_score: null,
+    gsax_raw: null,
+    gsax_regressed: null,
+    gsax_shots_faced: null,
+    gsax_xga: null,
+    gsax_ga: null,
+    as_of: null,
     proj_gp: 40,
     proj_fantasy_points: 300,
     proj_fantasy_ppg: 7.5,
@@ -80,7 +98,7 @@ function entry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntry {
   };
 }
 
-function goalie(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntry {
+function goalie(over: Partial<CardEntry> = {}): CardEntry {
   return entry({
     position: 'G',
     is_goalie: true,
@@ -135,6 +153,21 @@ describe('formatters — precision is a truth claim', () => {
     // -0.02 rounds to -0, which would render "-0.0" and read as a deficit.
     expect(fmtSigned1(-0.02)).toBe('0.0');
     expect(fmtSigned1(null)).toBe('-');
+  });
+
+  it('fmtSigned2 prints VOPA to two decimals, signed, and never minus zero', () => {
+    expect(fmtSigned2(3.114)).toBe('+3.11');
+    expect(fmtSigned2(-0.456)).toBe('-0.46');
+    expect(fmtSigned2(-0.001)).toBe('0.00');
+    expect(fmtSigned2(null)).toBe('-');
+  });
+
+  it('fmtInt prints counts with a thousands separator and no decimals', () => {
+    expect(fmtInt(1884.8)).toBe('1,885');
+    expect(fmtInt(97)).toBe('97');
+    expect(fmtInt(2515)).toBe('2,515');
+    expect(fmtInt(null)).toBe('-');
+    expect(fmtInt(NaN)).toBe('-');
   });
 
   it('normalizeSavePct accepts both units the column ships in', () => {
@@ -210,6 +243,21 @@ describe('metric sets', () => {
     ]);
   });
 
+  it('leads the goalie set with GSAx and reads the REGRESSED value', () => {
+    // The regressed value is what the projection system consumes and what
+    // the modal's own GSAx cell (PlayerService -> regressed_gsax) prints
+    // directly under this card. One label, one number, one screen.
+    expect(GOALIE_METRICS[0].key).toBe('gsax');
+    expect(GOALIE_METRICS[0].label).toBe('GSAx');
+    expect(GOALIE_METRICS[0].select(goalie({ gsax_raw: -7.6, gsax_regressed: -4.1 }))).toBe(-4.1);
+    expect(GOALIE_METRICS[0].format(-4.1)).toBe('-4.1');
+    // A goalie the join did not cover is "no data", never a zero.
+    expect(GOALIE_METRICS[0].select(goalie())).toBeNull();
+    // ...and it is inside the compact budget, so the embedded card shows it.
+    expect(GOALIE_METRICS.slice(0, COMPACT_METRIC_COUNT).map((m) => m.key)).toContain('gsax');
+    expect(GOALIE_METRICS.map((m) => m.key)).toEqual(['gsax', 'save_pct', 'gaa', 'wins', 'shutouts']);
+  });
+
   it('marks GAA as lower-is-better so an elite goalie does not read as the floor', () => {
     expect(GOALIE_METRICS.find((m) => m.key === 'gaa')?.direction).toBe('lower');
     expect(GOALIE_METRICS.find((m) => m.key === 'save_pct')?.direction).toBe('higher');
@@ -263,6 +311,32 @@ describe('buildAdvancedCardData', () => {
     expect(data.metrics.map((m) => m.spec.key)).toEqual(GOALIE_METRICS.map((m) => m.key));
     expect(data.finishing).toBeNull();
     expect(data.metrics.find((m) => m.spec.key === 'save_pct')?.display).toBe('.918');
+  });
+
+  it('places a goalie\'s GSAx against goalies only, and an unjoined goalie reads no data', () => {
+    const tendies = [
+      goalie({ gsax_regressed: -4.1, gsax_shots_faced: 1421 }),
+      goalie({ gsax_regressed: 2.3, gsax_shots_faced: 1500 }),
+      goalie({ gsax_regressed: 8.2, gsax_shots_faced: 1204 }),
+    ];
+    // A skater with a (nonsense) GSAx must not join the goalie scale.
+    const stray = entry({ position: 'C', gsax_regressed: 99 });
+    const pool = [...league, ...tendies, stray];
+
+    const best = buildAdvancedCardData(tendies[2], pool);
+    const g = best.metrics.find((m) => m.spec.key === 'gsax')!;
+    expect(best.cohort).toBe('G');
+    expect(g.display).toBe('+8.2');
+    expect(g.percentile).toBe(100);
+    // Three goalies with GSAx set the scale, not the two league goalies
+    // without a row and not the stray skater.
+    expect(g.cohortSize).toBe(3);
+
+    const none = buildAdvancedCardData(league[7], pool);
+    const g2 = none.metrics.find((m) => m.spec.key === 'gsax')!;
+    expect(g2.value).toBeNull();
+    expect(g2.display).toBe('-');
+    expect(g2.percentile).toBeNull();
   });
 
   it('excludes un-modelled players from the finishing distribution', () => {
@@ -384,10 +458,13 @@ describe('deriveVerdict — derived, or nothing', () => {
     expect(deriveVerdict(entry({ gp: 40 }), 'F', metrics({}), null, null)).toBeNull();
   });
 
-  it('gives goalies their own three readings', () => {
+  const SAVE_PCT_SPEC = GOALIE_METRICS.find((m) => m.key === 'save_pct')!;
+  const GSAX_SPEC = GOALIE_METRICS.find((m) => m.key === 'gsax')!;
+
+  it('gives goalies their own three save-rate readings when there is no GSAx', () => {
     const g = (percentile: number) => [
       {
-        spec: GOALIE_METRICS[0],
+        spec: SAVE_PCT_SPEC,
         value: 0.918,
         display: '.918',
         percentile,
@@ -404,6 +481,64 @@ describe('deriveVerdict — derived, or nothing', () => {
     expect(deriveVerdict(goalie({ gp: 40 }), 'G', g(50), null, null)).toContain(
       '40 appearances',
     );
+  });
+
+  it('leads a goalie with GSAx, names the source, the sample and the cohort', () => {
+    const g = (value: number, percentile: number) => [
+      { spec: GSAX_SPEC, value, display: fmtSigned1(value), percentile, cohortSize: 60, lowSample: false },
+      { spec: SAVE_PCT_SPEC, value: 0.918, display: '.918', percentile: 50, cohortSize: 60, lowSample: false },
+    ];
+    const tendy = goalie({ gp: 40, gsax_regressed: 8.2, gsax_shots_faced: 1204 });
+
+    const hi = deriveVerdict(tendy, 'G', g(8.2, 88), null, null)!;
+    expect(hi).toBe(
+      'Stopping more than his share. Citrus GSAx has him stopping 8.2 goals more than expected on 1,204 primary shots, 88th among goalies.',
+    );
+
+    const lo = deriveVerdict(goalie({ gp: 40, gsax_shots_faced: 640 }), 'G', g(-4.2, 12), null, null)!;
+    expect(lo).toBe(
+      'Leaking more than he should. Citrus GSAx has him conceding 4.2 goals more than expected on 640 primary shots, 12th among goalies.',
+    );
+
+    const mid = deriveVerdict(goalie({ gp: 40, gsax_shots_faced: 900 }), 'G', g(1.2, 54), null, null)!;
+    expect(mid).toBe('Citrus GSAx has him stopping 1.2 goals more than expected on 900 primary shots, 54th among goalies.');
+
+    const level = deriveVerdict(goalie({ gp: 40, gsax_shots_faced: 900 }), 'G', g(0.02, 50), null, null)!;
+    expect(level).toContain('level with expected');
+
+    // GSAx outranks the save rate, so none of these are the save-rate line.
+    for (const v of [hi, lo, mid, level]) expect(v).not.toContain('save rate');
+  });
+
+  it('falls back to the save rate when the GSAx join is empty', () => {
+    // The bullet may carry a value while the row has no shots-faced count
+    // (an old payload, a partial row). No denominator, no GSAx sentence.
+    const m = [
+      { spec: GSAX_SPEC, value: 8.2, display: '+8.2', percentile: 88, cohortSize: 60, lowSample: false },
+      { spec: SAVE_PCT_SPEC, value: 0.918, display: '.918', percentile: 84, cohortSize: 60, lowSample: false },
+    ];
+    const v = deriveVerdict(goalie({ gp: 40 }), 'G', m, null, null)!;
+    expect(v).toContain('.918 save rate');
+    expect(v).not.toContain('GSAx');
+  });
+
+  it('keeps the goalie GSAx line inside the budget at its worst-case numbers', () => {
+    // Four-digit shots, two-digit GSAx, three-digit percentile: the longest
+    // sentence this branch can build. 133 characters as written.
+    const m = [
+      { spec: GSAX_SPEC, value: 12.3, display: '+12.3', percentile: 100, cohortSize: 60, lowSample: false },
+    ];
+    const v = deriveVerdict(goalie({ gp: 60, gsax_shots_faced: 2515 }), 'G', m, null, null)!;
+    expect(v).toContain('2,515 primary shots');
+    expect(v.length).toBeLessThanOrEqual(VERDICT_MAX_CHARS);
+    const neg = deriveVerdict(
+      goalie({ gp: 60, gsax_shots_faced: 2515 }),
+      'G',
+      [{ spec: GSAX_SPEC, value: -12.3, display: '-12.3', percentile: 1, cohortSize: 60, lowSample: false }],
+      null,
+      null,
+    )!;
+    expect(neg.length).toBeLessThanOrEqual(VERDICT_MAX_CHARS);
   });
 
   it('never mentions a metric it was not given', () => {
@@ -434,6 +569,87 @@ describe('deriveVerdict — derived, or nothing', () => {
       expect(v).toBeTruthy();
       expect(v!.length).toBeLessThanOrEqual(VERDICT_MAX_CHARS);
     }
+  });
+});
+
+// ── The career trend ────────────────────────────────────────────────
+
+describe('xgTrend', () => {
+  const point = (season: number, xg: number, over: Partial<XgHistoryPoint> = {}): XgHistoryPoint => ({
+    season,
+    game_type: 'regular',
+    shots: 200,
+    sog: 120,
+    goals: 20,
+    xg,
+    finishing: 20 - xg,
+    teams: 1,
+    ...over,
+  });
+
+  it('draws nothing below two seasons: a one-point line is a made-up line', () => {
+    expect(MIN_TREND_SEASONS).toBe(2);
+    expect(xgTrend(null)).toBeNull();
+    expect(xgTrend(undefined)).toBeNull();
+    expect(xgTrend([])).toBeNull();
+    expect(xgTrend([point(2025, 40.47)])).toBeNull();
+    // A second season that is a PLAYOFF row does not count toward the two.
+    expect(xgTrend([point(2025, 40.47), point(2024, 3.1, { game_type: 'playoff' })])).toBeNull();
+  });
+
+  it('plots one point per season, ascending, labelled the way the season is spoken', () => {
+    const t = xgTrend([point(2025, 40.47), point(2023, 31.9), point(2024, 38.12)])!;
+    expect(t.points.map((p) => p.x)).toEqual([2023, 2024, 2025]);
+    expect(t.points.map((p) => p.y)).toEqual([31.9, 38.12, 40.47]);
+    expect(t.points.map((p) => p.gameDate)).toEqual(['2023-24', '2024-25', '2025-26']);
+    expect(t.endpoint).toBe('40.47');
+    expect(t.firstSeason).toBe(2023);
+    expect(t.lastSeason).toBe(2025);
+    expect(t.seasons).toBe(3);
+  });
+
+  it('sums a season it is handed twice rather than drawing two points for one year', () => {
+    // The server merges a traded player's team rows; this is the belt to
+    // that suspender, so no payload shape can produce a doubled x.
+    const t = xgTrend([point(2024, 10.25, { teams: 1 }), point(2024, 5.5, { teams: 1 }), point(2025, 20)])!;
+    expect(t.points).toHaveLength(2);
+    expect(t.points[0]).toMatchObject({ x: 2024, y: 15.75 });
+  });
+
+  it('filters to the requested game type', () => {
+    const rows = [point(2024, 30), point(2025, 33), point(2024, 4, { game_type: 'playoff' }), point(2025, 6, { game_type: 'playoff' })];
+    expect(xgTrend(rows)!.points.map((p) => p.y)).toEqual([30, 33]);
+    expect(xgTrend(rows, 'playoff')!.points.map((p) => p.y)).toEqual([4, 6]);
+  });
+});
+
+// ── Deployment ──────────────────────────────────────────────────────
+
+describe('deploymentParts', () => {
+  it('prints games and the minutes the per-60 rates are divided by', () => {
+    expect(deploymentParts(entry({ gp: 82, toi_total_minutes: 1884.8 }))).toEqual(['82 GP', '1,885 min']);
+  });
+
+  it('prints only what the payload carries: no row, no number, no zero', () => {
+    // Every 2025 production row has NULL vopa_score and avg_toi_per_game
+    // (0 of 940 non-null on 2026-09-03), so this is the line the card
+    // prints today for every player with a GAR row.
+    expect(deploymentParts(entry({ gp: 40, toi_total_minutes: null }))).toEqual(['40 GP']);
+    expect(deploymentParts(entry({ gp: 0, toi_total_minutes: null }))).toEqual([]);
+    expect(deploymentParts(entry({ gp: 40, toi_total_minutes: 0 }))).toEqual(['40 GP']);
+    // An old payload with none of the new columns at all.
+    const old = { ...entry({ gp: 40 }) } as Record<string, unknown>;
+    delete old.toi_total_minutes;
+    delete old.avg_toi_per_game;
+    delete old.vopa_score;
+    expect(deploymentParts(old as unknown as CardEntry)).toEqual(['40 GP']);
+  });
+
+  it('adds minutes a night and VOPA the day the pipeline fills them', () => {
+    expect(
+      deploymentParts(entry({ gp: 82, toi_total_minutes: 1884.8, avg_toi_per_game: 22.98, vopa_score: 3.114 })),
+    ).toEqual(['82 GP', '1,885 min', '23.0 min/GP', 'VOPA +3.11']);
+    expect(deploymentParts(entry({ gp: 12, vopa_score: -0.42 }))).toEqual(['12 GP', 'VOPA -0.42']);
   });
 });
 

@@ -5,7 +5,7 @@
 // server/src/lib/leagueRules.ts reads settings.rosterSlots.IR and falls
 // back to 3 — or the label would promise a slot the save then strips.
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_IR_SLOT_COUNT, irSlotIds, resolveIrSlotCount } from '../irSlots';
+import { DEFAULT_IR_SLOT_COUNT, irSlotIds, resolveIrSlotCount, shouldMoveOffIr } from '../irSlots';
 
 describe('resolveIrSlotCount mirrors the server rule', () => {
   it('reads the commissioner setting', () => {
@@ -40,5 +40,29 @@ describe('irSlotIds', () => {
   it('is empty for zero or negative counts', () => {
     expect(irSlotIds(0)).toEqual([]);
     expect(irSlotIds(-2)).toEqual([]);
+  });
+});
+
+// IR ELIGIBILITY (2026-09-03, WORLD_CLASS_READINESS gap B).
+//
+// The server now refuses a NEW IR placement for a player the NHL does not
+// list IR/LTIR (validateIrPlacements in server/src/lib/leagueRules.ts) and
+// tolerates an occupant who healed after he was placed. The rows carry the
+// second half of that rule: a tolerated occupant is still an illegal roster,
+// and "Move off IR" on his row is the door. The flag is the one the page has
+// gated IR on since the column arrived (migration 20260103151931), and only
+// an explicit false means healthy.
+describe('shouldMoveOffIr mirrors the server rule for a tolerated occupant', () => {
+  it('true only for an explicit is_ir_eligible=false', () => {
+    expect(shouldMoveOffIr({ is_ir_eligible: false })).toBe(true);
+  });
+
+  it('false for a player the NHL lists IR/LTIR', () => {
+    expect(shouldMoveOffIr({ is_ir_eligible: true })).toBe(false);
+  });
+
+  it('false when the flag was never sent: unknown is not healthy', () => {
+    expect(shouldMoveOffIr({})).toBe(false);
+    expect(shouldMoveOffIr({ is_ir_eligible: undefined })).toBe(false);
   });
 });

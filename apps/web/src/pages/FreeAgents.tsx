@@ -54,7 +54,20 @@ import { ScoringCalculator } from '@/utils/scoringUtils';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { DropPlayerForAddDialog } from '@/components/freeagents/DropPlayerForAddDialog';
 import { FreeAgentRow } from '@/components/freeagents/FreeAgentRow';
-import { FA_CHIP, FA_CHIP_ROW, FA_ROWS_ONLY, FA_TABLE_ONLY, freeAgentAction, sortByProjection, waiverClearsLabel } from '@/components/freeagents/freeAgentRow';
+import {
+  FA_CHIP,
+  FA_CHIP_ROW,
+  FA_CONTENT_COLUMN,
+  FA_NOTIFICATIONS_RAIL,
+  FA_PAGE_GRID,
+  FA_PAGE_GRID_WITH_RAIL,
+  FA_POOL_CARD,
+  FA_ROWS_ONLY,
+  FA_TABLE_ONLY,
+  freeAgentAction,
+  sortByProjection,
+  waiverClearsLabel,
+} from '@/components/freeagents/freeAgentRowKit';
 import { cn } from '@/lib/utils';
 import { ArrowLeftRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -395,7 +408,7 @@ const FreeAgents = () => {
       const allPlayers = await PlayerService.getAllPlayers();
 
       if (!allPlayers || allPlayers.length === 0) {
-        throw new Error('No players found');
+        throw new Error('The player pool came back empty.');
       }
       
       // LeagueService determines free agents - uses real database if leagueId provided
@@ -1408,6 +1421,10 @@ const FreeAgents = () => {
     return <Navigate to={getPoolRoute(_leagueType!, activeLeagueId)} replace />;
   }
 
+  // The notifications rail and the grid column it sits in are one decision
+  // (see FA_PAGE_GRID_WITH_RAIL): a guest never gets an empty 280px column.
+  const showNotificationsRail = userLeagueState === 'active-user' && Boolean(activeLeagueId);
+
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
       <div className="hidden lg:block"><Navbar /></div>
@@ -1446,10 +1463,13 @@ const FreeAgents = () => {
       </div>
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
         <div className="w-full m-0 p-0">
-          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
-          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile,
+              left on desktop; Notifications on the right from 1400px, where the
+              three columns hold the 722px pool table. The geometry and its
+              arithmetic live in freeAgentRowKit.ts (FA_PAGE_GRID). */}
+          <div className={cn(FA_PAGE_GRID, showNotificationsRail && FA_PAGE_GRID_WITH_RAIL)}>
             {/* Main Content - Appears first on mobile */}
-            <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
+            <div className={FA_CONTENT_COLUMN}>
 
               {/* The hero is desktop-only from 2026-09-02 — see the note on
                   the sticky bar above. `hidden lg:flex`, not a JS branch. */}
@@ -1516,7 +1536,7 @@ const FreeAgents = () => {
           <TabsContent value="available" className="space-y-6">
             {/* Quick Position Filters — ONE ROW that scrolls sideways below
                 `lg`, never three that wrap. Geometry and the reasoning live
-                in freeAgentRow.ts (FA_CHIP_ROW). */}
+                in freeAgentRowKit.ts (FA_CHIP_ROW). */}
             <div className={FA_CHIP_ROW} data-testid="position-filter-row">
               {positions.map((pos) => {
                 const isActive = positionFilter === pos;
@@ -1812,7 +1832,7 @@ const FreeAgents = () => {
                       )}
                     </div>
                     
-                    <div className="border rounded-lg overflow-hidden">
+                    <div className={FA_POOL_CARD}>
                       {/*
                         * THE PHONE LIST (2026-09-02).
                         *
@@ -1826,7 +1846,7 @@ const FreeAgents = () => {
                         *
                         * That point is `md`, not `lg`, and it is measured —
                         * `FA_ROWS_ONLY` / `FA_TABLE_ONLY` in
-                        * `components/freeagents/freeAgentRow.ts` carry the
+                        * `components/freeagents/freeAgentRowKit.ts` carry the
                         * numbers. A 820px tablet was getting a 64px row with
                         * 700px of empty space beside it and no sortable
                         * column, on a screen where all twelve columns fit.
@@ -2696,9 +2716,11 @@ const FreeAgents = () => {
               </div>
             </aside>
 
-            {/* Right Sidebar - Notifications (hidden on mobile) */}
-            {userLeagueState === 'active-user' && activeLeagueId && (
-              <aside className="hidden lg:block order-3">
+            {/* Right Sidebar - Notifications. Hidden below 1400px, where its column
+                would push the pool table sideways (FA_NOTIFICATIONS_RAIL); the
+                Navbar bell opens the same feed as a slide-over at every width. */}
+            {showNotificationsRail && activeLeagueId && (
+              <aside className={FA_NOTIFICATIONS_RAIL}>
                 <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId} />
                 </div>

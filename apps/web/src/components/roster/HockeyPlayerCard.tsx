@@ -5,6 +5,7 @@ import { AlertCircle, Shield, CalendarDays, Skull, Lock } from "lucide-react";
 import { useState, memo } from "react";
 
 import { CitrusPuckPlayerData, AggregatedPlayerData } from "@/types/citruspuck";
+import { playerPositionsLabel } from "./positions";
 
 export interface HockeyPlayer {
   id: number | string;
@@ -202,13 +203,12 @@ const HockeyPlayerCardContent = ({
     return pos.substring(0, 2);
   };
 
-  // Display dual-position eligibility (e.g., "C/LW") or single position
-  const getPositionDisplay = (): string => {
-    if (player.eligible_positions && player.eligible_positions.length > 1) {
-      return player.eligible_positions.slice(0, 2).join('/');
-    }
-    return getPositionAbbreviation(player.position);
-  };
+  // Display dual-position eligibility (e.g., "C/LW") or single position.
+  // The same reading the mobile rows and the sheets print (positions.ts):
+  // the listed position always counts, first, then whatever
+  // eligible_positions adds. That is the union the server validates against
+  // on save, so the card never shows a position the save would refuse.
+  const getPositionDisplay = (): string => playerPositionsLabel(player) || getPositionAbbreviation(player.position);
 
   const getTeamAbbreviation = (): string => {
     if (player.teamAbbreviation) return player.teamAbbreviation;

@@ -1,6 +1,15 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, logger, getTodayMST, getTodayMSTDate, getTodayNhlScheduleDate, getCurrentSeason } from '@citrus/shared';
-import { resolveSlotConfig, validateSlotAssignments } from '../lib/leagueRules';
+import {
+  COLUMNS,
+  logger,
+  getTodayMST,
+  getTodayMSTDate,
+  getTodayNhlScheduleDate,
+  getCurrentSeason,
+  parseEligiblePositions,
+  type PlayerDirectoryEligibilityRow,
+} from '@citrus/shared';
+import { resolveSlotConfig, validateSlotAssignments, validateIrPlacements } from '../lib/leagueRules';
 
 /** The spot a player holds in a lineup: which list, and which slot if it has one. */
 type LineupSpot = { type: 'active' | 'bench' | 'ir'; slot: string | null };
@@ -159,29 +168,46 @@ export class LineupService {
     // player_id — player_directory is a per-SEASON index (the same trap
     // that half-disabled the autopick roster guard). Any read failure
     // leaves the map empty and the validator fails OPEN on eligibility.
+    //
+    // THE CELL IS TEXT (2026-09-03). `eligible_positions` is a comma-separated
+    // TEXT column (migration 20260301000000), not an array. This block typed
+    // it `string[]` and called `.map` on it, a TypeError for every player
+    // whose cell is non-null (787 of 2,035 staging rows, 797 of 1,909 in
+    // production), and the catch below then failed the WHOLE map open. The
+    // 2026-08-23 fix was live only for players with a NULL cell and silently
+    // off for the rest. `parseEligiblePositions` (@citrus/shared) reads
+    // either shape and always includes `position_code`, so a player is never
+    // refused his own listed position.
+    //
+    // IR ELIGIBILITY (2026-09-03, WORLD_CLASS_READINESS gap B): the same read
+    // now covers everyone the save puts on IR, the `ir` list included (the
+    // snapshot writer stores every member of it, slot id or not), and carries
+    // names so the refusal below can say who.
+    const irPlayerIds = [...new Set([
+      ...(lineup.ir ?? []).map(String),
+      ...Object.entries(lineup.slot_assignments ?? {})
+        .filter(([, slotId]) => typeof slotId === 'string' && slotId.startsWith('ir-slot-'))
+        .map(([playerId]) => playerId),
+    ])];
     const eligibleById: Record<string, string[]> = {};
+    const nameOf: Record<string, string> = {};
     try {
-      const assignedIds = Object.keys(lineup.slot_assignments ?? {})
+      const lookupIds = [...new Set([...Object.keys(lineup.slot_assignments ?? {}), ...irPlayerIds])]
         .map((id) => Number(id))
         .filter((n) => Number.isFinite(n));
-      if (assignedIds.length > 0) {
+      if (lookupIds.length > 0) {
         const { data: posRows } = await this.supabase
           .from('player_directory')
-          .select('player_id, position_code, eligible_positions')
+          .select('player_id, full_name, position_code, eligible_positions')
           .order('season', { ascending: false })
-          .in('player_id', assignedIds);
+          .in('player_id', lookupIds);
         const seen = new Set<number>();
-        for (const row of (posRows ?? []) as Array<{
-          player_id: number;
-          position_code: string | null;
-          eligible_positions: string[] | null;
-        }>) {
+        for (const row of (posRows ?? []) as PlayerDirectoryEligibilityRow[]) {
           if (seen.has(row.player_id)) continue;
           seen.add(row.player_id);
-          const elig = (row.eligible_positions && row.eligible_positions.length > 0)
-            ? row.eligible_positions
-            : (row.position_code ? [row.position_code] : []);
-          if (elig.length > 0) eligibleById[String(row.player_id)] = elig.map((e) => String(e).toUpperCase());
+          const elig = parseEligiblePositions(row.eligible_positions, row.position_code);
+          if (elig.length > 0) eligibleById[String(row.player_id)] = elig;
+          if (row.full_name) nameOf[String(row.player_id)] = row.full_name;
         }
       }
     } catch (posErr) {
@@ -195,6 +221,34 @@ export class LineupService {
     for (const pid of verdict.strip) {
       logger.warn('[LineupService.saveLineup] Stripping invalid slot for player:', pid, lineup.slot_assignments[pid]);
       delete lineup.slot_assignments[pid];
+    }
+
+    // 1c. Only the injured go on IR (2026-09-03, WORLD_CLASS_READINESS gap B).
+    // The roster page has gated its IR slots on `is_ir_eligible` since the
+    // column arrived (migration 20260103151931); nothing on the server ever
+    // asked. Yahoo refuses a player who is not listed IR/LTIR outright, and
+    // so does this. Pure rule + tests in lib/leagueRules.ts
+    // (validateIrPlacements); the two reads below only happen when the save
+    // actually puts someone on IR, so the common save pays nothing. A player
+    // parked while injured who has since been activated is on record and
+    // tolerated (Yahoo blocks ADDS for that roster, not lineup changes).
+    // Both reads fail OPEN.
+    if (irPlayerIds.length > 0) {
+      const irEligibleById = await this.irEligibilityOf(irPlayerIds);
+      const alreadyOnIr = await this.playersOnIrOnRecord(teamId, leagueId, targetDate ?? getTodayMST());
+      const irVerdict = validateIrPlacements(
+        {
+          irPlayerIds,
+          irEligibleById: irEligibleById ?? undefined,
+          alreadyOnIr: alreadyOnIr ?? new Set(irPlayerIds),
+          nameOf,
+        },
+        slotConfig,
+      );
+      if (!irVerdict.ok) {
+        logger.info('[LineupService.saveLineup] IR placement refused', { teamId, leagueId, error: irVerdict.error });
+        return { success: false, error: irVerdict.error };
+      }
     }
 
     const starterSet = new Set(lineup.starters);
@@ -454,6 +508,83 @@ export class LineupService {
     }
     for (const [pid, team] of teamOf) if (started.has(team)) locked.add(pid);
     return { locked, nameOf };
+  }
+
+  /**
+   * player id -> the NHL lists him IR/LTIR, for EVERY id asked about, read
+   * from player_talent_metrics for the current season: the same flag and the
+   * same season PlayerService hands the roster page, so the server accepts
+   * exactly what the page offers and nothing the page would not. A row that
+   * is missing, or says false, is false: no designation means no IR. Null
+   * when the read itself fails, and the caller fails open.
+   */
+  private async irEligibilityOf(playerIds: string[]): Promise<Record<string, boolean> | null> {
+    const ids = playerIds.map((id) => Number(id)).filter((n) => Number.isFinite(n));
+    if (ids.length === 0) return {};
+    try {
+      const { data, error } = await this.supabase
+        .from('player_talent_metrics')
+        .select('player_id, is_ir_eligible, roster_status')
+        .eq('season', getCurrentSeason())
+        .in('player_id', ids);
+      if (error) throw error;
+      const listed = new Set<string>();
+      for (const row of (data ?? []) as Array<{ player_id: number; is_ir_eligible: boolean | null; roster_status: string | null }>) {
+        if (row.is_ir_eligible === true || row.roster_status === 'IR' || row.roster_status === 'LTIR') {
+          listed.add(String(row.player_id));
+        }
+      }
+      const out: Record<string, boolean> = {};
+      for (const id of playerIds) out[id] = listed.has(id);
+      return out;
+    } catch (err) {
+      logger.warn('[LineupService.saveLineup] IR status lookup failed open:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Who is on IR in the lineup on record: the base team_lineups row, plus
+   * every fantasy_daily_rosters IR row for this team from two weeks before
+   * `date` onward. A per-day save writes only its own date's rows and never
+   * the base (per-day isolation), so a placement made on a matchup day lives
+   * in daily rows alone; the window covers the previous matchup week too.
+   * Null when a read fails, and the caller treats everyone as on record
+   * (fail open: a lookup gap must never turn a healed occupant into a
+   * refused save).
+   */
+  private async playersOnIrOnRecord(teamId: string, leagueId: string, date: string): Promise<Set<string> | null> {
+    try {
+      const onIr = new Set<string>();
+      const { data: base, error: baseError } = await this.supabase
+        .from('team_lineups')
+        .select('ir')
+        .eq('team_id', teamId)
+        .eq('league_id', leagueId)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (baseError) throw baseError;
+      for (const id of ((base?.ir as unknown[]) ?? [])) onIr.add(String(id));
+
+      const from = new Date(`${date}T00:00:00Z`);
+      if (!Number.isNaN(from.getTime())) {
+        from.setUTCDate(from.getUTCDate() - 14);
+        const { data: rows, error: rowsError } = await this.supabase
+          .from('fantasy_daily_rosters')
+          .select('player_id')
+          .eq('team_id', teamId)
+          .eq('league_id', leagueId)
+          .eq('slot_type', 'ir')
+          .gte('roster_date', from.toISOString().slice(0, 10));
+        if (rowsError) throw rowsError;
+        for (const r of (rows ?? []) as Array<{ player_id: number | string }>) onIr.add(String(r.player_id));
+      }
+      return onIr;
+    } catch (err) {
+      logger.warn('[LineupService.saveLineup] IR on-record lookup failed open:', err);
+      return null;
+    }
   }
 
   /**

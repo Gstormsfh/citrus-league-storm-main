@@ -10,12 +10,24 @@
 // jsdom has no layout and no cascade, so everything here is a DOM/class
 // contract: which element the kind draws, which token it wears, what a
 // screen reader can name. Geometry is asserted as classes, not pixels.
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { render, screen, act, fireEvent } from '@testing-library/react';
+
+// The toaster mounts the realtime bridge (useNotificationCards), whose store
+// reaches the API client and, through it, the Supabase client that throws at
+// module scope under the suite's hermetic (empty) env. Same stub the row
+// tests use; nothing in this file exercises either module.
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: { from: vi.fn(), rpc: vi.fn(), channel: vi.fn(), removeChannel: vi.fn(), auth: { getSession: vi.fn() } },
+}));
+vi.mock('@/services/PlayerService', () => ({
+  PlayerService: { getPlayersByIds: vi.fn().mockResolvedValue([]) },
+}));
 
 import { CitrusToaster } from '../CitrusToaster';
 import { toast } from '@/hooks/use-toast';
 import { teamCrestUrl } from '@/components/roster/headshot';
+import { ROW_META, ROW_NAME } from '@/components/phoneRowScale';
 import { KIND_ICON_CLASSES, STATUS_TONE_CLASSES } from '../notificationKind';
 
 const MCDAVID = {
@@ -159,10 +171,27 @@ describe('CitrusToaster — kind: player', () => {
     expect(screen.getByText('Added from waivers')).toBeInTheDocument();
   });
 
+  it('the name and the meta line sit on the phone row ladder, not on private sizes', () => {
+    // ROW_NAME / ROW_META are the rungs the roster row and the matchup card
+    // climb (phoneRowTypeScaleGuard). A card announcing a player has to look
+    // like the row that player lives on; a private 15px here is how the
+    // three surfaces drifted apart the first time.
+    show({ kind: 'player', title: 'Connor McDavid', player: MCDAVID, meta: 'C · EDM' });
+    const headline = screen.getByTestId('citrus-toast-headline');
+    for (const cls of ROW_NAME.split(' ')) expect(headline.className).toContain(cls);
+    expect(headline.className).not.toContain('font-varsity');
+    const meta = screen.getByTestId('citrus-toast-meta');
+    for (const cls of ROW_META.split(' ')) expect(meta.className).toContain(cls);
+    // Colour stays in the .tsx where the contrast guard reads it.
+    expect(headline.className).toContain('text-pastel-cream');
+    expect(meta.className).toContain('text-white/55');
+  });
+
   it.each([
     ['good', 'Final'],
     ['attention', 'Action needed'],
     ['bad', 'Claim lost'],
+    ['neutral', 'Dropped'],
   ] as const)('the %s pill wears its own background AND the text that survives on it', (tone, label) => {
     show({ kind: 'player', title: 'Connor McDavid', player: MCDAVID, status: { label, tone } });
     const pill = screen.getByTestId('citrus-toast-status');
@@ -317,6 +346,39 @@ describe('CitrusToaster — accessibility', () => {
     const close = screen.getByRole('button', { name: 'Dismiss notification' });
     expect(card.contains(close)).toBe(true);
     expect(close.className).not.toContain('opacity-0');
+    // 16px glyph + 10px a side = 36px, not the scaffold's 24px (h-4 + p-1).
+    expect(close.className).toContain('p-2.5');
+    expect(close.className).not.toMatch(/\bp-1\b/);
+    // The card's right padding ends where the button starts.
+    expect(card.className).toContain('pr-10');
+  });
+
+  it('a tap anywhere on the card dismisses it (the top of the screen is not thumb country)', () => {
+    const card = show({ kind: 'player', title: 'Connor McDavid', player: MCDAVID });
+    act(() => {
+      fireEvent.click(card);
+    });
+    // open -> false in the hook's store; jsdom runs no exit animation, so
+    // Radix's Presence unmounts the Root at once.
+    expect(screen.queryByTestId('citrus-toast')).toBeNull();
+  });
+
+  it('a click Radix has already flagged as the tail of a swipe is not a tap', () => {
+    // react-toast's pointer-up handler adds a one-shot click listener that
+    // calls preventDefault after any swipe, ended or cancelled. The tap
+    // handler has to honour it, or a cancelled swipe would dismiss the card
+    // the user decided to keep.
+    const card = show({ title: 'Lineup Optimized' });
+    card.addEventListener('click', (e) => e.preventDefault(), { once: true });
+    act(() => {
+      fireEvent.click(card);
+    });
+    expect(screen.getByTestId('citrus-toast')).toBeInTheDocument();
+    // And the next, unflagged tap still works.
+    act(() => {
+      fireEvent.click(card);
+    });
+    expect(screen.queryByTestId('citrus-toast')).toBeNull();
   });
 
   it('the decorative glyph and the kind icon are hidden from assistive tech', () => {

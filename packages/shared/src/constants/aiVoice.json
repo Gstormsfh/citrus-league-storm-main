@@ -50,5 +50,50 @@
   "emDash": {
     "char": "—",
     "$comment": "U+2014. Commas, periods and parentheses all exist. This is the single loudest tell and it is banned outright in anything a reader sees."
+  },
+
+  "copyBans": {
+    "$comment": [
+      "THE COPY-VOICE BANS (docs/COPY_VOICE.md, banned vocabulary; docs/DESIGN_DIRECTION.md rule 7).",
+      "",
+      "Added 2026-09-03 as its own key, read by apps/web/src/__tests__/copyVoiceGuard.test.ts.",
+      "aiVoiceGuard reads bannedPhrases, accuracyClaims, moatOverstatement and emDash only,",
+      "so nothing here changes what that guard scans or how it reports.",
+      "",
+      "toastTitles   match a whole `title:` literal. The count of `title: \"Error\"` in the app",
+      "              reached 0 on 2026-09-03; these are what stop the 56th.",
+      "phrases       are tested against EVERY string literal and JSX text run a person could",
+      "              read (comparison operands and logger arguments excluded).",
+      "rawErrorCodes are tested against sentence-shaped literals only: 'ERR_NETWORK' as a",
+      "              code constant is data, and only becomes a defect once it sits in prose.",
+      "budgets       are the brevity budgets, in the units COPY_VOICE states them in. The guard",
+      "              pins them to the numbers in the doc, so change the doc first.",
+      "",
+      "Same portability rule as the rest of this file: no lookbehind, no named groups,",
+      "no \\p{...}. Matched case-insensitively."
+    ],
+    "toastTitles": [
+      { "name": "title: \"Error\"", "pattern": "^\\s*error\\s*[.!]*\\s*$" },
+      { "name": "title: \"Success\"", "pattern": "^\\s*success\\s*[.!]*\\s*$" }
+    ],
+    "phrases": [
+      { "name": "no data", "pattern": "\\bno data\\b" },
+      { "name": "no X found", "pattern": "\\bno\\s+(?:\\w+\\s+){1,3}found\\b" },
+      { "name": "oops", "pattern": "\\b(?:wh)?oops\\b" },
+      { "name": "uh oh", "pattern": "\\buh[- ]?oh\\b" },
+      { "name": "naked something went wrong", "pattern": "^\\W*something went wrong\\W*$" },
+      { "name": "failed to fetch", "pattern": "\\bfailed to fetch\\b" }
+    ],
+    "rawErrorCodes": [
+      { "name": "a PostgREST or SQLSTATE code", "pattern": "\\bPGRST\\d{3}\\b|\\bsqlstate\\b" },
+      { "name": "a Node or Chromium network code", "pattern": "\\bE(?:CONN\\w*|ADDR\\w*|PIPE|TIMEDOUT|NOTFOUND|ACCES|PERM)\\b|\\bERR_[A-Z_]+\\b|\\bnet::" },
+      { "name": "an HTTP status number", "pattern": "\\b(?:http|status(?:\\s+code)?|error(?:\\s+code)?)\\s*[:#]?\\s*[45]\\d\\d\\b|\\b[45]\\d\\d\\s+(?:internal server error|bad gateway|service unavailable|gateway time-?out|not found|forbidden|unauthorized|bad request)\\b" },
+      { "name": "a JavaScript runtime fault", "pattern": "\\[object object\\]|\\b(?:type|reference|syntax|range)error\\b|\\bundefined is not\\b|\\bcannot read propert|\\bis not a function\\b|\\bis not defined\\b" }
+    ],
+    "budgets": {
+      "toastTitleWords": 4,
+      "toastDescriptionSentences": 2,
+      "emptyStatePrimaryWords": 8
+    }
   }
 }

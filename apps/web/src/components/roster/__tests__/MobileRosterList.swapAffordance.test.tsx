@@ -167,7 +167,7 @@ describe('the first-run hint', () => {
   it('fires once when the list is editable, and not again on re-render', () => {
     const { rerender } = renderList({ swapHint: true });
     expect(toastSpy).toHaveBeenCalledTimes(1);
-    expect(toastSpy.mock.calls[0][0]).toMatchObject({ title: 'Tap a position to swap' });
+    expect(toastSpy.mock.calls[0][0]).toMatchObject({ title: 'Line Change' });
     rerender(
       <MobileRosterList
         starters={[MCDAVID, DRAISAITL]}

@@ -23,3 +23,20 @@ export function resolveIrSlotCount(
 export function irSlotIds(count: number): string[] {
   return Array.from({ length: Math.max(0, count) }, (_, i) => `ir-slot-${i + 1}`);
 }
+
+/**
+ * An IR occupant the NHL no longer lists IR or LTIR (2026-09-03,
+ * WORLD_CLASS_READINESS gap B): the roster is illegal until he moves, and
+ * the row should say so instead of leaving it to a one-time toast.
+ *
+ * `is_ir_eligible` is the flag the page has gated IR slots on since the
+ * column arrived (migration 20260103151931; player_talent_metrics, through
+ * the players API) and now the flag the
+ * server refuses a new IR placement without (`validateIrPlacements` in
+ * server/src/lib/leagueRules.ts). Explicit `false` only: the API always
+ * sends a boolean, so `undefined` means the row came from somewhere that
+ * never asked, and a cue built on it would be a guess.
+ */
+export function shouldMoveOffIr(p: { is_ir_eligible?: boolean }): boolean {
+  return p.is_ir_eligible === false;
+}

@@ -19,7 +19,7 @@ import {
   statusChipFor,
   waiverClearsLabel,
   type FreeAgentAction,
-} from './freeAgentRow';
+} from './freeAgentRowKit';
 
 /**
  * The minimum a Free Agents list knows about a player that is enough to

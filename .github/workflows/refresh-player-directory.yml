@@ -62,11 +62,14 @@ jobs:
       # 19m43s hang. Belt-and-suspenders: the script also calls
       # sys.stdout.reconfigure(line_buffering=True) at module top.
       - name: Refresh player_directory from rosters + raw_shots discovery
+        # `shell: bash` is `bash -eo pipefail`, so the tee below cannot mask a
+        # non-zero exit from the script (the default shell has no pipefail).
+        shell: bash
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PYTHONUNBUFFERED: '1'
-        run: python -u scripts/utilities/populate_player_directory.py
+        run: python -u scripts/utilities/populate_player_directory.py 2>&1 | tee /tmp/refresh.log
 
       # Post-run assertion — Task 0F. Imports the SAME seasons_to_populate
       # helper the writer uses, so writer and guard cannot drift. Fails on
@@ -146,3 +149,18 @@ jobs:
           # WARNs after the refresh indicate edge cases (IR/AHL/etc) that
           # need separate investigation per audit §10.7.
           "
+
+      # One row in public.ops_ci_runs so the job's outcome is readable through
+      # the Supabase MCP without a pasted log (docs/RUNBOOKS/CI_TELEMETRY.md).
+      # This job failed on 2026-09-03 (#48) and nobody could see it from the
+      # database; the passer_id team-id discovery it died on is fixed in the
+      # same change set as this step.
+      - name: Report run
+        if: always()
+        continue-on-error: true
+        uses: ./.github/actions/report-run
+        with:
+          status: ${{ job.status }}
+          log-file: /tmp/refresh.log
+          supabase-url: ${{ secrets.VITE_SUPABASE_URL }}
+          service-role-key: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

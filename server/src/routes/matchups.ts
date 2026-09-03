@@ -18,16 +18,23 @@ matchupRoutes.use('*', authMiddleware);
 // ── League-scoped routes (membership verified via :leagueId) ─────────
 
 // GET /api/matchups/league/:leagueId — Get all matchups for a league
+//
+// With ?week=N this is the league scoreboard (audit M7): every row also
+// carries team1_projected_total / team2_projected_total, the projected
+// final per side, computed server-side from the same tables the matchup
+// page reads (MatchupService.getLeagueScoreboard). Without a week it is the
+// season-wide list standings and the timeline read, and no projection is
+// computed. The wire shape is LeagueScoreboardMatchup in @citrus/shared.
 matchupRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const week = c.req.query('week');
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
 
-  const { matchups, error } = await service.getLeagueMatchups(
-    leagueId,
-    week ? parseInt(week, 10) : undefined,
-  );
+  const weekNumber = week ? parseInt(week, 10) : undefined;
+  const { matchups, error } = weekNumber !== undefined && Number.isFinite(weekNumber)
+    ? await service.getLeagueScoreboard(leagueId, weekNumber)
+    : await service.getLeagueMatchups(leagueId, weekNumber);
 
   if (error) {
     return handleError(c, error, 'Failed to fetch matchups');
@@ -141,6 +148,12 @@ matchupRoutes.get('/league/:leagueId/simulations', membershipMiddleware, async (
 
   const { data, error } = await query;
   if (error) {
+    // 42P01 = relation does not exist. matchup_simulations has no migration
+    // and no scheduled writer (simulate_matchups.py is CATEGORY: UTILITY,
+    // manual), so as of 2026-09-03 this route 500'd on every call. An empty
+    // array is the honest answer the client already handles: no simulations.
+    // Any other error is still a failure.
+    if ((error as { code?: string }).code === '42P01') return ok(c, []);
     return handleError(c, error, 'Failed to fetch simulations');
   }
 

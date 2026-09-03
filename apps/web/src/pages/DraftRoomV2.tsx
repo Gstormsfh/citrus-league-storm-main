@@ -521,6 +521,8 @@ export default function DraftRoomV2() {
       >
         &larr; League HQ
       </Link>
+        {/* OfflineDraftRoom types playersError as string and renders it straight
+            into JSX; the players hook hands back an Error, so pass .message. */}
         <OfflineDraftRoom
           leagueId={leagueId}
           teams={teams}
@@ -528,7 +530,7 @@ export default function DraftRoomV2() {
           onRetryTeams={retryTeamsFetch}
           playersById={playersById}
           playersLoading={playersLoading}
-          playersError={playersError}
+          playersError={playersError ? playersError.message : null}
           onRetryPlayers={reloadPlayers}
           commissionerId={offlineMeta.commissionerId}
           draftRounds={offlineMeta.draftRounds}
@@ -867,7 +869,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
       onRetryTeams();
     } catch (err) {
       const e = err as { response?: { data?: { error?: string } }; message?: string };
-      toast.error('Could not add AI teams', {
+      toast.error("Couldn't Add AI Teams", {
         description: e?.response?.data?.error ?? e?.message ?? 'Please try again.',
       });
     } finally {
@@ -1695,9 +1697,9 @@ function MainTabs({
 
   /**
    * One cohort-relative advanced read per player. The scales are built once
-   * from the payload (three cohorts x two metrics plus save rate), then every
-   * player is placed against them — the alternative, a scale per row, is
-   * seven passes over 2k rows per render.
+   * from the payload (three cohorts x two metrics, plus goalie GSAx and save
+   * rate), then every player is placed against them. The alternative, a
+   * scale per row, is eight passes over 2k rows per render.
    */
   const qualitySignals = useMemo(() => {
     if (dashboardIndex.length === 0) return new Map<string, QualitySignal>();

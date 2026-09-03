@@ -180,3 +180,43 @@ the image as a rollback target).
 **INS-16-family note.** Terminal's diagnostic SQL at `scripts/proof/t6-site-season-phase-fix.local.sql:78-84` referenced `l.season` and `l.league_type` — neither exists on prod `leagues`. Prod has `league_size`; `season` lives on `playoff_brackets`. Composed-not-harvested schema assumptions — architect adapted live at execution time. Ledger cross-ref: `docs/INSTRUMENT_LEDGER.md` INS-16 (harvest-from-real-output rule).
 
 **Docket task #65 candidate:** Beta League `playoffTeams` must be reconfigured (was 6) at 2026 season setup. The zero must not surprise anyone next spring. Add to Q3 2026 season-config checklist.
+
+## Rule 1 recorded change: raw_shots.passer_id team ids set to NULL (2026-09-03 ~17:55Z)
+
+**What.** `UPDATE public.raw_shots SET passer_id = NULL WHERE passer_id IS NOT NULL AND passer_id < 8000000;` on production, wrapped in the pre/post DO blocks of `supabase/migrations/20260903170000_null_team_ids_in_raw_shots_passer_id.sql` (full rationale block in the file).
+
+**Why.** The column had never held a player id. All 63,069 non-null values were NHL team ids (1..68, 34 distinct) copied from `eventOwnerTeamId` by `data_acquisition.py`'s pass detector when `prev_details['playerId']` was absent, which it always was. The daily player-directory job discovered them as "players" and died on them (run #48). Writer fixed in the same change set (`data_acquisition.py:321-345`); `critical_table_checks.check_raw_shots_passer_id_is_player_id` now guards the floor.
+
+**Executed by.** Garrett, Supabase SQL Editor (prod `iezwazccqqrhrjupxzvf`), from the migration file via `pbcopy`. Claude's MCP write was refused by the platform classifier; reads were not.
+
+**Before** (read-only, Claude, 2026-09-03 morning): 63,069 non-null, 63,069 below floor, 0 plausible player ids, all equal to `event_owner_team_id` on the same row.
+
+**After** (read-only, Claude, 2026-09-03 ~17:55Z): 0 below floor, 0 non-null, 1,024,625 rows total.
+
+**Reversal.** `UPDATE public.raw_shots SET passer_id = event_owner_team_id WHERE passer_id IS NULL AND ...` restores the prior state exactly, since every affected value equalled `event_owner_team_id`. Nobody should.
+
+**Staging.** Same defect, different road (53,022 rows, 2017-2024, historical CSV loaders; `event_owner_team_id` NULL on all staging rows so the equality cannot be used there). Not yet applied; Garrett's call was prod first for TestFlight. Same file applies unchanged.
+
+**Ledger note.** Applied via the SQL Editor, so no `supabase_migrations.schema_migrations` row exists for it. The repo file is the record. See `scripts/ops/dump-prod-schema.sh` 4b for why the two ledgers already differ by 409/342 versions.
+
+## Rule 1 recorded change: rebuild_player_talent_metrics() preserves foreign columns (2026-09-03 ~18:05Z)
+
+**What.** `CREATE OR REPLACE FUNCTION public.rebuild_player_talent_metrics(integer)` from `supabase/migrations/20260903180000_talent_metrics_rebuild_preserves_columns.sql`. Signature, return shape, SECURITY DEFINER, `search_path=public`, grants unchanged. Body: the unqualified `delete ... where season = p_season` becomes a delete of only players absent from the TOI set; the insert becomes `insert ... on conflict (player_id, season) do update` touching only `xg_per_60`, `xg_rating`, `updated_at`, `last_updated`.
+
+**Why.** pg_cron job 33 (`rebuild-talent-metrics`, 58 8 * * *) erased every column written by `fetch_injury_status.py`, `calculate_daily_projections.py` and `populate_gp_last_10_metric.py` once a day. Verified 2026-09-03: 940 rows, all `created_at = 08:58:00.060311`, 0 of 940 with `vopa_score`, `avg_toi_per_game`, `roster_status`, `positional_replacement_level`, `ros_projection_xg`, or non-zero `gp_last_10`.
+
+**Rule 1 capture (MIGRATION_SAFETY_GUIDE).** `supabase/migrations/captures/2026-09-03_pre_talent_metrics_rebuild_preserves_columns.sql`, md5 `d29db427b148049d82e4c5452085ed41`, equal to `md5(pg_get_functiondef(...))` on prod immediately before apply.
+
+**Rule 2 history read.** Prod history rows `20260811164221`, `20260811200656`, `20260827155703` read before authoring; their intent (preserve roster columns; write `last_updated` for the freshness SLA) is kept and made true.
+
+**Proof.** `scripts/proof/talent-metrics-rebuild-preserves-columns.proof.sh`, Postgres 16 with prod-shaped tables: old body wipes, new body preserves, refreshes, removes stale players, excludes goalies, idempotent, grants stable. ALL PASS before apply.
+
+**Executed by.** Garrett, Supabase SQL Editor (prod), from the file via `pbcopy`.
+
+**After** (read-only, Claude, ~18:05Z): live body md5 `0f5796539089beace23d456309a17e10` (matches proof), scoped delete present, upsert present, wipe absent, grants `{postgres=X/postgres,service_role=X/postgres}`.
+
+**Reversal.** `CREATE OR REPLACE` from the capture file restores the prior body byte-for-byte.
+
+**Follow-ups this unlocks.** `injury-status-sync.yml` schedule (one green manual run first); the projections and gp_last_10 writers now stick across the nightly rebuild.
+
+**Ledger note.** SQL Editor apply, so no `schema_migrations` row; the repo file is the record.

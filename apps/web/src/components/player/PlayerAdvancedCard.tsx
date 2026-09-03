@@ -3,22 +3,27 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Mug } from '@/components/roster/Mug';
 import { PercentileBullet } from '@/components/citrus2/PercentileBullet';
+import { SparklineMicroChart } from '@/components/citrus2/SparklineMicroChart';
+import { StaleDataBadge } from '@/components/citrus2/StaleDataBadge';
 import { ROW_HEADLINE, ROW_HEADLINE_LABEL, ROW_META, ROW_MICRO, ROW_NAME } from '@/components/phoneRowScale';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import {
-  usePlayerDashboardIndex,
-  type DashboardIndexEntry,
-} from '@/hooks/usePlayerDashboardIndex';
+import { usePlayerDashboardIndex } from '@/hooks/usePlayerDashboardIndex';
+import type { XgHistoryPoint } from '@citrus/shared';
 import {
   COMPACT_METRIC_COUNT,
   DISTRIBUTION_MIN_GP,
   buildAdvancedCardData,
+  deploymentParts,
   findDashboardPlayer,
   fmt1,
   fmt2,
   playerDashboardHref,
+  xgTrend,
   type AdvancedCardData,
+  type CardEntry,
 } from './playerAdvancedMetrics';
+import { seasonLabel } from './playerDashboardData';
+import { usePlayerXgHistory } from './usePlayerXgHistory';
 
 /**
  * PWS-1 — THE CONDENSED PLAYER CARD, ON EVERY PLAYER SURFACE.
@@ -65,8 +70,10 @@ import {
  *  2. No 3-column card grid: one column, hairline-separated bands.
  *  3. No decorative axes: the bullets carry one median hairline and no
  *     numeric scale, which is the primitive's own refinement.
- *  4. Pills only for meaningful state: the sole chip is LIMITED SAMPLE, and
- *     it appears only when the player really is under the threshold.
+ *  4. Pills only for meaningful state: the two chips are LIMITED SAMPLE,
+ *     which appears only when the player really is under the threshold,
+ *     and `StaleDataBadge`, which its own primitive hides until the
+ *     payload's timestamp is fourteen days old.
  *  5. Not centered: every band is left-anchored with its value flushed
  *     right — asymmetric, per the data-zone law.
  *  6. No tab strips.
@@ -84,6 +91,27 @@ import {
  * `components/phoneRowScale.ts` — names 15px, headline numbers 17px mono,
  * meta 12px, micro 10px — so this card wears the same ladder as the roster
  * row, the matchup row and the free-agent row rather than inventing a fifth.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * 2026-09-03: THE FOUR THINGS THE FIRST CUT COULD NOT SHOW
+ *
+ * The header of `playerAdvancedMetrics.ts` carries the reasoning for each;
+ * what this component does with them is:
+ *
+ *   * GSAx arrives through the metric stack like any other row, because it
+ *     IS a goalie metric and the goalie set now leads with it. Nothing here
+ *     is goalie-specific beyond what `metricsFor` already decided.
+ *   * The career sparkline is a second, per-player read
+ *     (`/api/players/:id/xg-history`, `usePlayerXgHistory`) and it runs ONLY
+ *     for the `expanded` variant: the compact card has a height budget and
+ *     is mounted on list surfaces where a fetch per row would be a fetch
+ *     storm. It renders nothing, not an empty tile, below two seasons.
+ *   * `StaleDataBadge` is wired to the row's `as_of` and rendered only when
+ *     that is non-null. The primitive's own null path prints "Update
+ *     timestamp unavailable", which is the false claim the first cut
+ *     refused to ship, and it is still refused.
+ *   * The deployment line under the eyebrow prints the sample the rates
+ *     rest on (games, minutes) and VOPA when the table has it.
  */
 
 export type PlayerAdvancedCardVariant = 'compact' | 'expanded';
@@ -109,9 +137,18 @@ export interface PlayerAdvancedCardProps {
   className?: string;
   /**
    * Inject the index instead of reading the shared hook. Tests and the render
-   * harness use this; production never passes it.
+   * harness use this; production never passes it. An injected index also
+   * switches the xG-history fetch off: a host with no API for the index has
+   * no API for the history either, and the harness must not spend a 404 a
+   * card.
    */
-  indexOverride?: readonly DashboardIndexEntry[];
+  indexOverride?: readonly CardEntry[];
+  /**
+   * Inject the career arc instead of fetching `/api/players/:id/xg-history`.
+   * `null` or `[]` means "we asked and there is none". Tests and the harness
+   * only, like `indexOverride`.
+   */
+  historyOverride?: readonly XgHistoryPoint[] | null;
 }
 
 /**
@@ -145,8 +182,20 @@ function finishingTone(v: number): string {
 }
 
 /** A hairline band. One divider style for the whole card. */
-function Band({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn('border-t border-white/10 px-3.5 py-2.5', className)}>{children}</div>;
+function Band({
+  children,
+  className,
+  testId,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  testId?: string;
+}) {
+  return (
+    <div data-testid={testId} className={cn('border-t border-white/10 px-3.5 py-2.5', className)}>
+      {children}
+    </div>
+  );
 }
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
@@ -164,14 +213,29 @@ export function PlayerAdvancedCard({
   showLink = true,
   className,
   indexOverride,
+  historyOverride,
 }: PlayerAdvancedCardProps) {
   const isMobile = useIsMobile();
+  const showAll = variant === 'expanded';
   // The hook is called unconditionally (rules of hooks) but never fetches
   // when an override is supplied or the host says it is not needed.
   const shared = usePlayerDashboardIndex({ enabled: enabled && !indexOverride });
-  const index = indexOverride ?? shared.players;
+  const index: readonly CardEntry[] = indexOverride ?? shared.players;
 
   const player = useMemo(() => findDashboardPlayer(index, playerId), [index, playerId]);
+
+  // The career arc is a second read, per player, and it is gated three
+  // ways: the host wants the card at all, the variant has the height for a
+  // chart, and nothing was injected in its place. Keyed on the RESOLVED
+  // player's id rather than the raw prop, so an id that did not resolve to
+  // a card never resolves to a request either.
+  const history = usePlayerXgHistory(player?.id ?? null, {
+    enabled: enabled && showAll && historyOverride === undefined && !indexOverride,
+  });
+  const trend = useMemo(
+    () => (showAll ? xgTrend(historyOverride === undefined ? history.points : historyOverride) : null),
+    [showAll, historyOverride, history.points],
+  );
 
   // Memoised on the index's IDENTITY, which is stable for the session — the
   // hook hands out one frozen array from a module-level cache — so the
@@ -185,9 +249,14 @@ export function PlayerAdvancedCard({
   // all one branch, all `null`. The host renders exactly what it always did.
   if (!enabled || !player || !data) return null;
 
-  const showAll = variant === 'expanded';
-  const metrics = showAll ? data.metrics : data.metrics.slice(0, COMPACT_METRIC_COUNT);
-  const visible = metrics.filter((m) => m.value != null || m.percentile != null);
+  // Drop the rows we have nothing for, THEN cut to the compact budget, so a
+  // compact card always shows its four rows when four are available. The
+  // other order left a goalie with no GSAx row (or a skater with no talent
+  // row) one row short, with the row that would have filled the slot held
+  // back in `expanded` for no reason. The budget is rows on screen, not
+  // positions in the spec list.
+  const available = data.metrics.filter((m) => m.value != null || m.percentile != null);
+  const visible = showAll ? available : available.slice(0, COMPACT_METRIC_COUNT);
 
   // A card with an identity strip and no numbers is worse than no card: it
   // implies we measured this player and found nothing. If the payload has
@@ -197,6 +266,24 @@ export function PlayerAdvancedCard({
   const projFp = player.proj_fantasy_points;
   const projPpg = player.proj_fantasy_ppg;
   const hasProjection = projFp != null || projPpg != null;
+  const deployment = deploymentParts(player);
+  const asOf = player.as_of ?? null;
+  /**
+   * StaleDataBadge hides itself below its 14-day threshold, so wrapping it
+   * unconditionally put an EMPTY <span data-testid="advanced-card-freshness">
+   * on every healthy card. That is the furniture the badge exists not to be,
+   * and a test asserting "nothing is rendered for a fresh row" reads the
+   * wrapper, not the badge. Mirror the threshold here so the wrapper appears
+   * only when the badge does. Keep these in step with StaleDataBadge's
+   * `thresholdDays` default.
+   */
+  const STALE_AFTER_DAYS = 14;
+  const showFreshness = (() => {
+    if (!asOf) return false;
+    const t = new Date(asOf).getTime();
+    if (Number.isNaN(t)) return false;
+    return (Date.now() - t) / 86_400_000 >= STALE_AFTER_DAYS;
+  })();
 
   return (
     <section
@@ -229,22 +316,50 @@ export function PlayerAdvancedCard({
             {player.position} · {player.team}
             {player.jersey != null && ` · #${player.jersey}`}
           </div>
+          {/* THE SAMPLE. Games, then the minutes every per-60 row below is
+              divided by, then minutes a night and VOPA when the table
+              carries them (it does not, today; see `deploymentParts`). A
+              percentile with no stated sample is as unfalsifiable as one
+              with no stated cohort, and the cohort already prints `n=`. */}
+          {deployment.length > 0 && (
+            <div
+              data-testid="advanced-card-deployment"
+              className={cn(ROW_MICRO, 'mt-0.5 font-jbmono uppercase tracking-[0.12em] text-white/55')}
+            >
+              {deployment.join(' · ')}
+            </div>
+          )}
         </div>
-        {data.lowSample && (
-          /* Anti-pattern #4: a chip for MEANINGFUL state only. This one
-             fires solely when the player is genuinely below the sample
-             floor the distribution is built on. */
-          <span
-            data-testid="advanced-card-low-sample"
-            title={`${player.gp} games played, too thin a sample to trust a per-60 rate`}
-            className={cn(
-              ROW_MICRO,
-              'flex-shrink-0 rounded-md px-1.5 py-0.5 font-jbmono font-bold uppercase tracking-[0.18em]',
-              'bg-pastel-butter/15 text-pastel-butter ring-1 ring-pastel-butter/40',
+        {(data.lowSample || asOf) && (
+          <div className="flex flex-shrink-0 flex-col items-end gap-1">
+            {data.lowSample && (
+              /* Anti-pattern #4: a chip for MEANINGFUL state only. This one
+                 fires solely when the player is genuinely below the sample
+                 floor the distribution is built on. */
+              <span
+                data-testid="advanced-card-low-sample"
+                title={`${player.gp} games played, too thin a sample to trust a per-60 rate`}
+                className={cn(
+                  ROW_MICRO,
+                  'rounded-md px-1.5 py-0.5 font-jbmono font-bold uppercase tracking-[0.18em]',
+                  'bg-pastel-butter/15 text-pastel-butter ring-1 ring-pastel-butter/40',
+                )}
+              >
+                {player.gp} GP
+              </span>
             )}
-          >
-            {player.gp} GP
-          </span>
+            {/* FRESHNESS. Rendered only when the payload carried a real
+                stamp: the primitive's null path prints "Update timestamp
+                unavailable", which is a claim about freshness nobody can
+                back, and is the reason the first cut left this out. With a
+                real stamp the primitive hides itself until the row is
+                fourteen days old, so on a healthy pipeline this is nothing. */}
+            {showFreshness && (
+              <span data-testid="advanced-card-freshness">
+                <StaleDataBadge asOf={asOf} />
+              </span>
+            )}
+          </div>
         )}
       </div>
 
@@ -310,6 +425,35 @@ export function PlayerAdvancedCard({
               />
             ))}
           </div>
+        </Band>
+      )}
+
+      {/* ── The career trend ─────────────────────────────────────────
+          Expanded only, like the projection, and only with two or more
+          seasons on record (`xgTrend` returns null below that, and a null
+          renders nothing rather than the primitive's "Not enough data"
+          tile: an absent chart is honest, a tile announcing absence is
+          furniture). Regular season only, summed per season, so a trade
+          cannot draw two points for one year and a playoff run cannot read
+          as a collapse. The eyebrow sits OUTSIDE the primitive for the
+          reason `pages/PlayerDashboard.tsx` gives at phone widths: the
+          floating endpoint label lands on top of an in-tile eyebrow when
+          the newest season is the series maximum. */}
+      {showAll && trend && (
+        <Band testId="advanced-card-trend">
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <Eyebrow>Citrus xG by season</Eyebrow>
+            <span className={cn(ROW_MICRO, 'font-jbmono tabular-nums uppercase tracking-[0.12em] text-white/55')}>
+              {seasonLabel(trend.firstSeason)} to {seasonLabel(trend.lastSeason)} · {trend.seasons} seasons
+            </span>
+          </div>
+          <SparklineMicroChart
+            data={trend.points}
+            endpointValue={trend.endpoint}
+            tooltipUnit=" xG"
+            height={72}
+            className="rounded-xl ring-0"
+          />
         </Band>
       )}
 

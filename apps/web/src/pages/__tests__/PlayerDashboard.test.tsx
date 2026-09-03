@@ -107,6 +107,9 @@ function indexEntry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntr
     proj_gp: 58, proj_fantasy_points: 320, proj_fantasy_ppg: 5.5,
     proj_goals: 30, proj_assists: 34, proj_sog: 200, proj_ppp: 18, proj_blocks: 55, proj_hits: 40,
     proj_wins: null, proj_saves: null, proj_shutouts: null,
+    toi_total_minutes: null, avg_toi_per_game: null, vopa_score: null,
+    gsax_raw: null, gsax_regressed: null, gsax_shots_faced: null, gsax_xga: null, gsax_ga: null,
+    as_of: null,
     ...over,
   };
 }

@@ -150,7 +150,7 @@ export class BestBallService {
         lineup?: { starters?: string[]; bench?: string[]; ir?: string[] };
         playerIds?: number[];
         players?: Array<{ player_id: number; position_code: string | null; eligible_positions: string | null }>;
-        weeklyStats?: Array<Record<string, unknown>>;
+        weeklyStats?: Array<Record<string, number>>;
       } | undefined;
       if (!bbData) return emptyResult;
 
@@ -314,7 +314,9 @@ export class BestBallService {
   ): Promise<{ daysOptimized: number; error?: string }> {
     try {
       const response = await bestballApi.triggerWeekOptimization(leagueId, { weekStartDate, weekEndDate });
-      return { daysOptimized: response.data?.daysOptimized || 0 };
+      // The api client types this body as `unknown`; the route replies { daysOptimized }.
+      const data = response.data as { daysOptimized?: number } | undefined;
+      return { daysOptimized: data?.daysOptimized || 0 };
     } catch (error: unknown) {
       logger.error('[BestBallService] triggerWeekOptimization error:', error);
       return { daysOptimized: 0, error: error instanceof Error ? error.message : String(error) };

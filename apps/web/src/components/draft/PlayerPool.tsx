@@ -689,9 +689,29 @@ export const PlayerPool = memo(({
           </button>
         )}
         {filteredAndSortedPlayers.length === 0 && (
-          <div className="text-center py-8 text-pastel-cream/70 text-sm">
-            No players found.
-          </div>
+          loadError ? (
+            // Same truth the desktop table tells (2026-08-18 launch audit):
+            // a directory that failed to load is not a filter miss.
+            <div className="text-center py-8 text-sm" data-testid="player-pool-load-error-mobile">
+              <p className="font-semibold text-destructive">Couldn&apos;t load the player list.</p>
+              <p className="text-xs mt-1 text-pastel-cream/70">
+                A connection problem, not a filter. Nothing loaded.
+              </p>
+              {onRetryLoad && (
+                <button
+                  type="button"
+                  onClick={onRetryLoad}
+                  className="mt-3 rounded-md border border-destructive/50 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-pastel-cream/70 text-sm">
+              Nobody left matches those filters.
+            </div>
+          )
         )}
       </div>
 
@@ -1017,7 +1037,7 @@ export const PlayerPool = memo(({
             </div>
           ) : (
             <div className="text-center py-12 text-pastel-cream/70">
-              No players found. Try adjusting your filters.
+              Nobody matches those filters. Widen the position, or clear the search to see the whole board.
             </div>
           )
         )}

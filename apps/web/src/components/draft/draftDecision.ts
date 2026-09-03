@@ -47,6 +47,7 @@ import {
   type MetricScale,
   type PlayerCohort,
 } from '@/utils/playerPercentiles';
+import { fmtSigned1 } from '@/components/player/playerAdvancedMetrics';
 
 // ── The projection ──────────────────────────────────────────────────
 
@@ -397,10 +398,12 @@ const COHORT_NOUN: Record<PlayerCohort, string> = {
   G: 'goalies',
 };
 
-/** The three scales a room needs, built once per pool rather than per row. */
+/** The scales a room needs, built once per pool rather than per row. */
 export interface QualityScales {
   xgPer60: Record<PlayerCohort, MetricScale>;
   garPer60: Record<PlayerCohort, MetricScale>;
+  /** Goals saved above expected, regressed, goalies only. */
+  gsax: MetricScale;
   savePct: MetricScale;
 }
 
@@ -430,7 +433,7 @@ function normalizeSavePctValue(v: number | null | undefined): number | null {
 /**
  * Build every scale the quality signal can need, in one pass per cohort.
  *
- * Seven passes over 2k rows per RENDER would be the naive shape; the card
+ * Eight passes over 2k rows per RENDER would be the naive shape; the card
  * already learned this lesson (`playerAdvancedMetrics`), so the scales are
  * built once from the payload and handed to every consumer.
  */
@@ -445,6 +448,7 @@ export function buildQualityScales(players: readonly DashboardIndexEntry[]): Qua
   return {
     xgPer60,
     garPer60,
+    gsax: buildMetricScale(players, 'G', (p) => p.gsax_regressed, 'higher'),
     savePct: buildMetricScale(players, 'G', (p) => normalizeSavePctValue(p.save_pct), 'higher'),
   };
 }
@@ -455,10 +459,17 @@ export function buildQualityScales(players: readonly DashboardIndexEntry[]): Qua
  * For a skater that is xG/60: shot quality independent of whether the pucks
  * went in, off the model that scored 1,026,149 shots from 2017 to 2025. GAR/60
  * is the fallback when the talent table has no xG row for him, because total
- * impact is the next-best single read. A goalie gets save rate, which is the
- * only goalie metric this payload carries that a cohort can be built from —
- * `goalie_gsax_primary` is the better number and the endpoint does not join
- * it (the follow-up is noted in `playerAdvancedMetrics.ts`).
+ * impact is the next-best single read.
+ *
+ * A goalie gets GSAx: goals saved above expected off the same shot model,
+ * the one goalie number that is ours. `gsax_regressed` has been on the index
+ * payload since the 2026-09-03 server pass joined `goalie_gsax_primary`
+ * (the first cut of this module noted the join as missing). It is the
+ * REGRESSED value, for the reason `playerAdvancedMetrics.ts` gives: every
+ * other GSAx on a Citrus surface prints that one, and two numbers wearing
+ * one label is how surfaces start disagreeing. The value is formatted by the
+ * same `fmtSigned1` the advanced card uses. Save rate is the fallback for a
+ * goalie the GSAx table does not hold.
  *
  * Returns null when nothing qualifies, and the caller prints nothing. A row
  * with no signal is a row with no signal; it is not a row with a zero.
@@ -472,6 +483,22 @@ export function qualitySignalFor(
   const noun = COHORT_NOUN[cohort];
 
   if (cohort === 'G') {
+    const gsax = entry.gsax_regressed;
+    if (typeof gsax === 'number' && Number.isFinite(gsax)) {
+      const placed = placeOnScale(scales.gsax, gsax, entry.gp);
+      if (placed.percentile !== null) {
+        return {
+          metric: 'GSAx',
+          shortMetric: 'GSAx',
+          percentile: placed.percentile,
+          cohortNoun: noun,
+          cohortSize: placed.cohortSize,
+          lowSample: placed.lowSample,
+          value: fmtSigned1(gsax),
+        };
+      }
+    }
+
     const rate = normalizeSavePctValue(entry.save_pct);
     if (rate === null) return null;
     const placed = placeOnScale(scales.savePct, rate, entry.gp);

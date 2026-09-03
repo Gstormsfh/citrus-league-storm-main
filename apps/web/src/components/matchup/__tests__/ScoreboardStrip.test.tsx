@@ -279,6 +279,93 @@ describe('ScoreboardStrip — layouts', () => {
   });
 });
 
+// 2026-09-03: the league endpoint serves a projected final per side for the
+// viewed week. What would be wrong: a projection printed for a row that has
+// none (a 0 where the server said null), a projection on a FINAL chip or a
+// bye, the projection stealing the headline (sage or orange), or the score
+// losing its own colour to it.
+describe('ScoreboardStrip: projected finals', () => {
+  const projected: WeekMatchupRow[] = [
+    { ...rows[0], team1_projected_total: 118.34, team2_projected_total: '104.2' },
+    { ...rows[1], team1_projected_total: null, team2_projected_total: null },
+    { ...rows[2] },
+  ];
+
+  it('prints "proj N" under each score that has one, one decimal, in the mono face', () => {
+    render(<ScoreboardStrip matchups={projected} onSelect={() => {}} today={TODAY} />);
+    const c = chip('m1');
+    const projs = within(c).getAllByTestId('scoreboard-proj');
+    expect(projs).toHaveLength(2);
+    expect(projs[0]).toHaveTextContent(/^proj\s*118\.3$/);
+    expect(projs[1]).toHaveTextContent(/^proj\s*104\.2$/);
+    // Each sits inside its own team line, under that team's score.
+    expect(within(within(c).getByTestId('scoreboard-team1')).getByTestId('scoreboard-proj')).toHaveTextContent('118.3');
+    expect(within(within(c).getByTestId('scoreboard-team2')).getByTestId('scoreboard-proj')).toHaveTextContent('104.2');
+    const number = projs[0].querySelector('.font-jbmono');
+    expect(number).not.toBeNull();
+    expect(number).toHaveClass('tabular-nums');
+    // The live score is still there, still the headline.
+    expect(within(c).getAllByTestId('scoreboard-score')[0]).toHaveTextContent('12.4');
+  });
+
+  it('a null projection renders nothing at all, never 0', () => {
+    render(<ScoreboardStrip matchups={projected} onSelect={() => {}} today={TODAY} />);
+    expect(within(chip('m2')).queryAllByTestId('scoreboard-proj')).toEqual([]);
+    expect(within(chip('m3')).queryAllByTestId('scoreboard-proj')).toEqual([]);
+    expect(chip('m2')).not.toHaveTextContent(/proj/);
+    expect(chip('m2')).not.toHaveTextContent(/0\.0/);
+  });
+
+  it('is secondary: the muted ROW_META rung, never orange, never sage', () => {
+    render(<ScoreboardStrip matchups={projected} ownMatchupId="m1" ownTeamId="t1" onSelect={() => {}} today={TODAY} />);
+    for (const el of within(chip('m1')).getAllByTestId('scoreboard-proj')) {
+      expect(el).toHaveClass('text-[12px]');
+      expect(el).toHaveClass('leading-none');
+      expect(el).toHaveClass('text-white/55');
+      expect(el.className).not.toMatch(/orange/);
+      expect(el.className).not.toMatch(/sage/);
+      expect(el.className).not.toMatch(/font-bold/);
+    }
+    // ...and the score keeps its own colour: team1 (mine, 12.4) leads, so it is sage.
+    const [s1, s2] = within(chip('m1')).getAllByTestId('scoreboard-score');
+    expect(s1).toHaveClass('text-pastel-sage');
+    expect(s2).toHaveClass('text-white/70');
+  });
+
+  it('a final chip shows no projection even if the row still carries one', () => {
+    const done = projected.map((r) => ({ ...r, status: 'completed' }));
+    render(<ScoreboardStrip matchups={done} onSelect={() => {}} today={TODAY} />);
+    expect(screen.queryAllByTestId('scoreboard-proj')).toEqual([]);
+    // Same for a week that ended on the calendar.
+    render(<ScoreboardStrip matchups={projected} onSelect={() => {}} today="2026-10-20" />);
+    expect(screen.queryAllByTestId('scoreboard-proj')).toEqual([]);
+  });
+
+  it('a bye projects the lone team only', () => {
+    render(
+      <ScoreboardStrip
+        matchups={[{ ...projected[0], id: 'bye', team2_id: null, team2_name: undefined, team2_score: null, team2_projected_total: 50 }]}
+        onSelect={() => {}}
+        today={TODAY}
+      />,
+    );
+    const c = chip('bye');
+    expect(within(c).getAllByTestId('scoreboard-proj')).toHaveLength(1);
+    expect(within(within(c).getByTestId('scoreboard-team1')).getByTestId('scoreboard-proj')).toHaveTextContent('118.3');
+    expect(within(c).getByTestId('scoreboard-team2')).not.toHaveTextContent(/proj/);
+  });
+
+  it('the accessible name says the projection where there is one, and only there', () => {
+    render(<ScoreboardStrip matchups={projected} onSelect={() => {}} today={TODAY} />);
+    expect(chip('m1')).toHaveAttribute(
+      'aria-label',
+      expect.stringMatching(/Citrus Crushers 12\.4 proj 118\.3, Thunder Titans 9\.8 proj 104\.2/),
+    );
+    expect(chip('m2')).toHaveAttribute('aria-label', expect.stringMatching(/^Puck Dynasty 31\.0, Ice Wolves 44\.5/));
+    expect(chip('m2').getAttribute('aria-label')).not.toMatch(/proj/);
+  });
+});
+
 describe('ScoreboardStrip — owner avatars on the discs (audit M8)', () => {
   it('draws the owner picture from the team-avatar map and the initial for everyone else', () => {
     const teamAvatars = new Map<string, string | null>([['t1', 'https://cdn/owner1.png'], ['t2', null]]);

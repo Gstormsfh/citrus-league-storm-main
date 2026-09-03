@@ -587,12 +587,13 @@ Five deviations from the spec above, each forced by something measured:
    which is itself a false claim. Both become available with a server
    change; neither was made on a UI branch.
 
-Also noted as follow-up, not done here: **GSAx is missing from the goalie
-card**. `goalie_gsax_primary` carries `raw_gsax` / `regressed_gsax` for 98
-goalies in 2025 and it is the best goalie metric Citrus owns, but
-`PlayerDashboardService` does not join that table. The goalie card therefore
-runs on save rate, GAA, wins and shutouts. Adding the join makes a GSAx
-bullet a ten-line change to `playerAdvancedMetrics.ts`.
+**Resolved 2026-09-03:** `PlayerDashboardService` now joins
+`goalie_gsax_primary` (98 goalies in 2025, verified by query that night) and
+the index entry carries `gsax_regressed` / `gsax_raw` / `gsax_shots_faced` /
+`gsax_xga` / `gsax_ga`. The compact goalie card leads with GSAx; save rate is
+the fallback when no row exists. Deviation 5 (Sparkline / StaleDataBadge cut)
+is also closed: `/api/players/:id/xg-history` feeds the trend band, and
+`as_of` (newest `updated_at` among the rows read) feeds the badge.
 
 ### PWS-2: Profile-page consolidation — condensed card at top of full profile
 
@@ -716,3 +717,4 @@ with a dated note. Don't let the spec drift from reality.
 | 2026-05-05 | Added Post-Web-Summit todos section: PWS-1 PlayerCard (condensed), PWS-2 profile-page consolidation, PWS-3 WrappedChapter library extension, PWS-4 G−xG true differential color encoding | Garrett + Claude |
 | 2026-09-02 | **COMPONENT 6.5 — the dashboard SHIPS.** `pages/PlayerDashboard.tsx` routed at `/players/:playerId` OUTSIDE the `import.meta.env.DEV` gate that had hidden the composition since it was built, wired to a new `GET /api/players/:playerId/dashboard` (shots + `player_xg_season` career arc + `goalie_gsax_primary` + `player_talent_metrics` + a real `as_of`). `PreviewPlayerProfile.tsx` deleted with its mock data. PWS-2 Option 1 implemented. Five deviations recorded under PWS-2: a sixth `CIRCLES` shot zone (five zones called circle shots "boards"), share-meters instead of `PercentileBullet` in the Shot Breakdown (a share is not a rank), the hero verdict moving below the rink under `lg` (measured 280 of 361px of cover at 393), a rink-free Concrete Poetry hero for goalies and for every no-map state, and season/game-type on the URL instead of a second segmented control. | Claude |
 | 2026-09-02 | PWS-1 BUILT and shipped into `PlayerStatsModal`. Added an implementation note under PWS-1 recording five measured deviations: the 180–240px envelope cannot hold 6–8 bullets (measured 407px compact / 587px expanded at 353px wide), a compact/expanded variant split, `#JERSEY` in place of `AGE` (no birth date on the payload), a labelled click-through to `/players?player=<id>` in place of a whole-card link to a route that does not exist, and Sparkline/StaleDataBadge cut because the payload carries neither a series nor a timestamp. GSAx logged as the top server-side follow-up. | Claude |
+| 2026-09-03 | GSAx joined and rendered on the goalie card; `/api/players/:id/xg-history` + trend band; `toi_total_minutes` / `avg_toi_per_game` / `vopa_score` passed through (the last two are NULL on every 2025 talent row in production, so the deployment line prints GP and minutes only until the pipeline writes them); `as_of` on the index entry feeds `StaleDataBadge`. `DashboardIndexEntry` moved to `@citrus/shared`. | Claude |

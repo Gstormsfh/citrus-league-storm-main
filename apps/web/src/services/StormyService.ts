@@ -63,6 +63,45 @@ export interface StormyResponse {
   error?: string;
 }
 
+// ── Context-line tokens ─────────────────────────────────────────
+//
+// Everything the methods below build is model input. Two rules apply to
+// every token:
+//
+//   1. The separator is a space, the label is `name:value`, and nothing
+//      carries an em dash. aiVoiceGuard.test.ts scans this file, and a
+//      model mirrors the punctuation of its context.
+//   2. A token is written only when the number behind it is real. A
+//      missing token tells the model the figure does not exist for that
+//      player; a zero would read as a measurement.
+//
+// The prompt (server/src/lib/stormy/systemPrompt.ts, "What Data You
+// Have") documents each token by its literal shape and the prompt test
+// pins those shapes, so change both or neither.
+
+/** goalie_gsax_primary: the regressed value plus the sample behind it. */
+interface GsaxSampleRow {
+  goalie_id: number;
+  regressed_gsax: number | null;
+  total_shots_faced: number | null;
+  total_xga: number | null;
+  total_ga: number | null;
+}
+
+/** player_ros_projections as /api/players/ros-projections returns it. */
+interface RosProjectionRow {
+  player_id: number;
+  player_name: string;
+  position: string | null;
+  team_abbrev: string | null;
+  total_projected_points: number;
+  avg_points_per_game: number;
+  games_remaining: number;
+}
+
+/** `+8.6` / `-4.8`: a signed number the way the GSAx token always was. */
+const signed = (n: number, digits = 1): string => `${n >= 0 ? '+' : ''}${n.toFixed(digits)}`;
+
 // ── Service ──────────────────────────────────────────────────────
 
 class StormyServiceImpl {
@@ -129,7 +168,7 @@ class StormyServiceImpl {
       };
     } catch (err: unknown) {
       const msg =
-        userMessage(err, "Something went wrong.");
+        userMessage(err, "Stormy could not answer that one. Try again in a moment.");
       return {
         response: "",
         error: msg,
@@ -187,6 +226,75 @@ class StormyServiceImpl {
       `${matchup.userTeam}: ${matchup.userScore} pts`,
       `${matchup.opponentTeam}: ${matchup.opponentScore} pts`,
     ].join("\n");
+  }
+
+  // ── Token helpers (pure, so the shapes can be pinned by a test) ──
+  //
+  // ADDED 2026-09-03 (voice rewrite 2). The founder: "he needs to be more
+  // organic like an assistant GM would, backed with stats." An assistant
+  // GM argues from comparisons, and the context carried the rate (xG/60)
+  // but not the pair it comes from (goals against expected), the ice
+  // time behind it, the ROS number for a rostered player (only free
+  // agents had one), or the sample behind a goalie's GSAx. Every field
+  // below was already on an object this method held; none of this adds
+  // a request.
+
+  /** ` xG:21.4 G-xG:+8.6`, or nothing when Citrus has no xG for him. */
+  static xgPair(goals: number, xGoals: number | null | undefined): string {
+    if (xGoals == null || !(xGoals > 0)) return '';
+    return ` xG:${xGoals.toFixed(1)} G-xG:${signed(goals - xGoals)}`;
+  }
+
+  /** ` TOI/GP:18.4`, minutes a night from NHL.com ice time. */
+  static toiPerGame(icetimeSeconds: number | null | undefined, gamesPlayed: number): string {
+    if (!icetimeSeconds || !(icetimeSeconds > 0) || !(gamesPlayed > 0)) return '';
+    return ` TOI/GP:${(icetimeSeconds / 60 / gamesPlayed).toFixed(1)}`;
+  }
+
+  /**
+   * ` GSAx:+8.2[primary shots:1204 xGA:92.4 GA:84]`. The bracket is the
+   * sample the regressed number was shrunk from, and it is written only
+   * when the row carries all three parts; a bare ` GSAx:+8.2` otherwise,
+   * which is the shape this file always wrote.
+   */
+  static gsaxToken(row: GsaxSampleRow | undefined): string {
+    if (!row || row.regressed_gsax == null) return '';
+    let token = ` GSAx:${signed(Number(row.regressed_gsax))}`;
+    if (row.total_shots_faced != null && row.total_xga != null && row.total_ga != null) {
+      token += `[primary shots:${row.total_shots_faced} xGA:${Number(row.total_xga).toFixed(1)} GA:${row.total_ga}]`;
+    }
+    return token;
+  }
+
+  /** ` ROS:412.5pts 61GR`, the same shape the free-agent list uses. */
+  static rosToken(row: RosProjectionRow | undefined): string {
+    if (!row || row.total_projected_points == null) return '';
+    return ` ROS:${Number(row.total_projected_points).toFixed(1)}pts ${row.games_remaining}GR`;
+  }
+
+  /** `Gap: you lead by 15.0`, or null until both sides have a score. */
+  static scoreGapLine(
+    userScore: number | null | undefined,
+    oppScore: number | null | undefined,
+  ): string | null {
+    if (userScore == null || oppScore == null) return null;
+    const gap = Number(userScore) - Number(oppScore);
+    if (!Number.isFinite(gap)) return null;
+    if (gap === 0) return 'Gap: level';
+    return gap > 0 ? `Gap: you lead by ${gap.toFixed(1)}` : `Gap: you trail by ${(-gap).toFixed(1)}`;
+  }
+
+  /**
+   * `Projected this week: your starters 84.2, your bench 22.1, their whole
+   * roster 91.0 (their lineup is not visible)`. The opponent's figure is
+   * every player they own, because their lineup is never fetched; the
+   * label says so in the line itself so the model cannot read it as a
+   * lineup total.
+   */
+  static weeklyProjectionLine(starters: number, bench: number, opponent: number | null): string {
+    let line = `Projected this week: your starters ${starters.toFixed(1)}, your bench ${bench.toFixed(1)}`;
+    if (opponent != null) line += `, their whole roster ${opponent.toFixed(1)} (their lineup is not visible)`;
+    return line;
   }
 
   /**
@@ -308,11 +416,14 @@ class StormyServiceImpl {
         })();
         const gsaxPromise = (async () => {
           try {
+            // The sample columns ride on the same request: xGA against GA is
+            // the expected-versus-actual pair for a goalie, and the regressed
+            // number alone hides how much shrinkage is in it.
             const { data } = await sb
               .from('goalie_gsax_primary')
-              .select('goalie_id, regressed_gsax')
+              .select('goalie_id, regressed_gsax, total_shots_faced, total_xga, total_ga')
               .in('goalie_id', allNeededPlayerIds);
-            return (data ?? []) as Array<{ goalie_id: number; regressed_gsax: number | null }>;
+            return (data ?? []) as GsaxSampleRow[];
           } catch { return []; }
         })();
 
@@ -332,12 +443,22 @@ class StormyServiceImpl {
         if (talentRows.status === 'fulfilled') {
           for (const r of talentRows.value) talentByPid.set(r.player_id, { xg_per_60: r.xg_per_60, xg_rating: r.xg_rating });
         }
-        const gsaxByPid = new Map<number, number>();
+        const gsaxByPid = new Map<number, GsaxSampleRow>();
         if (gsaxRows.status === 'fulfilled') {
           for (const r of gsaxRows.value) {
-            if (r.regressed_gsax != null) gsaxByPid.set(r.goalie_id, r.regressed_gsax);
+            if (r.regressed_gsax != null) gsaxByPid.set(r.goalie_id, r);
           }
         }
+
+        // ROS projections, keyed by player. The same rows feed the free-agent
+        // list in step 11; keyed here as well so a roster line carries its
+        // own ROS number and Stormy can put a free agent's ROS next to the
+        // ROS of the player he would replace. Same request as before.
+        const rosProjectionsData = rosProjectionsResult.status === 'fulfilled'
+          ? (rosProjectionsResult.value.data ?? []) as RosProjectionRow[]
+          : [];
+        const rosByPid = new Map<number, RosProjectionRow>();
+        for (const r of rosProjectionsData) rosByPid.set(r.player_id, r);
 
         const lineupData = lineupResult.status === 'fulfilled'
           ? lineupResult.value.data as { starters?: string[]; bench?: string[]; ir?: string[] } | null
@@ -352,12 +473,16 @@ class StormyServiceImpl {
         const teamGameDaysMap = new Map<string, string[]>();
 
         if (weekStart && weekEnd) {
+          // Both sides of the matchup, in the same two requests. Stormy is
+          // asked "how is my week looking" and the answer is a projection
+          // against the opponent's, so the opponent's players and teams go
+          // in the same id list rather than a second round trip.
           const uniqueTeams = [...new Set(
-            playerIds.map(pid => playerMap.get(pid)?.team).filter((t): t is string => !!t),
+            allNeededPlayerIds.map(pid => playerMap.get(pid)?.team).filter((t): t is string => !!t),
           )];
 
           const [projResult, gamesResult] = await Promise.allSettled([
-            getWeeklyProjections(playerIds, weekStart, weekEnd),
+            getWeeklyProjections(allNeededPlayerIds, weekStart, weekEnd),
             fetchGamesForTeams(uniqueTeams, weekStart, weekEnd),
           ]);
 
@@ -390,10 +515,10 @@ class StormyServiceImpl {
             if (isGoalie && (p.goalie_gp || 0) > 0) {
               line += ` ${p.goalie_gp}GP ${p.wins}W ${p.saves}SV ${p.goals_against}GA ${p.shutouts}SO`;
               if (p.save_percentage != null) line += ` ${Number(p.save_percentage).toFixed(3)}SV%`;
-              // GSAx (regressed goals saved above expected) — Bayesian-shrunk
-              // measure of true goaltending value vs an average NHL goalie.
-              const gsax = gsaxByPid.get(Number(p.id));
-              if (gsax != null) line += ` GSAx:${gsax >= 0 ? '+' : ''}${gsax.toFixed(1)}`;
+              // GSAx (regressed goals saved above expected), Bayesian-shrunk
+              // measure of true goaltending value against an average NHL
+              // goalie, with the primary-shot sample it was shrunk from.
+              line += StormyServiceImpl.gsaxToken(gsaxByPid.get(Number(p.id)));
             } else if (p.games_played > 0) {
               line += ` ${p.games_played}GP ${p.goals}G ${p.assists}A ${p.points}PTS`;
               const ppg = (p.points / p.games_played).toFixed(1);
@@ -401,7 +526,12 @@ class StormyServiceImpl {
               if ((p.ppp || 0) > 0) line += ` ${p.ppp}PPP`;
               if ((p.shp || 0) > 0) line += ` ${p.shp}SHP`;
               line += ` ${p.shots}SOG ${p.hits}HIT ${p.blocks}BLK ${p.pim}PIM`;
-              // xG/60 + tier rating — shot-quality signal. A 0.95 PPG player
+              // Goals against Citrus expected goals, and minutes a night. The
+              // pair is what "running hot" and "due" are measured from; the
+              // rate below is the same xG divided by this ice time.
+              line += StormyServiceImpl.xgPair(p.goals, p.xGoals);
+              line += StormyServiceImpl.toiPerGame(p.icetime_seconds, p.games_played);
+              // xG/60 + tier rating, the shot-quality signal. A 0.95 PPG player
               // with xG/60 of 1.4 (Elite) is hot but sustainable; a 1.1 PPG
               // player with xG/60 of 0.5 (Below Avg) is regression-prone.
               const t = talentByPid.get(Number(p.id));
@@ -424,9 +554,11 @@ class StormyServiceImpl {
               if (days?.length) line += `[${days.join(",")}]`;
             }
 
-            // Weekly projection
+            // Weekly projection, then the ROS projection in the free-agent
+            // list's shape so the two can be compared line to line.
             const proj = weeklyProjMap.get(Number(p.id));
             if (proj != null) line += ` wkProj:${proj.toFixed(1)}`;
+            line += StormyServiceImpl.rosToken(rosByPid.get(Number(p.id)));
 
             return { sortOrder, line };
           }).filter(r => r.line);
@@ -447,6 +579,33 @@ class StormyServiceImpl {
             `${opponentName}: ${oppScore} pts`,
           ];
 
+          // The gap, precomputed so the model quotes it rather than
+          // subtracting, and this week's projection on both sides.
+          const gapLine = StormyServiceImpl.scoreGapLine(userScore, oppScore);
+          if (gapLine) matchupLines.push(gapLine);
+          if (weeklyProjMap.size > 0) {
+            let starters = 0;
+            let bench = 0;
+            let opponent = 0;
+            let opponentHasProjection = false;
+            for (const pid of playerIds) {
+              const proj = weeklyProjMap.get(pid);
+              if (proj == null) continue;
+              const key = String(pid);
+              if (starterIds.has(key)) starters += proj;
+              else if (!irIds.has(key)) bench += proj;
+            }
+            for (const pid of opponentPlayerIds) {
+              const proj = weeklyProjMap.get(pid);
+              if (proj == null) continue;
+              opponent += proj;
+              opponentHasProjection = true;
+            }
+            matchupLines.push(
+              StormyServiceImpl.weeklyProjectionLine(starters, bench, opponentHasProjection ? opponent : null),
+            );
+          }
+
           if (opponentPlayerIds.length > 0) {
             const oppPlayers = opponentPlayerIds.map(pid => playerMap.get(pid)).filter(Boolean);
             if (oppPlayers.length > 0) {
@@ -458,16 +617,24 @@ class StormyServiceImpl {
                 if (isGoalie && (p.goalie_gp || 0) > 0) {
                   line += ` ${p.goalie_gp}GP ${p.wins}W`;
                   if (p.save_percentage != null) line += ` ${Number(p.save_percentage).toFixed(3)}SV%`;
-                  const gsax = gsaxByPid.get(Number(p.id));
-                  if (gsax != null) line += ` GSAx:${gsax >= 0 ? '+' : ''}${gsax.toFixed(1)}`;
+                  line += StormyServiceImpl.gsaxToken(gsaxByPid.get(Number(p.id)));
                 } else if (p.games_played > 0) {
-                  line += ` ${p.games_played}GP ${p.points}PTS ${(p.points / p.games_played).toFixed(1)}PPG`;
+                  line += ` ${p.games_played}GP ${p.goals}G ${p.points}PTS ${(p.points / p.games_played).toFixed(1)}PPG`;
+                  line += StormyServiceImpl.xgPair(p.goals, p.xGoals);
                   const t = talentByPid.get(Number(p.id));
                   if (t?.xg_per_60 != null) {
                     line += ` xG/60:${Number(t.xg_per_60).toFixed(2)}`;
                     if (t.xg_rating) line += `[${t.xg_rating}]`;
                   }
                 }
+                // The same injury, schedule and projection tokens as his own
+                // lines carry, so a start/sit can be argued against the man
+                // across the ice and not just against the bench.
+                if (p.roster_status && p.roster_status !== "ACT") line += ` [${p.roster_status}]`;
+                const oppGames = teamGamesCountMap.get(p.team ?? "");
+                if (oppGames != null) line += ` ${oppGames}GP/wk`;
+                const oppProj = weeklyProjMap.get(Number(p.id));
+                if (oppProj != null) line += ` wkProj:${oppProj.toFixed(1)}`;
                 matchupLines.push(line);
               });
             }
@@ -512,16 +679,7 @@ class StormyServiceImpl {
         }
 
         // ── 11. Top free agents (via API) ──────────────────────────
-        type RosProjectionRow = {
-          player_id: number; player_name: string; position: string | null;
-          team_abbrev: string | null; total_projected_points: number;
-          avg_points_per_game: number; games_remaining: number;
-        };
-
-        const rosProjectionsData = rosProjectionsResult.status === 'fulfilled'
-          ? (rosProjectionsResult.value.data ?? []) as RosProjectionRow[]
-          : [];
-
+        // rosProjectionsData was parsed next to the player maps above.
         if (rosProjectionsData.length > 0) {
           const freeAgents = rosProjectionsData
             .filter(p => !allRosteredIds.has(p.player_id))
@@ -596,12 +754,17 @@ class StormyServiceImpl {
       series_status: string | null;
     };
     type TeamRow = { team_id: number; abbreviation: string; name: string };
+    // player_directory's columns are position_code and team_abbrev. It has no
+    // `position` and no `status`; this type asked for both from 2026-04-18
+    // until 2026-09-03, PostgREST rejected the select, allSettled swallowed
+    // it, and Stormy saw zero players from this lookup for five months.
+    // Roster status lives on player_talent_metrics.roster_status (NULL on
+    // every row today; see docs/data/PIPELINE_INVENTORY_2026-09-03.md 3A).
     type PlayerDirRow = {
       player_id: number;
       full_name: string;
-      position: string | null;
+      position_code: string | null;
       team_abbrev: string | null;
-      status: string | null;
     };
     type PlayoffStatRow = {
       player_id: number;
@@ -691,7 +854,7 @@ class StormyServiceImpl {
 
         if (playerIds.length > 0) {
           const [playersRes, statsRes] = await Promise.allSettled([
-            sb.from('player_directory').select('player_id, full_name, position, team_abbrev, status').in('player_id', playerIds),
+            sb.from('player_directory').select('player_id, full_name, position_code, team_abbrev').in('player_id', playerIds),
             sb.from('player_playoff_stats').select('*').in('player_id', playerIds),
           ]);
 
@@ -744,7 +907,10 @@ class StormyServiceImpl {
             if (!p) continue;
             const s = statsById.get(pick.player_id);
             const teamAbbrev = p.team_abbrev ?? '?';
-            const status = p.status && p.status !== 'ACT' ? ` [${p.status}]` : '';
+            // No status column on player_directory; roster_status is on
+            // player_talent_metrics and is NULL on every row until the nightly
+            // rebuild stops deleting it. Print nothing rather than a guess.
+            const status = '';
             const isElim = eliminated.has(teamAbbrev);
             const teamState = isElim ? ' ⚠️ELIMINATED' : (teamAbbrevAlive.has(teamAbbrev) ? ' ✓ALIVE' : '');
             if (isElim) eliminatedCount++;
@@ -823,11 +989,11 @@ class StormyServiceImpl {
             if (ranked.length > 0) {
               const namesRes = await sb
                 .from('player_directory')
-                .select('player_id, full_name, position')
+                .select('player_id, full_name, position_code')
                 .in('player_id', ranked.map(x => x.row.player_id));
-              const dir = (namesRes.data ?? []) as Array<{ player_id: number; full_name: string; position: string | null }>;
+              const dir = (namesRes.data ?? []) as Array<{ player_id: number; full_name: string; position_code: string | null }>;
               const dirById = new Map<number, { full_name: string; position: string | null }>();
-              for (const d of dir) dirById.set(d.player_id, { full_name: d.full_name, position: d.position });
+              for (const d of dir) dirById.set(d.player_id, { full_name: d.full_name, position: d.position_code });
 
               const hotLines = ranked.map(({ row, ppg }) => {
                 const meta = dirById.get(row.player_id);

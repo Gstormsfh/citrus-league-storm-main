@@ -11,11 +11,16 @@
  * up to `team1_name` / `team2_name`. Both spellings are read, so a row that
  * skipped that copy still renders.
  *
- * NOT here, on purpose: projected scores. The league endpoint serves live
- * `team1_score` / `team2_score` only; a projection for someone else's
- * matchup would need every team's remaining-day projections server-side
- * (or `matchup_simulations`, whose table has no scheduled producer). The
- * strip shows what is banked and says nothing it cannot know.
+ * Projected finals (2026-09-03). The league endpoint now serves, beside the
+ * live scores, `team1_projected_total` / `team2_projected_total` for the
+ * viewed week (`LeagueScoreboardMatchup` in @citrus/shared): points banked
+ * plus every remaining starter-game's projection, computed server-side in
+ * MatchupService.getLeagueScoreboard from the same three tables the matchup
+ * page reads for its own "proj" (frozen daily rosters, player_projected_stats,
+ * the nhl_games clock), so the strip and the sticky bar are two evaluations
+ * of one formula. `projectionOf` reads it and returns null, never 0, when the
+ * server could not honestly say (a final matchup, a bye, a lineup or a
+ * projection batch not in hand); the strip draws nothing for null.
  */
 
 export type ScoreboardSide = 'team1' | 'team2';
@@ -48,6 +53,13 @@ export interface WeekMatchupRow {
   team2_name?: string | null;
   team1?: WeekMatchupTeam | null;
   team2?: WeekMatchupTeam | null;
+  /**
+   * Projected final per side from the league endpoint (`?week=N` only);
+   * null or absent when there is nothing honest to say. Numeric strings are
+   * tolerated the way the scores are.
+   */
+  team1_projected_total?: number | string | null;
+  team2_projected_total?: number | string | null;
 }
 
 /** Points as a number; the API hands back numerics as strings on some paths. */
@@ -118,6 +130,22 @@ export function isFinal(row: WeekMatchupRow, today: string): boolean {
   if (row.status === 'completed') return true;
   const end = row.week_end_date;
   return typeof end === 'string' && end.length >= 10 && end.slice(0, 10) < today;
+}
+
+/**
+ * The projected final for one side, or null when the strip must say nothing:
+ * the row carries none (a season-wide read, a server that could not compute
+ * it), the value is not a finite number, the side is a bye, or the matchup is
+ * final (a projection would only restate the score). Never 0 for "unknown":
+ * a zero here is a real projected total, and the strip prints it as one.
+ */
+export function projectionOf(row: WeekMatchupRow, side: ScoreboardSide, today: string): number | null {
+  if (isFinal(row, today)) return null;
+  if (side === 'team2' && isBye(row)) return null;
+  const raw = side === 'team1' ? row.team1_projected_total : row.team2_projected_total;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = typeof raw === 'number' ? raw : parseFloat(String(raw));
+  return Number.isFinite(n) ? n : null;
 }
 
 export type ScoreboardState = 'final' | 'live' | 'open';

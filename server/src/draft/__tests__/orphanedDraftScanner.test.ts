@@ -18,12 +18,32 @@ vi.mock('@citrus/shared', async (importOriginal) => ({
   },
 }));
 
-/** Minimal supabase double: .from('leagues').select('id').eq(...) is awaited. */
+/**
+ * Minimal supabase double for the scan query, which since 2026-09-03
+ * reads through `readAllPaged`:
+ *
+ *   .from('leagues').select('id').eq('draft_status', 'in_progress')
+ *     .order('id', { ascending: true }).range(from, to)
+ *
+ * Only `.range` resolves, and it slices like PostgREST's window does.
+ * Two consequences worth stating: a regression back to an unbounded
+ * `.select()` fails here instead of passing quietly, and a result set
+ * larger than one page is genuinely paged rather than faked.
+ */
 function makeSupabase(result: { data?: Array<{ id: string }>; error?: unknown }) {
-  const eq = vi.fn().mockResolvedValue(result);
-  const select = vi.fn().mockReturnValue({ eq });
+  const rows = result.data ?? [];
+  const range = vi.fn((from: number, to: number) =>
+    Promise.resolve(
+      result.error !== undefined && result.error !== null
+        ? { data: null, error: result.error }
+        : { data: rows.slice(from, to + 1), error: null },
+    ),
+  );
+  const order = vi.fn(() => ({ order, range }));
+  const eq = vi.fn(() => ({ eq, order, range }));
+  const select = vi.fn().mockReturnValue({ eq, order, range });
   const from = vi.fn().mockReturnValue({ select });
-  return { client: { from } as never, from, select, eq };
+  return { client: { from } as never, from, select, eq, order, range };
 }
 
 function makeRegistry(loadedLobbyIds: string[] = []) {

@@ -2,8 +2,11 @@
  * THE PHONE ROW TYPE SCALE (2026-09-02).
  *
  * Four rungs, one vocabulary, for every list row a manager reads on a phone:
- * the roster list, both sides of the matchup comparison, and the Free Agents
- * pool. Nothing else in the app is expected to use it.
+ * the roster list, both sides of the matchup comparison, the Free Agents
+ * pool, and (since 2026-09-03) the rich notification card, which is a player
+ * row that arrives at the top of the screen. Anything else that is a row a
+ * manager reads at arm's length composes from these rungs; nothing restates
+ * them.
  *
  * WHY IT EXISTS — the audit finding, measured in the harness at 393x852:
  *
@@ -34,7 +37,7 @@
  *   MICRO     10px  muted, tracked ... unit labels, status chips, the note.
  *
  * The values are the ones `FreeAgentRow` shipped and tuned by eye a day
- * earlier (`freeagents/freeAgentRow.ts`); this module lifts them out so the
+ * earlier (`freeagents/freeAgentRowKit.ts`); this module lifts them out so the
  * other two surfaces wear the same ladder instead of inventing a third and a
  * fourth. 17px rather than the 20px top of the audit's band is a fit
  * decision, not a taste one: the mobile matchup card gives each side

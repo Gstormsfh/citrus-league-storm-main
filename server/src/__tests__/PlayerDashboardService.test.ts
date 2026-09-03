@@ -7,6 +7,8 @@ import {
   PlayerDashboardService,
   clearDashboardIndexCache,
   clearPlayerDashboardCache,
+  clearPlayerXgHistoryCache,
+  mergeXgHistory,
   parsePlayerDashboardRequest,
   MIN_DASHBOARD_SEASON,
   SHOT_CAP,
@@ -55,6 +57,7 @@ const STATS = [
     nhl_gaa: 0,
     nhl_shutouts: 0,
     nhl_goals_against: 0,
+    updated_at: '2026-09-03T08:55:00.020Z',
   },
   {
     player_id: 8479361,
@@ -77,6 +80,7 @@ const STATS = [
     nhl_gaa: 2.9,
     nhl_shutouts: 2,
     nhl_goals_against: 124,
+    updated_at: '2026-09-03T08:55:00.020Z',
   },
 ];
 const GAR = [
@@ -88,11 +92,36 @@ const GAR = [
     ppd_gar_per_60: 0,
     penalty_gar_per_60: 0,
     total_gar_per_60: 0.497,
-    toi_total_minutes: 434.7,
+    // `numeric` on the wire, like the real column.
+    toi_total_minutes: '1248.23',
+    updated_at: '2026-09-03T08:35:00.037Z',
   },
 ];
 const TALENT = [
-  { player_id: 8479318, xg_per_60: 1.42, xg_rating: 'Elite', roster_status: null },
+  {
+    player_id: 8479318,
+    xg_per_60: 1.42,
+    xg_rating: 'Elite',
+    roster_status: null,
+    // Both NULL on every 2025 production row (2026-09-03). The fixture
+    // fills them so the pass-through is pinned for the day they are not.
+    vopa_score: '3.114',
+    avg_toi_per_game: '21.60',
+    updated_at: '2026-09-03T08:58:00.060Z',
+  },
+];
+/** `goalie_gsax_primary` for Woll. `numeric` columns arrive as strings. */
+const INDEX_GSAX = [
+  {
+    goalie_id: 8479361,
+    season: 2025,
+    total_shots_faced: 1421,
+    total_xga: '108.4',
+    total_ga: 116,
+    raw_gsax: '-7.6',
+    regressed_gsax: '-4.1',
+    updated_at: '2026-09-03T08:35:00.037Z',
+  },
 ];
 const ROS = [
   {
@@ -109,6 +138,7 @@ const ROS = [
     projected_wins_ros: 0,
     projected_saves_ros: 0,
     projected_shutouts_ros: 0,
+    updated_at: '2026-09-03T08:50:00.076Z',
   },
 ];
 
@@ -120,6 +150,7 @@ function mockTables(supabase: any, overrides: Record<string, { data: unknown; er
     if (table === 'player_gar_components') return createChain({ data: GAR, error: null });
     if (table === 'player_talent_metrics') return createChain({ data: TALENT, error: null });
     if (table === 'player_ros_projections') return createChain({ data: ROS, error: null });
+    if (table === 'goalie_gsax_primary') return createChain({ data: INDEX_GSAX, error: null });
     return createChain({ data: [], error: null });
   });
 }
@@ -134,7 +165,7 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     service = new PlayerDashboardService(mockSupabase);
   });
 
-  it('merges all five tables into one entry per directory player', async () => {
+  it('merges all six tables into one entry per directory player', async () => {
     mockTables(mockSupabase);
     const { players, error } = await service.getDashboardIndex();
     expect(error).toBeNull();
@@ -172,6 +203,88 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     const woll = players.find((p) => p.id === 8479361)!;
     expect(woll.proj_blocks).toBeNull();
     expect(woll.proj_hits).toBeNull();
+  });
+
+  // 2026-09-03: the four columns the condensed card said it could not show.
+  it('joins goalie_gsax_primary for a goalie and leaves every skater null', async () => {
+    mockTables(mockSupabase);
+    const { players } = await service.getDashboardIndex();
+    const woll = players.find((p) => p.id === 8479361)!;
+    // Strings on the wire, numbers on ours.
+    expect(woll.gsax_raw).toBeCloseTo(-7.6);
+    expect(woll.gsax_regressed).toBeCloseTo(-4.1);
+    expect(woll.gsax_shots_faced).toBe(1421);
+    expect(woll.gsax_xga).toBeCloseTo(108.4);
+    expect(woll.gsax_ga).toBe(116);
+    expect(typeof woll.gsax_raw).toBe('number');
+
+    const am = players.find((p) => p.id === 8479318)!;
+    expect(am.gsax_raw).toBeNull();
+    expect(am.gsax_regressed).toBeNull();
+    expect(am.gsax_shots_faced).toBeNull();
+  });
+
+  it('reads goalie_gsax_primary on the season, keyed and paged by goalie_id', async () => {
+    const chain = createChain({ data: INDEX_GSAX, error: null });
+    mockTables(mockSupabase);
+    const inner = mockSupabase.from;
+    mockSupabase.from = vi.fn((table: string) => (table === 'goalie_gsax_primary' ? chain : inner(table)));
+    await service.getDashboardIndex();
+    expect(chain.eq).toHaveBeenCalledWith('season', expect.any(Number));
+    expect(chain.order).toHaveBeenCalledWith('goalie_id', { ascending: true });
+    expect(chain.range).toHaveBeenCalledWith(0, 999);
+  });
+
+  it('a GSAx read failure drops GSAx and keeps the index, rather than 500ing the Players page', async () => {
+    mockTables(mockSupabase, {
+      goalie_gsax_primary: { data: null, error: { message: 'permission denied for table goalie_gsax_primary' } },
+    });
+    const { players, error } = await service.getDashboardIndex();
+    expect(error).toBeNull();
+    expect(players).toHaveLength(2);
+    const woll = players.find((p) => p.id === 8479361)!;
+    expect(woll.gsax_regressed).toBeNull();
+    expect(woll.save_pct).toBeCloseTo(0.899); // the rest of his row is intact
+  });
+
+  it('carries toi_total_minutes, avg_toi_per_game and vopa_score as numbers', async () => {
+    // toi_total_minutes was SELECTed and dropped by the mapper from the day
+    // the index shipped; the other two were never read. All three are
+    // `numeric`, so the fixture ships them as strings.
+    mockTables(mockSupabase);
+    const { players } = await service.getDashboardIndex();
+    const am = players.find((p) => p.id === 8479318)!;
+    expect(am.toi_total_minutes).toBeCloseTo(1248.23);
+    expect(am.avg_toi_per_game).toBeCloseTo(21.6);
+    expect(am.vopa_score).toBeCloseTo(3.114);
+    expect(typeof am.toi_total_minutes).toBe('number');
+
+    const woll = players.find((p) => p.id === 8479361)!;
+    expect(woll.toi_total_minutes).toBeNull();
+    expect(woll.avg_toi_per_game).toBeNull();
+    expect(woll.vopa_score).toBeNull();
+  });
+
+  it('as_of is the newest updated_at among the rows read for THAT player', async () => {
+    mockTables(mockSupabase);
+    const { players } = await service.getDashboardIndex();
+    // Matthews: talent 08:58 beats stats 08:55, ROS 08:50 and GAR 08:35.
+    expect(players.find((p) => p.id === 8479318)!.as_of).toBe('2026-09-03T08:58:00.060Z');
+    // Woll has only a stats row and a GSAx row: stats 08:55 wins.
+    expect(players.find((p) => p.id === 8479361)!.as_of).toBe('2026-09-03T08:55:00.020Z');
+  });
+
+  it('as_of is null when none of a player\'s rows carried a stamp; nothing is synthesised', async () => {
+    const stripped = STATS.map(({ updated_at: _drop, ...rest }) => rest);
+    mockTables(mockSupabase, {
+      player_season_stats: { data: stripped, error: null },
+      goalie_gsax_primary: { data: [], error: null },
+    });
+    const { players } = await service.getDashboardIndex();
+    // Woll: no GAR, talent or ROS rows, and his stats row lost its stamp.
+    expect(players.find((p) => p.id === 8479361)!.as_of).toBeNull();
+    // Matthews still has stamped GAR/talent/ROS rows.
+    expect(players.find((p) => p.id === 8479318)!.as_of).toBe('2026-09-03T08:58:00.060Z');
   });
 
   it('goalies read gp from goalie_gp and carry goalie stat columns', async () => {
@@ -224,6 +337,7 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
       if (table === 'player_gar_components') return createChain({ data: GAR, error: null });
       if (table === 'player_talent_metrics') return createChain({ data: TALENT, error: null });
       if (table === 'player_ros_projections') return createChain({ data: ROS, error: null });
+      if (table === 'goalie_gsax_primary') return createChain({ data: INDEX_GSAX, error: null });
       return createChain({ data: [], error: null });
     });
 
@@ -232,9 +346,9 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     releaseDirectory({ data: DIR, error: null });
     const results = await Promise.all(inFlight);
 
-    // One fan-out, not fifty: five tables, one read each.
+    // One fan-out, not fifty: six tables, one read each.
     expect(slowDirectory.range).toHaveBeenCalledTimes(1);
-    expect(mockSupabase.from).toHaveBeenCalledTimes(5);
+    expect(mockSupabase.from).toHaveBeenCalledTimes(6);
     for (const r of results) {
       expect(r.error).toBeNull();
       expect(r.players).toEqual(results[0].players);
@@ -786,6 +900,151 @@ describe('PlayerDashboardService.getPlayerDashboard', () => {
     const afterFirst = user.from.mock.calls.length;
     clearPlayerDashboardCache();
     await svc.getPlayerDashboard(REQ);
+    expect(user.from.mock.calls.length).toBeGreaterThan(afterFirst);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// XG HISTORY (2026-09-03): the career arc without the shots, merged per
+// season so a mid-season trade cannot draw two points for one year.
+//
+// `player_xg_season`'s primary key is (season, game_type, player_id,
+// team_id). Production on 2026-09-03 held 687 player-seasons with more than
+// one team row (up to four). The fixture below is one such season.
+
+const TRADED = 8477492;
+
+/** Three regular seasons, the middle one split across two sweaters, plus one playoff run. */
+const HISTORY_ROWS = [
+  { season: 2023, game_type: 'regular', player_id: TRADED, team_id: 10, shots: 300, sog: 180, goals: 25, xg: 27.5, updated_at: '2026-09-01T06:00:00.000Z' },
+  { season: 2024, game_type: 'regular', player_id: TRADED, team_id: 10, shots: 150, sog: 90, goals: 12, xg: '14.25', updated_at: '2026-09-02T06:00:00.000Z' },
+  { season: 2024, game_type: 'regular', player_id: TRADED, team_id: 22, shots: 140, sog: 85, goals: 11, xg: '12.5', updated_at: '2026-09-03T06:00:00.000Z' },
+  { season: 2024, game_type: 'playoff', player_id: TRADED, team_id: 22, shots: 40, sog: 24, goals: 2, xg: 3.75, updated_at: '2026-09-03T06:00:00.000Z' },
+  { season: 2025, game_type: 'regular', player_id: TRADED, team_id: 22, shots: 310, sog: 190, goals: 30, xg: 28.05, updated_at: '2026-09-03T06:00:00.000Z' },
+];
+
+describe('mergeXgHistory', () => {
+  it('sums a traded season into ONE point and says how many rows went into it', () => {
+    const points = mergeXgHistory(HISTORY_ROWS);
+    const p2024 = points.find((p) => p.season === 2024 && p.game_type === 'regular')!;
+    expect(p2024.teams).toBe(2);
+    expect(p2024.shots).toBe(290);
+    expect(p2024.sog).toBe(175);
+    expect(p2024.goals).toBe(23);
+    // '14.25' + '12.5': strings on the wire, a number on ours.
+    expect(p2024.xg).toBeCloseTo(26.75);
+    expect(p2024.finishing).toBeCloseTo(-3.75);
+    expect(typeof p2024.xg).toBe('number');
+  });
+
+  it('orders by season, regular before playoff within a season', () => {
+    const points = mergeXgHistory(HISTORY_ROWS);
+    expect(points.map((p) => `${p.season}:${p.game_type}`)).toEqual([
+      '2023:regular',
+      '2024:regular',
+      '2024:playoff',
+      '2025:regular',
+    ]);
+    for (const p of points.filter((x) => x.season !== 2024 || x.game_type !== 'regular')) {
+      expect(p.teams).toBe(1);
+    }
+  });
+
+  it('drops a game_type it does not know rather than inventing a third series', () => {
+    const points = mergeXgHistory([
+      ...HISTORY_ROWS,
+      { season: 2025, game_type: 'preseason', player_id: TRADED, team_id: 22, shots: 9, sog: 5, goals: 1, xg: 0.4, updated_at: null },
+    ]);
+    expect(points.some((p) => (p.game_type as string) === 'preseason')).toBe(false);
+  });
+
+  it('is empty for no rows', () => {
+    expect(mergeXgHistory([])).toEqual([]);
+  });
+});
+
+describe('PlayerDashboardService.getXgHistory', () => {
+  beforeEach(() => {
+    clearPlayerXgHistoryCache();
+  });
+
+  function historyClient(rows: unknown[] | null = HISTORY_ROWS, error: unknown = null) {
+    const mock = createMockSupabase();
+    mock.from = vi.fn((table: string) => {
+      if (table === 'player_xg_season') return createChain({ data: error ? null : rows, error });
+      return createChain({ data: [], error: null });
+    });
+    return mock;
+  }
+
+  it('returns the merged arc, ascending, with a real as_of', async () => {
+    const user = historyClient();
+    const { payload, error } = await new PlayerDashboardService(user).getXgHistory(TRADED);
+    expect(error).toBeNull();
+    expect(payload!.player_id).toBe(TRADED);
+    expect(payload!.points.map((p) => p.season)).toEqual([2023, 2024, 2024, 2025]);
+    expect(payload!.points[1].teams).toBe(2);
+    expect(payload!.as_of).toBe('2026-09-03T06:00:00.000Z');
+  });
+
+  it('reads player_xg_season on the caller\'s client, pinned to the player and paged by the full key', async () => {
+    const chain = createChain({ data: HISTORY_ROWS, error: null });
+    const user = createMockSupabase();
+    user.from = vi.fn(() => chain);
+
+    await new PlayerDashboardService(user).getXgHistory(TRADED);
+
+    expect(user.from.mock.calls.map((c: unknown[]) => c[0])).toEqual(['player_xg_season']);
+    expect(chain.eq).toHaveBeenCalledWith('player_id', TRADED);
+    // (season, game_type, team_id) with player_id pinned is the whole
+    // primary key, so two LIMIT/OFFSET windows can never overlap or skip.
+    expect(chain.order).toHaveBeenCalledWith('season', { ascending: true });
+    expect(chain.order).toHaveBeenCalledWith('game_type', { ascending: true });
+    expect(chain.order).toHaveBeenCalledWith('team_id', { ascending: true });
+    expect(chain.range).toHaveBeenCalledWith(0, 999);
+  });
+
+  it('never touches the service-role client: this read needs no elevation', async () => {
+    const user = historyClient();
+    const admin = createMockSupabase();
+    admin.from = vi.fn(() => createChain({ data: [], error: null }));
+    await new PlayerDashboardService(user, admin).getXgHistory(TRADED);
+    expect(admin.from).not.toHaveBeenCalled();
+  });
+
+  it('a player with no rows gets an empty arc and a null as_of, not an error', async () => {
+    const { payload, error } = await new PlayerDashboardService(historyClient([])).getXgHistory(TRADED);
+    expect(error).toBeNull();
+    expect(payload!.points).toEqual([]);
+    expect(payload!.as_of).toBeNull();
+  });
+
+  it('propagates a read failure as an error', async () => {
+    const { payload, error } = await new PlayerDashboardService(
+      historyClient(null, { message: 'permission denied' }),
+    ).getXgHistory(TRADED);
+    expect(payload).toBeNull();
+    expect(error?.message).toContain('permission denied');
+  });
+
+  it('caches per player; a different player is a fresh read', async () => {
+    const user = historyClient();
+    const svc = new PlayerDashboardService(user);
+    await svc.getXgHistory(TRADED);
+    const afterFirst = user.from.mock.calls.length;
+    await svc.getXgHistory(TRADED);
+    expect(user.from.mock.calls.length).toBe(afterFirst);
+    await svc.getXgHistory(MCDAVID);
+    expect(user.from.mock.calls.length).toBeGreaterThan(afterFirst);
+  });
+
+  it('clearPlayerXgHistoryCache forces the next call to re-read', async () => {
+    const user = historyClient();
+    const svc = new PlayerDashboardService(user);
+    await svc.getXgHistory(TRADED);
+    const afterFirst = user.from.mock.calls.length;
+    clearPlayerXgHistoryCache();
+    await svc.getXgHistory(TRADED);
     expect(user.from.mock.calls.length).toBeGreaterThan(afterFirst);
   });
 });
