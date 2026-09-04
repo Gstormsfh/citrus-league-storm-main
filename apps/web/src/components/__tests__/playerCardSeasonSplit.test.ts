@@ -158,6 +158,31 @@ describe('the game log asks the forward-looking question', () => {
   });
 });
 
+describe('every tab says which season it is showing', () => {
+  it('Overview and Detailed name the season they read', () => {
+    // They have no picker because there is nothing to pick between:
+    // production 2026-09-04 holds 1,063 season-stat rows and 940 talent-metric
+    // rows for 2025, and none of either for 2026. What they must not do is
+    // let a stat line with no year on it be read as "this season" - which is
+    // exactly wrong during the run-up.
+    expect(MODAL).toContain('data-testid="overview-season-label"');
+    expect(MODAL).toContain('data-testid="advanced-season-label"');
+    expect(MODAL).toMatch(/\{seasonLabel\(getCurrentSeason\(\)\)\} season/);
+  });
+
+  it('tells the reader when the other season starts, but only while they differ', () => {
+    expect(MODAL).toMatch(/getProjectionsSeason\(\) !== getCurrentSeason\(\)/);
+    expect(MODAL).toContain('openerLabel');
+  });
+
+  it('the game log and the stat tabs read DIFFERENT seasons, on purpose', () => {
+    // The whole point of the split. If these ever collapse to one call the
+    // card is lying on one half or the other for twenty-five days a year.
+    expect(MODAL).toContain('getProjectionsSeason()');
+    expect(MODAL).toContain('getCurrentSeason()');
+  });
+});
+
 describe('the card never wears the previous player\'s numbers', () => {
   it('clears the log and the totals when the player changes, not only on close', () => {
     // `heroProjectedPts` reads `totalProjected` straight out of state and
