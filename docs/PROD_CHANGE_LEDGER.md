@@ -247,4 +247,8 @@ The proof also caught a defect in this migration before it reached prod: `pg_get
 
 **Reversal.** `CREATE OR REPLACE` from the capture file restores the prior body byte-for-byte.
 
-**Executed by.** Not yet applied at the time of writing. Authored by Claude (Cowork) for Garrett Storms, launch-audit pass, 2026-09-04, the night before App Store submission; found by reading the failure out of `ops_ci_runs` rather than the GitHub inbox.
+**Executed by.** Garrett, Supabase SQL Editor (prod `iezwazccqqrhrjupxzvf`), from the migration file via `pbcopy`, 2026-09-04 ~07:30Z. "Success. No rows returned." Authored by Claude (Cowork), launch-audit pass, the night before App Store submission; found by reading the failure out of `ops_ci_runs` rather than the GitHub inbox.
+
+**After** (read-only, Claude, immediately post-apply). Live body md5 `cfd64c3da6ef5405e89f0ea47a743edb`. Comment-stripping predicate present; the old bare `p.prosrc ~` predicate absent; all three message strings (`opening night`, `no regular-season rows`, `silently falls back`) intact; still `prosecdef = true` and `provolatile = 's'`. `SELECT * FROM public.check_season_boundary(180)` returns **zero rows** — no ERROR, no WARN. The false positive is gone and nothing took its place.
+
+**Ledger note.** SQL Editor apply, so no `supabase_migrations.schema_migrations` row; the repo file is the record.
