@@ -554,11 +554,12 @@ export default function DraftRoomV2() {
     /* pb-28: clearance for the on-clock action bar, which is FIXED to the
        bottom edge on phones (see MainTabs). lg+ restores the normal pad —
        the bar is sticky-in-flow there. */
-    /* PRESS BOX (2026-09-04): px-0 below lg. The Press Box screens run
+    /* PRESS BOX (2026-09-04): px-0 below md. The Press Box screens run
        full-bleed with each block owning its own 14px gutter — the pool's
        selected row needs its rail to reach the screen edge — so the room
-       stops padding the phone and lets its children do it. */
-    <div className={`${PB_TYPE} container mx-auto px-0 py-4 lg:px-4 pb-28 lg:pb-4`} data-testid="draft-room-v2">
+       stops padding the phone and lets its children do it. The desktop pool
+       card takes over at md, and the gutter comes back with it. */
+    <div className={`${PB_TYPE} container mx-auto px-0 py-4 md:px-4 pb-28 lg:pb-4`} data-testid="draft-room-v2">
       {/*
         * NATIVE ESCAPE HATCH (2026-08-31, moved into the sticky header
         * 2026-09-01) — reported from the iOS simulator as "I'm stuck, the

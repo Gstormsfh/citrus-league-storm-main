@@ -107,6 +107,10 @@ export function PressBoxDraftPickBar({
             className={cn(
               'focus-citrus flex-1 h-[52px] rounded-[12px] bg-pressbox-orange text-pressbox-orange-ink',
               'flex flex-col items-center justify-center leading-[1.1] disabled:opacity-40',
+              /* The verb takes what the clock leaves on a PHONE. In a desktop
+                 column that is 430px of orange; from lg it stops at a hand's
+                 width and the row sits left. */
+              'lg:max-w-[320px]',
             )}
           >
             <span className="font-condensed font-bold text-[14px] uppercase tracking-[0.1em]">

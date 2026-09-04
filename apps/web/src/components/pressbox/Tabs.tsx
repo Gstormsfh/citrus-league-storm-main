@@ -52,7 +52,7 @@ export function PressBoxTabs({ tabs, activeKey, onSelect, label, fill, className
         'flex border-b border-white/[0.08]',
         'font-condensed font-bold uppercase text-pressbox-text/50',
         fill
-          ? 'text-[13px] tracking-[0.14em]'
+          ? 'text-[13px] tracking-[0.14em] lg:gap-7 lg:px-1'
           : 'px-3 gap-[14px] text-[12px] tracking-[0.12em]',
         className,
       )}
@@ -68,7 +68,11 @@ export function PressBoxTabs({ tabs, activeKey, onSelect, label, fill, className
             onClick={() => onSelect?.(t.key)}
             className={cn(
               'whitespace-nowrap uppercase',
-              fill ? 'flex-1 text-center pt-2 pb-2.5 -mb-px' : 'py-2',
+              /* `fill` divides a PHONE's width. From lg the same strip goes
+                 back to word-sized tabs on the left: three words spread
+                 across a 900px column is the artboard's rule applied to a
+                 screen it was never drawn for. */
+              fill ? 'flex-1 text-center pt-2 pb-2.5 -mb-px lg:flex-none lg:text-left' : 'py-2',
               active && 'text-pressbox-text border-b-2 border-pressbox-orange',
             )}
           >
