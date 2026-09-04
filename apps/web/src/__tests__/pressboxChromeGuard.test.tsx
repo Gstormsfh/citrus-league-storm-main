@@ -163,7 +163,41 @@ describe('the chrome obeys the styling and colour rules', () => {
       for (const b of iconButtons) {
         expect(b, `${name}: icon button needs aria-label`).toMatch(/aria-label=/);
       }
-      expect(src, `${name}: needs 44px targets`).toContain('min-h-[44px]');
+
+      // TWO WAYS TO REACH 44px, and the second one exists because the first
+      // has a cost. `min-h-[44px]` grows the BOX, which is right in a header
+      // row that is 44px tall anyway and wrong where the artboard draws an
+      // 18px glyph: on the league menu it made the row 44 against the
+      // artboard's 36 and pushed the centred league pill off the screen's
+      // centre line. A `relative` control with an `after:absolute` negative
+      // inset grows the HIT AREA and takes no layout space, which is both
+      // requirements instead of one traded for the other.
+      //
+      // The pattern is only real WITH `relative` — an absolutely positioned
+      // ::after on a static parent resolves against some ancestor and the
+      // target lands somewhere else entirely — so both halves are required
+      // here, and the inset must be at least 13px, which is what takes an
+      // 18px glyph to 44.
+      const grown = /relative[\s\S]{0,400}?after:absolute[\s\S]{0,80}?after:-inset(?:-[xy])?-(?:\[(\d+)px\]|(\d+))/.exec(src);
+      const insetPx = grown ? Number(grown[1] ?? Number(grown[2]) * 4) : 0;
+      expect(
+        src.includes('min-h-[44px]') || insetPx >= 13,
+        `${name}: needs 44px targets — either min-h-[44px], or a relative control with an after:-inset of 13px or more`,
+      ).toBe(true);
     }
+  });
+
+  it('the grown-hit-area pattern is detected honestly', () => {
+    // The escape hatch above must not be a hole. A bare `after:absolute`
+    // without `relative` positions against the wrong ancestor, and a 2px
+    // inset is not a tap target — neither may pass.
+    const probe = (src: string) => {
+      const m = /relative[\s\S]{0,400}?after:absolute[\s\S]{0,80}?after:-inset(?:-[xy])?-(?:\[(\d+)px\]|(\d+))/.exec(src);
+      return m ? Number(m[1] ?? Number(m[2]) * 4) : 0;
+    };
+    expect(probe("className=\"relative after:absolute after:-inset-[13px]\""), 'the real pattern').toBe(13);
+    expect(probe("className=\"relative after:absolute after:-inset-y-[13px] after:-inset-x-5\""), 'axis form').toBe(13);
+    expect(probe("className=\"after:absolute after:-inset-[13px]\""), 'no relative, no credit').toBe(0);
+    expect(probe("className=\"relative after:absolute after:-inset-[2px]\""), 'too small to be a target').toBe(2);
   });
 });

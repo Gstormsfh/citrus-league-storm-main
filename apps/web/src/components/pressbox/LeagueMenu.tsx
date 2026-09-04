@@ -23,7 +23,7 @@
  * its route lands, without editing this file.
  */
 import { Link } from 'react-router-dom';
-import { X, ChevronDown, Settings } from 'lucide-react';
+import { X, ChevronDown } from 'lucide-react';
 import { defaultLeagueTiles, type LeagueMenuTile } from './leagueMenuTiles';
 import { cn } from '@/lib/utils';
 import { PB_TYPE } from './rowScale';
@@ -75,35 +75,58 @@ export function LeagueMenu({
       aria-modal="true"
       aria-label={`${leagueName} menu`}
     >
-      <div className="flex items-center gap-2 px-3 py-3">
+      {/* THE LEAGUE IS THE TITLE, and it is CENTRED. The first draft put the
+          crest pill next to the close button, left-aligned like a page
+          header. Artboard 1a centres it and sets a fixed-width spacer on the
+          right so it stays centred whatever the league is called — because
+          this screen is not a page you navigated to, it is a switch you
+          pulled, and the thing it is switched TO belongs in the middle. The
+          crest, the name and `SWITCH` are one target: on a phone the whole
+          pill is the tap, not a 12px chevron inside it. */}
+      <div className="flex items-center justify-between gap-2 px-3.5 pt-2">
         <button
           type="button"
           onClick={onClose}
-          className="focus-citrus min-w-[44px] min-h-[44px] -ml-2 flex items-center justify-center text-pressbox-text/55"
+          className="focus-citrus relative flex-none text-pressbox-text/70 after:absolute after:-inset-[13px] after:content-['']"
           aria-label="Close menu"
         >
-          <X className="w-5 h-5" strokeWidth={2} aria-hidden="true" />
+          <X className="w-[18px] h-[18px]" strokeWidth={2} aria-hidden="true" />
         </button>
 
         <button
           type="button"
           onClick={onSwitchLeague}
           disabled={!onSwitchLeague}
-          className="focus-citrus flex items-center gap-2 min-w-0 h-9 px-3 rounded-full bg-pressbox-tile ring-1 ring-white/[0.08] disabled:cursor-default"
+          className="focus-citrus flex items-center gap-2 min-w-0 px-2.5 py-1.5 rounded-[10px] bg-pressbox-tile border border-white/10 disabled:cursor-default"
         >
-          <span className="font-condensed font-bold text-[15px] uppercase tracking-[0.02em] text-pressbox-text truncate">
+          <span
+            aria-hidden="true"
+            className="w-[22px] h-[22px] flex-none rounded-[6px] bg-pressbox-tile-high flex items-center justify-center font-condensed font-extrabold text-[10px] text-pressbox-text"
+          >
+            {/* ONE initial, the same fallback `LeagueHeader` uses. The
+                artboard shows `FZ` because its league has a chosen crest;
+                two letters derived from the name is a different rule from the
+                header's, and two crests for one league that disagree is worse
+                than a plainer crest that always matches. */}
+            {(leagueName || '?').slice(0, 1).toUpperCase()}
+          </span>
+          <span className="font-barlow font-bold text-[14px] text-pressbox-text truncate">
             {leagueName}
           </span>
           {onSwitchLeague && (
-            <span className="flex items-center gap-0.5 font-plex font-medium text-[9px] uppercase tracking-[0.06em] text-pressbox-text/45">
+            <span className="flex items-center gap-0.5 flex-none font-plex font-medium text-[10px] uppercase tracking-[0.06em] text-pressbox-text/50">
               Switch
               <ChevronDown className="w-3 h-3" strokeWidth={2} aria-hidden="true" />
             </span>
           )}
         </button>
+
+        {/* The counterweight. 18px, the close glyph's width, so the pill sits
+            on the screen's centre line and not 18px to the right of it. */}
+        <span aria-hidden="true" className="flex-none w-[18px]" />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 pb-6">
+      <div className="flex-1 overflow-y-auto px-3.5 pt-4 pb-6">
         {/* The artboard's tile, now a component: `PressBoxTile`. The stat
             line is Barlow 400 at 11px and NOT mono — everywhere else in Press
             Box a number is mono because it is being compared column against
@@ -119,11 +142,11 @@ export function LeagueMenu({
           <Link
             to="/profile"
             onClick={onClose}
-            className="focus-citrus mt-3 flex items-center gap-3 p-3 rounded-[14px] bg-pressbox-tile ring-1 ring-white/[0.08]"
+            className="focus-citrus mt-3.5 flex items-center gap-3 px-3.5 py-3 rounded-[14px] bg-pressbox-tile border border-white/[0.08]"
           >
             <span
               aria-hidden="true"
-              className="w-9 h-9 flex-shrink-0 rounded-full bg-pressbox-tile-high ring-1 ring-white/[0.08] flex items-center justify-center font-condensed font-extrabold text-[15px] text-pressbox-text"
+              className="w-10 h-10 flex-shrink-0 rounded-full bg-pressbox-orange/20 border-2 border-pressbox-orange flex items-center justify-center font-condensed font-bold text-[14px] text-pressbox-text"
             >
               {user.displayName.slice(0, 1).toUpperCase()}
             </span>
@@ -131,13 +154,18 @@ export function LeagueMenu({
               <span className="block font-barlow font-bold text-[15px] text-pressbox-text truncate">
                 {user.displayName}
               </span>
-              <span className="block font-plex font-medium text-[10px] whitespace-nowrap overflow-hidden text-ellipsis text-pressbox-text/55">
+              <span className="block font-plex font-medium text-[10px] whitespace-nowrap overflow-hidden text-ellipsis text-pressbox-text/50">
                 {[user.handle, typeof user.leagueCount === 'number' ? `${user.leagueCount} leagues` : null]
                   .filter(Boolean)
                   .join(' · ')}
               </span>
             </span>
-            <Settings className="w-4 h-4 flex-shrink-0 text-pressbox-text/45" strokeWidth={2} aria-hidden="true" />
+            {/* `PROFILE ›`, not a gear. The row already looks like a link;
+                what it needed was to say WHERE it goes. The artboard spells
+                it, and a word costs less width here than the ambiguity did. */}
+            <span className="flex-none font-plex font-medium text-[10px] text-pressbox-orange-soft">
+              PROFILE &rsaquo;
+            </span>
           </Link>
         )}
       </div>
