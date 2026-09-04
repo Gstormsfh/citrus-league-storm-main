@@ -14,6 +14,14 @@
  * The active tab's 2px orange rule sits directly on the strip's own 1px
  * hairline rather than replacing it, so the row keeps its full-width edge
  * whichever tab is selected.
+ *
+ * TWO SHAPES, because the artboard has two. Inside a screen (1a's matchup)
+ * the tabs sit left, sized to their words, at 12px/.12em — they are a minor
+ * control under a scoreboard that outranks them. When the tabs ARE the
+ * screen's navigation (4a's draft: Players / Queue / Board / My team) they
+ * divide the full width in four centred columns at 13px/.14em, and the active
+ * rule is pulled down a pixel so it lands ON the strip's hairline instead of
+ * above it. `fill` picks the second.
  */
 import { cn } from '@/lib/utils';
 import { PB_TYPE } from './rowScale';
@@ -29,18 +37,23 @@ export interface PressBoxTabsProps {
   onSelect?: (key: string) => void;
   /** Names the bar for a screen reader. `Matchup view`, not `Tabs`. */
   label: string;
+  /** Four equal centred columns at 13px, for a screen's own navigation. */
+  fill?: boolean;
   className?: string;
 }
 
-export function PressBoxTabs({ tabs, activeKey, onSelect, label, className }: PressBoxTabsProps) {
+export function PressBoxTabs({ tabs, activeKey, onSelect, label, fill, className }: PressBoxTabsProps) {
   return (
     <div
       role="tablist"
       aria-label={label}
       className={cn(
         PB_TYPE,
-        'flex px-3 gap-[14px] border-b border-white/[0.08]',
-        'font-condensed font-bold text-[12px] tracking-[0.12em] uppercase text-pressbox-text/50',
+        'flex border-b border-white/[0.08]',
+        'font-condensed font-bold uppercase text-pressbox-text/50',
+        fill
+          ? 'text-[13px] tracking-[0.14em]'
+          : 'px-3 gap-[14px] text-[12px] tracking-[0.12em]',
         className,
       )}
     >
@@ -54,7 +67,8 @@ export function PressBoxTabs({ tabs, activeKey, onSelect, label, className }: Pr
             aria-selected={active}
             onClick={() => onSelect?.(t.key)}
             className={cn(
-              'py-2 whitespace-nowrap',
+              'whitespace-nowrap uppercase',
+              fill ? 'flex-1 text-center pt-2 pb-2.5 -mb-px' : 'py-2',
               active && 'text-pressbox-text border-b-2 border-pressbox-orange',
             )}
           >
