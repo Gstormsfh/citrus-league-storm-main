@@ -1,6 +1,67 @@
 # Press Box implementation — overnight run, 2026-09-04
 
-Branch: `redesign/pressbox`. One commit per PR, in the order OPUS_PROMPT gives.
+## SUMMARY — read this, then the log below
+
+**Shipped: PR1, PR2, and the leaderboard aggregate. Four commits on
+`redesign/pressbox`. Nothing is applied to production and nothing is pushed.**
+
+| | |
+|---|---|
+| PR1 tokens / type / chips | done, committed |
+| PR2 shared chrome | done, committed (built, not mounted — see its entry) |
+| `manager_week_metrics` | done, committed, proof ALL PASS 23 |
+| PR3–PR18 | not started |
+
+**First thing to run:**
+
+```
+cd ~/dev/citrus/apps/web && npm run lint && npm test
+```
+
+I could not run vitest (Linux bridge, macOS-only native binding, blocked
+registry). Everything else I verified myself and said so per PR.
+
+### The three things I most want you to know
+
+**1. I did not touch the draft room, on purpose.** OPUS_PROMPT lists PR16 as a
+priority. Its own justification is "before the season opens" — that is
+**Sep 29**. Your twelve managers draft **Sep 8**. I cannot run the tests or see
+a rendered screen, and a draft room is the one surface with no undo. It is the
+change I would most want you awake for. Everything I did do is additive: new
+files, new tokens, new tables. Nothing tonight can change how a draft behaves.
+
+**2. Your leaderboards cannot render yet, and the spec is why.** It says never
+show a cut with under 100 managers. Citrus has **72 users**. So the aggregate
+is built, correct and proved — and `leaderboard_week` returns zero rows until
+you cross 100. It turns on by itself. I would rather you heard that from me
+than found an empty screen.
+
+**3. Three of the four leaderboard cuts have no data to stand on.** COUNTRY,
+CITY and FAN BASE need columns `profiles` does not have. The spec says fan
+base is "the favourite team already collected at signup" — it is not
+collected. `location` is free text and is set on 9 of 72 profiles. Those cuts
+need profile fields plus an opt-in flow before they can exist.
+
+### Needs your decision
+
+- **Draft room:** do PR16 with you awake, or leave it until after Tuesday?
+- **Profile fields** for country / city / favourite team — worth a migration
+  and an opt-in prompt, or drop those three cuts from the design?
+- **Six league-menu tiles** have neither route nor page (Commish note, Draft
+  results, Scoring & legend, League history, Managers & invites). Build the
+  pages, or cut them from the menu?
+- **Two migrations are waiting**, unapplied: `20260904100000` and
+  `20260904101000`.
+
+### What I could not verify, in one place
+
+`vitest`; the 393×852 harness diff against the reference; anything needing
+layout (row heights, META wrapping, tap-target geometry at render). Where I
+say a guard passes, I executed its assertions against the shipped sources by
+hand in node and reported the count. I did not claim a single check I did not
+run.
+
+---
 
 ## Two things about how this run is verified
 
