@@ -1,13 +1,32 @@
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { History } from 'lucide-react';
+import { useMemo } from 'react';
+import { cn } from '@/lib/utils';
+import { Mug } from '@/components/roster/Mug';
+import type { MugPlayer } from '@/components/roster/headshot';
+// By file, never the `@/components/pressbox` barrel — it reaches LeagueContext
+// and the Supabase client at module scope, and the draft room owns its own.
+import { PB_TYPE } from '@/components/pressbox/rowScale';
+import { PressBoxSectionHead } from '@/components/pressbox/SectionHead';
 
-/* 2026-08-19 visual audit: this panel was still on the ORIGINAL light
-   theme (fantasy-surface #FFFFFF, fantasy-dark #1E293B, fantasy-light
-   #FFF1DB) while the draft room around it renders on #0F1F15. It read as
-   a white box pasted into a dark app. Migrated to the pastel dark
-   surface tokens the rest of the room already uses. */
-
+/**
+ * PRESS BOX (2026-09-04): the HISTORY tab of the draft room.
+ *
+ * Artboard 4b prints the newest picks as `round.pick` in mono, the name in
+ * bold, `pos · club · who` beneath — LAST PICKS on the board. This is the
+ * same row, all of them, newest first, with the face beside the label so a
+ * manager scanning back through a 200-pick draft recognises players
+ * instead of reading them. One list at every width: the desktop table this
+ * replaced carried the same six facts in six columns, and the room's rail
+ * is 320px wide, where six columns never fit anyway.
+ *
+ * `round.pick` needs the round size (`teamCount`); without it the label
+ * falls back to the overall `#pick`, which is what v1's room still passes.
+ * The face comes through `mugFor` because a history pick carries no
+ * headshot URL — the v1Adapters pick shape is pinned by tests and the room
+ * already holds `playersById`, so the lookup happens where the data is.
+ *
+ * 2026-08-19 visual audit (kept for the record): this panel was on the
+ * ORIGINAL light theme inside a #0F1F15 room. It has been dark since.
+ */
 
 interface DraftPick {
   id: string;
@@ -25,99 +44,109 @@ interface DraftPick {
 interface DraftHistoryProps {
   draftHistory: DraftPick[];
   onPlayerClick?: (playerId: string) => void;
+  /** Round size, for the `2.04` label. Omitted → `#16`. */
+  teamCount?: number;
+  /** The manager's own team: its picks wear the board's orange inset. */
+  userTeamId?: string | null;
+  /** The face for a pick, looked up by the caller that holds the directory. */
+  mugFor?: (playerId: string) => MugPlayer | null | undefined;
 }
 
-export const DraftHistory = ({ draftHistory, onPlayerClick }: DraftHistoryProps) => {
-  const sortedHistory = [...draftHistory].reverse(); // Show most recent first
+const normalizePosition = (pos: string): string => {
+  if (!pos) return '';
+  const upper = pos.toUpperCase();
+  if (upper === 'L' || upper === 'LEFT' || upper === 'LEFTWING') return 'LW';
+  if (upper === 'R' || upper === 'RIGHT' || upper === 'RIGHTWING') return 'RW';
+  return upper;
+};
+
+export const DraftHistory = ({
+  draftHistory,
+  onPlayerClick,
+  teamCount,
+  userTeamId = null,
+  mugFor,
+}: DraftHistoryProps) => {
+  // Newest first — the same order the old panel used.
+  const sortedHistory = useMemo(
+    () => [...draftHistory].sort((a, b) => b.pick - a.pick),
+    [draftHistory],
+  );
+
+  const pickLabel = (pick: DraftPick) =>
+    teamCount && teamCount > 0
+      ? `${pick.round}.${String(((pick.pick - 1) % teamCount) + 1).padStart(2, '0')}`
+      : `#${pick.pick}`;
 
   return (
-    <Card className="p-3 sm:p-6">
-      <div className="flex items-center justify-between mb-3 sm:mb-6">
-        <h2 className="text-base sm:text-xl font-semibold flex items-center gap-2">
-          <History className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
-          History
-        </h2>
-        <div className="text-xs sm:text-sm text-muted-foreground">
-          {draftHistory.length} picks
-        </div>
+    <section className={PB_TYPE} data-testid="draft-history">
+      <div className="px-3.5 pt-3 pb-1.5">
+        <PressBoxSectionHead
+          title="History"
+          count={draftHistory.length > 0 ? `${draftHistory.length} picks` : null}
+        />
       </div>
 
       {draftHistory.length > 0 ? (
-        <>
-          {/* Mobile: Compact card list */}
-          <div className="md:hidden border border-white/10 rounded-lg overflow-hidden bg-pastel-surface-tile backdrop-blur-sm max-h-[60vh] overflow-y-auto scrollbar-styled">
-            {sortedHistory.map((pick) => (
-              <div key={pick.id} className="border-b border-white/10 px-3 py-2 flex items-center gap-2">
-                <span className="text-xs font-bold text-primary w-8 flex-shrink-0">#{pick.pick}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <Badge variant="outline" className="text-[10px] px-1 py-0 flex-shrink-0">{pick.position}</Badge>
-                    <span
-                      className={`font-medium text-sm truncate ${onPlayerClick ? 'cursor-pointer hover:text-primary hover:underline' : ''}`}
-                      onClick={(e) => { if (onPlayerClick) { e.stopPropagation(); onPlayerClick(pick.playerId); } }}
-                    >{pick.playerName}</span>
-                  </div>
-                  <div className="text-[11px] text-muted-foreground truncate">
-                    {pick.teamName} • R{pick.round}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Desktop: Full table */}
-          <div className="hidden md:block border border-white/10 rounded-lg overflow-hidden bg-pastel-surface-tile backdrop-blur-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-white/5 border-b border-white/10">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-semibold">Pick</th>
-                    <th className="px-3 py-2 text-left font-semibold">Player</th>
-                    <th className="px-3 py-2 text-left font-semibold">Pos</th>
-                    <th className="px-3 py-2 text-left font-semibold">Team</th>
-                    <th className="px-3 py-2 text-left font-semibold">Drafted By</th>
-                    <th className="px-3 py-2 text-center font-semibold">Round</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedHistory.map((pick) => (
-                    <tr
-                      key={pick.id}
-                      className="border-b border-white/10 hover:bg-white/5 transition-colors"
-                    >
-                      <td className="px-3 py-2 text-center font-medium text-primary">
-                        #{pick.pick}
-                      </td>
-                      <td
-                        className={`px-3 py-2 font-medium ${onPlayerClick ? 'cursor-pointer hover:text-primary hover:underline' : ''}`}
-                        onClick={() => onPlayerClick?.(pick.playerId)}
-                      >{pick.playerName}</td>
-                      <td className="px-3 py-2">
-                        <Badge variant="outline" className="text-xs">
-                          {pick.position}
-                        </Badge>
-                      </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{pick.playerTeam || '-'}</td>
-                      <td className="px-3 py-2 text-sm">{pick.teamName}</td>
-                      <td className="px-3 py-2 text-center text-muted-foreground">
-                        R{pick.round}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
+        <ol className="border-b border-white/[0.06]" aria-label="Draft history, newest first">
+          {sortedHistory.map((pick) => {
+            const mine = userTeamId !== null && pick.teamId === userTeamId;
+            const mug = mugFor?.(pick.playerId) ?? {
+              name: pick.playerName,
+              team: pick.playerTeam ?? null,
+            };
+            const rowClass = cn(
+              'w-full grid grid-cols-[34px_36px_1fr_auto] items-center gap-2.5 min-h-[54px] px-3.5 text-left',
+              'border-t border-white/[0.06] text-pressbox-text',
+              onPlayerClick && 'focus-citrus',
+              mine && 'bg-pressbox-orange/[0.06] shadow-[inset_3px_0_0_theme(colors.pressbox.orange)]',
+            );
+            const cells = (
+              <>
+                <span className="font-plex font-semibold text-[10px] tabular-nums text-pressbox-text/50">
+                  {pickLabel(pick)}
+                </span>
+                <Mug p={mug} size="sm" crest />
+                <span className="min-w-0">
+                  <span className="block truncate font-barlow font-bold text-[14px]">{pick.playerName}</span>
+                  <span className="block truncate mt-0.5 font-plex font-medium text-[10px] text-pressbox-text/50">
+                    {normalizePosition(pick.position)}
+                    {pick.playerTeam ? ` · ${pick.playerTeam}` : ''}
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    'max-w-[124px] truncate text-right font-plex font-medium text-[10px] uppercase tracking-[0.02em]',
+                    mine ? 'text-pressbox-orange-soft' : 'text-pressbox-text/60',
+                  )}
+                >
+                  {mine ? 'You' : pick.teamName}
+                </span>
+              </>
+            );
+            return (
+              <li key={pick.id} data-testid="draft-history-row">
+                {onPlayerClick ? (
+                  <button type="button" className={rowClass} onClick={() => onPlayerClick(pick.playerId)}>
+                    {cells}
+                  </button>
+                ) : (
+                  <div className={rowClass}>{cells}</div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
       ) : (
-        <div className="text-center py-8 sm:py-12">
-          <History className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3" />
-          <div className="text-muted-foreground text-sm mb-1">No picks made yet</div>
-          <div className="text-xs text-muted-foreground">
-            History will appear as picks are made
+        <div className="px-3.5 py-10 text-center" data-testid="draft-history-empty">
+          <div className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text/70">
+            No picks made yet
+          </div>
+          <div className="mt-1 font-plex font-medium text-[10px] text-pressbox-text/45">
+            History fills in as picks are made
           </div>
         </div>
       )}
-    </Card>
+    </section>
   );
 };

@@ -48,6 +48,7 @@ import { servicePlayerToHockeyPlayer } from '@/utils/playerStatsHelper';
 import { buildInviteLink, canSystemShare, shareInvite } from '@/utils/inviteShare';
 import { ScoringCalculator, type ScoringSettings } from '@citrus/shared';
 import { DraftHistory } from '@/components/draft/DraftHistory';
+import { mugFromDirectory } from '@/components/roster/headshot';
 import { TeamRosters } from '@/components/draft/TeamRosters';
 import { DraftQueue } from '@/components/draft/DraftQueue';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
@@ -2534,8 +2535,23 @@ function MainTabs({
           />
         </TabsContent>
 
-        <TabsContent value="history" className="mt-4">
-          <DraftHistory draftHistory={draftHistory} />
+        <TabsContent value="history" className="mt-2">
+          {/* PRESS BOX (2026-09-04): `round.pick` labels, the face, your
+              picks outlined, and the card on tap — the same card the board
+              opens. */}
+          <DraftHistory
+            draftHistory={draftHistory}
+            teamCount={teams.length}
+            userTeamId={myTeamId}
+            mugFor={(playerId) => {
+              const p = playersById.get(playerId);
+              return p ? mugFromDirectory(p) : null;
+            }}
+            onPlayerClick={(playerId) => {
+              const picked = playersById.get(playerId);
+              if (picked) setCardPlayer(picked);
+            }}
+          />
         </TabsContent>
       </Tabs>
 
