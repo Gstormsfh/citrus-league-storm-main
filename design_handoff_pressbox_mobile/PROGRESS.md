@@ -125,3 +125,87 @@ filled active tab, aria-labels, 44px targets).
 **Not verified by me** — vitest; the 393x852 harness diff (nothing is mounted
 yet, so there is nothing to diff until PR4).
 
+### Judgment call — I did NOT restyle the draft room (PR16)
+
+OPUS_PROMPT says PR1, PR2, PR16 first if timelines force a choice, and calls
+the draft room the highest-stakes surface. I skipped it, deliberately, and
+this is the reasoning so you can overrule it:
+
+- The spec's own justification is "ship before the season opens". The season
+  opens **2026-09-29**. Your twelve managers draft **2026-09-08**. Those are
+  not the same deadline, and only one of them is four days away.
+- I cannot run vitest and I cannot see a rendered screen. On a roster page a
+  cosmetic regression is embarrassing; in a live draft room it costs twelve
+  real people their draft, and it is the one surface with no undo.
+- It is the change I would most want you awake for.
+
+Everything else in this run is additive: new files, new tokens, new tables.
+Nothing I did tonight can change how the draft room behaves.
+
+### Leaderboard aggregate — `manager_week_metrics` (PR15's data half)
+
+You said you were most excited about the global leaderboards, so I built the
+machinery underneath them rather than a screen with nothing behind it.
+
+**Landed**
+- `supabase/migrations/20260904100000_manager_week_metrics.sql` — the table,
+  RLS on, self-read policy, service-role write, two indexes.
+- `supabase/migrations/20260904101000_manager_week_metrics_functions.sql` —
+  `refresh_manager_week_metrics(season, week)` (the nightly writer, returns
+  the row count it wrote) and `leaderboard_week(season, week, limit)`
+  (SECURITY DEFINER, returns ranks not rows, refuses under 100 managers).
+- `scripts/proof/manager-week-metrics.proof.sh` — **ALL PASS, 23 assertions.**
+
+**NOT APPLIED.** Both migrations are files only. Production mutations are your
+keystroke, and nothing in this run touched the database.
+
+**Two findings that change what the spec can deliver**
+
+1. **Three of the four leaderboard cuts cannot be built at all.** The spec
+   wants WORLDWIDE, COUNTRY, FAN BASE and CITY. `profiles` has no country
+   column, no city column and no favourite-team column — `nhl_teams.city` is
+   the NHL team's city, not a manager's. `profiles.location` is free text and
+   is set on **9 of 72** profiles. The spec says fan base is "the favourite
+   team already collected at signup"; it is not collected. Those three cuts
+   need profile fields plus an opt-in flow before they exist. They are absent,
+   not faked.
+
+2. **Even WORLDWIDE will render empty, and that is correct.** The spec's own
+   rule is "never show a leaderboard with under 100 managers". Citrus has
+   **72 users**. So `leaderboard_week` returns zero rows today and will keep
+   doing so until the population crosses 100 with a completed week. The
+   machinery accumulates from the first nightly run and lights up by itself.
+   I would rather tell you that now than have you find an empty screen.
+
+**Design decisions**
+
+- **z-score against the manager's own league median**, exactly as the spec
+  asks, because raw points are not comparable across leagues. The proof spends
+  most of its assertions on this: two leagues where one scores exactly 3x the
+  other produce **identical z-scores for all 8 pairs**, while ranking by raw
+  points hands the high-scoring league all eight top places on scale alone.
+- **Median and MAD, not mean and standard deviation.** A twelve-team league is
+  a small sample and one manager who never set a lineup drags a mean far
+  enough to move everyone else's rank. MAD is scaled by 1.4826 so a z here
+  means what a z usually means.
+- **Ranks come from a function, not from reading the table.** The table is
+  self-read-only; a leaderboard built by letting clients SELECT it would hand
+  every manager every other manager's weekly points and league membership.
+- **`points_for` is read from the scored matchup row, never recomputed.** A
+  second scoring path would be free to disagree with the scoreboard.
+- **`lineup_efficiency`, `waiver_hit_rate`, `xg_luck` ship NULL**, not zero —
+  zero would render. Each needs an input that does not exist yet: an
+  optimal-lineup solver, a two-week post-add scoring window, and per-roster
+  xG-vs-actual respectively.
+- **The writer returns its row count** and the caller records it. A nightly
+  aggregate that silently stops looks exactly like one with nothing to do,
+  which is the failure mode the schema checklist puts first.
+
+**Deferred, with what each needs**
+- Nightly cron wiring + the `integrity_check_results` health row.
+- Server route and `LeaderboardService` method.
+- The three NULL metrics.
+- COUNTRY / FAN BASE / CITY cuts — blocked on profile fields.
+- The five weekly awards (3f) — `StandingsService` and `WaiverService` have
+  the inputs; the awards table does not exist yet.
+
