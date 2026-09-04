@@ -363,3 +363,66 @@ Component tests that pull the Supabase client cannot run under the stand-in
 (the realtime client opens a socket at import and never settles); those files
 are covered instead by the byte-identity proof above, and by the full suite on
 the Mac.
+
+---
+
+## PR4a — the roster row and list (2026-09-04)
+
+`components/pressbox/RosterRow.tsx` and `RosterList.tsx`, plus a guard that
+runs: 19 assertions, all passing.
+
+**Built as new components rather than an edit to `MobileRosterList`, for two
+reasons and the second decided it.**
+
+1. The Press Box row is a different GRID (`30px 30px 1fr 52px 44px`), not a
+   restyle. Converting a 765-line component in place means rewriting its
+   markup and the six test files that pin it in one commit — the exact change
+   shape that broke thirteen files this morning.
+2. **It can be tested and that one cannot.** `npx vitest` will not start on the
+   sandbox that reaches this repo (darwin-arm64 rolldown binding only, linux
+   sandbox), so guards run directly on Node with type stripping through a
+   minimal vitest stand-in. That works for a component whose import graph is
+   small and pure; it hangs on `MobileRosterList`, which reaches the Supabase
+   client. A row with assertions I can actually run beats a row I can only
+   reason about. Both new files import nothing that touches the network.
+
+**Three numbers the spec asks for are absent, and their absence is asserted.**
+
+* ROSTERED % / START %. The spec's META line reads `100% · 99% | vs TOR 3RD`
+  and the spec names the gap in the same breath: no league-wide read exists.
+  Both percentages are omitted AND so is the separator that would have led
+  them — a bare `|` at the head of a line reads as a rendering bug, not a
+  placeholder. A `showOwnership` prop turns the whole segment on the day PR12
+  lands the aggregate; a test proves it renders then, and another proves no
+  percentage appears now.
+* The WK trend micro (`▲ 12%` / `▼ 31%`) needs a prior-week figure the roster
+  payload does not carry. Absent, and a comment-stripped source check keeps it
+  absent.
+
+**Column header at 10px, not the spec's 9.** Same floor `rowScale.ts` argues.
+`PLAYER · TODAY · WK` is text a manager reads, not a glyph they recognise. The
+header is its own 20px band, so no row got taller.
+
+**The section count is filled-over-required, passed in, not `rows.length`.** A
+list drawing twelve players and one empty slot must say `12/13`. Derived from
+row count it would say `13/13` and hide the hole it is rendering — the one
+thing that header exists to surface. There is a test for exactly that.
+
+**The bench note is derived or absent.** `2 PLAYING TONIGHT · PTS DON'T COUNT`
+renders only when a bench player actually has a game. Nobody playing means no
+note, never `0 PLAYING TONIGHT`.
+
+**Colour, on a screen where every row is already yours.** Orange would mean
+nothing as "you" here, so it is spent on the one thing that is a FORECAST
+rather than a fact: `orange-soft` on a projection, and nowhere else. Sage is
+what happened. Grapefruit is negative state only. The chip is neutral, and the
+only team colour on the row is a 1.5px ring on the mug, applied as a
+`boxShadow` — never a fill or a bar, which the repo-wide contrast rule
+forbids and a test re-asserts locally.
+
+**Not yet mounted.** The Roster page still renders `MobileRosterList`. Mounting
+is its own commit for the reason PR2 gave: an unfinished run should leave the
+app exactly as it is today, not half-converted.
+
+Verified: 19/19 on the new guard, 443/443 on every source-walking guard,
+`tsc --noEmit` exit 0, `eslint` clean on the new directory.

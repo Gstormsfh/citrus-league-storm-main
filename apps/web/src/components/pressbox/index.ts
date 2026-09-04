@@ -14,6 +14,14 @@ export {
   SCANLINE,
 } from './chromeMetrics';
 
+/** Roster surface (PR4). Presentational: every figure arrives as a prop. */
+export { PressBoxRosterRow, type PressBoxRosterRowProps, type PressBoxRosterRowPlayer } from './RosterRow';
+export {
+  PressBoxRosterList,
+  type PressBoxRosterListProps,
+  type PressBoxRosterSlotRow,
+} from './RosterList';
+
 /** The Press Box row ladder and chip. See rowScale.ts for why they fork. */
 export {
   PB_ROW_NAME,
