@@ -270,3 +270,96 @@ keystroke, and nothing in this run touched the database.
 - The five weekly awards (3f) — `StandingsService` and `WaiverService` have
   the inputs; the awards table does not exist yet.
 
+
+---
+
+## PR1-FIX — the primitives fork instead of mutating (2026-09-04, morning)
+
+**What happened.** PR1 as first written edited `src/components/phoneRowScale.ts`
+and `src/components/roster/positionChip.ts` in place. Twenty-six assertions
+across thirteen test files went red, and nothing on screen changed — the worst
+possible trade.
+
+**Why it was wrong, precisely.** Those two modules are consumed TODAY by five
+shipping surfaces: `PlayerCard` (matchup), `MobileRosterList`, `FreeAgentRow`,
+`ScoreboardStrip` and `CenterColumn`. Thirteen test files pin their exact class
+output — `font-jbmono`, `text-[12px]` META, `w-8 h-8` chips, the sage/forest
+chip pair, an index.css rem-parity check on `.player-team-name`. Meanwhile ZERO
+Press Box screens consumed the new values, because the screen PRs had not
+landed. So the edit put every live phone row into a half-converted state (Press
+Box families on the old layout) and bought nothing.
+
+The instruction "each PR its own commit, run the suite after each" exists to
+catch exactly this, and the suite did catch it. The mistake was the shape of
+the PR, not the checking.
+
+**The fix.** PR1 is now purely ADDITIVE, and the ladder forks for the length of
+the conversion:
+
+* `tailwind.config.ts` — KEPT. `pressbox.*` sits alongside `pastel.*`; three
+  new font families. Nothing reads differently until something asks for them.
+* `src/index.css` — KEPT. One `@import` line gains Barlow Condensed, Barlow and
+  IBM Plex Mono. Additive; no rule changed.
+* `src/components/phoneRowScale.ts` — REVERTED, byte-identical to `a35d1dc1`.
+* `src/components/roster/positionChip.ts` — REVERTED, byte-identical.
+* `src/__tests__/phoneRowTypeScaleGuard.test.tsx` — REVERTED, byte-identical.
+* `.../MobileRosterList.positionRing.test.tsx` — REVERTED, byte-identical.
+* NEW `src/components/pressbox/rowScale.ts` — the Press Box ladder.
+* NEW `src/components/pressbox/positionChip.ts` — the neutral 30px chip.
+
+**The rule this sets for PR3 onward.** A screen PR mounts the Press Box chrome
+AND switches that screen's rows from `phoneRowScale` to `pressbox/rowScale` in
+the SAME commit, and moves that screen's guard over with it. Every commit
+leaves the app entirely old or entirely new *per screen*, never both — which is
+also what makes it safe to stop the run at any PR. When the last consumer of
+`phoneRowScale.ts` is gone the file is deleted and the Press Box module takes
+the name.
+
+**DECISION — the 10px floor beats the spec.** The density pass asked for 9px
+unit labels and status marks. This repo carries "every label is >= 10px" as an
+explicit contract (`PlayerCard.mobileScore.test.tsx`, K-series) and three test
+files assert it by name. A design system does not overrule an accessibility
+floor because the mock looked tighter. Press Box MICRO and the headline label
+ship at 10px; the density the spec wanted comes from META 12 -> 10 and from
+`leading-none`, both above the floor, and the measured rows still land inside
+the spec's 56-58 / 64 / 44 band.
+
+**DECISION — `z-overlay`, not a new rung.** `LeagueMenu` first shipped
+`z-app-modal`, which is not a layer name; `zLayerScaleGuard` walks every
+fixed/sticky element in `src/` and caught it. `zLayers.ts` already defines
+`overlay` (100) as "full-window takeovers, above the nav, below the modal
+sheets", which is exactly this component: it must cover `app-nav` (45) and stay
+under `sheet` (9000) so a roster sheet opened from a menu destination lands on
+top. Adding a rung would have been wrong twice — the layer existed, and a rung
+with no argument for its position is how the old eleven-value mess grew.
+
+**Two of my own bugs, both caught by running the thing.**
+
+1. `LeagueHeader`'s week aria-label carried an em dash. `aiVoiceGuard` reads
+   aria-labels as user-facing copy, correctly. Now a comma.
+2. The `darkThemeContrastGuard` self-test hand-rolled its own parse
+   (`line.split(/\s+/)` on raw source) and reported the shipped, clean chip as
+   an offender: its tokens were `'bg-white/10` and `text-pressbox-text',` —
+   quote and comma attached, so neither filter matched. The rule was right; its
+   self-test was wrong, which is the one failure mode a self-test exists to
+   prevent. It now runs the same extraction the rule runs. Fixing it surfaced a
+   second error: I had expected bare `text-white` to pass, when the rule
+   correctly flags it — white on a saturated chip is the 1.45:1 pairing that
+   caused this file to exist.
+
+**Verification available on this machine.** `npx vitest` cannot start here:
+`node_modules` carries only `@rolldown/binding-darwin-arm64` and the sandbox
+that reaches the repo is linux. So the guards are run directly on Node with
+type stripping, through a minimal vitest stand-in (`~/pbrun`, scratch, not in
+the repo). Results this commit:
+
+* all 35 source-walking guards in `src/__tests__/*.ts` — **443 pass, 0 fail**
+* `pressboxChromeGuard.test.tsx` — **17 pass, 0 fail**
+* `npx tsc --noEmit -p tsconfig.app.json` — **exit 0**
+* `npx eslint .` — **0 errors** (21 pre-existing warnings)
+* the four reverted files — `git diff --quiet a35d1dc1` clean on each
+
+Component tests that pull the Supabase client cannot run under the stand-in
+(the realtime client opens a socket at import and never settles); those files
+are covered instead by the byte-identity proof above, and by the full suite on
+the Mac.

@@ -54,8 +54,21 @@ export function LeagueMenu({
   const items = tiles ?? defaultLeagueTiles(leagueId);
 
   return (
+    /*
+     * `z-overlay` (100), not a number and not a new rung. `src/styles/zLayers.ts`
+     * defines `overlay` as "full-window takeovers ... above the nav, below the
+     * modal sheets", which is exactly what this is: it has to cover `app-nav`
+     * (45) or the bottom nav prints through it, and it must stay under `sheet`
+     * (9000) so a roster sheet opened from a menu destination still lands on
+     * top. The first draft of this file invented `z-app-modal`, which is not a
+     * rung — `zLayerScaleGuard` walks every fixed/sticky element in `src/` and
+     * fails on any z-index name the scale does not define, which is how it was
+     * caught. Adding a rung would have been the wrong fix twice over: the scale
+     * already had the layer, and a rung between `app-nav` and `sheet` with no
+     * argument for why it belongs there is how the old eleven-value mess grew.
+     */
     <div
-      className={cn('fixed inset-0 z-app-modal bg-pressbox-surface flex flex-col', className)}
+      className={cn('fixed inset-0 z-overlay bg-pressbox-surface flex flex-col', className)}
       role="dialog"
       aria-modal="true"
       aria-label={`${leagueName} menu`}

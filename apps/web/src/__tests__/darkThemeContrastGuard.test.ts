@@ -310,8 +310,15 @@ describe('dark-theme contrast guard', () => {
   // The guard that measured that regression should be the one that prevents
   // its return.
 
-  it('position chips stay neutral — the letter carries the position', () => {
-    const src = readFileSync(resolve(SRC, 'components/roster/positionChip.ts'), 'utf8');
+  it('Press Box position chips stay neutral — the letter carries the position', () => {
+    // components/pressbox/positionChip.ts, NOT components/roster/positionChip.ts.
+    // The legacy chip keeps its sage/orange maps for the screens still wearing
+    // the old styling; this contract binds the Press Box skin, and each screen
+    // PR moves its own chip over as it converts. Pointing this rule at the
+    // legacy file before any screen consumed the new one is what broke
+    // thirteen test files on the first attempt — the rule was right and the
+    // target was a module five shipping surfaces still owned.
+    const src = readFileSync(resolve(SRC, 'components/pressbox/positionChip.ts'), 'utf8');
     const maps = [...src.matchAll(/const (posColor|posRingColor): Record<string, string> = \{([^}]+)\}/gs)];
     expect(maps.length, 'both chip maps must still exist').toBe(2);
 
@@ -360,26 +367,46 @@ describe('dark-theme contrast guard', () => {
   it('both Press Box rules bite: planted offenders are caught', () => {
     // A detector nobody has watched fail is a detector that might be reading
     // the wrong thing. Same self-test pattern the light-theme rule above uses.
-    const chipLine = "  RW: 'bg-pastel-orange text-white',";
-    const hue = chipLine
-      .split(/\s+/)
-      .filter((c) => /^(bg|text|ring)-/.test(c))
-      .filter((c) => !/^(bg|ring)-white\//.test(c))
-      .filter((c) => c !== 'text-pressbox-text' && !/^text-white\//.test(c));
-    expect(hue.length, 'a coloured chip must be detected').toBeGreaterThan(0);
+    //
+    // The FIRST version of this self-test hand-rolled its own parse —
+    // `line.split(/\s+/)` straight off a source line — and reported the
+    // shipped, clean chip as an offender: the tokens it produced were
+    // `'bg-white/10` (leading quote, so the white-alpha filter missed it) and
+    // `text-pressbox-text',` (trailing quote and comma, so the exact-match
+    // filter missed it). The rule above was right and its self-test was
+    // wrong, which is the one failure mode a self-test exists to prevent. So
+    // it now runs the SAME extraction the rule runs.
+    const hues = (line: string): string[] => {
+      const m = line.match(/^\s*([A-Za-z0-9_]+)\s*:\s*'([^']*)'/);
+      if (!m) return [];
+      return m[2]
+        .split(/\s+/)
+        .filter((c) => /^(bg|text|ring)-/.test(c))
+        .filter((c) => !/^(bg|ring)-white\//.test(c))
+        .filter((c) => c !== 'text-pressbox-text' && !/^text-white\//.test(c));
+    };
+
+    // `text-white` with no alpha is flagged alongside the fill, and should be:
+    // bare white on a saturated chip is the exact pairing that measured 1.45:1
+    // on sage-soft and 2.85:1 on orange. Only `text-white/NN` (an alpha over a
+    // dark ground) and the neutral token are exempt.
+    expect(hues("  RW: 'bg-pastel-orange text-white',"), 'a coloured chip must be detected').toEqual([
+      'bg-pastel-orange',
+      'text-white',
+    ]);
+    expect(hues("  LW: 'bg-pastel-sage-soft text-pastel-forest',"), 'the old sage pair too').toEqual([
+      'bg-pastel-sage-soft',
+      'text-pastel-forest',
+    ]);
 
     const fill = 'style={{ backgroundColor: teamColor }}';
-    const hit = [...fill.matchAll(/\b(backgroundColor|background)\s*:\s*([^,;\n}]+)/g)]
-      .filter((m) => /\bteam(Colou?r)\b/i.test(m[2]));
+    const hit = [...fill.matchAll(/\b(backgroundColor|background)\s*:\s*([^,;\n}]+)/g)].filter((m) =>
+      /\bteam(Colou?r)\b/i.test(m[2]),
+    );
     expect(hit.length, 'a team-colour fill must be detected').toBeGreaterThan(0);
 
     // And the shipped neutral pair must NOT trip the chip rule.
-    const clean = "  RW: 'bg-white/10 text-pressbox-text',";
-    const cleanHue = clean
-      .split(/\s+/)
-      .filter((c) => /^(bg|text|ring)-/.test(c))
-      .filter((c) => !/^(bg|ring)-white\//.test(c))
-      .filter((c) => c !== 'text-pressbox-text' && !/^text-white\//.test(c));
-    expect(cleanHue, 'the shipped chip must be clean').toEqual([]);
+    expect(hues("  RW: 'bg-white/10 text-pressbox-text',"), 'the shipped chip must be clean').toEqual([]);
+    expect(hues("  BN: 'bg-white/10 text-white/55 ring-white/16',"), 'the bench chip too').toEqual([]);
   });
 });

@@ -111,7 +111,7 @@ export function LeagueHeader({ weekLabel, onWeekPress, onSettingsPress, classNam
             onClick={onWeekPress}
             disabled={!onWeekPress}
             className="focus-citrus font-plex font-medium text-[10px] text-pressbox-text/45 whitespace-nowrap disabled:cursor-default"
-            aria-label={onWeekPress ? `Change week — currently ${weekLabel}` : weekLabel}
+            aria-label={onWeekPress ? `Change week, currently ${weekLabel}` : weekLabel}
           >
             {weekLabel}
           </button>

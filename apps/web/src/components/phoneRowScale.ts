@@ -55,36 +55,6 @@
  * `positionChip.ts` and `slotLabel.ts` give: a module that exports both a
  * component and plain values breaks react-refresh, so editing the row
  * during dev would force a full reload instead of a hot swap.
- *
- * ── PRESS BOX REVISION (2026-09-04) ────────────────────────────────────────
- *
- * Direction 1a re-skins these rungs. The LADDER is untouched -- 17 over 15 is
- * still the whole argument above, and the fit maths for the matchup card
- * still holds -- but three things change:
- *
- *   1. FAMILY. Names move to Barlow; every number and label moves to IBM Plex
- *      Mono. JetBrains Mono is not retired (the draft room and the desktop
- *      surfaces still wear it); the phone rows simply stop using it.
- *
- *   2. THE QUIET RUNGS GET QUIETER. META 12 -> 10 and MICRO 10 -> 9. That
- *      reads backwards until you look at what it buys: the spec's row heights
- *      (roster/matchup 56-58px, players 64px, standings 44px) are FIXED, and
- *      the density pass adds a line to most rows. The gap between NAME and
- *      META widens from 3px to 5px, so the hierarchy the audit asked for gets
- *      STRONGER, not weaker, while the row gets shorter. The two rungs a
- *      manager actually reads are unchanged.
- *
- *   3. META TRUNCATES BY CONTRACT. `whitespace-nowrap overflow-hidden
- *      text-ellipsis` is now part of the rung rather than something each call
- *      site remembers. The spec's rule is "if content is too long, shorten
- *      the string, never grow the row" -- a wrapping META line is the single
- *      most common way a fixed-height list turns ragged, and the only place
- *      to make that impossible is here.
- *
- * The size floor moves from 10px to 9px, which is a real legibility cost and
- * a deliberate one: 9px is Plex Mono at 500 on #0C1811, used only for unit
- * labels and status marks that a manager recognises by shape rather than
- * reads. Nothing that carries a sentence is allowed on the MICRO rung.
  */
 
 /**
@@ -97,7 +67,7 @@
  * beside it — measured on the matchup harness before this change, where
  * "Wennberg-Nylander" printed straight through the opponent's score.
  */
-export const ROW_NAME = 'font-barlow font-bold text-[15px] truncate leading-tight';
+export const ROW_NAME = 'font-display font-bold text-[15px] truncate leading-tight';
 
 /**
  * The number the row exists to show — tonight's points, the week's total,
@@ -117,7 +87,7 @@ export const ROW_NAME = 'font-barlow font-bold text-[15px] truncate leading-tigh
  * `leading-none` so the label under it sits tight and the pair reads as one
  * block.
  */
-export const ROW_HEADLINE = 'font-plex font-semibold text-[17px] tabular-nums leading-none';
+export const ROW_HEADLINE = 'font-jbmono font-bold text-[17px] tabular-nums leading-none';
 
 /**
  * The unit under a headline number — "proj", "week", "live", "final".
@@ -128,7 +98,7 @@ export const ROW_HEADLINE = 'font-plex font-semibold text-[17px] tabular-nums le
  * the same optical weight as the thing it is a unit of.
  */
 export const ROW_HEADLINE_LABEL =
-  'font-plex font-medium text-[9px] uppercase tracking-[0.1em] leading-none';
+  'font-jbmono text-[10px] uppercase tracking-[0.1em] leading-none';
 
 /**
  * Team, opponent, game time, the live stat line — everything that qualifies
@@ -141,12 +111,11 @@ export const ROW_HEADLINE_LABEL =
  * not allowed to cost. At `leading-none` the same row is 62px: bigger type,
  * shorter row.
  */
-export const ROW_META =
-  'font-plex font-medium text-[10px] leading-none whitespace-nowrap overflow-hidden text-ellipsis';
+export const ROW_META = 'text-[12px] leading-none';
 
 /**
  * Status chips, the scouting note, and anything else that is a mark rather
  * than a sentence. 10px is the floor: below it a label on this page is a
  * smudge, not small text.
  */
-export const ROW_MICRO = 'font-plex font-medium text-[9px] leading-tight';
+export const ROW_MICRO = 'text-[10px] leading-tight';

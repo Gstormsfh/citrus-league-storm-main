@@ -37,34 +37,24 @@ import { describe, it, expect } from 'vitest';
 // colour" identity. This line is the regression test: the value is
 // pinned here and in positionChip.ts, and drift in either fails.
 const EXPECTED_POS_COLOR: Record<string, string> = {
-  LW: 'bg-white/10 text-pressbox-text',
-  C: 'bg-white/10 text-pressbox-text',
-  RW: 'bg-white/10 text-pressbox-text',
-  D: 'bg-white/10 text-pressbox-text',
-  G: 'bg-white/10 text-pressbox-text',
-  UTIL: 'bg-white/10 text-pressbox-text',
-  F: 'bg-white/10 text-pressbox-text',
+  LW: 'bg-pastel-sage-soft text-pastel-forest',
+  C: 'bg-pastel-sage text-pastel-forest',
+  RW: 'bg-pastel-orange text-white',
+  D: 'bg-white/10 text-pastel-cream',
+  G: 'bg-pastel-sage/15 text-pastel-cream',
+  UTIL: 'bg-pastel-sage text-pastel-forest',
+  F: 'bg-emerald-600 text-white',
 };
 
 const EXPECTED_POS_RING_COLOR: Record<string, string> = {
-  LW: 'ring-white/16',
-  C: 'ring-white/16',
-  RW: 'ring-white/16',
-  D: 'ring-white/16',
-  G: 'ring-white/16',
-  UTIL: 'ring-white/16',
-  F: 'ring-white/16',
+  LW: 'ring-pastel-sage-soft/30',
+  C: 'ring-pastel-sage/30',
+  RW: 'ring-pastel-orange/30',
+  D: 'ring-white/30',
+  G: 'ring-pastel-sage/50',
+  UTIL: 'ring-pastel-sage/30',
+  F: 'ring-emerald-600/30',
 };
-
-// PRESS BOX (2026-09-04): every entry in both maps is now the SAME neutral
-// pair, and that sameness is the invariant this lock now protects. Colour
-// restraint in direction 1a says orange is the only saturated colour and
-// means "you"; a coloured position chip spends the screen's one loud colour
-// on something that carries no ownership. The letter carries the position.
-//
-// The maps were deliberately not collapsed into a single constant -- see the
-// header of positionChip.ts. Seven identical lines are harder to quietly
-// un-neutralise than one, and darkThemeContrastGuard fails anyone who tries.
 
 // This test reads the shipped source to verify the maps match. If someone
 // edits the maps but forgets to update this test, both the map assertion
@@ -183,7 +173,7 @@ describe('MobileRosterList — position-ring map lock (Entry 40 A-lite)', () => 
     expect(consumer).toMatch(importRe);
     expect(consumer).not.toMatch(/const posColor\s*[:=]/);
     expect(consumer).not.toMatch(/const posRingColor\s*[:=]/);
-    expect(consumer).not.toMatch(/'w-\[30px\] h-\[30px\] flex-shrink-0 rounded-md/);
+    expect(consumer).not.toMatch(/'w-8 h-8 flex-shrink-0 rounded-md/);
   });
 
   it('both maps cover the same position set (LW/C/RW/D/G/UTIL/F)', () => {
