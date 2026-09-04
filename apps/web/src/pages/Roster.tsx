@@ -270,6 +270,19 @@ const dayLabelFor = (dateStr: string): string => {
     .replace(',', '');
 };
 
+/**
+ * The roster's four views, one class for the four triggers. Below lg a pill
+ * in the Press Box well — Plex 10px, cream when active; from lg the
+ * condensed underline strip the desktop card has had. The tracking pair is
+ * the one mobileSweepGuard pins: tight where the column is 98px wide.
+ */
+const ROSTER_VIEW_TAB =
+  'flex-1 min-w-0 px-1 whitespace-nowrap uppercase transition-colors focus-citrus ' +
+  'h-[30px] rounded-[6px] font-plex font-semibold text-[9px] sm:text-[10px] tracking-[0.04em] sm:tracking-[0.14em] text-pressbox-text/60 ' +
+  'data-[state=active]:bg-pressbox-text data-[state=active]:text-pressbox-surface data-[state=active]:shadow-none ' +
+  'lg:h-[34px] lg:rounded-none lg:font-condensed lg:font-bold lg:text-[13px] lg:text-pressbox-text/45 ' +
+  'lg:data-[state=active]:bg-transparent lg:data-[state=active]:text-pressbox-text lg:data-[state=active]:border-b-2 lg:data-[state=active]:border-pressbox-sage lg:hover:text-pressbox-text';
+
 const Roster = () => {
   const { user } = useAuth();
   const { data: profile } = useProfile();
@@ -3456,15 +3469,21 @@ const Roster = () => {
           343px down a 852px screen. The Press Box header carries the LEAGUE:
           crest, name, the week, and the settings control.
 
-          `showSubTabs={false}`: this screen already has a strip (Roster /
-          Stats / Analytics / Transactions), and that is a different axis from
-          Match / Team / Players / League. Two condensed underline strips
-          stacked on one phone is a puzzle, not a header — the bottom nav is
-          what moves you between league screens. */}
+          THE SUB-TABS ARE BACK ON (PR2b, 2026-09-04). This header hid its
+          Match / Team / Players / League strip because the page had a strip
+          of its own and "the bottom nav is what moves you between league
+          screens" — which stopped being true the moment the bottom nav
+          became the APP nav (Leagues / Scores / Players / News / Account).
+          Without the strip a manager on their roster had no way to the
+          matchup or the pool except through the menu, which has neither.
+          The page's own four views (Roster / Stats / Analytics /
+          Transactions) are now a segmented control under the team card —
+          pills in a well, the vocabulary for "one team, four views" — so
+          the two are told apart on sight rather than stacked as twin
+          underline strips. */}
       <div className="lg:hidden pt-[env(safe-area-inset-top)]">
         <LeagueHeader
           weekLabel={weekLabelForHeader}
-          showSubTabs={false}
           onSettingsPress={() => setLeagueMenuOpen(true)}
         />
       </div>
@@ -3649,23 +3668,27 @@ const Roster = () => {
                   * at sm alongside the equal-width bar. The scroller stays only
                   * as a net for sub-360px devices.
                   */}
-                <TabsList className="w-full p-0 bg-transparent border-b border-white/[0.08] rounded-none gap-0 h-[34px] grid grid-cols-4">
+                {/* PRESS BOX (2026-09-04): a segmented control below lg — the
+                    #16241B well, 2px of padding, cream on the active pill —
+                    and the underline strip from lg, where the header's
+                    sub-tabs are not drawn. Still four equal columns. */}
+                <TabsList className="w-full grid grid-cols-4 gap-0.5 p-0.5 h-auto rounded-[8px] bg-pressbox-tile mx-3 max-lg:w-[calc(100%-24px)] mt-2 lg:mx-0 lg:mt-0 lg:w-full lg:p-0 lg:gap-0 lg:h-[34px] lg:rounded-none lg:bg-transparent lg:border-b lg:border-white/[0.08]">
                 <TabsTrigger
                   value="roster"
-                  className="flex-1 min-w-0 px-1 h-[34px] rounded-none font-condensed text-[13px] tracking-[0.04em] sm:tracking-[0.14em] uppercase font-bold whitespace-nowrap text-pressbox-text/45 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-pressbox-sage data-[state=active]:text-pressbox-text hover:text-pressbox-text transition-colors"
+                  className={ROSTER_VIEW_TAB}
                 >
                   Roster
                 </TabsTrigger>
                 <TabsTrigger
                   value="stats"
-                  className="flex-1 min-w-0 px-1 h-[34px] rounded-none font-condensed text-[13px] tracking-[0.04em] sm:tracking-[0.14em] uppercase font-bold whitespace-nowrap text-pressbox-text/45 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-pressbox-sage data-[state=active]:text-pressbox-text hover:text-pressbox-text transition-colors"
+                  className={ROSTER_VIEW_TAB}
                 >
                   <span className="sm:hidden">Stats</span>
                   <span className="hidden sm:inline">Team Stats</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="trends"
-                  className="flex-1 min-w-0 px-1 h-[34px] rounded-none font-condensed text-[13px] tracking-[0.04em] sm:tracking-[0.14em] uppercase font-bold whitespace-nowrap text-pressbox-text/45 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-pressbox-sage data-[state=active]:text-pressbox-text hover:text-pressbox-text transition-colors"
+                  className={ROSTER_VIEW_TAB}
                 >
                   {/* "TRENDS & ANALYTICS" is ~131px in Barlow Condensed at
                       13/.14em and the column is 98px at 393. The phone label
@@ -3677,7 +3700,7 @@ const Roster = () => {
                 </TabsTrigger>
                 <TabsTrigger
                   value="transactions"
-                  className="flex-1 min-w-0 px-1 h-[34px] rounded-none font-condensed text-[13px] tracking-[0.04em] sm:tracking-[0.14em] uppercase font-bold whitespace-nowrap text-pressbox-text/45 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-pressbox-sage data-[state=active]:text-pressbox-text hover:text-pressbox-text transition-colors"
+                  className={ROSTER_VIEW_TAB}
                 >
                   Transactions
                 </TabsTrigger>
