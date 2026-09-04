@@ -1,3 +1,64 @@
+# Press Box implementation — run log
+
+## EVENING RUN, 2026-09-04 — read this first
+
+**Every screen in artboard 1a, 4a and 4b is on its real page.** Twenty-two
+commits on `redesign/pressbox` since PR7 (`2fea1029..8ab6ca4c`). Nothing is
+pushed, nothing is applied to production. The working tree is clean.
+
+| screen | state | see it |
+|---|---|---|
+| Draft room (4a / 4b) — pool, bar (on AND off the clock), queue, board, my team, history | done, live in DraftRoomV2 | `harness/draft.html?picks=5` / `?picks=23` / `?picks=30` |
+| Players (1a) — action tile, TREND / AVAILABLE / WATCH, chips, column head, rows, watch star | done, live in FreeAgents | `page.html?p=freeagents` |
+| Standings (1a) — header, meta line, table with the playoff picture folded in | done, live in Standings | `page.html?p=standings` |
+| League HQ (1a) — draft CTA, MATCHUPS, tiles, teams | done, live in LeagueDashboard | `page.html?p=league` |
+| Match (1a) — `‹ WK ›`, score block, day strip, other-matchup chips, LINEUPS / BENCH / TONIGHT | done, live in Matchup | `page.html?p=matchup` |
+| Home (1a) — ticker, MY LEAGUES, TONIGHT ON YOUR ROSTERS | done, live at `/` for a signed-in phone | `page.html?p=home` |
+| Team / Roster (1a) — header sub-tabs back on, views as a segmented control | done | `page.html?p=roster` |
+| Player card (1a) — hero, team ground, tabs, full-screen sheet below sm | hero + shell done; the three panes' bodies are still the old markup | open any row |
+| App nav + Stormy bar | mounted app-wide; pool leagues keep their old tabs | any page |
+| League settings sheet | functional, NOT restyled (PR11 pieces still in `pressboxsettings.html`) | League HQ → League settings |
+
+**First thing to run** (five draft suites, the MatchupComparison suites, the
+hideRoutes suite and every page suite cannot load on my offline runner):
+
+```
+cd ~/dev/citrus/apps/web && npm run lint && npm run test
+```
+
+### Decisions I made that you may want to reverse
+
+1. **`/` is the app home on a phone, not a redirect to League HQ.** PR10b
+   supersedes the 2026-08-31 native boot redirect; its reason ("no menus")
+   no longer holds, and a LEAGUES tab that redirects away from itself is
+   not a tab. If you want one-league managers to boot into HQ, say so and
+   the redirect comes back behind `userLeagues.length === 1`.
+2. **Pool leagues keep the legacy bottom tabs.** Their pages carry no
+   LeagueHeader, so the app nav alone would strand them. Convert their
+   pages, then drop the branch in `MobileBottomNav.tsx`.
+3. **Not drawn, on purpose, each documented in its component:** `FA ONLY`
+   and `ROS%` on Players (no rostered-player list, no ownership read);
+   the `STANDINGS / POWER / PLAYOFF ODDS / MEDIAN` control on Standings (no
+   simulations); win chance and games-left on the HQ and Home cards (same);
+   the rank and `TRAILING 3 CATS` on Home; the artboard's `LEADERS` tile
+   routes to `/players`. All return with PR12's aggregates.
+4. **The off-clock bar's ETA is measured, not invented** (`pickPace.ts`):
+   median gap of the picks this session has watched land, else the clock's
+   ceiling (`≤ 9 MIN`), else nothing.
+5. **`StickyScoreBar` is deleted** (orphaned by PR5c; matchupDeadCodeGuard
+   demands it). `FreeAgentRow` and its 44 tests are still in the tree, no
+   longer imported by the page — delete both once Players is signed off.
+
+### Still open
+
+- The player card's three pane bodies (Overview / Detailed / Game log) —
+  PR7b's tiles, log and note components are built and waiting.
+- The league settings sheet (PR11 components built, not wired).
+- Two migrations, unapplied: `20260904100000`, `20260904101000`.
+- PR3 skeletons, PR12 aggregates, PR13 motion, PR14/15 moments, PR17, PR18.
+
+---
+
 # Press Box implementation — overnight run, 2026-09-04
 
 ## SUMMARY — read this, then the log below
