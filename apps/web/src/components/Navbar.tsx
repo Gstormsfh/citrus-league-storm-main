@@ -13,7 +13,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
-import { isPoolLeague, getPoolRoute, getPoolLabel, getLeagueTypeFromSettings } from '@/utils/leagueTypeHelpers';
+import { isPoolLeague, getPoolRoute, getPoolLabel, getLeagueTypeFromSettings, leagueSwitchDestination } from '@/utils/leagueTypeHelpers';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -128,18 +128,21 @@ const Navbar = () => {
           { label: 'Pool Home', path: `/pool/playoff-hub?league=${activeLeagueId}`, icon: Trophy },
           { label: 'My Picks', path: poolRoute, icon: Target },
           { label: 'NHL Bracket', path: '/nhl/playoffs', icon: BarChart3 },
+          { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
         ];
       case 'playoff-confidence-pool':
         return [
           { label: 'Pool Home', path: `/pool/playoff-hub?league=${activeLeagueId}`, icon: Trophy },
           { label: 'My Picks', path: poolRoute, icon: Target },
           { label: 'NHL Bracket', path: '/nhl/playoffs', icon: BarChart3 },
+          { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
         ];
       case 'playoff-roster-pool':
         return [
           { label: 'Pool Home', path: `/pool/playoff-hub?league=${activeLeagueId}`, icon: Trophy },
           { label: 'My Roster', path: poolRoute, icon: Users },
           { label: 'NHL Bracket', path: '/nhl/playoffs', icon: BarChart3 },
+          { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
         ];
       default:
         return [];
@@ -161,6 +164,15 @@ const Navbar = () => {
           { label: 'Free Agents', path: `/free-agents?league=${activeLeagueId}`, icon: UserPlus },
           { label: 'Players', path: '/players', icon: BarChart3 },
           { label: 'Standings', path: `/standings?league=${activeLeagueId}`, icon: TrendingUp },
+          // MOCK DRAFT (2026-09-04). Reported: "if I'm already in a league I
+          // can't do mock drafts". The simulator was never gated -- it is a
+          // public route with no auth and no league check -- it simply had no
+          // link once you had a league. The fantasy tab set above replaced the
+          // signed-out set, and only the signed-out set carried Armchair GM.
+          // On the native shell that left NO path to it at all: the homepage,
+          // which is where the other mock-draft entry points live, redirects
+          // straight into your league (Index.tsx).
+          { label: 'Mock Draft', path: '/armchair-gm?tab=mockdraft', icon: ClipboardList },
         ]
       : [
           { label: 'Create League', path: '/create-league', icon: Sparkles },
@@ -234,23 +246,7 @@ const Navbar = () => {
                       key={l.id}
                       onSelect={() => {
                         setActiveLeagueId(l.id);
-                        if (isPoolLeague(lType)) {
-                          navigate(getPoolRoute(lType, l.id));
-                        } else if (location.pathname.startsWith('/matchup/') || location.pathname === '/matchup') {
-                          navigate(`/matchup/${l.id}`);
-                        } else if (location.pathname.match(/^\/league\/[^/]+\/playoffs$/)) {
-                          navigate(`/league/${l.id}/playoffs`);
-                        } else if (location.pathname.match(/^\/league\/[^/]+$/)) {
-                          navigate(`/league/${l.id}`);
-                        } else if (location.pathname.startsWith('/draft-room') || location.pathname === '/draft') {
-                          navigate('/gm-office');
-                        } else {
-                          // SWEEP FIX (2026-08-16): selecting a league from
-                          // the home page (or any non-league page) previously
-                          // did nothing visible — set context AND land the
-                          // user in that league's HQ.
-                          navigate(`/league/${l.id}`);
-                        }
+                        navigate(leagueSwitchDestination(l.id, lType, location.pathname));
                       }}
                       className={cn(
                         "cursor-pointer text-pastel-cream focus:bg-white/5 focus:text-pastel-cream",
@@ -504,21 +500,7 @@ const Navbar = () => {
                         key={l.id}
                         onSelect={() => {
                           setActiveLeagueId(l.id);
-                          if (isPoolLeague(lType)) {
-                            navigate(getPoolRoute(lType, l.id));
-                          } else if (location.pathname.startsWith('/matchup/') || location.pathname === '/matchup') {
-                            navigate(`/matchup/${l.id}`);
-                          } else if (location.pathname.match(/^\/league\/[^/]+\/playoffs$/)) {
-                            navigate(`/league/${l.id}/playoffs`);
-                          } else if (location.pathname.match(/^\/league\/[^/]+$/)) {
-                            navigate(`/league/${l.id}`);
-                          } else if (location.pathname.startsWith('/draft-room') || location.pathname === '/draft') {
-                            navigate('/gm-office');
-                          } else {
-                            // SWEEP FIX (2026-08-16): land in League HQ from
-                            // home/any other page instead of a silent switch.
-                            navigate(`/league/${l.id}`);
-                          }
+                          navigate(leagueSwitchDestination(l.id, lType, location.pathname));
                           closeMobileMenu();
                         }}
                         className={cn(
