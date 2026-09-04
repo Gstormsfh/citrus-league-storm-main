@@ -1,0 +1,167 @@
+/**
+ * LEAGUE HEADER — Press Box shared chrome (2026-09-04).
+ *
+ * Replaces the per-page sticky headers. Two rows, sticky, on every league
+ * page: identity on top, navigation under it.
+ *
+ * WHY THE SUB-TAB STRIP EXISTS AT ALL. Before this, league navigation lived
+ * in the five-tab bottom nav, which meant the bottom nav had two jobs -- move
+ * between leagues and move within one -- and did neither cleanly. The
+ * playoff-pool trap fixed on the same day was a symptom: the pool tab sets
+ * had no route out of the pool, because "out" and "across" were the same
+ * control. Press Box splits them. The bottom nav is app-level (Leagues,
+ * Scores, Players, News, Account); this strip is league-level (Match, Team,
+ * Players, League). A tab bar that answers one question is legible; one that
+ * answers two is a maze.
+ *
+ * The week label is a PROP, not a fetch. Chrome that fetches is chrome that
+ * flickers on every route change, and the screens already hold the current
+ * matchup -- see `useLeagueChrome` when a screen has nothing to pass.
+ */
+import { useMemo } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { SlidersHorizontal } from 'lucide-react';
+import { useLeague } from '@/contexts/LeagueContext';
+import { teamCrestUrl } from '@/components/roster/headshot';
+import { cn } from '@/lib/utils';
+import { HEADER_ROW1_H, HEADER_SUBTAB_H, SCANLINE } from './chromeMetrics';
+
+export interface LeagueHeaderProps {
+  /** `WK 1 · SEP 28–OCT 4`. Omitted while the week is still loading. */
+  weekLabel?: string | null;
+  /** Tap target for the week label — the week picker. Omit to render it inert. */
+  onWeekPress?: () => void;
+  /**
+   * The sliders icon. League settings is a SHEET inside LeagueDashboard, not
+   * a route (`leagueSettingsMobileSheetGuard` pins that), so there is no
+   * `/league/:id/settings` to link to and inventing one would fail
+   * linkGraphIntegrity. Screens that own the sheet pass its opener; anywhere
+   * else the icon takes the manager to League HQ, where the sheet lives.
+   */
+  onSettingsPress?: () => void;
+  className?: string;
+}
+
+type SubTab = { key: string; label: string; to: (leagueId: string) => string; match: (p: string) => boolean };
+
+/**
+ * Four equal columns. `match` is deliberately a predicate rather than a
+ * prefix compare: Roster and Free Agents carry the league in the QUERY
+ * (`/roster?league=`), so a pathname prefix is the whole answer for them,
+ * while Match and League carry it in the PATH.
+ */
+const SUB_TABS: SubTab[] = [
+  { key: 'match', label: 'Match', to: (id) => `/matchup/${id}`, match: (p) => p.startsWith('/matchup') },
+  { key: 'team', label: 'Team', to: (id) => `/roster?league=${id}`, match: (p) => p.startsWith('/roster') },
+  { key: 'players', label: 'Players', to: (id) => `/free-agents?league=${id}`, match: (p) => p.startsWith('/free-agents') },
+  { key: 'league', label: 'League', to: (id) => `/league/${id}`, match: (p) => p.startsWith('/league') || p.startsWith('/standings') },
+];
+
+export function LeagueHeader({ weekLabel, onWeekPress, onSettingsPress, className }: LeagueHeaderProps) {
+  const league = useLeague();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const params = useParams<{ leagueId?: string }>();
+
+  // The league the URL names wins over the context's active league. Same rule
+  // matchupUrlSync.ts argues for: the path is the source of truth, and a
+  // header that disagrees with the page under it is how a manager ends up
+  // reading one league's name over another league's rows.
+  const leagueId = params.leagueId ?? league?.activeLeagueId ?? null;
+  const leagueName = league?.activeLeague?.name ?? '';
+  const crest = useMemo(() => {
+    const abbr = (league?.activeLeague?.settings as { crestTeam?: string } | null)?.crestTeam;
+    return abbr ? teamCrestUrl(abbr) : null;
+  }, [league?.activeLeague]);
+
+  const activeKey = SUB_TABS.find((t) => t.match(location.pathname))?.key ?? 'league';
+
+  return (
+    <header
+      className={cn('sticky top-0 z-app-nav bg-pressbox-surface', className)}
+      style={SCANLINE}
+    >
+      {/* Row 1 — identity */}
+      <div
+        className="flex items-center gap-2.5 px-3 border-b border-white/[0.08]"
+        style={{ height: HEADER_ROW1_H }}
+      >
+        <Link
+          to={leagueId ? `/league/${leagueId}` : '/'}
+          className="focus-citrus flex items-center gap-2.5 min-w-0 flex-1"
+          aria-label={leagueName ? `${leagueName} home` : 'League home'}
+        >
+          <span className="w-[30px] h-[30px] flex-shrink-0 rounded-md bg-pressbox-tile-high ring-1 ring-white/[0.08] flex items-center justify-center overflow-hidden">
+            {crest ? (
+              <img src={crest} alt="" className="w-[22px] h-[22px] object-contain" />
+            ) : (
+              <span className="font-condensed font-extrabold text-[13px] text-pressbox-text">
+                {(leagueName || '?').slice(0, 1).toUpperCase()}
+              </span>
+            )}
+          </span>
+          <span className="font-condensed font-bold text-[22px] uppercase tracking-[0.02em] text-pressbox-text truncate">
+            {leagueName}
+          </span>
+        </Link>
+
+        {weekLabel && (
+          <button
+            type="button"
+            onClick={onWeekPress}
+            disabled={!onWeekPress}
+            className="focus-citrus font-plex font-medium text-[10px] text-pressbox-text/45 whitespace-nowrap disabled:cursor-default"
+            aria-label={onWeekPress ? `Change week — currently ${weekLabel}` : weekLabel}
+          >
+            {weekLabel}
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => (onSettingsPress ? onSettingsPress() : leagueId && navigate(`/league/${leagueId}`))}
+          className="focus-citrus min-w-[44px] min-h-[44px] -mr-2 flex items-center justify-center text-pressbox-text/55"
+          aria-label="League settings"
+        >
+          <SlidersHorizontal className="w-[18px] h-[18px]" strokeWidth={2} aria-hidden="true" />
+        </button>
+      </div>
+
+      {/* Row 2 — the four-column sub-tab strip */}
+      <nav
+        className="grid grid-cols-4 border-b border-white/[0.08]"
+        style={{ height: HEADER_SUBTAB_H }}
+        aria-label="League sections"
+      >
+        {SUB_TABS.map((tab) => {
+          const active = tab.key === activeKey;
+          return (
+            <Link
+              key={tab.key}
+              to={leagueId ? tab.to(leagueId) : '/'}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                'focus-citrus relative flex items-center justify-center font-condensed font-bold',
+                'text-[13px] uppercase tracking-[0.14em]',
+                active ? 'text-pressbox-text' : 'text-pressbox-text/45',
+              )}
+            >
+              {tab.label}
+              {/* 200ms underline slide, per the Interactions table. */}
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'absolute bottom-0 left-0 right-0 h-[2px] bg-pressbox-sage origin-center',
+                  'transition-transform duration-200 ease-[cubic-bezier(.2,.7,.2,1)] motion-reduce:transition-none',
+                  active ? 'scale-x-100' : 'scale-x-0',
+                )}
+              />
+            </Link>
+          );
+        })}
+      </nav>
+    </header>
+  );
+}
+
+export default LeagueHeader;
