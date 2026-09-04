@@ -21,6 +21,41 @@ import {
   CitrusLogo,
 } from '@/components/citrus2';
 
+/**
+ * THIRD-PARTY SIGN-IN, off for v1 (2026-09-04, the night before submission).
+ *
+ * App Store Review Guideline 4.8 is a package deal: an app that offers a
+ * third-party login MUST also offer Sign in with Apple. Both buttons are
+ * built and the web flow works. What was never proven is the Apple provider
+ * on the Supabase side -- `auth.identities` held 41 Google identities and
+ * ZERO Apple ones, ever -- so "Continue with Apple" was on screen and could
+ * not complete. Reviewers tap it first, and a button that fails is a
+ * rejection.
+ *
+ * So both go, together. Hiding only Apple is the arrangement 4.8 forbids;
+ * hiding only Google leaves the button that does not work.
+ *
+ * Cost, measured on production the same day: 37 accounts are Google-only,
+ * but only 2 of them signed in during the last 30 days. Those two set a
+ * password through Forgot password, which is why the "you signed up with
+ * Google" branch below now points there instead of at a button that is no
+ * longer on screen.
+ *
+ * TURNED BACK ON the same night, once Apple actually worked rather than
+ * looked configured. The Apple provider was enabled in Supabase, the client
+ * secret minted from the .p8 (see scripts/ops/generate-apple-client-secret.mjs
+ * -- it EXPIRES 2027-03-05), and a real sign-in completed. Proof is a row in
+ * the database, not a screen that looked right: `auth.identities` gained its
+ * first-ever apple row at 2026-09-04 08:14:08Z, and Supabase linked it to the
+ * existing google identity for the same verified email rather than forking a
+ * second account.
+ *
+ * If Apple ever stops working -- the six-month secret lapsing is the way that
+ * happens -- set this back to false rather than hiding Apple alone. Google
+ * without Apple is the arrangement 4.8 forbids.
+ */
+const OAUTH_SIGN_IN_ENABLED = true;
+
 const Auth = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading, signIn, signUp, resetPassword, signInWithOAuth } = useAuth();
@@ -190,6 +225,16 @@ const Auth = () => {
           const info = body?.data || body;
           if (info?.exists && !info.has_password) {
             const oauthProviders = (info.providers || []).filter((p: string) => p !== 'email');
+            // With OAUTH_SIGN_IN_ENABLED false there is no button to point at,
+            // so pointing at one is a dead end. Forgot password sets a password
+            // on an account that has never had one, which is the way back in.
+            if (!OAUTH_SIGN_IN_ENABLED) {
+              const named = oauthProviders.includes('google') ? 'Google'
+                : oauthProviders.includes('apple') ? 'Apple' : oauthProviders[0];
+              setError(`This email signed up with ${named}. Use 'Forgot password' below to set a password for it.`);
+              setLoading(false);
+              return;
+            }
             if (oauthProviders.includes('google')) { setError("This email signed up with Google. Click 'Continue with Google' above."); setLoading(false); return; }
             if (oauthProviders.includes('apple')) { setError("This email signed up with Apple. Click 'Continue with Apple' above."); setLoading(false); return; }
             if (oauthProviders.length > 0) { setError(`This email signed up with ${oauthProviders[0]}. Use that option above.`); setLoading(false); return; }
@@ -354,6 +399,8 @@ const Auth = () => {
                     equivalent privacy-focused option — Sign in with Apple.
                     Apple's HIG: never render its button less prominently
                     than other providers, hence first + brand-white style. */}
+                {OAUTH_SIGN_IN_ENABLED && (
+                  <>
                 <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('apple')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'apple'} className="bg-white text-[#111111] ring-white/80 hover:bg-white/90 hover:text-black hover:ring-white">
                   {oauthLoading !== 'apple' && <Apple className="w-4 h-4 fill-current" />}
                   Continue with Apple
@@ -364,10 +411,29 @@ const Auth = () => {
                   Continue with Google
                 </CitrusButton>
 
+                {/* HIDE MY EMAIL (2026-09-04). Supabase links a new identity to an
+                    existing user by VERIFIED EMAIL. Apple lets a user hand over
+                    a @privaterelay.appleid.com address instead of their own, and
+                    that address matches nothing, so the same person signing in
+                    with Apple once and Google once ends up with two accounts and
+                    finds their team missing from the second. Nothing in code can
+                    prevent it, Apple gives the choice to the user, so the only
+                    lever is saying so before they choose.
+
+                    text-white/55, not /45: darkThemeContrastGuard measures white
+                    alpha against #0F1F15 and /45 is 4.43:1. No em dash either,
+                    aiVoiceGuard bans them in user-facing copy. */}
+                <p className="text-[11px] leading-snug text-center text-white/55 px-2">
+                  Use the same email for both. Apple&apos;s Hide My Email creates a
+                  separate account with none of your leagues.
+                </p>
+
                 <div className="relative py-1">
                   <div className="absolute inset-0 flex items-center"><div className="w-full h-px bg-white/10" /></div>
                   <div className="relative flex justify-center"><span className="bg-pastel-surface-tile px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/55">or with email</span></div>
                 </div>
+                  </>
+                )}
 
                 <form onSubmit={handleSignIn} className="space-y-3">
                   {error && (
@@ -440,6 +506,8 @@ const Auth = () => {
               </TabsContent>
 
               <TabsContent value="signup" className="space-y-4 mt-0">
+                {OAUTH_SIGN_IN_ENABLED && (
+                  <>
                 <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('apple')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'apple'} className="bg-white text-[#111111] ring-white/80 hover:bg-white/90 hover:text-black hover:ring-white">
                   {oauthLoading !== 'apple' && <Apple className="w-4 h-4 fill-current" />}
                   Continue with Apple
@@ -450,10 +518,29 @@ const Auth = () => {
                   Continue with Google
                 </CitrusButton>
 
+                {/* HIDE MY EMAIL (2026-09-04). Supabase links a new identity to an
+                    existing user by VERIFIED EMAIL. Apple lets a user hand over
+                    a @privaterelay.appleid.com address instead of their own, and
+                    that address matches nothing, so the same person signing in
+                    with Apple once and Google once ends up with two accounts and
+                    finds their team missing from the second. Nothing in code can
+                    prevent it, Apple gives the choice to the user, so the only
+                    lever is saying so before they choose.
+
+                    text-white/55, not /45: darkThemeContrastGuard measures white
+                    alpha against #0F1F15 and /45 is 4.43:1. No em dash either,
+                    aiVoiceGuard bans them in user-facing copy. */}
+                <p className="text-[11px] leading-snug text-center text-white/55 px-2">
+                  Use the same email for both. Apple&apos;s Hide My Email creates a
+                  separate account with none of your leagues.
+                </p>
+
                 <div className="relative py-1">
                   <div className="absolute inset-0 flex items-center"><div className="w-full h-px bg-white/10" /></div>
                   <div className="relative flex justify-center"><span className="bg-pastel-surface-tile px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/55">or with email</span></div>
                 </div>
+                  </>
+                )}
 
                 <form onSubmit={handleSignUp} className="space-y-3">
                   {error && (
