@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
+import { NewsPhone } from '@/components/news/NewsPhone';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -34,6 +37,9 @@ const News = () => {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  /** PRESS BOX (2026-09-04): the phone's search row, behind the header's glass. */
+  const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let mounted = true;
@@ -60,10 +66,29 @@ const News = () => {
 
   return (
     <DarkLayout>
-
-
-      <Navbar />
-      <main className="relative max-w-[1280px] mx-auto px-6 pt-24 pb-16">
+      {/* PRESS BOX (2026-09-04): the NEWS tab of the app nav. Below lg the
+          app header and NewsPhone; the desktop page from lg, untouched. */}
+      <div className="hidden lg:block"><Navbar /></div>
+      <div className="lg:hidden relative min-h-screen bg-pressbox-surface pt-[env(safe-area-inset-top)] pb-app-chrome">
+        <PressBoxAppHeader
+          title="News"
+          logoSrc="/favicon.svg"
+          onSearch={() => setPhoneSearchOpen((o) => !o)}
+          onNotifications={() => navigate('/profile')}
+        />
+        <NewsPhone
+          className="mt-1"
+          articles={filtered}
+          loading={loading}
+          categories={NEWS_CATEGORIES}
+          category={activeCategory}
+          onCategory={setActiveCategory}
+          searchOpen={phoneSearchOpen}
+          searchQuery={searchTerm}
+          onSearchQuery={setSearchTerm}
+        />
+      </div>
+      <main className="hidden lg:block relative max-w-[1280px] mx-auto px-6 pt-24 pb-16">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
@@ -251,7 +276,7 @@ const News = () => {
         )}
       </main>
 
-      <HockeyFooter />
+      <div className="hidden lg:block"><HockeyFooter /></div>
     </DarkLayout>
   );
 };
