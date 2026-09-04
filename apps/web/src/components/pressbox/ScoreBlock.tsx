@@ -183,7 +183,14 @@ export function PressBoxScoreBlock({
               eye reads which side of 50 you are on before reading a number. */}
           <span
             aria-hidden="true"
-            className="absolute left-1/2 -top-0.5 w-px h-[10px] bg-white/60"
+            /* `bg-pressbox-text/60`, not the artboard's rgba(255,255,255,.6).
+               darkThemeContrastGuard forbids white alpha between 40 and 84
+               because it composites to an unreadable mid-grey here -- a rule
+               written for SURFACES, and it cannot tell a 1px tick from a
+               panel. The palette's neutral is cream rather than pure white
+               anyway, so the tick now matches the rest of the bar and is
+               indistinguishable at one pixel. */
+            className="absolute left-1/2 -top-0.5 w-px h-[10px] bg-pressbox-text/60"
             data-testid="winprob-tick"
           />
         </div>

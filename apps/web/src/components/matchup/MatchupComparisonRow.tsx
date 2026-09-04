@@ -1,6 +1,9 @@
 import { MatchupPlayer } from "./types";
 import { PlayerCard } from "./PlayerCard";
 import { CenterColumn } from "./CenterColumn";
+import { useIsMobile } from "@/hooks/useIsMobile";
+import { PressBoxMatchupRow } from "@/components/pressbox";
+import { toMatchupRowPlayer } from "@/components/pressbox/matchupRows";
 
 interface MatchupComparisonRowProps {
   userPlayer: MatchupPlayer | null;
@@ -30,6 +33,32 @@ export const MatchupComparisonRow = ({
   selectedDate,
   dailyStatsMap
 }: MatchupComparisonRowProps) => {
+  const isMobile = useIsMobile();
+
+  /*
+   * PRESS BOX (2026-09-04). Below lg the row is one grid — `1fr 34px 1fr`,
+   * 58px, the opponent's half mirrored — rather than two `PlayerCard`s with a
+   * slot column between them. Branching on the hook rather than on CSS is
+   * deliberate here: this row renders 52 times on a live refresh, and
+   * `hidden lg:block` would mount both layouts every time. `PlayerCard`'s
+   * memo is load-bearing on this screen (audit M11) and rendering it into a
+   * hidden box would defeat the point of having it.
+   */
+  if (isMobile) {
+    return (
+      <PressBoxMatchupRow
+        slot={position}
+        bench={isBench}
+        you={toMatchupRowPlayer(userPlayer, selectedDate, dailyStatsMap)}
+        them={toMatchupRowPlayer(opponentPlayer, selectedDate, dailyStatsMap)}
+        onPlayerPress={(pl) => {
+          const original = String(pl.id) === String(userPlayer?.id) ? userPlayer : opponentPlayer;
+          if (original) onPlayerClick?.(original);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="matchup-comparison-row">
       {/* User Team Player Card */}
