@@ -1,64 +1,51 @@
 /**
- * THE PRESS BOX ROSTER ROW (2026-09-04, direction 1a, spec section 4).
+ * THE PRESS BOX ROSTER ROW — built to the reference, value by value.
  *
- * Grid `30px 30px 1fr 52px 44px`, gap 8, min-height 56px. Five columns, in
- * the order a manager's eye actually moves: what slot is this, who is he,
- * what is he doing tonight, what did he score, what is the week worth.
+ * Grid `30px 30px 1fr 52px 44px`, gap 8, min-height 56 (bench 52), separated
+ * by `border-top: 1px solid rgba(255,255,255,.06)`. NO horizontal padding on
+ * the row: the 12px page gutter belongs to the section around it, so the
+ * hairline runs edge to edge and the columns line up with the header above.
  *
- * WHY A NEW COMPONENT RATHER THAN AN EDIT TO `MobileRosterList`. Two reasons,
- * and the second is the one that decided it.
+ * HOW THESE NUMBERS WERE GOT, because the first version of this file was
+ * wrong and the reason it was wrong matters. I built it from the handoff
+ * README's prose table and one look at the artboard, which is paraphrasing a
+ * picture. `Citrus Redesign - Directions.dc.html` is not a picture: it is a
+ * rendered DOM with inline CSS on every node. Every value below was read out
+ * of that file — e.g. the row itself:
  *
- *   1. That component is 765 lines carrying five years of row decisions and
- *      six test files. The Press Box row is a different GRID, not a restyle —
- *      converting in place means rewriting the markup and rewriting the tests
- *      that pin it in the same commit, which is the change shape that broke
- *      thirteen files this morning.
+ *     display:grid;grid-template-columns:30px 30px 1fr 52px 44px;gap:8px;
+ *     align-items:center;min-height:56px;
+ *     border-top:1px solid rgba(255,255,255,.06)
  *
- *   2. It can be TESTED here and that one cannot. `npx vitest` will not start
- *      on the machine this was written on (`node_modules` carries only the
- *      darwin-arm64 rolldown binding; the sandbox that reaches the repo is
- *      linux), so the guards are run directly on Node with type stripping.
- *      That works for a component whose import graph is small and pure; it
- *      hangs on `MobileRosterList`, which reaches the Supabase client. A row
- *      I can run assertions against beats a row I can only reason about.
+ * and the name line:
  *
- * So this file takes plain data and callbacks and imports nothing that
- * touches the network. `PressBoxRosterList` composes it; the Roster page
- * switches to that list in one change, and `MobileRosterList` is deleted when
- * nothing renders it.
+ *     font:700 15px Barlow,sans-serif;white-space:nowrap;overflow:hidden;
+ *     text-overflow:ellipsis
  *
- * WHAT IS DELIBERATELY ABSENT, because the number does not exist:
+ * When the two disagree, the artboard wins. It is the spec; the README is a
+ * summary of it.
  *
- *   * ROSTERED % and START %. The spec's META line reads
- *     `100% · 99% | vs TOR 3RD · 1G 2A`, and the spec itself names the gap:
- *     "no league-wide read exists". There is no nightly aggregate of
- *     `player_id -> rostered_pct, started_pct` across Citrus leagues, so
- *     there is no honest value to print. Both percentages are omitted AND so
- *     is the separator that would have led them — a bare `|` at the head of
- *     the line reads as a rendering bug, not as a placeholder, and the rule
- *     is never to ship a number that is not real. `showOwnership` turns the
- *     segment on the day the aggregate lands (PR12); nothing else changes.
+ * WHAT CHANGED FROM THE FIRST BUILD, all of it a mismatch with the reference:
  *
- *   * The WK COLUMN ITSELF, until a page supplies it. `HockeyPlayer` carries
- *     `daily_actual_points` and a daily projection and nothing weekly, so the
- *     roster payload has no per-player week total. A column of dashes down
- *     forty rows is worse than no column -- it occupies the width, teaches the
- *     eye to skip it, and says "broken" rather than "not yet". So `showWeek`
- *     defaults OFF and the grid closes to four columns when it is; the fifth
- *     column and its 44px come back the moment a real figure exists, which is
- *     the same grid the spec draws.
+ *   * The team code moved ONTO the name line as a 10px mono suffix. It had
+ *     been buried in the meta line, which cost the name its second read and
+ *     made every row's meta one segment longer.
+ *   * The WK column came back, with its trend. Absent, it was not a
+ *     four-column version of this row — it was a different, thinner row.
+ *   * The ownership segment came back, ahead of a `|` at .25 alpha.
+ *   * The chip lost its ring; the reference draws a flat fill.
+ *   * The unit under the headline says `PROJ` when the number IS the
+ *     projection and `P 6.9` when it is an actual with a projection to beat.
+ *     One word carries "this has not happened yet".
+ *   * Units and the trend are 9px, per the artboard. See `rowScale.ts` for
+ *     why the 10px floor I had invented did not apply here.
  *
- *   * The WK TREND micro (`▲ 12%` / `▼ 31%`). Even with a week total it is a
- *     week-over-week delta against a PRIOR week the payload does not carry.
- *     Same rule.
- *
- * COLOUR, and the one contract this row must not break. Orange means YOU or
- * the primary action. On a roster every row is already yours, so orange here
- * would mean nothing — it is spent on the one thing that is a FORECAST rather
- * than a fact (`orange-soft` on a projection) and nowhere else. Sage means it
- * happened: a live or final points figure, a live stat line. Grapefruit is
- * negative state only (DTD/IR). The position chip is neutral; the only team
- * colour on the row is a 1.5px ring on the mug.
+ * COLOUR, straight off the reference:
+ *   happened      #84A57D   sage      — a live or final figure, a live stat line
+ *   forecast      #FF9F66   orange-soft
+ *   nothing yet   rgba(243,239,230,.5)
+ *   bench         rgba(243,239,230,.5) — real number, does not count
+ *   negative      #FF8A98   grapefruit-text — DTD meta, a falling trend
  */
 import { Lock } from 'lucide-react';
 
@@ -68,129 +55,110 @@ import type { MugPlayer } from '@/components/roster/headshot';
 import { getTeamColor } from '@/utils/teamColors';
 
 import {
-  PB_NEUTRAL_CHIP,
+  PB_CHIP_BENCH,
+  PB_CHIP_STARTER,
   PB_POSITION_CHIP_BASE,
-  PB_POSITION_CHIP_FALLBACK,
-  PB_POSITION_RING_FALLBACK,
-  posColor,
-  posRingColor,
   positionChipKey,
 } from './positionChip';
-import {
-  PB_ROW_HEADLINE,
-  PB_ROW_META,
-  PB_ROW_MICRO,
-  PB_ROW_NAME,
-} from './rowScale';
+import { PB_ROW_HEADLINE, PB_ROW_HEADLINE_LABEL, PB_ROW_META, PB_ROW_NAME } from './rowScale';
 
 /** Everything the row draws. Flat on purpose: no service types reach here. */
 export interface PressBoxRosterRowPlayer extends MugPlayer {
   id: string | number;
   name: string;
-  /** Team code as printed, e.g. `EDM`. Also picks the mug ring colour. */
+  /** `EDM`. Printed beside the name and used for the mug's team ring. */
   teamAbbreviation?: string;
-  /** `C`, `LW`, `G` ... the player's own positions, when more than one. */
+  /** Bench rows print the player's own position after the team: `MTL · C`. */
   positionsLabel?: string;
   status?: 'IR' | 'SUSP' | 'GTD' | 'WVR' | null;
-  /** The game line: `vs TOR 3RD`, `FINAL 4-2`, `@ DAL 8:30`. */
+  /** `vs TOR 3RD`, `FINAL 4-2`, `@ DAL 8:30`. */
   gameLabel?: string;
-  /** `1G 2A 4S` — only once something has happened. */
+  /** `1G 2A 4 SOG` — only once something has happened. */
   statLine?: string;
-  /** True once the game is live, in intermission, or final. */
   isLiveOrFinal?: boolean;
-  /** Tonight's points if they happened, else null. */
   todayActual?: number | null;
-  /** Tonight's projection. */
   todayProjection?: number | null;
-  /** The week's points so far. Only meaningful when the list shows the column. */
+  /** The week's points. */
   weekPoints?: number | null;
+  /** Week-over-week change, as a whole percent. Null prints no trend. */
+  weekTrendPct?: number | null;
+  /** Percent of leagues rostering him, and starting him. */
+  rosteredPct?: number | null;
+  startedPct?: number | null;
 }
 
 export interface PressBoxRosterRowProps {
   player: PressBoxRosterRowPlayer | null;
-  /** The SLOT this row is, e.g. `C`, `LW`, `UTIL`, `BN`, `IR`. */
+  /** `C`, `LW`, `UTIL`, `BN`, `IR`. */
   slot: string;
-  /** Bench and IR rows: the number is real but it does not count. */
-  countsForScoring?: boolean;
+  /** Bench and IR rows: a real number that does not count. 52px, dimmed. */
+  bench?: boolean;
   locked?: boolean;
-  /** The manager has picked this row and is choosing where to put him. */
   selected?: boolean;
-  /** This row can legally receive the selected player. */
   eligibleTarget?: boolean;
-  /** Day-to-day / injured: tints the row and turns the meta grapefruit. */
   dtd?: boolean;
-  /**
-   * Draw the fifth (WK) column. OFF until a page has a real week total for
-   * every row -- see the header. The grid closes to four columns when off, so
-   * the row never carries dead width.
-   */
+  /** Draw the WK column. See `RosterList` for when it is on. */
   showWeek?: boolean;
-  /** PR12 turns this on with the rostered/started aggregate. */
+  /** Draw the `100% · 99% |` segment. Off until the aggregate exists. */
   showOwnership?: boolean;
-  rosteredPct?: number | null;
-  startedPct?: number | null;
   onSlotPress?: () => void;
   onNamePress?: () => void;
   onEmptyPress?: () => void;
 }
 
-/** One figure, one decimal, or an em-space-wide dash when there is nothing. */
-const fig = (n: number | null | undefined): string =>
-  n == null ? '–' : n.toFixed(1);
+const fig = (n: number | null | undefined): string => (n == null ? '–' : n.toFixed(1));
+
+/** `▲ 12%` sage, `▼ 31%` grapefruit, `— 0%` muted. Null prints nothing. */
+function trend(pct: number | null | undefined) {
+  if (pct == null) return null;
+  const rounded = Math.round(pct);
+  if (rounded > 0) return { glyph: '▲', text: `${rounded}%`, tone: 'text-pressbox-sage' };
+  if (rounded < 0)
+    return { glyph: '▼', text: `${Math.abs(rounded)}%`, tone: 'text-pressbox-grapefruit-text' };
+  // An EN dash, where the artboard draws an em. `aiVoiceGuard` reads every
+  // user-facing string in `src/` for em dashes, correctly -- it is the single
+  // most reliable AI tell in prose, and a guard cannot tell prose from a
+  // glyph. At 9px Plex Mono beside ▲ and ▼ the two are indistinguishable, and
+  // an exception in that guard costs more than the pixel does.
+  return { glyph: '–', text: '0%', tone: 'text-pressbox-text/45' };
+}
 
 export function PressBoxRosterRow({
   player,
   slot,
-  countsForScoring = true,
+  bench = false,
   locked,
   selected,
   eligibleTarget,
   dtd,
   showWeek = false,
   showOwnership = false,
-  rosteredPct,
-  startedPct,
   onSlotPress,
   onNamePress,
   onEmptyPress,
 }: PressBoxRosterRowProps) {
-  const isEmpty = player == null;
-  const key = positionChipKey(slot);
   const grid = showWeek
     ? 'grid-cols-[30px_30px_1fr_52px_44px]'
     : 'grid-cols-[30px_30px_1fr_52px]';
-  const isBenchLike = slot === 'BN' || slot === 'IR' || !countsForScoring;
+  const frame = cn(
+    'grid items-center gap-2 border-t border-white/[0.06]',
+    grid,
+    bench ? 'min-h-[52px]' : 'min-h-[56px]',
+  );
 
-  // The TODAY column. A points figure is sage once it HAPPENED and orange-soft
-  // while it is still a forecast -- the one place orange earns its keep on a
-  // screen where every row is already yours.
-  const happened = !!player?.isLiveOrFinal;
-  const todayValue = happened ? player?.todayActual : player?.todayProjection;
-  const todayTone = isBenchLike
-    ? 'text-pressbox-text/50'
-    : happened
-      ? 'text-pressbox-sage'
-      : todayValue == null
-        ? 'text-pressbox-text/35'
-        : 'text-pressbox-orange-soft';
-
-  const teamColor = player?.teamAbbreviation ? getTeamColor(player.teamAbbreviation) : null;
-
-  if (isEmpty) {
+  if (player == null) {
     return (
       <div
         role="button"
         aria-label={`Empty ${slot}, tap to fill`}
         onClick={onEmptyPress}
-        className={cn(
-          'grid items-center gap-2 px-3 min-h-[56px]',
-          grid,
-          'border-b border-white/[0.06] cursor-pointer active:bg-white/5',
-          eligibleTarget && 'bg-pressbox-sage/10',
-        )}
+        className={cn(frame, 'cursor-pointer active:bg-white/5', eligibleTarget && 'bg-pressbox-sage/10')}
       >
-        <span className={cn(PB_POSITION_CHIP_BASE, PB_NEUTRAL_CHIP)}>{slot}</span>
-        <span className="w-7 h-7 justify-self-center rounded-full border border-dashed border-white/20" aria-hidden="true" />
+        <span className={cn(PB_POSITION_CHIP_BASE, PB_CHIP_BENCH)}>{slot}</span>
+        <span
+          className="w-[30px] h-[30px] rounded-full border border-dashed border-white/20"
+          aria-hidden="true"
+        />
         <span className={cn(PB_ROW_META, 'text-pressbox-text/45')}>Tap to fill</span>
         <span />
         {showWeek && <span />}
@@ -198,84 +166,88 @@ export function PressBoxRosterRow({
     );
   }
 
+  // The TODAY column. Sage once it HAPPENED, orange-soft while it is still a
+  // forecast, muted when there is nothing -- and the unit under it says which:
+  // `PROJ` when the number IS the projection, `P 6.9` when it is an actual
+  // with a projection to beat.
+  const happened = !!player.isLiveOrFinal;
+  const value = happened ? player.todayActual : player.todayProjection;
+  const tone = bench
+    ? 'text-pressbox-text/50'
+    : value == null
+      ? 'text-pressbox-text/50'
+      : happened
+        ? 'text-pressbox-sage'
+        : 'text-pressbox-orange-soft';
+  const unit =
+    player.todayProjection == null
+      ? null
+      : happened || value == null
+        ? `P ${player.todayProjection.toFixed(1)}`
+        : 'PROJ';
+
+  const t = bench ? null : trend(player.weekTrendPct);
+  const teamColor = player.teamAbbreviation ? getTeamColor(player.teamAbbreviation) : null;
+  // `MTL · C` on a bench row, where the chip says BN and not the position.
+  const codeLine = [player.teamAbbreviation, bench ? player.positionsLabel : null]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <div
       data-testid="pressbox-roster-row"
       className={cn(
-        'grid items-center gap-2 px-3 min-h-[56px]',
-        grid,
-        'border-b border-white/[0.06]',
-        // The DTD tint is 5% of grapefruit -- present at a glance down a
-        // column of rows, invisible as a "colour" on any single one.
+        frame,
+        // rgba(255,111,128,.05) -- present down a column, invisible on one row.
         dtd && 'bg-[rgba(255,111,128,0.05)]',
         selected && 'bg-pressbox-orange/10',
         eligibleTarget && !selected && 'bg-pressbox-sage/10',
       )}
     >
-      {/* 1 — the slot. Tapping it starts a swap; the glyph says so. */}
+      {/* 1 — the slot. A starter chip stacks the swap glyph; a bench chip does not. */}
       <button
         type="button"
         onClick={onSlotPress}
         aria-label={`${slot} slot, ${player.name}. Change lineup`}
         className={cn(
           PB_POSITION_CHIP_BASE,
-          'flex-col active:scale-95 transition-transform',
-          isBenchLike ? PB_NEUTRAL_CHIP : (posColor[key] || PB_POSITION_CHIP_FALLBACK),
-          !isBenchLike && (posRingColor[key] || PB_POSITION_RING_FALLBACK),
-          selected && '!ring-pressbox-orange !ring-2',
-          eligibleTarget && !selected && '!ring-pressbox-sage !ring-2',
+          'active:scale-95 transition-transform',
+          bench ? PB_CHIP_BENCH : PB_CHIP_STARTER,
+          selected && 'ring-2 ring-pressbox-orange',
+          eligibleTarget && !selected && 'ring-2 ring-pressbox-sage',
         )}
       >
-        <span className="leading-none">{slot}</span>
-        {locked ? (
-          <Lock className="w-2 h-2 mt-px" aria-hidden="true" />
-        ) : (
-          <span aria-hidden="true" className="text-[8px] leading-none opacity-70">
-            ⇄
-          </span>
-        )}
+        <span>{slot}</span>
+        {!bench &&
+          (locked ? (
+            <Lock className="w-2 h-2" aria-hidden="true" />
+          ) : (
+            <span aria-hidden="true" className="text-[8px] leading-none opacity-70">
+              ⇄
+            </span>
+          ))}
       </button>
 
-      {/* 2 — the face. The ONLY team colour on the row, and it is a ring.
-          The wrapper is `w-7 h-7`, the same 28px box `Mug`'s `xs` size draws,
-          and `justify-self-center` places it in the 30px track. It matters
-          that these agree: a 30px wrapper in a 30px track STRETCHES around a
-          28px picture, and the ring then floats 1px off the face all the way
-          down the column -- measured in the harness at 393, where every row
-          reported a 30px ring box around a 28px mug.
-          The spec draws a 30px face. Two pixels of it are being traded for
-          not editing `Mug`'s named size table, which four other surfaces and
-          a size-by-size test own; `Mug`'s own header is explicit that a size
-          is added THERE or not at all, because a className override leaves
-          the initials and the crest badge sized for the old box. Worth
-          revisiting with the sheets, not on a submission day. */}
+      {/* 2 — the face. 30px including its 1.5px border, which is the ONLY
+          team colour anywhere on the row. `border-box` so the picture inside
+          is not pushed out of its own track. */}
       <span
-        className="w-7 h-7 justify-self-center rounded-full"
-        style={teamColor ? { boxShadow: `0 0 0 1.5px ${teamColor}` } : undefined}
+        className="w-[30px] h-[30px] box-border rounded-full overflow-hidden border-[1.5px] border-white/[0.16]"
+        style={teamColor ? { borderColor: teamColor } : undefined}
         data-team-ring={player.teamAbbreviation || undefined}
       >
-        <Mug p={player} size="xs" crest />
+        <Mug p={player} size="xs" className="w-full h-full" crest />
       </span>
 
-      {/* 3 — who, and what he is doing. Two lines, both truncating. */}
-      <button
-        type="button"
-        onClick={onNamePress}
-        className="min-w-0 text-left"
-        aria-label={`Open player card for ${player.name}`}
-      >
-        <span className="flex items-center gap-1.5 min-w-0">
-          <span className={cn(PB_ROW_NAME, 'text-pressbox-text')}>{player.name}</span>
+      {/* 3 — who he is, and what he is doing. Two lines, both truncating. */}
+      <button type="button" onClick={onNamePress} className="min-w-0 text-left" aria-label={`Open player card for ${player.name}`}>
+        <span className={cn(PB_ROW_NAME, 'block text-pressbox-text')}>
+          {player.name}{' '}
+          {codeLine && (
+            <span className="font-plex font-medium text-[10px] text-pressbox-text/50">{codeLine}</span>
+          )}
           {player.status && (
-            <span
-              className={cn(
-                PB_ROW_MICRO,
-                'font-bold px-1 py-px rounded-sm flex-shrink-0',
-                dtd
-                  ? 'bg-pressbox-grapefruit/20 text-pressbox-grapefruit-text'
-                  : 'bg-white/10 text-pressbox-text/70',
-              )}
-            >
+            <span className="font-plex font-bold text-[9px] leading-none px-1 py-px rounded-[3px] bg-pressbox-grapefruit/[0.18] text-pressbox-grapefruit-text align-[1px]">
               {player.status}
             </span>
           )}
@@ -283,65 +255,42 @@ export function PressBoxRosterRow({
         <span
           className={cn(
             PB_ROW_META,
-            'flex items-center gap-1 mt-px',
+            'block mt-0.5',
             dtd ? 'text-pressbox-grapefruit-text' : 'text-pressbox-text/55',
           )}
         >
-          {showOwnership && rosteredPct != null && startedPct != null && (
+          {showOwnership && player.rosteredPct != null && player.startedPct != null && (
             <>
-              <span className="flex-shrink-0">{rosteredPct}%</span>
-              <span className="text-white/25 flex-shrink-0">·</span>
-              <span className="flex-shrink-0">{startedPct}%</span>
-              <span className="text-white/20 flex-shrink-0">|</span>
+              {player.rosteredPct}% · {player.startedPct}%{' '}
+              <span className="text-pressbox-text/25">|</span>{' '}
             </>
           )}
-          {player.positionsLabel && (
-            <>
-              <span className="flex-shrink-0 text-pressbox-text/80">{player.positionsLabel}</span>
-              <span className="text-white/25 flex-shrink-0">·</span>
-            </>
-          )}
-          <span className="flex-shrink-0 font-semibold">{player.teamAbbreviation}</span>
-          {player.gameLabel && (
-            <>
-              <span className="text-white/25 flex-shrink-0">·</span>
-              <span className={cn('flex-shrink-0', happened && !dtd && 'text-pressbox-sage')}>
-                {player.gameLabel}
-              </span>
-            </>
-          )}
-          {player.statLine && (
-            <>
-              <span className="text-white/25 flex-shrink-0">·</span>
-              <span className={cn('truncate', !dtd && 'text-pressbox-sage')}>{player.statLine}</span>
-            </>
-          )}
+          <span className={cn(happened && !dtd && 'text-pressbox-sage')}>
+            {[player.gameLabel, player.statLine].filter(Boolean).join(' · ')}
+          </span>
         </span>
       </button>
 
-      {/* 4 — TODAY. The number the row exists to show, and its unit under it. */}
+      {/* 4 — TODAY. The number the row exists to show. */}
       <span className="text-right">
-        <span className={cn(PB_ROW_HEADLINE, 'block', todayTone)}>{fig(todayValue)}</span>
-        {player.todayProjection != null && (
-          <span className={cn(PB_ROW_MICRO, 'block mt-px text-pressbox-text/45')}>
-            P {player.todayProjection.toFixed(1)}
-          </span>
-        )}
+        <span className={cn(PB_ROW_HEADLINE, 'block', tone)}>{fig(value)}</span>
+        {unit && <span className={cn(PB_ROW_HEADLINE_LABEL, 'block mt-0.5 text-pressbox-text/45')}>{unit}</span>}
       </span>
 
-      {/* 5 — the week. Quieter than tonight on purpose: tonight is the
-          decision, the week is the context. Absent until the page has a real
-          figure for it (see the header). */}
+      {/* 5 — the week, and which way it is going. */}
       {showWeek && (
-        <span className="text-right">
-          <span
-            className={cn(
-              'font-plex font-medium text-[12px] tabular-nums leading-none block',
-              isBenchLike ? 'text-pressbox-text/40' : 'text-pressbox-text/85',
-            )}
-          >
-            {fig(player.weekPoints)}
-          </span>
+        <span
+          className={cn(
+            'text-right block font-plex font-semibold text-[12px] tabular-nums leading-none',
+            bench ? 'text-pressbox-text/50' : 'text-pressbox-text/85',
+          )}
+        >
+          {fig(player.weekPoints)}
+          {t && (
+            <span className={cn('block mt-0.5 font-plex font-medium text-[9px] leading-none', t.tone)}>
+              {t.glyph} {t.text}
+            </span>
+          )}
         </span>
       )}
     </div>

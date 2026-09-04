@@ -1,35 +1,39 @@
 /**
- * THE PRESS BOX ROSTER LIST (2026-09-04, direction 1a, spec section 4).
+ * THE PRESS BOX ROSTER LIST — team card, day toggles, column header,
+ * STARTERS, BENCH. Layout only: every figure arrives as a prop, so the list
+ * renders and is asserted against without a network.
  *
- * Team card, action bar, day toggles, column header, STARTERS, BENCH. It owns
- * layout and nothing else: every figure arrives as a prop, so the list can be
- * rendered and asserted against without a network, and the page keeps sole
- * responsibility for where numbers come from.
+ * THE GUTTER LIVES HERE, NOT ON THE ROW. The reference wraps the whole
+ * section in `padding:10px 12px 0` and gives the rows no horizontal padding
+ * of their own, so the hairline between rows runs the full width of the
+ * column and the header's labels sit exactly over the numbers they name. A
+ * row that carried its own `px-3` would inset every rule by 12px and break
+ * both.
  *
- * THE SECTION HEADER CARRIES A COUNT, NOT A CLAIM. `STARTERS · 13/13` is
- * filled-over-required, and both halves are passed in. A roster with a hole
- * reads `12/13`, which is the single most useful thing the screen can say
- * before puck drop -- and it is why the count is not derived from
- * `rows.length` here: a list that renders twelve rows and an empty one would
- * otherwise report 13/13 and hide the hole it is showing.
+ * Section header, off the artboard:
+ *   `font:700 15px 'Barlow Condensed';text-transform:uppercase;
+ *    letter-spacing:.08em`, with the count in `rgba(243,239,230,.45)`;
+ *   `padding:0 2px`, and `margin-top:8px;padding:8px 2px;border-top:1px solid
+ *   rgba(255,255,255,.08)` on the BENCH one, which is what separates the two
+ *   halves of the roster without a heavier rule.
  *
- * THE BENCH NOTE IS DERIVED, NEVER DECORATIVE. `2 PLAYING TONIGHT · PTS DON'T
- * COUNT` only appears when at least one bench player actually has a game, and
- * the count is the count. With nobody playing there is nothing to warn about
- * and the note is absent rather than reading `0 PLAYING TONIGHT`.
+ * Column header: `font:500 9px 'IBM Plex Mono';color:rgba(243,239,230,.4);
+ * letter-spacing:.06em`, on the row's own grid, `padding:8px 2px 4px`.
  *
- * COLUMN HEADER AT 10px, NOT THE SPEC'S 9. Same floor `rowScale.ts` argues:
- * this repo carries ">= 10px" as a contract three test files assert by name,
- * and `PLAYER · TODAY · WK` is text a manager reads, not a glyph they
- * recognise. The row height is unaffected -- the header is its own 20px band.
+ * THE STARTERS COUNT IS FILLED-OVER-REQUIRED, and it is passed in. A list
+ * that draws twelve players and one empty slot must read `12/13`; derived
+ * from `rows.length` it would read `13/13` and hide the hole it is rendering,
+ * which is the one thing that header exists to surface.
+ *
+ * THE BENCH NOTE IS DERIVED OR ABSENT. `2 PLAYING TONIGHT · PTS DON'T COUNT`
+ * appears only when a bench player actually has a game. Nobody playing means
+ * no note, never `0 PLAYING TONIGHT`.
  */
 import { cn } from '@/lib/utils';
 
 import { PressBoxRosterRow, type PressBoxRosterRowPlayer } from './RosterRow';
-import { PB_ROW_MICRO } from './rowScale';
 
 export interface PressBoxRosterSlotRow {
-  /** Stable key. The slot id from the page, e.g. `c-1`, `bench-3`. */
   slotId: string;
   /** What the chip prints: `C`, `LW`, `UTIL`, `BN`, `IR`. */
   slot: string;
@@ -41,22 +45,21 @@ export interface PressBoxRosterSlotRow {
 }
 
 export interface PressBoxRosterListProps {
-  /** `THU` `FRI` `SAT` `WEEK` -- whatever the page is offering. */
   days: string[];
   activeDay: string;
   onDayChange?: (day: string) => void;
   starters: PressBoxRosterSlotRow[];
   bench: PressBoxRosterSlotRow[];
-  /** Filled and required starter counts. Both from the page's slot plan. */
   startersFilled: number;
   startersRequired: number;
-  /** How many bench players have a game on the selected day. */
+  /** Bench players with a game on the day being shown. */
   benchPlayingCount?: number;
-  /**
-   * Draw the WK column. Off until a page has a real per-player week total --
-   * `HockeyPlayer` carries daily figures only. See `RosterRow.tsx`.
-   */
+  /** Draw the WK column. Off until a page has a real per-player week total. */
   showWeek?: boolean;
+  /** Draw the `100% · 99%` segment. Off until the ownership aggregate exists. */
+  showOwnership?: boolean;
+  /** Rendered above STARTERS. Omit on a surface that has no team card. */
+  teamCard?: React.ReactNode;
   onSlotPress?: (slotId: string) => void;
   onNamePress?: (row: PressBoxRosterSlotRow) => void;
   onEmptyPress?: (slotId: string) => void;
@@ -64,7 +67,10 @@ export interface PressBoxRosterListProps {
 }
 
 const SECTION =
-  'font-condensed font-extrabold text-[15px] uppercase tracking-[0.08em] text-pressbox-text';
+  'font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text';
+const COUNT = 'text-pressbox-text/45';
+const COLHEAD =
+  'font-plex font-medium text-[9px] uppercase tracking-[0.06em] text-pressbox-text/40';
 
 export function PressBoxRosterList({
   days,
@@ -76,22 +82,29 @@ export function PressBoxRosterList({
   startersRequired,
   benchPlayingCount = 0,
   showWeek = false,
+  showOwnership = false,
+  teamCard,
   onSlotPress,
   onNamePress,
   onEmptyPress,
   className,
 }: PressBoxRosterListProps) {
-  const renderRow = (row: PressBoxRosterSlotRow, countsForScoring: boolean) => (
+  const grid = showWeek
+    ? 'grid-cols-[30px_30px_1fr_52px_44px]'
+    : 'grid-cols-[30px_30px_1fr_52px]';
+
+  const renderRow = (row: PressBoxRosterSlotRow, isBench: boolean) => (
     <PressBoxRosterRow
       key={row.slotId}
       player={row.player}
       slot={row.slot}
-      countsForScoring={countsForScoring}
-      showWeek={showWeek}
+      bench={isBench}
       locked={row.locked}
       dtd={row.dtd}
       selected={row.selected}
       eligibleTarget={row.eligibleTarget}
+      showWeek={showWeek}
+      showOwnership={showOwnership}
       onSlotPress={() => onSlotPress?.(row.slotId)}
       onNamePress={() => onNamePress?.(row)}
       onEmptyPress={() => onEmptyPress?.(row.slotId)}
@@ -99,17 +112,14 @@ export function PressBoxRosterList({
   );
 
   return (
-    <div className={cn('bg-pressbox-surface', className)}>
-      {/* STARTERS + the day toggles, on one line: which day you are looking at
-          is the same question as which lineup you are looking at. */}
-      <div className="flex items-center justify-between px-3 pt-3 pb-2">
+    <div className={cn('bg-pressbox-surface border-t border-white/[0.08] px-3 pt-2.5', className)}>
+      {teamCard}
+
+      <div className="flex items-center justify-between mt-3 px-0.5">
         <h2 className={SECTION}>
-          Starters
-          <span className="ml-1.5 font-plex font-medium text-[12px] tracking-normal text-pressbox-text/45">
-            {startersFilled}/{startersRequired}
-          </span>
+          Starters <span className={COUNT}>· {startersFilled}/{startersRequired}</span>
         </h2>
-        <div role="tablist" aria-label="Lineup day" className="flex items-center gap-1">
+        <div role="tablist" aria-label="Lineup day" className="flex gap-1">
           {days.map((d) => (
             <button
               key={d}
@@ -118,10 +128,8 @@ export function PressBoxRosterList({
               aria-selected={d === activeDay}
               onClick={() => onDayChange?.(d)}
               className={cn(
-                'font-plex font-medium text-[10px] uppercase tracking-[0.06em] px-2 h-6 rounded-md',
-                d === activeDay
-                  ? 'bg-pressbox-tile text-pressbox-text'
-                  : 'text-pressbox-text/45',
+                'font-plex font-semibold text-[10px] px-2 py-[3px] rounded-[4px]',
+                d === activeDay ? 'bg-pressbox-tile text-pressbox-text' : 'text-pressbox-text/50',
               )}
             >
               {d}
@@ -130,47 +138,29 @@ export function PressBoxRosterList({
         </div>
       </div>
 
-      {/* The column header. Same five-column grid as the rows, so the labels
-          land over the numbers they name rather than near them. */}
-      <div
-        aria-hidden="true"
-        className={cn(
-          'grid items-center gap-2 px-3 h-5 border-b border-white/[0.08]',
-          showWeek ? 'grid-cols-[30px_30px_1fr_52px_44px]' : 'grid-cols-[30px_30px_1fr_52px]',
-        )}
-      >
+      {/* The row's own grid, so every label lands over its column. */}
+      <div aria-hidden="true" className={cn('grid gap-2 pt-2 pb-1 px-0.5', grid, COLHEAD)}>
         <span />
         <span />
-        <span className={cn(PB_ROW_MICRO, 'uppercase tracking-[0.08em] text-pressbox-text/45')}>
-          Player
-        </span>
-        <span className={cn(PB_ROW_MICRO, 'uppercase tracking-[0.08em] text-pressbox-text/45 text-right')}>
-          Today
-        </span>
-        {showWeek && (
-          <span className={cn(PB_ROW_MICRO, 'uppercase tracking-[0.08em] text-pressbox-text/45 text-right')}>
-            Wk
-          </span>
-        )}
+        <span>Player{showOwnership && ' · Ros% / Start%'}</span>
+        <span className="text-right">Today</span>
+        {showWeek && <span className="text-right">Wk</span>}
       </div>
 
-      <div>{starters.map((r) => renderRow(r, true))}</div>
+      <div>{starters.map((r) => renderRow(r, false))}</div>
 
-      <div className="flex items-center justify-between px-3 pt-4 pb-2">
+      <div className="flex items-center justify-between mt-2 py-2 px-0.5 border-t border-white/[0.08]">
         <h2 className={SECTION}>
-          Bench
-          <span className="ml-1.5 font-plex font-medium text-[12px] tracking-normal text-pressbox-text/45">
-            {bench.length}
-          </span>
+          Bench <span className={COUNT}>· {bench.length}</span>
         </h2>
         {benchPlayingCount > 0 && (
-          <span className={cn(PB_ROW_MICRO, 'uppercase tracking-[0.06em] text-pressbox-orange-soft')}>
+          <span className="font-plex font-medium text-[10px] uppercase tracking-[0.02em] text-pressbox-orange-soft whitespace-nowrap">
             {benchPlayingCount} playing tonight · pts don't count
           </span>
         )}
       </div>
 
-      <div>{bench.map((r) => renderRow(r, false))}</div>
+      <div>{bench.map((r) => renderRow(r, true))}</div>
     </div>
   );
 }

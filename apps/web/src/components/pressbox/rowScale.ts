@@ -42,17 +42,24 @@
  *      common way a fixed-height list turns ragged, and the only place to make
  *      that impossible is here.
  *
- * THE 10px FLOOR IS NOT NEGOTIABLE, and the first attempt broke it. The
- * Press Box spec's density pass wanted 9px for unit labels and status marks;
- * this repo has carried "every label is >= 10px" as an explicit contract
- * since the mobile score work (`PlayerCard.mobileScore.test.tsx`, K-series),
- * and three test files assert it by name. A design system does not get to
- * overrule an accessibility floor because the mock looked tighter — 9px Plex
- * Mono at 500 on #0C1811 is a smudge for anyone who does not already know
- * what the label says. MICRO and the headline label stay at 10px. The density
- * the spec wanted comes from META 12 -> 10 and from `leading-none`, both of
- * which are above the floor, and the measured row heights still land inside
- * the spec's band.
+ * THE 9px RUNGS, AND THE ARGUMENT I LOST. The first version of this module
+ * held MICRO and the headline label at 10px, on the grounds that this repo
+ * carries ">= 10px" as a contract three test files assert by name
+ * (`PlayerCard.mobileScore.test.tsx`, K-series). That contract is real and it
+ * still binds — but it binds the MATCHUP score stack, which is what those
+ * three files render. It was never a repo-wide floor; I generalised it into
+ * one, and the cost was a roster row visibly thinner than the design it was
+ * supposed to be.
+ *
+ * The reference is explicit, and it is not a table in a README — it is
+ * inline CSS on the artboard itself:
+ *
+ *     font:500 9px 'IBM Plex Mono',monospace;color:rgba(243,239,230,.45)
+ *
+ * on the unit under a headline number, on the week trend, and on the column
+ * header. Three places, all of them marks a manager recognises by shape
+ * (`P 6.9`, `PROJ`, `▲ 12%`) rather than sentences anyone reads. The matchup
+ * stack's floor is untouched: nothing here renders inside it.
  *
  * SIZE, WEIGHT AND FAMILY ONLY — NO COLOUR, for the reason the legacy module
  * gives: this is a `.ts` and `darkThemeContrastGuard` only walks `.tsx`, so a
@@ -89,8 +96,7 @@ export const PB_ROW_HEADLINE = 'font-plex font-semibold text-[17px] tabular-nums
  * as the four figures above them, which is how a unit label ends up with the
  * same optical weight as the thing it is a unit of.
  */
-export const PB_ROW_HEADLINE_LABEL =
-  'font-plex font-medium text-[10px] uppercase tracking-[0.1em] leading-none';
+export const PB_ROW_HEADLINE_LABEL = 'font-plex font-medium text-[9px] leading-none';
 
 /**
  * Team, opponent, game time, the live stat line — everything that qualifies
@@ -104,4 +110,4 @@ export const PB_ROW_META =
  * than a sentence. 10px is the floor: below it a label on this page is a
  * smudge, not small text.
  */
-export const PB_ROW_MICRO = 'font-plex font-medium text-[10px] leading-tight';
+export const PB_ROW_MICRO = 'font-plex font-medium text-[9px] leading-none';

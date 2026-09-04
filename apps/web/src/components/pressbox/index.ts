@@ -16,6 +16,7 @@ export {
 
 /** Roster surface (PR4). Presentational: every figure arrives as a prop. */
 export { PressBoxRosterRow, type PressBoxRosterRowProps, type PressBoxRosterRowPlayer } from './RosterRow';
+export { PressBoxTeamCard, type PressBoxTeamCardProps, type PressBoxTeamAction } from './PressBoxTeamCard';
 export {
   PressBoxRosterList,
   type PressBoxRosterListProps,

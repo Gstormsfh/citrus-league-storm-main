@@ -79,12 +79,39 @@ export const posRingColor: Record<string, string> = {
  * Geometry and type. No `text-*` here — `posColor` owns the text colour so it
  * can never disagree with its own background.
  */
+/**
+ * `rounded-[6px]`, NOT `rounded-md`. This repo's `tailwind.config.ts` remaps
+ * the radius scale -- `lg` is `var(--radius)` (16px) and `md` is
+ * `calc(var(--radius) - 2px)` (14px) -- so the shadcn-shaped names mean
+ * something completely different here from what they mean anywhere else. A
+ * `rounded-md` chip measured 14px against the artboard's 6px, which is the
+ * difference between a chip and a pill. Every radius in `components/pressbox`
+ * is written in pixels for that reason.
+ */
 export const PB_POSITION_CHIP_BASE =
-  'w-[30px] h-[30px] flex-shrink-0 rounded-md flex items-center justify-center font-condensed text-[11px] font-extrabold tracking-wide ring-1';
+  'w-[30px] h-[30px] flex-shrink-0 rounded-[6px] flex items-center justify-center font-condensed text-[11px] font-extrabold leading-none';
+
+/**
+ * A STARTER chip stacks its letter over the swap glyph; a BENCH chip does not.
+ * Straight off the reference, which draws the starter chip
+ * `flex-direction:column` with an 8px `⇄` at .7 opacity under the letter, and
+ * the bench chip as a single centred `BN` with no glyph at all — because a
+ * bench row is not a slot you swap INTO, it is where a player waits.
+ */
+export const PB_CHIP_STARTER = 'flex-col bg-white/10 text-pressbox-text';
+export const PB_CHIP_BENCH = 'bg-white/[0.08] text-pressbox-text/55';
 
 /** An unrecognised slot renders something wrong-looking that can be reported. */
 export const PB_POSITION_CHIP_FALLBACK = 'bg-white/10 text-pressbox-text';
 export const PB_POSITION_RING_FALLBACK = 'ring-white/16';
+
+/**
+ * NO RING ON THE CHIP. The first build gave it `ring-1 ring-white/16`, which
+ * came from the LEGACY chip and not from the reference — the artboard's chip
+ * is a flat `rgba(255,255,255,.1)` fill with no border at all. A ring at that
+ * alpha beside a mug that DOES carry a 1.5px ring reads as two rings, and the
+ * mug's is the one that means something (the team).
+ */
 
 /**
  * A slot that is not a position: the bench (BN) and the total row (TOT / DAY).

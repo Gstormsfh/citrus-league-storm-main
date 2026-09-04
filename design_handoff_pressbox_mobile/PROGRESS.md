@@ -515,3 +515,91 @@ one.
 
 Verified: 443/443 source-walking guards, 20/20 on the row guard, 20/20 on the
 adapter, `tsc` exit 0, `eslint` 0 errors.
+
+---
+
+## PR4d — rebuilt against the artboard, value by value (2026-09-04)
+
+Rejected on sight, correctly: "yours is legit dogshit compared to Claude
+Design." It was. Here is why, and what changed.
+
+**THE METHOD WAS WRONG.** I built PR4 from this handoff's README — a prose
+table of the type scale and a paragraph per screen — plus one look at the
+rendered artboard. That is paraphrasing a picture, and paraphrase compounds:
+every screen after it would have missed by the same margin.
+
+`Citrus Redesign - Directions.dc.html` is **not a picture**. It is a rendered
+DOM with inline CSS on every node. The roster panel's own markup carries:
+
+    display:grid;grid-template-columns:30px 30px 1fr 52px 44px;gap:8px;
+    align-items:center;min-height:56px;
+    border-top:1px solid rgba(255,255,255,.06)
+
+So the method is now: render the file in Playwright, lift the panel's
+`outerHTML`, and build to the literal values. When the artboard and the README
+disagree, the artboard wins — it is the spec, the README is a summary of it.
+
+**WHAT THAT CAUGHT.**
+
+1. **`rounded-md` is 14px in this repo, not 6px.** `tailwind.config.ts` remaps
+   the radius scale (`lg: var(--radius)` = 16px, `md: calc(var(--radius) - 2px)`
+   = 14px), so every shadcn-shaped radius name means something different here
+   from everywhere else. The chip measured 14px against the artboard's 6 — the
+   difference between a chip and a pill. **This would have hit all eighteen
+   PRs.** Every radius in `components/pressbox` is now written in pixels, and
+   a test forbids the named scale in the chip.
+2. **The chip had a ring the artboard does not draw.** It came from the legacy
+   chip. Two rings beside a mug that carries a meaningful one is one too many.
+3. **The team code belongs on the NAME line**, as a 10px mono suffix
+   (`Connor McDavid EDM`), not buried in the meta. It had cost the name its
+   second read and made every meta line one segment longer.
+4. **`PROJ` vs `P 6.9`.** The unit under the headline says which: `PROJ` when
+   the number IS the projection, `P 6.9` when it is an actual with a
+   projection to beat. One word carries "this has not happened yet".
+5. **The WK column and the ownership segment came back.** Removed, this was
+   not a four-column version of the row — it was a different, thinner row.
+6. **Bench rows are 52px, starters 56.** And a bench row prints `MTL · C`,
+   because its chip says BN and not the position.
+7. **The row carries no horizontal padding.** The section owns the 12px
+   gutter, so the hairline runs the full column and the header labels sit over
+   their numbers.
+
+**THE 9px RUNGS — I REVERSED MYSELF.** I had held MICRO and the headline label
+at 10px, citing a repo contract three test files assert. That contract is real
+and it binds the MATCHUP score stack, which is what those three files render.
+It was never repo-wide; I generalised it into one, and the cost was a roster
+visibly thinner than its own design. The artboard is explicit —
+`font:500 9px 'IBM Plex Mono';color:rgba(243,239,230,.45)` — on the unit, the
+trend and the column header, all marks recognised by shape rather than read.
+The matchup floor is untouched: nothing here renders inside it.
+
+**ONE CHARACTER DELIBERATELY OFF-SPEC.** The flat trend is `– 0%` with an EN
+dash where the artboard draws an em. `aiVoiceGuard` reads every user-facing
+string for em dashes, correctly — it is the most reliable AI tell in prose,
+and a guard cannot tell prose from a glyph. At 9px beside ▲ and ▼ the two are
+indistinguishable; an exception in that guard costs more than the pixel does.
+
+**THE WIDTH COMPLAINT WAS A HARNESS BUG, AND A REAL ONE.** `ChatBar` and
+`PressBoxBottomNav` are `position: fixed`, so they escaped the 393px frame and
+spanned the pane — the list looked half-width under full-width chrome. The
+frame now carries `transform: translateZ(0)`, which makes it the containing
+block for its fixed descendants. It also carries `paddingBottom:
+BOTTOM_CHROME_H`, because without it the last bench row sits UNDER the chat
+bar — which is a real bug on the phone, not only in the harness.
+
+**NEW: `PressBoxTeamCard`.** Disc, record, rank, the win-probability bar
+(your orange growing from the left over their ice — the same "orange = you,
+ice = them" the matchup screen uses) and the four actions, exactly one of
+which is orange. Every figure optional: no probability draws no bar rather
+than a 50% one.
+
+Named `PressBoxTeamCard`, not `TeamCard`: `matchupDeadCodeGuard` pins that a
+deleted `components/matchup/TeamCard` stays deleted and matches `./TeamCard`
+relatively, so a file of that name anywhere trips it. The guard has a
+false-positive there; renaming is free and leaving a guard alone is not.
+
+**Measured in the browser at 393:** frame 393, grid
+`30px 30px 181px 52px 44px`, starters 56px and bench 52px exactly, chip 30x30
+radius 6 with no border, mug 30px with a 1.5px `rgb(255,76,0)` border.
+443/443 source-walking guards, 54/54 on the two Press Box guards (34 of them
+quoting the artboard rule they pin), `tsc` exit 0, `eslint` 0 errors.

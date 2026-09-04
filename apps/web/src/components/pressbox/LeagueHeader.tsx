@@ -91,7 +91,7 @@ export function LeagueHeader({ weekLabel, onWeekPress, onSettingsPress, classNam
           className="focus-citrus flex items-center gap-2.5 min-w-0 flex-1"
           aria-label={leagueName ? `${leagueName} home` : 'League home'}
         >
-          <span className="w-[30px] h-[30px] flex-shrink-0 rounded-md bg-pressbox-tile-high ring-1 ring-white/[0.08] flex items-center justify-center overflow-hidden">
+          <span className="w-[30px] h-[30px] flex-shrink-0 rounded-[7px] bg-pressbox-tile-high ring-1 ring-white/[0.08] flex items-center justify-center overflow-hidden">
             {crest ? (
               <img src={crest} alt="" className="w-[22px] h-[22px] object-contain" />
             ) : (

@@ -94,7 +94,7 @@ export function ChatBar({
         <button
           type="button"
           onClick={onAction}
-          className="focus-citrus flex-shrink-0 h-7 px-2.5 rounded-lg bg-pressbox-orange font-condensed font-extrabold text-[11px] uppercase tracking-[0.06em] text-pressbox-orange-ink"
+          className="focus-citrus flex-shrink-0 h-7 px-2.5 rounded-[8px] bg-pressbox-orange font-condensed font-extrabold text-[11px] uppercase tracking-[0.06em] text-pressbox-orange-ink"
         >
           {actionLabel}
         </button>
