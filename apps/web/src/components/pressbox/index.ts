@@ -23,6 +23,14 @@ export {
   type PressBoxRosterSlotRow,
 } from './RosterList';
 
+export { PressBoxMatchupRow, type PressBoxMatchupRowProps, type PressBoxMatchupPlayer } from './MatchupRow';
+export {
+  PressBoxScoreBlock,
+  type PressBoxScoreBlockProps,
+  type PressBoxScoreSide,
+  type PressBoxScoreDay,
+} from './ScoreBlock';
+
 /** The Press Box row ladder and chip. See rowScale.ts for why they fork. */
 export {
   PB_ROW_NAME,
