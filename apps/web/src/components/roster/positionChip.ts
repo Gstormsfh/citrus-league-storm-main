@@ -44,28 +44,58 @@
  * MobileRosterList.positionRing.test.tsx parses these maps out of this file's
  * source, so keep the `const name: Record<string, string> = {` shape and one
  * `KEY: 'classes',` entry per line.
+ *
+ * ── COLOUR RESTRAINT (2026-09-04, Press Box direction 1a) ──────────────────
+ *
+ * Every entry above is now the same neutral pair. The maps survive, and so
+ * does the shape the test parses, but they no longer VARY -- which is the
+ * point.
+ *
+ * The reasoning, from the design review that produced this direction: five
+ * saturated position fills down a roster read as decoration, and decoration
+ * competes with the one thing on the screen that has to be unmissable. In
+ * Press Box, orange `#FF6B1A` is the only saturated colour and it means
+ * "you / your pick / the primary action", one per screen region. A sage LW
+ * chip and an orange RW chip beside a manager's orange win-probability bar
+ * are three saturated things fighting over the same glance, and the RW chip
+ * -- which means nothing about ownership -- was winning.
+ *
+ * The LETTER carries the position. It always did; the fill was never doing
+ * that work. What the fill was doing was making the row look busy and making
+ * `RW` look like it meant something the others did not.
+ *
+ * The maps are deliberately NOT collapsed into a single constant. Keeping
+ * one entry per key means the next person who wants a coloured position has
+ * to edit six lines and stare at six identical values while doing it, and
+ * `darkThemeContrastGuard` fails them if they do. A lone constant would make
+ * the same regression a one-word change.
+ *
+ * The contrast argument in the block above is now moot rather than wrong:
+ * `bg-white/10` composites to ~#232F27 on the page and ~#2C3A31 on a tile,
+ * and `#F3EFE6` on either is well past 12:1. The old measurements are kept
+ * because they are why this file exists.
  */
 import { cn } from '@/lib/utils';
 import { resolveFantasyPosition } from '@/utils/rosterUtils';
 
 export const posColor: Record<string, string> = {
-  LW: 'bg-pastel-sage-soft text-pastel-forest',
-  C: 'bg-pastel-sage text-pastel-forest',
-  RW: 'bg-pastel-orange text-white',
-  D: 'bg-white/10 text-pastel-cream',
-  G: 'bg-pastel-sage/15 text-pastel-cream',
-  UTIL: 'bg-pastel-sage text-pastel-forest',
-  F: 'bg-emerald-600 text-white',
+  LW: 'bg-white/10 text-pressbox-text',
+  C: 'bg-white/10 text-pressbox-text',
+  RW: 'bg-white/10 text-pressbox-text',
+  D: 'bg-white/10 text-pressbox-text',
+  G: 'bg-white/10 text-pressbox-text',
+  UTIL: 'bg-white/10 text-pressbox-text',
+  F: 'bg-white/10 text-pressbox-text',
 };
 
 export const posRingColor: Record<string, string> = {
-  LW: 'ring-pastel-sage-soft/30',
-  C: 'ring-pastel-sage/30',
-  RW: 'ring-pastel-orange/30',
-  D: 'ring-white/30',
-  G: 'ring-pastel-sage/50',
-  UTIL: 'ring-pastel-sage/30',
-  F: 'ring-emerald-600/30',
+  LW: 'ring-white/16',
+  C: 'ring-white/16',
+  RW: 'ring-white/16',
+  D: 'ring-white/16',
+  G: 'ring-white/16',
+  UTIL: 'ring-white/16',
+  F: 'ring-white/16',
 };
 
 /**
@@ -73,22 +103,22 @@ export const posRingColor: Record<string, string> = {
  * colour so it can never disagree with its own background (see the map).
  */
 export const POSITION_CHIP_BASE =
-  'w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center font-varsity text-[11px] font-black tracking-wide ring-1';
+  'w-[30px] h-[30px] flex-shrink-0 rounded-md flex items-center justify-center font-condensed text-[11px] font-extrabold tracking-wide ring-1';
 
 /**
  * 2026-08-19: the fallback chip was bg-white/40 (mid-grey once composited on
  * the dark page) with pastel-forest text — the one combination in this map
  * that failed its own rule above.
  */
-export const POSITION_CHIP_FALLBACK = 'bg-white/15 text-pastel-cream';
-export const POSITION_RING_FALLBACK = 'ring-white/20';
+export const POSITION_CHIP_FALLBACK = 'bg-white/10 text-pressbox-text';
+export const POSITION_RING_FALLBACK = 'ring-white/16';
 
 /**
  * A slot that is not a position: the bench (BN) and the total row (TOT / DAY).
  * Neutral on purpose — a bench row has no position colour to claim, and the
  * chip's job there is to say "does not count" without shouting.
  */
-export const NEUTRAL_CHIP = 'bg-white/10 text-white/55 ring-white/20';
+export const NEUTRAL_CHIP = 'bg-white/10 text-white/55 ring-white/16';
 
 /**
  * Raw position or slot string -> the key the maps above understand.

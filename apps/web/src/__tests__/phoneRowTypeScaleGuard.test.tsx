@@ -67,7 +67,7 @@ function px(rung: string): number {
 // ── The ladder itself ─────────────────────────────────────────────────────
 
 describe('phoneRowScale — four rungs, strictly ordered', () => {
-  it('is the scale the audit asked for: 17 / 15 / 12 / 10', () => {
+  it('is the scale the audit asked for, Press Box rungs: 17 / 15 / 10 / 9', () => {
     // The audit's band for a headline number is 17-20px and for a name
     // 15-16px. 17 rather than 20 is a fit decision the module explains: the
     // mobile matchup row shows TWO players at 393px, so each score column
@@ -76,9 +76,28 @@ describe('phoneRowScale — four rungs, strictly ordered', () => {
     // one pixel" edit has to argue with this comment first.
     expect(px(ROW_HEADLINE)).toBe(17);
     expect(px(ROW_NAME)).toBe(15);
-    expect(px(ROW_META)).toBe(12);
-    expect(px(ROW_MICRO)).toBe(10);
-    expect(px(ROW_HEADLINE_LABEL)).toBe(10);
+    expect(px(ROW_META)).toBe(10);
+    expect(px(ROW_MICRO)).toBe(9);
+    expect(px(ROW_HEADLINE_LABEL)).toBe(9);
+  });
+
+  it('META truncates by contract, so a long line can never grow a fixed row', () => {
+    // Press Box fixes row heights (roster/matchup 56-58, players 64,
+    // standings 44). The spec's rule is "shorten the string, never grow the
+    // row", and a wrapping META line is the commonest way a fixed-height
+    // list goes ragged. Owning it in the rung means no call site can forget.
+    expect(ROW_META).toContain('whitespace-nowrap');
+    expect(ROW_META).toContain('overflow-hidden');
+    expect(ROW_META).toContain('text-ellipsis');
+  });
+
+  it('every rung that carries a number is Plex Mono, so columns line up', () => {
+    for (const rung of [ROW_HEADLINE, ROW_HEADLINE_LABEL, ROW_META, ROW_MICRO]) {
+      expect(rung).toContain('font-plex');
+    }
+    // The name is the one rung that is prose, not a figure.
+    expect(ROW_NAME).toContain('font-barlow');
+    expect(ROW_NAME).not.toContain('font-plex');
   });
 
   it('the headline number is bigger than the name, which is bigger than the metadata', () => {
@@ -92,9 +111,9 @@ describe('phoneRowScale — four rungs, strictly ordered', () => {
   });
 
   it('the headline number is mono and tabular, so a column of them lines up', () => {
-    expect(ROW_HEADLINE).toContain('font-jbmono');
+    expect(ROW_HEADLINE).toContain('font-plex');
     expect(ROW_HEADLINE).toContain('tabular-nums');
-    expect(ROW_HEADLINE).toContain('font-bold');
+    expect(ROW_HEADLINE).toContain('font-semibold');
     // NOT font-varsity: index.css colours `.font-varsity:not(button)` cream
     // at a specificity that beats every text-* utility, which is how the
     // roster's projections and final scores ended up the same colour.

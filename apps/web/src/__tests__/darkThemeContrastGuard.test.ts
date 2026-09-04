@@ -293,4 +293,93 @@ describe('dark-theme contrast guard', () => {
       `font-varsity color rules missing :not(button) — these force text color onto buttons:\n${offenders.join('\n')}`,
     ).toEqual([]);
   });
+
+  // ── PRESS BOX COLOUR CONTRACT (2026-09-04) ───────────────────────────────
+  //
+  // Direction 1a's central finding was that the app was noisy, not dark: five
+  // saturated position fills and per-team colour bars competed with the one
+  // element that actually had to be unmissable. The contract that fixed it:
+  //
+  //   orange #FF6B1A is the ONLY saturated colour and means "you / your pick
+  //   / the primary action", one per screen region. Position tags are
+  //   neutral. Team colour is a 1.5px ring on the mug, never a fill.
+  //
+  // Contrast is why this lives here rather than in a new file: a coloured
+  // position chip is not merely off-brand, it is the mechanism by which the
+  // old maps put white on #C8DCC4 at 1.45:1 (see positionChip.ts's header).
+  // The guard that measured that regression should be the one that prevents
+  // its return.
+
+  it('position chips stay neutral — the letter carries the position', () => {
+    const src = readFileSync(resolve(SRC, 'components/roster/positionChip.ts'), 'utf8');
+    const maps = [...src.matchAll(/const (posColor|posRingColor): Record<string, string> = \{([^}]+)\}/gs)];
+    expect(maps.length, 'both chip maps must still exist').toBe(2);
+
+    const offenders: string[] = [];
+    for (const [, mapName, body] of maps) {
+      for (const line of body.split('\n')) {
+        const m = line.match(/^\s*([A-Za-z0-9_]+)\s*:\s*'([^']*)'/);
+        if (!m) continue;
+        const [, key, classes] = m;
+        // Anything that is not white-alpha or the neutral text token is a hue.
+        const hue = classes
+          .split(/\s+/)
+          .filter((c) => /^(bg|text|ring)-/.test(c))
+          .filter((c) => !/^(bg|ring)-white\//.test(c))
+          .filter((c) => c !== 'text-pressbox-text' && !/^text-white\//.test(c));
+        if (hue.length) offenders.push(`${mapName}.${key}: ${hue.join(' ')}`);
+      }
+    }
+    expect(
+      offenders,
+      `coloured position chips — orange is the only saturated colour and it means "you":\n${offenders.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('team colour is a ring, never a fill or a bar', () => {
+    // teamColors.ts is allowed to EXPORT hexes; components are not allowed to
+    // pour them into a background or a bar. The reference calls this out
+    // twice because it is the regression that made the draft board look like
+    // a sticker album: `background: teamColor` on a row, and a 3px team-colour
+    // rule down its left edge.
+    const offenders: string[] = [];
+    for (const f of FILES.filter(inScope)) {
+      const src = code(readFileSync(f, 'utf8'));
+      for (const m of src.matchAll(/\b(backgroundColor|background|borderLeft|borderLeftColor|borderBottomColor)\s*:\s*([^,;\n}]+)/g)) {
+        const value = m[2];
+        if (!/\bteam(Colou?r|Primary|Secondary)\b/i.test(value)) continue;
+        offenders.push(`${REL(f)}: ${m[1]}: ${value.trim().slice(0, 60)}`);
+      }
+    }
+    expect(
+      offenders,
+      `team colour used as a fill or bar — Press Box allows a 1.5px ring on the mug only:\n${offenders.join('\n')}`,
+    ).toEqual([]);
+  });
+
+  it('both Press Box rules bite: planted offenders are caught', () => {
+    // A detector nobody has watched fail is a detector that might be reading
+    // the wrong thing. Same self-test pattern the light-theme rule above uses.
+    const chipLine = "  RW: 'bg-pastel-orange text-white',";
+    const hue = chipLine
+      .split(/\s+/)
+      .filter((c) => /^(bg|text|ring)-/.test(c))
+      .filter((c) => !/^(bg|ring)-white\//.test(c))
+      .filter((c) => c !== 'text-pressbox-text' && !/^text-white\//.test(c));
+    expect(hue.length, 'a coloured chip must be detected').toBeGreaterThan(0);
+
+    const fill = 'style={{ backgroundColor: teamColor }}';
+    const hit = [...fill.matchAll(/\b(backgroundColor|background)\s*:\s*([^,;\n}]+)/g)]
+      .filter((m) => /\bteam(Colou?r)\b/i.test(m[2]));
+    expect(hit.length, 'a team-colour fill must be detected').toBeGreaterThan(0);
+
+    // And the shipped neutral pair must NOT trip the chip rule.
+    const clean = "  RW: 'bg-white/10 text-pressbox-text',";
+    const cleanHue = clean
+      .split(/\s+/)
+      .filter((c) => /^(bg|text|ring)-/.test(c))
+      .filter((c) => !/^(bg|ring)-white\//.test(c))
+      .filter((c) => c !== 'text-pressbox-text' && !/^text-white\//.test(c));
+    expect(cleanHue, 'the shipped chip must be clean').toEqual([]);
+  });
 });

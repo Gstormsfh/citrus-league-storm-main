@@ -140,6 +140,34 @@ export default {
 				// Citrus brand: warm cream/peach pastel base, vibrant orange punches.
 				// Glossier × Casper × Notion register.
 				// ==========================================
+				// PRESS BOX (2026-09-04) — the phone re-skin's palette, direction 1a.
+				//
+				// Additive. `pastel.*` stays exactly as it is: every non-phone surface
+				// still wears it, and a rename would have been a thousand-line diff
+				// with no visual gain. Press Box screens use these; nothing else does.
+				//
+				// THE COLOUR CONTRACT, which is the whole point of the narrow palette:
+				// identity is not standing. `orange` means YOU -- your pick, your bar,
+				// the one primary action in a screen region -- and never "winning".
+				// `sage` means HAPPENED (live, final, positive) and never "you".
+				// `ice` is only ever the other side of a two-sided comparison.
+				// `grapefruit` is negative state. Position tags and team identity get
+				// NO fill at all -- see NEUTRAL_CHIP in roster/positionChip.ts and the
+				// enforcement in darkThemeContrastGuard.
+				pressbox: {
+					surface: '#0C1811',          // page background
+					tile: '#16241B',             // cards, row containers, chips
+					'tile-high': '#1f3327',      // crest boxes, hover
+					text: '#F3EFE6',             // primary text
+					orange: '#FF6B1A',           // YOU / primary action. Text on it: #2a1000
+					'orange-ink': '#2a1000',     // the only legible ink on an orange fill
+					'orange-soft': '#FF9F66',    // eyebrows, active nav, links, projections
+					sage: '#84A57D',             // happened / live / positive
+					'sage-soft': '#C8DCC4',      // LW chip, G chip text
+					ice: '#8DCDFF',              // OPPONENT side of a two-sided comparison
+					grapefruit: '#FF6F80',       // negative: drops, losses, DTD/IR
+					'grapefruit-text': '#FF8A98',// the same state, legible as text
+				},
 				pastel: {
 					cream: '#FFF8F0',           // base bg upper
 					'cream-warm': '#FFEDDB',    // base bg mid
@@ -290,6 +318,15 @@ export default {
 				// Pastel-vibrant redesign — Citrus warm-character serif + clean body + tabular mono
 				'calistoga': ['Calistoga', 'Georgia', 'serif'],            // Warm display serif — Citrus voice with human warmth
 				'jbmono': ['"JetBrains Mono"', 'ui-monospace', 'monospace'], // Tabular numbers + mono labels
+				// PRESS BOX (2026-09-04). Three families, one job each, phone only.
+				// Graduate / Montserrat / Calistoga / Inter stay declared because
+				// the marketing pages and the desktop surfaces still use them --
+				// "retire on phone surfaces" is a call-site instruction, not a
+				// deletion. Removing them here would have broken Homepage and the
+				// preview routes for no benefit to the re-skin.
+				'condensed': ['"Barlow Condensed"', '"Arial Narrow"', 'sans-serif'], // titles, section heads, sub-tabs, chips
+				'barlow': ['Barlow', 'system-ui', 'sans-serif'],                     // body + names (NAME rung)
+				'plex': ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],            // EVERY number and label, tabular
 			}
 		}
 	},
