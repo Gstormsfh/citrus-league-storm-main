@@ -33,6 +33,7 @@ import { matchupApi } from '../src/api/matchups';
 import { leagueApi } from '../src/api/leagues';
 import { rosterApi } from '../src/api/rosters';
 import { waiverApi } from '../src/api/waivers';
+import { scoresApi } from '../src/api/scores';
 import { ScoringCalculator, extractScoringSettings } from '../src/utils/scoringUtils';
 import { HARNESS_PLAYERS, harnessDirectoryPlayer, harnessPlayer } from './players';
 import { OPP as MATCHUP_OPP, USER as MATCHUP_USER } from './matchupFixtures';
@@ -199,6 +200,45 @@ const MATCHUP_ROW = {
 (matchupApi as any).ensureRosters = async () => ({ data: { ok: true } });
 (matchupApi as any).getFrozenRosterBatch = async () => ({ data: [] });
 (matchupApi as any).getMatchupScores = async () => ({ data: MATCHUP_ROW });
+
+/**
+ * THE APP HOME (2026-09-04): tonight's slate from the scores read, with the
+ * caller's players marked the way the real endpoint marks them
+ * (`roster.isMine`), so the ticker and TONIGHT ON YOUR ROSTERS render from
+ * the same shape production hands the page. Two live games, one final, one
+ * still to start.
+ */
+const HARNESS_TODAY = new Date().toISOString().slice(0, 10);
+const scoresGame = (id: number, away: string, home: string, over: Record<string, unknown>) => ({
+  gameId: id, gameDate: HARNESS_TODAY, startsAt: `${HARNESS_TODAY}T02:00:00.000Z`, state: 'scheduled', statusRaw: null,
+  period: null, periodTime: null, venue: null, gameType: '02', season: 20262027,
+  away: { abbrev: away, teamId: 1, city: null, name: null }, home: { abbrev: home, teamId: 2, city: null, name: null },
+  awayScore: null, homeScore: null, citrus: null, ...over,
+});
+const mineLine = (who: string, projected: number, actual: number | null, actuals: Record<string, number> | null) => {
+  const p = harnessDirectoryPlayer(harnessPlayer(who), 0);
+  return {
+    playerId: Number(p.id), name: p.full_name, teamAbbrev: p.team, position: p.position, isGoalie: p.position === 'G',
+    headshotUrl: p.headshot_url, projectedPoints: projected, confidenceLabel: 'high', actualPoints: actual,
+    actuals: actuals ? { goals: 0, assists: 0, points: 0, shotsOnGoal: 0, blocks: 0, hits: 0, ppp: 0, toiSeconds: 0, saves: null, goalsAgainst: null, wins: null, shutouts: null, ...actuals } : null,
+    roster: { teamId: 't1', teamName: 'Team 1', isMine: true },
+  };
+};
+(scoresApi as any).getDay = async () => ({
+  date: HARNESS_TODAY,
+  games: [
+    scoresGame(1, 'EDM', 'TOR', { state: 'live', period: '3rd', periodTime: '4:12', awayScore: 3, homeScore: 2,
+      citrus: { projectedPlayers: 4, players: [mineLine('Connor McDavid', 6.2, 8.4, { goals: 1, assists: 2, points: 3, shotsOnGoal: 4 })], rosteredCount: 6, myCount: 1, confidence: { high: 1, medium: 0, low: 0, unlabeled: 0 }, hasActuals: true } }),
+    scoresGame(2, 'BOS', 'NYR', { state: 'live', period: '2nd', periodTime: '11:40', awayScore: 1, homeScore: 1,
+      citrus: { projectedPlayers: 4, players: [mineLine('David Pastrnak', 5.1, 2.1, { shotsOnGoal: 3 })], rosteredCount: 5, myCount: 1, confidence: { high: 1, medium: 0, low: 0, unlabeled: 0 }, hasActuals: true } }),
+    scoresGame(3, 'COL', 'LAK', { citrus: { projectedPlayers: 3, players: [mineLine('Cale Makar', 6.2, null, null)], rosteredCount: 4, myCount: 1, confidence: { high: 1, medium: 0, low: 0, unlabeled: 0 }, hasActuals: false } }),
+    scoresGame(4, 'MIN', 'STL', { state: 'final', awayScore: 4, homeScore: 2 }),
+  ],
+  nearestDateWithGames: { before: null, after: null },
+  league: { id: 'harness-league', rostersResolved: true },
+  truncated: false,
+  generatedAt: new Date().toISOString(),
+});
 (WaiverService as any).getTeamWaiverClaims = async () => CLAIMS;
 (WaiverService as any).getWaiverPriority = async () => PRIORITY;
 (WaiverService as any).getAvailablePlayers = async () =>
@@ -428,6 +468,7 @@ const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
   teamanalytics: () => import('../src/pages/TeamAnalytics'),
   profile: () => import('../src/pages/Profile'),
   freeagents: () => import('../src/pages/FreeAgents'),
+  home: () => import('../src/pages/Index'),
   trade: () => import('../src/pages/TradeAnalyzer'),
   matchup: () => import('../src/pages/Matchup'),
   standings: () => import('../src/pages/Standings'),
@@ -456,6 +497,7 @@ const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   // So does Free Agents — and the LeagueHeader's PLAYERS underline matches on
   // the pathname, so under the harness's own path it lit LEAGUE instead.
   freeagents: { path: '/free-agents', at: '/free-agents?league=harness-league' },
+  home: { path: '/', at: '/' },
   // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
   // the week into the URL as soon as it resolves one. Under the old
   // `/matchup/:leagueId?` the very first push ("/matchup/harness-league/1")

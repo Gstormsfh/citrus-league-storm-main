@@ -4,18 +4,26 @@
  *
  * The native app booted onto the marketing homepage: the one core route
  * with no app navigation at all. A signed-in manager opening the app
- * landed on the sales pitch and had to hunt for their league. The native
- * shell now boots signed-in users with an active league straight to
- * League HQ; the web homepage stays the storefront.
+ * landed on the sales pitch and had to hunt for their league. The fix of
+ * 2026-08-31 redirected the native shell to League HQ.
+ *
+ * THE APP HOME (PRESS BOX, 2026-09-04) supersedes the redirect. `/` is now
+ * artboard 1a's LEAGUES tab for a signed-in manager with a league — on the
+ * native shell and on a phone-width web view — with the app nav, the Stormy
+ * bar, tonight's slate and every league's card. The original complaint was
+ * "no menus", not "not my league": the app home has both. A tab that
+ * redirected away from itself would not be a tab, so the redirect is gone
+ * and League HQ is the card's tap. The web at desktop width, anyone signed
+ * out, and anyone without a league still get the storefront.
  *
  * jsdom cannot run the Capacitor native branch, so these are source
  * contracts on the exact behaviors that matter:
- *   - the decision is native-only (web keeps the homepage)
- *   - it waits for auth AND league context to settle before deciding
- *     (deciding early flashes the marketing page, or strands a signed-in
- *     user whose `user` was still null at look time)
- *   - the redirect carries the ?league= param the LeagueContext URL
- *     watcher expects, matching the bottom nav's own link shape
+ *   - the native shell still waits for auth AND league context to settle
+ *     before deciding (deciding early flashes the marketing page, or strands
+ *     a signed-in user whose `user` was still null at look time)
+ *   - the app home is gated on a signed-in user WITH leagues, on native or
+ *     below lg — never the desktop web, never the signed-out
+ *   - nothing on this route redirects to League HQ any more
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -25,26 +33,26 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const SOURCE = readFileSync(resolve(here, '../pages/Index.tsx'), 'utf-8');
 
-describe('native boot lands on League HQ', () => {
-  it('gates the redirect on the native platform, never the web', () => {
+describe('the homepage is the app home on a phone, the storefront everywhere else', () => {
+  it('still knows the native platform, and holds the splash ground while it settles', () => {
     expect(SOURCE).toMatch(/Capacitor\.isNativePlatform\(\)/);
-  });
-
-  it('waits for auth and league context to settle before deciding', () => {
     expect(SOURCE).toMatch(/auth\?\.loading/);
     expect(SOURCE).toMatch(/league\?\.loading/);
-  });
-
-  it('redirects to League HQ with the league param the context watcher expects', () => {
-    expect(SOURCE).toMatch(/\/league\/\$\{activeLeagueId\}\?league=\$\{activeLeagueId\}/);
-    expect(SOURCE).toMatch(/replace/);
-  });
-
-  it('holds the splash ground color while settling — no marketing flash', () => {
     expect(SOURCE).toMatch(/#0F1F15/);
   });
 
-  it('still renders the homepage for the web and for users without leagues', () => {
+  it('renders the Press Box home for a signed-in manager with leagues, native or below lg', () => {
+    expect(SOURCE).toMatch(/<PressBoxHome/);
+    expect(SOURCE).toMatch(/auth\?\.user && hasLeagues && \(native \|\| isMobile\)/);
+    expect(SOURCE).toMatch(/userLeagues\?\.length/);
+  });
+
+  it('no longer redirects the native shell to League HQ — the LEAGUES tab has to come back here', () => {
+    expect(SOURCE).not.toMatch(/<Navigate/);
+    expect(SOURCE).not.toMatch(/\/league\/\$\{activeLeagueId\}/);
+  });
+
+  it('still renders the storefront for the web at desktop width and for users without leagues', () => {
     expect(SOURCE).toMatch(/<Homepage \/>/);
   });
 });
