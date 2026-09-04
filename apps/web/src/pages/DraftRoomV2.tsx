@@ -59,6 +59,7 @@ import { PressBoxDraftHeader } from '@/components/pressbox/DraftHeader';
 import { PressBoxTabs } from '@/components/pressbox/Tabs';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { Card } from '@/components/ui/card';
 import { DraftClientRunner } from '@/lib/draftClient/runner';
 import { fetchDraftOrderMatrix } from '@/lib/draftClient/fetchDraftOrderMatrix';
@@ -1594,6 +1595,7 @@ function DraftRoomBody({
    * the very queue it restored — see DraftQueue.persistence.test.tsx),
    * while the pool becomes a read/write view of the same array.
    */
+  const isMobile = useIsMobile();
   const [queue, setQueue] = useState<string[]>([]);
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
@@ -1682,6 +1684,7 @@ function DraftRoomBody({
           clockOffsetMs={clockOffsetMs}
           queue={queue}
           onQueueChange={setQueue}
+          isMobile={isMobile}
         />
       </div>
       {/* QUEUE-REACH (2026-08-13) — was `hidden lg:block`.
@@ -1698,16 +1701,22 @@ function DraftRoomBody({
           stacks underneath the pool, which is what v1 has always
           done. At lg and up nothing changes — it is still the right
           hand column. */}
-      <div className="space-y-4">
-        <SidebarPanel
-          leagueId={leagueId}
-          teams={teams}
-          playersById={playersById}
-          myTeamId={myTeamId}
-          queue={queue}
-          onQueueChange={setQueue}
-        />
-      </div>
+      {/* PRESS BOX (2026-09-04): below lg the rail's halves live in the
+          QUEUE and MY TEAM tabs (MainTabs), so the rail is not rendered
+          there at all — not hidden, not rendered — which is what keeps
+          DraftQueue at exactly one instance either way. */}
+      {!isMobile && (
+        <div className="space-y-4">
+          <SidebarPanel
+            leagueId={leagueId}
+            teams={teams}
+            playersById={playersById}
+            myTeamId={myTeamId}
+            queue={queue}
+            onQueueChange={setQueue}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1726,6 +1735,8 @@ interface MainTabsProps {
   /** QUEUE-REACH (2026-08-13) — owned by DraftRoomBody, shared with the sidebar. */
   queue: string[];
   onQueueChange: (next: string[]) => void;
+  /** Below lg: the rail's halves become the QUEUE and MY TEAM tabs. */
+  isMobile: boolean;
 }
 
 function MainTabs({
@@ -1739,6 +1750,7 @@ function MainTabs({
   clockOffsetMs,
   queue,
   onQueueChange,
+  isMobile,
 }: MainTabsProps) {
   const derived = useDerivedDraftState();
   const snapshot = useDraftSnapshot();
@@ -1775,7 +1787,7 @@ function MainTabs({
   // sticky bar and the header timer agree frame-for-frame.
   const pickTimeLimitSec = usePickTimeLimitSec();
   const pendingActions = usePendingActions();
-  const [tab, setTab] = useState<'players' | 'board' | 'history'>('players');
+  const [tab, setTab] = useState<'players' | 'queue' | 'board' | 'myteam' | 'history'>('players');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   // V2-PARITY (2026-08-17) — tap-for-player-card. Garrett's #1 feedback
   // from Citrus Draft Night: rows only highlighted; no card ever opened.
@@ -1902,6 +1914,11 @@ function MainTabs({
   const draftedIds = useMemo(
     () => (renderDerived ? toDraftedPlayerIds(renderDerived) : []),
     [renderDerived],
+  );
+  /** Queued players still on the board — the number the QUEUE tab carries. */
+  const liveQueueCount = useMemo(
+    () => queue.filter((id) => !draftedIds.includes(id)).length,
+    [queue, draftedIds],
   );
   const availablePlayers = useMemo(
     () => (renderDerived ? toAvailablePlayers(playersById, renderDerived) : []),
@@ -2364,12 +2381,61 @@ function MainTabs({
           label="Draft room view"
           activeKey={tab}
           onSelect={(v) => setTab(v as typeof tab)}
-          tabs={[
-            { key: 'players', label: 'Players' },
-            { key: 'board', label: 'Board' },
-            { key: 'history', label: 'History' },
-          ]}
+          tabs={
+            isMobile
+              ? [
+                  { key: 'players', label: 'Players' },
+                  { key: 'queue', label: liveQueueCount > 0 ? `Queue · ${liveQueueCount}` : 'Queue' },
+                  { key: 'board', label: 'Board' },
+                  { key: 'myteam', label: 'My team' },
+                  { key: 'history', label: 'History' },
+                ]
+              : [
+                  { key: 'players', label: 'Players' },
+                  { key: 'board', label: 'Board' },
+                  { key: 'history', label: 'History' },
+                ]
+          }
         />
+
+        {/* PRESS BOX (2026-09-04) — artboard 4a's QUEUE and MY TEAM tabs,
+            phones only. `forceMount` + `data-[state=inactive]:hidden` keeps
+            both panes MOUNTED while another tab is showing: DraftQueue's
+            restore effect overwrites the queue and toasts on every mount,
+            so a queue that unmounted on each tab switch would re-restore —
+            and could clobber a reorder still inside its 600ms save
+            debounce — every time you looked at the pool. Radix would
+            otherwise unmount an inactive pane. */}
+        {isMobile && (
+          <>
+            <TabsContent value="queue" forceMount className="mt-2 data-[state=inactive]:hidden">
+              <SidebarPanel
+                section="queue"
+                leagueId={leagueId}
+                teams={teams}
+                playersById={playersById}
+                myTeamId={myTeamId}
+                queue={queue}
+                onQueueChange={onQueueChange}
+                onDraftFromQueue={(playerId) => {
+                  const picked = playersById.get(playerId);
+                  if (picked) void handleDraftFromPool(picked);
+                }}
+              />
+            </TabsContent>
+            <TabsContent value="myteam" forceMount className="mt-3 px-3.5 space-y-3 data-[state=inactive]:hidden">
+              <SidebarPanel
+                section="rosters"
+                leagueId={leagueId}
+                teams={teams}
+                playersById={playersById}
+                myTeamId={myTeamId}
+                queue={queue}
+                onQueueChange={onQueueChange}
+              />
+            </TabsContent>
+          </>
+        )}
 
         <TabsContent value="players" className="mt-4">
           {playersLoading ? (
@@ -2504,6 +2570,23 @@ interface SidebarPanelProps {
   /** QUEUE-REACH (2026-08-13) — lifted to DraftRoomBody; see the note there. */
   queue: string[];
   onQueueChange: (next: string[]) => void;
+  /**
+   * PRESS BOX (2026-09-04) — artboard 4a gives the phone QUEUE and MY TEAM
+   * tabs. Below lg the rail's two halves render in those panes instead of
+   * stacked under 75 rows of pool; at lg the rail is still the rail. Both
+   * paths render ONE DraftQueue: `all` on the rail, `queue` in the tab, never
+   * together — "exactly one DraftQueue is mounted" is a tested invariant
+   * because its restore effect overwrites the queue on every mount.
+   */
+  section?: 'all' | 'queue' | 'rosters';
+  /**
+   * PRESS BOX (2026-09-04). On the phone the queue is a TAB, so its
+   * `DRAFT NOW` has to do something: MainTabs hands it the same guarded
+   * DR-2 submit the pool's Draft button uses. Absent (the desktop rail),
+   * the button keeps its "Draft from the Players tab" toast — architect
+   * ruling 1c's status quo, unchanged.
+   */
+  onDraftFromQueue?: (playerId: string) => void;
 }
 
 function SidebarPanel({
@@ -2513,7 +2596,11 @@ function SidebarPanel({
   myTeamId,
   queue,
   onQueueChange,
+  section = 'all',
+  onDraftFromQueue,
 }: SidebarPanelProps) {
+  const showRosters = section !== 'queue';
+  const showQueue = section !== 'rosters';
   const derived = useDerivedDraftState();
   const matrix = useDraftMatrix();
 
@@ -2558,49 +2645,61 @@ function SidebarPanel({
 
   return (
     <>
-      <ManagerPresencePanel teams={participatingTeams} />
-      {!anyPicksMade && derived !== null && (
-        <div
-          className="rounded border border-dashed border-muted-foreground/30 bg-muted/20 p-3 text-xs text-muted-foreground"
-          data-testid="rosters-empty-copy"
-        >
-          No picks yet. Rosters will fill in as the draft progresses.
+      {/* The queue leads the rail: during a draft it is the thing a manager
+          reaches for, and a rail that buries it under twelve rosters is a
+          rail that scrolls. */}
+      {showQueue && (
+        <div>
+          <DraftQueue
+            queue={queue}
+            players={allPlayers}
+            draftedPlayers={draftedIds}
+            onQueueChange={onQueueChange}
+            onDraftFromQueue={
+              onDraftFromQueue ??
+              (() => {
+                // Queue-drive submit is post-DR-3. For now, users draft
+                // via the pool's Draft button. Queue is display-only per
+                // architect ruling 1c.
+                toast.info('Draft from the Players tab');
+              })
+            }
+            isDraftActive={derived?.draftStatus === 'in_progress'}
+            isYourTurn={amIOnClock}
+            leagueId={leagueId}
+            // QUEUE (2026-08-12) — enables server persistence. Null for a
+            // spectator or an unresolved identity, in which case DraftQueue
+            // stays on its previous localStorage-only path.
+            teamId={myTeamId}
+            currentPick={derived?.currentPickNumber ?? undefined}
+            totalPicks={derived?.totalPicks ?? undefined}
+          />
+          <div
+            className="px-3.5 pb-3 font-plex font-medium text-[10px] text-pressbox-text/45"
+            data-testid="queue-persistence-note"
+          >
+            Saved to your team. Used for autopick if your clock expires
+          </div>
         </div>
       )}
-      <TeamRosters
-        teams={v1Teams}
-        draftHistory={draftHistory}
-        userTeamId={myTeamId}
-      />
-      <div>
-        <DraftQueue
-          queue={queue}
-          players={allPlayers}
-          draftedPlayers={draftedIds}
-          onQueueChange={onQueueChange}
-          onDraftFromQueue={() => {
-            // Queue-drive submit is post-DR-3. For now, users draft
-            // via the pool's Draft button. Queue is display-only per
-            // architect ruling 1c.
-            toast.info('Draft from the Players tab');
-          }}
-          isDraftActive={derived?.draftStatus === 'in_progress'}
-          isYourTurn={amIOnClock}
-          leagueId={leagueId}
-          // QUEUE (2026-08-12) — enables server persistence. Null for a
-          // spectator or an unresolved identity, in which case DraftQueue
-          // stays on its previous localStorage-only path.
-          teamId={myTeamId}
-          currentPick={derived?.currentPickNumber ?? undefined}
-          totalPicks={derived?.totalPicks ?? undefined}
-        />
-        <div
-          className="text-xs text-muted-foreground mt-1"
-          data-testid="queue-persistence-note"
-        >
-          Saved to your team. Used for autopick if your clock expires
-        </div>
-      </div>
+      {showRosters && (
+        <>
+          {!anyPicksMade && derived !== null && (
+            <div
+              className="rounded-[12px] border border-dashed border-white/15 px-3 py-2.5 font-barlow text-[12px] text-pressbox-text/55"
+              data-testid="rosters-empty-copy"
+            >
+              No picks yet. Rosters will fill in as the draft progresses.
+            </div>
+          )}
+          <TeamRosters
+            teams={v1Teams}
+            draftHistory={draftHistory}
+            userTeamId={myTeamId}
+          />
+          <ManagerPresencePanel teams={participatingTeams} />
+        </>
+      )}
       {/* DR-3 (2026-07-29) — DraftControls HIDDEN per architect ruling:
           v2 HTTP routes for /pause and /resume don't exist yet (only
           /undo is exposed at server/src/routes/draft.ts:273). Wiring
