@@ -48,40 +48,49 @@ export function PressBoxAppHeader({
       </div>
 
       <div className="flex items-center gap-1.5">
-        <button type="button" onClick={onSearch} aria-label="Search" className={SQUARE}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-        </button>
+        {/* Each control renders only with a handler (2026-09-04): the
+            Scores and News tabs carry the same header without the orange
+            `+ LEAGUE`, which belongs to the screen that lists leagues. */}
+        {onSearch && (
+          <button type="button" onClick={onSearch} aria-label="Search" className={SQUARE}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+          </button>
+        )}
 
-        <button
-          type="button"
-          onClick={onAddLeague}
-          className="focus-citrus h-[34px] px-3 rounded-[10px] bg-pressbox-orange text-pressbox-orange-ink flex items-center gap-1.5 font-plex font-bold text-[12px] tracking-[0.08em] whitespace-nowrap"
-        >
-          + LEAGUE
-        </button>
+        {onAddLeague && (
+          <button
+            type="button"
+            onClick={onAddLeague}
+            className="focus-citrus h-[34px] px-3 rounded-[10px] bg-pressbox-orange text-pressbox-orange-ink flex items-center gap-1.5 font-plex font-bold text-[12px] tracking-[0.08em] whitespace-nowrap"
+          >
+            + LEAGUE
+          </button>
+        )}
 
-        <button
-          type="button"
-          onClick={onNotifications}
-          aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
-          className={cn(SQUARE, 'relative')}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-            <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-          </svg>
-          {!!unread && (
-            <span
-              aria-hidden="true"
-              className="absolute -top-1 -right-1 px-1 py-px rounded-full bg-pressbox-grapefruit text-[#2a0a0f] font-plex font-bold text-[9px]"
-            >
-              {unread}
-            </span>
-          )}
-        </button>
+        {onNotifications && (
+          <button
+            type="button"
+            onClick={onNotifications}
+            aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
+            className={cn(SQUARE, 'relative')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+            </svg>
+            {!!unread && (
+              <span
+                aria-hidden="true"
+                className="absolute -top-1 -right-1 px-1 py-px rounded-full bg-pressbox-grapefruit text-[#2a0a0f] font-plex font-bold text-[9px]"
+              >
+                {unread}
+              </span>
+            )}
+          </button>
+        )}
       </div>
     </header>
   );

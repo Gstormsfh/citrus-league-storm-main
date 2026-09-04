@@ -30,13 +30,13 @@ import { formatPoints, hasUnconfirmedGoalieDuel } from './scoresFormat';
 function confidenceClass(label: string | null): string {
   switch ((label ?? '').trim().toLowerCase()) {
     case 'high':
-      return 'text-pastel-sage';
+      return 'text-pressbox-sage';
     case 'medium':
-      return 'text-pastel-butter';
+      return 'text-pressbox-text/70';
     case 'low':
-      return 'text-pastel-orange-soft';
+      return 'text-pressbox-orange-soft';
     default:
-      return 'text-pastel-forest-dim';
+      return 'text-pressbox-text/45';
   }
 }
 
@@ -45,18 +45,18 @@ function PlayerPill({ player }: { player: ScoresPlayerLine }) {
   return (
     <div
       className={cn(
-        'flex items-center gap-1.5 min-w-0 flex-1 rounded-lg px-1.5 py-1',
-        player.roster?.isMine ? 'bg-pastel-orange/15 ring-1 ring-pastel-orange/30' : 'bg-white/[0.03]',
+        'flex items-center gap-1.5 min-w-0 flex-1 rounded-[8px] px-1.5 py-1 border',
+        player.roster?.isMine ? 'bg-pressbox-orange/[0.08] border-pressbox-orange/30' : 'bg-white/[0.03] border-white/[0.06]',
       )}
     >
       {player.teamAbbrev ? <TeamChip abbrev={player.teamAbbrev} size="xs" /> : null}
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-1 min-w-0">
-          <span className="font-display text-[10px] text-pastel-cream truncate leading-tight">
+          <span className="font-barlow font-semibold text-[11px] text-pressbox-text truncate leading-tight">
             {player.name}
           </span>
           {player.position ? (
-            <span className="font-jbmono text-[8px] text-pastel-sage/60 flex-shrink-0">
+            <span className="font-plex text-[8px] text-pressbox-text/45 flex-shrink-0">
               {player.position}
             </span>
           ) : null}
@@ -64,20 +64,20 @@ function PlayerPill({ player }: { player: ScoresPlayerLine }) {
         <div className="flex items-baseline gap-1 leading-none mt-0.5">
           {hasActual ? (
             <>
-              <span className="font-jbmono text-[11px] font-bold text-pastel-cream tabular-nums">
+              <span className="font-plex font-semibold text-[12px] text-pressbox-sage tabular-nums">
                 {formatPoints(player.actualPoints)}
               </span>
-              <span className="font-jbmono text-[8px] text-pastel-sage/60 tabular-nums">
-                proj {formatPoints(player.projectedPoints)}
+              <span className="font-plex text-[8px] text-pressbox-text/45 tabular-nums">
+                P {formatPoints(player.projectedPoints)}
               </span>
             </>
           ) : (
             <>
-              <span className="font-jbmono text-[11px] font-bold text-pastel-cream tabular-nums">
+              <span className="font-plex font-semibold text-[12px] text-pressbox-orange-soft tabular-nums">
                 {formatPoints(player.projectedPoints)}
               </span>
               <span
-                className={cn('font-jbmono text-[8px]', confidenceClass(player.confidenceLabel))}
+                className={cn('font-plex text-[8px]', confidenceClass(player.confidenceLabel))}
               >
                 {player.confidenceLabel ?? 'no grade'}
               </span>
@@ -96,14 +96,14 @@ export function CitrusRowStrip({ citrus }: { citrus: ScoresGameCitrus | null }) 
   const unconfirmedGoalies = hasUnconfirmedGoalieDuel(citrus.players);
 
   return (
-    <div className="mt-2 pt-2 border-t border-pastel-sage/10">
+    <div className="mt-2 pt-2 border-t border-white/[0.06]">
       <div className="flex items-center gap-1.5 mb-1.5">
-        <span className="font-jbmono text-[8px] tracking-[0.2em] uppercase text-pastel-orange-soft">
-          {citrus.hasActuals ? 'Citrus actual vs projected' : 'Citrus projections'}
+        <span className="font-plex font-semibold text-[8px] tracking-[0.14em] uppercase text-pressbox-text/45">
+          {citrus.hasActuals ? 'Actual · projected' : 'Projected'}
         </span>
         {citrus.myCount !== null && citrus.myCount > 0 ? (
-          <span className="font-jbmono text-[8px] px-1.5 py-0.5 rounded bg-pastel-orange/20 text-pastel-orange-soft">
-            {citrus.myCount} yours
+          <span className="font-plex font-semibold text-[8px] tracking-[0.08em] px-1.5 py-0.5 rounded-[4px] bg-pressbox-orange/15 text-pressbox-orange-soft">
+            {citrus.myCount} YOURS
           </span>
         ) : null}
       </div>
@@ -115,7 +115,7 @@ export function CitrusRowStrip({ citrus }: { citrus: ScoresGameCitrus | null }) 
       </div>
 
       {unconfirmedGoalies ? (
-        <p className="font-display text-[9px] text-pastel-forest-dim mt-1.5 leading-tight">
+        <p className="font-barlow text-[10px] text-pressbox-text/45 mt-1.5 leading-tight">
           Two goalies projected for one club: the starter is not confirmed.
         </p>
       ) : null}

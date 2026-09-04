@@ -23,7 +23,7 @@ interface ScoresListProps {
 
 export function ScoresList({ games, leagueId, expandedGameId, onToggle }: ScoresListProps) {
   return (
-    <div className="flex flex-col gap-2 px-3 py-3" data-testid="scores-list">
+    <div className="flex flex-col gap-2 px-3.5 py-3" data-testid="scores-list">
       {games.map((game) => (
         <ScoreboardGameRow
           key={game.gameId}

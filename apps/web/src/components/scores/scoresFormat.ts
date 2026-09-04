@@ -102,8 +102,8 @@ export function citrusSummaryText(game: ScoreboardGame): string {
   if (!citrus || citrus.projectedPlayers === 0) return '';
 
   if (citrus.myCount !== null && citrus.myCount > 0) {
-    const noun = citrus.myCount === 1 ? 'player' : 'players';
-    return `${citrus.myCount} of your ${noun} in this one`;
+    // "1 of your players": the set is plural however many are in the game.
+    return `${citrus.myCount} of your players in this one`;
   }
   if (citrus.rosteredCount !== null && citrus.rosteredCount > 0) {
     const noun = citrus.rosteredCount === 1 ? 'player' : 'players';

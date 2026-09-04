@@ -776,7 +776,9 @@ describe('scores architecture guard', () => {
 
     it('live is marked in place with a ring and a pulse', () => {
       const code = codeOf(row);
-      expect(code).toContain("game.state === 'live' && 'ring-1 ring-pastel-sage/30'");
+      // PRESS BOX (2026-09-04): the ring is the tile's border going sage,
+      // the way the Home ticker marks a game being played.
+      expect(code).toContain("game.state === 'live' ? 'border-pressbox-sage/40' : 'border-white/[0.08]'");
       expect(code).toMatch(/\{showsLivePulse\(game\) \? <LivePulse\b/);
     });
   });
@@ -817,7 +819,9 @@ describe('scores architecture guard', () => {
       const code = codeOf(strip);
       expect(count(code, /\bprojectedPoints\b/g)).toBeGreaterThanOrEqual(2);
       expect(count(code, /\bconfidenceLabel\b/g)).toBeGreaterThanOrEqual(2);
-      expect(literalsOf(strip).map((s) => s.text)).toContain('Citrus projections');
+      // PRESS BOX (2026-09-04): the eyebrow is `PROJECTED`, the artboards'
+      // word for it (`6.2 PROJ`); the brand is the app, not the label.
+      expect(literalsOf(strip).map((s) => s.text)).toContain('Projected');
     });
 
     it('the wire shape carries no odds field either', () => {

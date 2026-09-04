@@ -240,6 +240,32 @@ const mineLine = (who: string, projected: number, actual: number | null, actuals
   truncated: false,
   generatedAt: new Date().toISOString(),
 });
+/**
+ * A game's expanded detail on the Scores tab (2026-09-04): the row's own
+ * players plus a few from the other club, one rostered by someone else and
+ * one free, so the row states (yours / theirs / nobody's) are all on screen.
+ */
+(scoresApi as any).getGame = async (gameId: number) => {
+  const day = await (scoresApi as any).getDay();
+  const game = day.games.find((g: any) => g.gameId === gameId) ?? day.games[0];
+  const live = game.state !== 'scheduled';
+  const other = (who: string, projected: number, actual: number | null, roster: any) => ({
+    ...mineLine(who, projected, actual, actual == null ? null : { goals: 1, assists: 0, points: 1, shotsOnGoal: 2 }),
+    roster,
+  });
+  return {
+    game,
+    players: [
+      ...(game.citrus?.players ?? []),
+      other('Mitch Marner', 5.8, live ? 3.2 : null, { teamId: 't3', teamName: 'Puck Norris', isMine: false }),
+      other('William Nylander', 4.1, live ? 0 : null, null),
+      other('Leon Draisaitl', 5.4, live ? 6.1 : null, { teamId: 't4', teamName: 'Crease Lightning', isMine: false }),
+    ],
+    league: { id: 'harness-league', rostersResolved: true },
+    truncated: false,
+    generatedAt: new Date().toISOString(),
+  };
+};
 (WaiverService as any).getTeamWaiverClaims = async () => CLAIMS;
 (WaiverService as any).getWaiverPriority = async () => PRIORITY;
 (WaiverService as any).getAvailablePlayers = async () =>
@@ -588,6 +614,11 @@ const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
   // so nothing here could show the page's own chrome, its empty states, or
   // whether the list is wired to the page's handlers at all.
   roster: () => import('../src/pages/Roster'),
+  // The app nav's other four tabs (2026-09-04), so the whole nav can be
+  // walked here.
+  scores: () => import('../src/pages/Scores'),
+  players: () => import('../src/pages/Players'),
+  news: () => import('../src/pages/News'),
 };
 
 const which = new URLSearchParams(location.search).get('p') || 'waivers';
@@ -607,6 +638,9 @@ const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   // the pathname, so under the harness's own path it lit LEAGUE instead.
   freeagents: { path: '/free-agents', at: '/free-agents?league=harness-league' },
   home: { path: '/', at: '/' },
+  scores: { path: '/scores', at: '/scores' },
+  players: { path: '/players', at: '/players' },
+  news: { path: '/news', at: '/news' },
   // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
   // the week into the URL as soon as it resolves one. Under the old
   // `/matchup/:leagueId?` the very first push ("/matchup/harness-league/1")

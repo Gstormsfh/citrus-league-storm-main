@@ -114,7 +114,8 @@ describe('ScoreboardGameRow', () => {
     render(
       <ScoreboardGameRow game={GAME({ citrus: CITRUS() })} expanded={false} onToggle={vi.fn()} />,
     );
-    expect(screen.getByText('Citrus projections')).toBeInTheDocument();
+    // PRESS BOX (2026-09-04): the eyebrow is the artboards' word, `PROJECTED`.
+    expect(screen.getByText('Projected')).toBeInTheDocument();
     expect(screen.getByText('8.9')).toBeInTheDocument();
     expect(screen.getByText('High')).toBeInTheDocument();
     expect(screen.getByText('49 projected')).toBeInTheDocument();
@@ -136,9 +137,10 @@ describe('ScoreboardGameRow', () => {
         onToggle={vi.fn()}
       />,
     );
-    expect(screen.getByText('Citrus actual vs projected')).toBeInTheDocument();
+    expect(screen.getByText('Actual · projected')).toBeInTheDocument();
     expect(screen.getByText('16.6')).toBeInTheDocument();
-    expect(screen.getByText('proj 8.9')).toBeInTheDocument();
+    // `P 8.9` — the roster row's spelling of a projection beside an actual.
+    expect(screen.getByText('P 8.9')).toBeInTheDocument();
   });
 
   it('says the starter is unknown when one club has two goalies projected', () => {
@@ -181,15 +183,15 @@ describe('ScoresEmptyDay', () => {
       <ScoresEmptyDay nearest={{ before: '2026-06-14', after: '2026-09-29' }} onSelect={onSelect} />,
     );
     expect(screen.getByText('No games on this date')).toBeInTheDocument();
-    screen.getByText('Next games Sep 29').click();
+    screen.getByText('NEXT GAMES · SEP 29 ›').click();
     expect(onSelect).toHaveBeenCalledWith('2026-09-29');
-    screen.getByText('Back to Jun 14').click();
+    screen.getByText('‹ JUN 14').click();
     expect(onSelect).toHaveBeenCalledWith('2026-06-14');
   });
 
   it('renders without jump buttons when neither neighbour is known', () => {
     render(<ScoresEmptyDay nearest={{ before: null, after: null }} onSelect={vi.fn()} />);
     expect(screen.getByTestId('scores-empty-day')).toBeInTheDocument();
-    expect(screen.queryByText(/Next games/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/NEXT GAMES/)).not.toBeInTheDocument();
   });
 });
