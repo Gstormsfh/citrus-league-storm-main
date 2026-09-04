@@ -1,8 +1,7 @@
 import { userMessage } from '@/lib/userMessage';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Star, AlertCircle, Clock, Trash2, Flame, Snowflake, CalendarDays, Loader2, CheckCircle2, Newspaper } from 'lucide-react';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { cn } from '@/lib/utils';
@@ -22,6 +21,10 @@ import { generatePlayerWriteup, WriteupTone } from '@/utils/playerWriteup';
 import { getCurrentSeason, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
 import { PlayerAdvancedCard } from '@/components/player/PlayerAdvancedCard';
+import { PressBoxPlayerCardHero, pressBoxPlayerCardGround } from '@/components/pressbox/PlayerCard';
+import { PressBoxTabs } from '@/components/pressbox/Tabs';
+import { PB_TYPE } from '@/components/pressbox/rowScale';
+import { getTeamColor } from '@/utils/teamColors';
 
 /* 2026-08-19 visual audit — muted-text correction.
    text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
@@ -93,15 +96,6 @@ interface PlayerStatsModalProps {
     pendingLabel?: string;
   };
 }
-
-// ─── Position color mapping ──────────────────────────────────────────
-const posColors: Record<string, { bg: string; text: string; border: string }> = {
-  C:  { bg: 'bg-citrus-sage', text: 'text-white', border: 'border-citrus-sage' },
-  LW: { bg: 'bg-citrus-green-dark', text: 'text-white', border: 'border-citrus-green-dark' },
-  RW: { bg: 'bg-citrus-orange', text: 'text-white', border: 'border-citrus-orange' },
-  D:  { bg: 'bg-citrus-forest', text: 'text-white', border: 'border-citrus-forest' },
-  G:  { bg: 'bg-citrus-peach', text: 'text-pastel-forest', border: 'border-citrus-peach' },
-};
 
 /**
  * Scouting-tag palette. Caution borrows the amber/red language the status
@@ -176,11 +170,12 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   const { user } = useAuth();
   const { toast } = useToast();
   const [isDropping, setIsDropping] = useState(false);
-  const [imgErr, setImgErr] = useState(false);
   // Headshot-first avatar (2026-08-18): try the player's real NHL
   // headshot, fall back to team logo, then jersey number. Mirrors
   // HockeyPlayerCard's chain so every card surface agrees.
   const [headshotErr, setHeadshotErr] = useState(false);
+  /** PRESS BOX (2026-09-04): the card's tab, driven by the Press Box strip. */
+  const [cardTab, setCardTab] = useState<'stats' | 'advanced' | 'gamelog'>('stats');
 
   // Game log state (all 82 games: actuals for played + projections for future)
   const [gameLog, setGameLog] = useState<GameLogEntry[]>([]);
@@ -493,9 +488,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   // not memoised on a value that changes identity every render anyway.
   const writeup = generatePlayerWriteup(player);
   const posAbbr = getPositionAbbr(player.position);
-  const posStyle = posColors[posAbbr] || posColors['C'];
   const teamAbbr = player.teamAbbreviation || player.team?.split(' ').pop()?.substring(0, 3).toUpperCase() || '';
-  const teamLogoUrl = `https://assets.nhle.com/logos/nhl/svg/${player.teamAbbreviation || 'NHL'}_light.svg`;
 
   // Use game log totals for the hero banner
   const dailyProj = isGoalie ? player.goalieProjection : player.daily_projection;
@@ -549,68 +542,62 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg sm:max-w-2xl p-0 overflow-hidden border-citrus-sage/30 rounded-2xl">
+      <DialogContent
+        className={cn(
+          'max-w-lg sm:max-w-2xl p-0 overflow-hidden rounded-2xl bg-pressbox-surface border-white/[0.08] text-pressbox-text',
+          /* PRESS BOX (2026-09-04): below sm the card is the SCREEN, as the
+             artboard draws it — no centred modal with the team colour cut
+             off at the rounded corners. Same sheet mechanics the league
+             settings dialog uses; the body flexes to fill. */
+          'max-sm:inset-0 max-sm:top-0 max-sm:left-0 max-sm:translate-x-0 max-sm:translate-y-0 max-sm:max-w-none max-sm:w-full max-sm:h-full max-sm:max-h-none max-sm:rounded-none max-sm:flex max-sm:flex-col max-sm:pt-[env(safe-area-inset-top)]',
+        )}
+      >
 
-        {/* ═══ Hero Header ═══ */}
-        <div className="relative bg-gradient-to-br from-citrus-forest via-citrus-green-dark to-citrus-sage px-5 pt-6 pb-5 overflow-hidden">
-          {/* Decorative circles */}
-          <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/5" />
-          <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-white/5" />
-
-          <div className="relative flex items-start gap-4">
-            {/* Team logo / player avatar */}
-            <div className="w-16 h-16 flex-shrink-0 rounded-2xl bg-white/15 backdrop-blur-sm border-2 border-white/20 flex items-center justify-center overflow-hidden shadow-lg">
-              {player.image && !headshotErr ? (
-                <img
-                  loading="lazy"
-                  decoding="async"
-                  src={player.image}
-                  alt={player.name}
-                  className="w-full h-full object-cover"
-                  onError={() => setHeadshotErr(true)}
-                />
-              ) : !imgErr ? (
-                <img loading="lazy" decoding="async" src={teamLogoUrl} alt={teamAbbr} className="w-12 h-12 object-contain" onError={() => setImgErr(true)} />
-              ) : (
-                <span className="text-2xl font-varsity font-black text-white/80">
-                  {player.number || (player.name || '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-                </span>
-              )}
-            </div>
-
-            {/* Name + meta */}
-            <div className="flex-1 min-w-0">
-              <h2 className="text-xl sm:text-2xl font-varsity font-black text-white leading-tight tracking-tight truncate">
-                {player.name}
-              </h2>
-              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <Badge className={cn("text-[10px] font-varsity font-black px-2 h-5 tracking-wider border", posStyle.bg, posStyle.text, posStyle.border)}>
-                  {posAbbr}
-                </Badge>
-                <span className="text-white/70 text-sm font-display font-medium">{player.team}</span>
-                {/* Some surfaces (matchup) don't know the sweater number —
-                    hide "#0" rather than showing a wrong number. */}
-                {player.number ? <span className="text-white/55 text-sm">#{player.number}</span> : null}
-              </div>
-              {/* Status badge */}
-              {statusInfo && (
-                <div className="mt-2">
-                  <Badge variant="outline" className={cn("text-[10px] font-semibold gap-1 border", statusInfo.cls)}>
-                    <statusInfo.icon className="w-3 h-3" />
-                    {statusInfo.label}
-                  </Badge>
-                </div>
-              )}
-            </div>
-          </div>
+        {/* ═══ Hero Header ═══
+            PRESS BOX (2026-09-04): artboard 1a's player card. The team's
+            colour washes the top 240px and dies into the surface; the hero
+            is the first and last name at 30px condensed over the owner and
+            position line, the face at 84px with the club badge on its
+            corner, and the vitals the directory holds. The projection
+            banner keeps every word it had — `≈3 projected starts`, the
+            off-season sentence — in a Press Box tile under the hero. */}
+        <div className="relative px-4 pt-4 pb-3" style={pressBoxPlayerCardGround(getTeamColor(teamAbbr))}>
+          {(() => {
+            const words = (player.name || '').trim().split(/\s+/);
+            const firstName = words.length > 1 ? words.slice(0, -1).join(' ') : words[0] ?? '';
+            const lastName = words.length > 1 ? words[words.length - 1] : '';
+            const ownerLine = [isOnRoster ? 'YOUR ROSTER' : null, statusInfo?.label?.toUpperCase() ?? null, player.starter ? 'STARTER' : null]
+              .filter(Boolean)
+              .join(' · ');
+            const vitals = [
+              player.age != null ? { label: 'AGE', value: String(player.age) } : null,
+              player.height ? { label: 'HT', value: player.height } : null,
+              player.weight ? { label: 'WT', value: player.weight } : null,
+              player.experience ? { label: 'EXP', value: player.experience } : null,
+            ].filter((v): v is { label: string; value: string } => v !== null);
+            return (
+              <PressBoxPlayerCardHero
+                firstName={firstName}
+                lastName={lastName}
+                ownerLine={ownerLine || null}
+                position={posAbbr}
+                jersey={player.number ? `#${player.number}` : null}
+                teamAbbreviation={teamAbbr || null}
+                teamColor={getTeamColor(teamAbbr)}
+                headshotUrl={player.image && !headshotErr ? player.image : null}
+                vitals={vitals}
+                onClose={onClose}
+              />
+            );
+          })()}
 
           {/* Week Projection Banner */}
-          <div className="mt-4 flex items-center justify-between bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2.5 border border-white/10">
-            <div className="flex items-center gap-2">
+          <div className={cn(PB_TYPE, 'mt-3 flex items-center justify-between gap-3 rounded-[12px] bg-pressbox-tile border border-white/[0.08] px-3 py-2')}>
+            <div className="flex items-center gap-2 min-w-0">
               {hasGame ? (
                 <>
-                  <CalendarDays className="w-4 h-4 text-citrus-orange" />
-                  <span className="text-white/80 text-sm font-display font-medium">
+                  <CalendarDays className="w-4 h-4 flex-none text-pressbox-orange-soft" aria-hidden="true" />
+                  <span className="font-plex font-medium text-[11px] text-pressbox-text/70 truncate">
                     {heroGameCount > 0
                       ? goalieStartsRemaining !== null
                         ? `≈${goalieStartsRemaining} projected starts`
@@ -620,12 +607,12 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 </>
               ) : (
                 <>
-                  <Snowflake className="w-4 h-4 text-white/55" />
+                  <Snowflake className="w-4 h-4 flex-none text-pressbox-text/45" aria-hidden="true" />
                   {/* 2026-08-24 polish: during the off-season EVERY card
                       hit this branch and read like a data failure
                       ("No upcoming games · PROJ —", spotted in trade QA).
                       Jul–Sep is the NHL off-season — say so instead. */}
-                  <span className="text-white/55 text-sm font-display italic">
+                  <span className="font-plex font-medium text-[11px] text-pressbox-text/55 truncate">
                     {(() => {
                       // Was hard-coded to "return in October", which is wrong
                       // for 2026-27: that season opens Sept 29. Read the real
@@ -642,38 +629,38 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 </>
               )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-white/50 text-[10px] font-display uppercase tracking-wider">
-                {heroGameCount > 0 ? 'Total Proj' : 'Proj'}
+            <div className="flex items-baseline gap-1.5 flex-none">
+              <span className="font-plex font-semibold text-[9px] uppercase tracking-[0.1em] text-pressbox-text/45">
+                {heroGameCount > 0 ? 'Total proj' : 'Proj'}
               </span>
               <span className={cn(
-                "text-xl font-varsity font-black",
-                hasGame ? "text-citrus-orange" : "text-white/55"
+                'font-plex font-semibold text-[17px] tabular-nums',
+                hasGame ? 'text-pressbox-orange-soft' : 'text-pressbox-text/55',
               )}>
-                {hasGame ? heroProjectedPts.toFixed(1) : '-'}
+                {hasGame ? heroProjectedPts.toFixed(1) : '–'}
               </span>
             </div>
           </div>
-
-          {/* Starter badge */}
-          {player.starter && (
-            <div className="absolute top-4 right-4">
-              <Badge className="bg-citrus-orange/90 text-white border-0 text-[9px] font-varsity font-black tracking-wider gap-1">
-                <Star className="w-3 h-3 fill-white" />
-                STARTER
-              </Badge>
-            </div>
-          )}
         </div>
 
         {/* ═══ Body ═══ */}
-        <div className="px-5 py-4 max-h-[55vh] overflow-y-auto">
-          <Tabs defaultValue="stats">
-            <TabsList className="grid w-full grid-cols-3 bg-white/5 border border-citrus-sage/20 rounded-xl h-9 mb-4">
-              <TabsTrigger value="stats" className="text-xs font-display font-semibold rounded-lg data-[state=active]:bg-citrus-sage data-[state=active]:text-white">Overview</TabsTrigger>
-              <TabsTrigger value="advanced" className="text-xs font-display font-semibold rounded-lg data-[state=active]:bg-citrus-sage data-[state=active]:text-white">Detailed</TabsTrigger>
-              <TabsTrigger value="gamelog" className="text-xs font-display font-semibold rounded-lg data-[state=active]:bg-citrus-sage data-[state=active]:text-white">Game Log</TabsTrigger>
-            </TabsList>
+        {/* PRESS BOX (2026-09-04): the strip is the artboard's — orange
+            underline, condensed caps — and it drives the same three panes.
+            `max-h-[55vh] overflow-y-auto` stays for the modal; on the phone
+            sheet the body takes what the hero and the footer leave. */}
+        <div className={cn(PB_TYPE, 'px-4 pt-1 pb-4 max-h-[55vh] overflow-y-auto max-sm:max-h-none max-sm:flex-1 max-sm:min-h-0')}>
+          <Tabs value={cardTab} onValueChange={(v) => setCardTab(v as 'stats' | 'advanced' | 'gamelog')}>
+            <PressBoxTabs
+              className="px-0 gap-4 mb-4 border-white/10"
+              label="Player card view"
+              activeKey={cardTab}
+              onSelect={(k) => setCardTab(k as 'stats' | 'advanced' | 'gamelog')}
+              tabs={[
+                { key: 'stats', label: 'Overview' },
+                { key: 'advanced', label: 'Detailed' },
+                { key: 'gamelog', label: 'Game log' },
+              ]}
+            />
 
             {/* ─── Overview Tab ─── */}
             <TabsContent value="stats" className="mt-0 space-y-4">
@@ -1227,28 +1214,28 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
         {/* ═══ Footer Actions ═══ */}
         {action && (
-          <div className="px-5 py-3 border-t border-citrus-sage/15 bg-white/[0.03] pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            <Button
+          <div className={cn(PB_TYPE, 'px-4 py-3 border-t border-white/[0.08] bg-pressbox-surface pb-[max(0.75rem,env(safe-area-inset-bottom))]')}>
+            <button
+              type="button"
               onClick={action.onClick}
               disabled={action.disabled || action.pending}
-              className="w-full h-11 font-bold rounded-xl bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50"
+              className="focus-citrus w-full h-[44px] rounded-[10px] bg-pressbox-orange text-pressbox-orange-ink font-condensed font-bold text-[14px] uppercase tracking-[0.1em] disabled:opacity-40"
             >
               {action.pending ? (action.pendingLabel ?? 'Working…') : action.label}
-            </Button>
+            </button>
           </div>
         )}
         {leagueId && user && isOnRoster && (
-          <div className="px-5 py-3 border-t border-citrus-sage/15 bg-white/[0.03]">
-            <Button
-              variant="outline"
-              size="sm"
+          <div className={cn(PB_TYPE, 'px-4 py-3 border-t border-white/[0.08] bg-pressbox-surface pb-[max(0.75rem,env(safe-area-inset-bottom))]')}>
+            <button
+              type="button"
               onClick={handleDropPlayer}
               disabled={isDropping}
-              className="w-full text-red-400 border-red-400/40 bg-transparent hover:bg-red-500/10 hover:border-red-400/60 hover:text-red-300 font-display font-semibold"
+              className="focus-citrus w-full h-[38px] rounded-[9px] bg-pressbox-grapefruit/[0.12] border border-pressbox-grapefruit/35 text-pressbox-grapefruit-text font-plex font-semibold text-[11px] tracking-[0.06em] uppercase flex items-center justify-center gap-1.5 disabled:opacity-40"
             >
-              <Trash2 className="h-4 w-4 mr-2" />
-              {isDropping ? 'Dropping...' : 'Drop Player'}
-            </Button>
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              {isDropping ? 'Dropping…' : 'Drop player'}
+            </button>
           </div>
         )}
       </DialogContent>
