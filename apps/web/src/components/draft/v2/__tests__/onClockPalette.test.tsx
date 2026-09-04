@@ -109,38 +109,49 @@ const FOREIGN_UTILITIES = [
   'border-border',
 ];
 
+// PRESS BOX (2026-09-04, later the same day). The bar's half of this file
+// was written against the dark-tile-and-ring bar that replaced the lemon
+// slab that morning; by the afternoon the founder's ruling was to bake the
+// whole room into the Press Box design reference, and the bar is now
+// artboard 4a's pick bar. Same intent, new contract:
+//
+//   * still never lemon, never stock red — now `bg-pressbox-surface`;
+//   * time left is a 34px MONO FIGURE, sage until ten seconds and grapefruit
+//     after, instead of a ring. At that size the number is the shape;
+//   * the verb takes the width beside the clock (`flex-1`), not the whole
+//     bar, and it is the only orange thing;
+//   * the rule across the top is DRAFT progress in sage — what has happened
+//     — and it never pretends to know a total it was not given.
 describe('the on-clock bar wears the app palette, not the mascot one', () => {
-  it('is the same dark tile as every other card in the room, at rest and under pressure', () => {
-    expect(renderBar(47).className).toContain('bg-pastel-surface-tile');
+  const surface = (bar: HTMLElement) => bar.firstElementChild as HTMLElement;
+
+  it('is the Press Box surface, at rest and under pressure', () => {
+    expect(surface(renderBar(47)).className).toContain('bg-pressbox-surface');
     cleanup();
     // Ten seconds or fewer is the urgent branch. It used to become a slab of
-    // stock red; it now keeps the tile and moves only its accents.
-    expect(renderBar(6).className).toContain('bg-pastel-surface-tile');
+    // stock red; it keeps the surface and moves only its accents.
+    expect(surface(renderBar(6)).className).toContain('bg-pressbox-surface');
   });
 
   it('never paints itself lemon or stock red', () => {
     for (const secs of [47, 6]) {
-      const cls = renderBar(secs).className;
-      expect(cls).not.toContain('bg-fantasy-primary');
-      expect(cls).not.toContain('bg-red-600');
+      const html = renderBar(secs).innerHTML;
+      expect(html).not.toContain('bg-fantasy-primary');
+      expect(html).not.toContain('bg-red-600');
       cleanup();
     }
   });
 
-  it('draws the clock as a ring, so time left is a shape before it is a number', () => {
-    const bar = renderBar(47);
-    const circles = bar.querySelectorAll('svg circle');
-    // A track and an arc. The arc is what empties.
-    expect(circles.length).toBe(2);
-
+  it('draws the clock as a 34px figure, sage while there is room', () => {
+    renderBar(47);
     const countdown = screen.getByTestId('on-clock-countdown');
-    // The number lives INSIDE the ring rather than beside it.
-    expect(countdown.closest('div')?.parentElement?.querySelector('svg')).not.toBeNull();
+    expect(countdown.className).toContain('text-[34px]');
+    expect(countdown.className).toContain('text-pressbox-sage');
     // And it still says exactly what every other clock in the room says.
     expect(countdown.textContent).toMatch(/^\d{2}:\d{2}$/);
   });
 
-  it('omits the arc when it does not know the pick window, rather than inventing one', () => {
+  it('carries draft progress across its top, and draws none when it was not told the total', () => {
     render(
       <OnClockActionBar
         amIOnClock={true}
@@ -152,27 +163,51 @@ describe('the on-clock bar wears the app palette, not the mascot one', () => {
         roundNumber={3}
       />,
     );
-    // Track only. A fraction with no denominator would be a guess drawn as a
-    // fact, on the one control a manager is trusting with their turn.
-    expect(screen.getByTestId('on-clock-action-bar').querySelectorAll('svg circle').length).toBe(1);
+    const rule = screen.getByTestId('on-clock-action-bar').querySelector('.bg-pressbox-sage') as HTMLElement;
+    // A track with nothing in it. A width with no denominator would be a
+    // guess drawn as a fact, on the one control a manager is trusting with
+    // their turn.
+    expect(rule.style.width).toBe('0%');
+    cleanup();
+    render(
+      <OnClockActionBar
+        amIOnClock={true}
+        currentPickDeadline={deadlineIn(47)}
+        pickTimeLimitSec={60}
+        selectedPlayer={mkPlayer()}
+        onDraft={() => {}}
+        pickNumber={29}
+        roundNumber={3}
+        picksMade={28}
+        totalPicks={112}
+      />,
+    );
+    const told = screen.getByTestId('on-clock-action-bar').querySelector('.bg-pressbox-sage') as HTMLElement;
+    expect(told.style.width).toBe('25%');
   });
 
-  it('gives the verb the full width of the bar', () => {
+  it('gives the verb the width beside the clock, and nothing else is orange', () => {
     // It was a small pill wedged beside a name up to twenty characters long,
     // which is how the most-clicked control in the product became the least
-    // reachable thing on the screen.
+    // reachable thing on the screen. It is a 52px block now, with the name in
+    // it, filling everything the clock does not use.
     expect(screen.queryByTestId('on-clock-draft-button')).toBeNull();
-    renderBar(47);
-    expect(screen.getByTestId('on-clock-draft-button').className).toContain('w-full');
+    const bar = renderBar(47);
+    const btn = screen.getByTestId('on-clock-draft-button');
+    expect(btn.className).toContain('flex-1');
+    expect(btn.className).toContain('h-[52px]');
+    expect(btn.className).toContain('bg-pressbox-orange');
+    expect(bar.innerHTML.split('bg-pressbox-orange ').length - 1).toBe(1);
   });
 
   it('keeps urgency in the accents so the Draft button stays the brightest thing', () => {
     const bar = renderBar(6);
-    // The eyebrow and the ring go grapefruit...
-    expect(bar.innerHTML).toContain('text-fantasy-grapefruit-red');
+    // The clock goes grapefruit...
+    expect(screen.getByTestId('on-clock-countdown').className).toContain('text-pressbox-grapefruit-text');
     // ...and the button stays orange, which is the whole point: under a shot
     // clock the eye should land on the verb.
-    expect(screen.getByTestId('on-clock-draft-button').className).toContain('bg-pastel-orange');
+    expect(screen.getByTestId('on-clock-draft-button').className).toContain('bg-pressbox-orange');
+    expect(bar.innerHTML).not.toContain('bg-red-600');
   });
 });
 

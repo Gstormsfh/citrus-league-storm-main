@@ -97,13 +97,17 @@ describe('nothing floats over the player pool during a draft', () => {
   });
 
   it('the on-clock bar owns the bottom edge on phones instead of fighting the header', () => {
-    expect(ROOM).toMatch(/fixed inset-x-3 bottom-\[max\(0\.75rem,env\(safe-area-inset-bottom\)\)\] z-page-header lg:sticky/);
+    // PRESS BOX (2026-09-04): full-bleed, not a floating card 12px in from
+    // each edge. Artboard 4a draws the pick bar flush to the bottom with its
+    // own hairline and its own safe-area padding, and a floating card lets
+    // the list scroll visibly through the gaps beside it. Still fixed, still
+    // the bottom edge, still sticky-in-flow from lg.
+    expect(ROOM).toMatch(/fixed inset-x-0 bottom-0 z-page-header lg:sticky/);
     expect(ROOM).not.toMatch(/"sticky top-24 z-20"/);
-    // On lg it goes back in flow, below the room's own sticky header
-    // (z-section-header). Rung names, from src/styles/zLayers.ts.
+    // lg+ keeps it sticky just under the compact header, above the pool's
+    // own sticky column header.
     expect(ROOM).toMatch(/lg:top-16 lg:z-sticky-raised/);
-    // …and the room container leaves clearance so the list's last rows
-    // scroll out from under it.
+    // The room container clears the bar on phones only.
     expect(ROOM).toMatch(/pb-28 lg:pb-4/);
   });
 });

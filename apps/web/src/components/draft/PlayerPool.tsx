@@ -11,6 +11,13 @@ import { Player } from '@/services/PlayerService';
 import { ScoringCalculator, ScoringSettings } from '@citrus/shared';
 import { DraftPoolRow } from './DraftPoolRow';
 import { poolHeadlineFor } from './draftPoolHeadline';
+// Direct file imports, not the `@/components/pressbox` barrel: the barrel
+// re-exports LeagueHeader, which reaches LeagueContext and the Supabase
+// client at module scope. The pool is a draft-room surface with its own
+// transport and must not pull the league shell in behind it.
+import { PB_TYPE } from '@/components/pressbox/rowScale';
+import { PressBoxChips } from '@/components/pressbox/Chips';
+import { PB_SORT_TRIGGER, PressBoxDraftSearchRow } from '@/components/pressbox/DraftSearchRow';
 import { Mug } from '@/components/roster/Mug';
 import { mugFromDirectory } from '@/components/roster/headshot';
 import type { DraftProjection, QualitySignal } from './draftDecision';
@@ -503,8 +510,190 @@ export const PlayerPool = memo(({
     return Row;
   }, [selectedPlayer?.id, draftedSet, isDraftActive, isYourTurn, isSubmitPending, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, onShowCard, fptsMap, projectedFptsMap]);
 
+  /**
+   * THE PHONE POOL, PRESS BOX (2026-09-04) — artboard 4a.
+   *
+   * Below `md` the pool is no longer a Card with a heading; it is the
+   * screen. Search and sort share one 38px line, the position filter is a
+   * row of chips, the column head names the number every row leads with,
+   * and the rows run full-bleed so a selected row's rail can reach the
+   * screen edge. Every control here drives the SAME state as the desktop
+   * filters below — one search term, one position, one sort key, one
+   * show-drafted flag — so a manager who turns the phone sideways is looking
+   * at the same list.
+   *
+   * The sort stays a Radix Select. The artboard draws a `PROJ ▾` button and
+   * that is exactly what the trigger now looks like, but the sixteen sort
+   * keys and the goalie/skater split behind it did not need rewriting to
+   * change their clothes.
+   */
+  const headColumnLabel = (poolHeadlineFor(sortBy, {
+    seasonFpts: 0, projectionTotal: 0, projectionPerGp: 0, gamesPlayed: 0, points: 0, goals: 0,
+    assists: 0, shots: 0, hits: 0, blocks: 0, xGoals: 0, plusMinus: 0, ppp: 0, shp: 0, pim: 0,
+    icetimeSeconds: 0, wins: 0, losses: 0, gaa: 0, savePct: 0, saves: 0, shutouts: 0,
+  })?.label ?? 'proj').toUpperCase();
+  const positionChips = [
+    { key: 'All', label: 'ALL' },
+    { key: 'C', label: 'C' },
+    { key: 'LW', label: 'LW' },
+    { key: 'RW', label: 'RW' },
+    { key: 'D', label: 'D' },
+    { key: 'G', label: 'G' },
+    { key: 'F', label: 'FWD' },
+  ];
+  const sortOptions = selectedPosition === 'G'
+    ? [['projRank', 'RANK'], ['wins', 'W'], ['losses', 'L'], ['gaa', 'GAA'], ['savePct', 'SV%'], ['saves', 'SV'], ['shutouts', 'SO'], ['name', 'NAME']]
+    : [['projRank', 'RANK'], ['points', 'PTS'], ['goals', 'G'], ['assists', 'A'], ['plusMinus', '+/-'], ['ppp', 'PPP'], ['shp', 'SHP'], ['shots', 'SOG'], ['hits', 'HIT'], ['blocks', 'BLK'], ['pim', 'PIM'], ['toi', 'TOI'], ['xGoals', 'xG'], ['name', 'NAME']];
+  const sortLabel = sortOptions.find(([k]) => k === sortBy)?.[1] ?? 'RANK';
+
+  const phonePool = (
+    <div className={cn(PB_TYPE, 'md:hidden')} data-testid="player-pool-phone">
+      <div className="px-3.5 pt-2.5">
+        <PressBoxDraftSearchRow
+          value={searchTerm}
+          onValueChange={setSearchTerm}
+          sort={
+            <Select value={sortBy} onValueChange={(value) => { setSortBy(value); setSortDirection('desc'); }}>
+              <SelectTrigger className={cn(PB_SORT_TRIGGER, 'w-auto gap-1.5 border-0 [&>svg]:hidden')} aria-label={`Sort by ${sortLabel}. Change sort`}>
+                {sortLabel} &#9662;
+              </SelectTrigger>
+              <SelectContent>
+                {sortOptions.map(([k, label]) => (
+                  <SelectItem key={k} value={k}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          }
+        />
+
+        <div className="mt-2 flex items-center gap-1.5">
+          <PressBoxChips
+            chips={positionChips}
+            activeKey={selectedPosition}
+            onSelect={setSelectedPosition}
+            label="Position filter"
+            className="min-w-0 overflow-x-auto scrollbar-none"
+          />
+          {/* Show-drafted is a toggle, not a position, so it is not one of the
+              chips above — but it wears the chip's clothes and takes the
+              artboard's trailing slot at the row's far edge. */}
+          <button
+            type="button"
+            onClick={() => setShowDrafted(!showDrafted)}
+            aria-pressed={showDrafted}
+            title={showDrafted ? 'Hide drafted players' : 'Show drafted players'}
+            className={cn(
+              'ml-auto flex-none px-[11px] py-[5px] rounded-full font-plex font-semibold text-[10px] tracking-[0.06em] whitespace-nowrap',
+              showDrafted ? 'bg-pressbox-text text-pressbox-surface' : 'bg-pressbox-tile text-pressbox-text/70',
+            )}
+          >
+            DRAFTED
+          </button>
+        </div>
+
+        <div
+          aria-hidden="true"
+          className="grid grid-cols-[22px_1fr_54px_40px] gap-2.5 pt-3 pb-1.5 px-0.5 font-plex font-medium text-[9px] tracking-[0.08em] text-pressbox-text/40"
+        >
+          <span>RK</span>
+          <span>PLAYER</span>
+          <span className="text-right">{headColumnLabel}</span>
+          <span />
+        </div>
+      </div>
+
+      <div>
+        {visiblePlayers.map((player, index) => {
+          const isSelected = selectedPlayer?.id === player.id;
+          const isDrafted = draftedSet.has(player.id);
+          const queueIndex = queue.indexOf(player.id);
+          return (
+            <DraftPoolRow
+              key={player.id}
+              rank={index + 1}
+              player={player}
+              seasonFpts={fptsMap.get(player.id) || 0}
+              projection={projectedFptsMap.get(player.id) ?? null}
+              signal={qualitySignals.get(player.id) ?? null}
+              headlineOverride={poolHeadlineFor(sortBy, {
+                seasonFpts: fptsMap.get(player.id) || 0,
+                projectionTotal: projectedFptsMap.get(player.id)?.total ?? null,
+                projectionPerGp: projectedFptsMap.get(player.id)?.perGp ?? null,
+                gamesPlayed: player.games_played ?? null,
+                points: player.points ?? null,
+                goals: player.goals ?? null,
+                assists: player.assists ?? null,
+                shots: player.shots ?? null,
+                hits: player.hits ?? null,
+                blocks: player.blocks ?? null,
+                xGoals: player.xGoals ?? null,
+                plusMinus: player.plus_minus ?? null,
+                ppp: player.ppp ?? null,
+                shp: player.shp ?? null,
+                pim: player.pim ?? null,
+                icetimeSeconds: player.icetime_seconds ?? null,
+                wins: player.wins ?? null,
+                losses: player.losses ?? null,
+                gaa: player.goals_against_average ?? null,
+                savePct: player.save_percentage ?? null,
+                saves: player.saves ?? null,
+                shutouts: player.shutouts ?? null,
+              })}
+              selected={isSelected}
+              drafted={isDrafted}
+              queued={queueIndex >= 0}
+              queuePosition={queueIndex >= 0 ? queueIndex + 1 : null}
+              canDraft={(isSelected || isYourTurn) && isDraftActive && !isDrafted}
+              submitting={isSubmitPending}
+              onSelect={() => onPlayerSelect(player)}
+              onDraft={() => onPlayerDraft(player)}
+              onToggleQueue={onAddToQueue ? () => onAddToQueue(player.id) : undefined}
+              onShowCard={onShowCard ? () => onShowCard(player) : undefined}
+            />
+          );
+        })}
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+            className="w-full py-3 border-t border-white/[0.06] font-plex font-semibold text-[10px] tracking-[0.08em] text-pressbox-orange-soft"
+          >
+            + {filteredAndSortedPlayers.length - visibleCount} MORE
+          </button>
+        )}
+        {filteredAndSortedPlayers.length === 0 && (
+          loadError ? (
+            // Same truth the desktop table tells (2026-08-18 launch audit):
+            // a directory that failed to load is not a filter miss.
+            <div className="text-center py-8 px-3.5" data-testid="player-pool-load-error-mobile">
+              <p className="font-barlow font-semibold text-[14px] text-pressbox-grapefruit-text">Couldn&apos;t load the player list.</p>
+              <p className="mt-1 font-barlow text-[12px] text-pressbox-text/55">
+                A connection problem, not a filter. Nothing loaded.
+              </p>
+              {onRetryLoad && (
+                <button
+                  type="button"
+                  onClick={onRetryLoad}
+                  className="mt-3 rounded-[8px] border border-pressbox-grapefruit/45 px-3 py-1.5 font-plex font-semibold text-[10px] tracking-[0.06em] text-pressbox-grapefruit-text"
+                >
+                  RETRY
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 font-barlow text-[12px] text-pressbox-text/55">
+              Nobody left matches those filters.
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <Card className="p-2 sm:p-4 border-white/10 bg-pastel-surface-tile">
+    <>
+    {phonePool}
+    <Card className="hidden md:block p-2 sm:p-4 border-white/10 bg-pastel-surface-tile">
       <div className="flex items-center justify-between mb-3 px-1">
         <h2 className="text-base sm:text-xl font-semibold flex items-center gap-2 text-pastel-cream">
           <Star className="h-4 w-4 sm:h-5 sm:w-5 text-fantasy-primary" />
@@ -645,99 +834,6 @@ export const PlayerPool = memo(({
         >
           {showDrafted ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </Button>
-      </div>
-
-      {/* THE PHONE POOL (2026-09-02). Was a bespoke 60px flex row with its
-          own five type sizes, its own bare <img> face and last season's
-          fantasy points as its headline. It is now `DraftPoolRow`, which
-          wears the vocabulary the roster, matchup and free-agent lists
-          already share — `Mug`, `positionChip`, the four rungs of
-          `phoneRowScale` — and leads with the rest-of-season projection plus
-          one cohort-relative advanced read. The full stats table remains the
-          desktop (md+) experience below. */}
-      <div className="md:hidden border border-white/10 rounded-lg bg-pastel-surface-tile text-pastel-cream backdrop-blur-sm min-w-0 overflow-hidden">
-        <div className="divide-y divide-white/5">
-          {visiblePlayers.map((player, index) => {
-            const isSelected = selectedPlayer?.id === player.id;
-            const isDrafted = draftedSet.has(player.id);
-            return (
-              <DraftPoolRow
-                key={player.id}
-                rank={index + 1}
-                player={player}
-                seasonFpts={fptsMap.get(player.id) || 0}
-                projection={projectedFptsMap.get(player.id) ?? null}
-                signal={qualitySignals.get(player.id) ?? null}
-                headlineOverride={poolHeadlineFor(sortBy, {
-                  seasonFpts: fptsMap.get(player.id) || 0,
-                  projectionTotal: projectedFptsMap.get(player.id)?.total ?? null,
-                  projectionPerGp: projectedFptsMap.get(player.id)?.perGp ?? null,
-                  gamesPlayed: player.games_played ?? null,
-                  points: player.points ?? null,
-                  goals: player.goals ?? null,
-                  assists: player.assists ?? null,
-                  shots: player.shots ?? null,
-                  hits: player.hits ?? null,
-                  blocks: player.blocks ?? null,
-                  xGoals: player.xGoals ?? null,
-                  plusMinus: player.plus_minus ?? null,
-                  ppp: player.ppp ?? null,
-                  shp: player.shp ?? null,
-                  pim: player.pim ?? null,
-                  icetimeSeconds: player.icetime_seconds ?? null,
-                  wins: player.wins ?? null,
-                  losses: player.losses ?? null,
-                  gaa: player.goals_against_average ?? null,
-                  savePct: player.save_percentage ?? null,
-                  saves: player.saves ?? null,
-                  shutouts: player.shutouts ?? null,
-                })}
-                selected={isSelected}
-                drafted={isDrafted}
-                queued={queue.includes(player.id)}
-                canDraft={(isSelected || isYourTurn) && isDraftActive && !isDrafted}
-                submitting={isSubmitPending}
-                onSelect={() => onPlayerSelect(player)}
-                onDraft={() => onPlayerDraft(player)}
-                onToggleQueue={onAddToQueue ? () => onAddToQueue(player.id) : undefined}
-                onShowCard={onShowCard ? () => onShowCard(player) : undefined}
-              />
-            );
-          })}
-        </div>
-        {hasMore && (
-          <button
-            onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
-            className="w-full py-2.5 text-xs font-display font-bold text-pastel-cream bg-citrus-sage/10 hover:bg-citrus-sage/20 transition-colors"
-          >
-            Show more ({filteredAndSortedPlayers.length - visibleCount} remaining)
-          </button>
-        )}
-        {filteredAndSortedPlayers.length === 0 && (
-          loadError ? (
-            // Same truth the desktop table tells (2026-08-18 launch audit):
-            // a directory that failed to load is not a filter miss.
-            <div className="text-center py-8 text-sm" data-testid="player-pool-load-error-mobile">
-              <p className="font-semibold text-destructive">Couldn&apos;t load the player list.</p>
-              <p className="text-xs mt-1 text-pastel-cream/70">
-                A connection problem, not a filter. Nothing loaded.
-              </p>
-              {onRetryLoad && (
-                <button
-                  type="button"
-                  onClick={onRetryLoad}
-                  className="mt-3 rounded-md border border-destructive/50 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 transition-colors"
-                >
-                  Retry
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-pastel-cream/70 text-sm">
-              Nobody left matches those filters.
-            </div>
-          )
-        )}
       </div>
 
       {/* Desktop: Full table view — horizontally scrollable to show all stats */}
@@ -1068,6 +1164,7 @@ export const PlayerPool = memo(({
         )}
       </div>
     </Card>
+    </>
   );
 });
 

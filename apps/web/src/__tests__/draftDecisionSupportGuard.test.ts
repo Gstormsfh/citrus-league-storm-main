@@ -172,11 +172,16 @@ describe('no em dashes in the draft room’s user-facing copy', () => {
 });
 
 describe('the phone row speaks the shared row vocabulary', () => {
-  it('uses Mug, the position chip palette and the phone type scale', () => {
+  it('uses Mug, the shared position key and the Press Box type', () => {
+    // PRESS BOX (2026-09-04): the row's type is the Press Box ladder now —
+    // `PB_TYPE` from pressbox/rowScale — imported by file, never through the
+    // barrel, which reaches LeagueContext and the Supabase client. The face
+    // and the position key are unchanged.
     const src = code(ROW);
     expect(src).toContain("from '@/components/roster/Mug'");
     expect(src).toContain("from '@/components/roster/positionChip'");
-    expect(src).toContain("from '@/components/phoneRowScale'");
+    expect(src).toContain("from '@/components/pressbox/rowScale'");
+    expect(src).not.toContain("from '@/components/pressbox'");
   });
 
   it('has no private headshot <img> that can hide itself on error', () => {

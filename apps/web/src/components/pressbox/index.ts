@@ -77,13 +77,12 @@ export {
 } from './LeagueMatchupCard';
 
 /** The draft room (PR16). Artboards 4a (the pool) and 4b (the board). */
-export { PressBoxDraftHeader, type PressBoxDraftHeaderProps } from './DraftHeader';
-export { PressBoxDraftSearchRow, type PressBoxDraftSearchRowProps } from './DraftSearchRow';
-export {
-  PressBoxDraftPoolRow,
-  type PressBoxDraftPoolRowProps,
-  type PressBoxDraftPoolPlayer,
-} from './DraftPoolRow';
+export { PressBoxDraftHeader, PB_DRAFT_EXIT, type PressBoxDraftHeaderProps } from './DraftHeader';
+export { PressBoxDraftSearchRow, PB_SORT_TRIGGER, type PressBoxDraftSearchRowProps } from './DraftSearchRow';
+// The draft pool ROW is `components/draft/DraftPoolRow` — the shared v1/v2
+// row, restyled to artboard 4a on 2026-09-04 with every control it had. It
+// lives there, not here, because it is wired to the draft transport and is
+// verified in `harness/draft.html` against the real engine path.
 export { PressBoxDraftPickBar, type PressBoxDraftPickBarProps } from './DraftPickBar';
 export { PressBoxStandingsTable, type PressBoxStandingsTableProps, type PressBoxStandingsRow } from './StandingsTable';
 export { PressBoxPlayerRow, type PressBoxPlayerRowProps, type PressBoxPlayerRowPlayer, type PressBoxPlayerAction, formatAdds } from './PlayerRow';

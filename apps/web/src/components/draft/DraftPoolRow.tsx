@@ -2,49 +2,53 @@ import { cn } from '@/lib/utils';
 import { Star, Info } from 'lucide-react';
 import { Mug } from '@/components/roster/Mug';
 import { mugFromDirectory } from '@/components/roster/headshot';
-import { positionChipClasses, positionChipKey } from '@/components/roster/positionChip';
+import { positionChipKey } from '@/components/roster/positionChip';
 import { statusChipFor } from '@/components/player/statusChip';
+import { PB_TYPE } from '@/components/pressbox/rowScale';
 import type { PoolHeadline } from './draftPoolHeadline';
-import { ROW_HEADLINE, ROW_HEADLINE_LABEL, ROW_META, ROW_MICRO, ROW_NAME } from '@/components/phoneRowScale';
 import type { Player } from '@/services/PlayerService';
 import type { DraftProjection, QualitySignal } from './draftDecision';
 import { ordinalPercentile } from './draftDecision';
 
 /**
- * ONE DRAFT-POOL ROW ON A PHONE (2026-09-02).
+ * ONE DRAFT-POOL ROW ON A PHONE — the Press Box cut (2026-09-04).
  *
- * Measured before this existed, on `harness/draft.html` at 393x852 with the
- * caller on the clock: the row was 60px carrying a 9px rank, a 13px name, an
- * 11px stat line truncated mid-number ("C · ANA · 31 G · 56 A · …"), a 15px
- * headline and an 8px unit label — five sizes inside seven pixels of each
- * other, which is the flat band `phoneRowScale.ts` was written to fix on the
- * roster and matchup rows. Its headline number was the player's SEASON TOTAL
- * fantasy points, and its face was a bare <img> that set `display:none` on
- * error, so a row whose headshot failed showed no face at all.
+ * The 2026-09-02 row below this one fixed the reading order and the data:
+ * `Mug` for the face, the rest-of-season projection as the headline, the
+ * cohort percentile as the one advanced read. All of that survives. What
+ * changes is the geometry, which is now artboard 4a's — grid
+ * `22px 1fr 54px 40px` at gap 10 on a 62px floor — and the type, which is
+ * the Press Box ladder instead of `phoneRowScale`.
  *
- * This row wears the vocabulary the rest of the app already speaks:
- * `Mug` for the face (headshot → team crest → initials, never a hole),
- * `positionChip` for the position, and the four rungs of `phoneRowScale`
- * for type. It is deliberately the same reading order as
- * `freeagents/FreeAgentRow` — where he ranks, who he is, what he plays, what
- * he is worth, the tap that gets him — because a manager who has learned one
- * pool should not have to learn a second.
+ * WHERE THE V1 CONTROLS WENT, because the artboard drew five rows and no
+ * controls at all, and the founder's ruling was to bake them in rather than
+ * lose them:
  *
- * WHAT IS NEW HERE, and why each earns its pixels on a 393px screen:
+ *   * THE QUEUE STAR sits OVER THE RANK in the 22px column. That is the
+ *     Players screen's own vocabulary on artboard 1a — an 18px glyph stacked
+ *     on a number in a 22px column — so it costs no width and reads as part
+ *     of the language rather than a bolt-on. One tap queues, exactly as
+ *     before, and the row grows the artboard's `★ Q2` after the name so the
+ *     queue POSITION is visible without opening the Queue tab.
+ *   * THE 40px SLOT AT THE RIGHT is the artboard's ADP column. This codebase
+ *     carries no ADP, so the column was going to be empty; it is the action
+ *     slot instead, in the 40px `rounded-[10px]` shape every Players-row
+ *     action wears on 1a. Off the clock it is the card (`ⓘ`); on the clock it
+ *     is DRAFT, solid orange, because under a shot clock the eye should land
+ *     on the verb. The 2026-09-02 rule holds: never both, so the name always
+ *     has room for a real name.
+ *   * SELECTED is the artboard's target row — a 6% orange wash and a 3px
+ *     inset rail that reaches the screen edge — not a ring. The list is
+ *     full-bleed and each row carries its own 14px gutter so the rail can.
  *
- *   * The headline is the REST-OF-SEASON PROJECTION scored through this
- *     league's own categories, not last season's total. A draft is a
- *     forward-looking decision.
- *   * Under it, a quality signal: xG/60 (or GAR/60, or save rate for a
- *     goalie) as a percentile inside the player's own cohort. One number,
- *     cohort-relative, from the Citrus model — the thing a manager cannot
- *     get from a raw stat line, and the thing that used to be two taps and a
- *     modal away.
+ * The headline's unit (`proj`, `fpts`, or the sort stat) takes the 8px line
+ * under the number where the artboard prints a tier. It is uppercased by CSS
+ * and left lowercase in the DOM, because that is the string every test and
+ * every screen reader has always read.
  *
- * Neither is invented. `projection` and `signal` are both null when the
- * payload cannot support them (a guest's 401, a player the pipeline has not
- * scored), and the row then renders exactly what it rendered before they
- * existed: season fantasy points, and no signal line.
+ * Everything that made the previous row honest still does: `projection` and
+ * `signal` are null when the payload cannot support them, and the row then
+ * renders exactly what it rendered before they existed.
  */
 
 export interface DraftPoolRowProps {
@@ -68,6 +72,8 @@ export interface DraftPoolRowProps {
   selected: boolean;
   drafted: boolean;
   queued: boolean;
+  /** 1-based place in the caller's queue. Renders the artboard's `★ Q2`. */
+  queuePosition?: number | null;
   /** Show the inline Draft button: on the clock, or this row is selected. */
   canDraft: boolean;
   submitting: boolean;
@@ -79,6 +85,9 @@ export interface DraftPoolRowProps {
   onShowCard?: () => void;
 }
 
+const SLOT =
+  'h-10 w-10 flex items-center justify-center rounded-[10px] border transition-transform active:scale-95';
+
 export function DraftPoolRow({
   rank,
   player,
@@ -89,6 +98,7 @@ export function DraftPoolRow({
   selected,
   drafted,
   queued,
+  queuePosition = null,
   canDraft,
   submitting,
   onSelect,
@@ -114,134 +124,21 @@ export function DraftPoolRow({
     <div
       data-testid="draft-pool-row"
       className={cn(
-        'flex items-center gap-1.5 px-2.5 py-2 min-h-[64px] transition-colors active:bg-pastel-surface-high/60',
+        PB_TYPE,
+        'grid grid-cols-[22px_1fr_54px_40px] gap-2.5 items-center min-h-[62px] px-3.5',
+        'border-t border-white/[0.06] transition-colors active:bg-white/5',
         !drafted && 'cursor-pointer',
-        selected && 'bg-fantasy-primary/10 ring-1 ring-inset ring-fantasy-primary/40',
+        selected && 'bg-pressbox-orange/[0.06] shadow-[inset_3px_0_0_theme(colors.pressbox.orange)]',
         drafted && 'opacity-40',
       )}
       onClick={() => !drafted && onSelect()}
     >
-      <span
-        className={cn(
-          'w-5 shrink-0 text-right font-jbmono tabular-nums leading-none text-white/55',
-          ROW_MICRO,
-        )}
-        data-testid="draft-pool-rank"
-      >
-        {rank}
-      </span>
-
-      <Mug p={mugFromDirectory(player)} size="sm" crest />
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          {queued && (
-            <Star
-              className="h-3 w-3 shrink-0 fill-fantasy-tertiary text-fantasy-tertiary"
-              aria-hidden="true"
-            />
-          )}
-          <span className={cn(ROW_NAME, 'text-pastel-cream')}>{player.full_name}</span>
-          {status && (
-            <span
-              data-testid="draft-pool-status-chip"
-              className={cn(
-                ROW_MICRO,
-                'leading-none font-bold px-1 py-px rounded-sm whitespace-nowrap shrink-0',
-                status.cls,
-              )}
-            >
-              {status.label}
-            </span>
-          )}
-        </div>
-
-        <div className={cn(ROW_META, 'mt-1 flex items-center gap-1.5 overflow-hidden')}>
-          {/* The roster's own position palette shrunk to a second line, the
-              same `cn` trick FreeAgentRow uses: tailwind-merge lets the
-              geometry here replace the chip's 32px box while every colour
-              and ring in positionChip.ts survives. One palette, two sizes. */}
-          <span
-            data-testid="draft-pool-position-chip"
-            className={cn(
-              positionChipClasses(posKey),
-              'w-auto h-[18px] min-w-[26px] px-1.5 rounded text-[10px]',
-            )}
-          >
-            {posKey}
-          </span>
-          <span className="text-white/55 font-semibold shrink-0">{player.team}</span>
-          {signal ? (
-            <>
-              {/* NO SEPARATOR DOT, and the reason is measured, not stylistic:
-                  the name column is 112px at 393 and the meta line needs
-                  110px for chip + team + signal. The dot plus its two gaps is
-                  10px, which is exactly what was pushing the percentile off
-                  the row ("xG 9…" on every row). The signal is sage against a
-                  white-alpha team code, so it separates on colour instead.
-
-                  The moat, on the row. `title` carries the cohort in full;
-                  the row itself has 393px and prints the short form. */}
-              <span
-                data-testid="draft-pool-signal"
-                className="text-pastel-sage font-semibold truncate"
-                title={`${signal.metric} ${signal.value}, ${ordinalPercentile(signal.percentile)} percentile of ${signal.cohortSize} ${signal.cohortNoun}. Citrus model${signal.lowSample ? '. Thin sample' : ''}`}
-              >
-                {signal.shortMetric} {ordinalPercentile(signal.percentile)}
-                {signal.lowSample ? '*' : ''}
-              </span>
-            </>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="flex shrink-0 flex-col items-end text-right">
-        <span
-          className={cn(ROW_HEADLINE, 'text-pastel-sage-soft')}
-          data-testid="draft-pool-projection"
-        >
-          {headlineText}
-        </span>
-        <span
-          className={cn(ROW_HEADLINE_LABEL, 'text-white/55 mt-1')}
-          data-testid="draft-pool-projection-label"
-        >
-          {headlineLabel}
-        </span>
-      </div>
-
-      <div className="flex shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
-        {/* THE MODAL STEP STANDS DOWN UNDER THE CLOCK (2026-09-02).
-            Measured at 393x852: rank, face, name, projection, info, star and
-            Draft together left the name column 90px, so every row read "Leo
-            Car…" and the quality signal was clipped off the second line
-            entirely. Something had to go, and the info button is the right
-            thing: this row now carries the projection and the cohort
-            percentile inline, which is exactly the information the modal was
-            being opened for, and nobody opens a modal with twenty seconds on
-            the clock. Off the clock the button is back and the card is one
-            tap away. Never more than two controls, so the name always has
-            room for a real name. */}
-        {onShowCard && !canDraft && (
-          <button
-            type="button"
-            className="h-9 w-8 flex items-center justify-center rounded-md active:bg-white/5"
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              onShowCard();
-            }}
-            title={`View ${player.full_name} card`}
-            aria-label={`View ${player.full_name} player card`}
-            data-testid="pool-row-card-button"
-          >
-            <Info className="h-4 w-4 text-pastel-cream/70" aria-hidden="true" />
-          </button>
-        )}
+      {/* 1 — the star over the rank. */}
+      <span className="flex flex-col items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
         {onToggleQueue && (
           <button
             type="button"
-            className="h-9 w-8 flex items-center justify-center rounded-md active:bg-white/5"
+            className="focus-citrus relative flex h-[18px] w-[18px] items-center justify-center after:absolute after:-inset-[13px] after:content-['']"
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();
@@ -258,22 +155,112 @@ export function DraftPoolRow({
           >
             <Star
               className={cn(
-                'h-4 w-4',
-                queued ? 'fill-fantasy-tertiary text-fantasy-tertiary' : 'text-pastel-cream/70',
+                'h-3.5 w-3.5',
+                queued
+                  ? 'fill-pressbox-orange-soft text-pressbox-orange-soft'
+                  : 'text-pressbox-text/45',
               )}
+              strokeWidth={2}
               aria-hidden="true"
             />
           </button>
         )}
-        {canDraft && (
+        <span
+          className="font-plex font-semibold text-[12px] tabular-nums text-pressbox-text/60"
+          data-testid="draft-pool-rank"
+        >
+          {rank}
+        </span>
+      </span>
+
+      {/* 2 — the player. */}
+      <span className="flex items-center gap-2.5 min-w-0">
+        <Mug p={mugFromDirectory(player)} size="sm" crest />
+        <span className="min-w-0">
+          <span className="block font-barlow font-bold text-[15px] truncate text-pressbox-text">
+            {player.full_name}
+            {queued && (
+              <>
+                {' '}
+                <span
+                  className="font-plex font-semibold text-[10px] text-pressbox-orange-soft"
+                  data-testid="draft-pool-queue-badge"
+                >
+                  &#9733;{queuePosition != null ? ` Q${queuePosition}` : ''}
+                </span>
+              </>
+            )}
+            {status && (
+              <>
+                {' '}
+                <span
+                  data-testid="draft-pool-status-chip"
+                  className={cn(
+                    'font-plex font-bold text-[9px] px-1 py-px rounded-[3px] whitespace-nowrap align-[1px]',
+                    'bg-pressbox-grapefruit/[0.18] text-pressbox-grapefruit-text',
+                  )}
+                >
+                  {status.label}
+                </span>
+              </>
+            )}
+          </span>
+          <span className="block mt-[3px] font-plex font-medium text-[10px] text-pressbox-text/55 truncate">
+            {posKey && (
+              <b data-testid="draft-pool-position-chip" className="font-bold text-pressbox-text">
+                {posKey}
+              </b>
+            )}
+            {posKey && player.team ? ' · ' : ''}
+            {player.team}
+            {signal ? (
+              <>
+                {' · '}
+                {/* The moat, on the row. `title` carries the cohort in full;
+                    the row itself has 393px and prints the short form. */}
+                <span
+                  data-testid="draft-pool-signal"
+                  className="text-pressbox-sage"
+                  title={`${signal.metric} ${signal.value}, ${ordinalPercentile(signal.percentile)} percentile of ${signal.cohortSize} ${signal.cohortNoun}. Citrus model${signal.lowSample ? '. Thin sample' : ''}`}
+                >
+                  {signal.shortMetric} {ordinalPercentile(signal.percentile)}
+                  {signal.lowSample ? '*' : ''}
+                </span>
+              </>
+            ) : null}
+          </span>
+        </span>
+      </span>
+
+      {/* 3 — the number the row exists to show, and what it is. */}
+      <span className="text-right">
+        <span
+          className="block font-plex font-semibold text-[17px] tabular-nums text-pressbox-text"
+          data-testid="draft-pool-projection"
+        >
+          {headlineText}
+        </span>
+        <span
+          className="block font-plex font-medium text-[8px] uppercase tracking-[0.04em] text-pressbox-text/45"
+          data-testid="draft-pool-projection-label"
+        >
+          {headlineLabel}
+        </span>
+      </span>
+
+      {/* 4 — the action slot. The verb on the clock, the card off it, never
+          both. */}
+      <span className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+        {canDraft ? (
           <button
             type="button"
             className={cn(
-              'ml-0.5 h-9 px-2 rounded-lg font-display font-bold text-[11px] leading-none whitespace-nowrap',
-              'bg-pastel-orange text-pastel-surface active:scale-95 transition-transform',
-              'disabled:opacity-50',
+              SLOT,
+              'border-transparent bg-pressbox-orange text-pressbox-orange-ink',
+              'font-condensed font-bold text-[10px] uppercase tracking-[0.06em] disabled:opacity-50',
             )}
             disabled={submitting}
+            aria-busy={submitting}
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();
@@ -281,10 +268,32 @@ export function DraftPoolRow({
             }}
             data-testid="pool-row-draft-button"
           >
-            {submitting ? 'Submitting…' : 'Draft'}
+            {submitting ? (
+              <>
+                <span aria-hidden="true">&hellip;</span>
+                <span className="sr-only">Submitting…</span>
+              </>
+            ) : (
+              'Draft'
+            )}
           </button>
-        )}
-      </div>
+        ) : onShowCard ? (
+          <button
+            type="button"
+            className={cn(SLOT, 'border-white/[0.12] bg-white/[0.06] text-pressbox-text/70')}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onShowCard();
+            }}
+            title={`View ${player.full_name} card`}
+            aria-label={`View ${player.full_name} player card`}
+            data-testid="pool-row-card-button"
+          >
+            <Info className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+          </button>
+        ) : null}
+      </span>
     </div>
   );
 }

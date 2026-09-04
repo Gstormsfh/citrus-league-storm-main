@@ -50,7 +50,15 @@ import { ScoringCalculator, type ScoringSettings } from '@citrus/shared';
 import { DraftHistory } from '@/components/draft/DraftHistory';
 import { TeamRosters } from '@/components/draft/TeamRosters';
 import { DraftQueue } from '@/components/draft/DraftQueue';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
+// Direct file imports, not the `@/components/pressbox` barrel: the barrel
+// re-exports LeagueHeader, which reaches LeagueContext and the Supabase
+// client at module scope. The room reads its league from the PATH and must
+// not pull the league shell in behind it.
+import { PressBoxDraftHeader } from '@/components/pressbox/DraftHeader';
+import { PressBoxTabs } from '@/components/pressbox/Tabs';
+import { PB_TYPE } from '@/components/pressbox/rowScale';
+import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { DraftClientRunner } from '@/lib/draftClient/runner';
 import { fetchDraftOrderMatrix } from '@/lib/draftClient/fetchDraftOrderMatrix';
@@ -66,6 +74,7 @@ import {
   useIdentityFailure,
   usePendingActions,
   usePickTimeLimitSec,
+  usePresence,
 } from '@/stores/draftClientStore';
 import { useMyTeamIdCrossCheck } from '@/hooks/useMyTeamIdCrossCheck';
 import {
@@ -545,7 +554,11 @@ export default function DraftRoomV2() {
     /* pb-28: clearance for the on-clock action bar, which is FIXED to the
        bottom edge on phones (see MainTabs). lg+ restores the normal pad —
        the bar is sticky-in-flow there. */
-    <div className="container mx-auto p-4 pb-28 lg:pb-4" data-testid="draft-room-v2">
+    /* PRESS BOX (2026-09-04): px-0 below lg. The Press Box screens run
+       full-bleed with each block owning its own 14px gutter — the pool's
+       selected row needs its rail to reach the screen edge — so the room
+       stops padding the phone and lets its children do it. */
+    <div className={`${PB_TYPE} container mx-auto px-0 py-4 lg:px-4 pb-28 lg:pb-4`} data-testid="draft-room-v2">
       {/*
         * NATIVE ESCAPE HATCH (2026-08-31, moved into the sticky header
         * 2026-09-01) — reported from the iOS simulator as "I'm stuck, the
@@ -561,6 +574,7 @@ export default function DraftRoomV2() {
         leagueId={leagueId}
         onRetryNow={handleRetryNow}
         clockOffsetMs={clockOffsetMs}
+        teams={teams}
       />
       <IdentityFailureBanner />
       <DraftLobbyV2
@@ -657,6 +671,11 @@ interface StickyHeaderProps {
   leagueId: string;
   onRetryNow: () => void;
   clockOffsetMs: number;
+  /**
+   * PRESS BOX (2026-09-04). Who is actually in the room, `11/12 ●`, in the
+   * artboard's corner. Owned teams only — an AI seat is never "present".
+   */
+  teams: FetchedTeam[];
 }
 
 // DR-4 (2026-07-30) — honest status label. Pre-DR-4 the header showed
@@ -1414,11 +1433,12 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
 // round/pick/status, and the countdown as a compact pill. The h1 stays
 // for screen readers and the page-heading test; sighted users don't
 // need a sign saying "Draft Room" — they need the clock and the way out.
-function StickyHeader({ leagueId, onRetryNow, clockOffsetMs }: StickyHeaderProps) {
+function StickyHeader({ leagueId, onRetryNow, clockOffsetMs, teams }: StickyHeaderProps) {
   const connectionState = useDraftConnectionState();
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
   const pickTimeLimitSec = usePickTimeLimitSec();
+  const presentUserIds = usePresence();
   const wsOpen = connectionState.kind === 'connected';
 
   // Status stays in the DOM in every state (the DR-4 honest-status
@@ -1431,64 +1451,90 @@ function StickyHeader({ leagueId, onRetryNow, clockOffsetMs }: StickyHeaderProps
       ? 'hidden sm:inline'
       : '';
 
-  return (
-    <div className="sticky top-0 z-section-header bg-background/95 backdrop-blur border-b border-border pb-2 mb-3 pt-safe">
-      <h1 className="sr-only">Draft Room</h1>
-      <div className="flex min-h-[44px] items-center justify-between gap-2">
-        <Link
-          to={`/league/${leagueId}`}
-          data-testid="draft-room-exit"
-          className="-ml-1.5 inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-sm font-semibold text-pastel-orange transition-colors hover:text-pastel-orange/80 active:bg-white/5"
-        >
-          &larr; League HQ
-        </Link>
-        {snapshot !== null && derived !== null ? (
-          <div
-            className="min-w-0 flex-1 truncate text-right text-xs sm:text-sm text-muted-foreground tabular-nums"
-            data-testid="draft-header-label"
-          >
-            {/* AUCTION CHROME (2026-09-01): an auction has lots sold,
-                not a round/pick position — and its clock lives on the
-                nomination card, so the snake pick timer stays hidden. */}
-            {snapshot.format === 'auction' ? (
-              <>
-                Auction · {derived.picksMade} / {derived.totalPicks} sold
-                <span className={statusVisibility}>
-                  {' '}· {describeStatus(derived.draftStatus, derived.picksMade)}
-                </span>
-              </>
-            ) : derived.currentPickNumber !== null &&
-            derived.currentRoundNumber !== null ? (
-              <>
-                Round {derived.currentRoundNumber} · Pick{' '}
-                {derived.currentPickNumber} / {derived.totalPicks}
-                <span className={statusVisibility}>
-                  {' '}· {describeStatus(derived.draftStatus, derived.picksMade)}
-                </span>
-              </>
-            ) : (
-              <>
-                {derived.picksMade} / {derived.totalPicks} picks ·{' '}
-                {describeStatus(derived.draftStatus, derived.picksMade)}
-              </>
-            )}
-          </div>
+  // Same count ManagerPresencePanel draws its dots from: owned seats only.
+  const ownedTeams = teams.filter((t) => typeof t.owner_id === 'string' && t.owner_id.length > 0);
+  const connectedCount = ownedTeams.filter((t) => presentUserIds.has(t.owner_id as string)).length;
+
+  /*
+   * PRESS BOX (2026-09-04) — artboard 4a's header. The exit, the title, the
+   * `Round · Pick / total` line and presence in one block, with the compact
+   * clock beside presence so the room still tells the time OFF the clock
+   * (the pick bar below only exists on it).
+   *
+   * The title says DRAFT ROOM, not `<league> DRAFT`: the room reads its
+   * league from the path, LeagueContext may point at a different league for
+   * the whole draft (ARCHITECT 2026-08-12, below), and the in-draft render
+   * path is deliberately free of extra network work. The name lands with
+   * the LeagueContext proposal, not with a fetch here.
+   *
+   * The progress line keeps the exact text it had — `Round 1 · Pick 6 / 36
+   * · in progress` — uppercased by CSS. Its textContent is a DR-1b/DR-4
+   * contract (DraftRoomV2.test.tsx reads /Round 1/, /Pick 6 \/ 36/ and
+   * /in progress/ off it) and the honest-status words stay in the DOM in
+   * every state.
+   */
+  const progress =
+    snapshot !== null && derived !== null ? (
+      <span data-testid="draft-header-label" className="tabular-nums">
+        {snapshot.format === 'auction' ? (
+          <>
+            Auction · {derived.picksMade} / {derived.totalPicks} sold
+            <span className={statusVisibility}>
+              {' '}· {describeStatus(derived.draftStatus, derived.picksMade)}
+            </span>
+          </>
+        ) : derived.currentPickNumber !== null && derived.currentRoundNumber !== null ? (
+          <>
+            Round {derived.currentRoundNumber} · Pick{' '}
+            {derived.currentPickNumber} / {derived.totalPicks}
+            <span className={statusVisibility}>
+              {' '}· {describeStatus(derived.draftStatus, derived.picksMade)}
+            </span>
+          </>
         ) : (
-          <div className="min-w-0 flex-1 truncate text-right text-sm font-semibold">
-            Draft Room
-          </div>
+          <>
+            {derived.picksMade} / {derived.totalPicks} picks ·{' '}
+            {describeStatus(derived.draftStatus, derived.picksMade)}
+          </>
         )}
-        {snapshot !== null && derived !== null && snapshot.format !== 'auction' && (
-          <DraftTimerV2
-            variant="compact"
-            currentPickDeadline={snapshot.stateSnapshot.currentPickDeadline}
-            draftStatus={derived.draftStatus}
-            wsOpen={wsOpen}
-            clockOffsetMs={clockOffsetMs}
-            pickTimeLimitSec={pickTimeLimitSec}
-          />
-        )}
-      </div>
+      </span>
+    ) : null;
+
+  return (
+    <div className="sticky top-0 z-section-header bg-pressbox-surface/95 backdrop-blur border-b border-white/[0.08] pb-2 mb-3 pt-safe">
+      <PressBoxDraftHeader
+        exit={
+          <Link
+            to={`/league/${leagueId}`}
+            data-testid="draft-room-exit"
+            /* Spelled out rather than `PB_DRAFT_EXIT`, on purpose: the guard
+               that keeps this exit brand orange reads the class off the
+               room's own source, at the call site, and it should. */
+            className="focus-citrus relative flex-none text-[18px] leading-none text-pastel-orange after:absolute after:-inset-y-[13px] after:-inset-x-5 after:content-['']"
+            aria-label="Back to League HQ"
+          >
+            &lsaquo;
+          </Link>
+        }
+        progress={progress}
+        connected={ownedTeams.length > 0 ? connectedCount : null}
+        total={ownedTeams.length > 0 ? ownedTeams.length : null}
+        aside={
+          /* AUCTION CHROME (2026-09-01): an auction has lots sold, not a
+             round/pick position — and its clock lives on the nomination
+             card, so the snake pick timer stays hidden. */
+          snapshot !== null && derived !== null && snapshot.format !== 'auction' && (
+            <DraftTimerV2
+              variant="compact"
+              currentPickDeadline={snapshot.stateSnapshot.currentPickDeadline}
+              draftStatus={derived.draftStatus}
+              wsOpen={wsOpen}
+              clockOffsetMs={clockOffsetMs}
+              pickTimeLimitSec={pickTimeLimitSec}
+            />
+          )
+        }
+      />
       <ConnectionBanner onRetryNow={onRetryNow} />
     </div>
   );
@@ -2233,7 +2279,7 @@ function MainTabs({
           the list's last rows scroll clear of it. lg+ keeps it in-flow,
           sticky just below the compact header. */}
       {!isAuctionRoom && (
-        <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-page-header lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-16 lg:z-sticky-raised">
+        <div className="fixed inset-x-0 bottom-0 z-page-header lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-16 lg:z-sticky-raised">
           <OnClockActionBar
             amIOnClock={amIOnClock}
             currentPickDeadline={snapshot?.stateSnapshot.currentPickDeadline ?? null}
@@ -2249,23 +2295,42 @@ function MainTabs({
             projection={selectedProjection}
             signal={selectedSignal}
             scarcity={scarcity}
+            /* PRESS BOX (2026-09-04): the rule across the bar's top, and the
+               queue position the artboard prints inside the verb. */
+            picksMade={derived?.picksMade ?? null}
+            totalPicks={derived?.totalPicks ?? null}
+            selectedQueuePosition={
+              selectedPlayer !== null && queue.indexOf(selectedPlayer.id) >= 0
+                ? queue.indexOf(selectedPlayer.id) + 1
+                : null
+            }
           />
         </div>
       )}
       {/* Toggles live in normal flow — set-and-forget controls don't earn
-          a permanent slice of a phone screen the way the pick action does. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          a permanent slice of a phone screen the way the pick action does.
+          PRESS BOX (2026-09-04): they wear the filter chip — a pill that is
+          cream when armed and tile when not — because that is what a
+          set-and-forget switch IS on artboard 4a, and an underlined sentence
+          with an emoji in it was the one piece of the room still speaking
+          the old language. `aria-pressed` says the state to a screen reader;
+          the word says it to everyone else. */}
+      <div className="flex flex-wrap items-center gap-1.5 px-3.5 font-plex font-semibold text-[10px] tracking-[0.06em]">
         {/* DR-4 (2026-07-30) — alarm mute toggle. Beeping at a user who's
             already looking is obnoxious; muting is one click. */}
         {amIOnClock && (
           <button
             type="button"
             onClick={() => alarm.setMuted(!alarm.muted)}
-            className="text-xs text-muted-foreground hover:text-foreground underline"
+            className={cn(
+              'px-[11px] py-[5px] rounded-full whitespace-nowrap',
+              alarm.muted ? 'bg-pressbox-tile text-pressbox-text/70' : 'bg-pressbox-text text-pressbox-surface',
+            )}
             data-testid="alarm-mute-toggle"
             aria-pressed={alarm.muted}
+            title={alarm.muted ? 'Alarm muted. Tap to unmute' : 'Alarm on. Tap to mute'}
           >
-            {alarm.muted ? '🔇 Alarm muted. Click to unmute' : '🔊 Alarm on. Click to mute'}
+            {alarm.muted ? 'ALARM MUTED' : 'ALARM ON'}
           </button>
         )}
         {/* V2-PARITY (2026-08-17) — autodraft toggle, always visible so a
@@ -2275,26 +2340,35 @@ function MainTabs({
           <button
             type="button"
             onClick={toggleAutodraft}
-            className={
-              autodraftOn
-                ? 'text-xs underline text-fantasy-primary font-semibold'
-                : 'text-xs underline text-muted-foreground hover:text-foreground'
-            }
+            className={cn(
+              'px-[11px] py-[5px] rounded-full whitespace-nowrap',
+              autodraftOn ? 'bg-pressbox-text text-pressbox-surface' : 'bg-pressbox-tile text-pressbox-text/70',
+            )}
             data-testid="autodraft-toggle"
             aria-pressed={autodraftOn}
             title="When on, your picks submit automatically. Top of your queue first, best available otherwise. One attempt per pick; the draft clock is still the backstop."
           >
-            {autodraftOn ? '🤖 Autodraft ON. Click to turn off' : '🤖 Autodraft off. Click to turn on'}
+            {autodraftOn ? 'AUTODRAFT ON' : 'AUTODRAFT OFF'}
           </button>
         )}
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="players">Players</TabsTrigger>
-          <TabsTrigger value="board">Board</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-        </TabsList>
+        {/* PRESS BOX (2026-09-04): artboard 4a's strip — four centred
+            columns in Barlow Condensed at .14em, an orange rule under the
+            one you are on. Radix still owns the panes below; this is only
+            the trigger row, which is why it is not a TabsList. */}
+        <PressBoxTabs
+          fill
+          label="Draft room view"
+          activeKey={tab}
+          onSelect={(v) => setTab(v as typeof tab)}
+          tabs={[
+            { key: 'players', label: 'Players' },
+            { key: 'board', label: 'Board' },
+            { key: 'history', label: 'History' },
+          ]}
+        />
 
         <TabsContent value="players" className="mt-4">
           {playersLoading ? (

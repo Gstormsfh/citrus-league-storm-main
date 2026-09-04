@@ -29,16 +29,25 @@ export interface PressBoxDraftPickBarProps {
   /** 0–1. The share of the draft's picks already made. */
   progress: number;
   /** `YOUR PICK · 3.07`, or `ON THE CLOCK`, or whose turn it is. */
-  eyebrow: string;
+  eyebrow: React.ReactNode;
   /** `1:12`. The page formats it; this only renders it. */
   clock: string;
   urgent?: boolean;
   /** `Draft Makar`. Absent renders the bar without an action. */
-  actionLabel?: string | null;
-  /** `QUEUE #1 · D · 612`. */
-  actionDetail?: string | null;
+  actionLabel?: React.ReactNode;
   onAction?: () => void;
   actionDisabled?: boolean;
+  /** Not `fixed`: the caller owns the bar's position. */
+  inline?: boolean;
+  /** Anything the room adds under the main row — a decision line, chips. */
+  children?: React.ReactNode;
+  /** Test ids the room's contract pins. */
+  clockTestId?: string;
+  actionTestId?: string;
+  /** Accessible name for the clock. */
+  clockLabel?: string;
+  /** `QUEUE #1 · D · 612`. Rendered inside the action, under the label. */
+  actionDetail?: React.ReactNode;
   className?: string;
 }
 
@@ -51,6 +60,11 @@ export function PressBoxDraftPickBar({
   actionDetail,
   onAction,
   actionDisabled,
+  inline,
+  children,
+  clockTestId,
+  actionTestId,
+  clockLabel,
   className,
 }: PressBoxDraftPickBarProps) {
   const pct = Math.max(0, Math.min(1, progress)) * 100;
@@ -58,7 +72,7 @@ export function PressBoxDraftPickBar({
     <div
       className={cn(
         PB_TYPE,
-        'fixed bottom-0 left-0 right-0 z-app-nav lg:hidden',
+        !inline && 'fixed bottom-0 left-0 right-0 z-app-nav lg:hidden',
         'bg-pressbox-surface border-t border-white/[0.08]',
         className,
       )}
@@ -67,7 +81,7 @@ export function PressBoxDraftPickBar({
         <div className="h-full bg-pressbox-sage" style={{ width: `${pct}%` }} />
       </div>
 
-      <div className="flex items-center gap-3 px-3.5 pt-3 pb-[26px]">
+      <div className={cn('flex items-center gap-3 px-3.5 pt-3', children ? 'pb-2' : 'pb-[max(26px,env(safe-area-inset-bottom))]')}>
         <div>
           <p className="font-condensed font-bold text-[10px] uppercase tracking-[0.14em] text-pressbox-orange-soft">
             {eyebrow}
@@ -77,6 +91,8 @@ export function PressBoxDraftPickBar({
               'mt-0.5 font-plex font-semibold text-[34px] leading-none tabular-nums tracking-[-0.02em]',
               urgent ? 'text-pressbox-grapefruit-text' : 'text-pressbox-sage',
             )}
+            data-testid={clockTestId}
+            aria-label={clockLabel}
           >
             {clock}
           </p>
@@ -87,6 +103,7 @@ export function PressBoxDraftPickBar({
             type="button"
             onClick={onAction}
             disabled={actionDisabled}
+            data-testid={actionTestId}
             className={cn(
               'focus-citrus flex-1 h-[52px] rounded-[12px] bg-pressbox-orange text-pressbox-orange-ink',
               'flex flex-col items-center justify-center leading-[1.1] disabled:opacity-40',
@@ -101,6 +118,7 @@ export function PressBoxDraftPickBar({
           </button>
         )}
       </div>
+      {children && <div className="px-3.5 pb-[max(26px,env(safe-area-inset-bottom))]">{children}</div>}
     </div>
   );
 }

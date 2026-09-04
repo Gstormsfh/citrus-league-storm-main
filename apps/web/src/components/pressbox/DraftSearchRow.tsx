@@ -14,11 +14,21 @@ export interface PressBoxDraftSearchRowProps {
   value: string;
   onValueChange: (v: string) => void;
   placeholder?: string;
-  /** `PROJ`. The arrow is drawn here. */
-  sortLabel: string;
+  /** `PROJ`. The arrow is drawn here. Ignored when `sort` is supplied. */
+  sortLabel?: string;
   onSortPress?: () => void;
+  /**
+   * A caller-owned sort control in the button's place — the pool passes its
+   * Radix Select here, with the trigger wearing `PB_SORT_TRIGGER`, so the
+   * sixteen sort keys and the goalie/skater split keep working unchanged.
+   */
+  sort?: React.ReactNode;
   className?: string;
 }
+
+/** The sort button's own classes, exported so a Select trigger can wear them. */
+export const PB_SORT_TRIGGER =
+  'focus-citrus h-[38px] px-3 rounded-[10px] bg-pressbox-tile font-plex font-semibold text-[10px] text-pressbox-text/80 whitespace-nowrap';
 
 export function PressBoxDraftSearchRow({
   value,
@@ -26,6 +36,7 @@ export function PressBoxDraftSearchRow({
   placeholder = 'Search',
   sortLabel,
   onSortPress,
+  sort,
   className,
 }: PressBoxDraftSearchRowProps) {
   return (
@@ -53,14 +64,16 @@ export function PressBoxDraftSearchRow({
           className="flex-1 min-w-0 bg-transparent outline-none font-barlow text-[13px] text-pressbox-text placeholder:text-pressbox-text/45"
         />
       </div>
-      <button
-        type="button"
-        onClick={onSortPress}
-        aria-label={`Sort by ${sortLabel}. Change sort`}
-        className="focus-citrus h-[38px] px-3 rounded-[10px] bg-pressbox-tile font-plex font-semibold text-[10px] text-pressbox-text/80"
-      >
-        {sortLabel} &#9662;
-      </button>
+      {sort ?? (
+        <button
+          type="button"
+          onClick={onSortPress}
+          aria-label={`Sort by ${sortLabel ?? 'projection'}. Change sort`}
+          className={PB_SORT_TRIGGER}
+        >
+          {sortLabel} &#9662;
+        </button>
+      )}
     </div>
   );
 }

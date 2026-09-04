@@ -13,6 +13,9 @@ export const TEAMS = Array.from({ length: TEAM_COUNT }, (_, i) => ({
   ][i],
   owner_name: `Manager ${i + 1}`,
   user_id: i === 0 ? 'harness-user' : `user-${i + 1}`,
+  // FetchedTeam reads `owner_id`; presence counts owned seats by it. Without
+  // this the harness room showed no `n/12 ●` at all.
+  owner_id: i === 0 ? 'harness-user' : `user-${i + 1}`,
 }));
 
 export const MY_TEAM_ID = 'team-1';
