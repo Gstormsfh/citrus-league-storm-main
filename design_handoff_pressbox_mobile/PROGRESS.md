@@ -2,8 +2,9 @@
 
 ## EVENING RUN, 2026-09-04 — read this first
 
-**Every screen in artboard 1a, 4a and 4b is on its real page.** Twenty-two
-commits on `redesign/pressbox` since PR7 (`2fea1029..8ab6ca4c`). Nothing is
+**Every screen in artboard 1a, 4a and 4b is on its real page, the player
+card's panes and the commissioner's settings included.** Twenty-four
+commits on `redesign/pressbox` since PR7 (`2fea1029..7cda66f6`). Nothing is
 pushed, nothing is applied to production. The working tree is clean.
 
 | screen | state | see it |
@@ -15,9 +16,9 @@ pushed, nothing is applied to production. The working tree is clean.
 | Match (1a) — `‹ WK ›`, score block, day strip, other-matchup chips, LINEUPS / BENCH / TONIGHT | done, live in Matchup | `page.html?p=matchup` |
 | Home (1a) — ticker, MY LEAGUES, TONIGHT ON YOUR ROSTERS | done, live at `/` for a signed-in phone | `page.html?p=home` |
 | Team / Roster (1a) — header sub-tabs back on, views as a segmented control | done | `page.html?p=roster` |
-| Player card (1a) — hero, team ground, tabs, full-screen sheet below sm | hero + shell done; the three panes' bodies are still the old markup | open any row |
+| Player card (1a) — hero, team ground, tabs, Overview / Detailed / Game log as the artboard's tiles, log table, upcoming cards | done (PR7d) | open any row; Game log renders in `page.html?p=freeagents` now |
+| League settings (1a) — chips, value rows with the rule under each label, option + stepper pickers, DISCARD / SAVE & NOTIFY LEAGUE | done (PR9), phone only; desktop dialog untouched | `page.html?p=league` → League settings tile |
 | App nav + Stormy bar | mounted app-wide; pool leagues keep their old tabs | any page |
-| League settings sheet | functional, NOT restyled (PR11 pieces still in `pressboxsettings.html`) | League HQ → League settings |
 
 **First thing to run** (five draft suites, the MatchupComparison suites, the
 hideRoutes suite and every page suite cannot load on my offline runner):
@@ -48,13 +49,22 @@ cd ~/dev/citrus/apps/web && npm run lint && npm run test
 5. **`StickyScoreBar` is deleted** (orphaned by PR5c; matchupDeadCodeGuard
    demands it). `FreeAgentRow` and its 44 tests are still in the tree, no
    longer imported by the page — delete both once Players is signed off.
+6. **The game log's phone table drops the per-game confidence bar** (the
+   likely range rides in the tail column instead; both said the same
+   thing and one fits) and shows G A SOG +/- PPP HIT for a played game,
+   G A SOG PPP HIT for a projected one. SHP, BLK, PIM still count in the
+   totals; they are not columns on a 361px body. `computedConfidence` is
+   still on every entry if you want the bar back.
+7. **League settings are stated once as data** (`leagueSettingsSections.ts`)
+   and the phone draws them; the desktop dialog keeps its hand-written
+   form. The 09-01 phone classes and section dropdown were removed from
+   that dialog — it never opens below `lg` now. `ScoringRulesEditor` and
+   the phone share `useScoringRules`.
 
 ### Still open
 
-- The player card's three pane bodies (Overview / Detailed / Game log) —
-  PR7b's tiles, log and note components are built and waiting.
-- The league settings sheet (PR11 components built, not wired).
 - Two migrations, unapplied: `20260904100000`, `20260904101000`.
+- `FreeAgentRow` + its tests, once Players is signed off.
 - PR3 skeletons, PR12 aggregates, PR13 motion, PR14/15 moments, PR17, PR18.
 
 ---
