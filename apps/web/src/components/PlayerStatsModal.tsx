@@ -1,8 +1,7 @@
 import { userMessage } from '@/lib/userMessage';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
-import { Star, AlertCircle, Clock, Trash2, Flame, Snowflake, CalendarDays, Loader2, CheckCircle2, Newspaper } from 'lucide-react';
+import { AlertCircle, Clock, Trash2, Snowflake, CalendarDays, Loader2, Newspaper } from 'lucide-react';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { cn } from '@/lib/utils';
 import { LeagueService } from '@/services/LeagueService';
@@ -21,8 +20,24 @@ import { generatePlayerWriteup, WriteupTone } from '@/utils/playerWriteup';
 import { getCurrentSeason, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
 import { PlayerAdvancedCard } from '@/components/player/PlayerAdvancedCard';
-import { PressBoxPlayerCardHero, pressBoxPlayerCardGround } from '@/components/pressbox/PlayerCard';
+import {
+  PressBoxPlayerCardHero,
+  pressBoxPlayerCardGround,
+  PressBoxGameLog,
+  PressBoxUpcomingCards,
+} from '@/components/pressbox/PlayerCard';
+import { PressBoxSectionHead } from '@/components/pressbox/SectionHead';
 import { PressBoxTabs } from '@/components/pressbox/Tabs';
+import {
+  type GameLogEntry,
+  playedRows,
+  upcomingRows,
+  upcomingCards,
+  SKATER_LOG_HEADINGS,
+  GOALIE_LOG_HEADINGS,
+  SKATER_PROJ_HEADINGS,
+  GOALIE_PROJ_HEADINGS,
+} from '@/components/player/gameLogRows';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { getTeamColor } from '@/utils/teamColors';
 
@@ -34,23 +49,12 @@ import { getTeamColor } from '@/utils/teamColors';
    hierarchy while clearing 4.5:1 on a dark tile. */
 
 
-// ─── Types for game log entries ──────────────────────────────────────
-interface GameLogEntry {
-  date: string; // YYYY-MM-DD
-  dayLabel: string; // e.g. "Sun", "Mon"
-  dateLabel: string; // e.g. "Feb 15"
-  opponent: string; // e.g. "vs BOS" or "@ NYR"
-  gameTime?: string;
-  projectedPoints: number;
-  projection: Record<string, unknown> | null; // Full projection object (skater or goalie)
-  isGoalie: boolean;
-  isPast: boolean;
-  isToday: boolean;
-  computedConfidence: number; // 0.0-1.0, computed fresh on the frontend
-  // Actual stats for played games
-  actualPoints?: number;
-  actualStats?: Record<string, unknown>;
-}
+// The GameLogEntry type lives with the row mapping in
+// components/player/gameLogRows.ts (2026-09-04).
+
+/** Rows the phone log shows before "+ N MORE". */
+const PLAYED_ROWS = 10;
+const UPCOMING_ROWS = 10;
 
 /** Compute a meaningful confidence score from projection data + temporal distance */
 function computeConfidence(projection: Record<string, unknown>, gameDate: string, todayStr: string): number {
@@ -103,9 +107,9 @@ interface PlayerStatsModalProps {
  * for as the app's "this is you" identity signal (Standings, matchup ScoreCard).
  */
 const WRITEUP_TAG_STYLES: Record<WriteupTone, string> = {
-  positive: 'bg-pastel-sage/20 text-pastel-cream ring-pastel-sage/40',
-  neutral: 'bg-white/5 text-white/70 ring-white/15',
-  caution: 'bg-amber-500/15 text-amber-200 ring-amber-500/30',
+  positive: 'bg-pressbox-sage/15 text-pressbox-sage-soft',
+  neutral: 'bg-white/[0.06] text-pressbox-text/70',
+  caution: 'bg-pressbox-grapefruit/[0.15] text-pressbox-grapefruit-text',
 };
 
 const getPositionAbbr = (pos: string) => {
@@ -123,16 +127,21 @@ const getPositionAbbr = (pos: string) => {
 // pastel-cream text on a cream surface — the washed-out stat boxes. The
 // .dark remap layer that was supposed to darken it never applies because
 // no .dark class exists on <html>. Dark-first tile instead.
+/**
+ * PRESS BOX (2026-09-04): the artboard's stat tile — Plex 8px label at 45%
+ * over an 18px tabular figure in a #16241B tile at 10px radius. `highlight`
+ * is the artboard's orange-soft, for the figures a manager scans for first.
+ */
 const StatCell = ({ label, value, highlight, sub }: { label: string; value: string | number; highlight?: boolean; sub?: string }) => (
-  <div className="flex flex-col items-center p-3 bg-white/5 rounded-xl border border-citrus-sage/20">
-    <span className="text-[10px] font-display font-semibold text-pastel-cream/65 uppercase tracking-wider mb-1">{label}</span>
+  <div className={cn(PB_TYPE, 'p-2 rounded-[10px] bg-pressbox-tile border border-white/[0.08]')}>
+    <span className="block font-plex font-medium text-[8px] tracking-[0.08em] uppercase text-pressbox-text/45 truncate">{label}</span>
     <span className={cn(
-      "text-xl font-varsity font-black leading-none",
-      highlight ? "text-citrus-orange" : "text-pastel-cream"
+      'block mt-[3px] font-plex font-semibold text-[18px] tabular-nums',
+      highlight ? 'text-pressbox-orange-soft' : 'text-pressbox-text',
     )}>
       {value}
     </span>
-    {sub && <span className="text-[9px] text-pastel-cream/60 font-display mt-0.5">{sub}</span>}
+    {sub && <span className="block font-plex font-medium text-[9px] text-pressbox-text/45">{sub}</span>}
   </div>
 );
 
@@ -201,6 +210,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
    * what those tabs hang off.
    */
   const [logSeason, setLogSeason] = useState<number>(() => getProjectionsSeason());
+  const [showAllPlayed, setShowAllPlayed] = useState(false);
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
 
   /** "September 29", or null when the map has no next opener. Same read the
    *  off-season line above the tabs uses, hoisted so both agree. */
@@ -273,6 +284,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
     setTotalActual(0);
     setGoalieStartsRemaining(null);
     setGameLogLoading(true);
+    setShowAllPlayed(false);
+    setShowAllUpcoming(false);
 
     // A player change mid-flight must not let the OLD response win. Same
     // guard usePlayerXgHistory carries, for the same reason.
@@ -479,6 +492,12 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   // an early return runs conditionally, which breaks the Rules of Hooks and
   // desyncs every hook after it the moment `player` goes null on close.
   const { notes: citrusNotes } = useCitrusPlayerNotes(player?.id, isOpen);
+  // Same rule: the log's rows are derived above the early return. They read
+  // the goalie flag off `player` directly because `isGoalie` is declared
+  // below it.
+  const logIsGoalie = player?.position === 'Goalie' || player?.position === 'G';
+  const playedLog = useMemo(() => playedRows(gameLog, logIsGoalie), [gameLog, logIsGoalie]);
+  const upcomingLog = useMemo(() => upcomingRows(gameLog, logIsGoalie), [gameLog, logIsGoalie]);
 
   if (!player) return null;
 
@@ -681,12 +700,12 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
               <div className="flex items-center justify-between gap-2 -mb-1">
                 <span
                   data-testid="overview-season-label"
-                  className="font-jbmono text-[10px] uppercase tracking-[0.16em] text-pastel-cream/60"
+                  className="font-plex font-medium text-[10px] uppercase tracking-[0.1em] text-pressbox-text/45"
                 >
                   {seasonLabel(getCurrentSeason())} season
                 </span>
                 {openerLabel && getProjectionsSeason() !== getCurrentSeason() && (
-                  <span className="font-display text-[10px] text-pastel-cream/60">
+                  <span className="font-plex font-medium text-[10px] text-pressbox-text/45">
                     {seasonLabel(getProjectionsSeason())} starts {openerLabel}
                   </span>
                 )}
@@ -694,30 +713,32 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
               {/* Scouting report — leads the tab the way ESPN/Sleeper lead
                   with a blurb. Derived from the same stat line rendered
                   directly below it (see utils/playerWriteup), so the prose and
-                  the numbers can never disagree. */}
-              <div className="py-3 px-3.5 bg-white/5 rounded-xl border border-citrus-sage/15">
+                  the numbers can never disagree.
+                  PRESS BOX (2026-09-04): the artboard's note card — eyebrow in
+                  orange-soft mono, Barlow body — with Citrus's byline kept. */}
+              <div className="p-3 rounded-[12px] bg-pressbox-tile border border-white/[0.08]">
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                   <div className="flex items-center gap-1.5">
-                    <CitrusSparkle className="w-3 h-3 text-citrus-orange" aria-hidden="true" />
-                    <span className="text-[9px] font-display uppercase tracking-[0.18em] text-pastel-cream/60">
+                    <CitrusSparkle className="w-3 h-3 text-pressbox-orange-soft" aria-hidden="true" />
+                    <span className="font-plex font-semibold text-[9px] uppercase tracking-[0.12em] text-pressbox-orange-soft">
                       Player Outlook
                     </span>
                   </div>
                   {/* Bylined, the way Sleeper credits Rotowire. This is our own
                       analysis, derived from our own numbers — so it says so. */}
-                  <span className="text-[9px] font-display text-white/55 flex-shrink-0">
+                  <span className="font-plex font-medium text-[9px] text-pressbox-text/45 flex-shrink-0">
                     via Citrus
                   </span>
                 </div>
-                <div className="text-sm font-display font-bold text-pastel-cream leading-snug">
+                <div className="font-barlow font-bold text-[14px] text-pressbox-text leading-snug">
                   {writeup.headline}
                 </div>
-                <p className="mt-1 text-[13px] leading-relaxed text-white/70">
+                <p className="mt-1 font-barlow text-[13px] leading-[1.45] text-pressbox-text/70">
                   {writeup.summary}
                 </p>
                 {writeup.analysis && (
-                  <p className="mt-2 text-[13px] leading-relaxed text-white/70">
-                    <span className="font-display font-bold text-pastel-cream">Analysis: </span>
+                  <p className="mt-2 font-barlow text-[13px] leading-[1.45] text-pressbox-text/70">
+                    <span className="font-bold text-pressbox-text">Analysis: </span>
                     {writeup.analysis}
                   </p>
                 )}
@@ -727,7 +748,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                       <span
                         key={tag.label}
                         className={cn(
-                          'inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-jbmono uppercase tracking-wider font-bold ring-1',
+                          'inline-flex items-center rounded-[4px] px-1.5 py-0.5 font-plex font-semibold text-[9px] uppercase tracking-[0.08em]',
                           WRITEUP_TAG_STYLES[tag.tone],
                         )}
                       >
@@ -743,15 +764,15 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                   Renders nothing at all when there are no notes; an empty
                   "Latest News" header would imply the feed had failed. */}
               {citrusNotes.length > 0 && (
-                <div className="py-3 px-3.5 bg-white/5 rounded-xl border border-citrus-sage/15">
+                <div className="p-3 rounded-[12px] bg-pressbox-tile border border-white/[0.08]">
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="flex items-center gap-1.5">
-                      <Newspaper className="w-3 h-3 text-citrus-orange" aria-hidden="true" />
-                      <span className="text-[9px] font-display uppercase tracking-[0.18em] text-pastel-cream/60">
+                      <Newspaper className="w-3 h-3 text-pressbox-orange-soft" aria-hidden="true" />
+                      <span className="font-plex font-semibold text-[9px] uppercase tracking-[0.12em] text-pressbox-orange-soft">
                         Latest News
                       </span>
                     </div>
-                    <span className="text-[9px] font-display text-white/55 flex-shrink-0">via Citrus</span>
+                    <span className="font-plex font-medium text-[9px] text-pressbox-text/45 flex-shrink-0">via Citrus</span>
                   </div>
                   <div className="space-y-3">
                     {citrusNotes.map((note) => (
@@ -764,18 +785,18 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                                 ? 'bg-amber-400'
                                 : note.severity === 'positive'
                                   ? 'bg-pastel-sage'
-                                  : 'bg-pastel-cream/70',
+                                  : 'bg-pressbox-text/70',
                             )}
                             aria-hidden="true"
                           />
                           <div className="min-w-0">
-                            <div className="text-sm font-display font-bold text-pastel-cream leading-snug">
+                            <div className="font-barlow font-bold text-[14px] text-pressbox-text leading-snug">
                               {note.headline}
                             </div>
-                            <p className="mt-1 text-[13px] leading-relaxed text-white/70">{note.body}</p>
+                            <p className="mt-1 font-barlow text-[13px] leading-[1.45] text-pressbox-text/70">{note.body}</p>
                             {note.analysis && (
-                              <p className="mt-1.5 text-[13px] leading-relaxed text-white/70">
-                                <span className="font-display font-bold text-pastel-cream">Analysis: </span>
+                              <p className="mt-1.5 font-barlow text-[13px] leading-[1.45] text-pressbox-text/70">
+                                <span className="font-bold text-pressbox-text">Analysis: </span>
                                 {note.analysis}
                               </p>
                             )}
@@ -789,7 +810,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
               {/* Key stats grid */}
               {isGoalie ? (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-1.5">
                   <StatCell label="W" value={stats.wins ?? 0} highlight />
                   <StatCell label="GAA" value={stats.gaa?.toFixed(2) ?? '0.00'} />
                   <StatCell label="SV%" value={stats.savePct ? `${(stats.savePct * 100).toFixed(1)}` : '0.0'} />
@@ -798,7 +819,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                   <StatCell label="SV" value={stats.saves ?? 0} />
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-1.5">
                   <StatCell label="G" value={stats.goals ?? 0} highlight />
                   <StatCell label="A" value={stats.assists ?? 0} highlight />
                   <StatCell label="PTS" value={stats.points ?? ((stats.goals ?? 0) + (stats.assists ?? 0))} highlight />
@@ -810,7 +831,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
               {/* Secondary stats row */}
               {!isGoalie && (
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 gap-1.5">
                   <StatCell label="PPP" value={stats.powerPlayPoints ?? 0} />
                   <StatCell label="HIT" value={stats.hits ?? 0} />
                   <StatCell label="BLK" value={stats.blockedShots ?? 0} />
@@ -818,35 +839,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 </div>
               )}
 
-              {/* Bio quick view */}
-              {(player.age || player.height || player.weight) && (
-                <div className="flex items-center gap-4 py-2.5 px-3 bg-white/5 rounded-xl border border-citrus-sage/15 text-sm">
-                  {player.age && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-pastel-cream/60 text-xs font-display">Age</span>
-                      <span className="font-display font-bold text-pastel-cream">{player.age}</span>
-                    </div>
-                  )}
-                  {player.height && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-pastel-cream/60 text-xs font-display">Ht</span>
-                      <span className="font-display font-bold text-pastel-cream">{player.height}</span>
-                    </div>
-                  )}
-                  {player.weight && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-pastel-cream/60 text-xs font-display">Wt</span>
-                      <span className="font-display font-bold text-pastel-cream">{player.weight}</span>
-                    </div>
-                  )}
-                  {player.experience && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-pastel-cream/60 text-xs font-display">Exp</span>
-                      <span className="font-display font-bold text-pastel-cream">{player.experience}</span>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* The vitals — age, height, weight, experience — moved up into
+                  the Press Box hero (2026-09-04); the bio strip that repeated
+                  them here is gone. */}
             </TabsContent>
 
             {/* ─── Detailed Stats Tab ─── */}
@@ -855,7 +850,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                   reader assume it. See the note there. */}
               <span
                 data-testid="advanced-season-label"
-                className="block font-jbmono text-[10px] uppercase tracking-[0.16em] text-pastel-cream/60 -mb-1"
+                className="block font-plex font-medium text-[10px] uppercase tracking-[0.1em] text-pressbox-text/45 -mb-1"
               >
                 {seasonLabel(getCurrentSeason())} season
               </span>
@@ -898,7 +893,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                         : '-'
                     } highlight={!!(stats.goalsSavedAboveExpected && stats.goalsSavedAboveExpected > 0)} />
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-1.5">
                     <StatCell label="W" value={stats.wins ?? 0} />
                     <StatCell label="L" value={stats.losses ?? 0} />
                     <StatCell label="OTL" value={stats.otl ?? 0} />
@@ -910,8 +905,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
               ) : (
                 <>
                   {/* Full stat grid — scrollable on narrow screens */}
-                  <div className="rounded-xl border border-citrus-sage/20 overflow-x-auto">
-                    <div className="grid grid-cols-4 gap-px bg-citrus-sage/15 min-w-[320px]">
+                  <div className="rounded-[12px] border border-white/[0.08] overflow-x-auto">
+                    <div className="grid grid-cols-4 gap-px bg-white/[0.06] min-w-[320px]">
                       {[
                         { label: 'G', value: stats.goals ?? 0 },
                         { label: 'A', value: stats.assists ?? 0 },
@@ -926,9 +921,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                         { label: 'GP', value: stats.gamesPlayed ?? 0 },
                         { label: 'TOI/G', value: stats.toi ?? '-' },
                       ].map((item, i) => (
-                        <div key={i} className="bg-card p-2.5 flex flex-col items-center text-center">
-                          <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase tracking-wider">{item.label}</span>
-                          <span className="text-base font-varsity font-black text-pastel-cream mt-0.5">{item.value}</span>
+                        <div key={i} className="bg-pressbox-tile p-2.5 flex flex-col items-center text-center">
+                          <span className="font-plex font-medium text-[8px] uppercase tracking-[0.08em] text-pressbox-text/45">{item.label}</span>
+                          <span className="font-plex font-semibold text-[15px] tabular-nums text-pressbox-text mt-0.5">{item.value}</span>
                         </div>
                       ))}
                     </div>
@@ -936,11 +931,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
                   {/* Advanced metrics */}
                   <div className="space-y-2">
-                    <h4 className="text-xs font-display font-bold text-pastel-cream/65 uppercase tracking-wider flex items-center gap-1.5">
-                      <CitrusSparkle className="w-3.5 h-3.5 text-citrus-orange" />
+                    <h4 className="font-condensed font-bold text-[14px] uppercase tracking-[0.08em] text-pressbox-text flex items-center gap-1.5">
+                      <CitrusSparkle className="w-3.5 h-3.5 text-pressbox-orange-soft" aria-hidden="true" />
                       Advanced
                     </h4>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-1.5">
                       <StatCell
                         label="xGoals"
                         value={stats.xGoals?.toFixed(1) ?? '-'}
@@ -966,7 +961,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
               <div
                 role="group"
                 aria-label="Season"
-                className="grid grid-cols-2 gap-0.5 rounded-lg bg-white/5 p-0.5"
+                className="grid grid-cols-2 gap-0.5 rounded-[8px] bg-pressbox-tile p-0.5"
               >
                 {[getProjectionsSeason(), getProjectionsSeason() - 1].map((yr) => {
                   const active = logSeason === yr;
@@ -978,10 +973,10 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                       aria-pressed={active}
                       onClick={() => setLogSeason(yr)}
                       className={cn(
-                        'h-9 rounded-md font-display text-[12px] font-bold tabular-nums transition-colors',
+                        'focus-citrus h-8 rounded-[6px] font-plex font-semibold text-[10px] tracking-[0.06em] tabular-nums transition-colors',
                         active
-                          ? 'bg-citrus-sage text-white'
-                          : 'text-pastel-cream/60 hover:text-pastel-cream',
+                          ? 'bg-pressbox-text text-pressbox-surface'
+                          : 'text-pressbox-text/60 hover:text-pressbox-text',
                       )}
                     >
                       {seasonLabel(yr)}
@@ -992,19 +987,23 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
               {gameLogLoading ? (
                 <div className="text-center py-10">
-                  <Loader2 className="w-8 h-8 text-citrus-sage/40 mx-auto mb-3 animate-spin" />
-                  <p className="text-sm font-display text-pastel-cream/60">Loading game log…</p>
+                  <Loader2 className="w-8 h-8 text-pressbox-sage/40 mx-auto mb-3 animate-spin" />
+                  <p className="font-plex font-medium text-[10px] text-pressbox-text/45">Loading game log…</p>
                 </div>
               ) : gameLog.length > 0 ? (
                 <>
-                  {/* Season summary banner */}
-                  <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-citrus-sage/10 to-citrus-peach/10 rounded-xl border border-citrus-sage/20">
-                    <CalendarDays className="w-5 h-5 text-citrus-orange flex-shrink-0" />
+                  {/* Season summary banner. Only once it says something the
+                      UPCOMING head below cannot: games played, or the goalie
+                      starts note. Before the opener the head IS the summary,
+                      and two lines reading `8 GAMES · 37.6 PROJ` is a stutter. */}
+                  {(pastGames.length > 0 || goalieStartsRemaining !== null) && (
+                  <div className="flex items-center gap-3 p-3 rounded-[12px] bg-pressbox-tile border border-white/[0.08]">
+                    <CalendarDays className="w-4 h-4 text-pressbox-orange-soft flex-shrink-0" aria-hidden="true" />
                     <div>
-                      <span className="text-sm font-display font-bold text-pastel-cream">
+                      <span className="font-barlow font-bold text-[14px] text-pressbox-text">
                         {gameLog.length} Game{gameLog.length !== 1 ? 's' : ''}
                       </span>
-                      <span className="text-xs text-pastel-cream/65 ml-2">
+                      <span className="font-plex font-medium text-[10px] text-pressbox-text/55 ml-2">
                         {pastGames.length} played · {goalieStartsRemaining !== null
                           ? `≈${goalieStartsRemaining} projected starts of ${futureGames.length} team games`
                           : `${futureGames.length} remaining`}
@@ -1012,198 +1011,87 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                     </div>
                     <div className="ml-auto text-right">
                       {totalActual > 0 && (
-                        <div className="text-lg font-varsity font-black text-pastel-cream leading-tight">{totalActual.toFixed(1)}<span className="text-[9px] text-pastel-cream/60 font-display uppercase ml-1">actual</span></div>
+                        <div className="font-plex font-semibold text-[17px] tabular-nums text-pressbox-text leading-tight">{totalActual.toFixed(1)}<span className="font-plex font-medium text-[9px] text-pressbox-text/45 uppercase ml-1">actual</span></div>
                       )}
                       {futureGames.length > 0 && (
-                        <div className="text-sm font-varsity font-black text-citrus-orange leading-tight">{totalProjected.toFixed(1)}<span className="text-[9px] text-pastel-cream/60 font-display uppercase ml-1">proj</span></div>
+                        <div className="font-plex font-semibold text-[14px] tabular-nums text-pressbox-orange-soft leading-tight">{totalProjected.toFixed(1)}<span className="font-plex font-medium text-[9px] text-pressbox-text/45 uppercase ml-1">proj</span></div>
                       )}
                     </div>
                   </div>
+                  )}
 
-                  {/* Game-by-game log — chronological order, auto-scroll to today */}
-                  <div className="space-y-2">
-                    {(() => {
-                      const hasToday = gameLog.some(g => g.isToday);
-                      let scrollTargetSet = false;
-                      return gameLog.map((gp) => {
-                      const hasActuals = gp.isPast && gp.actualStats != null;
-                      const displayPoints = hasActuals ? (gp.actualPoints ?? 0) : gp.projectedPoints;
-                      const as = gp.actualStats || {};
-                      // Scroll target: today's game, or first non-past game if no today game
-                      const isScrollTarget = gp.isToday || (!hasToday && !gp.isPast && !scrollTargetSet);
-                      if (isScrollTarget && !gp.isPast) scrollTargetSet = true;
+                  {/* PLAYED — the artboard's table, newest first, AVG footer.
+                      Ten rows by default: a full season is 82, and the ten
+                      most recent are what "how's he going" means. The rest
+                      are one press away. */}
+                  {playedLog.length > 0 && (
+                    <div>
+                      <PressBoxGameLog
+                        statHeadings={isGoalie ? GOALIE_LOG_HEADINGS : SKATER_LOG_HEADINGS}
+                        rows={
+                          showAllPlayed || playedLog.length <= PLAYED_ROWS + 1
+                            ? playedLog
+                            : [...playedLog.slice(0, PLAYED_ROWS), ...playedLog.slice(-1)]
+                        }
+                      />
+                      {!showAllPlayed && playedLog.length > PLAYED_ROWS + 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAllPlayed(true)}
+                          className="focus-citrus mt-1.5 w-full h-8 rounded-[8px] bg-white/[0.04] border border-white/[0.08] font-plex font-semibold text-[10px] tracking-[0.08em] text-pressbox-text/60 hover:text-pressbox-text"
+                        >
+                          + {playedLog.length - PLAYED_ROWS - 1} MORE
+                        </button>
+                      )}
+                    </div>
+                  )}
 
-                      return (
-                      <div
-                        key={gp.date}
-                        ref={isScrollTarget ? todayGameRef : undefined}
-                        className={cn(
-                          "rounded-xl border overflow-hidden transition-all",
-                          gp.isToday ? "border-citrus-orange bg-citrus-peach/5"
-                            : hasActuals ? "border-citrus-sage/20 bg-card"
-                            : gp.isPast ? "border-citrus-sage/15 bg-white/[0.03] opacity-50"
-                            : "border-citrus-sage/20 bg-white/5"
-                        )}
-                      >
-                        {/* Game header row */}
-                        <div className="flex items-center gap-3 px-3 py-2">
-                          <div className="flex flex-col items-center min-w-[40px]">
-                            <span className={cn(
-                              "text-[10px] font-varsity font-black uppercase tracking-wider",
-                              gp.isToday ? "text-citrus-orange" : "text-pastel-cream/65"
-                            )}>
-                              {gp.dayLabel}
-                            </span>
-                            <span className="text-xs font-display font-bold text-pastel-cream">{gp.dateLabel}</span>
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              {hasActuals ? (
-                                <CheckCircle2 className="w-3.5 h-3.5 text-citrus-sage" />
-                              ) : (
-                                <Flame className={cn("w-3.5 h-3.5", gp.isToday ? "text-citrus-orange" : "text-citrus-sage/50")} />
-                              )}
-                              <span className="text-sm font-display font-bold text-pastel-cream">{gp.opponent}</span>
-                              {!hasActuals && gp.gameTime && <span className="text-[10px] text-pastel-cream/60 font-display">{gp.gameTime}</span>}
-                            </div>
-                            {gp.isToday && (
-                              <Badge className="mt-0.5 bg-citrus-orange/90 text-white border-0 text-[10px] font-varsity font-black tracking-wider h-4 px-1.5">
-                                TODAY
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <div className={cn(
-                              "text-xl font-varsity font-black",
-                              hasActuals ? "text-pastel-cream" : (displayPoints > 0 ? "text-citrus-orange" : "text-pastel-cream/60")
-                            )}>
-                              {hasActuals ? displayPoints.toFixed(1) : (displayPoints > 0 ? displayPoints.toFixed(1) : (gp.isPast ? 'DNP' : '-'))}
-                            </div>
-                            <div className="text-[10px] text-pastel-cream/60 font-display uppercase">
-                              {hasActuals ? 'pts' : (gp.isPast ? '' : 'proj')}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Stat breakdown row — horizontally scrollable on mobile */}
-                        {hasActuals ? (
-                          /* ACTUAL STATS for played games */
-                          <div className="px-3 pb-2 pt-0 overflow-x-auto">
-                            {gp.isGoalie ? (
-                              <div className="grid grid-cols-6 gap-1 min-w-[320px]">
-                                {[
-                                  { label: 'W', value: Number(as.wins || 0) },
-                                  { label: 'SV', value: Number(as.saves || 0) },
-                                  { label: 'SO', value: Number(as.shutouts || 0) },
-                                  { label: 'GA', value: Number(as.goals_against || 0) },
-                                  { label: 'GAA', value: as.gaa != null ? Number(as.gaa).toFixed(2) : '-' },
-                                  { label: 'SV%', value: as.save_pct != null ? `${(Number(as.save_pct) * 100).toFixed(1)}` : '-' },
-                                ].map((s, i) => (
-                                  <div key={i} className="flex flex-col items-center py-1 bg-citrus-sage/10 rounded border border-citrus-sage/15">
-                                    <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
-                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-8 gap-1 min-w-[380px]">
-                                {[
-                                  { label: 'G', value: Number(as.goals || 0) },
-                                  { label: 'A', value: Number(as.assists || 0) },
-                                  { label: 'SOG', value: Number(as.shots_on_goal || 0) },
-                                  { label: 'BLK', value: Number(as.blocks || 0) },
-                                  { label: 'PPP', value: Number(as.ppp || 0) },
-                                  { label: 'SHP', value: Number(as.shp || 0) },
-                                  { label: 'HIT', value: Number(as.hits || 0) },
-                                  { label: 'PIM', value: Number(as.pim || 0) },
-                                ].map((s, i) => (
-                                  <div key={i} className="flex flex-col items-center py-1 bg-citrus-sage/10 rounded border border-citrus-sage/15">
-                                    <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
-                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ) : gp.projection && gp.projectedPoints > 0 ? (
-                          /* PROJECTED STATS for future games */
-                          <div className="px-3 pb-2 pt-0 overflow-x-auto">
-                            {gp.isGoalie ? (
-                              <div className="grid grid-cols-6 gap-1 min-w-[320px]">
-                                {[
-                                  { label: 'W', value: (gp.projection.projected_wins as number | undefined)?.toFixed(2) },
-                                  { label: 'SV', value: (gp.projection.projected_saves as number | undefined)?.toFixed(0) },
-                                  { label: 'SO', value: (gp.projection.projected_shutouts as number | undefined)?.toFixed(2) },
-                                  { label: 'GA', value: (gp.projection.projected_goals_against as number | undefined)?.toFixed(2) },
-                                  { label: 'GAA', value: (gp.projection.projected_gaa as number | undefined)?.toFixed(2) },
-                                  { label: 'SV%', value: gp.projection.projected_save_pct ? `${(Number(gp.projection.projected_save_pct) * 100).toFixed(1)}` : '-' },
-                                ].map((s, i) => (
-                                  <div key={i} className="flex flex-col items-center py-1 bg-white/5 rounded border border-citrus-sage/10">
-                                    <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
-                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value ?? '-'}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="grid grid-cols-8 gap-1 min-w-[380px]">
-                                {[
-                                  { label: 'G', value: (gp.projection.projected_goals as number | undefined)?.toFixed(2) },
-                                  { label: 'A', value: (gp.projection.projected_assists as number | undefined)?.toFixed(2) },
-                                  { label: 'SOG', value: (gp.projection.projected_sog as number | undefined)?.toFixed(1) },
-                                  { label: 'BLK', value: (gp.projection.projected_blocks as number | undefined)?.toFixed(1) },
-                                  { label: 'PPP', value: (gp.projection.projected_ppp as number | undefined)?.toFixed(2) },
-                                  { label: 'SHP', value: (gp.projection.projected_shp as number | undefined)?.toFixed(2) },
-                                  { label: 'HIT', value: (gp.projection.projected_hits as number | undefined)?.toFixed(1) },
-                                  { label: 'PIM', value: (gp.projection.projected_pim as number | undefined)?.toFixed(1) },
-                                ].map((s, i) => (
-                                  <div key={i} className="flex flex-col items-center py-1 bg-white/5 rounded border border-citrus-sage/10">
-                                    <span className="text-[9px] font-display font-semibold text-pastel-cream/60 uppercase">{s.label}</span>
-                                    <span className="text-[10px] font-varsity font-black text-pastel-cream">{s.value ?? '-'}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {/* Likely Range + Confidence for future games */}
-                            {gp.projection?.likely_low != null && gp.projection?.likely_high != null && (
-                              <div className="flex items-center justify-between mt-1.5 px-1">
-                                <span className="text-[10px] font-display text-pastel-cream/60">Likely Range</span>
-                                <span className="text-[9px] font-varsity font-black text-pastel-cream">
-                                  {Number(gp.projection.likely_low).toFixed(1)} – {Number(gp.projection.likely_high).toFixed(1)} pts
-                                </span>
-                              </div>
-                            )}
-                            {gp.computedConfidence > 0 && (
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[10px] font-display text-pastel-cream/60">Confidence</span>
-                                <div className="flex-1 h-1.5 bg-citrus-sage/10 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-gradient-to-r from-citrus-sage to-citrus-orange rounded-full"
-                                    style={{ width: `${Math.min(gp.computedConfidence * 100, 100)}%` }}
-                                  />
-                                </div>
-                                <span className="text-[9px] font-varsity font-black text-pastel-cream">
-                                  {Math.round(gp.computedConfidence * 100)}%
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        ) : null}
-                      </div>
-                    );});
-                    })()}
-                  </div>
+                  {/* UPCOMING — the next three as the artboard's cards, then
+                      every remaining game's projection in the same table
+                      with the likely range where TOI would be. The ref lands
+                      here so the auto-scroll still brings "now" into view. */}
+                  {futureGames.length > 0 && (
+                    <div ref={todayGameRef} className="space-y-2">
+                      <PressBoxSectionHead
+                        sm
+                        title="Upcoming"
+                        action={
+                          <span className="font-plex font-medium text-[10px] tabular-nums text-pressbox-text/45 whitespace-nowrap">
+                            {futureGames.length} GAME{futureGames.length === 1 ? '' : 'S'}
+                            {totalProjected > 0 ? ` · ${totalProjected.toFixed(1)} PROJ` : ''}
+                          </span>
+                        }
+                      />
+                      <PressBoxUpcomingCards games={upcomingCards(gameLog)} />
+                      <PressBoxGameLog
+                        pointsHeading="PROJ"
+                        tail={{ heading: 'RANGE', width: 64 }}
+                        statHeadings={isGoalie ? GOALIE_PROJ_HEADINGS : SKATER_PROJ_HEADINGS}
+                        rows={showAllUpcoming ? upcomingLog : upcomingLog.slice(0, UPCOMING_ROWS)}
+                      />
+                      {!showAllUpcoming && upcomingLog.length > UPCOMING_ROWS && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAllUpcoming(true)}
+                          className="focus-citrus w-full h-8 rounded-[8px] bg-white/[0.04] border border-white/[0.08] font-plex font-semibold text-[10px] tracking-[0.08em] text-pressbox-text/60 hover:text-pressbox-text"
+                        >
+                          + {upcomingLog.length - UPCOMING_ROWS} MORE
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-10">
-                  <Snowflake className="w-10 h-10 text-pastel-cream/60 mx-auto mb-3" />
+                  <Snowflake className="w-8 h-8 text-pressbox-text/45 mx-auto mb-3" aria-hidden="true" />
                   {/* Names the season (2026-09-04). With a picker above it,
                       "No games scheduled" is ambiguous: the reader cannot tell
                       whether the schedule is missing or they are simply
                       looking at a season this player did not play. */}
-                  <p className="text-sm font-display text-pastel-cream/60">
+                  <p className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text/70">
                     No games in {seasonLabel(logSeason)}
                   </p>
-                  <p className="text-xs font-display text-pastel-cream/60 mt-1">
+                  <p className="font-plex font-medium text-[10px] text-pressbox-text/45 mt-1">
                     Try the other season, or check back when the schedule lands
                   </p>
                 </div>

@@ -201,7 +201,10 @@ export interface PressBoxGameLogRow {
   date: string;
   opponent: string;
   points?: number | null;
+  /** Shown in place of the points figure — `DNP` on a played date with no line. */
+  pointsLabel?: string;
   cells: (string | number)[];
+  /** The tail column: TOI on a played row, the likely range on a projected one. */
   toi?: string | null;
   /** The most recent game takes a sage wash. */
   latest?: boolean;
@@ -213,11 +216,23 @@ export interface PressBoxGameLogProps {
   /** `['G','A','SOG','+/-','PPP','HIT']`. Drives the grid's flexible columns. */
   statHeadings: string[];
   rows: PressBoxGameLogRow[];
+  /** `FPTS` for a played log; `PROJ` for the remaining games. */
+  pointsHeading?: string;
+  /** The tail column's heading and width: TOI at 34px unless the table says otherwise. */
+  tail?: { heading: string; width: number };
   className?: string;
 }
 
-export function PressBoxGameLog({ statHeadings, rows, className }: PressBoxGameLogProps) {
-  const cols = `30px 42px 44px ${statHeadings.map(() => '1fr').join(' ')} 34px`;
+export function PressBoxGameLog({
+  statHeadings,
+  rows,
+  pointsHeading = 'FPTS',
+  tail = { heading: 'TOI', width: 34 },
+  className,
+}: PressBoxGameLogProps) {
+  // The artboard draws DT at 30px, which fits `9/30` and not `10/10`; 34px
+  // fits every date a season has (2026-09-04).
+  const cols = `34px 44px 44px ${statHeadings.map(() => '1fr').join(' ')} ${tail.width}px`;
   return (
     <div
       className={cn(
@@ -233,13 +248,13 @@ export function PressBoxGameLog({ statHeadings, rows, className }: PressBoxGameL
       >
         <span>DT</span>
         <span>OPP</span>
-        <span className="text-pressbox-sage">FPTS</span>
+        <span className="text-pressbox-sage">{pointsHeading}</span>
         {statHeadings.map((h) => (
           <span key={h} className="text-center">
             {h}
           </span>
         ))}
-        <span className="text-right">TOI</span>
+        <span className="text-right">{tail.heading}</span>
       </div>
 
       {rows.map((r) => (
@@ -260,7 +275,7 @@ export function PressBoxGameLog({ statHeadings, rows, className }: PressBoxGameL
               r.summary ? 'text-pressbox-orange-soft' : r.latest ? 'text-pressbox-sage' : 'text-pressbox-text',
             )}
           >
-            {r.points == null ? '–' : r.points.toFixed(1)}
+            {r.pointsLabel ?? (r.points == null ? '–' : r.points.toFixed(1))}
           </span>
           {r.cells.map((c, i) => (
             <span key={i} className="text-center text-pressbox-text">
@@ -299,10 +314,10 @@ export function PressBoxUpcomingCards({ games, className }: { games: PressBoxUpc
         >
           <p className="truncate">{g.when}</p>
           <p className="mt-[3px] font-barlow font-bold text-[13px] text-pressbox-text truncate">{g.opponent}</p>
-          {g.note && (
+          {(g.note || g.noteTail) && (
             <p className="mt-0.5 text-pressbox-orange-soft truncate">
               {g.note}
-              {g.noteTail && <span className="text-pressbox-sage"> {g.noteTail}</span>}
+              {g.noteTail && <span className="text-pressbox-sage">{g.note ? ' ' : ''}{g.noteTail}</span>}
             </p>
           )}
         </div>

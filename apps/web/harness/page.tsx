@@ -354,6 +354,77 @@ const HARNESS_GAMES = new Map<string, any[]>(
   new Map(teams.map((t) => [t.toUpperCase(), (HARNESS_GAMES.get(t.toUpperCase()) ?? [])[1] ?? null]));
 
 /**
+ * The player card's GAME LOG pane (2026-09-04). It reads the schedule one
+ * team at a time (`getGamesForTeam`, singular; the roster uses the plural
+ * stubbed above) and then makes one request for the player's stats and
+ * projections across that window. Neither had a stub, so the pane sat on
+ * "Loading game log..." forever and its Press Box restyle could not be seen
+ * here. Eight generated games inside whatever window the card asks for --
+ * every one of them PLAYED when the window is behind us (last season's
+ * picker: actual lines) and every one still AHEAD when it is in front of us
+ * (this season's picker: projections), so each picker shows the row state
+ * a manager would really see on that day. Identities are real; the figures
+ * are generated from the player id and say so here.
+ */
+(ScheduleService as any).getGamesForTeam = async (team: string, start: string, end: string) => {
+  const t = team.toUpperCase();
+  const todayIso = isoDay(0);
+  const anchor = new Date(`${start > todayIso ? start : end < todayIso ? end : todayIso}T12:00:00Z`).getTime();
+  const offsets = start > todayIso ? [0, 2, 3, 5, 7, 9, 11, 13] : end < todayIso ? [-15, -13, -11, -9, -7, -5, -2, 0] : [-6, -4, -2, 0, 1, 3, 5, 7];
+  const games = offsets
+    .map((off, i) => {
+      const date = new Date(anchor + off * DAY).toISOString().slice(0, 10);
+      const home = i % 2 === 0;
+      const opponent = OPPONENT(t, i);
+      const played = date < todayIso;
+      return {
+        id: `${t}-log-${date}`,
+        game_id: 2026030000 + i,
+        game_date: date,
+        game_time: `${date}T01:00:00.000Z`,
+        home_team: home ? t : opponent,
+        away_team: home ? opponent : t,
+        home_score: played ? 3 : 0,
+        away_score: played ? 2 : 0,
+        status: played ? 'final' : 'scheduled',
+        period: null,
+        period_time: null,
+        venue: null,
+        season: 20262027,
+        game_type: 'regular' as const,
+      };
+    })
+    .filter((g) => g.game_date >= start && g.game_date <= end);
+  return { games, error: null };
+};
+(matchupApi as any).getPlayerGameLog = async (playerId: number, start: string, end: string) => {
+  const p = PLAYERS.find((x: any) => String(x.id) === String(playerId)) as any;
+  const goalie = p?.position === 'G';
+  const { games } = await (ScheduleService as any).getGamesForTeam(String(p?.team_abbreviation ?? p?.team ?? ''), start, end);
+  const todayIso = isoDay(0);
+  const seed = Number(playerId) % 7;
+  return {
+    data: {
+      games: games
+        .filter((g: any) => g.game_date < todayIso)
+        .map((g: any, i: number) =>
+          goalie
+            ? { game_date: g.game_date, wins: (i + seed) % 3 ? 1 : 0, saves: 24 + ((i + seed) % 5) * 3, goals_against: (i + seed) % 4, shutouts: (i + seed) % 5 === 0 ? 1 : 0, toi_seconds: 3540 }
+            : { game_date: g.game_date, goals: (i + seed) % 3 ? 1 : 0, assists: (i + seed) % 2, shots_on_goal: 2 + ((i + seed) % 4), blocks: (i + seed) % 2, ppp: (i + seed) % 3 === 0 ? 1 : 0, shp: 0, hits: (i + seed) % 3, pim: (i + seed) % 4 === 0 ? 2 : 0, plus_minus: ((i + seed) % 3) - 1, toi_seconds: 1080 + ((i + seed) % 5) * 90 },
+        ),
+      projections: games
+        .filter((g: any) => g.game_date >= todayIso)
+        .map((g: any, i: number) => {
+          const total = Number((goalie ? 8.5 : 3.2) + (((i + seed) % 5) / 5) * 4).toFixed(1);
+          return goalie
+            ? { projection_date: g.game_date, total_projected_points: total, projected_wins: 0.55, projected_saves: 27, projected_shutouts: 0.08, projected_goals_against: 2.4, projected_gaa: 2.4, projected_save_pct: 0.912, dynamic_confidence: 0.6, likely_low: Number(total) - 3, likely_high: Number(total) + 4 }
+            : { projection_date: g.game_date, total_projected_points: total, projected_goals: 0.42, projected_assists: 0.61, projected_sog: 3.4, projected_blocks: 0.6, projected_ppp: 0.31, projected_shp: 0.02, projected_hits: 1.1, projected_pim: 0.4, dynamic_confidence: 0.62, likely_low: Number(total) - 2, likely_high: Number(total) + 3 };
+        }),
+    },
+  };
+};
+
+/**
  * A projection for every player, derived from his own fixture line so the
  * numbers differ row to row rather than repeating one value down the column
  * -- a column of identical figures hides exactly the bug a projection column
