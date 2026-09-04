@@ -53,6 +53,7 @@ import { notifyRosterChanged } from '@/utils/rosterRefresh';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { DropPlayerForAddDialog } from '@/components/freeagents/DropPlayerForAddDialog';
+import { FreeAgentRowPressBox } from '@/components/freeagents/FreeAgentRowPressBox';
 import { FreeAgentRow } from '@/components/freeagents/FreeAgentRow';
 import {
   FA_CHIP,
@@ -1594,7 +1595,7 @@ const FreeAgents = () => {
                             nothing you could pick a player WITH. */}
                         <div className={FA_ROWS_ONLY}>
                           {topTrending.map((player, i) => (
-                            <FreeAgentRow
+                            <FreeAgentRowPressBox
                               key={player.id}
                               rank={i + 1}
                               player={player}
@@ -1719,7 +1720,7 @@ const FreeAgents = () => {
                         {/* Phone list — the shared FreeAgentRow. */}
                         <div className={FA_ROWS_ONLY}>
                           {topProjected.map((player, i) => (
-                            <FreeAgentRow
+                            <FreeAgentRowPressBox
                               key={player.id}
                               rank={i + 1}
                               player={player}
@@ -1853,7 +1854,7 @@ const FreeAgents = () => {
                         */}
                       <div className={FA_ROWS_ONLY} data-testid="free-agents-phone-list">
                         {phoneRows.map((player, i) => (
-                          <FreeAgentRow
+                          <FreeAgentRowPressBox
                             key={player.id}
                             rank={i + 1}
                             player={player}

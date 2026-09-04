@@ -23,6 +23,7 @@ export {
   type PressBoxRosterSlotRow,
 } from './RosterList';
 
+export { PressBoxPlayerRow, type PressBoxPlayerRowProps, type PressBoxPlayerRowPlayer, type PressBoxPlayerAction, formatAdds } from './PlayerRow';
 export { PressBoxMatchupRow, type PressBoxMatchupRowProps, type PressBoxMatchupPlayer } from './MatchupRow';
 export {
   PressBoxScoreBlock,
