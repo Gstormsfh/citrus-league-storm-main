@@ -45,12 +45,23 @@ export interface PressBoxScoreSide {
 export interface PressBoxScoreDay {
   /** `MON`. */
   label: string;
+  /** The date behind the tile, `2026-09-27`; handed back on press. */
+  key?: string;
   /** Points scored, when the day has been played. */
   yours?: number | null;
   theirs?: number | null;
+  /**
+   * MATCHUP PAGE (2026-09-04): `yours` / `theirs` are a PROJECTION for a
+   * day still ahead, not points. Drawn dimmed with no leader tint, so a
+   * number that has not happened is never read as one that has — the
+   * artboard prints game COUNTS for those days, and the page draws them
+   * instead whenever it holds them.
+   */
+  projected?: boolean;
   /** Game counts, for a day still ahead. */
   yourGames?: number | null;
   theirGames?: number | null;
+  /** Outlined — today, or the day the page is showing. */
   isToday?: boolean;
 }
 
@@ -201,10 +212,11 @@ export function PressBoxScoreBlock({
         <div className="flex gap-1 mt-2.5">
           {days.map((d) => {
             const played = d.yours != null || d.theirs != null;
-            const youLead = played && (d.yours ?? 0) >= (d.theirs ?? 0);
+            const youLead = played && !d.projected && (d.yours ?? 0) >= (d.theirs ?? 0);
             return (
               <button
-                key={d.label}
+                key={d.key ?? d.label}
+                data-projected={d.projected ? 'true' : undefined}
                 type="button"
                 onClick={() => onDayPress?.(d)}
                 aria-current={d.isToday ? 'date' : undefined}
@@ -218,10 +230,10 @@ export function PressBoxScoreBlock({
                 )}
               >
                 <span className="block">{d.label}</span>
-                <span className={cn('block mt-0.5', youLead ? 'text-pressbox-sage' : 'text-pressbox-text/70')}>
+                <span className={cn('block mt-0.5', youLead ? 'text-pressbox-sage' : d.projected ? 'text-pressbox-text/45' : 'text-pressbox-text/70')}>
                   {played ? fig(d.yours) : (d.yourGames ?? '')}
                 </span>
-                <span className={cn('block', played && !youLead ? 'text-pressbox-sage' : 'text-pressbox-text/70')}>
+                <span className={cn('block', played && !d.projected && !youLead ? 'text-pressbox-sage' : d.projected ? 'text-pressbox-text/45' : 'text-pressbox-text/70')}>
                   {played ? fig(d.theirs) : (d.theirGames ?? '')}
                 </span>
               </button>

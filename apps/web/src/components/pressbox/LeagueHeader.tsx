@@ -33,6 +33,13 @@ export interface LeagueHeaderProps {
   /** Tap target for the week label — the week picker. Omit to render it inert. */
   onWeekPress?: () => void;
   /**
+   * MATCHUP PAGE (2026-09-04): `‹ WK 1 ›`. The artboard's Match screen
+   * steps weeks from the header, and the chevrons draw only when a
+   * handler is given — a disabled one at the season's ends.
+   */
+  onWeekPrev?: (() => void) | null;
+  onWeekNext?: (() => void) | null;
+  /**
    * The sliders icon. League settings is a SHEET inside LeagueDashboard, not
    * a route (`leagueSettingsMobileSheetGuard` pins that), so there is no
    * `/league/:id/settings` to link to and inventing one would fail
@@ -70,6 +77,8 @@ const SUB_TABS: SubTab[] = [
 export function LeagueHeader({
   weekLabel,
   onWeekPress,
+  onWeekPrev,
+  onWeekNext,
   onSettingsPress,
   showSubTabs = true,
   className,
@@ -122,15 +131,39 @@ export function LeagueHeader({
         </Link>
 
         {weekLabel && (
-          <button
-            type="button"
-            onClick={onWeekPress}
-            disabled={!onWeekPress}
-            className="focus-citrus font-plex font-medium text-[10px] text-pressbox-text/45 whitespace-nowrap disabled:cursor-default"
-            aria-label={onWeekPress ? `Change week, currently ${weekLabel}` : weekLabel}
-          >
-            {weekLabel}
-          </button>
+          <span className="flex items-center whitespace-nowrap">
+            {onWeekPrev !== undefined && (
+              <button
+                type="button"
+                onClick={onWeekPrev ?? undefined}
+                disabled={!onWeekPrev}
+                aria-label="Previous week"
+                className="focus-citrus relative px-1 font-plex text-[12px] text-pressbox-text/45 disabled:opacity-30 after:absolute after:-inset-y-[13px] after:-inset-x-2 after:content-['']"
+              >
+                &lsaquo;
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onWeekPress}
+              disabled={!onWeekPress}
+              className="focus-citrus font-plex font-medium text-[10px] text-pressbox-text/45 whitespace-nowrap disabled:cursor-default"
+              aria-label={onWeekPress ? `Change week, currently ${weekLabel}` : weekLabel}
+            >
+              {weekLabel}
+            </button>
+            {onWeekNext !== undefined && (
+              <button
+                type="button"
+                onClick={onWeekNext ?? undefined}
+                disabled={!onWeekNext}
+                aria-label="Next week"
+                className="focus-citrus relative px-1 font-plex text-[12px] text-pressbox-text/45 disabled:opacity-30 after:absolute after:-inset-y-[13px] after:-inset-x-2 after:content-['']"
+              >
+                &rsaquo;
+              </button>
+            )}
+          </span>
         )}
 
         <button

@@ -7,7 +7,8 @@ import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
 import { cn } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { LeagueHeader, LeagueMenu, PB_TYPE, PressBoxChips, PressBoxScoreBlock, PressBoxTabs, type PressBoxScoreDay } from '@/components/pressbox';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { MatchupComparison } from "@/components/matchup/MatchupComparison";
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
@@ -18,7 +19,6 @@ import { getCurrentSeason } from '@/utils/seasonConstants';
 import LeagueNotifications from "@/components/matchup/LeagueNotifications";
 import { MatchupSidebar } from "@/components/matchup/MatchupSidebar";
 import { ScoreboardStrip } from "@/components/matchup/ScoreboardStrip";
-import { StickyScoreBar } from "@/components/matchup/StickyScoreBar";
 import { anyGameLive, type TeamAvatarMap } from "@/components/matchup/scoreboard";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -202,6 +202,10 @@ const Matchup = () => {
   const { leagueId: urlLeagueId, weekId: urlWeekId } = useParams<{ leagueId?: string; weekId?: string }>();
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  /** PRESS BOX (2026-09-04): the phone's league menu and its LINEUPS / BENCH tab. */
+  const [leagueMenuOpen, setLeagueMenuOpen] = useState(false);
+  const [phoneSection, setPhoneSection] = useState<'lineups' | 'bench'>('lineups');
+  const isMobile = useIsMobile();
   // In-place reload trigger for the main loader (2026-09-01): bumped by the
   // visibility-change refresh instead of a full window.location reload.
   const [matchupReloadNonce, setMatchupReloadNonce] = useState(0);
@@ -5338,6 +5342,100 @@ const Matchup = () => {
     [myTeam, opponentTeamPlayers],
   );
 
+  // ─────────────────────────────────────────────────────────────────────
+  // PRESS BOX (2026-09-04): the phone's score block, from the same figures
+  // the ScoreCard, the day strip and the sticky bar have always shown.
+  // ─────────────────────────────────────────────────────────────────────
+  const phoneScore = useMemo(() => {
+    if (!currentMatchup) return null;
+    const active = userLeagueState === 'active-user';
+    const todayStr = getTodayMST();
+    const weekDates = enumerateWeekDates(currentMatchup.week_start_date, currentMatchup.week_end_date);
+    const inWeek = weekDates.includes(todayStr);
+    const focus = selectedDate ?? (inWeek ? todayStr : null);
+    const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    const dow = (d: string) => DOW[new Date(`${d}T00:00:00`).getDay()];
+    const shortDate = (d: string) =>
+      new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+    /* `THU · DAY 4/7` while the week is on; its dates when it is not yet
+       (or no longer) — a day number for a week that has not started is a
+       claim about a day that has not happened. */
+    const dayLabel = focus
+      ? `${dow(focus)} · DAY ${weekDates.indexOf(focus) + 1}/${weekDates.length}`
+      : weekDates.length
+        ? `${shortDate(weekDates[0])} – ${shortDate(weekDates[weekDates.length - 1])}`
+        : null;
+    const days: PressBoxScoreDay[] = weekDates.map((d) => {
+      const totals = calculatedDailyTotals?.get(d);
+      const ahead = d > todayStr;
+      return {
+        key: d,
+        label: dow(d),
+        yours: totals?.myTotal ?? null,
+        theirs: totals?.oppTotal ?? null,
+        projected: ahead,
+        isToday: focus === d,
+      };
+    });
+    const winPct = matchupOutlook ? matchupOutlook.probability * 100 : null;
+    const rec = (r: { wins: number; losses: number }) => `${r.wins}–${r.losses}`;
+    return {
+      you: {
+        name: active ? (viewingTeamName || userTeam?.team_name || 'My Team') : 'Citrus Crushers',
+        record: active ? rec(myTeamRecord) : '7–3',
+        score: parseFloat(myTeamPoints || '0'),
+        projection: (matchupOutlook && !matchupOutlook.settled ? matchupOutlook.myExpectedFinal : null) ?? myTotalProjection ?? null,
+        gamesLeft: myTeamGamesRemaining ?? null,
+        winPct,
+      },
+      them: {
+        name: active ? (viewingOpponentTeamName || opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans',
+        record: active ? rec(opponentTeamRecord) : '9–1',
+        score: parseFloat(opponentTeamPoints || '0'),
+        projection: (matchupOutlook && !matchupOutlook.settled ? matchupOutlook.oppExpectedFinal : null) ?? opponentTotalProjection ?? null,
+        gamesLeft: opponentTeamGamesRemaining ?? null,
+        winPct: winPct != null ? 100 - winPct : null,
+      },
+      dayLabel,
+      days,
+      tonight: inWeek
+        ? (userLeagueState === 'active-user' ? myTeam : demoMyTeam).filter(
+            (p) => p.isStarter && (p.games ?? []).some((g) => (g.game_date ?? '').slice(0, 10) === todayStr),
+          ).length
+        : null,
+      today: inWeek ? todayStr : null,
+    };
+  }, [
+    currentMatchup, userLeagueState, selectedDate, calculatedDailyTotals, matchupOutlook,
+    viewingTeamName, userTeam?.team_name, myTeamRecord, myTeamPoints, myTotalProjection,
+    myTeamGamesRemaining, viewingOpponentTeamName, opponentTeam?.team_name, opponentTeamRecord,
+    opponentTeamPoints, opponentTotalProjection, opponentTeamGamesRemaining, myTeam, demoMyTeam,
+  ]);
+
+  /** `‹ WK 1 ›` in the header: the neighbours of the viewed week, when they exist. */
+  const weekIndex = availableWeeks.indexOf(selectedWeek);
+  const prevWeek = weekIndex > 0 ? availableWeeks[weekIndex - 1] : null;
+  const nextWeek = weekIndex >= 0 && weekIndex < availableWeeks.length - 1 ? availableWeeks[weekIndex + 1] : null;
+
+  /** The league's other matchups as chips — the phone's scoreboard strip. */
+  const matchupChips = useMemo(() => {
+    /* `Bench Bosses` → `BB`, `Sin Bin Saints` → `SBS`, `Team 1` → `T1`: the
+       initials of each word, three at most — the way a scoreboard ticker
+       names a club. Three letters of one word (`BEN · SIN`) read as nothing. */
+    const abbr = (name: string | null | undefined) =>
+      (name || '?')
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 3)
+        .map((w) => w[0])
+        .join('')
+        .toUpperCase();
+    return allWeekMatchups.map((m) => ({
+      key: m.id,
+      label: `${abbr(m.team1_name)} · ${m.team2_id ? abbr(m.team2_name) : 'BYE'}`,
+    }));
+  }, [allWeekMatchups]);
+
   // =============================================================================
   // SIMPLIFIED LOADING STATE - One-way gate prevents flash/cycling
   // =============================================================================
@@ -5464,31 +5562,43 @@ const Matchup = () => {
         <Navbar />
       </div>
       
-      {/* MOBILE: the one-band sticky header (2026-09-01, audit M8) — ESPN
-          pins the scores while you scroll, Sleeper's header is one dense
-          band: disc · name · win chance · score · proj on BOTH sides, the
-          same numbers the ScoreCard shows at rest. Names follow the VIEWED
-          matchup (a stranger's pair from the scoreboard is not "My Team").
-          The hex-marker header string the menu guard keys on is the legacy
-          spelling of the same colour; this bar keeps the token. */}
-      <div className="lg:hidden sticky top-0 z-page-header bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <StickyScoreBar
-          menu={<MobileMenuButton />}
-          week={currentMatchup ? selectedWeek : undefined}
-          myTeamName={userLeagueState === 'active-user' ? (viewingTeamName || userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
-          myTeamPoints={parseFloat(myTeamPoints || '0').toFixed(1)}
-          myTeamExpectedFinal={projectedFinals?.my}
-          myTeamAvatarUrl={myTeamAvatarUrl}
-          opponentTeamName={userLeagueState === 'active-user' ? (viewingOpponentTeamName || opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
-          opponentTeamPoints={parseFloat(opponentTeamPoints || '0').toFixed(1)}
-          opponentTeamExpectedFinal={projectedFinals?.opp}
-          opponentTeamAvatarUrl={opponentTeamAvatarUrl}
-          winProbability={matchupOutlook ? matchupOutlook.probability * 100 : undefined}
-          settled={matchupOutlook?.settled ?? false}
-          isOwnTeam={isOwnTeamOnLeft}
-          seasonDormant={seasonStatus.isDormant}
+      {/*
+        * PRESS BOX (2026-09-04): the Match screen, artboard 1a.
+        *
+        * Below `lg` the sticky score bar of 2026-09-01 gives way to the
+        * shared LeagueHeader — identity, `‹ WK n ›`, and the Match / Team /
+        * Players / League strip — over the score block, which carries what
+        * that bar and the ScoreCard showed: both names and records, the two
+        * scores at 40px, projection · games left · win chance, the bar with
+        * its 50% tick, and the seven days. The week selector, the scoreboard
+        * strip, the ScoreCard, the day strip and the Top Performers card are
+        * the desktop's from `lg` and are not rendered below it.
+        */}
+      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+        <LeagueHeader
+          weekLabel={currentMatchup ? `WK ${selectedWeek}` : null}
+          onWeekPrev={prevWeek !== null ? () => handleWeekChange(prevWeek) : null}
+          onWeekNext={nextWeek !== null ? () => handleWeekChange(nextWeek) : null}
+          onSettingsPress={() => setLeagueMenuOpen(true)}
         />
       </div>
+      <LeagueMenu
+        open={leagueMenuOpen}
+        onClose={() => setLeagueMenuOpen(false)}
+        leagueId={league?.id ?? activeLeagueId ?? ''}
+        leagueName={league?.name ?? ''}
+        user={
+          profile
+            ? {
+                displayName:
+                  profile.display_name
+                  || (profile.username && !/^user_[0-9a-f]{6,}$/i.test(profile.username) ? profile.username : null)
+                  || 'You',
+                handle: profile.username ?? null,
+              }
+            : null
+        }
+      />
 
       {/* MOBILE: Full-screen scrollable content / DESKTOP: Grid layout */}
       <main className={cn(
@@ -5545,8 +5655,10 @@ const Matchup = () => {
                   </Link>
                 </div>
               )}
-              {/* Header Section - Clean and Professional with Citrus Colors */}
-              <div className="mb-6">
+              {/* Header Section - Clean and Professional with Citrus Colors.
+                  PRESS BOX (2026-09-04): desktop only — the phone steps weeks
+                  from the header. */}
+              <div className="hidden lg:block mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                   {/* Week Selector - Show for both active users AND guests (the correct toggle!) */}
                   {(userLeagueState === 'active-user' || userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') && 
@@ -5637,17 +5749,21 @@ const Matchup = () => {
                   tapped chip raised while the lineup reloads. Live scores only — the
                   league endpoint serves no projections for other matchups. The
                   desktop rail lives in the left aside. */}
-              {userLeagueState === 'active-user' && allWeekMatchups.length > 0 && (
-                <ScoreboardStrip
-                  className="lg:hidden mb-4"
-                  matchups={allWeekMatchups}
-                  ownMatchupId={userMatchupId}
-                  ownTeamId={userTeam?.id}
-                  viewedMatchupId={selectedMatchupId || currentMatchup?.id}
-                  onSelect={handleMatchupSwitch}
-                  week={selectedWeek}
-                  live={scoreboardLive}
-                  teamAvatars={teamAvatars}
+              {/* PRESS BOX (2026-09-04): the strip is now a chip row under
+                  the score block — one chip per matchup, the viewed one
+                  cream — calling the same handleMatchupSwitch. Live scores
+                  for the others live on League HQ's cards. */}
+              {userLeagueState === 'active-user' && allWeekMatchups.length > 1 && (
+                <PressBoxChips
+                  className={`${PB_TYPE} lg:hidden px-3 pt-2 pb-0.5 overflow-x-auto scrollbar-hide`}
+                  label="League matchups"
+                  outlined
+                  compact
+                  chips={matchupChips}
+                  activeKey={selectedMatchupId || currentMatchup?.id || ''}
+                  onSelect={(id) => {
+                    if (id !== (selectedMatchupId || currentMatchup?.id)) handleMatchupSwitch(id);
+                  }}
                 />
               )}
 
@@ -5707,6 +5823,20 @@ const Matchup = () => {
           ) && (
             <>
           
+          {phoneScore && (
+            <div className="lg:hidden">
+              <PressBoxScoreBlock
+                you={phoneScore.you}
+                them={phoneScore.them}
+                dayLabel={phoneScore.dayLabel}
+                days={phoneScore.days}
+                /* A day tile toggles that day; the day already showing goes
+                   back to the full week — the old FULL WEEK button. */
+                onDayPress={(d) => d.key && setSelectedDate(selectedDate === d.key ? null : d.key)}
+              />
+            </div>
+          )}
+          <div className="hidden lg:block">
           <ScoreCard
             seasonDormant={seasonStatus.isDormant}
             myTeamName={userLeagueState === 'active-user' ? (viewingTeamName || userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
@@ -5732,13 +5862,16 @@ const Matchup = () => {
             simulationPerspective={simulationPerspective}
             isOwnTeam={isOwnTeamOnLeft}
           />
+          </div>
           
           {/* Weekly Schedule - Show for both active users AND guests (the weekly date selector they love!)
               `compact`: on a phone the "Week Overview" header row is dropped
               (audit M8) — the day cards are self-explanatory and the row was
-              the third band of chrome above the first player. */}
+              the third band of chrome above the first player.
+              PRESS BOX (2026-09-04): desktop only; the score block's day
+              strip is the phone's. */}
           {currentMatchup && (
-            <div className="mb-6">
+            <div className="hidden lg:block mb-6">
               <WeeklySchedule
                 weekStart={currentMatchup.week_start_date}
                 weekEnd={currentMatchup.week_end_date}
@@ -5773,7 +5906,44 @@ const Matchup = () => {
                 {/* Pass pre-calculated totals to prevent flicker from async data loading
                     MatchupComparison displays pre-calc values immediately (no flicker)
                     And recalculates in background to update if needed */}
+                {/* PRESS BOX (2026-09-04): LINEUPS / BENCH / TONIGHT · n. Orange
+                    underline here where the header strip uses sage: sage is
+                    where you are in the league, orange what you are looking at
+                    inside a screen. TONIGHT is the day view of today, one tap. */}
+                {isMobile && phoneScore && (
+                  <PressBoxTabs
+                    className="mb-1"
+                    label="Matchup view"
+                    activeKey={
+                      phoneSection === 'bench'
+                        ? 'bench'
+                        : phoneScore.today && selectedDate === phoneScore.today
+                          ? 'tonight'
+                          : 'lineups'
+                    }
+                    onSelect={(k) => {
+                      if (k === 'bench') {
+                        setPhoneSection('bench');
+                      } else if (k === 'tonight') {
+                        setPhoneSection('lineups');
+                        setSelectedDate(phoneScore.today);
+                      } else {
+                        setPhoneSection('lineups');
+                        if (phoneScore.today && selectedDate === phoneScore.today) setSelectedDate(null);
+                      }
+                    }}
+                    tabs={[
+                      { key: 'lineups', label: 'Lineups' },
+                      { key: 'bench', label: 'Bench' },
+                      ...(phoneScore.tonight !== null
+                        ? [{ key: 'tonight', label: `Tonight · ${phoneScore.tonight}` }]
+                        : []),
+                    ]}
+                  />
+                )}
                 <MatchupComparison
+                  variant={isMobile ? 'pressbox' : 'default'}
+                  section={phoneSection}
                   userStarters={displayStarters as MatchupPlayer[]}
                   opponentStarters={displayOpponentStarters as MatchupPlayer[]}
                   userBench={myBench as MatchupPlayer[]}
@@ -5870,7 +6040,10 @@ const Matchup = () => {
 
             {/* Dynamic Matchup Sidebar - Compact on mobile, full sidebar on desktop */}
             {/* Mobile: Rendered BELOW lineup (users see their players first, then Top Performers) */}
-            <div className="lg:hidden px-2 order-3">
+            {/* PRESS BOX (2026-09-04): not drawn below lg — the artboard's
+                Match screen carries no card under the rows, and the rows
+                themselves print every figure this card ranked. */}
+            <div className="hidden order-3">
               <MatchupSidebar
                 myStarters={weeklyMyStarters}
                 opponentStarters={weeklyOpponentStarters}

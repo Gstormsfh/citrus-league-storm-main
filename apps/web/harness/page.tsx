@@ -28,6 +28,7 @@ import { rosterApi } from '../src/api/rosters';
 import { waiverApi } from '../src/api/waivers';
 import { ScoringCalculator, extractScoringSettings } from '../src/utils/scoringUtils';
 import { HARNESS_PLAYERS, harnessDirectoryPlayer, harnessPlayer } from './players';
+import { OPP as MATCHUP_OPP, USER as MATCHUP_USER } from './matchupFixtures';
 
 /**
  * The SERVER computes fantasy points and the row reads `total_points` off the
@@ -93,7 +94,7 @@ const PRIORITY = Array.from({ length: 10 }, (_, i) => ({
   error: null,
 });
 (LeagueService as any).getUserLeagues = async () => ({
-  leagues: [{ id: 'harness-league', name: 'Harness League', commissioner_id: 'harness-user', draft_status: 'completed' }],
+  leagues: [{ id: 'harness-league', name: 'Harness League', commissioner_id: 'harness-user', draft_status: 'completed', created_at: '2026-09-01T18:00:00.000Z', settings: {} }],
   error: null,
 });
 /**
@@ -146,6 +147,51 @@ const HARNESS_RECORDS = [
   error: null,
 });
 (PlayoffService as any).getBracket = async () => ({ bracket: null, error: null });
+
+/**
+ * THE MATCHUP PAGE RENDERS (2026-09-04). Until now `page.html?p=matchup`
+ * showed "No matchup data available" — the page needs a user team, a
+ * matchup for the week and the two rosters, and none of those were
+ * stubbed; the rows could only be looked at through `matchup.html`, which
+ * mounts them bare. These hand the page the same two rosters that harness
+ * uses, through the service calls the page actually makes, in the order it
+ * makes them. Scores and records are the fixture's.
+ */
+const MATCHUP_ROW = {
+  id: 'm1', league_id: 'harness-league', week_number: 1,
+  team1_id: 't1', team2_id: 't2', team1_score: 118.4, team2_score: 96.1,
+  status: 'in_progress', week_start_date: '2026-09-27', week_end_date: '2026-10-03',
+  created_at: '2026-09-01T18:00:00.000Z', updated_at: '2026-09-01T18:00:00.000Z',
+};
+(LeagueService as any).getUserTeam = async () => ({
+  team: { id: 't1', league_id: 'harness-league', owner_id: 'harness-user', team_name: 'Team 1', created_at: '2026-09-01', updated_at: '2026-09-01' },
+  error: null,
+});
+(LeagueService as any).getLeagueTeams = async () => ({
+  teams: PRIORITY.map((p, i) => ({ id: p.team_id, league_id: 'harness-league', team_name: p.team_name, owner_id: i === 0 ? 'harness-user' : `owner-${i + 1}` })),
+  error: null,
+});
+(MatchupService as any).getUserMatchup = async () => ({ matchup: MATCHUP_ROW, error: null });
+(MatchupService as any).getMatchupData = async () => ({
+  data: {
+    matchupId: 'm1',
+    matchup: MATCHUP_ROW,
+    currentWeek: 1,
+    scheduleLength: 24,
+    isPlayoffWeek: false,
+    userTeam: { id: 't1', name: 'Team 1', roster: MATCHUP_USER.filter(Boolean), slotAssignments: {}, record: { wins: 4, losses: 1 }, dailyPoints: [] },
+    opponentTeam: { id: 't2', name: 'Team 2', roster: MATCHUP_OPP.filter(Boolean), slotAssignments: {}, record: { wins: 3, losses: 2 }, dailyPoints: [] },
+    navigation: { previousWeek: null, nextWeek: 2, previousMatchupId: null, nextMatchupId: null },
+  },
+  error: null,
+});
+(MatchupService as any).getMatchupRosters = async () => ({
+  team1Roster: MATCHUP_USER.filter(Boolean), team2Roster: MATCHUP_OPP.filter(Boolean),
+  team1SlotAssignments: {}, team2SlotAssignments: {}, error: null,
+});
+(matchupApi as any).ensureRosters = async () => ({ data: { ok: true } });
+(matchupApi as any).getFrozenRosterBatch = async () => ({ data: [] });
+(matchupApi as any).getMatchupScores = async () => ({ data: MATCHUP_ROW });
 (WaiverService as any).getTeamWaiverClaims = async () => CLAIMS;
 (WaiverService as any).getWaiverPriority = async () => PRIORITY;
 (WaiverService as any).getAvailablePlayers = async () =>
