@@ -174,33 +174,77 @@ export const DraftTimerV2 = memo(
     const seconds = remainingSec % 60;
     const label = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
-    // Color hint at low time. Matches v1 DraftTimer's thresholds
-    // (green > 33%, orange > 11%, red else) but the v2 component
-    // doesn't know pickTimeLimit — use fixed absolute thresholds:
-    // > 30s green, > 10s orange, else red.
-    const colorClass =
+    // ───────────────────────────────────────────────────────────────────
+    // THE HEADER CLOCK SPEAKS CITRUS NOW (2026-09-04).
+    //
+    // Founder verdict after the first live test draft: "same with timer."
+    // The compact pill was `border-border bg-card` carrying stock
+    // text-green-600 / orange-600 / red-600 - three Tailwind defaults that
+    // exist nowhere else in this product - pinned to the top of a room built
+    // entirely from forest, sage and orange. It read as a debug widget
+    // someone forgot to style.
+    //
+    // Same three thresholds, same math, said in the app's own colours:
+    // sage while there is room, orange as it tightens, grapefruit when
+    // autopick is close. The compact pill also gains a drain ring, so the
+    // header and the on-clock bar now tell the time the same way.
+    //
+    // CONTRACT: the compact variant's ENTIRE textContent must remain the
+    // mm:ss label and nothing else. countdownTick.test.tsx asserts
+    // getByRole('timer').textContent === the on-clock bar's countdown,
+    // character for character, at forty sampling points. The ring is SVG and
+    // the icon has no text node, so both stay outside that string.
+    // ───────────────────────────────────────────────────────────────────
+    const toneClass =
       remainingSec > 30
-        ? 'text-green-600'
+        ? 'text-pastel-sage'
         : remainingSec > 10
-          ? 'text-orange-600'
-          : 'text-red-600';
+          ? 'text-pastel-orange'
+          : 'text-fantasy-grapefruit-red';
+    const toneHex =
+      remainingSec > 30 ? '#84A57D' : remainingSec > 10 ? '#FF6B1A' : '#FF6F80';
+
+    // No known window means no honest fraction: the ring renders as a bare
+    // track rather than implying progress it cannot compute.
+    const fractionLeft =
+      pickTimeLimitSec !== null && pickTimeLimitSec > 0
+        ? Math.min(1, Math.max(0, remainingSec / pickTimeLimitSec))
+        : null;
 
     if (variant === 'compact') {
+      const R = 18;
+      const RR = 7.5;
+      const CIRC = 2 * Math.PI * RR;
       return (
         <div
           role="timer"
           aria-label={`Draft timer: ${minutes} minutes ${seconds} seconds remaining${wsOpen ? '' : ' (connection lost)'}`}
           className={cn(
-            'flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1',
+            'flex shrink-0 items-center gap-1.5 rounded-lg bg-pastel-surface-tile px-2 py-1 ring-1 ring-pastel-sage-soft/20',
             !wsOpen && 'opacity-60',
           )}
         >
           {wsOpen ? (
-            <Clock className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+            <svg width={R} height={R} viewBox={`0 0 ${R} ${R}`} className="block -rotate-90" aria-hidden="true">
+              <circle cx={R / 2} cy={R / 2} r={RR} fill="none" stroke={toneHex} strokeOpacity={0.22} strokeWidth={2.5} />
+              {fractionLeft !== null && (
+                <circle
+                  cx={R / 2}
+                  cy={R / 2}
+                  r={RR}
+                  fill="none"
+                  stroke={toneHex}
+                  strokeWidth={2.5}
+                  strokeLinecap="round"
+                  strokeDasharray={CIRC}
+                  strokeDashoffset={CIRC * (1 - fractionLeft)}
+                />
+              )}
+            </svg>
           ) : (
-            <WifiOff className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+            <WifiOff className="h-3.5 w-3.5 text-pastel-sage-soft/60" aria-hidden="true" />
           )}
-          <span className={cn('text-base font-bold tabular-nums leading-none', colorClass)}>
+          <span className={cn('font-jbmono text-base font-bold tabular-nums leading-none', toneClass)}>
             {label}
           </span>
         </div>
@@ -215,7 +259,7 @@ export const DraftTimerV2 = memo(
       >
         <div className="flex items-center gap-2 mb-2">
           {wsOpen ? (
-            <Clock className="h-4 w-4 text-primary" aria-hidden="true" />
+            <Clock className={cn('h-4 w-4', toneClass)} aria-hidden="true" />
           ) : (
             <WifiOff className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           )}
@@ -225,7 +269,7 @@ export const DraftTimerV2 = memo(
         </div>
         <div className="text-center">
           <div
-            className={cn('text-2xl font-bold tabular-nums', colorClass)}
+            className={cn('font-jbmono text-2xl font-bold tabular-nums', toneClass)}
             aria-hidden="true"
           >
             {label}

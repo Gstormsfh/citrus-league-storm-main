@@ -15,6 +15,7 @@ import type { CategoryStats } from "@/utils/scoringUtils";
 import { getTodayMST } from "@/utils/timezoneUtils";
 import type { LeagueSettings } from "@/types/leagueTypes";
 import type { Team } from "./LeagueService";
+import { deriveStandings, type StandingsByTeamId, type StandingsMatchup } from "@citrus/shared";
 
 // Cache for team standings to prevent redundant calculations
 // TTL: 60 seconds (refresh after 1 minute to get latest scores)
@@ -58,139 +59,37 @@ export const StandingsService = {
       return cached.data;
     }
 
-    type TeamStatsWithHistory = {
-      pointsFor: number;
-      pointsAgainst: number;
-      wins: number;
-      losses: number;
-      ties: number;
-      streak: string;
-      last5: { wins: number; losses: number; ties: number };
-      matchupHistory: Array<{ week: number; result: 'win' | 'loss' | 'tie' }>;
-    };
-    const teamStats: Record<string, TeamStatsWithHistory> = {};
+    // THE RULE LIVES IN ONE PLACE (2026-09-03).
+    //
+    // Everything about what counts as a played week, who won it, and how the
+    // streak and last-5 are built now lives in `deriveStandings` in
+    // @citrus/shared. The API server's GET /api/leagues/:leagueId/standings
+    // calls the SAME function over the SAME matchup columns, so the web app
+    // and a native client cannot report different records for one league.
+    //
+    // What this replaced: a local loop that counted every matchup whose week
+    // had ended and read `team1Score === team2Score` as a tie. An unscored
+    // week is 0-0 in `matchups`, so eighteen weeks that were never played
+    // showed up as draws in the demo league (1-1-18, verified in production
+    // 2026-09-03). See the header of packages/shared/src/utils/standings.ts
+    // for the evidence and the rule.
+    const teamIds = teams.map(team => team.id);
+    const todayStr = getTodayMST();
 
-    teams.forEach(team => {
-      teamStats[team.id] = {
-        pointsFor: 0, pointsAgainst: 0,
-        wins: 0, losses: 0, ties: 0,
-        streak: '-',
-        last5: { wins: 0, losses: 0, ties: 0 },
-        matchupHistory: []
-      };
-    });
+    // Zeroed records up front so an API failure below leaves every team in
+    // the table at 0-0-0 rather than dropping rows out of it.
+    let teamStats: StandingsByTeamId = deriveStandings(teamIds, [], todayStr);
 
     try {
-      const todayStr = getTodayMST();
-
       // Fetch all matchups via API
       const { matchupApi } = await import('@/api/matchups');
       const matchupsResult = await matchupApi.getLeagueMatchups(leagueId);
-      const allMatchupData = (matchupsResult.data ?? []) as Array<{
-        id: string; team1_id: string; team2_id: string | null;
-        team1_score: number | null; team2_score: number | null;
-        week_number: number; status: string; week_end_date: string;
-      }>;
+      const allMatchupData = (matchupsResult.data ?? []) as StandingsMatchup[];
 
-      // Filter to completed or past matchups, deduplicate
-      const matchupMap = new Map<string, typeof allMatchupData[0]>();
-      allMatchupData
-        .filter(m => m.status === 'completed' || m.week_end_date < todayStr)
-        .forEach(m => { if (m.id) matchupMap.set(m.id, m); });
-      const matchups = Array.from(matchupMap.values()).sort((a, b) => a.week_number - b.week_number);
-
-      if (!matchups || matchups.length === 0) {
-        return teamStats;
-      }
-
-      matchups.forEach(matchup => {
-        const team1Score = parseFloat(String(matchup.team1_score)) || 0;
-        const team2Score = matchup.team2_id ? (parseFloat(String(matchup.team2_score)) || 0) : 0;
-
-        if (!matchup.team2_id) {
-          if (teamStats[matchup.team1_id]) {
-            teamStats[matchup.team1_id].wins++;
-            teamStats[matchup.team1_id].pointsFor += team1Score;
-            teamStats[matchup.team1_id].matchupHistory.push({ week: matchup.week_number, result: 'win' });
-          }
-        } else {
-          if (teamStats[matchup.team1_id]) {
-            teamStats[matchup.team1_id].pointsFor += team1Score;
-            teamStats[matchup.team1_id].pointsAgainst += team2Score;
-          }
-          if (teamStats[matchup.team2_id]) {
-            teamStats[matchup.team2_id].pointsFor += team2Score;
-            teamStats[matchup.team2_id].pointsAgainst += team1Score;
-          }
-
-          const team1Won = team1Score > team2Score;
-          const team2Won = team2Score > team1Score;
-          const isTie = team1Score === team2Score;
-
-          if (team1Won) {
-            if (teamStats[matchup.team1_id]) {
-              teamStats[matchup.team1_id].wins++;
-              teamStats[matchup.team1_id].matchupHistory.push({ week: matchup.week_number, result: 'win' });
-            }
-            if (teamStats[matchup.team2_id]) {
-              teamStats[matchup.team2_id].losses++;
-              teamStats[matchup.team2_id].matchupHistory.push({ week: matchup.week_number, result: 'loss' });
-            }
-          } else if (team2Won) {
-            if (teamStats[matchup.team2_id]) {
-              teamStats[matchup.team2_id].wins++;
-              teamStats[matchup.team2_id].matchupHistory.push({ week: matchup.week_number, result: 'win' });
-            }
-            if (teamStats[matchup.team1_id]) {
-              teamStats[matchup.team1_id].losses++;
-              teamStats[matchup.team1_id].matchupHistory.push({ week: matchup.week_number, result: 'loss' });
-            }
-          } else if (isTie) {
-            if (teamStats[matchup.team1_id]) {
-              teamStats[matchup.team1_id].ties++;
-              teamStats[matchup.team1_id].matchupHistory.push({ week: matchup.week_number, result: 'tie' });
-            }
-            if (teamStats[matchup.team2_id]) {
-              teamStats[matchup.team2_id].ties++;
-              teamStats[matchup.team2_id].matchupHistory.push({ week: matchup.week_number, result: 'tie' });
-            }
-          }
-        }
-      });
-
-      // Calculate streak and last 5 for each team
-      Object.keys(teamStats).forEach(teamId => {
-        const stats = teamStats[teamId];
-        const history = stats.matchupHistory;
-        history.sort((a, b) => b.week - a.week);
-
-        if (history.length > 0) {
-          const mostRecent = history[0];
-          let streakCount = 1;
-          for (let i = 1; i < history.length; i++) {
-            if (history[i].result === mostRecent.result) streakCount++;
-            else break;
-          }
-          const streakLabel = mostRecent.result === 'win' ? 'W' : mostRecent.result === 'loss' ? 'L' : 'T';
-          stats.streak = `${streakLabel}${streakCount}`;
-        }
-
-        const last5Games = history.slice(0, 5);
-        stats.last5 = {
-          wins: last5Games.filter(g => g.result === 'win').length,
-          losses: last5Games.filter(g => g.result === 'loss').length,
-          ties: last5Games.filter(g => g.result === 'tie').length,
-        };
-
-        delete (stats as Partial<TeamStatsWithHistory>).matchupHistory;
-      });
+      teamStats = deriveStandings(teamIds, allMatchupData, todayStr);
     } catch (error) {
       logger.error('[StandingsService] Exception calculating team standings:', error);
     }
-
-    Object.keys(teamStats).forEach(teamId => {
-      delete (teamStats[teamId] as any).matchupHistory;
-    });
 
     standingsCache.set(cacheKey, { data: teamStats, timestamp: now });
     return teamStats;

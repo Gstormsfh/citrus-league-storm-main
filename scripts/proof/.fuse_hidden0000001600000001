@@ -1,0 +1,734 @@
+#!/usr/bin/env bash
+# CITRUS-CLASSIFICATION ----------------------------------------------------------
+# CATEGORY: PROOF (scratch Postgres only; never points at a Supabase project)
+# Purpose:     Prove 20260903210000_matchup_scoreboard_uses_v2_scoring_rules.sql
+#              against prod-shaped tables: the OLD writer scores a matchup with
+#              twelve hardcoded categories and drops plus_minus even though the
+#              league prices it - putting a different number on the scoreboard
+#              than the box score behind it, and naming the wrong winner. The
+#              NEW writer scores through get_effective_scoring_rules, agrees
+#              with its own line items to the cent, leaves a twelve-category
+#              league bit-for-bit unchanged, and is idempotent. Exit 0 = PASS.
+# Last active: 2026-09-03
+# Invoked:     PGHOST=/tmp PGPORT=54329 PGUSER=postgres bash scripts/proof/matchup-scoreboard-v2-writer.proof.sh
+# Reads:       supabase/migrations/20260903210000_matchup_scoreboard_uses_v2_scoring_rules.sql
+#              supabase/migrations/captures/2026-09-03_pre_matchup_scoreboard_uses_v2_scoring_rules.sql
+# Writes:      scratch database matchup_scoreboard_proof (dropped and recreated)
+# ----------------------------------------------------------------------------
+# Column types, the matchup_status enum, the v_player_game_stat_long definition
+# and the bodies of get_effective_scoring_rules, score_matchup_lines,
+# calculate_daily_matchup_scores_v2, calculate_daily_matchup_scores and
+# update_all_matchup_scores were harvested from production information_schema /
+# pg_get_functiondef / pg_get_viewdef on 2026-09-03, not composed (INS-16).
+# The only normalisation applied is CRLF -> LF in update_all_matchup_scores,
+# which production stores with CRLF line endings. The capture file is
+# byte-exact and is fed to psql untouched.
+#
+# Every UUID and weight below is a literal and every date is derived from
+# current_date, so the script is deterministic on any run date and needs no
+# uuidgen, no seeded random, and no network.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+MIG="$ROOT/supabase/migrations/20260903210000_matchup_scoreboard_uses_v2_scoring_rules.sql"
+CAP="$ROOT/supabase/migrations/captures/2026-09-03_pre_matchup_scoreboard_uses_v2_scoring_rules.sql"
+P0="psql -v ON_ERROR_STOP=1 -qX"
+
+for f in "$MIG" "$CAP"; do
+  [ -r "$f" ] || { echo "FAIL: cannot read $f"; exit 1; }
+done
+
+echo "[0] the capture is the body the migration claims it captured"
+# The migration header states the md5 of the pre-change live body. If the
+# capture on disk does not hash to it, every "old behaviour" assertion below
+# is meaningless, so refuse before building anything.
+CAP_MD5="$( (md5sum "$CAP" 2>/dev/null || md5 -q "$CAP") | awk '{print $1}' )"
+WANT_MD5="484fb2d84119aacf336b7828eb1a74de"
+if [ "$CAP_MD5" != "$WANT_MD5" ]; then
+  echo "FAIL: capture md5 $CAP_MD5 != $WANT_MD5 declared in the migration header"; exit 1
+fi
+grep -q "$WANT_MD5" "$MIG" || { echo "FAIL: migration header does not carry the capture md5"; exit 1; }
+echo "    capture md5 $CAP_MD5 matches the migration header"
+
+$P0 -c "drop database if exists matchup_scoreboard_proof;"
+$P0 -c "create database matchup_scoreboard_proof;"
+P="$P0 -d matchup_scoreboard_proof"
+
+echo "[1] build prod-shaped tables, the long-form stat view, and the prod scorers"
+$P <<'SQL'
+-- Supabase ships these roles; a scratch cluster does not. The migration
+-- GRANTs EXECUTE to service_role and asserts anon/authenticated were not
+-- granted, so all three must exist for those statements to mean anything.
+do $$ begin
+  if not exists (select 1 from pg_roles where rolname='service_role')  then create role service_role nologin;  end if;
+  if not exists (select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin; end if;
+  if not exists (select 1 from pg_roles where rolname='anon')          then create role anon nologin;          end if;
+end $$;
+
+create type public.matchup_status as enum ('scheduled','in_progress','completed');
+
+create table public.leagues (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  scoring_settings jsonb);
+
+create table public.matchups (
+  id uuid primary key default gen_random_uuid(),
+  league_id uuid not null,
+  week_number integer not null,
+  team1_id uuid not null,
+  team2_id uuid,
+  team1_score numeric not null default 0,
+  team2_score numeric not null default 0,
+  status public.matchup_status not null default 'scheduled',
+  week_start_date date not null,
+  week_end_date date not null,
+  updated_at timestamptz not null default now());
+
+create table public.fantasy_daily_rosters (
+  id uuid primary key default gen_random_uuid(),
+  league_id uuid not null,
+  team_id uuid not null,
+  matchup_id uuid not null,
+  player_id integer not null,
+  roster_date date not null,
+  slot_type text not null);
+
+create table public.nhl_games (
+  game_id integer primary key,
+  game_date date not null,
+  game_type text default 'regular');
+
+create table public.player_directory (
+  season integer not null,
+  player_id integer not null,
+  position_code text,
+  is_goalie boolean not null default false,
+  primary key (season, player_id));
+
+create table public.stat_catalog (
+  stat_key text primary key,
+  display_name text not null,
+  applies_to text not null,
+  default_multiplier numeric not null default 0);
+
+create table public.league_scoring_rules (
+  league_id uuid not null,
+  stat_key text not null,
+  multiplier numeric not null,
+  primary key (league_id, stat_key));
+
+-- Every column either engine reads. All integer in production.
+create table public.player_game_stats (
+  game_id integer not null,
+  game_date date not null,
+  player_id integer not null,
+  is_goalie boolean,
+  goals integer, primary_assists integer, secondary_assists integer,
+  shots_on_goal integer, hits integer, blocks integer, pim integer,
+  ppp integer, shp integer,
+  wins integer, saves integer, goals_against integer, shutouts integer,
+  nhl_goals integer, nhl_assists integer, nhl_shots_on_goal integer,
+  nhl_hits integer, nhl_blocks integer, nhl_pim integer, nhl_ppp integer,
+  nhl_shp integer, nhl_plus_minus integer, nhl_toi_seconds integer,
+  nhl_wins integer, nhl_losses integer, nhl_ot_losses integer,
+  nhl_saves integer, nhl_shots_faced integer, nhl_goals_against integer,
+  nhl_shutouts integer, nhl_faceoff_wins integer, nhl_faceoff_losses integer,
+  nhl_takeaways integer, nhl_giveaways integer, nhl_ppg integer,
+  nhl_ppa integer, nhl_shg integer, nhl_sha integer, nhl_shots_missed integer,
+  nhl_shifts integer, nhl_gwg integer, nhl_pp_saves integer,
+  nhl_sh_saves integer, nhl_shots_blocked integer, nhl_shot_attempts integer,
+  nhl_otg integer, nhl_even_saves integer,
+  primary key (game_id, player_id));
+SQL
+
+# The long-form stat view, verbatim from pg_get_viewdef on prod 2026-09-03.
+# This is what makes _v2 a 35-category scorer: one row per (player-game,
+# category), gated so goalie rows carry only goalie keys and skater rows only
+# skater keys.
+$P <<'SQL'
+create view public.v_player_game_stat_long as
+ SELECT pgs.game_id, pgs.player_id, pgs.game_date, pgs.is_goalie, v.stat_key, v.value
+   FROM player_game_stats pgs
+     CROSS JOIN LATERAL ( VALUES ('goals'::text,'skater'::text,COALESCE(pgs.nhl_goals, 0)::numeric), ('assists'::text,'skater'::text,COALESCE(pgs.nhl_assists, 0)::numeric), ('power_play_points'::text,'skater'::text,COALESCE(pgs.nhl_ppp, 0)::numeric), ('short_handed_points'::text,'skater'::text,COALESCE(pgs.nhl_shp, 0)::numeric), ('shots_on_goal'::text,'skater'::text,COALESCE(pgs.nhl_shots_on_goal, 0)::numeric), ('blocks'::text,'skater'::text,COALESCE(pgs.nhl_blocks, 0)::numeric), ('hits'::text,'skater'::text,COALESCE(pgs.nhl_hits, 0)::numeric), ('penalty_minutes'::text,'skater'::text,COALESCE(pgs.nhl_pim, 0)::numeric), ('plus_minus'::text,'skater'::text,COALESCE(pgs.nhl_plus_minus, 0)::numeric), ('power_play_goals'::text,'skater'::text,COALESCE(pgs.nhl_ppg, 0)::numeric), ('power_play_assists'::text,'skater'::text,COALESCE(pgs.nhl_ppa, 0)::numeric), ('short_handed_goals'::text,'skater'::text,COALESCE(pgs.nhl_shg, 0)::numeric), ('short_handed_assists'::text,'skater'::text,COALESCE(pgs.nhl_sha, 0)::numeric), ('game_winning_goals'::text,'skater'::text,COALESCE(pgs.nhl_gwg, 0)::numeric), ('overtime_goals'::text,'skater'::text,COALESCE(pgs.nhl_otg, 0)::numeric), ('faceoff_wins'::text,'skater'::text,COALESCE(pgs.nhl_faceoff_wins, 0)::numeric), ('faceoff_losses'::text,'skater'::text,COALESCE(pgs.nhl_faceoff_losses, 0)::numeric), ('takeaways'::text,'skater'::text,COALESCE(pgs.nhl_takeaways, 0)::numeric), ('giveaways'::text,'skater'::text,COALESCE(pgs.nhl_giveaways, 0)::numeric), ('shot_attempts'::text,'skater'::text,COALESCE(pgs.nhl_shot_attempts, 0)::numeric), ('shots_missed'::text,'skater'::text,COALESCE(pgs.nhl_shots_missed, 0)::numeric), ('shots_blocked_by_opp'::text,'skater'::text,COALESCE(pgs.nhl_shots_blocked, 0)::numeric), ('shifts'::text,'skater'::text,COALESCE(pgs.nhl_shifts, 0)::numeric), ('toi_minutes'::text,'skater'::text,round(COALESCE(pgs.nhl_toi_seconds, 0)::numeric / 60.0, 4)), ('wins'::text,'goalie'::text,COALESCE(pgs.nhl_wins, 0)::numeric), ('saves'::text,'goalie'::text,COALESCE(pgs.nhl_saves, 0)::numeric), ('shutouts'::text,'goalie'::text,COALESCE(pgs.nhl_shutouts, 0)::numeric), ('goals_against'::text,'goalie'::text,COALESCE(pgs.nhl_goals_against, 0)::numeric), ('losses'::text,'goalie'::text,COALESCE(pgs.nhl_losses, 0)::numeric), ('ot_losses'::text,'goalie'::text,COALESCE(pgs.nhl_ot_losses, 0)::numeric), ('shots_faced'::text,'goalie'::text,COALESCE(pgs.nhl_shots_faced, 0)::numeric), ('even_saves'::text,'goalie'::text,COALESCE(pgs.nhl_even_saves, 0)::numeric), ('pp_saves'::text,'goalie'::text,COALESCE(pgs.nhl_pp_saves, 0)::numeric), ('sh_saves'::text,'goalie'::text,COALESCE(pgs.nhl_sh_saves, 0)::numeric), ('goalie_toi_minutes'::text,'goalie'::text,round(COALESCE(pgs.nhl_toi_seconds, 0)::numeric / 60.0, 4))) v(stat_key, applies_to, value)
+  WHERE (v.applies_to = 'goalie'::text) = COALESCE(pgs.is_goalie, false);
+SQL
+
+# The read path, verbatim from prod.
+$P <<'SQL'
+CREATE OR REPLACE FUNCTION public.get_effective_scoring_rules(p_league_id uuid)
+ RETURNS TABLE(stat_key text, multiplier numeric)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select c.stat_key,
+         coalesce(lr.multiplier, dr.multiplier, c.default_multiplier) as multiplier
+    from stat_catalog c
+    left join league_scoring_rules lr
+      on lr.stat_key = c.stat_key and lr.league_id = p_league_id
+    left join league_scoring_rules dr
+      on dr.stat_key = c.stat_key
+     and dr.league_id = '00000000-0000-0000-0000-000000000000'::uuid;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.score_matchup_lines(p_matchup_id uuid, p_team_id uuid, p_week_start date, p_week_end date)
+ RETURNS TABLE(roster_date date, player_id integer, is_goalie boolean, points numeric)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  with lg as (
+    select m.league_id from matchups m where m.id = p_matchup_id
+  ),
+  rules as (
+    select r.stat_key, r.multiplier
+      from lg, lateral public.get_effective_scoring_rules(lg.league_id) r
+  )
+  select fdr.roster_date,
+         l.player_id,
+         l.is_goalie,
+         round(sum(l.value * rules.multiplier), 3) as points
+    from fantasy_daily_rosters fdr
+    join player_game_stats pgs
+      on pgs.player_id = fdr.player_id
+     and pgs.game_date = fdr.roster_date
+    join nhl_games g_reg
+      on g_reg.game_id = pgs.game_id
+     and g_reg.game_type = 'regular'
+    join public.v_player_game_stat_long l
+      on l.game_id = pgs.game_id
+     and l.player_id = pgs.player_id
+    join rules on rules.stat_key = l.stat_key
+   where fdr.matchup_id = p_matchup_id
+     and fdr.team_id    = p_team_id
+     and fdr.slot_type  = 'active'
+     and fdr.roster_date >= p_week_start
+     and fdr.roster_date <= p_week_end
+   group by fdr.roster_date, l.player_id, l.is_goalie;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.calculate_daily_matchup_scores_v2(p_matchup_id uuid, p_team_id uuid, p_week_start date, p_week_end date)
+ RETURNS TABLE(roster_date date, daily_score numeric)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select d::date as roster_date,
+         coalesce((select round(sum(sl.points),3)
+                     from public.score_matchup_lines(p_matchup_id,p_team_id,p_week_start,p_week_end) sl
+                    where sl.roster_date = d::date), 0) as daily_score
+    from generate_series(p_week_start, p_week_end, '1 day'::interval) d;
+$function$;
+SQL
+
+# The legacy twelve-category scorer, verbatim from prod. Nothing in this
+# migration changes it; it is installed so the OLD writer behaves exactly as
+# production's does.
+$P <<'SQL'
+CREATE OR REPLACE FUNCTION public.calculate_daily_matchup_scores(p_matchup_id uuid, p_team_id uuid, p_week_start date, p_week_end date)
+ RETURNS TABLE(roster_date date, daily_score numeric)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_date DATE;
+  v_score NUMERIC(10, 3);
+  v_league_id UUID;
+  v_goalie_wins_weight NUMERIC(10, 3) := 4.0;
+  v_goalie_saves_weight NUMERIC(10, 3) := 0.2;
+  v_goalie_shutouts_weight NUMERIC(10, 3) := 3.0;
+  v_goalie_ga_weight NUMERIC(10, 3) := -1.0;
+  v_skater_goals_weight NUMERIC(10, 3) := 3.0;
+  v_skater_assists_weight NUMERIC(10, 3) := 2.0;
+  v_skater_ppp_weight NUMERIC(10, 3) := 1.0;
+  v_skater_shp_weight NUMERIC(10, 3) := 2.0;
+  v_skater_sog_weight NUMERIC(10, 3) := 0.4;
+  v_skater_blocks_weight NUMERIC(10, 3) := 0.5;
+  v_skater_hits_weight NUMERIC(10, 3) := 0.2;
+  v_skater_pim_weight NUMERIC(10, 3) := 0.5;
+  v_scoring_settings JSONB;
+BEGIN
+  SELECT m.league_id, l.scoring_settings
+  INTO v_league_id, v_scoring_settings
+  FROM matchups m
+  LEFT JOIN leagues l ON m.league_id = l.id
+  WHERE m.id = p_matchup_id;
+
+  IF v_scoring_settings IS NOT NULL THEN
+    IF v_scoring_settings->'goalie' IS NOT NULL THEN
+      v_goalie_wins_weight     := COALESCE((v_scoring_settings->'goalie'->>'wins')::numeric, 4.0);
+      v_goalie_saves_weight    := COALESCE((v_scoring_settings->'goalie'->>'saves')::numeric, 0.2);
+      v_goalie_shutouts_weight := COALESCE((v_scoring_settings->'goalie'->>'shutouts')::numeric, 3.0);
+      v_goalie_ga_weight       := COALESCE((v_scoring_settings->'goalie'->>'goals_against')::numeric, -1.0);
+    END IF;
+    IF v_scoring_settings->'skater' IS NOT NULL THEN
+      v_skater_goals_weight   := COALESCE((v_scoring_settings->'skater'->>'goals')::numeric, 3.0);
+      v_skater_assists_weight := COALESCE((v_scoring_settings->'skater'->>'assists')::numeric, 2.0);
+      v_skater_ppp_weight     := COALESCE((v_scoring_settings->'skater'->>'power_play_points')::numeric, 1.0);
+      v_skater_shp_weight     := COALESCE((v_scoring_settings->'skater'->>'short_handed_points')::numeric, 2.0);
+      v_skater_sog_weight     := COALESCE((v_scoring_settings->'skater'->>'shots_on_goal')::numeric, 0.4);
+      v_skater_blocks_weight  := COALESCE((v_scoring_settings->'skater'->>'blocks')::numeric, 0.5);
+      v_skater_hits_weight    := COALESCE((v_scoring_settings->'skater'->>'hits')::numeric, 0.2);
+      v_skater_pim_weight     := COALESCE((v_scoring_settings->'skater'->>'penalty_minutes')::numeric, 0.5);
+    END IF;
+  END IF;
+
+  FOR v_date IN
+    SELECT generate_series(p_week_start, p_week_end, '1 day'::interval)::DATE
+  LOOP
+    SELECT COALESCE(SUM(
+      CASE
+        WHEN COALESCE(pd.is_goalie, pgs.is_goalie, false)
+          OR COALESCE(pd.position_code, '') = 'G' THEN
+          (COALESCE(NULLIF(pgs.nhl_wins, 0), pgs.wins, 0) * v_goalie_wins_weight) +
+          (COALESCE(NULLIF(pgs.nhl_saves, 0), pgs.saves, 0) * v_goalie_saves_weight) +
+          (COALESCE(NULLIF(pgs.nhl_shutouts, 0), pgs.shutouts, 0) * v_goalie_shutouts_weight) +
+          (COALESCE(NULLIF(pgs.nhl_goals_against, 0), pgs.goals_against, 0) * v_goalie_ga_weight)
+        ELSE
+          (COALESCE(pgs.nhl_goals, pgs.goals, 0) * v_skater_goals_weight) +
+          (COALESCE(pgs.nhl_assists, pgs.primary_assists + pgs.secondary_assists, 0) * v_skater_assists_weight) +
+          (COALESCE(pgs.nhl_ppp, pgs.ppp, 0) * v_skater_ppp_weight) +
+          (COALESCE(pgs.nhl_shp, pgs.shp, 0) * v_skater_shp_weight) +
+          (COALESCE(pgs.nhl_shots_on_goal, pgs.shots_on_goal, 0) * v_skater_sog_weight) +
+          (COALESCE(pgs.nhl_blocks, pgs.blocks, 0) * v_skater_blocks_weight) +
+          (COALESCE(pgs.nhl_hits, pgs.hits, 0) * v_skater_hits_weight) +
+          (COALESCE(pgs.nhl_pim, pgs.pim, 0) * v_skater_pim_weight)
+      END
+    ), 0) INTO v_score
+    FROM fantasy_daily_rosters fdr
+    INNER JOIN player_game_stats pgs ON fdr.player_id = pgs.player_id
+      AND pgs.game_date = v_date
+    INNER JOIN nhl_games g_reg ON g_reg.game_id = pgs.game_id
+      AND g_reg.game_type = 'regular'
+    -- 0F-SCORE-2: season comes from the GAME being scored, never the calendar.
+    LEFT JOIN player_directory pd ON fdr.player_id = pd.player_id
+      AND pd.season = substring(pgs.game_id::text from 1 for 4)::int
+    WHERE fdr.matchup_id = p_matchup_id
+      AND fdr.team_id = p_team_id
+      AND fdr.roster_date = v_date
+      AND fdr.slot_type = 'active';
+
+    RETURN QUERY SELECT v_date, COALESCE(v_score, 0);
+  END LOOP;
+
+  RETURN;
+END;
+$function$;
+SQL
+
+# The writer, verbatim from prod (CRLF normalised to LF). This migration does
+# NOT change it - it is the unchanged caller whose behaviour must flip purely
+# because calculate_matchup_total_score changed underneath it.
+$P <<'SQL'
+CREATE OR REPLACE FUNCTION public.update_all_matchup_scores(p_league_id uuid DEFAULT NULL::uuid)
+ RETURNS TABLE(matchup_id uuid, team1_id uuid, team2_id uuid, team1_score numeric, team2_score numeric, updated boolean)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_matchup RECORD;
+  v_team1_score NUMERIC(10, 3);
+  v_team2_score NUMERIC(10, 3);
+  v_error_count INTEGER := 0;
+BEGIN
+  IF p_league_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM leagues WHERE id = p_league_id) THEN
+    RAISE EXCEPTION 'League % does not exist', p_league_id;
+  END IF;
+
+  FOR v_matchup IN
+    SELECT m.id, m.league_id, m.team1_id, m.team2_id, m.week_start_date, m.week_end_date
+    FROM matchups m
+    WHERE (p_league_id IS NULL OR m.league_id = p_league_id)
+      AND m.week_start_date <= CURRENT_DATE
+    ORDER BY m.week_end_date DESC, m.id
+  LOOP
+    BEGIN
+      SELECT calculate_matchup_total_score(
+        v_matchup.id, v_matchup.team1_id, v_matchup.week_start_date, v_matchup.week_end_date
+      ) INTO v_team1_score;
+
+      IF v_team1_score IS NULL THEN
+        v_team1_score := 0;
+      END IF;
+
+      IF v_matchup.team2_id IS NOT NULL THEN
+        SELECT calculate_matchup_total_score(
+          v_matchup.id, v_matchup.team2_id, v_matchup.week_start_date, v_matchup.week_end_date
+        ) INTO v_team2_score;
+
+        IF v_team2_score IS NULL THEN
+          v_team2_score := 0;
+        END IF;
+      ELSE
+        v_team2_score := 0;
+      END IF;
+
+      UPDATE matchups
+      SET team1_score = v_team1_score,
+          team2_score = v_team2_score,
+          updated_at = NOW()
+      WHERE id = v_matchup.id;
+
+      RETURN QUERY SELECT
+        v_matchup.id, v_matchup.team1_id, v_matchup.team2_id,
+        v_team1_score, v_team2_score, true;
+    EXCEPTION WHEN OTHERS THEN
+      v_error_count := v_error_count + 1;
+      RAISE WARNING 'Error updating matchup %: %', v_matchup.id, SQLERRM;
+
+      RETURN QUERY SELECT
+        v_matchup.id, v_matchup.team1_id, v_matchup.team2_id,
+        0::NUMERIC(10, 3), 0::NUMERIC(10, 3), false;
+    END;
+  END LOOP;
+
+  IF v_error_count > 0 THEN
+    RAISE WARNING 'update_all_matchup_scores completed with % errors', v_error_count;
+  END IF;
+END;
+$function$;
+SQL
+
+echo "[2] seed two leagues that differ ONLY in whether plus_minus is priced"
+$P <<'SQL'
+-- The 35-row catalog, keys and default_multipliers as production carries them.
+insert into public.stat_catalog (stat_key, display_name, applies_to, default_multiplier) values
+ ('goals','Goals','skater',6.0), ('assists','Assists','skater',4.0),
+ ('power_play_points','PP Points','skater',2.0), ('short_handed_points','SH Points','skater',0.0),
+ ('shots_on_goal','Shots on Goal','skater',0.9), ('blocks','Blocks','skater',1.0),
+ ('hits','Hits','skater',0.0), ('penalty_minutes','PIM','skater',0.0),
+ ('plus_minus','Plus/Minus','skater',0.0), ('power_play_goals','PP Goals','skater',0.0),
+ ('power_play_assists','PP Assists','skater',0.0), ('short_handed_goals','SH Goals','skater',0.0),
+ ('short_handed_assists','SH Assists','skater',0.0), ('game_winning_goals','GW Goals','skater',0.0),
+ ('overtime_goals','OT Goals','skater',0.0), ('faceoff_wins','Faceoff Wins','skater',0.0),
+ ('faceoff_losses','Faceoff Losses','skater',0.0), ('takeaways','Takeaways','skater',0.0),
+ ('giveaways','Giveaways','skater',0.0), ('shot_attempts','Shot Attempts','skater',0.0),
+ ('shots_missed','Shots Missed','skater',0.0), ('shots_blocked_by_opp','Shots Blocked','skater',0.0),
+ ('shifts','Shifts','skater',0.0), ('toi_minutes','TOI Minutes','skater',0.0),
+ ('wins','Wins','goalie',5.0), ('saves','Saves','goalie',0.6),
+ ('shutouts','Shutouts','goalie',5.0), ('goals_against','Goals Against','goalie',-3.0),
+ ('losses','Losses','goalie',0.0), ('ot_losses','OT Losses','goalie',0.0),
+ ('shots_faced','Shots Faced','goalie',0.0), ('even_saves','Even Saves','goalie',0.0),
+ ('pp_saves','PP Saves','goalie',0.0), ('sh_saves','SH Saves','goalie',0.0),
+ ('goalie_toi_minutes','Goalie TOI','goalie',0.0);
+
+-- League A prices plus_minus at 0.5, exactly as the seven exposed production
+-- leagues do. League B is the twelve-category control.
+insert into public.leagues (id, name, scoring_settings) values
+ ('a0000000-0000-4000-8000-000000000001','Proof League A (prices plus_minus 0.5)',
+  '{"goalie": {"wins": 4, "saves": 0.2, "shutouts": 3, "goals_against": -1},
+    "skater": {"hits": 0.2, "goals": 3, "blocks": 0.5, "assists": 2, "plus_minus": 0.5,
+               "shots_on_goal": 0.4, "penalty_minutes": 0.5, "power_play_points": 1,
+               "short_handed_points": 2}}'::jsonb),
+ ('b0000000-0000-4000-8000-000000000001','Proof League B (twelve legacy categories only)',
+  '{"goalie": {"wins": 4, "saves": 0.2, "shutouts": 3, "goals_against": -1},
+    "skater": {"hits": 0.2, "goals": 3, "blocks": 0.5, "assists": 2, "plus_minus": 0.0,
+               "shots_on_goal": 0.4, "penalty_minutes": 0.5, "power_play_points": 1,
+               "short_handed_points": 2}}'::jsonb);
+
+-- Both leagues carry their own full 35 rows, as all 15 live leagues do.
+-- The twelve legacy weights are identical in both and identical to what the
+-- legacy body resolves out of scoring_settings above; the ONLY difference in
+-- the whole fixture is League A's plus_minus.
+insert into public.league_scoring_rules (league_id, stat_key, multiplier)
+select l.id, c.stat_key,
+       case c.stat_key
+         when 'goals' then 3.0 when 'assists' then 2.0
+         when 'power_play_points' then 1.0 when 'short_handed_points' then 2.0
+         when 'shots_on_goal' then 0.4 when 'blocks' then 0.5
+         when 'hits' then 0.2 when 'penalty_minutes' then 0.5
+         when 'wins' then 4.0 when 'saves' then 0.2
+         when 'shutouts' then 3.0 when 'goals_against' then -1.0
+         when 'plus_minus' then
+           case when l.id = 'a0000000-0000-4000-8000-000000000001'::uuid then 0.5 else 0.0 end
+         else 0.0
+       end
+  from public.leagues l cross join public.stat_catalog c;
+
+-- One week that has already started, so update_all_matchup_scores picks it up
+-- on any run date.
+insert into public.matchups (id, league_id, week_number, team1_id, team2_id,
+                             week_start_date, week_end_date, status) values
+ ('a0000000-0000-4000-8000-0000000000f1','a0000000-0000-4000-8000-000000000001',1,
+  'a0000000-0000-4000-8000-0000000000a1','a0000000-0000-4000-8000-0000000000a2',
+  current_date - 7, current_date - 1, 'completed'),
+ ('b0000000-0000-4000-8000-0000000000f1','b0000000-0000-4000-8000-000000000001',1,
+  'b0000000-0000-4000-8000-0000000000b1','b0000000-0000-4000-8000-0000000000b2',
+  current_date - 7, current_date - 1, 'completed');
+
+-- Two game days inside that week. game_id starts with the season, because the
+-- legacy body derives player_directory.season from substring(game_id,1,4).
+insert into public.nhl_games (game_id, game_date, game_type) values
+ (2025020001, current_date - 6, 'regular'),
+ (2025020002, current_date - 6, 'regular'),
+ (2025020003, current_date - 4, 'regular'),
+ (2025020004, current_date - 4, 'regular'),
+ -- A playoff game both engines must ignore (0F-SCORE-2). If the change ever
+ -- lost the game_type filter, player 8478402 would gain 15 points here.
+ (2025030001, current_date - 4, 'playoff');
+
+insert into public.player_directory (season, player_id, position_code, is_goalie) values
+ (2025, 8478402, 'C', false), (2025, 8477934, 'L', false),
+ (2025, 8480069, 'R', false), (2025, 8476945, 'D', false),
+ (2025, 8471679, 'G', true),  (2025, 8474596, 'G', true);
+
+-- Legacy (non-nhl_) columns are all 0, matching production, where the
+-- NULLIF fallbacks in the legacy body fire on 0 of 52,478 rows.
+insert into public.player_game_stats (
+  game_id, game_date, player_id, is_goalie,
+  goals, primary_assists, secondary_assists, shots_on_goal, hits, blocks, pim, ppp, shp,
+  wins, saves, goals_against, shutouts,
+  nhl_goals, nhl_assists, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp,
+  nhl_plus_minus, nhl_toi_seconds, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves,
+  nhl_shots_faced, nhl_goals_against, nhl_shutouts, nhl_faceoff_wins, nhl_faceoff_losses,
+  nhl_takeaways, nhl_giveaways, nhl_ppg, nhl_ppa, nhl_shg, nhl_sha, nhl_shots_missed,
+  nhl_shifts, nhl_gwg, nhl_pp_saves, nhl_sh_saves, nhl_shots_blocked, nhl_shot_attempts,
+  nhl_otg, nhl_even_saves) values
+ -- Day 1. Skater 8478402: 1G 1A 1PPP 4SOG 2BLK 3HIT 2PIM -> 10.2 on twelve cats, plus_minus -5
+ (2025020001, current_date - 6, 8478402, false, 0,0,0,0,0,0,0,0,0, 0,0,0,0,
+  1,1,4,3,2,2,1,0, -5,1200, 0,0,0,0, 0,0,0, 0,0, 0,0, 0,0,0,0, 0, 20,0, 0,0, 0,0, 0,0),
+ -- Day 1. Goalie 8471679: 1W 30SV 0SO 2GA -> 8.0
+ (2025020001, current_date - 6, 8471679, true, 0,0,0,0,0,0,0,0,0, 0,0,0,0,
+  0,0,0,0,0,0,0,0, 0,3600, 1,0,0,30, 32,2,0, 0,0, 0,0, 0,0,0,0, 0, 0,0, 0,0, 0,0, 0,0),
+ -- Day 1. Skater 8480069: 2G 0A 1SHP 5SOG -> 10.0, plus_minus +5
+ (2025020002, current_date - 6, 8480069, false, 0,0,0,0,0,0,0,0,0, 0,0,0,0,
+  2,0,5,0,0,0,0,1, 5,1100, 0,0,0,0, 0,0,0, 0,0, 0,0, 0,0,0,0, 0, 18,0, 0,0, 0,0, 0,0),
+ -- Day 1. Goalie 8474596: 0W 11SV 0SO 0GA -> 2.2
+ (2025020002, current_date - 6, 8474596, true, 0,0,0,0,0,0,0,0,0, 0,0,0,0,
+  0,0,0,0,0,0,0,0, 0,1800, 0,1,0,11, 11,0,0, 0,0, 0,0, 0,0,0,0, 0, 0,0, 0,0, 0,0, 0,0),
+ -- Day 2. Skater 8477934: 0G 2A 1PPP 3SOG 1BLK 1HIT -> 6.9, plus_minus -3
+ (2025020003, current_date - 4, 8477934, false, 0,0,0,0,0,0,0,0,0, 0,0,0,0,
+  0,2,3,1,1,0,1,0, -3,1000, 0,0,0,0, 0,0,0, 0,0, 0,0, 0,0,0,0, 0, 17,0, 0,0, 0,0, 0,0),
+ -- Day 2. Skater 8476945: 1G 1A 1PPP 2SOG 4BLK 5HIT -> 9.8, plus_minus +3
+ (2025020004, current_date - 4, 8476945, false, 0,0,0,0,0,0,0,0,0, 0,0,0,0,
+  1,1,2,5,4,0,1,0, 3,1300, 0,0,0,0, 0,0,0, 0,0, 0,0, 0,0,0,0, 0, 22,0, 0,0, 0,0, 0,0),
+ -- Day 2, PLAYOFF. Must be ignored by both engines.
+ (2025030001, current_date - 4, 8478402, false, 0,0,0,0,0,0,0,0,0, 0,0,0,0,
+  5,0,0,0,0,0,0,0, 10,1400, 0,0,0,0, 0,0,0, 0,0, 0,0, 0,0,0,0, 0, 21,0, 0,0, 0,0, 0,0);
+
+-- Both leagues roster the same players on the same days, so the two leagues
+-- see identical stats and differ only by their scoring rules.
+insert into public.fantasy_daily_rosters (league_id, team_id, matchup_id, player_id, roster_date, slot_type)
+select v.league_id::uuid, v.team_id::uuid, v.matchup_id::uuid, v.player_id, d.d, 'active'
+  from (values
+    ('a0000000-0000-4000-8000-000000000001','a0000000-0000-4000-8000-0000000000a1','a0000000-0000-4000-8000-0000000000f1',8478402),
+    ('a0000000-0000-4000-8000-000000000001','a0000000-0000-4000-8000-0000000000a1','a0000000-0000-4000-8000-0000000000f1',8477934),
+    ('a0000000-0000-4000-8000-000000000001','a0000000-0000-4000-8000-0000000000a1','a0000000-0000-4000-8000-0000000000f1',8471679),
+    ('a0000000-0000-4000-8000-000000000001','a0000000-0000-4000-8000-0000000000a2','a0000000-0000-4000-8000-0000000000f1',8480069),
+    ('a0000000-0000-4000-8000-000000000001','a0000000-0000-4000-8000-0000000000a2','a0000000-0000-4000-8000-0000000000f1',8476945),
+    ('a0000000-0000-4000-8000-000000000001','a0000000-0000-4000-8000-0000000000a2','a0000000-0000-4000-8000-0000000000f1',8474596),
+    ('b0000000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-0000000000b1','b0000000-0000-4000-8000-0000000000f1',8478402),
+    ('b0000000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-0000000000b1','b0000000-0000-4000-8000-0000000000f1',8477934),
+    ('b0000000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-0000000000b1','b0000000-0000-4000-8000-0000000000f1',8471679),
+    ('b0000000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-0000000000b2','b0000000-0000-4000-8000-0000000000f1',8480069),
+    ('b0000000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-0000000000b2','b0000000-0000-4000-8000-0000000000f1',8476945),
+    ('b0000000-0000-4000-8000-000000000001','b0000000-0000-4000-8000-0000000000b2','b0000000-0000-4000-8000-0000000000f1',8474596)
+  ) v(league_id, team_id, matchup_id, player_id)
+  cross join (select current_date - 6 as d union all select current_date - 4) d;
+
+-- The box score the user clicks into: the v2 line rollup, the same relation
+-- persist_matchup_lines writes into fantasy_matchup_lines. This is the number
+-- the scoreboard is supposed to agree with.
+create view public.proof_box_score as
+  select m.id as matchup_id, t.team_id, t.side,
+         coalesce((select round(sum(sl.points),3)
+                     from public.score_matchup_lines(m.id, t.team_id, m.week_start_date, m.week_end_date) sl), 0) as box_total
+    from public.matchups m
+    cross join lateral (values (m.team1_id,'team1'),(m.team2_id,'team2')) t(team_id, side)
+   where t.team_id is not null;
+
+create table public.proof_old_scores (
+  matchup_id uuid primary key, team1_score numeric, team2_score numeric);
+SQL
+
+echo "[3] install the OLD body from the capture and run the writer"
+# pg_get_functiondef emits no trailing semicolon, so append one rather than
+# relying on psql to flush an unterminated buffer at EOF.
+{ cat "$CAP"; printf '\n;\n'; } | $P
+$P <<'SQL'
+do $$ declare v_bad int; begin
+  -- update_all_matchup_scores swallows per-matchup errors and reports
+  -- updated=false with a 0.000 score. Without this guard a broken fixture
+  -- would read as a passing "no difference" result.
+  select count(*) into v_bad from public.update_all_matchup_scores(null) r where not r.updated;
+  if v_bad > 0 then raise exception 'FAIL: % matchups errored inside update_all_matchup_scores', v_bad; end if;
+end $$;
+insert into public.proof_old_scores select id, team1_score, team2_score from public.matchups;
+SQL
+
+echo "[4] OLD writer: it drops a category the league prices, and names the"
+echo "    wrong winner, while the box score behind it says otherwise"
+$P <<'SQL'
+do $$
+declare
+  a1 numeric; a2 numeric; b1 numeric; b2 numeric;
+  box_a1 numeric; box_a2 numeric;
+begin
+  select team1_score, team2_score into a1, a2 from public.matchups
+   where id = 'a0000000-0000-4000-8000-0000000000f1';
+  select team1_score, team2_score into b1, b2 from public.matchups
+   where id = 'b0000000-0000-4000-8000-0000000000f1';
+  select box_total into box_a1 from public.proof_box_score
+   where matchup_id = 'a0000000-0000-4000-8000-0000000000f1' and side = 'team1';
+  select box_total into box_a2 from public.proof_box_score
+   where matchup_id = 'a0000000-0000-4000-8000-0000000000f1' and side = 'team2';
+
+  -- Twelve-category arithmetic, by hand:
+  --   A1 = 10.2 (8478402) + 6.9 (8477934) + 8.0 (8471679) = 25.100
+  --   A2 = 10.0 (8480069) + 9.8 (8476945) + 2.2 (8474596) = 22.000
+  if a1 <> 25.100 or a2 <> 22.000 then
+    raise exception 'UNEXPECTED: old writer gave % - %, expected 25.100 - 22.000; the capture may not be the live body', a1, a2;
+  end if;
+  -- The control league must score the same, since the fixtures are identical
+  -- apart from plus_minus, which the old writer cannot see in either league.
+  if b1 <> 25.100 or b2 <> 22.000 then
+    raise exception 'UNEXPECTED: control league gave % - %', b1, b2;
+  end if;
+
+  -- The box score already counts plus_minus: A1 loses 4.0, A2 gains 4.0.
+  if box_a1 <> 21.100 or box_a2 <> 26.000 then
+    raise exception 'UNEXPECTED: box score gave % - %, expected 21.100 - 26.000', box_a1, box_a2;
+  end if;
+
+  if a1 = box_a1 and a2 = box_a2 then
+    raise exception 'UNEXPECTED: old writer already agrees with the box score; the defect did not reproduce';
+  end if;
+
+  -- The sharp end. Not just a different number: a different winner.
+  if not (a1 > a2 and box_a1 < box_a2) then
+    raise exception 'UNEXPECTED: fixture did not produce a leader disagreement (% - % vs % - %)', a1, a2, box_a1, box_a2;
+  end if;
+
+  raise notice 'old writer: scoreboard % - % (team1 leads), box score % - % (team2 leads)', a1, a2, box_a1, box_a2;
+  raise notice 'old writer: plus_minus priced at 0.5 and worth % / % points is invisible to the scoreboard',
+    round(box_a1 - a1, 3), round(box_a2 - a2, 3);
+end $$;
+SQL
+
+echo "[5] apply the migration"
+$P -f "$MIG"
+
+echo "[6] NEW writer: the priced category is counted, the winner is corrected,"
+echo "    and the scoreboard equals the sum of its own box score"
+$P <<'SQL'
+do $$ declare v_bad int; begin
+  select count(*) into v_bad from public.update_all_matchup_scores(null) r where not r.updated;
+  if v_bad > 0 then raise exception 'FAIL: % matchups errored inside update_all_matchup_scores', v_bad; end if;
+end $$;
+
+do $$
+declare a1 numeric; a2 numeric; box_a1 numeric; box_a2 numeric;
+begin
+  select team1_score, team2_score into a1, a2 from public.matchups
+   where id = 'a0000000-0000-4000-8000-0000000000f1';
+  select box_total into box_a1 from public.proof_box_score
+   where matchup_id = 'a0000000-0000-4000-8000-0000000000f1' and side = 'team1';
+  select box_total into box_a2 from public.proof_box_score
+   where matchup_id = 'a0000000-0000-4000-8000-0000000000f1' and side = 'team2';
+
+  if a1 <> 21.100 or a2 <> 26.000 then
+    raise exception 'FAIL: new writer gave % - %, expected 21.100 - 26.000', a1, a2;
+  end if;
+  if a1 <> box_a1 or a2 <> box_a2 then
+    raise exception 'FAIL: scoreboard % - % still disagrees with box score % - %', a1, a2, box_a1, box_a2;
+  end if;
+  if not (a1 < a2) then
+    raise exception 'FAIL: new writer did not correct the leader';
+  end if;
+  raise notice 'PASS new writer: % - %, plus_minus counted, leader corrected from team1 to team2', a1, a2;
+end $$;
+
+-- The invariant pg_cron job 28 checks nightly, over every matchup, both sides.
+do $$
+declare v_bad int;
+begin
+  select count(*) into v_bad
+    from public.matchups m
+    join public.proof_box_score b1 on b1.matchup_id = m.id and b1.side = 'team1'
+    join public.proof_box_score b2 on b2.matchup_id = m.id and b2.side = 'team2'
+   where abs(m.team1_score - b1.box_total) >= 0.01
+      or abs(m.team2_score - b2.box_total) >= 0.01;
+  if v_bad > 0 then
+    raise exception 'FAIL: % matchups where the stored score does not equal the sum of its line items', v_bad;
+  end if;
+  raise notice 'PASS every matchup score equals the sum of its own line items (the job-28 invariant)';
+end $$;
+SQL
+
+echo "[7] a twelve-category league is unchanged to the cent"
+$P <<'SQL'
+do $$
+declare o record; n record;
+begin
+  select team1_score, team2_score into o from public.proof_old_scores
+   where matchup_id = 'b0000000-0000-4000-8000-0000000000f1';
+  select team1_score, team2_score into n from public.matchups
+   where id = 'b0000000-0000-4000-8000-0000000000f1';
+
+  -- Exact numeric equality, not a tolerance. For a league whose effective
+  -- rules are exactly the twelve legacy categories, the new number IS the
+  -- old number.
+  if o.team1_score <> n.team1_score or o.team2_score <> n.team2_score then
+    raise exception 'FAIL: control league moved from % - % to % - %',
+      o.team1_score, o.team2_score, n.team1_score, n.team2_score;
+  end if;
+  if n.team1_score <> 25.100 or n.team2_score <> 22.000 then
+    raise exception 'FAIL: control league is not at its hand-computed value: % - %',
+      n.team1_score, n.team2_score;
+  end if;
+  raise notice 'PASS twelve-category league unchanged: % - % before, % - % after (exact equality)',
+    o.team1_score, o.team2_score, n.team1_score, n.team2_score;
+end $$;
+
+-- The playoff game must still be excluded by the new writer. Player 8478402's
+-- playoff line is 5G and +10; if the game_type filter had been lost, League B
+-- team1 would read 40.100 instead of 25.100.
+do $$
+declare v numeric;
+begin
+  select team1_score into v from public.matchups where id = 'b0000000-0000-4000-8000-0000000000f1';
+  if v <> 25.100 then
+    raise exception 'FAIL: playoff game leaked into the score (%)', v;
+  end if;
+  raise notice 'PASS playoff game still excluded (0F-SCORE-2 preserved)';
+end $$;
+SQL
+
+echo "[8] re-apply is a no-op and the writer is stable across a second run"
+$P -f "$MIG" >/dev/null
+$P <<'SQL'
+do $$ declare v_bad int; begin
+  select count(*) into v_bad from public.update_all_matchup_scores(null) r where not r.updated;
+  if v_bad > 0 then raise exception 'FAIL: % matchups errored on the idempotent re-run', v_bad; end if;
+end $$;
+
+do $$
+declare a1 numeric; a2 numeric; b1 numeric; b2 numeric; v_body text;
+begin
+  select team1_score, team2_score into a1, a2 from public.matchups
+   where id = 'a0000000-0000-4000-8000-0000000000f1';
+  select team1_score, team2_score into b1, b2 from public.matchups
+   where id = 'b0000000-0000-4000-8000-0000000000f1';
+  if a1 <> 21.100 or a2 <> 26.000 or b1 <> 25.100 or b2 <> 22.000 then
+    raise exception 'FAIL: re-apply moved the scores: % - % / % - %', a1, a2, b1, b2;
+  end if;
+
+  v_body := pg_get_functiondef('public.calculate_matchup_total_score(uuid,uuid,date,date)'::regprocedure);
+  if v_body ~ 'FROM calculate_daily_matchup_scores\(' then
+    raise exception 'FAIL: the legacy call came back';
+  end if;
+
+  -- The legacy scorer is deliberately left installed and untouched.
+  perform 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'calculate_daily_matchup_scores';
+  if not found then
+    raise exception 'FAIL: the migration dropped calculate_daily_matchup_scores; it must stay for demoMatchup.ts';
+  end if;
+
+  raise notice 'PASS migration re-applied cleanly, scores stable, legacy scorer left installed';
+end $$;
+SQL
+
+echo "ALL PASS"

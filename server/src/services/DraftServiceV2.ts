@@ -329,6 +329,49 @@ function mapRpcError(err: { message?: string; code?: string }): AppError {
     }
   }
 
+  // CONCURRENCY (2026-09-04 load audit) — the lost same-slot race.
+  //
+  // Two independent writers reach `submit_pick_v2` for one league: human
+  // picks over POST /api/draft/v2/league/:leagueId/pick (Cloud Run, up to
+  // 10 instances) and engine autopicks from the draft engine's own queue.
+  // Nothing serializes them above the database. The RPC's preflight
+  // (`v_pick_count`, `player_taken`) runs BEFORE it takes the leagues row
+  // lock at the `draft_event_counter` UPDATE, so under READ COMMITTED both
+  // transactions can clear preflight for the SAME pick_number.
+  //
+  // Nothing bad lands: `tg_draft_events_project_pick` does a plain INSERT
+  // into `draft_picks_v2`, whose PRIMARY KEY is (league_id, pick_number),
+  // so the loser's whole transaction — event row, counter bump and all —
+  // rolls back. That is the guard working, and it is why a draft cannot
+  // record two picks in one slot.
+  //
+  // What was wrong is what the loser was TOLD. Postgres reports
+  // `duplicate key value violates unique constraint "draft_picks_v2_pkey"`,
+  // which matches no prefix above, so it fell through to a 500
+  // INTERNAL_ERROR that also carried the constraint name onto the wire.
+  // The web client's mapServerError (draftClient/submitPick.ts) then
+  // classified it `server_error` -> "Something went wrong on our end.
+  // Please try again." — advice that is actively wrong, because the slot
+  // is gone and no retry can ever succeed. On draft night this is the
+  // single most likely concurrent failure a manager can hit.
+  //
+  // It is a `pick_out_of_order`: the pick number the caller sent was
+  // consumed by someone else while the request was in flight, which is
+  // exactly what the RPC's own preflight raises when it can see the race.
+  // Reporting it under that prefix makes the 409 path apply end to end —
+  // the client renders the clock_expired copy ("Your clock ran out —
+  // autopick made your choice") and LobbyManager.mapAppErrorToReason maps
+  // it to 'pick_out_of_order' off the same prefix. No pipeline semantics
+  // change: the pick still fails, for the same reason, at the same place.
+  if (msg.includes('draft_picks_v2_pkey')) {
+    return new AppError(
+      'pick_out_of_order: that pick number was taken by a concurrent pick',
+      409,
+      'CONFLICT',
+      err.code,
+    );
+  }
+
   return new AppError(`RPC error: ${msg}`, 500, 'INTERNAL_ERROR', err.code);
 }
 

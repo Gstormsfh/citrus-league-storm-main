@@ -194,7 +194,13 @@ export function toastFromNotification(n: Notification): NotificationCard {
     };
   }
 
-  if (type === 'waiver_result') {
+  // 'waiver_result' is what scheduled.ts wrote until 2026-09-04. The header
+  // above guessed right: the CHECK constraint never admitted it, production
+  // holds no row of that type, and the writer now sends 'WAIVER', which the
+  // constraint does admit. Both are read, the old name because this file
+  // already promised to. A 'WAIVER' row with no `status` is a commissioner
+  // note rather than a claim result, and keeps the plain shape.
+  if (type === 'waiver_result' || (type === 'WAIVER' && meta.status != null)) {
     const won = meta.status === 'successful';
     return { kind: won ? 'success' : 'warning', title: n.title, description: n.message, at };
   }

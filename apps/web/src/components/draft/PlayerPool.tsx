@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { Player } from '@/services/PlayerService';
 import { ScoringCalculator, ScoringSettings } from '@citrus/shared';
 import { DraftPoolRow } from './DraftPoolRow';
+import { poolHeadlineFor } from './draftPoolHeadline';
 import { Mug } from '@/components/roster/Mug';
 import { mugFromDirectory } from '@/components/roster/headshot';
 import type { DraftProjection, QualitySignal } from './draftDecision';
@@ -481,7 +482,7 @@ export const PlayerPool = memo(({
             {(isSelected || isYourTurn) && isDraftActive && !isDrafted && (
               <Button
                 size="sm"
-                className="h-7 px-3 text-xs font-bold bg-fantasy-primary text-[#0F1F15] hover:bg-fantasy-primary/90 relative z-20 pointer-events-auto"
+                className="h-7 px-3 text-xs font-bold bg-pastel-orange text-pastel-surface hover:bg-pastel-orange/90 relative z-20 pointer-events-auto"
                 disabled={isSubmitPending}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -667,6 +668,30 @@ export const PlayerPool = memo(({
                 seasonFpts={fptsMap.get(player.id) || 0}
                 projection={projectedFptsMap.get(player.id) ?? null}
                 signal={qualitySignals.get(player.id) ?? null}
+                headlineOverride={poolHeadlineFor(sortBy, {
+                  seasonFpts: fptsMap.get(player.id) || 0,
+                  projectionTotal: projectedFptsMap.get(player.id)?.total ?? null,
+                  projectionPerGp: projectedFptsMap.get(player.id)?.perGp ?? null,
+                  gamesPlayed: player.games_played ?? null,
+                  points: player.points ?? null,
+                  goals: player.goals ?? null,
+                  assists: player.assists ?? null,
+                  shots: player.shots ?? null,
+                  hits: player.hits ?? null,
+                  blocks: player.blocks ?? null,
+                  xGoals: player.xGoals ?? null,
+                  plusMinus: player.plus_minus ?? null,
+                  ppp: player.ppp ?? null,
+                  shp: player.shp ?? null,
+                  pim: player.pim ?? null,
+                  icetimeSeconds: player.icetime_seconds ?? null,
+                  wins: player.wins ?? null,
+                  losses: player.losses ?? null,
+                  gaa: player.goals_against_average ?? null,
+                  savePct: player.save_percentage ?? null,
+                  saves: player.saves ?? null,
+                  shutouts: player.shutouts ?? null,
+                })}
                 selected={isSelected}
                 drafted={isDrafted}
                 queued={queue.includes(player.id)}

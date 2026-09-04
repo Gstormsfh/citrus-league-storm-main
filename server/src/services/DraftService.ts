@@ -1,7 +1,48 @@
+import { randomInt } from 'node:crypto';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS, logger } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
 import { withResilience } from '../lib/resilientSupabase';
+
+/**
+ * A fair, uniformly random draft order.
+ *
+ * WHY THIS EXISTS (2026-09-04). `initializeDraftOrder` used to fall back to
+ * `teams.map(t => t.id)`, and `get_league_teams()` ends `ORDER BY
+ * t.created_at`. The commissioner's team is created by `createLeague`, before
+ * anyone else can join, so the commissioner picked first in every draft
+ * Citrus has ever run. Checked on production 2026-09-04: `commissioner's team
+ * = first-created team` was true for 12 of 12 leagues, and in the 252-pick
+ * draft of 2026-09-04 all twelve round-one slots matched join order exactly.
+ *
+ * The v1 room had a Fisher-Yates shuffle behind a "Randomize order" button
+ * (DraftRoom.tsx). The v2 room, which replaced it on 2026-08-18, passes no
+ * customTeamOrder at all, so the shuffle was lost in the migration rather
+ * than decided against.
+ *
+ * Randomizing HERE rather than in a lobby button is deliberate. The order is
+ * drawn once, on the server, at ignition, and written straight into
+ * `draft_order` - so it is the same order for every manager, it is persisted
+ * before the first pick, and nobody can re-roll it after seeing it. A
+ * commissioner-side button would have produced a roll that only the
+ * commissioner could see and that he could spin until he liked it.
+ *
+ * `randomInt` from node:crypto, not `Math.random`. Modulo bias in a
+ * twelve-element shuffle is small but this draw decides who gets the first
+ * overall pick, and there is no reason to accept a biased one when the
+ * unbiased primitive is in the standard library.
+ *
+ * An explicit `customTeamOrder` still wins - that is the commissioner setting
+ * an order on purpose, which is a different thing from not having one.
+ */
+export function shuffleTeamOrder(ids: readonly string[]): string[] {
+  const out = [...ids];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
 /**
  * DraftService — Server-side draft management with DI Supabase client.
@@ -321,6 +362,47 @@ export class DraftService {
     customTeamOrder?: string[],
     draftType?: string,
   ) {
+    // MID-DRAFT GUARD (2026-09-04 funnel audit). The first thing this
+    // method does is HARD-DELETE every draft_order row for the league and
+    // write a fresh set from whatever `teams` the caller handed it — and
+    // the only thing standing in front of it is commissionerMiddleware.
+    // Nothing checked whether a draft was already running.
+    //
+    // The reachable path: the commissioner has the v2 lobby open on two
+    // devices (or a second tab). Device A starts the draft. Device B's
+    // lobby is a latched pre-ignition panel that only unlatches when its
+    // own discovery poll succeeds, so for a few seconds its Start button
+    // is still live. Pressing it calls this method a second time — with
+    // device B's `teams`, which was fetched at ITS mount and may be a
+    // different list. start_draft_v2 correctly refuses the second
+    // ignition (draft_already_in_progress), but that refusal comes AFTER
+    // this call has already replaced the running draft's order. The
+    // in-memory LobbyManager keeps the order it ignited with, while
+    // fetchDraftOrderMatrix now serves clients a different one: the room
+    // shows the wrong team on the clock and picks land against the wrong
+    // slots.
+    //
+    // Rebuilding the order is only ever legal before ignition. Resetting
+    // a draft puts the league back to not_started (resetDraft below), so
+    // the legitimate re-init path is unaffected.
+    const { data: leagueRow, error: statusError } = await this.supabase
+      .from('leagues')
+      .select('draft_status')
+      .eq('id', leagueId)
+      .single();
+    if (statusError) {
+      return { error: statusError, sessionId: undefined };
+    }
+    const draftStatus = (leagueRow as { draft_status?: string } | null)?.draft_status;
+    if (draftStatus && draftStatus !== 'not_started' && draftStatus !== 'queued') {
+      return {
+        error:
+          `Draft order cannot be rebuilt while the draft is ${draftStatus}. ` +
+          'Reset the draft first.',
+        sessionId: undefined,
+      };
+    }
+
     // Hard-delete existing orders
     await this.supabase
       .from('draft_order')
@@ -329,7 +411,10 @@ export class DraftService {
 
     const sessionId = crypto.randomUUID();
     const isLinear = draftType === 'linear';
-    const teamOrder = customTeamOrder || teams.map((t) => t.id);
+    // See shuffleTeamOrder above: without this the commissioner picks first in
+    // every draft, because team rows come back ordered by created_at and his
+    // is created with the league.
+    const teamOrder = customTeamOrder ?? shuffleTeamOrder(teams.map((t) => t.id));
 
     const orders: { league_id: string; round_number: number; team_order: string[]; draft_session_id: string }[] = [];
     for (let round = 1; round <= totalRounds; round++) {

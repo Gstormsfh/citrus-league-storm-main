@@ -11,3 +11,4 @@ export * from './practiceDraft';
 export * from './gameState';
 export * from './seasonPhase';
 export * from './positionEligibility';
+export * from './standings';

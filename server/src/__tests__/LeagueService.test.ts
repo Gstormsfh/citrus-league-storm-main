@@ -190,16 +190,51 @@ describe('LeagueService', () => {
     });
   });
 
+  /**
+   * Standings are DERIVED from matchups, not read off `teams`.
+   *
+   * This block used to hand the mock two team rows carrying `wins: 10` and
+   * assert only on the array length, which is why it stayed green while the
+   * route was a permanent 500: `teams` has no wins column (id, league_id,
+   * owner_id, team_name, created_at, updated_at, and nothing else), so the
+   * real query answered 42703 on every call. The fixture asserted a shape the
+   * database does not have.
+   *
+   * The full contract lives in services/__tests__/LeagueService.standings.test.ts.
+   * What is kept here is the smoke test this block was always meant to be.
+   */
   describe('getStandings', () => {
-    it('returns teams ordered by wins', async () => {
+    it('derives a record from matchups', async () => {
       const teams = [
-        { id: 't1', team_name: 'Team A', wins: 10, losses: 2 },
-        { id: 't2', team_name: 'Team B', wins: 8, losses: 4 },
+        { id: 't1', league_id: 'league-1', owner_id: 'o1', team_name: 'Team A' },
+        { id: 't2', league_id: 'league-1', owner_id: 'o2', team_name: 'Team B' },
       ];
-      mockSupabase.from = vi.fn(() => createChain({ data: teams, error: null }));
+      const matchups = [
+        { id: 'm1', league_id: 'league-1', week_number: 1, team1_id: 't1', team2_id: 't2', team1_score: '120.000', team2_score: '100.000', status: 'completed', week_end_date: '2026-01-16' },
+        // Never played. Both scores are 0 because nothing was ever scored,
+        // not because the two teams drew.
+        { id: 'm2', league_id: 'league-1', week_number: 2, team1_id: 't1', team2_id: 't2', team1_score: '0.000', team2_score: '0.000', status: 'completed', week_end_date: '2026-01-23' },
+      ];
+      mockSupabase.from = vi.fn((table: string) =>
+        createChain({ data: table === 'matchups' ? matchups : teams, error: null }));
 
       const result = await service.getStandings('league-1');
+
+      expect(result.error).toBeNull();
       expect(result.standings).toHaveLength(2);
+      expect(result.standings[0]).toMatchObject({ team_id: 't1', wins: 1, losses: 0, ties: 0 });
+      expect(result.standings[1]).toMatchObject({ team_id: 't2', wins: 0, losses: 1, ties: 0 });
+    });
+
+    it('never asks `teams` for a wins column', async () => {
+      const chain = createChain({ data: [], error: null });
+      mockSupabase.from = vi.fn(() => chain);
+
+      await service.getStandings('league-1');
+
+      for (const call of chain.select.mock.calls) {
+        expect(String(call[0])).not.toMatch(/\bwins\b/);
+      }
     });
   });
 

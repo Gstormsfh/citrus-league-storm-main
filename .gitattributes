@@ -29,3 +29,23 @@
 # is visible in review, where a conflict marker would be too, and it is
 # worth trading for thirteen resolutions of a route table.
 apps/web/harness/README.md merge=union
+
+# -- pg_get_functiondef captures are evidence, not source -----------------
+# MIGRATION_SAFETY_GUIDE Rule 1 requires the capture beside a
+# CREATE OR REPLACE FUNCTION migration to be the BYTE-EXACT output of
+# pg_get_functiondef against the live database, and the apply protocol
+# verifies it by comparing md5(file) against md5(pg_get_functiondef(...)).
+#
+# `* text=auto eol=lf` above rewrites line endings on checkout, which
+# silently breaks that comparison. It is not theoretical: on 2026-09-03
+# the live bodies of process_all_faab_waivers() and
+# should_process_waivers_now() were found to contain CRLF (a Windows psql
+# apply, Rule 3's own failure mode), git warned "CRLF will be replaced by
+# LF the next time Git touches it" on the commit carrying their captures,
+# and the next checkout would have made both captures fail to match a
+# production they still describe correctly.
+#
+# `-text` disables all line-ending conversion for this directory, so the
+# bytes committed are the bytes pg produced. Captures are append-only and
+# never edited (see captures/README.md), so there is no merge cost.
+supabase/migrations/captures/** -text

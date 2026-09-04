@@ -39,7 +39,13 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-const WEEKLY_LIMIT = 3; // 3 questions per matchup week
+// The server's WEEKLY_MESSAGE_LIMIT (server/src/services/
+// StormyAssistantService.ts), which is the number actually enforced:
+// checkUserWeeklyLimit counts stormy_chat_log rows in a rolling 7 days
+// and refuses at 15. This read 3, so the meter on this page filled to
+// 100 percent and showed 3/3 while the user still had 12 questions
+// left. Display only, but it is the only place the allowance is shown.
+const WEEKLY_LIMIT = 15;
 
 const StormyAssistant = () => {
   const { userLeagueState, activeLeagueId, activeLeague } = useLeague();

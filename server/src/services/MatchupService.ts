@@ -1092,10 +1092,15 @@ export class MatchupService {
       return { initialized: 0 };
     }
 
-    let initialized = 0;
     const teamIds = [matchup.team1_id, matchup.team2_id].filter(Boolean);
 
-    for (const teamId of teamIds) {
+    // PERF (2026-09-04): the two teams are independent — different team_id,
+    // different rows, no shared state — and this loop awaited them one after
+    // the other. Every Matchup page view blocks on this endpoint before it may
+    // read any roster (see apps/web/src/api/matchups.ts `ensureRosters`, which
+    // measured it at ~1s a call), so the serial loop doubled the wait for no
+    // reason. Run both teams together.
+    const perTeam = async (teamId: string): Promise<number> => {
       // PERF (2026-09-01): read the FULL lineup once and hand it to the
       // backfill — this method used to read `starters` here, then the
       // backfill read the full lineup again, then a third time after a
@@ -1107,12 +1112,13 @@ export class MatchupService {
         .eq('league_id', matchup.league_id)
         .maybeSingle();
 
+      let created = 0;
       let effectiveLineup = lineup;
       if (!lineup?.starters || (Array.isArray(lineup.starters) && lineup.starters.length === 0)) {
         logger.info('[ensureMatchupRosters] No lineup for team', teamId, '— building from roster_assignments');
-        const created = await this.buildAndSaveDefaultLineup(admin, teamId, matchup.league_id);
-        if (created) {
-          initialized++;
+        const built = await this.buildAndSaveDefaultLineup(admin, teamId, matchup.league_id);
+        if (built) {
+          created = 1;
           logger.info('[ensureMatchupRosters] Created lineup for team', teamId);
           // Let the backfill re-read the freshly built lineup itself.
           effectiveLineup = null;
@@ -1127,7 +1133,12 @@ export class MatchupService {
         matchup.week_start_date, matchup.week_end_date,
         effectiveLineup,
       );
-    }
+
+      return created;
+    };
+
+    const createdCounts = await Promise.all(teamIds.map((teamId) => perTeam(teamId as string)));
+    const initialized = createdCounts.reduce((sum, n) => sum + n, 0);
 
     return { initialized };
   }

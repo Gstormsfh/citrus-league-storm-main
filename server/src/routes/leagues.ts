@@ -391,7 +391,48 @@ leagueRoutes.post('/:leagueId/simulate-fill', commissionerMiddleware, async (c) 
 
     // Use admin client to bypass RLS — AI teams have null owner_id
     const adminClient = getSupabaseAdmin();
-    const rows = teamNames.map(name => ({
+
+    // SEAT CAP (2026-09-04 funnel audit). This route inserted exactly what
+    // the client asked for, with no idea how many seats the league has.
+    // The count the caller sends is `league_size - teams.length` computed
+    // from a team list the draft lobby fetches once, so two lobbies open
+    // at the same time (two tabs, phone + laptop) both compute "11 open"
+    // and both fill: 23 teams in a 12-team league.
+    //
+    // That is not a cosmetic overfill. start_draft_v2 hard-requires
+    // round-1 team_order length === league_size, so the league can never
+    // start again — and the v2 lobby has no delete-team control, so there
+    // is no way back from inside the product. Clamp to the seats that are
+    // actually open and refuse outright when there are none.
+    const { data: leagueRow, error: leagueErr } = await adminClient
+      .from('leagues')
+      .select('league_size')
+      .eq('id', leagueId)
+      .single();
+    if (leagueErr) return handleError(c, leagueErr, 'Failed to add AI teams');
+
+    const leagueSize = (leagueRow as { league_size: number | null } | null)?.league_size ?? null;
+    let wanted = teamNames;
+    if (leagueSize !== null && leagueSize > 0) {
+      const { count, error: countErr } = await adminClient
+        .from('teams')
+        .select('id', { count: 'exact', head: true })
+        .eq('league_id', leagueId);
+      if (countErr) return handleError(c, countErr, 'Failed to add AI teams');
+
+      const openSeats = leagueSize - (count ?? 0);
+      if (openSeats <= 0) {
+        return fail(
+          c,
+          AppError.badRequest(
+            `This league already has all ${leagueSize} teams. Refresh the lobby to see them.`,
+          ),
+        );
+      }
+      wanted = teamNames.slice(0, openSeats);
+    }
+
+    const rows = wanted.map(name => ({
       league_id: leagueId,
       team_name: name,
       owner_id: null,

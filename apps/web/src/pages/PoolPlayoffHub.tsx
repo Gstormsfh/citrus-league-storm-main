@@ -35,6 +35,10 @@ import { logger } from '@/utils/logger';
 // errors. The 2026-08-15 sweep that introduced API_BASE_URL missed this
 // file. Prefixed with API_BASE_URL, matching PoolPlayoffRoster.tsx.
 import { API_BASE_URL } from '@/api/client';
+// 2026-09-03 launch audit: was a literal `?season=2025` in the request
+// URL below. Correct today and wrong from April 2027; see the note in
+// packages/shared/src/constants/season.ts. One rule, one place.
+import { getCurrentPlayoffSeason } from '@citrus/shared';
 import { onTeamColor } from '@/utils/teamColorContrast';
 
 interface Team {
@@ -140,7 +144,7 @@ export default function PoolPlayoffHub() {
         const [leagueRes, teamsRes, bracketRes] = await Promise.all([
           fetch(`${API_BASE_URL}/api/leagues/${leagueId}`, { headers }).then(r => r.json()).catch(() => null),
           fetch(`${API_BASE_URL}/api/leagues/${leagueId}/teams`, { headers }).then(r => r.json()).catch(() => null),
-          fetch(`${API_BASE_URL}/api/nhl-playoffs/bracket?season=2025`).then(r => r.json()).catch(() => null),
+          fetch(`${API_BASE_URL}/api/nhl-playoffs/bracket?season=${getCurrentPlayoffSeason()}`).then(r => r.json()).catch(() => null),
         ]);
         const leagueData = leagueRes?.data || leagueRes;
         setLeague(leagueData);

@@ -170,10 +170,21 @@ const Auth = () => {
       if (isInvalidCreds) {
         try {
           const apiBase = import.meta.env.VITE_API_URL || '';
+          // BOUNDED (2026-09-04). This lookup is a nicety on top of an
+          // already-failed sign-in, but `loading` is still true while it
+          // runs and every button on this screen is gated on it, the two
+          // OAuth buttons included. A raw fetch has no deadline of its own,
+          // so a slow or unreachable API left the whole login screen
+          // disabled for as long as the platform took to give up (about a
+          // minute in the iOS webview). Cap it: the hint is worth 5 seconds,
+          // never the screen. On abort we fall through to the honest
+          // credentials error below, exactly as any other failure here does.
+          // Feature-detected the way api/client.ts detects it.
           const res = await fetch(`${apiBase}/api/auth/check-method`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email }),
+            signal: typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(5000) : undefined,
           });
           const body = await res.json();
           const info = body?.data || body;
@@ -307,7 +318,7 @@ const Auth = () => {
         className="fixed inset-0 pointer-events-none z-page-backdrop"
         style={{ background: 'radial-gradient(ellipse 50% 40% at 80% 15%, rgba(255,107,26,0.08) 0%, transparent 60%)' }}
       />
-      <main className="relative z-10 flex items-center justify-center px-4 pt-24 pb-12 lg:pt-28 lg:pb-20 min-h-[calc(100vh-92px)]">
+      <main className="relative z-10 flex items-center justify-center px-4 pt-[calc(6rem+env(safe-area-inset-top))] pb-12 lg:pt-28 lg:pb-20 min-h-[calc(100vh-92px)]">
         <div className="w-full max-w-[440px]">
           <div className="flex flex-col items-center mb-6">
             <CitrusLogo className="w-10 h-10 mb-3" variant="on-dark" />

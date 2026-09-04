@@ -127,9 +127,32 @@
 --       league is processed that day rather than skipped. An
 --       hour-equality gate would have skipped it; 17 production leagues
 --       are configured at 02:00.
---     fall back - 01:00 local occurs twice. waiver_last_due_at resolves
---       to the first occurrence, and the NOT EXISTS guard means the
---       second pass is a no-op.
+--     fall back - 01:00 local occurs twice. CORRECTED 2026-09-03 after
+--       measurement in a PostgreSQL 16 scratch cluster; an earlier draft
+--       of this block asserted the opposite of what Postgres does, and
+--       both halves of it were wrong:
+--         (i)  Postgres resolves an ambiguous local time to the
+--              STANDARD-time reading, which here is the SECOND 01:00
+--              (01:00 EST). waiver_last_due_at('01:00') evaluated at the
+--              first 01:15 returns 2026-11-01 06:00:00+00, not
+--              05:00:00+00. So due_at sits 45 minutes AHEAD of the first
+--              01:15 run.
+--         (ii) The league still fires on that first 01:15 run (its claim
+--              was created before due_at and nothing has been processed
+--              since), and the repeated 01:15 is a no-op - but what
+--              makes it a no-op is the pending-claim EXISTS, because the
+--              first pass resolved every pending claim. It is NOT the
+--              NOT EXISTS processed_at guard: at the repeated 01:15 the
+--              stamp left by the first pass (05:15) is still earlier
+--              than due_at (06:00), so that guard is satisfied and does
+--              not block. Hand the league a fresh claim between the two
+--              passes and the second one processes it, which is the
+--              wanted behaviour rather than a bug.
+--       Net effect on production: none. The live configured values are
+--       02:00 (17 leagues) and 03:00 (38); no league is configured at
+--       01:00, and 02:00 is unambiguous on fall-back day. All three
+--       facts are asserted mechanically in
+--       scripts/proof/faab-waiver-due-gate.proof.sh step [10].
 --
 --   TIMEZONE, and what is deliberately NOT changed here: the stored
 --   times keep being read as America/New_York. That is what the applied
@@ -267,8 +290,11 @@ BEGIN
           AND (d.due_at IS NULL OR wc.created_at <= d.due_at)
       )
       -- ... and this league has not already been processed for that
-      -- moment. Guards against re-running every hour, including the
-      -- duplicated local hour when clocks fall back.
+      -- moment. This is what stops an hourly cron from re-running a
+      -- league whose claims were pending at due_at but are still pending
+      -- after a partial or failed pass, which the EXISTS above cannot
+      -- see. It is not what handles the duplicated local hour on
+      -- fall-back day; see the DST note above for what actually does.
       AND (
         d.due_at IS NULL
         OR NOT EXISTS (

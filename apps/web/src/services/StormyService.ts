@@ -105,8 +105,6 @@ const signed = (n: number, digits = 1): string => `${n >= 0 ? '+' : ''}${n.toFix
 // ── Service ──────────────────────────────────────────────────────
 
 class StormyServiceImpl {
-  private guestMessageCount = 0;
-  private static readonly GUEST_LIMIT = 1;
 
   /**
    * Send a message to Stormy and get an AI-powered response.
@@ -123,14 +121,27 @@ class StormyServiceImpl {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        this.guestMessageCount++;
-        if (this.guestMessageCount > StormyServiceImpl.GUEST_LIMIT) {
-          return {
-            response: "",
-            error:
-              "Want more from Stormy? Sign up for a free account to get 3 questions per matchup week!",
-          };
-        }
+        // GUEST (2026-09-04 TestFlight audit). This used to let the FIRST
+        // guest message through to the API and only refuse the second. That
+        // first one could never have worked: the route sits behind
+        // authMiddleware (server/src/routes/stormy.ts:76), so a request
+        // carrying no bearer token comes back 401, and the ApiError branch
+        // below hands the SERVER's own wording straight to the chat bubble
+        // as Stormy's reply. StormyChatBubble is mounted at the App root
+        // (App.tsx:291) with no auth gate, so the pulsing mascot button is
+        // on the landing and sign-in screens: the very first thing a
+        // signed-out tester could get out of Stormy was the raw
+        // authorization-header complaint.
+        //
+        // There is no guest tier behind this to fall back to, so answer in
+        // Stormy's own voice and stop here. The count is 15, the server's
+        // WEEKLY_MESSAGE_LIMIT (services/StormyAssistantService.ts); the
+        // copy said 3, which was never any limit the server enforced.
+        return {
+          response: "",
+          error:
+            "Want more from Stormy? Sign up for a free account to get 15 questions per matchup week!",
+        };
       }
 
       const contextString = context
@@ -144,14 +155,29 @@ class StormyServiceImpl {
       // your N questions this week") IS the product behaviour.
       let envelope: { data?: { response?: string; usage?: unknown } };
       try {
-        envelope = await apiClient.post("/api/stormy/chat", {
-          message,
-          conversationHistory: history.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          context: contextString,
-        });
+        envelope = await apiClient.post(
+          "/api/stormy/chat",
+          {
+            message,
+            conversationHistory: history.map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+            context: contextString,
+          },
+          // TIMEOUT AND RETRIES (2026-09-04 TestFlight audit). apiClient
+          // defaults to a 15s timeout (api/client.ts:54) and retries an
+          // AbortError twice with backoff (client.ts:266-283). The server
+          // allows Claude 60s (routes/stormy.ts:99) for up to 1536 output
+          // tokens (MAX_RESPONSE_TOKENS), so a full-length answer outlives
+          // the client's own patience. Every time it did, the client fired
+          // the SAME question two more times: three Claude calls billed,
+          // three stormy_chat_log rows, three of the user's 15 weekly
+          // questions spent on one ask, roughly 48s of "Stormy is
+          // thinking", and a failure message at the end of it. Wait past
+          // the server's ceiling instead, and never re-ask.
+          { timeoutMs: 70_000, retries: 0 },
+        );
       } catch (err) {
         if (err instanceof ApiError) {
           const serverMessage =

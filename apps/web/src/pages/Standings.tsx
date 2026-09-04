@@ -542,8 +542,11 @@ const Standings = () => {
           <h1 className="text-lg font-bold text-pastel-cream">Standings</h1>
           <div className="flex items-center gap-1">
             {(activeLeague?.name || leagueTeams.length > 0) && (
-              <span className="text-xs font-jbmono text-white/55 truncate max-w-[120px]">
-                {activeLeague?.name}{leagueTeams.length > 0 ? ` \u2022 ${leagueTeams.length} teams` : ''}
+              <span className="flex items-center gap-1 min-w-0 text-xs font-jbmono text-white/55">
+                <span className="truncate max-w-[120px]">{activeLeague?.name}</span>
+                {leagueTeams.length > 0 && (
+                  <span className="shrink-0">{`\u2022 ${leagueTeams.length} teams`}</span>
+                )}
               </span>
             )}
             <MobileMenuButton />
@@ -600,7 +603,12 @@ const Standings = () => {
           <div className="flex flex-col md:flex-row items-center justify-between max-w-5xl mx-auto mb-8">
             <div className="mb-4 md:mb-0 animated-element animate">
               <h2 className="text-2xl font-bold text-pastel-cream">
-                {userLeagueState === 'active-user' && selectedLeague ? selectedLeague.name : 'Citrus League'}
+                {/* 'Citrus League' (2026-09-04): a signed-in user with no
+                    league saw that name in league-title type, directly above
+                    the Create-a-League call to action - a league that does
+                    not exist, rendered as though it were theirs. The page's
+                    own name is the honest fallback. */}
+                {userLeagueState === 'active-user' && selectedLeague ? selectedLeague.name : 'Standings'}
               </h2>
               <p className="text-white/55">
                 {leagueFormat.scoringFormat !== 'h2h-points' && (

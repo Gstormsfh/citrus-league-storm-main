@@ -98,6 +98,7 @@ import { overlayPendingPicks } from '@/lib/draftClient/overlayPending';
 import type { Player } from '@/services/PlayerService';
 import { Button } from '@/components/ui/button';
 import type { Team } from '@/services/LeagueService';
+import { userMessage } from '@/lib/userMessage';
 
 export default function DraftRoomV2() {
   const params = useParams<{ leagueId: string; draftId?: string }>();
@@ -626,7 +627,7 @@ function IdentityFailureBanner() {
   return (
     <div
       role="alert"
-      className="mb-4 rounded border border-destructive bg-destructive/10 p-4 text-destructive"
+      className="mb-4 rounded border border-fantasy-grapefruit-red/50 bg-destructive/10 p-4 text-fantasy-grapefruit-red"
       data-testid="identity-failure-banner"
       data-identity-failure-reason={failure.reason}
     >
@@ -695,6 +696,10 @@ function describeStatus(
 // success the live WS receives the draft_started event, `derived`
 // flips to in_progress, and this panel unmounts on the next render —
 // no navigation, we are already in /draft-v2.
+/** How often the open lobby re-reads the league's team list. See the
+ *  LOBBY LIVENESS note in DraftLobbyV2 for why this exists. */
+const LOBBY_TEAMS_POLL_MS = 8000;
+
 interface DraftLobbyV2Props {
   leagueId: string;
   teams: FetchedTeam[];
@@ -762,6 +767,14 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
   const [leagueError, setLeagueError] = useState<string | null>(null);
   const [leagueFetchNonce, setLeagueFetchNonce] = useState(0);
 
+  // Lobby seat controls (rename / open a seat). Declared up here with the
+  // rest of the state because the early return below is a hooks boundary.
+  const [renamingTeamId, setRenamingTeamId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameSaving, setRenameSaving] = useState(false);
+  const [removingTeamId, setRemovingTeamId] = useState<string | null>(null);
+
+
   // Additive-only invariant, keyed on the SAME signal ConnectionBanner
   // uses for its "Waiting for the draft to start" copy: the engine's
   // discovery answers 409 with status `not_started` (commissioner hasn't
@@ -819,6 +832,28 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
     };
   }, [leagueId, waitingForStart, leagueFetchNonce]);
 
+  // LOBBY LIVENESS (2026-09-04 funnel audit). DraftRoomV2's team-list
+  // effect has deps [leagueId, teamsFetchNonce] and nothing bumped the
+  // nonce except an explicit error-Retry and the AI-fill button — so the
+  // roster of "The room" was a snapshot taken the instant the page
+  // mounted. A commissioner who opened the lobby first (the normal
+  // order: open the room, then send the invite) watched a frozen list
+  // and a Start button that stayed disabled no matter how many managers
+  // joined, because `roomFull` is derived from that stale `teams`. The
+  // only way out was reloading the page, and nothing on screen said so.
+  //
+  // Poll while — and ONLY while — this panel is the pre-ignition lobby.
+  // `waitingForStart` is the same latched signal that decides whether
+  // this component renders at all, so the interval is torn down the
+  // moment the draft goes live: nothing extra runs during a draft, and
+  // the in-draft render path is untouched. One GET /teams every 8s for
+  // as long as a lobby is open is the whole cost.
+  useEffect(() => {
+    if (!waitingForStart) return;
+    const id = setInterval(() => onRetryTeams(), LOBBY_TEAMS_POLL_MS);
+    return () => clearInterval(id);
+  }, [waitingForStart, onRetryTeams]);
+
   if (!waitingForStart) return null;
 
   // Our user id = the owner of our team. The teams list carries owner_id
@@ -827,7 +862,71 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
   // v2 room stays testable in isolation.
   const myUserId = teams.find((t) => t.id === myTeamId)?.owner_id ?? null;
   const isCommissioner = !!myUserId && !!league && myUserId === league.commissioner_id;
+
+  // ─────────────────────────────────────────────────────────────────────
+  // TWO THINGS THE LOBBY COULD NOT DO (2026-09-04).
+  //
+  // 1. NAME YOUR TEAM. `handle_new_user` mints `user_a3f9c1` and nothing
+  //    ever asks for a real name: `requireProfile` exists on ProtectedRoute
+  //    and no route passes it, so /profile-setup is unreachable. Landing on
+  //    an invite link auto-joins 50ms after the session resolves, so the
+  //    join tab's team-name box is never seen either. Production, 2026-09-04:
+  //    8 of 72 profiles have a real username, and the live team-name
+  //    histogram already reads "My Team x5, Team 1 x3, Team 2 x4". Twelve
+  //    people were going to draft against a board of "Team 4".
+  //
+  //    The rename lives HERE because the lobby is the one screen where
+  //    everyone is sitting still with nothing to do. It writes through
+  //    PUT /api/account/team-name, the same endpoint Profile uses, which
+  //    sets default_team_name and syncs every team this user owns. That
+  //    is a whole-account rename, not a per-league one, so the copy says
+  //    "your team" and not "this team".
+  //
+  // 2. OPEN A SEAT AGAIN. AI fill was one-way from inside the app: the
+  //    DELETE endpoint, its client wrapper and its commissioner check all
+  //    existed, and only the v1 lobby ever called it. Fill the room, then
+  //    have a friend turn up late, and there was no way to make room.
+  // ─────────────────────────────────────────────────────────────────────
+  const saveTeamName = async () => {
+    const name = renameValue.trim();
+    if (!name || !myUserId) {
+      setRenamingTeamId(null);
+      return;
+    }
+    setRenameSaving(true);
+    try {
+      const { LeagueService } = await import('@/services/LeagueService');
+      const { error } = await LeagueService.updateUserTeamNames(myUserId, name);
+      if (error) throw error;
+      setRenamingTeamId(null);
+      onRetryTeams();
+      toast.success('Team renamed');
+    } catch (err) {
+      toast.error('Rename failed', {
+        description: userMessage(err, 'Please try again.'),
+      });
+    } finally {
+      setRenameSaving(false);
+    }
+  };
+
+  const removeAiTeam = async (teamId: string) => {
+    setRemovingTeamId(teamId);
+    try {
+      const { leagueApi } = await import('@/api/leagues');
+      await leagueApi.deleteTeam(leagueId, teamId);
+      onRetryTeams();
+      toast.success('Seat opened');
+    } catch (err) {
+      toast.error('Could not remove', {
+        description: userMessage(err, 'Please try again.'),
+      });
+    } finally {
+      setRemovingTeamId(null);
+    }
+  };
   const joinedHumans = teams.filter((t) => t.owner_id);
+  const aiTeams = teams.length - joinedHumans.length;
 
   // start_draft_v2 hard-requires round-1 team_order length ===
   // league_size (draft_not_configured otherwise). Enabling Start with
@@ -922,10 +1021,26 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
       // derivation — no navigate, we are already in /draft-v2.
       toast.success('Draft started. Good luck!');
     } catch (err) {
+      // START ERRORS ARE READ BY A COMMISSIONER, NOT AN ENGINEER (2026-09-04).
+      //
+      // This catch surfaced whatever the server said, verbatim. The most
+      // likely failure by far is the second press - two devices, or a stale
+      // tab - and start_draft_v2 answers that with
+      //   draft_already_in_progress: league <uuid> draft is already in progress
+      // which is exactly what the commissioner saw, uuid and all, at the
+      // moment eleven people were waiting on him.
+      //
+      // The two engine codes are translated; anything else falls through to
+      // userMessage, which keeps genuine domain sentences and replaces
+      // transport noise like "Failed to fetch".
       const e = err as { response?: { data?: { error?: string } }; message?: string };
-      toast.error('Cannot start draft', {
-        description: e?.response?.data?.error ?? e?.message ?? 'Please try again.',
-      });
+      const raw = e?.response?.data?.error ?? e?.message ?? '';
+      const description = raw.includes('already_in_progress')
+        ? 'This draft is already running. Close this and rejoin the room.'
+        : raw.includes('already_completed')
+          ? 'This draft has already finished.'
+          : userMessage(err, 'Please try again.');
+      toast.error('Cannot start draft', { description });
     } finally {
       setIsStarting(false);
     }
@@ -974,9 +1089,12 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
               ) : (
                 <>
                   <span className="font-semibold text-pastel-cream">
-                    {joinedHumans.length} of {teams.length}
+                    {teams.length} of {leagueSize ?? teams.length}
                   </span>{' '}
-                  {teams.length === 1 ? 'manager' : 'managers'} in the room
+                  seats filled
+                  {aiTeams > 0
+                    ? ` \u00b7 ${joinedHumans.length} manager${joinedHumans.length === 1 ? '' : 's'}, ${aiTeams} AI`
+                    : ''}
                   {isCommissioner
                     ? ' · start whenever you’re ready'
                     : ' · the commissioner starts when everyone’s in'}
@@ -1124,7 +1242,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
           className="mx-5 sm:mx-7 mb-4 flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2"
           data-testid="draft-lobby-v2-error"
         >
-          <p className="text-sm text-destructive">{leagueError}</p>
+          <p className="text-sm text-fantasy-grapefruit-red">{leagueError}</p>
           <Button
             variant="outline"
             size="sm"
@@ -1140,7 +1258,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
           className="mx-5 sm:mx-7 mb-4 flex items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2"
           data-testid="draft-lobby-v2-teams-error"
         >
-          <p className="text-sm text-destructive">{teamsError}</p>
+          <p className="text-sm text-fantasy-grapefruit-red">{teamsError}</p>
           <Button
             variant="outline"
             size="sm"
@@ -1151,15 +1269,33 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
           </Button>
         </div>
       )}
-      {/* Draft order slots. Numbered, because in a snake draft the order
-          IS the story — a manager should be able to see where they pick
-          before the clock ever starts. */}
+      {/* THE SEATS ARE NOT THE DRAFT ORDER (2026-09-04).
+          
+          This block used to number each seat 1..N and call them "Draft
+          order slots", on the reasoning that in a snake draft the order is
+          the story and a manager should see where they pick before the
+          clock starts. The reasoning was right; the number was not. It was
+          the index of `teams`, which arrives ORDER BY created_at, and the
+          draft then used that same array — so the number happened to be
+          true, and it was true in a way nobody chose: the commissioner's
+          team is created with the league, so he was seat 1 and first
+          overall in all twelve production leagues.
+          
+          The order is now drawn on the server at ignition
+          (DraftService.shuffleTeamOrder), which means the join-order index
+          is no longer the pick position and a numeral here would be a
+          confident lie — you would read "3rd" in the lobby and pick ninth.
+          So the seats say who is here, the badge is an initial rather than
+          a rank, and the line below says when the order is decided. */}
       <div className="border-t border-white/5 bg-black/15 px-5 py-4 sm:px-7">
-        <div className="mb-3 font-jbmono text-[10px] font-bold uppercase tracking-[0.28em] text-white/55">
+        <div className="mb-1 font-jbmono text-[10px] font-bold uppercase tracking-[0.28em] text-white/55">
           The room
         </div>
+        <div className="mb-3 text-xs text-white/55">
+          Draft order is randomized when the draft starts.
+        </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {teams.map((t, i) => {
+          {teams.map((t) => {
             const isMine = t.id === myTeamId;
             return (
               <div
@@ -1171,21 +1307,74 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                 }`}
               >
                 <span
+                  aria-hidden="true"
                   className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg font-jbmono text-[11px] font-bold ${
                     isMine
                       ? 'bg-pastel-orange text-[#2A0F00]'
                       : 'bg-white/10 text-white/55'
                   }`}
                 >
-                  {i + 1}
+                  {(t.team_name ?? '').trim().charAt(0).toUpperCase() || '\u00b7'}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-sm font-bold text-pastel-cream">
-                  {t.team_name}
-                </span>
-                {isMine && (
-                  <span className="font-jbmono text-[9px] font-bold uppercase tracking-[0.16em] text-pastel-orange-soft">
-                    You
-                  </span>
+                {isMine && renamingTeamId === t.id ? (
+                  <>
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      maxLength={40}
+                      disabled={renameSaving}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void saveTeamName();
+                        if (e.key === 'Escape') setRenamingTeamId(null);
+                      }}
+                      aria-label="Your team name"
+                      data-testid="lobby-rename-input"
+                      className="min-w-0 flex-1 rounded-md bg-black/30 px-2 py-1 text-sm font-bold text-pastel-cream ring-1 ring-pastel-orange/40 outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void saveTeamName()}
+                      disabled={renameSaving}
+                      data-testid="lobby-rename-save"
+                      className="shrink-0 rounded-md bg-pastel-orange px-2 py-1 font-jbmono text-[10px] font-bold uppercase tracking-[0.12em] text-[#2A0F00] active:scale-95"
+                    >
+                      {renameSaving ? '…' : 'Save'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="min-w-0 flex-1 truncate text-sm font-bold text-pastel-cream">
+                      {t.team_name}
+                    </span>
+                    {isMine && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRenameValue(t.team_name ?? '');
+                          setRenamingTeamId(t.id);
+                        }}
+                        data-testid="lobby-rename-open"
+                        aria-label="Rename your team"
+                        className="shrink-0 rounded-md px-2 py-1 font-jbmono text-[9px] font-bold uppercase tracking-[0.16em] text-pastel-orange-soft ring-1 ring-pastel-orange/40 active:scale-95"
+                      >
+                        Rename
+                      </button>
+                    )}
+                    {!t.owner_id && isCommissioner && (
+                      <button
+                        type="button"
+                        onClick={() => void removeAiTeam(t.id)}
+                        disabled={removingTeamId === t.id}
+                        data-testid="lobby-remove-ai"
+                        aria-label={`Remove ${t.team_name} and open the seat`}
+                        title="Open this seat for a manager"
+                        className="shrink-0 rounded-md px-2 py-1 font-jbmono text-[11px] font-bold leading-none text-white/55 ring-1 ring-white/15 active:scale-95"
+                      >
+                        {removingTeamId === t.id ? '…' : '\u00d7'}
+                      </button>
+                    )}
+                  </>
                 )}
                 <span
                   className={`h-2 w-2 flex-shrink-0 rounded-full ${
@@ -1197,7 +1386,12 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
             );
           })}
         </div>
-        {isCommissioner && startBlockedReason && (
+        {/* Everyone waits on the same thing, so everyone gets told what
+            it is. Gated on isCommissioner, this line left the other
+            eleven managers with a headline ("Waiting on the room") and
+            no number: nothing on their screen said how many seats were
+            still open or that they were not the ones holding it up. */}
+        {startBlockedReason && (
           <p
             className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-xs text-white/55 ring-1 ring-white/10"
             data-testid="draft-lobby-v2-blocked"

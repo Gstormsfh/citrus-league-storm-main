@@ -659,9 +659,26 @@ export const MatchupService = {
     targetDate?: string // Optional: if provided and is past date, load frozen roster for that date
   ): Promise<{ data: MatchupDataResponse | null; error: Error | null }> {
     try {
-      // Get league via API
+      // The league and the caller's team in this league are two independent
+      // reads — both keyed on `leagueId` alone, neither reading the other's
+      // response. They were awaited one after the other, so the page paid two
+      // serial round trips before it knew anything. Fire them together
+      // (PERF 2026-09-04).
+      //
+      // The team request's OUTCOME is captured rather than awaited, so this
+      // change cannot reorder errors: if the league read fails or comes back
+      // empty, the caller still gets that failure (or 'League not found')
+      // first, exactly as when the team read had not been issued yet. A team
+      // failure is re-thrown below, at the point the old code would have hit
+      // it. `apiClient` throws ApiError on any non-2xx, so both arms can
+      // reject.
       const { leagueApi } = await import('@/api/leagues');
+      const teamOutcome = leagueApi.getMyTeam(leagueId).then(
+        (response) => ({ response: response as { data?: unknown } | null, error: null as unknown }),
+        (error: unknown) => ({ response: null as { data?: unknown } | null, error }),
+      );
       const leagueResponse = await leagueApi.getLeague(leagueId);
+
       const league = leagueResponse.data || null;
       if (!league) {
         return { data: null, error: new Error('League not found') };
@@ -673,10 +690,9 @@ export const MatchupService = {
       const scheduleLength = getScheduleLength(firstWeekStart);
       const isPlayoffWeek = weekNumber > scheduleLength;
 
-      // Get user's team via API
-      const { leagueApi: leagueApiForTeam } = await import('@/api/leagues');
-      const teamResponse = await leagueApiForTeam.getMyTeam(leagueId);
-      const userTeam = teamResponse.data as Record<string, unknown> | null;
+      const teamResult = await teamOutcome;
+      if (teamResult.error) throw teamResult.error;
+      const userTeam = (teamResult.response?.data ?? null) as Record<string, unknown> | null;
       if (!userTeam) {
         return { data: null, error: new Error('User team not found') };
       }
@@ -801,9 +817,23 @@ export const MatchupService = {
       const userSlotAssignments = normalizeSlotAssignments(isTeam1 ? team1SlotAssignments : team2SlotAssignments);
       const opponentSlotAssignments = normalizeSlotAssignments(isTeam1 ? team2SlotAssignments : team1SlotAssignments);
 
-      // Get team records
-      const userRecord = await this.getTeamRecord(userTeamData.id, leagueId, userId);
-      const opponentRecord = opponentTeamObj ? await this.getTeamRecord(opponentTeamObj.id, leagueId, userId) : { wins: 0, losses: 0 };
+      // Team records and the stored daily-score rows: three reads that share
+      // no data, awaited one after another to fill three independent fields of
+      // the same response. /team-record for me, /team-record for the opponent
+      // and /daily-scores now go out together (PERF 2026-09-04). The
+      // daily-scores promise carries its own catch, so a failure still lands in
+      // the same "all zeroes" fallback the try/catch below produced and can
+      // never surface as an unhandled rejection while the records are in flight.
+      const dailyScoresPromise = matchupApi.getDailyScores(matchup.id).catch((error: unknown) => {
+        logger.error('[getMatchupData] Exception calculating daily scores:', error);
+        return null;
+      });
+      const [userRecord, opponentRecord] = await Promise.all([
+        this.getTeamRecord(userTeamData.id, leagueId, userId),
+        opponentTeamObj
+          ? this.getTeamRecord(opponentTeamObj.id, leagueId, userId)
+          : Promise.resolve({ wins: 0, losses: 0 }),
+      ]);
 
       // Calculate daily points
       const matchupStatus = matchup.status;
@@ -819,10 +849,11 @@ export const MatchupService = {
       const weekStartStr = matchup.week_start_date;
       const weekEndStr = matchup.week_end_date;
 
-      // Calculate daily scores via API (single call for both teams)
+      // Calculate daily scores via API (single call for both teams).
+      // The request was started above alongside the team records.
       try {
-        const response = await matchupApi.getDailyScores(matchup.id);
-        const dailyScoresData = response.data;
+        const response = await dailyScoresPromise;
+        const dailyScoresData = response?.data;
         if (dailyScoresData && Array.isArray(dailyScoresData)) {
           const parseDailyScores = (teamId: string) => {
             const teamEntries = (dailyScoresData as Array<{ team_id: string; roster_date: string; daily_score: string | number }>)

@@ -331,7 +331,7 @@ const LeagueDashboard = () => {
       
       if (simError) {
         logger.error('handleSimulateFill: Error from simulateLeagueFill:', simError);
-        const errorMessage = (simError as Error).message || JSON.stringify(simError) || 'Failed to simulate teams';
+        const errorMessage = userMessage(simError, "Couldn't create the simulated teams. Try again in a moment.");
         toast({
           title: 'Error Creating Teams',
           description: errorMessage,
@@ -411,17 +411,23 @@ const LeagueDashboard = () => {
     if (activeSettingsTab === 'rosters' && leagueId && teams.length > 0) {
       const loadRosterCounts = async () => {
         setLoadingRosterCounts(true);
+        // PERF (2026-09-04): one /roster/player-ids request per team, awaited
+        // in series — a 12-team league paid twelve round trips to fill twelve
+        // independent counters. Nothing here reads a previous response, so
+        // they all go out at once.
+        const entries = await Promise.all(
+          teams.map(async (team) => {
+            try {
+              const response = await rosterApi.getPlayerIds(leagueId, team.id);
+              const playerIds = (response.data || []) as unknown[];
+              return [team.id, playerIds.length] as const;
+            } catch {
+              return [team.id, 0] as const;
+            }
+          }),
+        );
         const counts: Record<string, number> = {};
-        
-        for (const team of teams) {
-          try {
-            const response = await rosterApi.getPlayerIds(leagueId, team.id);
-            const playerIds = (response.data || []) as unknown[];
-            counts[team.id] = playerIds.length;
-          } catch {
-            counts[team.id] = 0;
-          }
-        }
+        for (const [teamId, count] of entries) counts[teamId] = count;
         
         setRosterCounts(counts);
         setLoadingRosterCounts(false);
@@ -449,7 +455,7 @@ const LeagueDashboard = () => {
           { waiver_process_time, waiver_period_hours, waiver_game_lock, waiver_type, allow_trades_during_games }
         );
         saved = success;
-        errorMessage = (saveError as Error)?.message || 'Failed to save waiver settings';
+        errorMessage = userMessage(saveError, "Couldn't save the waiver settings. Try again in a moment.");
 
         // Also persist transaction limits + FAAB budget into JSONB settings column
         if (saved) {
@@ -477,7 +483,7 @@ const LeagueDashboard = () => {
           draftSettings
         );
         saved = success;
-        errorMessage = (saveError as Error)?.message || 'Failed to save draft settings';
+        errorMessage = userMessage(saveError, "Couldn't save the draft settings. Try again in a moment.");
       } else if (activeSettingsTab === 'trades') {
         const { success, error: tradeErr } = await TradeService.updateTradeReviewSettings(
           leagueId,
@@ -493,7 +499,7 @@ const LeagueDashboard = () => {
           keeperSettings
         );
         saved = success;
-        errorMessage = (keeperErr as Error)?.message || 'Failed to save keeper settings';
+        errorMessage = userMessage(keeperErr, "Couldn't save the keeper settings. Try again in a moment.");
       } else if (activeSettingsTab === 'categories') {
         const { success, error: catErr } = await LeagueService.updateCategorySettings(
           leagueId,
@@ -501,7 +507,7 @@ const LeagueDashboard = () => {
           categorySettings
         );
         saved = success;
-        errorMessage = (catErr as Error)?.message || 'Failed to save category settings';
+        errorMessage = userMessage(catErr, "Couldn't save the category settings. Try again in a moment.");
       } else if (activeSettingsTab === 'rosterslots') {
         const { success, error: slotErr } = await LeagueService.updateRosterSlotSettings(
           leagueId,
@@ -509,7 +515,7 @@ const LeagueDashboard = () => {
           rosterSlotSettings
         );
         saved = success;
-        errorMessage = (slotErr as Error)?.message || 'Failed to save roster slot settings';
+        errorMessage = userMessage(slotErr, "Couldn't save the roster slot settings. Try again in a moment.");
       } else if (activeSettingsTab === 'playoffs') {
         // Save playoff settings into the JSONB settings column
         const leagueResponse = await leagueApi.getLeague(leagueId);

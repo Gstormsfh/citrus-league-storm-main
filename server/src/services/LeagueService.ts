@@ -1,5 +1,14 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, DEFAULT_SCORING, logger } from '@citrus/shared';
+import {
+  COLUMNS,
+  DEFAULT_SCORING,
+  logger,
+  deriveStandings,
+  rankStandings,
+  getTodayMST,
+  type StandingsMatchup,
+  type StandingsTeamRef,
+} from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
@@ -637,15 +646,63 @@ export class LeagueService {
     return { league: data, error };
   }
 
-  /** Get league standings sorted by wins */
+  /**
+   * League standings, DERIVED from matchups.
+   *
+   * WHAT THIS USED TO DO, AND WHY IT WAS A PERMANENT 500 (fixed 2026-09-03):
+   *
+   *   .select('id, team_name, owner_id, wins, losses, ties, points_for, points_against')
+   *
+   * `teams` has six columns and always has: id, league_id, owner_id,
+   * team_name, created_at, updated_at (verified against production
+   * 2026-09-03; COLUMNS.TEAM says the same). There are no W/L/T columns and
+   * nothing writes any. Every call therefore came back 42703 'column "wins"
+   * does not exist' and GET /api/leagues/:leagueId/standings answered 500 on
+   * every request it has ever served. The web app never noticed because
+   * `leagueApi.getStandings` has no call sites in apps/web/src -- but the
+   * route is live and documented, so a native client could hit it on day one.
+   *
+   * Removing the route would be a product decision and the wrong one for a
+   * client that may already call it, so it now computes the same answer the
+   * web app shows.
+   *
+   * THE RULE IS NOT WRITTEN HERE. `deriveStandings` in @citrus/shared is the
+   * one implementation, and apps/web/src/services/StandingsService.ts calls
+   * the same function over the same COLUMNS.MATCHUP rows. Same input, same
+   * function, same output: this endpoint and the Standings page cannot
+   * disagree about a league. Read packages/shared/src/utils/standings.ts
+   * before changing what counts as a played week.
+   */
   async getStandings(leagueId: string) {
-    const { data, error } = await this.supabase
-      .from('teams')
-      .select('id, team_name, owner_id, wins, losses, ties, points_for, points_against')
-      .eq('league_id', leagueId)
-      .order('wins', { ascending: false });
+    const [teamsRes, matchupsRes] = await Promise.all([
+      this.supabase
+        .from('teams')
+        .select(COLUMNS.TEAM)
+        .eq('league_id', leagueId),
+      this.supabase
+        .from('matchups')
+        .select(COLUMNS.MATCHUP)
+        .eq('league_id', leagueId),
+    ]);
 
-    return { standings: data || [], error };
+    if (teamsRes.error) return { standings: [], error: teamsRes.error };
+    // A matchup read failure is not a standings failure: the league still has
+    // teams, and 0-0-0 rows are truthful for a league with no results. Failing
+    // the whole request here would put the route back where it started.
+    if (matchupsRes.error) {
+      logger.error('[LeagueService] standings: matchup read failed:', matchupsRes.error);
+    }
+
+    const teams = (teamsRes.data || []) as unknown as StandingsTeamRef[];
+    const matchups = (matchupsRes.data || []) as unknown as StandingsMatchup[];
+
+    const records = deriveStandings(
+      teams.map((team) => team.id),
+      matchups,
+      getTodayMST(),
+    );
+
+    return { standings: rankStandings(teams, records), error: null };
   }
 
   /**

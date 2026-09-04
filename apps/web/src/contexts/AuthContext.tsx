@@ -230,6 +230,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        // BOUNDED (2026-09-04 funnel audit). Same defect the sign-IN path's
+        // /check-method call was bounded for, on the screen where it costs
+        // more. This is a raw fetch with no deadline of its own: Auth.tsx's
+        // handleSignUp sets `loading` before awaiting it and only clears it
+        // on an error branch, and every control on the sign-up form is
+        // disabled on `loading`. A slow or unreachable API therefore left a
+        // brand-new user staring at a dead "Create Account" button until the
+        // platform gave up on its own — about a minute in the iOS webview,
+        // with no error, no retry, and nothing to tap.
+        //
+        // 20s, not the sign-in path's 5s: this request does real work on the
+        // far side (admin createUser + a server-side sign-in) and can eat a
+        // Cloud Run cold start. On timeout the abort lands in the catch
+        // below, which falls back to Supabase's own client-side signup — a
+        // visible outcome either way (a session, or an honest error the user
+        // can act on) instead of a hang.
+        signal:
+          typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(20_000) : undefined,
       });
       const json = await res.json();
       if (!res.ok) {

@@ -179,14 +179,21 @@ describe('StormyService', () => {
 
       const result = await StormyService.sendMessage('What about my goalie?', history);
 
-      expect(mockApiPost).toHaveBeenCalledWith('/api/stormy/chat', {
-        message: 'What about my goalie?',
-        conversationHistory: [
-          { role: 'user', content: 'Who should I start?' },
-          { role: 'assistant', content: 'Check your lineup.' },
-        ],
-        context: '',
-      });
+      expect(mockApiPost).toHaveBeenCalledWith(
+        '/api/stormy/chat',
+        {
+          message: 'What about my goalie?',
+          conversationHistory: [
+            { role: 'user', content: 'Who should I start?' },
+            { role: 'assistant', content: 'Check your lineup.' },
+          ],
+          context: '',
+        },
+        // The Claude round-trip gets its own budget: the server allows the
+        // model 60s, and apiClient's 15s default was aborting mid-answer and
+        // then re-asking the same question twice. See StormyService.
+        { timeoutMs: 70_000, retries: 0 },
+      );
       expect(result.response).toBe('Stormy says hello!');
       expect(result.error).toBeUndefined();
     });
@@ -259,7 +266,7 @@ describe('StormyService', () => {
       expect(result.usage?.dailyLimit).toBe(3);
     });
 
-    it('throttles guest users after 1 message', async () => {
+    it('refuses a signed-out caller without ever reaching the API', async () => {
       // Make it a guest
       mockGetUser.mockResolvedValue({ data: { user: null } });
 
@@ -318,13 +325,20 @@ describe('StormyService', () => {
       const mod = await import('../StormyService');
       const freshService = mod.StormyService;
 
-      // First guest message should succeed
-      const result1 = await freshService.sendMessage('Hello', []);
-      expect(result1.response).toBe('Stormy says hello!');
+      // The route is behind authMiddleware, so a guest request could only
+      // ever come back 401 and the server's own header complaint would be
+      // painted into the chat as Stormy's reply. Refuse locally, on the
+      // FIRST message, and never call the API at all.
+      mockApiPost.mockClear();
 
-      // Second guest message should be throttled
+      const result1 = await freshService.sendMessage('Hello', []);
+      expect(result1.error).toContain('Sign up');
+      expect(result1.response).toBe('');
+
       const result2 = await freshService.sendMessage('Another', []);
       expect(result2.error).toContain('Sign up');
+
+      expect(mockApiPost).not.toHaveBeenCalled();
     });
 
     it('includes scoring settings and extra context in context string', async () => {

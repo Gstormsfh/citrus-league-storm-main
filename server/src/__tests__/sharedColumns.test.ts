@@ -67,4 +67,35 @@ describe('shared COLUMNS constants', () => {
       expect(value).toMatch(pattern);
     });
   });
+
+  // ---------------------------------------------------------------------
+  // TEAM has no record columns, and a query that names one is a 500.
+  //
+  // 2026-09-03: LeagueService.getStandings selected
+  //   'id, team_name, owner_id, wins, losses, ties, points_for, points_against'
+  // from `teams`. Production `teams` has six columns -- id, league_id,
+  // owner_id, team_name, created_at, updated_at -- so every call came back
+  // 42703 'column "wins" does not exist' and
+  // GET /api/leagues/:leagueId/standings answered 500 on every request it
+  // ever served. Standings are DERIVED from matchups (see
+  // packages/shared/src/utils/standings.ts); there is no W/L/T to select.
+  //
+  // Same species as the GOALIE_GSAX case above: a query naming a column the
+  // table does not have, shipped and unnoticed. This is the tripwire for it.
+  // ---------------------------------------------------------------------
+  describe('TEAM carries no derived record columns', () => {
+    it.each(['wins', 'losses', 'ties', 'points_for', 'points_against'])(
+      'does not select %s',
+      (column) => {
+        expect(COLUMNS.TEAM).not.toMatch(new RegExp(`\\b${column}\\b`));
+      },
+    );
+
+    it('is exactly the six columns the table has', () => {
+      const columns = COLUMNS.TEAM.split(',').map((c) => c.trim()).sort();
+      expect(columns).toEqual([
+        'created_at', 'id', 'league_id', 'owner_id', 'team_name', 'updated_at',
+      ]);
+    });
+  });
 });

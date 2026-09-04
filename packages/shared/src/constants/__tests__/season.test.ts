@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getSeasonYearForDate, getProjectionsSeason, getUpcomingSeasonStartDate } from '../season';
+import { getSeasonYearForDate, getProjectionsSeason, getUpcomingSeasonStartDate, getPlayoffSeasonForDate } from '../season';
 
 // Local-time constructor: month is 1-based here for readability.
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day, 12, 0, 0);
@@ -68,5 +68,37 @@ describe('getUpcomingSeasonStartDate ("Games This Week" zero-grid fix, 2026-08-2
     // A late-evening local time on the day before the opener must still count
     // as "upcoming"; a UTC-based comparison would already have rolled over.
     expect(getUpcomingSeasonStartDate(new Date(2026, 8, 28, 23, 30, 0))).toBe('2026-09-29');
+  });
+});
+
+describe('getPlayoffSeasonForDate (playoff pool season key, 2026-09-03)', () => {
+  it('holds 2025 across the whole gap between the two playoff runs', () => {
+    // The 2025-26 run was played 2026-04-18..2026-06-14. It stays "the
+    // current playoffs" until the next run starts, which is why the literal
+    // ?season=2025 in the playoff pool pages was correct rather than stale.
+    expect(getPlayoffSeasonForDate(d(2026, 4, 18))).toBe(2025); // first game
+    expect(getPlayoffSeasonForDate(d(2026, 6, 14))).toBe(2025); // last game
+    expect(getPlayoffSeasonForDate(d(2026, 9, 3))).toBe(2025);  // audit date
+  });
+
+  it('does NOT flip when the 2026-27 REGULAR season opens', () => {
+    // This is the whole point. getSeasonYearForDate flips to 2026 here and
+    // nhl_playoff_seeds holds nothing for 2026 until the following spring,
+    // so a playoff page keyed on the regular-season year goes blank.
+    expect(getSeasonYearForDate(d(2026, 9, 29))).toBe(2026);
+    expect(getPlayoffSeasonForDate(d(2026, 9, 29))).toBe(2025);
+    expect(getPlayoffSeasonForDate(d(2026, 12, 25))).toBe(2025);
+    expect(getPlayoffSeasonForDate(d(2027, 1, 15))).toBe(2025);
+    expect(getPlayoffSeasonForDate(d(2027, 3, 31))).toBe(2025);
+  });
+
+  it('flips to the new run on April 1, with no code change', () => {
+    expect(getPlayoffSeasonForDate(d(2027, 4, 1))).toBe(2026);
+    expect(getPlayoffSeasonForDate(d(2027, 6, 20))).toBe(2026);
+  });
+
+  it('January-March belongs to the run two calendar years back', () => {
+    // Jan 2026: the last playoffs played were April-June 2025, season 2024.
+    expect(getPlayoffSeasonForDate(d(2026, 2, 10))).toBe(2024);
   });
 });

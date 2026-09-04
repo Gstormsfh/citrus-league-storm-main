@@ -27,6 +27,10 @@ import { cn } from '@/lib/utils';
 // errors. The 2026-08-15 sweep that introduced API_BASE_URL missed this
 // file. Prefixed with API_BASE_URL, matching PoolPlayoffRoster.tsx.
 import { API_BASE_URL } from '@/api/client';
+// 2026-09-03 launch audit: was a literal `?season=2025` in the request
+// URL below. Correct today and wrong from April 2027; see the note in
+// packages/shared/src/constants/season.ts. One rule, one place.
+import { getCurrentPlayoffSeason } from '@citrus/shared';
 
 interface Seed {
   team_id: number;
@@ -109,11 +113,11 @@ export default function PoolPlayoffConfidence() {
     const load = async () => {
       try {
         const [bracketRes, picksRes, h2hRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/nhl-playoffs/bracket?season=2025`).then(r => r.json()),
+          fetch(`${API_BASE_URL}/api/nhl-playoffs/bracket?season=${getCurrentPlayoffSeason()}`).then(r => r.json()),
           fetch(`${API_BASE_URL}/api/playoff-pools/${leagueId}/picks?type=confidence`, {
             headers: { Authorization: `Bearer ${(await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session?.access_token || ''}` },
           }).then(r => r.json()),
-          fetch(`${API_BASE_URL}/api/nhl-playoffs/h2h?season=2025`).then(r => r.json()).catch(() => null),
+          fetch(`${API_BASE_URL}/api/nhl-playoffs/h2h?season=${getCurrentPlayoffSeason()}`).then(r => r.json()).catch(() => null),
         ]);
         setSeeds(bracketRes.data?.seeds || bracketRes.seeds || []);
         setSeries(bracketRes.data?.series || bracketRes.series || []);

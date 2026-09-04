@@ -203,13 +203,21 @@ const MobileBottomNav = () => {
                 <Icon
                   className={cn(
                     "w-[18px] h-[18px] transition-colors duration-200",
-                    active ? "text-white" : "text-white/55"
+                    active ? "text-[#581E00]" : "text-white/55"
                   )}
                   strokeWidth={active ? 2.5 : 2}
                 />
               </div>
+              {/* whitespace-nowrap (2026-09-04): the row is a fixed h-16 and the
+                  labels are content-sized under justify-around. "Free Agents"
+                  measures ~60px of text at 10px bold against ~70px of slack
+                  across the five tabs, so it fits today - but it is the only
+                  two-word label and it sits one font-metric away from
+                  wrapping into a tab twice the height of its neighbours.
+                  Renaming it was the other option and would have undone the
+                  deliberate 2026-08-18 decision recorded above. */}
               <span className={cn(
-                "text-[10px] font-bold leading-tight transition-colors duration-200 tracking-tight",
+                "whitespace-nowrap text-[10px] font-bold leading-tight transition-colors duration-200 tracking-tight",
                 active ? "text-pastel-cream" : "text-white/55"
               )}>
                 {item.label}

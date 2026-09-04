@@ -569,9 +569,21 @@ const PlayoffBracket = () => {
       const { result, error } = await PlayoffService.advanceRound(bracket.id);
       if (error) throw error;
 
+      // P3 (2026-09-03): advance_playoff_round now refuses to decide a series
+      // whose weeks were never finished or never scored, so "0 series advanced"
+      // is a normal, expected answer and the reason has to reach the
+      // commissioner. Without this the button looked like it silently failed.
+      const advanced = Number(result?.advanced_count ?? 0);
+      const skipped = Number(result?.skipped_count ?? 0);
+      const firstReason: string | undefined = result?.skipped?.[0]?.reason;
+
       toast({
-        title: 'Round Advanced',
-        description: `${result.advanced_count} series advanced to the next round.`,
+        title: advanced > 0 ? 'Round Advanced' : 'Nothing to Advance Yet',
+        description:
+          skipped > 0
+            ? `${advanced} series advanced. ${skipped} left undecided - ${firstReason ?? 'those weeks are not finished yet'}.`
+            : `${advanced} series advanced to the next round.`,
+        variant: advanced === 0 ? 'destructive' : undefined,
       });
 
       await loadData();

@@ -1,7 +1,7 @@
 import { apiClient } from '@/api/client';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
-import { getCurrentSeason } from '@/utils/seasonConstants';
+import { getCurrentSeason, getProjectionsSeason } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
 
 /**
@@ -34,8 +34,22 @@ export async function getWeeklyProjections(
     // Query projections via API client
     const startDate = dates[0];
     const endDate = dates[dates.length - 1];
+    // PROJECTIONS ARE KEYED TO THE SEASON THEY DESCRIBE (2026-09-04).
+    //
+    // This asked for `getCurrentSeason()` - the season being PLAYED - while
+    // `player_projected_stats` stores rows under the season they describe.
+    // Measured on production 2026-09-04: 66,024 rows for season 2026 running
+    // 2026-09-29 to 2027-04-10, and 72,060 rows for season 2025 that are
+    // entirely in the past. So all summer this asked for the OLD season's
+    // projections. Not zero rows, which would have been obvious - a full set
+    // of stale ones.
+    //
+    // Same distinction the Player Stats modal now draws: schedule and
+    // projections look forward, season stats and advanced metrics look back.
+    // The directory read below is deliberately NOT changed: it is a positions
+    // lookup, and 2025 is the season with full coverage (1,089 rows to 820).
     const { data } = await apiClient.get(
-      `/api/players/projections/batch?ids=${playerIds.join(',')}&startDate=${startDate}&endDate=${endDate}&season=${getCurrentSeason()}`
+      `/api/players/projections/batch?ids=${playerIds.join(',')}&startDate=${startDate}&endDate=${endDate}&season=${getProjectionsSeason()}`
     );
 
     // Sum projections per player across all days

@@ -235,7 +235,17 @@ scheduledRoutes.post('/waiver-process', async (c) => {
           return [{
             league_id: cl.league_id,
             user_id: ownerId,
-            type: 'waiver_result',
+            // TYPE (2026-09-04 TestFlight audit). Was 'waiver_result',
+            // which public.notifications' CHECK constraint does not admit:
+            // notifications_type_check allows only ADD, DROP, WAIVER,
+            // TRADE, CHAT and SYSTEM. Every insert here therefore failed
+            // with 23514, and because these rows go in as ONE batch a
+            // single bad type killed the whole batch. The catch below
+            // logged it and the endpoint still returned 200, so waiver
+            // results have been silent since they shipped on 2026-08-16.
+            // Confirmed against production: notifications has never held a
+            // row of any type outside the six the constraint names.
+            type: 'WAIVER',
             title: won ? 'Waiver Claim Successful' : 'Waiver Claim Missed',
             message: won
               ? `${player} is now on your roster.`

@@ -438,21 +438,52 @@ export class PoolService {
 
     const weekGames = await this.getWeekGames(weekNumber);
     const gameMap = new Map(weekGames.map((g: any) => [String(g.id), g]));
-    const picks = inputPicks.filter(p => {
-      const game = gameMap.get(p.game_id);
-      return !game || !this.isGameLocked(game);
-    });
 
-    if (picks.length === 0 && inputPicks.length > 0) {
+    // A pick may only name a game that is IN the week being submitted.
+    //
+    // 2026-09-03 launch audit: this filter read
+    //   return !game || !this.isGameLocked(game);
+    // and the leading `!game ||` KEPT every pick whose game_id was not in the
+    // requested week -- the exact inverse of the intended check. Combined with
+    // score_confidence_week, which resolved the game by id alone and never
+    // asked which week it belonged to, any league member could POST week 12
+    // carrying the game_id of a game already played in week 3 and be graded
+    // against a result they already knew, at whatever confidence rank they
+    // chose. Confidence pools weight by rank, so the payout was maximal and
+    // guaranteed.
+    //
+    // submitPickemPicks, the same ten lines one pool over, always had it
+    // right: `if (!game) return false`. Matched to it. The scorer half is
+    // fixed in supabase/migrations/20260903221000_confidence_week_game_scope.sql
+    // -- either layer alone closes the exploit; both is the point.
+    const weekPicks = inputPicks.filter(p => gameMap.has(p.game_id));
+
+    if (weekPicks.length === 0 && inputPicks.length > 0) {
+      throw AppError.badRequest('None of the selected games are in this week. A pick must name a game from the week it is submitted for.');
+    }
+
+    const picks = weekPicks.filter(p => !this.isGameLocked(gameMap.get(p.game_id)!));
+
+    if (picks.length === 0 && weekPicks.length > 0) {
       throw AppError.badRequest('All selected games have already started. Picks are locked after game time.');
     }
 
-    // Validate uniqueness and sequential 1-to-N
-    const pointSet = new Set(picks.map(p => p.confidence_points));
-    if (pointSet.size !== picks.length) {
+    // Validate uniqueness and sequential 1-to-N over the SUBMITTED slate, not
+    // over the post-lock survivors.
+    //
+    // Same-day fix: this ran on the filtered list, so an honest partial
+    // submission was rejected. A manager ranking five games 1..5 who is one
+    // game late finds four picks left holding {1,2,4,5}, which is not
+    // sequential 1..4 -- their whole slate was refused for being on time for
+    // four of five games. The ranking is a property of the slate the manager
+    // built; dropping a locked game must not invalidate the ones still open.
+    // Out-of-week games are excluded from this check as well as from the
+    // write, because they were never part of a legitimate slate.
+    const pointSet = new Set(weekPicks.map(p => p.confidence_points));
+    if (pointSet.size !== weekPicks.length) {
       throw AppError.validation('Each pick must have a unique confidence point value.');
     }
-    const n = picks.length;
+    const n = weekPicks.length;
     const expectedSet = new Set(Array.from({ length: n }, (_, i) => i + 1));
     for (const pts of pointSet) {
       if (!expectedSet.has(pts)) {
@@ -476,7 +507,15 @@ export class PoolService {
       .upsert(rows, { onConflict: 'league_id,user_id,week_number,game_id' });
 
     if (error) throw AppError.internal(error.message);
-    return { success: true, submitted: picks.length, locked: inputPicks.length - picks.length };
+    // `locked` counts games in this week that had already started. Picks that
+    // named a game outside the week are reported separately as `skipped` so a
+    // caller cannot read a rejected launder attempt as a lock.
+    return {
+      success: true,
+      submitted: picks.length,
+      locked: weekPicks.length - picks.length,
+      skipped: inputPicks.length - weekPicks.length,
+    };
   }
 
   /** Get a user's confidence picks for a week. */

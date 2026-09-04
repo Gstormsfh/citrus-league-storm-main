@@ -2487,6 +2487,44 @@ const Roster = () => {
       toast({ title: 'Cannot Edit Past Dates', description: 'Rosters for past dates are frozen and cannot be changed.', variant: 'destructive' });
       return;
     }
+    // OFFSEASON (2026-09-04). Reported from a phone: "Auto lineup button
+    // doesn't work brother."
+    //
+    // It did not work because it was `disabled` whenever `seasonDormant`, and
+    // dormant is true for every day between the last game and the next. On
+    // 4 September the earliest scheduled game in `nhl_games` is 29 September,
+    // so this control had already been dead for weeks and would have stayed
+    // dead through the TestFlight window and the whole of the Sept 8 test
+    // drafts - the first thing twelve managers do after a draft is open their
+    // roster and reach for it.
+    //
+    // The only explanation it offered was a `title` attribute, and a title is
+    // a HOVER affordance: on a touchscreen it does not exist. So the button
+    // greyed itself out and gave no reason, which is indistinguishable from
+    // broken. The sheet behind it has carried exactly the right sentence all
+    // along ("No games scheduled, so there is nothing to set") and no one
+    // could ever reach it.
+    //
+    // Every other refusal in this handler already speaks. This one does too
+    // now, and the button is no longer disabled for any of them: a tap that
+    // produces a sentence beats a tap that produces nothing.
+    if (seasonDormant) {
+      const opensOn = seasonStatus.nextGameDate
+        ? new Date(`${seasonStatus.nextGameDate}T00:00:00Z`).toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+            timeZone: 'UTC',
+          })
+        : null;
+      toast({
+        title: seasonHeadline ?? 'No games scheduled',
+        description: opensOn
+          ? `No hockey until ${opensOn}, so every player projects to zero and there is no lineup to optimize yet.`
+          : 'Nothing is scheduled, so there is no lineup to optimize yet.',
+      });
+      return;
+    }
     // Refuse to plan against unloaded projections rather than preview a
     // lineup in which nobody has a game.
     if (!projectionsReadyForSelectedDate) {
@@ -3492,7 +3530,12 @@ const Roster = () => {
                   <Button
                     onClick={handleAutoLineup}
                     variant="outline"
-                    disabled={!projectionsReadyForSelectedDate || isPastDate || seasonDormant}
+                    /* NOT `disabled` (2026-09-04). It used to be, for all
+                       three of these, and `title` was the only thing that
+                       said why - a hover affordance on a product whose
+                       testers are all on iPhones. handleAutoLineup answers
+                       each case with a toast instead; the title stays for
+                       people on a desktop, where hover is real. */
                     title={
                       seasonDormant
                         ? 'No games scheduled for this date'
@@ -3502,7 +3545,7 @@ const Roster = () => {
                             ? 'Preview the best lineup for this date'
                             : 'Loading projections for this date…'
                     }
-                    className="flex gap-1.5 lg:gap-2 h-8 min-h-0 px-2.5 text-xs border-2 [&_svg]:size-4 lg:h-12 lg:min-h-[48px] lg:px-6 lg:text-base lg:border-4 lg:[&_svg]:size-5 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex gap-1.5 lg:gap-2 h-8 min-h-0 px-2.5 text-xs border-2 [&_svg]:size-4 lg:h-12 lg:min-h-[48px] lg:px-6 lg:text-base lg:border-4 lg:[&_svg]:size-5 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold"
                   >
                     <Wand2 className="w-4 h-4" aria-hidden="true" />
                     Auto Lineup
@@ -4103,7 +4146,7 @@ const Roster = () => {
                         {pendingWaivers.length > 0 && (
                           <div>
                             <div className="mb-3 flex items-center gap-2">
-                              <AlertCircle className="w-4 h-4 text-orange-600" aria-hidden="true" />
+                              <AlertCircle className="w-4 h-4 text-pastel-orange" aria-hidden="true" />
                               <h3 className="text-lg font-bold">Active Waiver Claims</h3>
                               <Badge variant="secondary" className="text-xs">{pendingWaivers.length}</Badge>
                             </div>
@@ -4118,7 +4161,7 @@ const Roster = () => {
                                 return (
                                   <div
                                     key={tx.id}
-                                    className="p-4 rounded-lg border-2 bg-gradient-to-r from-amber-50 to-orange-50 border-amber-500/60"
+                                    className="p-4 rounded-lg border-2 bg-pastel-surface-tile border-pastel-orange/60"
                                   >
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                       <div className="flex-1 min-w-[200px]">
@@ -4129,7 +4172,7 @@ const Roster = () => {
                                           </div>
                                         )}
                                         {tx.dropPlayerName && (
-                                          <div className="text-sm text-orange-700 mt-1">
+                                          <div className="text-sm text-pastel-orange-soft mt-1">
                                             Dropping: {tx.dropPlayerName}
                                             {(tx.dropPlayerPosition || tx.dropPlayerTeam) && (
                                               <> ({tx.dropPlayerPosition || ''}{tx.dropPlayerPosition && tx.dropPlayerTeam ? ' • ' : ''}{tx.dropPlayerTeam || ''})</>
@@ -4159,10 +4202,10 @@ const Roster = () => {
                                     {(clearsAtFormatted || nextProcessFormatted) && (
                                       <div className="mt-3 grid gap-2 sm:grid-cols-2 text-xs">
                                         {clearsAtFormatted && (
-                                          <div className="flex items-start gap-2 rounded-md bg-pastel-surface-tile border border-amber-500/40 p-2">
-                                            <Clock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" aria-hidden="true" />
+                                          <div className="flex items-start gap-2 rounded-md bg-pastel-surface-tile border border-pastel-orange/40 p-2">
+                                            <Clock className="w-4 h-4 text-pastel-orange mt-0.5 shrink-0" aria-hidden="true" />
                                             <div>
-                                              <div className="uppercase tracking-wide text-[10px] text-amber-700 font-bold">
+                                              <div className="uppercase tracking-wide text-[10px] text-pastel-orange-soft font-bold">
                                                 Waiver window clears
                                               </div>
                                               <div className="font-semibold">{clearsAtFormatted}</div>
@@ -4170,10 +4213,10 @@ const Roster = () => {
                                           </div>
                                         )}
                                         {nextProcessFormatted && (
-                                          <div className="flex items-start gap-2 rounded-md bg-pastel-surface-tile border border-green-600/40 p-2">
-                                            <Zap className="w-4 h-4 text-green-700 mt-0.5 shrink-0" aria-hidden="true" />
+                                          <div className="flex items-start gap-2 rounded-md bg-pastel-surface-tile border border-pastel-sage/40 p-2">
+                                            <Zap className="w-4 h-4 text-pastel-sage mt-0.5 shrink-0" aria-hidden="true" />
                                             <div>
-                                              <div className="uppercase tracking-wide text-[10px] text-green-700 font-bold">
+                                              <div className="uppercase tracking-wide text-[10px] text-pastel-sage-soft font-bold">
                                                 Claim processes
                                               </div>
                                               <div className="font-semibold">{nextProcessFormatted}</div>
@@ -4265,7 +4308,7 @@ const Roster = () => {
 
                                   {/* Failure reason (spans full row when present) */}
                                   {tx.status === 'failed' && tx.failureReason && (
-                                    <div className="col-span-12 text-xs text-red-600 mt-1 md:mt-0">
+                                    <div className="col-span-12 text-xs text-fantasy-grapefruit-red mt-1 md:mt-0">
                                       Reason: {tx.failureReason}
                                     </div>
                                   )}

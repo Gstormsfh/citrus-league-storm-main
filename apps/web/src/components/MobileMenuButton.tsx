@@ -144,7 +144,7 @@ const MobileMenuButton = () => {
   return (
     <>
       <button
-        className="focus-citrus p-2 rounded-xl text-pastel-cream active:bg-white/10 transition-colors"
+        className="focus-citrus inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-2 rounded-xl text-pastel-cream active:bg-white/10 transition-colors"
         onClick={() => setMenuOpen(!menuOpen)}
         aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
         aria-expanded={menuOpen}
@@ -172,7 +172,7 @@ const MobileMenuButton = () => {
                 <span className="font-calistoga text-lg text-pastel-cream leading-none">Citrus</span>
               </Link>
               <button
-                className="focus-citrus p-2.5 rounded-xl text-pastel-cream active:bg-white/10 transition-colors"
+                className="focus-citrus inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-2.5 rounded-xl text-pastel-cream active:bg-white/10 transition-colors"
                 onClick={closeMenu}
                 aria-label="Close menu"
               >
@@ -306,10 +306,10 @@ const MobileMenuButton = () => {
                     <p className="text-xs text-white/55 truncate">{user.email}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Link to="/profile" onClick={closeMenu} className="p-2 rounded-lg bg-white/5 ring-1 ring-white/10 active:bg-white/[0.08] transition-colors">
+                    <Link to="/profile" onClick={closeMenu} className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-2 rounded-lg bg-white/5 ring-1 ring-white/10 active:bg-white/[0.08] transition-colors">
                       <CircleUser className="h-4 w-4 text-pastel-cream" />
                     </Link>
-                    <button onClick={handleSignOut} className="focus-citrus p-2 rounded-lg bg-red-400/15 ring-1 ring-red-400/30 active:bg-red-400/25 transition-colors" aria-label="Sign out">
+                    <button onClick={handleSignOut} className="focus-citrus inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-2 rounded-lg bg-red-400/15 ring-1 ring-red-400/30 active:bg-red-400/25 transition-colors" aria-label="Sign out">
                       <LogOut className="h-4 w-4 text-red-300" />
                     </button>
                   </div>
