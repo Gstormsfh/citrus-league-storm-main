@@ -389,7 +389,11 @@ def check_raw_shots_passer_id_is_player_id(db: SupabaseRest) -> CheckResult:
     try:
         recent = db.select(
             "raw_shots",
-            select="passer_id,shot_id,season",
+            # `id`, not `shot_id`: raw_shots' primary key is `id` (bigint).
+            # Asking for shot_id made PostgREST 400 on every run, so this
+            # check reported FAIL/"query failed" from the day it was wired in
+            # and never once evaluated the invariant it was written for.
+            select="passer_id,id,season",
             filters=[("passer_id", "not.is", "null")],
             order="created_at.desc",
             limit=2000,
@@ -410,7 +414,7 @@ def check_raw_shots_passer_id_is_player_id(db: SupabaseRest) -> CheckResult:
                        "sub_floor_count": len(bad),
                        "floor": NHL_PLAYER_ID_FLOOR,
                        "sub_floor_sample": [
-                           {"shot_id": r.get("shot_id"), "passer_id": r["passer_id"], "season": r.get("season")}
+                           {"id": r.get("id"), "passer_id": r["passer_id"], "season": r.get("season")}
                            for r in bad[:5]
                        ],
                        "writer": "data-pipeline/acquisition/data_acquisition.py find_pass_before_shot"})
@@ -419,13 +423,30 @@ def check_raw_shots_passer_id_is_player_id(db: SupabaseRest) -> CheckResult:
 def check_player_game_stats_nhl_columns_populated(db: SupabaseRest) -> CheckResult:
     """nhl_goals + nhl_assists are NOT NULL by schema; this is essentially a
     regression sentinel. We additionally verify a recent sample has reasonable
-    values (not all-zero, since some players score every game)."""
+    values (not all-zero, since some players score every game).
+
+    SAMPLING (fixed 2026-09-04). This used to order by `updated_at.desc`,
+    which does not mean "recent" in this table. A bulk backfill stamps every
+    row it touches with one timestamp: measured on production 2026-09-04, all
+    2,000 rows at the top of that ordering shared `updated_at`
+    2026-08-21 03:52:34.780196. Inside a tie that large PostgREST returns an
+    arbitrary window, so the "recent sample" was an arbitrary 2,000 rows out
+    of 474,720 - and it drew 2017 games. Two consecutive runs saw
+    goals_total 18 and 5 against a threshold of 50, from the same unchanged
+    data, and the check paged both times.
+
+    `game_id.desc` is the ordering that means recency here: NHL game ids are
+    SSSSTTNNNN, so they sort by season then by type then by game. Measured the
+    same day, the same 2,000-row sample under this ordering: game ids
+    2025030166..2025030416 (the 2025 playoffs), goals_total 331,
+    assists_total 558. That is what this check was written to see.
+    """
     name = "player_game_stats_nhl_columns_populated"
     try:
         rows = db.select(
             "player_game_stats",
             select="nhl_goals,nhl_assists,nhl_shots_on_goal,player_id",
-            order="updated_at.desc",
+            order="game_id.desc",
             limit=2000,
         )
     except Exception as e:
@@ -445,40 +466,92 @@ def check_player_game_stats_nhl_columns_populated(db: SupabaseRest) -> CheckResu
 
 
 def check_player_game_stats_no_orphan_game_ids(db: SupabaseRest) -> CheckResult:
-    """player_game_stats.game_id must reference a row in nhl_games.
+    """Recent player_game_stats.game_id values must exist in nhl_games.
 
-    Sample 200 distinct recent game_ids and confirm coverage.
+    SCOPE (fixed 2026-09-04). As first written this asked whether EVERY
+    sampled game_id had an nhl_games row, and it can never pass, because the
+    two tables are not the same kind of table. `nhl_games` is the loaded
+    SCHEDULE - measured on production 2026-09-04, 2,738 rows, seasons 2025 and
+    2026, game ids 2025020001..2026021344. `player_game_stats` is the stat
+    ARCHIVE - 474,720 rows reaching back to game 2017020001. 418,962 of those
+    rows (88%) have no nhl_games row and are supposed not to: the schedule
+    table is not a nine-season history and was never loaded as one.
+
+    Compounding it, the sample was drawn `updated_at.desc`, which in this
+    table is a tie of hundreds of thousands of rows (see
+    check_player_game_stats_nhl_columns_populated), so the arbitrary window it
+    returned was full of 2017 games and the check paged on 200 of 200.
+
+    What is worth guarding is the real invariant: a game that the schedule
+    COVERS must not be missing from it. So sample by `game_id.desc` - genuinely
+    the most recent games - and hold only the sampled ids at or above the
+    lowest game_id nhl_games actually holds. An id below that floor is
+    archive, not an orphan. Measured the same day under this rule: 2,000 rows,
+    ids 2025030166..2025030416, 0 orphans.
     """
     name = "player_game_stats_no_orphan_game_ids"
     try:
         recent = db.select(
             "player_game_stats",
             select="game_id",
-            order="updated_at.desc",
+            order="game_id.desc",
             limit=2000,
         )
     except Exception as e:
         return CheckResult(name, SEVERITY_WARN, STATUS_FAIL,
                           {"error": f"query failed: {e}"})
-    distinct_game_ids = list({r["game_id"] for r in recent if r.get("game_id")})[:200]
+    distinct_game_ids = sorted({r["game_id"] for r in recent if r.get("game_id")},
+                               reverse=True)[:200]
     if not distinct_game_ids:
         return CheckResult(name, SEVERITY_WARN, STATUS_FAIL,
                           {"error": "no game_ids in sample"})
+
+    # The floor: the oldest game the schedule table claims to cover. Anything
+    # below it is archive the schedule was never loaded for.
+    try:
+        floor_rows = db.select(
+            "nhl_games",
+            select="game_id",
+            order="game_id.asc",
+            limit=1,
+        )
+    except Exception as e:
+        return CheckResult(name, SEVERITY_WARN, STATUS_FAIL,
+                          {"error": f"nhl_games floor lookup failed: {e}"})
+    if not floor_rows:
+        # No schedule at all is a different alarm, and season_boundary owns it.
+        return CheckResult(name, SEVERITY_WARN, STATUS_FAIL,
+                          {"error": "nhl_games is empty; see the season_boundary invariant"})
+    schedule_floor = floor_rows[0]["game_id"]
+
+    in_scope = [g for g in distinct_game_ids if g >= schedule_floor]
+    if not in_scope:
+        # Every recent stat row predates the loaded schedule. Legitimate in a
+        # fresh environment; not this check's business to page about.
+        return CheckResult(name, SEVERITY_PAGE, STATUS_PASS,
+                          {"sampled_game_ids": len(distinct_game_ids),
+                           "in_scope": 0,
+                           "schedule_floor": schedule_floor,
+                           "note": "all sampled game_ids predate the loaded schedule"})
+
     try:
         games = db.select(
             "nhl_games",
             select="game_id",
-            filters=[("game_id", "in", distinct_game_ids)],
-            limit=len(distinct_game_ids) + 10,
+            filters=[("game_id", "in", in_scope)],
+            limit=len(in_scope) + 10,
         )
     except Exception as e:
         return CheckResult(name, SEVERITY_WARN, STATUS_FAIL,
                           {"error": f"nhl_games lookup failed: {e}"})
     found = {r["game_id"] for r in games}
-    orphans = [g for g in distinct_game_ids if g not in found]
+    orphans = [g for g in in_scope if g not in found]
     status = STATUS_PASS if not orphans else STATUS_FAIL
     return CheckResult(name, SEVERITY_PAGE, status,
                       {"sampled_game_ids": len(distinct_game_ids),
+                       "in_scope": len(in_scope),
+                       "schedule_floor": schedule_floor,
+                       "below_floor_skipped": len(distinct_game_ids) - len(in_scope),
                        "orphan_count": len(orphans),
                        "orphan_sample": orphans[:5]})
 

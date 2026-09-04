@@ -5,13 +5,13 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
-import { isPoolLeague, getPoolRoute, getPoolLabel, getLeagueTypeFromSettings } from '@/utils/leagueTypeHelpers';
+import { isPoolLeague, getPoolRoute, getPoolLabel, getLeagueTypeFromSettings, leagueSwitchDestination } from '@/utils/leagueTypeHelpers';
 import { CitrusLogo } from '@/components/citrus2';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   Swords, Users, BarChart3, Search, Sparkles, DollarSign,
-  Target, Shield, TrendingUp,
+  Target, Shield, TrendingUp, ClipboardList,
 } from 'lucide-react';
 
 /**
@@ -105,18 +105,21 @@ const MobileMenuButton = () => {
           { label: 'Pool Home', path: `/pool/playoff-hub?league=${activeLeagueId}`, icon: Trophy },
           { label: 'My Picks', path: poolRoute, icon: Target },
           { label: 'NHL Bracket', path: '/nhl/playoffs', icon: BarChart3 },
+          { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
         ];
       case 'playoff-confidence-pool':
         return [
           { label: 'Pool Home', path: `/pool/playoff-hub?league=${activeLeagueId}`, icon: Trophy },
           { label: 'My Picks', path: poolRoute, icon: Target },
           { label: 'NHL Bracket', path: '/nhl/playoffs', icon: BarChart3 },
+          { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
         ];
       case 'playoff-roster-pool':
         return [
           { label: 'Pool Home', path: `/pool/playoff-hub?league=${activeLeagueId}`, icon: Trophy },
           { label: 'My Roster', path: poolRoute, icon: Users },
           { label: 'NHL Bracket', path: '/nhl/playoffs', icon: BarChart3 },
+          { label: 'Armchair GM', path: '/armchair-gm', icon: DollarSign },
         ];
       default:
         return [];
@@ -134,6 +137,9 @@ const MobileMenuButton = () => {
           { label: 'Roster', path: `/roster?league=${activeLeagueId}`, icon: Users },
           { label: 'Free Agents', path: `/free-agents?league=${activeLeagueId}`, icon: UserPlus },
           { label: 'Standings', path: `/standings?league=${activeLeagueId}`, icon: TrendingUp },
+          // See the Navbar note: the simulator is public and ungated, it was
+          // just unreachable from inside a league.
+          { label: 'Mock Draft', path: '/armchair-gm?tab=mockdraft', icon: ClipboardList },
         ]
       : [
           { label: 'Create League', path: '/create-league', icon: Sparkles },
@@ -224,22 +230,7 @@ const MobileMenuButton = () => {
                           )}
                           onClick={() => {
                             setActiveLeagueId(l.id);
-                            if (isPoolLeague(lType)) {
-                              navigate(getPoolRoute(lType, l.id));
-                            } else if (location.pathname.startsWith('/matchup/') || location.pathname === '/matchup') {
-                              navigate(`/matchup/${l.id}`);
-                            } else if (location.pathname.match(/^\/league\/[^/]+\/playoffs$/)) {
-                              navigate(`/league/${l.id}/playoffs`);
-                            } else if (location.pathname.match(/^\/league\/[^/]+$/)) {
-                              navigate(`/league/${l.id}`);
-                            } else if (location.pathname.startsWith('/draft-room') || location.pathname === '/draft') {
-                              navigate('/gm-office');
-                            } else {
-                              // SWEEP FIX (2026-08-16): from home/any other
-                              // page, land in the league's HQ instead of a
-                              // silent context switch.
-                              navigate(`/league/${l.id}`);
-                            }
+                            navigate(leagueSwitchDestination(l.id, lType, location.pathname));
                             setLeagueListOpen(false);
                             closeMenu();
                           }}

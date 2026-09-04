@@ -118,3 +118,6 @@ __pycache__/
 **/__pycache__/
 *.pyc
 .claude/settings.local.json
+
+.fuse_hidden*
+Claude outputs/

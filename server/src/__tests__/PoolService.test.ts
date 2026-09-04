@@ -512,12 +512,18 @@ describe('PoolService', () => {
           { id: 'g1', home_team: 'TOR', away_team: 'MTL', status: 'scheduled', game_date: '2099-01-01', game_time: '2099-01-01T23:00:00Z' },
         ],
       });
+      const upsertChain = createChain({ error: null });
+      mockSupabase.from = vi.fn(() => upsertChain);
 
       await expect(
         service.submitConfidencePicks('league-1', 'user-1', 1, [
           { game_id: 'gX', picked_team: 'BOS', confidence_points: 1 },
         ]),
-      ).rejects.toThrow('not in this week');
+      ).rejects.toThrow('None of the selected games are in this week');
+
+      // The throw is not the point; not writing is. A laundered slate that
+      // rejects AFTER the upsert is still a graded pick.
+      expect(upsertChain.upsert).not.toHaveBeenCalled();
     });
 
     // ── PL3 secondary: honest partial submissions ─────────────────────
