@@ -29,7 +29,9 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
-import MobileRosterList from '@/components/roster/MobileRosterList';
+import { PressBoxRosterList } from '@/components/pressbox';
+import { buildRosterRows } from '@/components/pressbox/rosterRows';
+import { buildSlotConfig } from '@/components/roster/slotConfig';
 import { FillSlotSheet } from '@/components/roster/FillSlotSheet';
 import { TodayStrip } from '@/components/roster/TodayStrip';
 import { computeTodaySummary } from '@/components/roster/todaySummary';
@@ -3861,24 +3863,69 @@ const Roster = () => {
                           </button>
                         </div>
                       )}
-                      <MobileRosterList
-                        starters={displayRoster.starters}
-                        bench={displayRoster.bench}
-                        ir={displayRoster.ir}
-                        slotAssignments={displayRoster.slotAssignments}
-                        lockedPlayerIds={lockedPlayerIds}
-                        tapSelectedPlayerId={tapSelectedPlayerId}
-                        tapEligibleSlots={tapEligibleSlots}
-                        onPlayerTap={handleMobileTapPlayer}
-                        onPlayerNameTap={handlePlayerClick}
-                        onSlotTap={handleMobileTapSlot}
-                        onBenchTap={handleMobileTapBench}
-                        onCancelSelection={() => setTapSelectedPlayerId(null)}
-                        onFillSlot={handleFillSlot}
-                        swapHint={canEdit}
-                        positionType={leaguePositionType}
-                        irSlotCount={irSlotCount}
-                      />
+                      {/* PRESS BOX (2026-09-04, direction 1a). The rows the
+                          list draws are built by `buildRosterRows`, a pure
+                          function this page hands its own state to — the page
+                          keeps every fetch, the row keeps every pixel, and
+                          the mapping between them is the part with tests.
+
+                          The day toggles are NOT passed. `TodayStrip` above
+                          already owns which day is on screen, and two day
+                          controls on one screen can disagree; the Press Box
+                          toggles come back when the strip is retired.
+
+                          `showWeek` and `showOwnership` stay off: there is no
+                          per-player week total on this payload and no
+                          cross-league ownership aggregate. The columns and
+                          the grid that carries them return the day those
+                          numbers exist, not before. */}
+                      {(() => {
+                        const rows = buildRosterRows({
+                          starters: displayRoster.starters,
+                          bench: displayRoster.bench,
+                          ir: displayRoster.ir,
+                          irSlotCount,
+                          slotConfig: buildSlotConfig(leaguePositionType, leagueRosterSlots),
+                          slotAssignments: displayRoster.slotAssignments,
+                          lockedPlayerIds,
+                          tapSelectedPlayerId,
+                          tapEligibleSlots,
+                        });
+                        return (
+                          <PressBoxRosterList
+                            starters={rows.starters}
+                            bench={rows.bench}
+                            ir={rows.ir}
+                            irRequired={rows.irRequired}
+                            startersFilled={rows.startersFilled}
+                            startersRequired={rows.startersRequired}
+                            benchPlayingCount={rows.benchPlayingCount}
+                            onSlotPress={(slotId) => {
+                              // A held slot selects its player; an empty one
+                              // is a move target with a player already picked
+                              // and the Fill trigger otherwise. One gesture,
+                              // read against the page's state — the rule the
+                              // list this replaces established (audit R2).
+                              const held = rows.starters.find((r) => r.slotId === slotId)?.player;
+                              const bench = rows.bench.find((r) => r.slotId === slotId)?.player;
+                              const p = [...displayRoster.starters, ...displayRoster.bench, ...displayRoster.ir]
+                                .find((x) => String(x.id) === String(held?.id ?? bench?.id ?? ''));
+                              if (p) handleMobileTapPlayer(p);
+                              else if (tapSelectedPlayerId != null) handleMobileTapSlot(slotId);
+                              else handleFillSlot(slotId);
+                            }}
+                            onNamePress={(row) => {
+                              const p = [...displayRoster.starters, ...displayRoster.bench, ...displayRoster.ir]
+                                .find((x) => String(x.id) === String(row.player?.id ?? ''));
+                              if (p) handlePlayerClick(p);
+                            }}
+                            onEmptyPress={(slotId) => {
+                              if (tapSelectedPlayerId != null) handleMobileTapSlot(slotId);
+                              else handleFillSlot(slotId);
+                            }}
+                          />
+                        );
+                      })()}
                       {/* Fill sheet — slot-first counterpart of the Line
                           Change sheet; opens from an empty row (audit R2). */}
                       <FillSlotSheet

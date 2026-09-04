@@ -143,9 +143,18 @@ describe('the Lineup heading and the stat-view toggle are desktop-only', () => {
 
 describe('the phone list is told the league\'s real IR slot count', () => {
   it('resolves it with the server rule and passes it down', () => {
+    // The SHAPE changed with the Press Box conversion (2026-09-04): the page
+    // no longer hands a component `irSlotCount` as a prop, it hands it to
+    // `buildRosterRows`, which turns the count into one row per IR SLOT --
+    // held or empty -- for the list to draw. The intent this guard exists to
+    // protect is unchanged and is what is asserted: the count is resolved by
+    // the SERVER's rule, never defaulted locally, and it reaches the rows.
     expect(ROSTER).toContain('resolveIrSlotCount(leagueRosterSlots)');
-    const list = ROSTER.slice(ROSTER.indexOf('<MobileRosterList'), ROSTER.indexOf('<FillSlotSheet'));
-    expect(list).toContain('irSlotCount={irSlotCount}');
+    const call = ROSTER.slice(ROSTER.indexOf('buildRosterRows({'), ROSTER.indexOf('<PressBoxRosterList'));
+    expect(call, 'the IR count reaches the row builder').toContain('irSlotCount,');
+    const list = ROSTER.slice(ROSTER.indexOf('<PressBoxRosterList'), ROSTER.indexOf('<FillSlotSheet'));
+    expect(list, 'and the built IR rows reach the list').toContain('ir={rows.ir}');
+    expect(list).toContain('irRequired={rows.irRequired}');
   });
 });
 

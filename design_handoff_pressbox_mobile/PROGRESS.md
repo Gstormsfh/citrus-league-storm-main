@@ -603,3 +603,60 @@ false-positive there; renaming is free and leaving a guard alone is not.
 radius 6 with no border, mug 30px with a 1.5px `rgb(255,76,0)` border.
 443/443 source-walking guards, 54/54 on the two Press Box guards (34 of them
 quoting the artboard rule they pin), `tsc` exit 0, `eslint` 0 errors.
+
+---
+
+## PR4e — mounted, and the method is now a repo tool (2026-09-04)
+
+**`scripts/design/extract-artboard.mjs`.** The artboard-lifting method that
+rescued PR4 is a script in the repo now rather than something I did once in a
+sandbox, so every screen from here gets the same treatment:
+
+    node scripts/design/extract-artboard.mjs 1a --find Starters --to /tmp/roster.html
+
+It also writes down the two things that will otherwise cost an hour: the
+artboards live inside an `<x-dc>` element that stays `display:none` until a
+CDN-hosted script upgrades it (one injected stylesheet fixes that), and `#1a`
+is an invalid CSS selector because an identifier cannot begin with a digit.
+
+**`Roster.tsx` renders `PressBoxRosterList`.** The page keeps every fetch;
+`buildRosterRows` turns its state into rows; the row keeps every pixel.
+
+Three decisions at the call site:
+
+* **No day toggles.** `TodayStrip` above already owns which day is on screen,
+  and two day controls that can disagree is worse than one in the wrong place.
+  `days` is optional now and renders nothing when empty. The Press Box toggles
+  come back when the strip is retired.
+* **`showWeek` and `showOwnership` stay OFF in the app.** There is no
+  per-player week total on the roster payload and no cross-league ownership
+  aggregate. The harness shows both, labelled, so the row can be judged at
+  full density; the app renders what is true. `?plain` on the harness shows
+  what ships today.
+* **IR survived the conversion.** The old list rendered an IR section that
+  showed every slot the league defines, occupied or not, so the slot is
+  discoverable before the first injury (roster audit R8). `buildRosterRows`
+  now emits one row per IR slot and the list draws a third section.
+
+**A guard moved with the screen rather than being deleted.**
+`rosterMobileChromeGuard`'s R8 case asserted the literal
+`irSlotCount={irSlotCount}` prop on the old component. The prop is gone; the
+INTENT is not. It now asserts that the count is resolved by the server's rule
+(`resolveIrSlotCount`), that it reaches `buildRosterRows`, and that the built
+rows reach the list. Same contract, new shape — which is what "move the guard
+with the screen" has to mean, or a conversion quietly drops its guarantees.
+
+**`harness/page.html?p=roster`** renders the real page. Until now the only way
+to look at the roster was `cards.html` / `slot.html`, which mount the LIST — so
+nothing could show the page's own chrome, its empty states, or whether the list
+is wired to the page's handlers at all. Verified there: 18 Press Box rows,
+grid `30px 30px 185px 52px`, heights 56 and 52 exactly, sections
+`Starters · 13/13`, `Bench · 5`, `Injured reserve · 0/3`.
+
+**KNOWN, AND THE NEXT INCREMENT.** Everything ABOVE the list on that page is
+still the old chrome — the page header, the team card, the ROSTER / STATS /
+TRENDS / TRANSACTIONS tabs, the TODAY summary. The screen is half-dressed
+until `LeagueHeader` + the sub-tab strip replace them, which is its own commit
+because it changes navigation.
+
+443/443 source-walking guards, 71/71 Press Box, `tsc` exit 0, `eslint` 0 errors.

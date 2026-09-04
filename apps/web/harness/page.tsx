@@ -167,6 +167,12 @@ const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
   matchup: () => import('../src/pages/Matchup'),
   standings: () => import('../src/pages/Standings'),
   league: () => import('../src/pages/LeagueDashboard'),
+  // Added 2026-09-04 with the Press Box conversion. The roster is the screen
+  // that page owns, and until now the only way to look at it was
+  // `cards.html` / `slot.html`, which mount the LIST rather than the page --
+  // so nothing here could show the page's own chrome, its empty states, or
+  // whether the list is wired to the page's handlers at all.
+  roster: () => import('../src/pages/Roster'),
 };
 
 const which = new URLSearchParams(location.search).get('p') || 'waivers';
@@ -180,6 +186,8 @@ const Page = lazy(PAGES[which] ?? PAGES.waivers);
  */
 const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   league: { path: '/league/:leagueId', at: '/league/harness-league' },
+  // Roster reads the league off the QUERY STRING, not a path param.
+  roster: { path: '/roster', at: '/roster?league=harness-league' },
   // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
   // the week into the URL as soon as it resolves one. Under the old
   // `/matchup/:leagueId?` the very first push ("/matchup/harness-league/1")

@@ -26,6 +26,7 @@
  * screen.
  */
 import type { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import { irSlotIds } from '@/components/roster/irSlots';
 import { multiPositionLabel } from '@/components/roster/positions';
 import type { SlotConfig } from '@/components/roster/slotConfig';
 
@@ -106,6 +107,10 @@ export function toRowPlayer(p: HockeyPlayer): PressBoxRosterRowPlayer {
 export interface BuildRosterRowsInput {
   starters: HockeyPlayer[];
   bench: HockeyPlayer[];
+  /** Everyone the page is holding on injured reserve. */
+  ir?: HockeyPlayer[];
+  /** IR slots this league defines. The section renders even when empty. */
+  irSlotCount?: number;
   slotConfig: SlotConfig;
   /** `playerId -> slotId`, straight from the page. */
   slotAssignments: Record<string | number, string>;
@@ -117,6 +122,9 @@ export interface BuildRosterRowsInput {
 export interface BuildRosterRowsResult {
   starters: PressBoxRosterSlotRow[];
   bench: PressBoxRosterSlotRow[];
+  /** One row per IR SLOT, held or empty — the slot is discoverable empty. */
+  ir: PressBoxRosterSlotRow[];
+  irRequired: number;
   /** Starter slots that actually hold a player. */
   startersFilled: number;
   /** Starter slots the league defines. */
@@ -131,6 +139,8 @@ const isDtd = (p: HockeyPlayer) => p.status === 'GTD' || p.status === 'IR' || p.
 export function buildRosterRows({
   starters,
   bench,
+  ir = [],
+  irSlotCount = 0,
   slotConfig,
   slotAssignments,
   lockedPlayerIds = new Set(),
@@ -161,6 +171,28 @@ export function buildRosterRows({
     };
   });
 
+  // IR is slot-shaped like the starters, not list-shaped like the bench: the
+  // section shows every slot the league defines so an empty one is visible
+  // before the first injury, which is the whole point of roster audit R8.
+  const irBySlot = new Map<string, HockeyPlayer>();
+  for (const [playerId, slotId] of Object.entries(slotAssignments)) {
+    if (!slotId.startsWith('ir-slot-')) continue;
+    const p = ir.find((x) => String(x.id) === String(playerId));
+    if (p) irBySlot.set(slotId, p);
+  }
+  const irRows: PressBoxRosterSlotRow[] = irSlotIds(irSlotCount).map((slotId) => {
+    const p = irBySlot.get(slotId) ?? null;
+    return {
+      slotId,
+      slot: 'IR',
+      player: p ? toRowPlayer(p) : null,
+      locked: false,
+      dtd: p ? isDtd(p) : false,
+      selected: p != null && String(p.id) === String(tapSelectedPlayerId ?? ''),
+      eligibleTarget: tapSelectedPlayerId != null && tapEligibleSlots.has(slotId),
+    };
+  });
+
   const benchRows: PressBoxRosterSlotRow[] = bench.map((p, i) => ({
     slotId: `bench-${p.id ?? i}`,
     slot: 'BN',
@@ -174,6 +206,8 @@ export function buildRosterRows({
   return {
     starters: starterRows,
     bench: benchRows,
+    ir: irRows,
+    irRequired: irSlotIds(irSlotCount).length,
     startersFilled: starterRows.filter((r) => r.player != null).length,
     startersRequired: slotConfig.allSlots.length,
     // "Playing tonight" means the schedule has a line for him today, not that

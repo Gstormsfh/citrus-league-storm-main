@@ -45,8 +45,13 @@ export interface PressBoxRosterSlotRow {
 }
 
 export interface PressBoxRosterListProps {
-  days: string[];
-  activeDay: string;
+  /**
+   * `THU FRI SAT WEEK`. Empty renders no toggles at all — a surface that
+   * already carries a day control (the roster page's `TodayStrip`) must not
+   * grow a second one that can disagree with it.
+   */
+  days?: string[];
+  activeDay?: string;
   onDayChange?: (day: string) => void;
   starters: PressBoxRosterSlotRow[];
   bench: PressBoxRosterSlotRow[];
@@ -54,6 +59,14 @@ export interface PressBoxRosterListProps {
   startersRequired: number;
   /** Bench players with a game on the day being shown. */
   benchPlayingCount?: number;
+  /**
+   * Injured-reserve rows, and how many IR slots the league defines. The
+   * section renders whenever the league HAS slots, occupied or not, so the
+   * slot is discoverable before the first injury — the same rule the list
+   * this replaces adopted (roster audit R8). `irRequired: 0` hides it.
+   */
+  ir?: PressBoxRosterSlotRow[];
+  irRequired?: number;
   /** Draw the WK column. Off until a page has a real per-player week total. */
   showWeek?: boolean;
   /** Draw the `100% · 99%` segment. Off until the ownership aggregate exists. */
@@ -73,7 +86,7 @@ const COLHEAD =
   'font-plex font-medium text-[9px] uppercase tracking-[0.06em] text-pressbox-text/40';
 
 export function PressBoxRosterList({
-  days,
+  days = [],
   activeDay,
   onDayChange,
   starters,
@@ -81,6 +94,8 @@ export function PressBoxRosterList({
   startersFilled,
   startersRequired,
   benchPlayingCount = 0,
+  ir = [],
+  irRequired = 0,
   showWeek = false,
   showOwnership = false,
   teamCard,
@@ -119,6 +134,7 @@ export function PressBoxRosterList({
         <h2 className={SECTION}>
           Starters <span className={COUNT}>· {startersFilled}/{startersRequired}</span>
         </h2>
+        {days.length > 0 && (
         <div role="tablist" aria-label="Lineup day" className="flex gap-1">
           {days.map((d) => (
             <button
@@ -136,6 +152,7 @@ export function PressBoxRosterList({
             </button>
           ))}
         </div>
+        )}
       </div>
 
       {/* The row's own grid, so every label lands over its column. */}
@@ -161,6 +178,20 @@ export function PressBoxRosterList({
       </div>
 
       <div>{bench.map((r) => renderRow(r, true))}</div>
+
+      {irRequired > 0 && (
+        <>
+          <div className="flex items-center justify-between mt-2 py-2 px-0.5 border-t border-white/[0.08]">
+            <h2 className={SECTION}>
+              Injured reserve{' '}
+              <span className={COUNT}>
+                · {ir.filter((r) => r.player != null).length}/{irRequired}
+              </span>
+            </h2>
+          </div>
+          <div>{ir.map((r) => renderRow(r, true))}</div>
+        </>
+      )}
     </div>
   );
 }
