@@ -355,6 +355,24 @@ describe('dark-theme contrast guard', () => {
       for (const m of src.matchAll(/\b(backgroundColor|background|borderLeft|borderLeftColor|borderBottomColor)\s*:\s*([^,;\n}]+)/g)) {
         const value = m[2];
         if (!/\bteam(Colou?r|Primary|Secondary)\b/i.test(value)) continue;
+        // NARROWED 2026-09-04, for the player card's 24px team badge.
+        //
+        // What this rule is actually protecting is READABILITY and surface
+        // hierarchy: `background: teamColor` on a ROW destroys the tile
+        // ladder, and a team-colour rule down an edge turns a board into a
+        // sticker album. A small identity badge is neither — it is the one
+        // place on artboard 1a where a team's own colour is the point.
+        //
+        // What made the original rule right is that arbitrary NHL hexes span
+        // from #00205B to #FFB81C, so cream ink is unreadable on half of them
+        // and forest ink on the other half. `onTeamColor` (utils/
+        // teamColorContrast.ts) answers that per colour by MEASURING both
+        // candidates rather than guessing from a luminance cutoff. So the fill
+        // is allowed exactly when the ink is derived from it, and stays
+        // banned everywhere else — including the case the reference names,
+        // where there is no ink at all because the offender is a bar.
+        const near = src.slice(Math.max(0, m.index - 240), m.index + 240);
+        if (/\bonTeamColor\s*\(/.test(near)) continue;
         offenders.push(`${REL(f)}: ${m[1]}: ${value.trim().slice(0, 60)}`);
       }
     }
@@ -404,6 +422,17 @@ describe('dark-theme contrast guard', () => {
       /\bteam(Colou?r)\b/i.test(m[2]),
     );
     expect(hit.length, 'a team-colour fill must be detected').toBeGreaterThan(0);
+
+    // The narrowing must not become a hole. A fill whose ink is measured is
+    // allowed; the SAME fill without it is not, and neither is a bar that
+    // happens to sit in a file which uses onTeamColor somewhere far away.
+    const near = (text: string, at: number) =>
+      /\bonTeamColor\s*\(/.test(text.slice(Math.max(0, at - 240), at + 240));
+    const safe = 'style={{ background: teamColor, color: onTeamColor(teamColor) }}';
+    expect(near(safe, safe.indexOf('background:')), 'a measured fill is allowed').toBe(true);
+    expect(near(fill, fill.indexOf('backgroundColor:')), 'an unmeasured fill is not').toBe(false);
+    const far = `const ink = onTeamColor(c);${' '.repeat(400)}style={{ borderLeft: teamColor }}`;
+    expect(near(far, far.indexOf('borderLeft:')), 'a distant helper does not excuse a bar').toBe(false);
 
     // And the shipped neutral pair must NOT trip the chip rule.
     expect(hues("  RW: 'bg-white/10 text-pressbox-text',"), 'the shipped chip must be clean').toEqual([]);

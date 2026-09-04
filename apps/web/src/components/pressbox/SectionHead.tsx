@@ -20,13 +20,20 @@ export interface PressBoxSectionHeadProps {
   count?: string | number | null;
   /** `WEEK 1 ›`, or a control. Sits hard right. */
   action?: React.ReactNode;
+  /** 14px instead of 15 — the artboard's size for a head inside a card stack. */
+  sm?: boolean;
   className?: string;
 }
 
-export function PressBoxSectionHead({ title, count, action, className }: PressBoxSectionHeadProps) {
+export function PressBoxSectionHead({ title, count, action, sm, className }: PressBoxSectionHeadProps) {
   return (
     <div className={cn(PB_TYPE, 'flex items-center justify-between gap-2', className)}>
-      <h2 className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text truncate">
+      <h2
+        className={cn(
+          'font-condensed font-bold uppercase tracking-[0.08em] text-pressbox-text truncate',
+          sm ? 'text-[14px]' : 'text-[15px]',
+        )}
+      >
         {title}
         {count != null && count !== '' && (
           <span className="text-pressbox-text/45"> &middot; {count}</span>
