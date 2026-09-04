@@ -74,7 +74,7 @@ const ArmchairGM = () => {
     <div className="min-h-screen flex flex-col bg-[#0F1F15] text-pastel-cream">
       <Navbar />
 
-      <main className="flex-1 w-full pt-[var(--header-height)] pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-12">
+      <main className="flex-1 w-full pt-[var(--header-height)] pb-app-chrome lg:pb-12">
         {/* Hero Header — deeper #0F1F15 band with orange glow + diagonal stripes for depth */}
         <div className="w-full bg-[#0F1F15] border-b border-white/10 relative isolate overflow-hidden">
           <div aria-hidden="true" className="absolute -top-32 -right-20 w-[480px] h-[480px] bg-pastel-orange/15 rounded-full blur-3xl pointer-events-none" />

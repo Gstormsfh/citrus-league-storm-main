@@ -577,7 +577,7 @@ const Standings = () => {
             : null
         }
       />
-      <div className={`${PB_TYPE} lg:hidden px-3 pt-3 pb-[calc(5rem+env(safe-area-inset-bottom))]`} data-testid="standings-phone">
+      <div className={`${PB_TYPE} lg:hidden px-3 pt-3 pb-app-chrome`} data-testid="standings-phone">
         {userLeagueState === 'logged-in-no-league' && (
           <div className="mb-4">
             <LeagueCreationCTA

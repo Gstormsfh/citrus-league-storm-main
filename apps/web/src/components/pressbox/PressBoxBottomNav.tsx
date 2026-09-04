@@ -15,7 +15,7 @@
  * ships `Calendar` and I could not confirm `CalendarRange` without adding a
  * dependency risk at 4am. Same silhouette at 20px. Logged in PROGRESS.md.
  */
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { Trophy, Calendar, TrendingUp, BarChart3, CircleUser } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BOTTOMNAV_H } from './chromeMetrics';
@@ -29,7 +29,18 @@ const TABS = [
   { to: '/profile', label: 'Account', Icon: CircleUser, end: false },
 ] as const;
 
+/**
+ * LEAGUES is lit on every league screen (2026-09-04). `end` on `/` made it
+ * active on the home list alone, so a manager on Standings or the Match
+ * screen saw five dim tabs — the artboard lights LEAGUES there, because a
+ * league is where you are. The other four own their prefixes; everything
+ * that is not one of them belongs to LEAGUES.
+ */
+const OTHER_PREFIXES = ['/scores', '/players', '/news', '/profile'];
+
 export function PressBoxBottomNav({ className }: { className?: string }) {
+  const { pathname } = useLocation();
+  const leaguesActive = !OTHER_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   return (
     <nav
       aria-label="Main"
@@ -47,6 +58,7 @@ export function PressBoxBottomNav({ className }: { className?: string }) {
             <NavLink
               to={to}
               end={end}
+              aria-current={to === '/' && leaguesActive ? 'page' : undefined}
               className={({ isActive }) =>
                 cn(
                   'focus-citrus flex flex-col items-center justify-center gap-1.5 min-h-[44px]',
@@ -54,7 +66,7 @@ export function PressBoxBottomNav({ className }: { className?: string }) {
                   // no filled square behind it: a filled tab is a second
                   // saturated shape competing with the one orange element the
                   // screen is allowed.
-                  isActive ? 'text-pressbox-orange-soft' : 'text-pressbox-text/45',
+                  (to === '/' ? leaguesActive : isActive) ? 'text-pressbox-orange-soft' : 'text-pressbox-text/45',
                 )
               }
             >

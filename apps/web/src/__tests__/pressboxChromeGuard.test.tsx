@@ -24,7 +24,7 @@
  *     allowed inline style is the computed scanline gradient.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -130,6 +130,24 @@ describe('fixed chrome heights', () => {
 
   it('the nav clears the home indicator', () => {
     expect(NAV).toContain('env(safe-area-inset-bottom)');
+  });
+
+  it('every page reserves the whole strip — bar plus nav — under its content', () => {
+    // PRESS BOX (2026-09-04): `.pb-app-chrome` in index.css is the one place
+    // the pages' bottom padding lives; twenty of them carry the class. The
+    // number in the stylesheet cannot drift from the number the chrome is
+    // built to, or the Stormy bar covers the last row on every page again.
+    const css = readFileSync(resolve(here, '..', 'index.css'), 'utf-8');
+    const rule = /\.pb-app-chrome\s*\{\s*padding-bottom:\s*calc\((\d+)px \+ env\(safe-area-inset-bottom\)\)/.exec(css);
+    expect(rule, '.pb-app-chrome rule in index.css').not.toBeNull();
+    expect(Number(rule![1])).toBe(BOTTOM_CHROME_H);
+    const pages = readdirSync(resolve(here, '..', 'pages')).filter((f) => f.endsWith('.tsx'));
+    const carrying = pages.filter((f) => readFileSync(resolve(here, '..', 'pages', f), 'utf-8').includes('pb-app-chrome'));
+    expect(carrying.length).toBeGreaterThanOrEqual(20);
+    for (const f of pages) {
+      const src = readFileSync(resolve(here, '..', 'pages', f), 'utf-8');
+      expect(src, `${f} pads for the nav alone`).not.toContain('pb-[calc(5rem+env(safe-area-inset-bottom))]');
+    }
   });
 });
 

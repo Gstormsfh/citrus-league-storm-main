@@ -13,6 +13,13 @@ import { CitrusToaster } from '../src/components/notifications/CitrusToaster';
  * omits the app frame answers a question nobody asked.
  */
 import MobileBottomNav from '../src/components/MobileBottomNav';
+/**
+ * THE STORMY BAR (2026-09-04). App.tsx mounts StormyChatBubble on every
+ * route; on a phone its closed state is now the Press Box bar above the nav,
+ * and a page reviewed without it is a page reviewed with 40px more room than
+ * it will have.
+ */
+import { StormyChatBubble } from '../src/components/StormyChatBubble';
 
 // Every network call the pages make, stubbed at the module object.
 import { WaiverService } from '../src/services/WaiverService';
@@ -475,6 +482,7 @@ createRoot(document.getElementById('root')!).render(
       )}
     </Suspense>
     <CitrusToaster />
+    <StormyChatBubble />
     <MobileBottomNav />
   </MemoryRouter>
   </QueryClientProvider>,

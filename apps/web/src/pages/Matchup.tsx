@@ -5606,7 +5606,7 @@ const Matchup = () => {
         // Mobile: Full height scrollable, no padding for navbar
         "lg:pt-24 lg:pb-8",
         // Mobile: Account for bottom nav
-        "pb-[calc(5rem+env(safe-area-inset-bottom))]"
+        "pb-app-chrome"
       )}>
         <div className="w-full m-0 p-0">
           {/* Desktop: 3-column grid / Mobile: Single column, content only */}

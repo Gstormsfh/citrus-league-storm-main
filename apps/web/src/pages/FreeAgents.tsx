@@ -1664,7 +1664,7 @@ const FreeAgents = () => {
             : null
         }
       />
-      <div className="lg:hidden pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <div className="lg:hidden pb-app-chrome">
         <PlayersPhone
           view={phoneView}
           onView={setPhoneView}

@@ -895,7 +895,7 @@ const LeagueDashboard = () => {
             : null
         }
       />
-      <div className="lg:hidden pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <div className="lg:hidden pb-app-chrome">
         <LeagueHQPhone
           week={currentWeek !== null && leagueId ? { number: currentWeek, to: `/matchup/${leagueId}/${currentWeek}` } : null}
           seasonOpensOn={seasonOpensOn}

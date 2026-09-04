@@ -837,7 +837,7 @@ const CreateLeague = () => {
         </div>
       </div>
 
-      <main className="lg:pt-32 lg:pb-20 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))] px-4">
+      <main className="lg:pt-32 lg:pb-20 pt-4 pb-app-chrome px-4">
         <div className="container mx-auto max-w-4xl">
 
           <div className="mb-8 text-left">

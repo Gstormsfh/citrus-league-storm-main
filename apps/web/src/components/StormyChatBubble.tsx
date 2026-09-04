@@ -10,6 +10,7 @@ import { MascotAvatar } from '@/components/citrus2';
 import { StormyService, fetchLeagueContext, type StormyMessage, type StormyContext } from '@/services/StormyService';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { ChatBar } from '@/components/pressbox/ChatBar';
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -36,6 +37,22 @@ const getPageLabel = (pathname: string): string => {
   if (pathname.includes('/gm-office')) return 'GM Office';
   if (pathname === '/') return 'Home';
   return 'App';
+};
+
+/**
+ * PRESS BOX (2026-09-04): the one line the phone's Stormy bar carries —
+ * short enough to survive a 40px bar beside the mascot and never wrap. The
+ * greeting below is what the open panel still says first.
+ */
+const getContextNudge = (pathname: string): string => {
+  if (pathname.includes('/roster')) return 'Start/sit help? Ask me';
+  if (pathname.includes('/trade-analyzer')) return 'I can weigh both sides of a trade';
+  if (pathname.includes('/free-agents')) return "Ask who's about to heat up";
+  if (pathname.includes('/matchup')) return 'Ask me your win chance this week';
+  if (pathname.includes('/team-analytics')) return 'Ask where your lineup is weakest';
+  if (pathname.includes('/standings')) return 'Ask me about playoff scenarios';
+  if (pathname.includes('/waiver-wire')) return 'Ask me who to claim';
+  return 'Ask me about a start/sit, a trade or a pickup';
 };
 
 const getContextGreeting = (pathname: string): string => {
@@ -299,6 +316,28 @@ export const StormyChatBubble = () => {
   }
 
   // ── Closed State (FAB) ─────────────────────────────────────────
+
+  /**
+   * PRESS BOX (2026-09-04): on a phone the closed state is the Stormy BAR
+   * above the bottom nav — artboard 1a draws it on every league screen —
+   * not a floating orange circle over the page's rows. The bar and the nav
+   * are one strip of fixed chrome (`.pb-app-chrome` reserves the room), so
+   * it stands down wherever the nav does: the auth and setup routes, and
+   * the draft rooms handled above. Desktop keeps the FAB.
+   */
+  if (!isOpen && isMobile) {
+    const navHidden = ['/auth', '/profile-setup', '/verify-email', '/reset-password'].some((r) =>
+      location.pathname.startsWith(r),
+    );
+    if (navHidden || textFieldFocused) return null;
+    return (
+      <ChatBar
+        variant="stormy"
+        message={getContextNudge(location.pathname)}
+        onPress={() => setIsOpen(true)}
+      />
+    );
+  }
 
   if (!isOpen) {
     return (

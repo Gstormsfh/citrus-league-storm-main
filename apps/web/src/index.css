@@ -166,6 +166,16 @@
     color: #007AFF;
   }
   
+  /* PRESS BOX (2026-09-04): the room a page leaves for the fixed bottom
+     chrome on a phone — the 76px bottom nav plus the 40px Stormy bar above
+     it (chromeMetrics.BOTTOM_CHROME_H = 116) plus the home-indicator inset.
+     One class, because twenty pages carried `pb-[calc(5rem+…)]` for the nav
+     alone and the bar would have covered the last row on every one of them.
+     pressboxChromeGuard pins this number to BOTTOM_CHROME_H. */
+  .pb-app-chrome {
+    padding-bottom: calc(116px + env(safe-area-inset-bottom));
+  }
+
   /* Hide scrollbar but keep functionality */
   .scrollbar-hide {
     -ms-overflow-style: none;
