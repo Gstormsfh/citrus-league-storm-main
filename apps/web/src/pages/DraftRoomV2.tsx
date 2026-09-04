@@ -2525,6 +2525,12 @@ function MainTabs({
                 : undefined
             }
             draftType="snake"
+            /* PRESS BOX (2026-09-04): the outlined column and the card on tap. */
+            userTeamId={myTeamId}
+            onPlayerClick={(playerId) => {
+              const picked = playersById.get(playerId);
+              if (picked) setCardPlayer(picked);
+            }}
           />
         </TabsContent>
 
