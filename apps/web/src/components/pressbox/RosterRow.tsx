@@ -60,7 +60,7 @@ import {
   PB_POSITION_CHIP_BASE,
   positionChipKey,
 } from './positionChip';
-import { PB_ROW_HEADLINE, PB_ROW_HEADLINE_LABEL, PB_ROW_META, PB_ROW_NAME } from './rowScale';
+import { PB_TYPE, PB_ROW_HEADLINE, PB_ROW_HEADLINE_LABEL, PB_ROW_META, PB_ROW_NAME } from './rowScale';
 
 /** Everything the row draws. Flat on purpose: no service types reach here. */
 export interface PressBoxRosterRowPlayer extends MugPlayer {
@@ -141,6 +141,7 @@ export function PressBoxRosterRow({
     ? 'grid-cols-[30px_30px_1fr_52px_44px]'
     : 'grid-cols-[30px_30px_1fr_52px]';
   const frame = cn(
+    PB_TYPE,
     'grid items-center gap-2 border-t border-white/[0.06]',
     grid,
     bench ? 'min-h-[52px]' : 'min-h-[56px]',

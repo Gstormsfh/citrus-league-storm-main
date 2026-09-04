@@ -31,7 +31,7 @@ import { Mug } from '@/components/roster/Mug';
 import type { MugPlayer } from '@/components/roster/headshot';
 import { getTeamColor } from '@/utils/teamColors';
 
-import { PB_ROW_META, PB_ROW_NAME } from './rowScale';
+import { PB_TYPE, PB_ROW_META, PB_ROW_NAME } from './rowScale';
 
 /** What tapping the action does. The glyph and tint follow the meaning. */
 export type PressBoxPlayerAction = 'add' | 'claim' | 'swap' | 'none';
@@ -108,7 +108,7 @@ export function PressBoxPlayerRow({
   return (
     <div
       data-testid="pressbox-player-row"
-      className={cn('flex items-center gap-2 min-h-[64px] border-t border-white/[0.06]', className)}
+      className={cn(PB_TYPE, 'flex items-center gap-2 min-h-[64px] border-t border-white/[0.06]', className)}
     >
       {rank != null && (
         <span className="w-[22px] flex-none flex flex-col items-center gap-0.5">

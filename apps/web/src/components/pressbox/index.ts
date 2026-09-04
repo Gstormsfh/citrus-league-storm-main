@@ -23,6 +23,8 @@ export {
   type PressBoxRosterSlotRow,
 } from './RosterList';
 
+export { PressBoxSegmented, type PressBoxSegmentedProps, type PressBoxSegment } from './Segmented';
+export { PressBoxStandingsTable, type PressBoxStandingsTableProps, type PressBoxStandingsRow } from './StandingsTable';
 export { PressBoxPlayerRow, type PressBoxPlayerRowProps, type PressBoxPlayerRowPlayer, type PressBoxPlayerAction, formatAdds } from './PlayerRow';
 export { PressBoxMatchupRow, type PressBoxMatchupRowProps, type PressBoxMatchupPlayer } from './MatchupRow';
 export {
@@ -34,6 +36,7 @@ export {
 
 /** The Press Box row ladder and chip. See rowScale.ts for why they fork. */
 export {
+  PB_TYPE,
   PB_ROW_NAME,
   PB_ROW_HEADLINE,
   PB_ROW_HEADLINE_LABEL,

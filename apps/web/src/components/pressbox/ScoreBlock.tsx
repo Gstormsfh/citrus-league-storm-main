@@ -26,6 +26,7 @@
  * five, not six points), and a day with neither draws an empty tile.
  */
 import { cn } from '@/lib/utils';
+import { PB_TYPE } from './rowScale';
 
 const MONO = 'font-plex tabular-nums';
 
@@ -92,7 +93,7 @@ export function PressBoxScoreBlock({
   const leading = you.score != null && them.score != null && you.score >= them.score;
 
   return (
-    <div className={cn('border-t border-white/[0.08] px-3 pt-2.5 pb-2', className)}>
+    <div className={cn(PB_TYPE, 'border-t border-white/[0.08] px-3 pt-2.5 pb-2', className)}>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <span className="flex items-center gap-2 min-w-0">
           <Disc letter={you.name.slice(0, 1).toUpperCase()} mine />

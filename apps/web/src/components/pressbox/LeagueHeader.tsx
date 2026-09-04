@@ -25,6 +25,7 @@ import { useLeague } from '@/contexts/LeagueContext';
 import { teamCrestUrl } from '@/components/roster/headshot';
 import { cn } from '@/lib/utils';
 import { HEADER_ROW1_H, HEADER_SUBTAB_H, SCANLINE } from './chromeMetrics';
+import { PB_TYPE } from './rowScale';
 
 export interface LeagueHeaderProps {
   /** `WK 1 · SEP 28–OCT 4`. Omitted while the week is still loading. */
@@ -93,7 +94,7 @@ export function LeagueHeader({
 
   return (
     <header
-      className={cn('sticky top-0 z-app-nav bg-pressbox-surface', className)}
+      className={cn(PB_TYPE, 'sticky top-0 z-app-nav bg-pressbox-surface', className)}
       style={SCANLINE}
     >
       {/* Row 1 — identity */}

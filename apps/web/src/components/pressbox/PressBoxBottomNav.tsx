@@ -19,6 +19,7 @@ import { NavLink } from 'react-router-dom';
 import { Trophy, Calendar, TrendingUp, BarChart3, CircleUser } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BOTTOMNAV_H } from './chromeMetrics';
+import { PB_TYPE } from './rowScale';
 
 const TABS = [
   { to: '/', label: 'Leagues', Icon: Trophy, end: true },
@@ -33,6 +34,7 @@ export function PressBoxBottomNav({ className }: { className?: string }) {
     <nav
       aria-label="Main"
       className={cn(
+        PB_TYPE,
         'fixed bottom-0 left-0 right-0 z-app-nav lg:hidden',
         'bg-pressbox-surface border-t border-white/[0.08]',
         'pb-[env(safe-area-inset-bottom)]',

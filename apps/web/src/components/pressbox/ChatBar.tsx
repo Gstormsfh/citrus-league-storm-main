@@ -19,6 +19,7 @@
 import { MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CHATBAR_H, BOTTOMNAV_H } from './chromeMetrics';
+import { PB_TYPE } from './rowScale';
 
 export interface ChatBarProps {
   variant?: 'chat' | 'stormy';
@@ -53,6 +54,7 @@ export function ChatBar({
   return (
     <div
       className={cn(
+        PB_TYPE,
         'fixed left-0 right-0 z-app-nav lg:hidden',
         'bg-pressbox-surface border-t border-white/[0.08]',
         'flex items-center gap-2 px-3',

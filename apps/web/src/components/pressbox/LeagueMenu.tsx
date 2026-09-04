@@ -26,6 +26,7 @@ import { Link } from 'react-router-dom';
 import { X, ChevronDown, Settings } from 'lucide-react';
 import { defaultLeagueTiles, type LeagueMenuTile } from './leagueMenuTiles';
 import { cn } from '@/lib/utils';
+import { PB_TYPE } from './rowScale';
 
 export interface LeagueMenuProps {
   open: boolean;
@@ -68,7 +69,7 @@ export function LeagueMenu({
      * argument for why it belongs there is how the old eleven-value mess grew.
      */
     <div
-      className={cn('fixed inset-0 z-overlay bg-pressbox-surface flex flex-col', className)}
+      className={cn(PB_TYPE, 'fixed inset-0 z-overlay bg-pressbox-surface flex flex-col', className)}
       role="dialog"
       aria-modal="true"
       aria-label={`${leagueName} menu`}

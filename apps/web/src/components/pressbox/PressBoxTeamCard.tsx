@@ -31,6 +31,7 @@
 import { Link } from 'react-router-dom';
 
 import { cn } from '@/lib/utils';
+import { PB_TYPE } from './rowScale';
 
 export interface PressBoxTeamAction {
   /** `⚡`, `⇄`, `+`, `☰` — drawn before the label. */
@@ -82,6 +83,7 @@ export function PressBoxTeamCard({
   return (
     <div
       className={cn(
+        PB_TYPE,
         'bg-pressbox-tile border border-white/[0.08] rounded-[14px] px-3 py-2.5',
         className,
       )}

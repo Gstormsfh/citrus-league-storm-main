@@ -38,6 +38,7 @@ import { PlayoffService, type PlayoffPictureTeam, type PlayoffBracket as Bracket
 import { logger } from '@/utils/logger';
 // Citrus decorative imports removed — cleaner layout
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
+import { PB_TYPE, PressBoxStandingsTable } from '@/components/pressbox';
 
 interface StandingsTeam {
   id: string;
@@ -688,7 +689,57 @@ const Standings = () => {
             </div>
           </div>
           
-          <Card className="max-w-5xl mx-auto overflow-hidden bg-pastel-surface-tile !border-white/10 ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] p-0" style={{ visibility: 'visible', opacity: 1 }}>
+          {/* PRESS BOX (2026-09-04). The table below is a seven-column
+              <Table> that scrolls sideways on a phone; this is the artboard's
+              standings, which fits 393 because the team cell stacks the name
+              over the handle and the playoff odds instead of giving each its
+              own column. Desktop keeps the table, where the width exists. */}
+          <div className={`${PB_TYPE} lg:hidden px-3`}>
+            {/* The artboard's meta line. `WEEK n OF 24` belongs here too and
+                lands with the week state; the playoff cut is what this page
+                already knows, and it is the half that changes how the table
+                reads. */}
+            {hasMatchups && (
+              <p className="mb-2 font-plex font-medium text-[10px] text-pressbox-text/45">
+                TOP {leagueFormat.playoffTeams} MAKE PLAYOFFS
+              </p>
+            )}
+            <PressBoxStandingsTable
+              rows={sortedTeams.map((team, index) => {
+                const isUserTeam = !!(user && leagueTeams.some((t) => t.id === team.id && t.owner_id === user.id));
+                const { wins, losses, ties } = team.record;
+                const l5 = team.last5;
+                return {
+                  teamId: team.id,
+                  rank: index + 1,
+                  name: team.name,
+                  // The handle and the playoff odds are what the artboard puts
+                  // here. Odds are a simulation this page does not run, so the
+                  // line carries the owner alone until it does.
+                  subLine: team.owner ? `@${team.owner}` : null,
+                  record: ties ? `${wins}–${losses}–${ties}` : `${wins}–${losses}`,
+                  pointsFor: team.pointsFor,
+                  pointsAgainst: team.pointsAgainst,
+                  streak: team.streak || null,
+                  /* `last5` is a TALLY, not a sequence — the page has counts
+                     and no order — so the squares say "four of the last five
+                     were wins" and the aria-label says exactly that. They are
+                     deliberately not sorted to imply a run. */
+                  lastFive: [
+                    ...Array.from({ length: l5.wins }, () => true),
+                    ...Array.from({ length: l5.losses + l5.ties }, () => false),
+                  ].slice(0, 5),
+                  isYou: isUserTeam,
+                };
+              })}
+              /* The line is only meaningful once the league is actually
+                 playing matchups; before that every team is above it. */
+              playoffSpots={hasMatchups ? leagueFormat.playoffTeams : null}
+              onRowPress={(row) => navigate(`/team/${row.teamId}`)}
+            />
+          </div>
+
+          <Card className="hidden lg:block max-w-5xl mx-auto overflow-hidden bg-pastel-surface-tile !border-white/10 ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] p-0" style={{ visibility: 'visible', opacity: 1 }}>
             <div className="overflow-x-auto" style={{ visibility: 'visible', opacity: 1 }}>
               <Table style={{ visibility: 'visible', opacity: 1 }}>
                 <thead className="bg-black/20 border-b border-white/10">

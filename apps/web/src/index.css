@@ -473,6 +473,61 @@
   font-family: 'Montserrat', sans-serif;
   font-weight: 500; /* font-medium */
   }
+
+  /* ══════════════════════════════════════════════════════════════════
+     PRESS BOX TYPE INHERITANCE (2026-09-04)
+
+     The rule directly above is an ELEMENT selector, so it does not just
+     set a default — it BEATS INHERITANCE. A <span> inside a row marked
+     `font-plex font-semibold` renders in Montserrat 500 anyway, because
+     `span` matches the span and `font-plex` only matches its parent.
+     Same story for `h1, h2, .font-varsity` (Graduate, uppercase, 900)
+     and the `h3..h6` rules below: any heading inside a Press Box panel
+     silently comes out in the varsity face.
+
+     This is the same class of bug as the `p, span, div { text-citrus-
+     forest }` rule removed on 2026-08-19 and documented below — an
+     element rule quietly overriding the utility on the ancestor — and
+     it is why the first Press Box screens read as "not the design"
+     while every value in them was right: the sizes and colours were
+     the artboard's, the FACES were not. Every figure on artboard 1a is
+     IBM Plex Mono and every name is Barlow.
+
+     `.pb-type` turns inheritance back on for a Press Box subtree.
+     The element list is wrapped in `:where()` ON PURPOSE, and the first
+     draft of this rule was wrong for want of it. Tailwind v3 INLINES
+     `@layer` — the output is ordinary source order, not native cascade
+     layers — so a plain `.pb-type span` (0,1,1) outranks `.font-barlow`
+     (0,1,0) and the reset ate the very utilities it exists to let
+     through: team names came out in Plex Mono 500. `:where()` adds no
+     specificity, so the selector is (0,1,0): it still beats the bare
+     `span` (0,0,1), and a `font-*` utility on the element ties on
+     specificity and wins on source order, because Tailwind emits
+     utilities after base. That is the behaviour Tailwind assumes and
+     this stylesheet had taken away.
+
+     Applied via PB_TYPE in components/pressbox/rowScale.ts. Do not
+     widen it past the Press Box: the rest of the app has been drawn
+     against the element rules and would shift under it.
+     ══════════════════════════════════════════════════════════════════ */
+  .pb-type {
+  /* The artboard writes every rule with the `font:` shorthand, which resets
+     line-height to `normal`. This app's base is 1.5, which added 7px to
+     every two-line row. It lives HERE rather than in the PB_TYPE class
+     string because `cn()` is tailwind-merge, and tailwind-merge drops a
+     `leading-*` class when a `text-{size}` class follows it — `text-sm` and
+     friends set both, so it treats them as conflicting. A CSS declaration
+     cannot be merged away; a `leading-*` utility on the same element still
+     wins, on source order. */
+  line-height: normal;
+  }
+
+  .pb-type :where(p, span, h1, h2, h3, h4, h5, h6) {
+  font-family: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: none;
+  }
   
   /* 2026-08-19: citrus-charcoal (#5C5C5C) measured 2.25:1 on the dark
      tiles — this is what made the "My Team" / "Team 2" manager list in

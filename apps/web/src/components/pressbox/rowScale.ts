@@ -111,3 +111,41 @@ export const PB_ROW_META =
  * smudge, not small text.
  */
 export const PB_ROW_MICRO = 'font-plex font-medium text-[9px] leading-none';
+
+/**
+ * THE ARTBOARD'S TYPE, RESTORED — leading AND face.
+ *
+ * Every rule in the design file is written with the `font:` shorthand — and
+ * the shorthand RESETS `line-height` to `normal` whether or not the author
+ * meant it to. So the reference is `normal` everywhere: a 13px Barlow name
+ * occupies 15px, a 9px mono sub-line occupies 10px, an 8px column header
+ * occupies 9.
+ *
+ * Both halves live in the `.pb-type` rule in index.css rather than in this
+ * string: `cn()` is tailwind-merge, and tailwind-merge DROPS a `leading-*`
+ * class when a `text-{size}` class follows it, because `text-sm` and friends
+ * set both. The segmented control lost its leading exactly that way.
+ *
+ * This app's base leading is 1.5. Inherited into a Press Box row that is two
+ * lines of text beside a 26px disc, 1.5 turns 25px of stack into 33 and the
+ * row from 43px to 50 — seven pixels per row, nine rows, half a screen of
+ * standings gone. It is also the whole of what "it still looks way too spread
+ * out" was pointing at: nothing was wrong with any single value, the leading
+ * was wrong under all of them.
+ *
+ * THE SECOND HALF IS THE FACE. `index.css` carries
+ * `body, p, span, .font-body { font-family: Montserrat; font-weight: 500 }`
+ * as an ELEMENT rule, which beats inheritance: a <span> inside a row marked
+ * `font-plex` renders in Montserrat anyway, because `span` matches the span
+ * and the utility only matches its parent. Headings are worse — `h1, h2`
+ * pull the Graduate varsity face at weight 900, uppercase. So the numbers in
+ * the standings table were Montserrat 500 while every figure on artboard 1a
+ * is IBM Plex Mono. `pb-type` (see index.css) turns inheritance back on for
+ * the subtree, and still loses to a `font-*` utility written on the element
+ * itself.
+ *
+ * Put this on the outermost node of a Press Box surface. Everything inside
+ * inherits it, exactly as it does on the artboard, and any block that wants
+ * real leading or a different face asks for it explicitly.
+ */
+export const PB_TYPE = 'pb-type';

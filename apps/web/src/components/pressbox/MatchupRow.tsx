@@ -37,7 +37,7 @@ import type { MugPlayer } from '@/components/roster/headshot';
 import { getTeamColor } from '@/utils/teamColors';
 
 import { PB_POSITION_CHIP_BASE, PB_CHIP_STARTER, PB_CHIP_BENCH } from './positionChip';
-import { PB_ROW_HEADLINE, PB_ROW_HEADLINE_LABEL, PB_ROW_META } from './rowScale';
+import { PB_TYPE, PB_ROW_HEADLINE, PB_ROW_HEADLINE_LABEL, PB_ROW_META } from './rowScale';
 
 export interface PressBoxMatchupPlayer extends MugPlayer {
   id: string | number;
@@ -100,6 +100,7 @@ function Side({
       onClick={() => onPress?.(player)}
       aria-label={`Open player card for ${player.name}`}
       className={cn(
+        PB_TYPE,
         'flex items-center gap-[7px] min-w-0 w-full text-left',
         // The mirror: face to the outside, number against the centre chip.
         !mine && 'flex-row-reverse text-right',

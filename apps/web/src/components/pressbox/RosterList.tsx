@@ -32,6 +32,7 @@
 import { cn } from '@/lib/utils';
 
 import { PressBoxRosterRow, type PressBoxRosterRowPlayer } from './RosterRow';
+import { PB_TYPE } from './rowScale';
 
 export interface PressBoxRosterSlotRow {
   slotId: string;
@@ -127,7 +128,7 @@ export function PressBoxRosterList({
   );
 
   return (
-    <div className={cn('bg-pressbox-surface border-t border-white/[0.08] px-3 pt-2.5', className)}>
+    <div className={cn(PB_TYPE, 'bg-pressbox-surface border-t border-white/[0.08] px-3 pt-2.5', className)}>
       {teamCard}
 
       <div className="flex items-center justify-between mt-3 px-0.5">
