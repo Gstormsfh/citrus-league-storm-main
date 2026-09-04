@@ -24,11 +24,10 @@ import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PB_TYPE } from './rowScale';
 
-export interface PressBoxTileProps {
+interface PressBoxTileBase {
   title: string;
   /** The one live number. Omit it rather than inventing one. */
   stat?: string | null;
-  to: string;
   Icon: LucideIcon;
   onNavigate?: () => void;
   /** League HQ's tighter tile. */
@@ -36,18 +35,25 @@ export interface PressBoxTileProps {
   className?: string;
 }
 
-export function PressBoxTile({ title, stat, to, Icon, onNavigate, dense, className }: PressBoxTileProps) {
-  return (
-    <Link
-      to={to}
-      onClick={onNavigate}
-      className={cn(
-        PB_TYPE,
-        'focus-citrus flex flex-col min-h-[88px] p-3 bg-pressbox-tile border border-white/[0.08]',
-        dense ? 'rounded-[12px]' : 'rounded-[14px]',
-        className,
-      )}
-    >
+/**
+ * A tile goes somewhere — a route, or an action on the page it sits on (the
+ * commissioner's settings sheet on League HQ lives inside that page and has
+ * no route; `leagueSettingsMobileSheetGuard` pins that). One or the other is
+ * REQUIRED: a tile with neither is the dead tile this type exists to make
+ * unrepresentable.
+ */
+export type PressBoxTileProps = PressBoxTileBase &
+  ({ to: string; onPress?: never } | { to?: never; onPress: () => void });
+
+export function PressBoxTile({ title, stat, to, onPress, Icon, onNavigate, dense, className }: PressBoxTileProps) {
+  const shell = cn(
+    PB_TYPE,
+    'focus-citrus flex flex-col min-h-[88px] p-3 bg-pressbox-tile border border-white/[0.08] text-left',
+    dense ? 'rounded-[12px]' : 'rounded-[14px]',
+    className,
+  );
+  const body = (
+    <>
       <Icon
         className={cn('text-pressbox-orange-soft', dense ? 'w-4 h-4' : 'w-[18px] h-[18px]')}
         strokeWidth={2}
@@ -59,7 +65,19 @@ export function PressBoxTile({ title, stat, to, Icon, onNavigate, dense, classNa
       {stat && (
         <span className="block mt-0.5 font-barlow text-[11px] text-pressbox-text/55">{stat}</span>
       )}
-    </Link>
+    </>
+  );
+  if (to) {
+    return (
+      <Link to={to} onClick={onNavigate} className={shell}>
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={onPress} className={shell}>
+      {body}
+    </button>
   );
 }
 

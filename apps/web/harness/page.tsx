@@ -89,7 +89,7 @@ const PRIORITY = Array.from({ length: 10 }, (_, i) => ({
   PLAYERS.filter((p: any) => ids.map(String).includes(String(p.id)));
 (LeagueService as any).getFreeAgents = async () => ({ players: PLAYERS.slice(18) });
 (LeagueService as any).getLeague = async () => ({
-  league: { id: 'harness-league', name: 'Harness League', team_count: 10, settings: {}, scoring_settings: HARNESS_SCORING, waiver_type: 'rolling', draft_status: 'completed', commissioner_id: 'harness-user' },
+  league: { id: 'harness-league', name: 'Harness League', team_count: 10, settings: {}, scoring_settings: HARNESS_SCORING, waiver_type: 'rolling', draft_status: 'completed', commissioner_id: 'harness-user', created_at: '2026-09-01T18:00:00.000Z', join_code: 'HARNESS' },
   error: null,
 });
 (LeagueService as any).getUserLeagues = async () => ({
@@ -109,7 +109,7 @@ const PRIORITY = Array.from({ length: 10 }, (_, i) => ({
 (LeagueService as any).getLeagueTeamsWithOwners = async () => ({
   teams: PRIORITY.map((p, i) => ({
     id: p.team_id, name: p.team_name, team_name: p.team_name, owner_name: p.owner_name,
-    owner_id: i === 1 ? 'harness-user' : `owner-${i + 1}`,
+    owner_id: i === 0 ? 'harness-user' : `owner-${i + 1}`,
   })),
   error: null,
 });
@@ -172,8 +172,34 @@ const HARNESS_RECORDS = [
 (waiverApi as any).getSettings = async () => ({ data: { waiver_type: 'rolling', process_day: 3, process_hour: 3 } });
 (waiverApi as any).getPlayersOnWaivers = async () => ({ data: [] });
 (leagueApi as any).getMyTeam = async () => ({ data: { id: 't1', name: 'Harness Team', waiver_priority: 3, faab_budget: 100 } });
-(leagueApi as any).getTeams = async () => ({ data: PRIORITY.map(p => ({ id: p.team_id, name: p.team_name, owner_id: 'harness-user' })) });
-(leagueApi as any).getLeague = async () => ({ data: { id: 'harness-league', name: 'Harness League', settings: {}, scoring_settings: HARNESS_SCORING, team_count: 10, waiver_type: 'rolling', draft_status: 'completed', commissioner_id: 'harness-user' } });
+(leagueApi as any).getTeams = async () => ({ data: PRIORITY.map((p, i) => ({ id: p.team_id, name: p.team_name, team_name: p.team_name, owner_id: i === 0 ? 'harness-user' : i < 6 ? `owner-${i + 1}` : null })) });
+(leagueApi as any).getLeague = async () => ({ data: { id: 'harness-league', name: 'Harness League', settings: {}, scoring_settings: HARNESS_SCORING, team_count: 10, waiver_type: 'rolling', draft_status: 'completed', commissioner_id: 'harness-user', created_at: '2026-09-01T18:00:00.000Z', join_code: 'HARNESS' } });
+/**
+ * LEAGUE HQ (2026-09-04): the week's scoreboard and the transaction ledger,
+ * which the Press Box HQ reads and the old one never did. Five matchups for
+ * ten teams, the second team's the caller's; three ledger rows inside the
+ * last seven days and one older, so `n this week` has something to count.
+ */
+const HARNESS_NOW = Date.now();
+(matchupApi as any).getLeagueMatchups = async (_leagueId: string, week?: number) => ({
+  data: Array.from({ length: 5 }, (_, i) => {
+    const a = PRIORITY[i * 2], b = PRIORITY[i * 2 + 1];
+    return {
+      id: `m${i + 1}`, league_id: 'harness-league', week_number: week ?? 1,
+      team1_id: a.team_id, team2_id: b.team_id,
+      team1: { id: a.team_id, team_name: a.team_name }, team2: { id: b.team_id, team_name: b.team_name },
+      team1_score: [118.4, 104.7, 71.3, 96.2, 88.0][i], team2_score: [96.1, 103.9, 127.5, 90.4, 91.7][i],
+      team1_projected_total: 140, team2_projected_total: 120,
+      status: 'in_progress', week_start_date: '2026-09-27', week_end_date: '2026-10-03',
+    };
+  }),
+});
+(leagueApi as any).getTransactions = async () => ({
+  data: [1, 2, 3, 12].map((daysAgo, i) => ({
+    id: `tx${i}`, type: i % 2 ? 'drop' : 'add', player_name: PLAYERS[20 + i].full_name,
+    team_name: PRIORITY[i].team_name, created_at: new Date(HARNESS_NOW - daysAgo * 86_400_000).toISOString(), status: 'processed',
+  })),
+});
 (rosterApi as any).getTeamRoster = async () => ({ data: MY_ROSTER.map((p: any) => ({ player_id: p.id })) });
 (rosterApi as any).getPlayerIds = async () => ({ data: MY_ROSTER.map((p: any) => Number(p.id)) });
 /**

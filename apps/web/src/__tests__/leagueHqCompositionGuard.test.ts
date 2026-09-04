@@ -39,7 +39,13 @@ describe('League HQ composition', () => {
   const H1S = [...SOURCE.matchAll(/<h1[^>]*>\{league\.name\}<\/h1>/g)].map((m) => m[0]);
 
   it('the phone chrome bar carries the league name, not a generic label', () => {
-    expect(H1S.length, 'chrome-bar h1 + page h1').toBeGreaterThanOrEqual(2);
+    // PRESS BOX (2026-09-04): the phone's identity row is the shared
+    // LeagueHeader — it prints the league's name and crest by contract
+    // (pressboxChromeGuard) — so the page keeps ONE h1 of its own, the
+    // desktop identity at sm+. The phone must still mount the header.
+    expect(H1S.length, 'page h1').toBeGreaterThanOrEqual(1);
+    const phoneChrome = SOURCE.slice(SOURCE.indexOf('className="lg:hidden pt-[env(safe-area-inset-top)]"'));
+    expect(phoneChrome).toContain('<LeagueHeader');
     expect(SOURCE).not.toContain('>League</h1>');
   });
 
@@ -145,7 +151,15 @@ describe('League HQ practice entry', () => {
     const linkAt = DRAFT_CARD.indexOf(LINK);
     expect(gateAt).toBeGreaterThan(-1);
     expect(linkAt).toBeGreaterThan(gateAt);
-    expect(SOURCE.split(MOCK_TARGET).length - 1, 'one practice entry on HQ').toBe(1);
+    // PRESS BOX (2026-09-04): two in the SOURCE, one per screen — the phone
+    // layer (`lg:hidden`) and the desktop card (`hidden lg:block`) each
+    // carry it, and a viewer only ever sees one. Both are behind the same
+    // gate; the phone's is checked here because it is outside DRAFT_CARD.
+    expect(SOURCE.split(MOCK_TARGET).length - 1, 'one practice entry per screen').toBe(2);
+    const phoneMockAt = SOURCE.indexOf(MOCK_TARGET);
+    expect(SOURCE.slice(phoneMockAt - 160, phoneMockAt)).toMatch(
+      /FEATURE_PRACTICE_DRAFT && league\.draft_status === 'not_started'/,
+    );
   });
 
   it('is a ghost, never a second orange verb beside Draft Room', () => {

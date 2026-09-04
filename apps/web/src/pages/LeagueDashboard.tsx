@@ -1,5 +1,6 @@
 import { userMessage } from '@/lib/userMessage';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   HockeyFooter,
@@ -28,14 +29,18 @@ import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import { waiverApi } from '@/api/waivers';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { LeagueHeader, LeagueMenu } from '@/components/pressbox';
+import { LeagueHQPhone, type LeagueHQMatchup } from '@/components/league/LeagueHQPhone';
+import { matchupApi } from '@/api/matchups';
+import { isBye, scoreOf, teamNameOf, type WeekMatchupRow } from '@/components/matchup/scoreboard';
+import { clampToSeasonStart, getCurrentWeekNumber, getDraftCompletionDate, getFirstWeekStartDate } from '@/utils/weekCalculator';
 import { LeagueTimelineCard } from '@/components/dashboard/LeagueTimelineCard';
 import { FEATURE_PRACTICE_DRAFT } from '@/lib/featureFlags';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Trophy, Users, Calendar, Settings, Play, Copy, CheckCircle, Clock, Shield, RefreshCw, UserPlus, Crown, Mail, ArrowLeftRight, Layers, Share2 } from 'lucide-react';
+import { Loader2, Trophy, Users, Calendar, Settings, Play, Copy, CheckCircle, Clock, Shield, RefreshCw, UserPlus, Crown, Mail, ArrowLeftRight, Layers, Share2, BarChart3, ArrowUpDown, CalendarDays, Briefcase, ClipboardList } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { buildInviteLink, canSystemShare, emailInvite, shareInvite } from '@/utils/inviteShare';
 import { InvitePlayersButton } from '@/components/InvitePlayersButton';
@@ -72,6 +77,8 @@ const LeagueDashboard = () => {
   
   // Commissioner Settings State
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** PRESS BOX (2026-09-04): the league menu behind the header's sliders. */
+  const [leagueMenuOpen, setLeagueMenuOpen] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [processingWaivers, setProcessingWaivers] = useState(false);
   const [waiverSettings, setWaiverSettings] = useState({
@@ -716,6 +723,105 @@ const LeagueDashboard = () => {
     }
   };
 
+  // ─────────────────────────────────────────────────────────────────────
+  // PRESS BOX (2026-09-04): what the phone's HQ draws, from what this page
+  // already holds plus one read — the week's scoreboard, which the old HQ
+  // never showed at all.
+  // ─────────────────────────────────────────────────────────────────────
+
+  /**
+   * The fantasy week, by the same arithmetic the Matchup page uses, and
+   * null when there is none: before the draft, or in the offseason (the
+   * `THERE IS NO WEEK` gate above). `phase === 'unknown'` on a failed season
+   * read leaves the week in, so a dead status API cannot hide the list.
+   */
+  const currentWeek = useMemo(() => {
+    if (!league || inOffseason) return null;
+    const done = getDraftCompletionDate(league);
+    if (!done || Number.isNaN(done.getTime())) return null;
+    return getCurrentWeekNumber(clampToSeasonStart(getFirstWeekStartDate(done)));
+  }, [league, inOffseason]);
+
+  const weekMatchupsQuery = useQuery({
+    queryKey: ['league-hq-matchups', leagueId, currentWeek],
+    enabled: !!leagueId && currentWeek !== null,
+    queryFn: async () => {
+      const res = await matchupApi.getLeagueMatchups(leagueId!, currentWeek!);
+      const rows = ((res as { data?: unknown }).data ?? res) as unknown;
+      return Array.isArray(rows) ? (rows as WeekMatchupRow[]) : [];
+    },
+    staleTime: 60_000,
+  });
+
+  /** The same key LeagueTimelineCard uses, so the two reads share one cache entry. */
+  const transactionsQuery = useQuery({
+    queryKey: ['league-timeline-transactions', leagueId],
+    enabled: !!leagueId,
+    queryFn: async () => {
+      const res = await leagueApi.getTransactions(leagueId!);
+      const raw = (res as { data?: unknown; transactions?: unknown }).data
+        ?? (res as { transactions?: unknown }).transactions
+        ?? res;
+      return Array.isArray(raw) ? (raw as Array<{ created_at?: string }>) : [];
+    },
+    staleTime: 60_000,
+  });
+  const transactionsThisWeek = useMemo(() => {
+    const rows = transactionsQuery.data;
+    if (!rows) return null;
+    const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return rows.filter((r) => r.created_at && new Date(r.created_at).getTime() >= since).length;
+  }, [transactionsQuery.data]);
+
+  const hqMatchups = useMemo<LeagueHQMatchup[] | undefined>(() => {
+    if (currentWeek === null || !leagueId) return [];
+    const rows = weekMatchupsQuery.data;
+    if (!rows) return weekMatchupsQuery.isError ? [] : undefined;
+    const mine = userTeam?.id ?? null;
+    const to = `/matchup/${leagueId}/${currentWeek}`;
+    // LeagueHQPhone puts yours first; this is the week's order.
+    return rows.map((row) => ({
+      id: row.id,
+      home: { name: teamNameOf(row, 'team1'), points: scoreOf(row.team1_score), isYou: mine !== null && row.team1_id === mine },
+      away: isBye(row)
+        ? { name: 'Bye week' }
+        : { name: teamNameOf(row, 'team2'), points: scoreOf(row.team2_score), isYou: mine !== null && row.team2_id === mine },
+      to,
+    }));
+  }, [currentWeek, leagueId, weekMatchupsQuery.data, weekMatchupsQuery.isError, userTeam?.id]);
+
+  /** The draft card, in the states the desktop card has (see it below). */
+  const hqDraft = useMemo(() => {
+    if (!league || !leagueId || league.draft_status === 'completed') return null;
+    const maxTeams = league.settings?.teamsCount || 12;
+    let description: string;
+    if (league.draft_status === 'in_progress') {
+      description = 'The draft is live. Join the room to make your picks.';
+    } else if (league.scheduled_draft_time && new Date(league.scheduled_draft_time) > new Date()) {
+      const at = new Date(league.scheduled_draft_time);
+      description = `Draft scheduled for ${at.toLocaleDateString()} at ${at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else if (isCommissioner) {
+      description = teams.length >= maxTeams
+        ? 'All teams are ready. Set up and start the draft.'
+        : `Need ${maxTeams - teams.length} more team${maxTeams - teams.length === 1 ? '' : 's'} to start the draft.`;
+    } else {
+      description = 'The commissioner starts the draft when every team is in. Join the lobby to wait.';
+    }
+    return {
+      label: league.draft_status === 'in_progress' ? 'Join draft room' : isCommissioner ? 'Go to draft room' : 'Enter draft lobby',
+      hot: league.draft_status === 'in_progress' || (isCommissioner && league.draft_status === 'not_started' && teams.length >= maxTeams),
+      description,
+      // DRAFT CUTOVER (2026-08-31): the live-engine room is /draft-v2/:leagueId.
+      to: `/draft-v2/${leagueId}`,
+      note: !isCommissioner && league.draft_status === 'not_started'
+        ? "You'll be able to participate once the commissioner starts the draft"
+        : null,
+      mock: FEATURE_PRACTICE_DRAFT && league.draft_status === 'not_started'
+        ? { label: 'Run a mock draft', to: '/armchair-gm?tab=mockdraft', note: 'Practice against the computer. Nothing there touches this league.' }
+        : null,
+    };
+  }, [league, leagueId, isCommissioner, teams.length]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0F1F15]">
@@ -755,18 +861,89 @@ const LeagueDashboard = () => {
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col">
       <div className="hidden lg:block"><Navbar /></div>
-      {/* HQ MOBILE COMPOSITION (2026-09-01, Sleeper pattern): the chrome
-          bar carries the league's identity on phones — not a generic
-          "League" label — so the page below can skip the duplicate mega
-          header and put the draft CTA above the fold. */}
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream truncate px-1">{league.name}</h1>
-          <MobileMenuButton />
-        </div>
+      {/*
+        * PRESS BOX (2026-09-04): League HQ, artboard 1a's LEAGUE tab.
+        *
+        * Below `lg`: the shared LeagueHeader over `LeagueHQPhone` — this
+        * week's matchups (a read the old HQ never made), the tile grid, the
+        * teams. `<main>` — the status badges, the squad card, the timeline,
+        * the settings dialog's trigger and the sidebar — is the desktop's
+        * from `lg` and is not rendered below it. The settings SHEET itself
+        * still opens on a phone: the Dialog is controlled (`settingsOpen`)
+        * and portals to the body, so a hidden trigger costs it nothing.
+        */}
+      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+        <LeagueHeader
+          weekLabel={currentWeek !== null ? `WK ${currentWeek}` : null}
+          onSettingsPress={() => setLeagueMenuOpen(true)}
+        />
       </div>
-      <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <LeagueMenu
+        open={leagueMenuOpen}
+        onClose={() => setLeagueMenuOpen(false)}
+        leagueId={leagueId ?? ''}
+        leagueName={league.name}
+        user={
+          profile
+            ? {
+                displayName:
+                  profile.display_name
+                  || (profile.username && !/^user_[0-9a-f]{6,}$/i.test(profile.username) ? profile.username : null)
+                  || 'You',
+                handle: profile.username ?? null,
+              }
+            : null
+        }
+      />
+      <div className="lg:hidden pb-[calc(5rem+env(safe-area-inset-bottom))]">
+        <LeagueHQPhone
+          week={currentWeek !== null && leagueId ? { number: currentWeek, to: `/matchup/${leagueId}/${currentWeek}` } : null}
+          seasonOpensOn={seasonOpensOn}
+          matchups={hqMatchups}
+          draft={hqDraft}
+          tiles={[
+            { title: 'Standings', to: `/standings?league=${leagueId}`, Icon: BarChart3 },
+            {
+              title: 'Transactions',
+              to: `/waiver-wire?league=${leagueId}`,
+              Icon: ArrowUpDown,
+              stat: transactionsThisWeek !== null ? `${transactionsThisWeek} this week` : null,
+            },
+            { title: 'Trades', to: `/trade-analyzer?league=${leagueId}`, Icon: ArrowLeftRight },
+            { title: 'Schedule', to: `/schedule-manager?league=${leagueId}`, Icon: CalendarDays },
+            {
+              title: 'My team',
+              to: `/roster?league=${leagueId}`,
+              Icon: Users,
+              stat: userTeam ? (myRosterCount !== null && myRosterCount > 0 ? `${myRosterCount} players` : userTeam.team_name) : null,
+            },
+            { title: 'GM office', to: '/gm-office', Icon: Briefcase },
+            ...(league.draft_status === 'completed'
+              ? [{
+                  title: 'Draft results',
+                  to: `/draft-v2/${leagueId}`,
+                  Icon: ClipboardList,
+                  stat: `${draftSettings.draft_rounds} rds`,
+                }]
+              : []),
+            ...(isCommissioner
+              ? [{ title: 'League settings', onPress: () => setSettingsOpen(true), Icon: Settings }]
+              : []),
+          ]}
+          teams={teams.map((t) => ({
+            id: t.id,
+            name: t.team_name,
+            owner: t.owner_id ? (t.owner_id === user?.id ? 'You' : 'Manager') : 'AI team',
+            rosterCount: rosterCounts[t.id] ?? null,
+            isYou: t.owner_id === user?.id,
+            to: `/team/${t.id}`,
+          }))}
+          /* Every member can invite — the guard is the join code existing,
+             not the commissioner's role (leagueHqCompositionGuard). */
+          invite={league.join_code && <InvitePlayersButton joinCode={league.join_code} leagueName={league.name} />}
+        />
+      </div>
+      <main className="hidden lg:block w-full lg:pt-24 lg:pb-8">
         <div className="w-full m-0 p-0">
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2 pt-3 sm:pt-0">
