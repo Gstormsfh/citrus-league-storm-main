@@ -190,7 +190,7 @@ export function PressBoxRosterRow({
         )}
       >
         <span className={cn(PB_POSITION_CHIP_BASE, PB_NEUTRAL_CHIP)}>{slot}</span>
-        <span className="w-[30px] h-[30px] rounded-full border border-dashed border-white/20" aria-hidden="true" />
+        <span className="w-7 h-7 justify-self-center rounded-full border border-dashed border-white/20" aria-hidden="true" />
         <span className={cn(PB_ROW_META, 'text-pressbox-text/45')}>Tap to fill</span>
         <span />
         {showWeek && <span />}
@@ -236,9 +236,21 @@ export function PressBoxRosterRow({
         )}
       </button>
 
-      {/* 2 — the face. The ONLY team colour on the row, and it is a ring. */}
+      {/* 2 — the face. The ONLY team colour on the row, and it is a ring.
+          The wrapper is `w-7 h-7`, the same 28px box `Mug`'s `xs` size draws,
+          and `justify-self-center` places it in the 30px track. It matters
+          that these agree: a 30px wrapper in a 30px track STRETCHES around a
+          28px picture, and the ring then floats 1px off the face all the way
+          down the column -- measured in the harness at 393, where every row
+          reported a 30px ring box around a 28px mug.
+          The spec draws a 30px face. Two pixels of it are being traded for
+          not editing `Mug`'s named size table, which four other surfaces and
+          a size-by-size test own; `Mug`'s own header is explicit that a size
+          is added THERE or not at all, because a className override leaves
+          the initials and the crest badge sized for the old box. Worth
+          revisiting with the sheets, not on a submission day. */}
       <span
-        className="w-[30px] h-[30px] rounded-full"
+        className="w-7 h-7 justify-self-center rounded-full"
         style={teamColor ? { boxShadow: `0 0 0 1.5px ${teamColor}` } : undefined}
         data-team-ring={player.teamAbbreviation || undefined}
       >

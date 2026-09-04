@@ -471,3 +471,47 @@ is invisible at 13 slots and is not at 30.
 
 Verified: 57/57 across the three Press Box guards, 443/443 across every
 source-walking guard, `tsc --noEmit` exit 0, `eslint` 0 errors.
+
+---
+
+## PR4c — the harness, and three things only a browser could have told me
+
+`harness/pressbox.html` + `pressbox.tsx`: the real `PressBoxRosterList`, the
+real `LeagueHeader` / `ChatBar` / `PressBoxBottomNav`, the real sixty NHL
+players and the real NHL CDN headshots, in a fixed 393px frame. Run it with
+`npx vite --config harness/vite.config.ts` and open `/harness/pressbox.html`.
+
+**Measured in the browser, not asserted from a comment.** Grid
+`30px 30px 233px 52px`, every row exactly 56px, nothing clipped inside any row
+at 393px, chip 30x30 Barlow Condensed 800 11px, name Barlow 700 15px, meta IBM
+Plex Mono 10px, headline Plex Mono 17px, mug ring
+`rgb(255,76,0) 0 0 0 1.5px` — Edmonton orange, on the mug, as a ring.
+
+**1. The mug ring floated 1px off the face, on every row.** The wrapper was
+`w-[30px]` in a 30px grid track, and grid stretches an item to its track, so a
+30px ring box was drawn around the 28px picture `Mug`'s `xs` size actually
+renders. Invisible in jsdom, obvious in a column of ten. The wrapper is now
+`w-7 h-7 justify-self-center` — the same 28px box, centred in the 30px track.
+
+The spec draws a 30px face; two pixels of it are traded for not editing `Mug`'s
+named size table, which four surfaces and a size-by-size test own, and whose
+own header is explicit that a size is added there or not at all (a className
+override leaves the initials and the crest badge sized for the old box).
+Revisit with the sheets, not on a submission day.
+
+**2. Tailwind does not scan `harness/`.** `tailwind.config.ts` covers
+`./pages`, `./components`, `./app` and `./src`. A class that appears ONLY in a
+harness file is never generated and silently does nothing — `w-[393px]` on the
+frame did exactly nothing, and the page rendered at the pane's own 980px, which
+is a width no manager will ever see. The frame is an inline style now, and the
+gotcha is written down: every harness page can only use classes the app already
+uses somewhere. Widening the content globs would put harness-only classes in
+the app's CSS, so it is not the fix.
+
+**3. The harness league stub had no `activeLeague`.** The Press Box header
+reads it for the name and the crest, so the header rendered an empty title and
+a `?` disc — a thin fixture reading as a broken component. The stub now carries
+one.
+
+Verified: 443/443 source-walking guards, 20/20 on the row guard, 20/20 on the
+adapter, `tsc` exit 0, `eslint` 0 errors.
