@@ -2,6 +2,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { getTodayMST } from '@/utils/timezoneUtils';
+import { FANTASY_WEEK_START_DOW, weekEndDow } from '@/utils/weekCalculator';
 import { CitrusSparkle } from '@/components/icons/CitrusIcons';
 import { logger } from '@/utils/logger';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -54,7 +55,7 @@ export const WeeklySchedule = ({
   // Below the lg breakpoint — the same line index.css's mobile block draws.
   const isPhone = useIsMobile();
 
-  // Generate all dates in the week (Sun-Sat)
+  // Generate all dates in the week (seven days from weekStart)
   // Parse dates carefully to avoid timezone issues
   const dates: string[] = [];
   
@@ -66,21 +67,33 @@ export const WeeklySchedule = ({
   const startDate = new Date(startYear, startMonth - 1, startDay); // Month is 0-indexed
   const endDate = new Date(endYear, endMonth - 1, endDay);
   
-  // Verify that startDate is actually a Sunday (getDay() returns 0 for Sunday)
+  // WEEK SHAPE (2026-09-04). These two checks hardcoded Sunday and Saturday,
+  // which disagreed with clampToSeasonStart's Monday anchor, so every league
+  // built for this season logged both warnings on every render. Nine leagues
+  // times every matchup view is a lot of noise for a component that renders
+  // correctly either way -- it labels each column with that date's real
+  // weekday, so a Monday-anchored week draws Mon..Sun and looks right.
+  //
+  // Now read from the one place that defines a fantasy week. When the
+  // per-league week-start setting lands this takes a prop and passes it in;
+  // until then every league uses the default.
+  const expectedStartDow = FANTASY_WEEK_START_DOW;
+  const expectedEndDow = weekEndDow(expectedStartDow);
+  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
   const startDayOfWeek = startDate.getDay();
-  if (startDayOfWeek !== 0) {
-    logger.warn(`[WeeklySchedule] weekStart (${weekStart}) is not a Sunday! Day of week: ${startDayOfWeek} (0=Sun, 1=Mon, etc.)`);
+  if (startDayOfWeek !== expectedStartDow) {
+    logger.warn(`[WeeklySchedule] weekStart (${weekStart}) is a ${DAY_NAMES[startDayOfWeek]}, expected ${DAY_NAMES[expectedStartDow]}`);
   }
-  
-  // Verify that endDate is actually a Saturday (getDay() returns 6 for Saturday)
+
   const endDayOfWeek = endDate.getDay();
-  if (endDayOfWeek !== 6) {
-    logger.warn(`[WeeklySchedule] weekEnd (${weekEnd}) is not a Saturday! Day of week: ${endDayOfWeek} (0=Sun, 1=Mon, etc.)`);
+  if (endDayOfWeek !== expectedEndDow) {
+    logger.warn(`[WeeklySchedule] weekEnd (${weekEnd}) is a ${DAY_NAMES[endDayOfWeek]}, expected ${DAY_NAMES[expectedEndDow]}`);
   }
   
   const current = new Date(startDate);
 
-  // Generate dates from Sunday to Saturday (7 days)
+  // Seven days from weekStart, whatever weekday that is
   while (current <= endDate) {
     // Format as YYYY-MM-DD to match database format
     // Use local date components to avoid timezone issues
@@ -91,7 +104,8 @@ export const WeeklySchedule = ({
     current.setDate(current.getDate() + 1);
   }
   
-  // Ensure we have exactly 7 days (Sun-Sat)
+  // Ensure we have exactly 7 days. THIS one is a real defect if it trips:
+  // a week that is not seven days long drops or double-counts games.
   if (dates.length !== 7) {
     logger.warn(`[WeeklySchedule] Expected 7 days but got ${dates.length}. Week: ${weekStart} to ${weekEnd}`);
   }

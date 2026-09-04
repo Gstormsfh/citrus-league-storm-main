@@ -160,17 +160,61 @@ export function getCurrentWeekNumber(firstWeekStart: Date): number {
  * containing October 1. In-season anchors (Oct–Apr) pass through
  * unchanged, preserving existing behaviour for mid-season leagues.
  */
-export function clampToSeasonStart(firstWeekStart: Date): Date {
+/**
+ * WHAT DAY A FANTASY WEEK STARTS (2026-09-04).
+ *
+ * The app held two answers and never noticed. `getFirstWeekStartDate` snaps
+ * to SUNDAY; `clampToSeasonStart` anchored the season to the MONDAY of the
+ * week containing Oct 1. The clamp wins for any draft between May and
+ * September, so every league built for this season came out Monday-aligned
+ * while WeeklySchedule.tsx asserted Sunday-to-Saturday and logged a warning
+ * on every render.
+ *
+ * Measured on production 2026-09-04, every matchup row by weekday:
+ *
+ *   Mon -> Sun   461 matchups   9 leagues   2026-09-28 .. 2027-04-05
+ *   Sat -> Fri    60 matchups   2 leagues   2026-01-10 .. 2026-05-23
+ *   Sun -> Sat    36 matchups   2 leagues   2026-03-01 .. 2026-04-19
+ *
+ * All nine of the Monday leagues are rehearsals -- "Launch Dry Run",
+ * "MLSE Walkthrough Rehearsal", "Test at golf" -- with zero non-scheduled
+ * matchups. No real league is anchored either way yet, which is why the
+ * default could be settled by choice rather than by migration.
+ *
+ * Garrett's call: SUNDAY to SATURDAY, with the day configurable per league
+ * later. So the two halves of the app now agree on Sunday, and the day is a
+ * PARAMETER rather than a literal in three files, so the per-league setting
+ * drops in without touching this logic again.
+ */
+export const FANTASY_WEEK_START_DOW = 0; // Sunday (Date.getDay(): Sun=0 .. Sat=6)
+
+/** The weekday a fantasy week ends on, given the day it starts. */
+export const weekEndDow = (startDow: number = FANTASY_WEEK_START_DOW): number =>
+  (startDow + 6) % 7;
+
+/**
+ * NOT YET REGENERATED. The nine rehearsal leagues above still hold
+ * Monday-anchored matchups, because changing this constant does not rewrite
+ * rows that already exist. They are rehearsals with nothing played, so they
+ * can be regenerated whenever, or left as a record of the old shape. Any
+ * league drafted from here on is Sunday-anchored.
+ */
+
+export function clampToSeasonStart(
+  firstWeekStart: Date,
+  startDow: number = FANTASY_WEEK_START_DOW,
+): Date {
   const m = firstWeekStart.getMonth(); // 0-11
   if (m < 4 || m > 8) return firstWeekStart; // Oct–Apr: in-season, unchanged
   const oct1 = new Date(firstWeekStart.getFullYear(), 9, 1);
-  // Monday of the week containing Oct 1 (getDay: Sun=0 … Sat=6)
-  const day = oct1.getDay();
-  const daysBackToMonday = (day + 6) % 7;
-  const monday = new Date(oct1);
-  monday.setDate(oct1.getDate() - daysBackToMonday);
-  monday.setHours(0, 0, 0, 0);
-  return monday;
+  // Walk BACK to the most recent `startDow` on or before Oct 1. This read
+  // `(day + 6) % 7`, which is the same walk hardcoded to Monday and is where
+  // the app's second opinion about the week lived.
+  const daysBack = (oct1.getDay() - startDow + 7) % 7;
+  const anchor = new Date(oct1);
+  anchor.setDate(oct1.getDate() - daysBack);
+  anchor.setHours(0, 0, 0, 0);
+  return anchor;
 }
 
 export function getAvailableWeeks(firstWeekStart: Date): number[] {
