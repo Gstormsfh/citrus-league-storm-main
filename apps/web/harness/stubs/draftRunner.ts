@@ -41,7 +41,26 @@ export class DraftClientRunner {
   connect(_params: unknown, callbacks: Record<string, unknown> = {}) {
     this.cbs = callbacks as never;
     const deadline = new Date(Date.now() + CLOCK_SECONDS * 1000).toISOString();
-    const recentEvents = Array.from({ length: PRE_PICKS }, (_, i) => pickEvent(i + 1));
+    /**
+     * A real seed carries the `draft_started` event, and the store reads the
+     * pick clock's limit off it (Entry 87 Fix C). Without it the harness
+     * room ran with `pickTimeLimitSec` null: the timer unclamped, and the
+     * off-clock bar's `≤ n MIN` ceiling missing. Seq 0 so it folds as a
+     * no-op ahead of the picks.
+     */
+    const started = {
+      kind: 'draft_started' as const,
+      seq: 0,
+      timestamp: '2026-09-28T18:00:00.000Z',
+      correlationId: 'harness-start',
+      startedAt: '2026-09-28T18:00:00.000Z',
+      firstPickDeadline: '2026-09-28T18:00:30.000Z',
+      totalRounds: ROUNDS,
+      totalTeams: TEAMS.length,
+      pickTimeLimitSeconds: CLOCK_SECONDS,
+      draftFormat: 'snake' as const,
+    };
+    const recentEvents = [started, ...Array.from({ length: PRE_PICKS }, (_, i) => pickEvent(i + 1))];
     const next = MATRIX[PRE_PICKS];
     queueMicrotask(() => {
       this.cbs.onSnapshot?.({

@@ -34,6 +34,7 @@ import {
   useClockOffsetEstimator,
 } from '@/components/draft/v2/DraftTimerV2';
 import { OnClockActionBar } from '@/components/draft/v2/OnClockActionBar';
+import { OffClockBar } from '@/components/draft/v2/OffClockBar';
 import { AuctionPanel } from '@/components/draft/v2/AuctionPanel';
 import { OfflineDraftRoom } from '@/components/draft/v2/OfflineDraftRoom';
 import { ManagerPresencePanel } from '@/components/draft/v2/ManagerPresencePanel';
@@ -553,15 +554,19 @@ export default function DraftRoomV2() {
   }
 
   return (
-    /* pb-28: clearance for the on-clock action bar, which is FIXED to the
-       bottom edge on phones (see MainTabs). lg+ restores the normal pad —
-       the bar is sticky-in-flow there. */
+    /* pb-40: clearance for the pick bar, which is FIXED to the bottom edge
+       on phones (see MainTabs). lg+ restores the normal pad — the bar is
+       sticky-in-flow there. PRESS BOX (2026-09-04): was pb-28 (112px), set
+       for the old bar. The artboard's bar with the decision line and the
+       scarcity strip under it measured 141px at 393, and the pool's
+       `+ N MORE` button sat 30px under it. 160 clears the tallest bar with
+       room for the safe-area inset. */
     /* PRESS BOX (2026-09-04): px-0 below md. The Press Box screens run
        full-bleed with each block owning its own 14px gutter — the pool's
        selected row needs its rail to reach the screen edge — so the room
        stops padding the phone and lets its children do it. The desktop pool
        card takes over at md, and the gutter comes back with it. */
-    <div className={`${PB_TYPE} container mx-auto px-0 py-4 md:px-4 pb-28 lg:pb-4`} data-testid="draft-room-v2">
+    <div className={`${PB_TYPE} container mx-auto px-0 py-4 md:px-4 pb-40 lg:pb-4`} data-testid="draft-room-v2">
       {/*
         * NATIVE ESCAPE HATCH (2026-08-31, moved into the sticky header
         * 2026-09-01) — reported from the iOS simulator as "I'm stuck, the
@@ -2019,6 +2024,19 @@ function MainTabs({
     derived?.currentPickNumber,
   ]);
 
+  /**
+   * PRESS BOX (2026-09-04): the off-clock bar's `NEXT PICK 4.06 · 11 PICKS
+   * AWAY`. `picksUntilNextTurn` already answers the second half for the
+   * scarcity strip; the first half is the same walk of the matrix.
+   */
+  const offClockNextPick = useMemo<{ number: number; picksAway: number } | 'none' | 'unknown'>(() => {
+    const current = derived?.currentPickNumber ?? null;
+    if (!matrix || myTeamId === null || current === null) return 'unknown';
+    const away = picksUntilNextTurn(matrix, myTeamId, current);
+    if (away === null) return 'none';
+    return { number: current + away, picksAway: away };
+  }, [matrix, myTeamId, derived?.currentPickNumber]);
+
   const selectedProjection = selectedPlayer
     ? (projectedFptsMap.get(selectedPlayer.id) ?? null)
     : null;
@@ -2294,7 +2312,7 @@ function MainTabs({
           sticky header can never overlap. (Its old `sticky top-24` sat
           UNDERNEATH the taller pre-compaction header, z-20 vs z-30.)
           The draft routes already hide MobileBottomNav, so the bottom
-          edge belongs to the draft; the room container carries pb-28 so
+          edge belongs to the draft; the room container carries pb-40 so
           the list's last rows scroll clear of it. lg+ keeps it in-flow,
           sticky just below the compact header. */}
       {!isAuctionRoom && (
@@ -2324,6 +2342,31 @@ function MainTabs({
                 : null
             }
           />
+          {/* PRESS BOX (2026-09-04): the bar between turns. The handoff's
+              `NEXT PICK 4.06 · 11 PICKS AWAY · ~8 MIN` with QUEUE as the
+              verb on a phone; the desktop rail already shows the queue, so
+              there the bar is the line and the room's clock alone. Only
+              while the draft is running — a lobby has no next pick. */}
+          {!amIOnClock && derived !== null && derived.draftStatus === 'in_progress' && (
+            <OffClockBar
+              currentPickDeadline={snapshot?.stateSnapshot.currentPickDeadline ?? null}
+              clockOffsetMs={clockOffsetMs}
+              pickTimeLimitSec={pickTimeLimitSec}
+              pickNumber={derived.currentPickNumber}
+              roundNumber={derived.currentRoundNumber}
+              onClockTeamName={
+                derived.onClockTeamId !== null
+                  ? (teams.find((t) => t.id === derived.onClockTeamId)?.team_name ?? null)
+                  : null
+              }
+              nextPick={offClockNextPick}
+              teamCount={participatingTeamIds.size}
+              picksMade={derived.picksMade}
+              totalPicks={derived.totalPicks}
+              queueCount={liveQueueCount}
+              onOpenQueue={isMobile ? () => setTab('queue') : undefined}
+            />
+          )}
         </div>
       )}
       {/* Toggles live in normal flow — set-and-forget controls don't earn

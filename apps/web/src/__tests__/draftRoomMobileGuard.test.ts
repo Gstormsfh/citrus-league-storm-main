@@ -107,8 +107,11 @@ describe('nothing floats over the player pool during a draft', () => {
     // lg+ keeps it sticky just under the compact header, above the pool's
     // own sticky column header.
     expect(ROOM).toMatch(/lg:top-16 lg:z-sticky-raised/);
-    // The room container clears the bar on phones only.
-    expect(ROOM).toMatch(/pb-28 lg:pb-4/);
+    // The room container clears the bar on phones only. PRESS BOX
+    // (2026-09-04): pb-40, because the artboard's bar with the decision line
+    // and the scarcity strip measured 141px at 393 and the pool's `+ N MORE`
+    // button was 30px under the old 112.
+    expect(ROOM).toMatch(/pb-40 lg:pb-4/);
   });
 });
 
