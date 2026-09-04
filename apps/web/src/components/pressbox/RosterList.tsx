@@ -52,6 +52,11 @@ export interface PressBoxRosterListProps {
   startersRequired: number;
   /** How many bench players have a game on the selected day. */
   benchPlayingCount?: number;
+  /**
+   * Draw the WK column. Off until a page has a real per-player week total --
+   * `HockeyPlayer` carries daily figures only. See `RosterRow.tsx`.
+   */
+  showWeek?: boolean;
   onSlotPress?: (slotId: string) => void;
   onNamePress?: (row: PressBoxRosterSlotRow) => void;
   onEmptyPress?: (slotId: string) => void;
@@ -70,6 +75,7 @@ export function PressBoxRosterList({
   startersFilled,
   startersRequired,
   benchPlayingCount = 0,
+  showWeek = false,
   onSlotPress,
   onNamePress,
   onEmptyPress,
@@ -81,6 +87,7 @@ export function PressBoxRosterList({
       player={row.player}
       slot={row.slot}
       countsForScoring={countsForScoring}
+      showWeek={showWeek}
       locked={row.locked}
       dtd={row.dtd}
       selected={row.selected}
@@ -127,7 +134,10 @@ export function PressBoxRosterList({
           land over the numbers they name rather than near them. */}
       <div
         aria-hidden="true"
-        className="grid grid-cols-[30px_30px_1fr_52px_44px] items-center gap-2 px-3 h-5 border-b border-white/[0.08]"
+        className={cn(
+          'grid items-center gap-2 px-3 h-5 border-b border-white/[0.08]',
+          showWeek ? 'grid-cols-[30px_30px_1fr_52px_44px]' : 'grid-cols-[30px_30px_1fr_52px]',
+        )}
       >
         <span />
         <span />
@@ -137,9 +147,11 @@ export function PressBoxRosterList({
         <span className={cn(PB_ROW_MICRO, 'uppercase tracking-[0.08em] text-pressbox-text/45 text-right')}>
           Today
         </span>
-        <span className={cn(PB_ROW_MICRO, 'uppercase tracking-[0.08em] text-pressbox-text/45 text-right')}>
-          Wk
-        </span>
+        {showWeek && (
+          <span className={cn(PB_ROW_MICRO, 'uppercase tracking-[0.08em] text-pressbox-text/45 text-right')}>
+            Wk
+          </span>
+        )}
       </div>
 
       <div>{starters.map((r) => renderRow(r, true))}</div>

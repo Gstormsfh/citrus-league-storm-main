@@ -44,14 +44,26 @@ const row = (props: Partial<React.ComponentProps<typeof PressBoxRosterRow>> = {}
 
 describe('Press Box roster row — geometry', () => {
   it('is the spec grid at the spec height: 30/30/1fr/52/44, gap 8, min 56', () => {
-    const el = row().querySelector('[data-testid="pressbox-roster-row"]')!;
-    const cls = el.className;
     // The five columns in order, not a five-column grid of any widths: the
     // chip and the mug are fixed so that names in a column all start at the
     // same x, which is the property that makes a list scannable.
-    expect(cls).toContain('grid-cols-[30px_30px_1fr_52px_44px]');
-    expect(cls).toContain('gap-2');
-    expect(cls).toContain('min-h-[56px]');
+    const withWeek = row({ showWeek: true }).querySelector('[data-testid="pressbox-roster-row"]')!;
+    expect(withWeek.className).toContain('grid-cols-[30px_30px_1fr_52px_44px]');
+    expect(withWeek.className).toContain('gap-2');
+    expect(withWeek.className).toContain('min-h-[56px]');
+  });
+
+  it('without a week figure the grid CLOSES rather than printing a dash column', () => {
+    // HockeyPlayer carries daily points and a daily projection and nothing
+    // weekly. Forty rows of "–" under a WK header occupies 44px, teaches the
+    // eye to skip that edge of the row, and reads as broken rather than as
+    // not-yet. The column and its width return together when a real figure
+    // does.
+    const el = row().querySelector('[data-testid="pressbox-roster-row"]')!;
+    expect(el.className).toContain('grid-cols-[30px_30px_1fr_52px]');
+    expect(el.className).not.toContain('52px_44px');
+    expect(row({ showWeek: true }).textContent).toContain('12.4');
+    expect(row().textContent).not.toContain('12.4');
   });
 
   it('the chip is 30px and neutral — the letter carries the position', () => {
@@ -232,7 +244,7 @@ describe('Press Box roster list', () => {
   });
 
   it('the column header wears the row grid, so labels land over their numbers', () => {
-    const header = [...list().querySelectorAll('div')].find(
+    const header = [...list({ showWeek: true }).querySelectorAll('div')].find(
       (d) => d.className.includes('grid-cols-[30px_30px_1fr_52px_44px]') && d.getAttribute('aria-hidden') === 'true',
     );
     expect(header, 'a header on the row grid').toBeDefined();

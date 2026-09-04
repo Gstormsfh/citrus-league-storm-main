@@ -426,3 +426,48 @@ app exactly as it is today, not half-converted.
 
 Verified: 19/19 on the new guard, 443/443 on every source-walking guard,
 `tsc --noEmit` exit 0, `eslint` clean on the new directory.
+
+---
+
+## PR4b — the adapter, and one definition of a league's slots (2026-09-04)
+
+`components/pressbox/rosterRows.ts`, a pure function from the roster payload to
+Press Box rows, with 20 assertions. Plus `components/roster/slotConfig.ts`.
+
+**`buildSlotConfig` came out of `MobileRosterList` rather than being copied.**
+It was a private function in a 765-line component and the Press Box roster
+needs the same answer. Two definitions of "what slots does this league have"
+is a correctness hazard, not a style one: they agree the day they are written
+and disagree the first time a league setting grows a slot, and the symptom is
+a player who holds a slot on one surface and is homeless on the other. The
+body is unchanged — the only diff against the original is an explicit return
+type and the signature wrapped across lines. `MobileRosterList` now imports it
+and behaves identically.
+
+**Four things the adapter refuses to invent, each with a test.**
+
+* **The period.** The mock reads `vs TOR 3RD`; the payload has
+  `gameStatus` (`scheduled|live|intermission|final`), `score` and `gameTime`
+  and no period. So live reads `vs TOR 2-1`, or `vs TOR LIVE` with no score;
+  intermission `vs TOR INT 2-1`; final `FINAL 4-2` or bare `FINAL`; scheduled
+  `@ DAL 8:30 PM`. A test asserts `3RD` never appears.
+* **Plus/minus.** The mock's stat line ends `+1`. `daily_actual_stats` has no
+  plus/minus field. Asserted absent.
+* **The week total.** `HockeyPlayer` carries daily points and a daily
+  projection and nothing weekly, so `weekPoints` is null and the WK column is
+  off — the row's grid closes to four columns rather than printing a dash
+  column 44px wide down forty rows. Both halves are tested: the closed grid
+  now, the full spec grid the moment a real figure exists.
+* **A projection standing in for a result.** Before puck drop `todayActual` is
+  null, not zero; after it starts a zero is a real number and prints as one.
+
+**"Playing tonight" counts the schedule, not projections.** A scratched player
+can carry a stale projection and a confirmed starter on an idle team must not
+be counted, so the bench note reads `nextGame.isToday`.
+
+**The slot lookup is inverted once.** `slotAssignments` is keyed by player and
+valued by slot, and the original scanned the whole object once per slot. That
+is invisible at 13 slots and is not at 30.
+
+Verified: 57/57 across the three Press Box guards, 443/443 across every
+source-walking guard, `tsc --noEmit` exit 0, `eslint` 0 errors.

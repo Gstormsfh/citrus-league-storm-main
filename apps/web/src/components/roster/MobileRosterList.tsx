@@ -10,6 +10,11 @@ import { slotLabel as labelForSlot } from "./slotLabel";
 import { LOCKED_CHIP } from "./slotChip";
 import { DEFAULT_IR_SLOT_COUNT, irSlotIds, shouldMoveOffIr } from "./irSlots";
 import { multiPositionLabel } from "./positions";
+// The league's slot plan. Lifted into its own pure module (2026-09-04) so the
+// Press Box roster reads the SAME plan rather than carrying a second copy --
+// two answers to "what slots does this league have" is a correctness hazard,
+// not a style one. The logic is unchanged.
+import { buildSlotConfig } from "./slotConfig";
 import { Mug } from "./Mug";
 import { useSwapHint } from "@/hooks/useSwapHint";
 import { useMemo } from "react";
@@ -76,49 +81,6 @@ interface MobileRosterListProps {
    * `resolveIrSlotCount` (the server's rule); 0 hides the section.
    */
   irSlotCount?: number;
-}
-
-/**
- * Build slot label map and slot arrays dynamically from position type and roster slots.
- */
-function buildSlotConfig(positionType: PositionType = 'individual', rosterSlots?: Record<string, number>) {
-  const labels: Record<string, string> = {};
-  const allSlots: string[] = [];
-
-  const posKeys = positionType === 'forward'
-    ? ['F', 'D', 'G']
-    : ['C', 'LW', 'RW', 'D', 'G'];
-
-  const defaults: Record<string, number> = positionType === 'forward'
-    ? { F: 6, D: 4, G: 2, UTIL: 1 }
-    : { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
-
-  for (const pos of posKeys) {
-    const count = rosterSlots?.[pos] ?? defaults[pos] ?? 0;
-    for (let i = 1; i <= count; i++) {
-      const slotId = `slot-${pos}-${i}`;
-      labels[slotId] = pos;
-      allSlots.push(slotId);
-    }
-  }
-
-  // UTIL slot
-  const utilCount = rosterSlots?.UTIL ?? defaults.UTIL ?? 1;
-  for (let i = 0; i < utilCount; i++) {
-    const slotId = utilCount === 1 ? 'slot-UTIL' : `slot-UTIL-${i + 1}`;
-    labels[slotId] = 'UTIL';
-    allSlots.push(slotId);
-  }
-
-  // Group by section
-  const forwardSlots = positionType === 'forward'
-    ? allSlots.filter(s => s.startsWith('slot-F-'))
-    : allSlots.filter(s => s.startsWith('slot-LW-') || s.startsWith('slot-C-') || s.startsWith('slot-RW-'));
-  const defenseSlots = allSlots.filter(s => s.startsWith('slot-D-'));
-  const goalieSlots = allSlots.filter(s => s.startsWith('slot-G-'));
-  const utilSlots = allSlots.filter(s => s.startsWith('slot-UTIL'));
-
-  return { labels, allSlots, forwardSlots, defenseSlots, goalieSlots, utilSlots };
 }
 
 // ─── Format compact stat line from actual game stats (live/final only) ───

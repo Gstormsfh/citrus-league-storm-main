@@ -39,8 +39,18 @@
  *     is never to ship a number that is not real. `showOwnership` turns the
  *     segment on the day the aggregate lands (PR12); nothing else changes.
  *
- *   * The WK TREND micro (`▲ 12%` / `▼ 31%`). It is a week-over-week delta
- *     against a figure the roster payload does not carry. Same rule.
+ *   * The WK COLUMN ITSELF, until a page supplies it. `HockeyPlayer` carries
+ *     `daily_actual_points` and a daily projection and nothing weekly, so the
+ *     roster payload has no per-player week total. A column of dashes down
+ *     forty rows is worse than no column -- it occupies the width, teaches the
+ *     eye to skip it, and says "broken" rather than "not yet". So `showWeek`
+ *     defaults OFF and the grid closes to four columns when it is; the fifth
+ *     column and its 44px come back the moment a real figure exists, which is
+ *     the same grid the spec draws.
+ *
+ *   * The WK TREND micro (`▲ 12%` / `▼ 31%`). Even with a week total it is a
+ *     week-over-week delta against a PRIOR week the payload does not carry.
+ *     Same rule.
  *
  * COLOUR, and the one contract this row must not break. Orange means YOU or
  * the primary action. On a roster every row is already yours, so orange here
@@ -92,7 +102,7 @@ export interface PressBoxRosterRowPlayer extends MugPlayer {
   todayActual?: number | null;
   /** Tonight's projection. */
   todayProjection?: number | null;
-  /** The week's points so far. */
+  /** The week's points so far. Only meaningful when the list shows the column. */
   weekPoints?: number | null;
 }
 
@@ -109,6 +119,12 @@ export interface PressBoxRosterRowProps {
   eligibleTarget?: boolean;
   /** Day-to-day / injured: tints the row and turns the meta grapefruit. */
   dtd?: boolean;
+  /**
+   * Draw the fifth (WK) column. OFF until a page has a real week total for
+   * every row -- see the header. The grid closes to four columns when off, so
+   * the row never carries dead width.
+   */
+  showWeek?: boolean;
   /** PR12 turns this on with the rostered/started aggregate. */
   showOwnership?: boolean;
   rosteredPct?: number | null;
@@ -130,6 +146,7 @@ export function PressBoxRosterRow({
   selected,
   eligibleTarget,
   dtd,
+  showWeek = false,
   showOwnership = false,
   rosteredPct,
   startedPct,
@@ -139,6 +156,9 @@ export function PressBoxRosterRow({
 }: PressBoxRosterRowProps) {
   const isEmpty = player == null;
   const key = positionChipKey(slot);
+  const grid = showWeek
+    ? 'grid-cols-[30px_30px_1fr_52px_44px]'
+    : 'grid-cols-[30px_30px_1fr_52px]';
   const isBenchLike = slot === 'BN' || slot === 'IR' || !countsForScoring;
 
   // The TODAY column. A points figure is sage once it HAPPENED and orange-soft
@@ -163,7 +183,8 @@ export function PressBoxRosterRow({
         aria-label={`Empty ${slot}, tap to fill`}
         onClick={onEmptyPress}
         className={cn(
-          'grid grid-cols-[30px_30px_1fr_52px_44px] items-center gap-2 px-3 min-h-[56px]',
+          'grid items-center gap-2 px-3 min-h-[56px]',
+          grid,
           'border-b border-white/[0.06] cursor-pointer active:bg-white/5',
           eligibleTarget && 'bg-pressbox-sage/10',
         )}
@@ -172,7 +193,7 @@ export function PressBoxRosterRow({
         <span className="w-[30px] h-[30px] rounded-full border border-dashed border-white/20" aria-hidden="true" />
         <span className={cn(PB_ROW_META, 'text-pressbox-text/45')}>Tap to fill</span>
         <span />
-        <span />
+        {showWeek && <span />}
       </div>
     );
   }
@@ -181,7 +202,8 @@ export function PressBoxRosterRow({
     <div
       data-testid="pressbox-roster-row"
       className={cn(
-        'grid grid-cols-[30px_30px_1fr_52px_44px] items-center gap-2 px-3 min-h-[56px]',
+        'grid items-center gap-2 px-3 min-h-[56px]',
+        grid,
         'border-b border-white/[0.06]',
         // The DTD tint is 5% of grapefruit -- present at a glance down a
         // column of rows, invisible as a "colour" on any single one.
@@ -296,17 +318,20 @@ export function PressBoxRosterRow({
       </span>
 
       {/* 5 — the week. Quieter than tonight on purpose: tonight is the
-          decision, the week is the context. */}
-      <span className="text-right">
-        <span
-          className={cn(
-            'font-plex font-medium text-[12px] tabular-nums leading-none block',
-            isBenchLike ? 'text-pressbox-text/40' : 'text-pressbox-text/85',
-          )}
-        >
-          {fig(player.weekPoints)}
+          decision, the week is the context. Absent until the page has a real
+          figure for it (see the header). */}
+      {showWeek && (
+        <span className="text-right">
+          <span
+            className={cn(
+              'font-plex font-medium text-[12px] tabular-nums leading-none block',
+              isBenchLike ? 'text-pressbox-text/40' : 'text-pressbox-text/85',
+            )}
+          >
+            {fig(player.weekPoints)}
+          </span>
         </span>
-      </span>
+      )}
     </div>
   );
 }
