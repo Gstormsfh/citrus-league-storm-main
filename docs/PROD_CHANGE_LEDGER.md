@@ -220,3 +220,31 @@ the image as a rollback target).
 **Follow-ups this unlocks.** `injury-status-sync.yml` schedule (one green manual run first); the projections and gp_last_10 writers now stick across the nightly rebuild.
 
 **Ledger note.** SQL Editor apply, so no `schema_migrations` row; the repo file is the record.
+
+## Rule 1 recorded change: check_season_boundary() stops matching its own comments (2026-09-04 ~04:50Z)
+
+**What.** `CREATE OR REPLACE FUNCTION public.check_season_boundary(integer)` from `supabase/migrations/20260904003000_check_season_boundary_ignores_comments.sql`. Signature, `RETURNS TABLE`, LANGUAGE plpgsql, STABLE SECURITY DEFINER, `search_path=public`, all three checks and every message string unchanged. Body: one predicate. `p.prosrc ~ '\mget_nhl_season_year\s*\('` becomes the same regex against `prosrc` with `--` line comments and `/* */` blocks stripped first.
+
+**Why.** Data Invariants (daily) has been failing on `season_boundary` with `calendar_rule_called_directly: pool_playoff_season call get_nhl_season_year() directly`. It does not. What `pool_playoff_season` contains is the comment saying why it deliberately does not — "Deliberately NOT get_nhl_season_year(), which answers the regular-season question and returns 2025 for September 2026." `prosrc` includes comments, so the detector matched the note describing the fix and reported the bug as still present. A monitor that reads its own explanation as the defect is the permanently-amber failure mode this repo removed from the DB monitors on purpose, and it was red twenty-five days from opening night.
+
+**Rule 1 capture (MIGRATION_SAFETY_GUIDE).** `supabase/migrations/captures/2026-09-04_pre_check_season_boundary.sql`, 1,905 bytes, md5 `de27d7d72285aff9e9ba18d966636978`, equal to `md5(pg_get_functiondef(...))` read off prod immediately before authoring. The migration was GENERATED from that capture by string substitution, not retyped: the diff is one hunk, four lines in place of one.
+
+**Measured on live prod before applying** (read-only, Claude). Both predicates run side by side over every function in `public`, excluding the same three names the check excludes:
+
+| proname | matches_today | matches_after_fix |
+|---|---|---|
+| pool_playoff_season | true | false |
+
+One row, and no function matched under either predicate other than that one. So the change clears exactly the one false positive and takes no real caller with it — there were none.
+
+**Proof.** `scripts/proof/check-season-boundary-ignores-comments.proof.sh`, scratch Postgres 16.13: **ALL PASS (17 assertions)**. It reproduces the false positive against the CAPTURED body first, so it is a reproduction rather than a restatement, and it asserts on both sides — a function that genuinely calls the rule must still be reported after the fix, which is the assertion that would fail if the "fix" were to stop looking. Block comments, the two untouched checks, idempotent re-apply, volatility, security, signature and all three message strings are pinned too.
+
+The proof also caught a defect in this migration before it reached prod: `pg_get_functiondef` output ends `$function$` with no terminating semicolon, so wrapping the generated body in `BEGIN; … COMMIT;` made psql read `COMMIT` as part of the function body — `syntax error at or near "COMMIT"`. Fixed to `$function$;` and re-proved.
+
+**Known limit, deliberate.** String literals are not stripped, so a function that merely NAMES the rule inside a message would still trip this. The only one that does is `check_season_boundary` itself, already in the `NOT IN` list. Stripping literals too would mean parsing dollar-quoted bodies in a regex.
+
+**Blast radius.** Read-only, called only by the daily Data Invariants workflow, on no user-facing path. Safe to apply mid-draft.
+
+**Reversal.** `CREATE OR REPLACE` from the capture file restores the prior body byte-for-byte.
+
+**Executed by.** Not yet applied at the time of writing. Authored by Claude (Cowork) for Garrett Storms, launch-audit pass, 2026-09-04, the night before App Store submission; found by reading the failure out of `ops_ci_runs` rather than the GitHub inbox.

@@ -36,18 +36,21 @@ const here = dirname(fileURLToPath(import.meta.url));
 const MODAL = readFileSync(resolve(here, '../PlayerStatsModal.tsx'), 'utf-8');
 
 /**
- * The game-log effect body, where the schedule window is chosen.
+ * Source with the prose taken out.
  *
- * Comments are stripped: the old call is NAMED in the comment that explains
- * why it went, so a naive grep would match the prose describing the fix and
- * report the bug as still present.
+ * Every check below greps for a call that the fix REMOVED, and the comments
+ * explaining the fix name that call - so a naive grep would match the note
+ * describing the repair and report the bug as still present.
  */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+}
+
+/** The game-log effect body, where the schedule window is chosen. */
 function gameLogEffect(): string {
   const at = MODAL.indexOf('const fetchGameLog = async () => {');
   expect(at, 'the game-log fetch is gone from PlayerStatsModal').toBeGreaterThan(-1);
-  return MODAL.slice(at, MODAL.indexOf('fetchGameLog();', at))
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '');
+  return stripComments(MODAL.slice(at, MODAL.indexOf('fetchGameLog();', at)));
 }
 
 describe('the two seasons disagree exactly when it matters', () => {
@@ -144,9 +147,25 @@ describe('the game log asks the forward-looking question', () => {
       'the schedule is back on the season being played; all summer it will show the season that just ended',
     ).toBe(false);
     expect(body).toContain('seasonWindow(logSeason)');
-    // Belt to that suspender: the modal no longer imports it at all, so no
-    // other read in this file can quietly go back to the played season.
-    expect(MODAL).not.toMatch(/import \{[^}]*getCurrentSeason[^}]*\} from '@citrus\/shared'/);
+  });
+
+  it('the played season is only ever LABELLED, never used to fetch anything', () => {
+    // Belt to that suspender. The modal does still import getCurrentSeason -
+    // the Overview and Detailed headers have to name the season those stats
+    // came from - so the guard cannot be "it is absent". It is: every call
+    // site is a label or the comparison that drives one. Strike those two
+    // shapes out and nothing may remain, so no future read can quietly go
+    // back to the season being played to ask for data.
+    const executable = stripComments(MODAL);
+    const leftovers = executable
+      .replace(/seasonLabel\(getCurrentSeason\(\)\)/g, '')
+      .replace(/getProjectionsSeason\(\) !== getCurrentSeason\(\)/g, '');
+    expect(
+      leftovers.includes('getCurrentSeason()'),
+      'getCurrentSeason() is being read for something other than a season label',
+    ).toBe(false);
+    // And the labels really are there, so this does not pass by deletion.
+    expect(executable).toContain('seasonLabel(getCurrentSeason())');
   });
 
   it('opens the window at the real opener, not a hardcoded September 1st', () => {
