@@ -139,7 +139,7 @@ export function PressBoxPlayerRow({
         <span className={cn(PB_ROW_NAME, 'block text-pressbox-text')}>
           {player.name}
           {player.status && (
-            <span className="ml-1.5 font-plex font-bold text-[9px] leading-none px-1 py-px rounded-[3px] bg-pressbox-grapefruit/[0.18] text-pressbox-grapefruit-text align-[1px]">
+            <span className="ml-1.5 font-plex font-bold text-[9px] px-1 py-px rounded-[3px] bg-pressbox-grapefruit/[0.18] text-pressbox-grapefruit-text align-[1px]">
               {player.status}
             </span>
           )}
@@ -209,7 +209,7 @@ export function PressBoxPlayerRow({
             // 40px square: the iOS minimum, so the face and the tap target
             // agree instead of the face being decoration inside a bigger box.
             'w-10 h-10 flex-none rounded-[10px] border flex flex-col items-center justify-center',
-            'font-plex font-semibold text-[16px] leading-none disabled:opacity-40',
+            'font-plex font-semibold text-[16px] disabled:opacity-40',
             action === 'add' && 'bg-pressbox-orange/[0.15] border-pressbox-orange/[0.45] text-pressbox-orange-soft',
             action === 'claim' && 'bg-pressbox-sage/[0.15] border-pressbox-sage/40 text-pressbox-sage',
             action === 'swap' && 'bg-white/[0.06] border-white/10 text-pressbox-text',
@@ -217,7 +217,7 @@ export function PressBoxPlayerRow({
         >
           <span>{ACTION_GLYPH[action]}</span>
           {action === 'claim' && claimDay && (
-            <span className="font-plex font-medium text-[8px] leading-none mt-0.5">{claimDay}</span>
+            <span className="font-plex font-medium text-[8px] mt-0.5">{claimDay}</span>
           )}
         </button>
       )}

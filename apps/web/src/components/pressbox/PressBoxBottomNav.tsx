@@ -59,7 +59,7 @@ export function PressBoxBottomNav({ className }: { className?: string }) {
               }
             >
               <Icon className="w-5 h-5" strokeWidth={2} aria-hidden="true" />
-              <span className="font-plex font-semibold text-[10px] uppercase tracking-[0.06em] leading-none">
+              <span className="font-plex font-semibold text-[10px] uppercase tracking-[0.06em]">
                 {label}
               </span>
             </NavLink>

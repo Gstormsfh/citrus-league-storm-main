@@ -115,7 +115,7 @@ function Side({
       </span>
 
       <span className="flex-1 min-w-0 block">
-        <span className="font-barlow font-bold text-[14px] leading-tight truncate block text-pressbox-text">
+        <span className="font-barlow font-bold text-[14px] truncate block text-pressbox-text">
           {mine ? (
             <>
               {player.name} {code}
@@ -162,7 +162,7 @@ function Side({
           {fig(happened ? player.points : null)}
         </span>
         {player.projection != null && (
-          <span className={cn(PB_ROW_HEADLINE_LABEL, 'block mt-0.5 text-pressbox-text/45')}>
+          <span className={cn(PB_ROW_HEADLINE_LABEL, 'block text-pressbox-text/45')}>
             P {player.projection.toFixed(1)}
           </span>
         )}

@@ -113,11 +113,11 @@ export function LeagueMenu({
             >
               <Icon className="w-[18px] h-[18px] text-pressbox-orange-soft" strokeWidth={2} aria-hidden="true" />
               <span className="mt-3">
-                <span className="block font-barlow font-bold text-[15px] text-pressbox-text leading-tight">
+                <span className="block font-barlow font-bold text-[15px] text-pressbox-text">
                   {title}
                 </span>
                 {stat && (
-                  <span className="block mt-0.5 font-plex font-medium text-[11px] leading-none whitespace-nowrap overflow-hidden text-ellipsis text-pressbox-text/55">
+                  <span className="block mt-0.5 font-plex font-medium text-[11px] whitespace-nowrap overflow-hidden text-ellipsis text-pressbox-text/55">
                     {stat}
                   </span>
                 )}
@@ -142,7 +142,7 @@ export function LeagueMenu({
               <span className="block font-barlow font-bold text-[15px] text-pressbox-text truncate">
                 {user.displayName}
               </span>
-              <span className="block font-plex font-medium text-[10px] leading-none whitespace-nowrap overflow-hidden text-ellipsis text-pressbox-text/55">
+              <span className="block font-plex font-medium text-[10px] whitespace-nowrap overflow-hidden text-ellipsis text-pressbox-text/55">
                 {[user.handle, typeof user.leagueCount === 'number' ? `${user.leagueCount} leagues` : null]
                   .filter(Boolean)
                   .join(' · ')}

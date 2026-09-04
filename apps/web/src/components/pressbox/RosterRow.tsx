@@ -248,7 +248,7 @@ export function PressBoxRosterRow({
             <span className="font-plex font-medium text-[10px] text-pressbox-text/50">{codeLine}</span>
           )}
           {player.status && (
-            <span className="font-plex font-bold text-[9px] leading-none px-1 py-px rounded-[3px] bg-pressbox-grapefruit/[0.18] text-pressbox-grapefruit-text align-[1px]">
+            <span className="font-plex font-bold text-[9px] px-1 py-px rounded-[3px] bg-pressbox-grapefruit/[0.18] text-pressbox-grapefruit-text align-[1px]">
               {player.status}
             </span>
           )}
@@ -275,20 +275,20 @@ export function PressBoxRosterRow({
       {/* 4 — TODAY. The number the row exists to show. */}
       <span className="text-right">
         <span className={cn(PB_ROW_HEADLINE, 'block', tone)}>{fig(value)}</span>
-        {unit && <span className={cn(PB_ROW_HEADLINE_LABEL, 'block mt-0.5 text-pressbox-text/45')}>{unit}</span>}
+        {unit && <span className={cn(PB_ROW_HEADLINE_LABEL, 'block text-pressbox-text/45')}>{unit}</span>}
       </span>
 
       {/* 5 — the week, and which way it is going. */}
       {showWeek && (
         <span
           className={cn(
-            'text-right block font-plex font-semibold text-[12px] tabular-nums leading-none',
+            'text-right block font-plex font-semibold text-[12px] tabular-nums',
             bench ? 'text-pressbox-text/50' : 'text-pressbox-text/85',
           )}
         >
           {fig(player.weekPoints)}
           {t && (
-            <span className={cn('block mt-0.5 font-plex font-medium text-[9px] leading-none', t.tone)}>
+            <span className={cn('block font-plex font-medium text-[9px]', t.tone)}>
               {t.glyph} {t.text}
             </span>
           )}

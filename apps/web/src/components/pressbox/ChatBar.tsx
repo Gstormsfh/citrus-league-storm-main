@@ -78,7 +78,7 @@ export function ChatBar({
         ) : (
           <MessageCircle className="w-4 h-4 flex-shrink-0 text-pressbox-orange-soft" strokeWidth={2} aria-hidden="true" />
         )}
-        <span className="font-plex font-medium text-[10px] leading-none whitespace-nowrap overflow-hidden text-ellipsis text-pressbox-text/55">
+        <span className="font-plex font-medium text-[10px] whitespace-nowrap overflow-hidden text-ellipsis text-pressbox-text/55">
           {label}
         </span>
       </button>

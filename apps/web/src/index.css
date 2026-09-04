@@ -522,11 +522,21 @@
   line-height: normal;
   }
 
-  .pb-type :where(p, span, h1, h2, h3, h4, h5, h6) {
+  .pb-type :where(p, span, button, h1, h2, h3, h4, h5, h6) {
   font-family: inherit;
   font-weight: inherit;
   letter-spacing: inherit;
-  text-transform: none;
+  /* `inherit`, not `none`. `none` also cancels an `uppercase` written on an
+     ancestor — the roster's column header is an uppercase <div> of <span>s,
+     and it came back mixed-case the moment this rule said `none`. Restoring
+     inheritance is the whole point; asserting a value is not.
+
+     `button` is in the list for this property above all: Tailwind's own
+     preflight ships `button, select { text-transform: none }` to normalise
+     Firefox, so an `uppercase` written on a tab strip never reaches the tab
+     BUTTONS inside it. The matchup's LINEUPS / CATEGORIES / BENCH bar came
+     out in sentence case for exactly that reason. */
+  text-transform: inherit;
   }
   
   /* 2026-08-19: citrus-charcoal (#5C5C5C) measured 2.25:1 on the dark

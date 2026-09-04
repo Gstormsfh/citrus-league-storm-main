@@ -21,6 +21,7 @@ import {
   PressBoxBottomNav,
   PressBoxMatchupRow,
   PressBoxScoreBlock,
+  PressBoxTabs,
   type PressBoxMatchupPlayer,
 } from '../src/components/pressbox';
 import { harnessPlayer, harnessRowPlayer } from './players';
@@ -63,7 +64,12 @@ const ROWS: Array<{ slot: string; you: PressBoxMatchupPlayer; them: PressBoxMatc
   },
 ];
 
-const TABS = ['Lineups', 'Categories', 'Bench', 'Tonight · 9'];
+const TABS = [
+  { key: 'lineups', label: 'Lineups' },
+  { key: 'categories', label: 'Categories' },
+  { key: 'bench', label: 'Bench' },
+  { key: 'tonight', label: 'Tonight · 9' },
+];
 
 function Harness() {
   return (
@@ -93,18 +99,7 @@ function Harness() {
       {/* Section tabs — orange underline here, where the header strip uses
           sage. The artboard is deliberate about it: sage marks WHERE you are
           in the league, orange marks what you are looking at inside a screen. */}
-      <div className="flex gap-3.5 px-3 border-b border-white/[0.08] font-condensed font-bold text-[12px] uppercase tracking-[0.12em] text-pressbox-text/50">
-        {TABS.map((t, i) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => log(`tab:${t}`)}
-            className={i === 0 ? 'py-2 text-pressbox-text border-b-2 border-pressbox-orange' : 'py-2'}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      <PressBoxTabs tabs={TABS} activeKey="lineups" onSelect={(k) => log(`tab:${k}`)} label="Matchup view" />
 
       {ROWS.map((r, i) => (
         <PressBoxMatchupRow

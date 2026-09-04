@@ -24,6 +24,7 @@ export {
 } from './RosterList';
 
 export { PressBoxSegmented, type PressBoxSegmentedProps, type PressBoxSegment } from './Segmented';
+export { PressBoxTabs, type PressBoxTabsProps, type PressBoxTab } from './Tabs';
 export { PressBoxStandingsTable, type PressBoxStandingsTableProps, type PressBoxStandingsRow } from './StandingsTable';
 export { PressBoxPlayerRow, type PressBoxPlayerRowProps, type PressBoxPlayerRowPlayer, type PressBoxPlayerAction, formatAdds } from './PlayerRow';
 export { PressBoxMatchupRow, type PressBoxMatchupRowProps, type PressBoxMatchupPlayer } from './MatchupRow';

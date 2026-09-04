@@ -75,7 +75,7 @@
  *
  * `truncate` is part of the rung, not an add-on.
  */
-export const PB_ROW_NAME = 'font-barlow font-bold text-[15px] truncate leading-tight';
+export const PB_ROW_NAME = 'font-barlow font-bold text-[15px] truncate';
 
 /**
  * The number the row exists to show — tonight's points, the week's total, the
@@ -86,7 +86,7 @@ export const PB_ROW_NAME = 'font-barlow font-bold text-[15px] truncate leading-t
  * instead of re-finding them. `leading-none` so the label under it sits tight
  * and the pair reads as one block.
  */
-export const PB_ROW_HEADLINE = 'font-plex font-semibold text-[17px] tabular-nums leading-none';
+export const PB_ROW_HEADLINE = 'font-plex font-semibold text-[17px] tabular-nums';
 
 /**
  * The unit under a headline number — "proj", "week", "live", "final".
@@ -96,21 +96,21 @@ export const PB_ROW_HEADLINE = 'font-plex font-semibold text-[17px] tabular-nums
  * as the four figures above them, which is how a unit label ends up with the
  * same optical weight as the thing it is a unit of.
  */
-export const PB_ROW_HEADLINE_LABEL = 'font-plex font-medium text-[9px] leading-none';
+export const PB_ROW_HEADLINE_LABEL = 'font-plex font-medium text-[9px]';
 
 /**
  * Team, opponent, game time, the live stat line — everything that qualifies
  * the name but is not the name. Truncates by contract; never wraps.
  */
 export const PB_ROW_META =
-  'font-plex font-medium text-[10px] leading-none whitespace-nowrap overflow-hidden text-ellipsis';
+  'font-plex font-medium text-[10px] whitespace-nowrap overflow-hidden text-ellipsis';
 
 /**
  * Status chips, the scouting note, and anything else that is a mark rather
  * than a sentence. 10px is the floor: below it a label on this page is a
  * smudge, not small text.
  */
-export const PB_ROW_MICRO = 'font-plex font-medium text-[9px] leading-none';
+export const PB_ROW_MICRO = 'font-plex font-medium text-[9px]';
 
 /**
  * THE ARTBOARD'S TYPE, RESTORED — leading AND face.
@@ -143,6 +143,14 @@ export const PB_ROW_MICRO = 'font-plex font-medium text-[9px] leading-none';
  * is IBM Plex Mono. `pb-type` (see index.css) turns inheritance back on for
  * the subtree, and still loses to a `font-*` utility written on the element
  * itself.
+ *
+ * THE ARTBOARD DECLARES A LINE-HEIGHT EXACTLY EIGHT TIMES, and they are the
+ * only places a `leading-*` class belongs in Press Box: `line-height:1` on
+ * the six roster position chips, and `font:600 40px/1` on the two matchup
+ * scores. The shorthand form is easy to miss when grepping for
+ * `line-height:` — it is written `40px/1`, inside the `font:` value. Anything
+ * else with a `leading-*` on it is a value someone invented to fight the 1.5
+ * base, and it is now the thing making the screen wrong.
  *
  * Put this on the outermost node of a Press Box surface. Everything inside
  * inherits it, exactly as it does on the artboard, and any block that wants
