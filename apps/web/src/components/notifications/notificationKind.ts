@@ -34,7 +34,7 @@ export type GenericNotificationKind = Extract<
  * drop, a lineup lock. Painting those sage would say "good for you" and
  * orange would say "act now", and a card that asserts a valence the event
  * does not have is the leak the matchup's identity-vs-standing rule exists
- * to stop (StickyScoreBar.tsx: orange is YOU, sage is AHEAD, nothing else).
+ * to stop (pressbox/ScoreBlock.tsx: orange is YOU, sage is AHEAD, nothing else).
  */
 export type StatusTone = 'good' | 'attention' | 'bad' | 'neutral';
 

@@ -57,16 +57,22 @@ describe('the hero is desktop-only', () => {
   });
 });
 
-describe('the compact phone chrome carries the search', () => {
-  it('the sticky bar holds the title and a search input bound to the same state', () => {
-    const bar = blockFrom('lg:hidden sticky top-0');
-    expect(bar).toContain('Free Agents');
-    expect(bar).toContain('<Input');
-    expect(bar).toContain('placeholder="Search players…"');
-    expect(bar).toContain('value={searchQuery}');
-    expect(bar).toContain('setSearchQuery(e.target.value)');
-    // Reachable without a pointer, and labelled — it has no visible <label>.
-    expect(bar).toContain('aria-label="Search free agents"');
+describe('the Press Box chrome carries the search (PR6b, 2026-09-04)', () => {
+  // The compact title bar of 2026-09-02 is gone with the hero it replaced:
+  // below lg the page is the shared LeagueHeader over PlayersPhone, whose
+  // SEARCH cell opens a field bound to the same state the desktop input uses.
+  it('the phone layer is the LeagueHeader over PlayersPhone, bound to the page search', () => {
+    const chrome = blockFrom('className="lg:hidden pt-[env(safe-area-inset-top)]"', 600);
+    expect(chrome).toContain('<LeagueHeader');
+    const phone = blockFrom('<PlayersPhone', 2400);
+    expect(phone).toContain('searchQuery={searchQuery}');
+    expect(phone).toContain('onSearchQuery={setSearchQuery}');
+    expect(phone).toContain('positionFilter={positionFilter}');
+    expect(phone).toContain('renderRow={renderPhoneRow}');
+  });
+
+  it('the desktop layout is not rendered below lg', () => {
+    expect(PAGE).toContain('<main className="hidden lg:block');
   });
 });
 
@@ -86,24 +92,33 @@ describe('the position filters are one row, never three', () => {
 });
 
 describe('every phone list is the shared row', () => {
-  it('Trending, Top Projected and the filtered/search list all render FreeAgentRow', () => {
-    expect(count('<FreeAgentRow')).toBe(3);
-    expect(PAGE).toContain("import { FreeAgentRow } from '@/components/freeagents/FreeAgentRow'");
+  it('Trending, Top Projected, the pool and the three phone views all render FreeAgentRowPressBox', () => {
+    // Three in <main> (tablet widths, md–lg) and three in renderPhoneRow —
+    // TREND, GAMES and the projection row PlayersPhone draws below lg.
+    expect(count('<FreeAgentRowPressBox')).toBe(6);
+    expect(PAGE).toContain("import { FreeAgentRowPressBox } from '@/components/freeagents/FreeAgentRowPressBox'");
+    // The legacy row is no longer imported by the page; it stays in the
+    // tree with its tests until the screen is signed off (PR6).
+    expect(PAGE).not.toContain("from '@/components/freeagents/FreeAgentRow'");
   });
 
-  it('each of them shows the projection and derives its own action state', () => {
-    for (const block of PAGE.split('<FreeAgentRow').slice(1)) {
+  it('each <main> row shows the projection and derives its own action state', () => {
+    for (const block of BODY.split('<FreeAgentRowPressBox').slice(1)) {
       const tag = block.slice(0, block.indexOf('/>'));
-      expect(tag).toContain('projection={');
-      expect(tag).toContain('action={freeAgentAction(');
-      expect(tag).toContain('todayStr={todayStr}');
-      expect(tag).toContain('onAction={() => handleRowAction(');
+      expect(tag).toMatch(/projection=\{|\{\.\.\.common\}/);
+      expect(tag).toMatch(/action=\{freeAgentAction\(|\{\.\.\.common\}/);
     }
+    // The phone rows share one prop bag, and it derives the same state.
+    const common = blockFrom('const common = {', 500);
+    expect(common).toContain('projection: player.weeklyProjection');
+    expect(common).toContain('action: freeAgentAction(player, rosterFull)');
+    expect(common).toContain('todayStr,');
+    expect(common).toContain('onAction: () => handleRowAction(player)');
   });
 
   it('the sideways table is not the phone experience, and the row list stands in its place', () => {
     const list = blockFrom('data-testid="free-agents-phone-list"', 900);
-    expect(list).toContain('<FreeAgentRow');
+    expect(list).toContain('<FreeAgentRowPressBox');
     // The wrapper that used to be the phone experience.
     expect(PAGE).not.toContain('<div className="overflow-x-auto">\n                        <Table className="min-w-[600px]');
   });
@@ -156,7 +171,7 @@ describe('the row list gives way to the table where the table fits', () => {
   it('the tablet keeps the mobile chrome — the breakpoints answer different questions', () => {
     // The page header, the hero and the nav still split at `lg`, because
     // "does this screen want app chrome" is not "does this table fit".
-    expect(PAGE).toContain('lg:hidden sticky top-0');
+    expect(PAGE).toContain('className="lg:hidden pt-[env(safe-area-inset-top)]"');
     expect(PAGE).toContain('hidden lg:flex flex-col md:flex-row justify-between');
     expect(PAGE).toContain('<div className="hidden lg:block"><Navbar /></div>');
   });

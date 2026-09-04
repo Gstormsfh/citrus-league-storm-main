@@ -61,7 +61,6 @@ import {
 } from '@/components/freeagents/PlayersPhone';
 import { LeagueHeader, LeagueMenu } from '@/components/pressbox';
 import { useProfile } from '@/hooks/useProfile';
-import { FreeAgentRow } from '@/components/freeagents/FreeAgentRow';
 import {
   FA_CHIP,
   FA_CHIP_ROW,
