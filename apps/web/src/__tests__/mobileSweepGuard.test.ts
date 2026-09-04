@@ -113,15 +113,32 @@ describe('roster tabs fit a phone without a hidden scroller', () => {
     // Measured in Chromium: at 393px the four full labels overflowed and the
     // third was cut mid-word to "TRENDS & ANAL", with nothing signalling that
     // the row scrolled — so Transactions was undiscoverable.
-    for (const [short, full] of [['Stats', 'Team Stats'], ['Trends', 'Trends &amp; Analytics']]) {
+    //
+    // The short label for the third tab is ANALYTICS, not TRENDS (2026-09-04).
+    // That tab is the insight surface other fantasy apps do not have, and
+    // "Trends" reads as a generic mover list; if only one word survives the
+    // phone, it has to be the one that says what the tab is for.
+    for (const [short, full] of [['Stats', 'Team Stats'], ['Analytics', 'Trends &amp; Analytics']]) {
       expect(ROSTER).toContain(`<span className="sm:hidden">${short}</span>`);
       expect(ROSTER).toContain(`<span className="hidden sm:inline">${full}</span>`);
     }
   });
 
   it('tracking loosens only at sm, where the bar has room', () => {
-    // Tracking was the lever that made all four fit at 375px; shipping
-    // 0.22em on mobile again re-cuts the row.
-    expect(ROSTER).toContain('tracking-[0.12em] sm:tracking-[0.22em]');
+    // Tracking was the lever that made all four fit at 375px; shipping the
+    // wide value on mobile again re-cuts the row. The pair moved to the Press
+    // Box strip's values (2026-09-04) — Barlow Condensed 13px is narrower than
+    // the JetBrains Mono it replaced, but "TRANSACTIONS" in a 98px column
+    // still needs the tight setting.
+    expect(ROSTER).toContain('tracking-[0.04em] sm:tracking-[0.14em]');
+  });
+
+  it('the strip is four equal columns, not a scroller', () => {
+    // The old bar was `overflow-x-auto` with `flex-none` triggers — a row you
+    // have to scroll is a row that failed to fit. Four equal columns cannot
+    // hide a tab.
+    const list = ROSTER.slice(ROSTER.indexOf('<TabsList'), ROSTER.indexOf('</TabsList>'));
+    expect(list).toContain('grid grid-cols-4');
+    expect(list).not.toContain('overflow-x-auto');
   });
 });

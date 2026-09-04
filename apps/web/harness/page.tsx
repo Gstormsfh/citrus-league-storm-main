@@ -11,10 +11,35 @@ import { WaiverService } from '../src/services/WaiverService';
 import { PlayerService } from '../src/services/PlayerService';
 import { LeagueService } from '../src/services/LeagueService';
 import { ScheduleService } from '../src/services/ScheduleService';
+import { MatchupService } from '../src/services/MatchupService';
+import { matchupApi } from '../src/api/matchups';
 import { leagueApi } from '../src/api/leagues';
 import { rosterApi } from '../src/api/rosters';
 import { waiverApi } from '../src/api/waivers';
+import { ScoringCalculator, extractScoringSettings } from '../src/utils/scoringUtils';
 import { HARNESS_PLAYERS, harnessDirectoryPlayer, harnessPlayer } from './players';
+
+/**
+ * The SERVER computes fantasy points and the row reads `total_points` off the
+ * stat line -- so a fixture that returns counting stats without it prints 0.0
+ * on every live and final row, which is exactly what this harness did. The
+ * calculator is the app's own, configured with the app's own defaults, so the
+ * number under a stat line can never disagree with the stat line above it.
+ */
+const HARNESS_SCORER = new ScoringCalculator(extractScoringSettings(null));
+
+/**
+ * THE LEAGUE SCORES LIKE A REAL ONE (2026-09-04). This was `{}` -- an empty
+ * object, which is TRUTHY, so `extractScoringSettings` handed it to the
+ * calculator instead of falling back, every stat was worth nothing, and the
+ * roster's TODAY column read 0.0 on every live and final row. A page-level
+ * zero that looks exactly like a broken points pipeline.
+ *
+ * `null` is the fix, not a hand-written weights table: the app then falls
+ * back to its OWN `DEFAULT_SCORING`, so the harness scores the way an
+ * unconfigured league really does and cannot drift from it.
+ */
+const HARNESS_SCORING = null;
 
 /**
  * THE ROSTER IS REAL (2026-09-02). This file used to wrap an 18-name list to
@@ -54,7 +79,7 @@ const PRIORITY = Array.from({ length: 10 }, (_, i) => ({
   PLAYERS.filter((p: any) => ids.map(String).includes(String(p.id)));
 (LeagueService as any).getFreeAgents = async () => ({ players: PLAYERS.slice(18) });
 (LeagueService as any).getLeague = async () => ({
-  league: { id: 'harness-league', name: 'Harness League', team_count: 10, settings: {}, scoring_settings: {}, waiver_type: 'rolling', draft_status: 'completed', commissioner_id: 'harness-user' },
+  league: { id: 'harness-league', name: 'Harness League', team_count: 10, settings: {}, scoring_settings: HARNESS_SCORING, waiver_type: 'rolling', draft_status: 'completed', commissioner_id: 'harness-user' },
   error: null,
 });
 (LeagueService as any).getUserLeagues = async () => ({
@@ -89,11 +114,113 @@ const PRIORITY = Array.from({ length: 10 }, (_, i) => ({
 (waiverApi as any).getPlayersOnWaivers = async () => ({ data: [] });
 (leagueApi as any).getMyTeam = async () => ({ data: { id: 't1', name: 'Harness Team', waiver_priority: 3, faab_budget: 100 } });
 (leagueApi as any).getTeams = async () => ({ data: PRIORITY.map(p => ({ id: p.team_id, name: p.team_name, owner_id: 'harness-user' })) });
-(leagueApi as any).getLeague = async () => ({ data: { id: 'harness-league', name: 'Harness League', settings: {}, scoring_settings: {}, team_count: 10, waiver_type: 'rolling', draft_status: 'completed', commissioner_id: 'harness-user' } });
+(leagueApi as any).getLeague = async () => ({ data: { id: 'harness-league', name: 'Harness League', settings: {}, scoring_settings: HARNESS_SCORING, team_count: 10, waiver_type: 'rolling', draft_status: 'completed', commissioner_id: 'harness-user' } });
 (rosterApi as any).getTeamRoster = async () => ({ data: MY_ROSTER.map((p: any) => ({ player_id: p.id })) });
 (rosterApi as any).getPlayerIds = async () => ({ data: MY_ROSTER.map((p: any) => Number(p.id)) });
-(ScheduleService as any).getGamesForTeams = async () => ({ gamesByTeam: new Map() });
-(ScheduleService as any).getNextGamesForTeams = async () => new Map();
+/**
+ * A REAL SCHEDULE, not an empty Map (2026-09-04).
+ *
+ * These two used to return `new Map()`, and the cost only became visible when
+ * the roster page was added to this harness: with no games, every player has
+ * no `nextGame`, which kills the game line, the stat line, the actual and the
+ * projection in one stroke. FOUR of the roster row's five information layers,
+ * gone -- so the screen under review was a row starved of everything it
+ * exists to show, and it read as a design regression when it was a fixture.
+ *
+ * A page harness whose stubs return nothing cannot answer "does this screen
+ * work", only "does it mount". So: one fixture per team on yesterday, today
+ * and tomorrow, cycling scheduled / live / final so all three row states are
+ * on screen at once. Identities are real (harness/players.ts); the fixtures
+ * are generated, and say so here.
+ */
+const DAY = 86_400_000;
+const isoDay = (offset: number) => new Date(Date.now() + offset * DAY).toISOString().slice(0, 10);
+const HARNESS_DATES = [isoDay(-1), isoDay(0), isoDay(1)];
+const TEAMS = [...new Set(HARNESS_PLAYERS.map((p) => p.team))];
+/** Every team gets an opponent that is not itself, stable across renders. */
+const OPPONENT = (team: string, i: number) => TEAMS[(TEAMS.indexOf(team) + 1 + i) % TEAMS.length];
+
+const HARNESS_GAMES = new Map<string, any[]>(
+  TEAMS.map((team, ti) => [
+    team,
+    HARNESS_DATES.map((date, di) => {
+      const phase = (ti + di) % 3; // 0 scheduled, 1 live, 2 final
+      const home = phase !== 1;
+      const opponent = OPPONENT(team, di);
+      return {
+        id: `${team}-${date}`,
+        game_id: 2026020000 + ti * 10 + di,
+        game_date: date,
+        // getGameInfo parses this with `new Date()`, so it must be a timestamp.
+        game_time: `${date}T${['23:00', '01:00', '02:30'][di]}:00.000Z`,
+        home_team: home ? team : opponent,
+        away_team: home ? opponent : team,
+        home_score: phase === 0 ? 0 : phase === 1 ? 2 : 4,
+        away_score: phase === 0 ? 0 : phase === 1 ? 1 : 2,
+        status: (['scheduled', 'live', 'final'] as const)[phase],
+        period: phase === 1 ? '2nd' : null,
+        period_time: phase === 1 ? '08:14' : null,
+        venue: null,
+        season: 20262027,
+        game_type: 'regular' as const,
+      };
+    }),
+  ]),
+);
+
+(ScheduleService as any).getGamesForTeams = async (teams: string[] = []) => ({
+  gamesByTeam: new Map(teams.map((t) => [t.toUpperCase(), HARNESS_GAMES.get(t.toUpperCase()) ?? []])),
+  error: null,
+});
+(ScheduleService as any).getNextGamesForTeams = async (teams: string[] = []) =>
+  new Map(teams.map((t) => [t.toUpperCase(), (HARNESS_GAMES.get(t.toUpperCase()) ?? [])[1] ?? null]));
+
+/**
+ * A projection for every player, derived from his own fixture line so the
+ * numbers differ row to row rather than repeating one value down the column
+ * -- a column of identical figures hides exactly the bug a projection column
+ * exists to surface.
+ */
+(MatchupService as any).getDailyProjectionsForMatchup = async (ids: (string | number)[] = []) =>
+  new Map(
+    ids.map((id) => {
+      const p = PLAYERS.find((x: any) => String(x.id) === String(id)) as any;
+      const base = p?.position === 'G' ? 9 : 3;
+      const spread = ((Number(id) % 17) / 17) * 6;
+      return [Number(id), { total_projected_points: Number((base + spread).toFixed(1)), is_goalie: p?.position === 'G' }];
+    }),
+  );
+
+/** Actual stats for the games the fixture above marks live or final. */
+(matchupApi as any).getDailyGameStats = async (ids: (string | number)[] = [], date: string) => ({
+  data: ids
+    .map((id) => {
+      const p = PLAYERS.find((x: any) => String(x.id) === String(id)) as any;
+      const games = HARNESS_GAMES.get(String(p?.team_abbreviation ?? p?.team ?? '').toUpperCase()) ?? [];
+      const game = games.find((g: any) => g.game_date === date);
+      if (!game || game.status === 'scheduled') return null;
+      const n = Number(id) % 5;
+      const isGoalie = p?.position === 'G';
+      const stats = isGoalie
+        ? { saves: 24 + n * 3, goals_against: n % 3, wins: n % 2, shutouts: 0 }
+        : {
+            goals: n === 0 ? 1 : 0,
+            assists: n === 1 ? 2 : n === 3 ? 1 : 0,
+            shots_on_goal: 1 + (n % 4),
+            hits: n === 2 ? 3 : 0,
+            blocked_shots: n === 4 ? 2 : 0,
+            powerPlayPoints: 0,
+          };
+      return {
+        player_id: Number(id),
+        game_date: date,
+        ...stats,
+        points: (stats as any).goals ?? 0 + ((stats as any).assists ?? 0),
+        total_points: Number(HARNESS_SCORER.calculatePoints(stats as any, isGoalie).toFixed(1)),
+      };
+    })
+    .filter(Boolean),
+});
 (PlayerService as any).getTrendingPlayers = async () => new Map();
 (PlayerService as any).getRosterAssignmentCount = async () => new Map();
 (PlayerService as any).recordPlayerTransaction = async () => ({ error: null });

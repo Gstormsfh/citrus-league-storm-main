@@ -660,3 +660,93 @@ until `LeagueHeader` + the sub-tab strip replace them, which is its own commit
 because it changes navigation.
 
 443/443 source-walking guards, 71/71 Press Box, `tsc` exit 0, `eslint` 0 errors.
+
+---
+
+## PR4f — the page, not the component (2026-09-04)
+
+Rejected again, and the question was the right one: "how did it regress so
+hard from the prior roster?" It had not regressed. It was the same component,
+byte for byte. What changed was what I handed it — and that is the more
+dangerous failure, because it would have repeated on all eight remaining
+screens.
+
+**THE HARNESS WAS LYING.** `harness/page.tsx` carried:
+
+    (ScheduleService as any).getGamesForTeams = async () => ({ gamesByTeam: new Map() });
+    (ScheduleService as any).getNextGamesForTeams = async () => new Map();
+
+Empty maps. So every player had no game, which killed the game line, the stat
+line, the actual and the projection in one stroke — FOUR of the row's five
+information layers. Measured on the mounted page: **18 of 18 rows had no meta
+line at all.** The screen under review was a row starved of everything it
+exists to show, and it read as a design regression.
+
+Meanwhile `harness/pressbox.tsx` had every field hand-written by me. So the
+screenshot that got approved was substantially a demo of my own fixtures. A
+component harness answers "does this row render"; only a page harness answers
+"does this screen work", and I had been shipping on the first.
+
+**What the fixtures carry now**, all of it generated but shaped like
+production and stated as such in the file:
+
+* One game per team on yesterday, today and tomorrow, cycling
+  scheduled / live / final so all three row states are on screen at once.
+* A projection per player, derived from his own id so the column varies —
+  a column of identical figures hides the exact bug a projection column exists
+  to surface.
+* Daily stats for the games marked live or final, with `total_points` computed
+  by **the app's own `ScoringCalculator`** configured with **the app's own
+  defaults**, so the number under a stat line can never disagree with the stat
+  line above it.
+* `scoring_settings: null`, not `{}`. The empty object is TRUTHY, so
+  `extractScoringSettings` handed it to the calculator instead of falling
+  back, every stat was worth nothing, and TODAY read `0.0` on every live and
+  final row — a page-level zero that looks exactly like a broken points
+  pipeline.
+
+**Three real defects the honest fixture then exposed.**
+
+1. **The list was 345px wide inside a 393px viewport, inset at x=24.** I had
+   mounted it INSIDE the page's rounded card, so the Press Box list — which
+   owns its own 12px gutter and runs its hairlines edge to edge — sat in a box
+   with another 24px around it. The card is now desktop-only, and the list
+   carries `-mx-3 lg:mx-0` to cancel the page column's phone padding. Scoped
+   to the list, not the tab body: the summary card above it still wants that
+   padding, and bleeding it to the screen edges was the first thing I broke
+   trying to fix this.
+2. **No team card.** The component existed and was simply not wired.
+   `PressBoxTeamCard` now renders below lg with the team's real record and
+   rank and four actions — Optimize (the page's real `handleAutoLineup`),
+   Trade, Add, Log — exactly one of them orange. No win-probability bar: that
+   figure lives on the matchup payload and this page does not fetch it, so the
+   card draws no bar rather than a 50% one.
+3. **`teamStats.rank` is the literal string `"-"`** until standings resolve,
+   and passing it through printed `0-0-0 · -` — a field that reads broken
+   rather than pending. Both record and rank are now gated on it.
+
+**The tab strip is the Press Box strip.** Four equal columns, Barlow Condensed
+13px uppercase, 2px sage underline on the active one, no scroller — the old
+bar was `overflow-x-auto`, and a row you have to scroll is a row that failed
+to fit.
+
+**The phone label for the third tab is ANALYTICS, not TRENDS.** "TRENDS &
+ANALYTICS" is ~131px in Barlow Condensed at 13/.14em and the column is 98px at
+393. If only one word survives the phone it has to be the one that says what
+the tab is for: that tab is the insight surface other fantasy apps do not
+have, and "Trends" reads as a generic mover list.
+
+**Three guards moved with the screen, and one was added.**
+`rosterMobileChromeGuard`'s padding case asserted the legacy card shrinks on
+phones; below lg that card is no longer drawn at all, which is a stronger
+guarantee than shrinking it, so the case now pins `hidden lg:block` on it plus
+the Press Box card, its four actions and its single primary. A new case pins
+the `-mx-3` escape. `mobileSweepGuard`'s two label cases moved to the Press Box
+values and gained a third: four equal columns, never a scroller.
+
+**Still legacy above the fold:** the page header (`MY ROSTER / Finalsz` with
+the hamburger) and the TODAY summary strip. `LeagueHeader` replacing the page
+header changes navigation, so it is its own commit.
+
+446/446 source-walking guards (three of them new), 71/71 Press Box, `tsc` exit
+0, `eslint` 0 errors.

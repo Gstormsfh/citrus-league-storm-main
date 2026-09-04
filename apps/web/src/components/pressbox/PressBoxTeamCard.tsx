@@ -28,12 +28,22 @@
  * standings call comes back, and a placeholder number on the screen a manager
  * makes lineup decisions from is worse than an absence.
  */
+import { Link } from 'react-router-dom';
+
 import { cn } from '@/lib/utils';
 
 export interface PressBoxTeamAction {
   /** `⚡`, `⇄`, `+`, `☰` — drawn before the label. */
   glyph: string;
   label: string;
+  /**
+   * An in-app destination. Renders a `Link` rather than a button, so the
+   * action is a real anchor: middle-click and long-press work, and
+   * `linkGraphIntegrity` can see the route. `onPress` is for the actions that
+   * do something on THIS page (open a sheet, switch a tab) rather than go
+   * somewhere.
+   */
+  to?: string;
   onPress?: () => void;
   /** The one orange action. Exactly one per card, by contract. */
   primary?: boolean;
@@ -119,23 +129,30 @@ export function PressBoxTeamCard({
 
       {actions.length > 0 && (
         <div className="flex gap-1.5 mt-2.5">
-          {actions.map((a) => (
-            <button
-              key={a.label}
-              type="button"
-              onClick={a.onPress}
-              className={cn(
-                'flex-1 h-8 rounded-[8px] flex items-center justify-center gap-1.5',
-                'font-plex font-semibold text-[10px] uppercase tracking-[0.08em]',
-                a.primary
-                  ? 'bg-pressbox-orange text-pressbox-orange-ink'
-                  : 'bg-white/[0.06] border border-white/10 text-pressbox-text',
-              )}
-            >
-              <span aria-hidden="true">{a.glyph}</span>
-              {a.label}
-            </button>
-          ))}
+          {actions.map((a) => {
+            const cls = cn(
+              'flex-1 h-8 rounded-[8px] flex items-center justify-center gap-1.5',
+              'font-plex font-semibold text-[10px] uppercase tracking-[0.08em]',
+              a.primary
+                ? 'bg-pressbox-orange text-pressbox-orange-ink'
+                : 'bg-white/[0.06] border border-white/10 text-pressbox-text',
+            );
+            const body = (
+              <>
+                <span aria-hidden="true">{a.glyph}</span>
+                {a.label}
+              </>
+            );
+            return a.to ? (
+              <Link key={a.label} to={a.to} className={cn('focus-citrus', cls)}>
+                {body}
+              </Link>
+            ) : (
+              <button key={a.label} type="button" onClick={a.onPress} className={cn('focus-citrus', cls)}>
+                {body}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

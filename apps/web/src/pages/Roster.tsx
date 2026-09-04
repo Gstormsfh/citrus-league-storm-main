@@ -29,7 +29,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
-import { PressBoxRosterList } from '@/components/pressbox';
+import { PressBoxRosterList, PressBoxTeamCard } from '@/components/pressbox';
 import { buildRosterRows } from '@/components/pressbox/rosterRows';
 import { buildSlotConfig } from '@/components/roster/slotConfig';
 import { FillSlotSheet } from '@/components/roster/FillSlotSheet';
@@ -3472,7 +3472,37 @@ const Roster = () => {
                   Pts live on the Team Stats tab; the manager eyebrow is a
                   desktop nicety. Every desktop element is untouched — the
                   compaction is responsive classes only. */}
-              <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-3 lg:p-5 mb-3 lg:mb-4 relative overflow-hidden">
+              {/* PRESS BOX TEAM CARD — phones only (2026-09-04). The card
+                  below it is the desktop one, unchanged: it carries Rank,
+                  Total Pts and a 48px Auto Lineup button that a 393px row
+                  cannot hold. The phone version is the artboard's: disc,
+                  record and rank on one line, then the four actions, exactly
+                  one of them orange.
+
+                  No win-probability bar. That figure lives on the matchup
+                  payload and this page does not fetch it — the component
+                  draws no bar rather than a 50% one, and the bar returns when
+                  the roster starts asking for the number. */}
+              <div className="lg:hidden mb-3">
+                <PressBoxTeamCard
+                  teamName={userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Team')}
+                  /* teamStats.rank is the literal string "-" until standings
+                     resolve. Passing it through printed "0-0-0 · -", which
+                     reads as a broken field rather than a pending one. */
+                  rank={teamStats.rank && teamStats.rank !== '-' ? String(teamStats.rank) : null}
+                  record={teamStats.record && teamStats.record !== '-' ? teamStats.record : null}
+                  actions={[
+                    ...(userLeagueState === 'active-user'
+                      ? [{ glyph: '⚡', label: 'Optimize', primary: true, onPress: handleAutoLineup }]
+                      : []),
+                    { glyph: '⇄', label: 'Trade', to: `/trade-analyzer${userTeam?.league_id ? `?league=${userTeam.league_id}` : ''}` },
+                    { glyph: '+', label: 'Add', to: `/free-agents${userTeam?.league_id ? `?league=${userTeam.league_id}` : ''}` },
+                    { glyph: '☰', label: 'Log', onPress: () => setActiveTab('transactions') },
+                  ]}
+                />
+              </div>
+
+              <div className="hidden lg:block bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-3 lg:p-5 mb-3 lg:mb-4 relative overflow-hidden">
                 <div data-testid="roster-header-card" className="flex items-center gap-3 lg:gap-4 lg:justify-between relative z-10">
               <div className="flex items-center gap-2.5 lg:gap-3 min-w-0 flex-1 lg:flex-none">
                 <div className="w-8 h-8 lg:w-12 lg:h-12 flex-shrink-0 rounded-lg lg:rounded-xl bg-gradient-to-br from-pastel-orange to-pastel-orange-soft ring-1 ring-pastel-orange/40 flex items-center justify-center text-[#0F1F15] text-sm lg:text-2xl font-calistoga relative overflow-hidden shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
@@ -3559,7 +3589,15 @@ const Roster = () => {
 
             {/* Main Tabs — Citrus 2.0 dark */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+              {/* FULL-BLEED ON PHONES (2026-09-04, Press Box). The card is a
+                  desktop affordance: on a 393px screen it inset the roster by
+                  24px a side and rounded off the hairlines the row grid
+                  depends on, so the list read as a narrow panel floating in a
+                  box. The Press Box list carries its own 12px gutter and its
+                  rules run edge to edge, which is what makes a dense list
+                  scannable. The card returns at lg, where there is width to
+                  spend on it. */}
+              <div className="bg-transparent ring-0 rounded-none shadow-none lg:bg-[#1A2A20] lg:ring-1 lg:ring-white/10 lg:rounded-2xl lg:shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                 {/*
                   * The four labels do not fit a phone. "TRENDS & ANALYTICS" alone
                   * needs ~150px at this letter-spacing. The first fix made the
@@ -3574,30 +3612,35 @@ const Roster = () => {
                   * at sm alongside the equal-width bar. The scroller stays only
                   * as a net for sub-360px devices.
                   */}
-                <TabsList className="w-full p-0 bg-transparent border-b border-white/10 rounded-none gap-0 h-auto justify-start overflow-x-auto sm:overflow-x-visible">
+                <TabsList className="w-full p-0 bg-transparent border-b border-white/[0.08] rounded-none gap-0 h-[34px] grid grid-cols-4">
                 <TabsTrigger
                   value="roster"
-                  className="flex-none shrink-0 px-3 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.12em] sm:tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className="flex-1 min-w-0 px-1 h-[34px] rounded-none font-condensed text-[13px] tracking-[0.04em] sm:tracking-[0.14em] uppercase font-bold whitespace-nowrap text-pressbox-text/45 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-pressbox-sage data-[state=active]:text-pressbox-text hover:text-pressbox-text transition-colors"
                 >
                   Roster
                 </TabsTrigger>
                 <TabsTrigger
                   value="stats"
-                  className="flex-none shrink-0 px-3 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.12em] sm:tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className="flex-1 min-w-0 px-1 h-[34px] rounded-none font-condensed text-[13px] tracking-[0.04em] sm:tracking-[0.14em] uppercase font-bold whitespace-nowrap text-pressbox-text/45 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-pressbox-sage data-[state=active]:text-pressbox-text hover:text-pressbox-text transition-colors"
                 >
                   <span className="sm:hidden">Stats</span>
                   <span className="hidden sm:inline">Team Stats</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="trends"
-                  className="flex-none shrink-0 px-3 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.12em] sm:tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className="flex-1 min-w-0 px-1 h-[34px] rounded-none font-condensed text-[13px] tracking-[0.04em] sm:tracking-[0.14em] uppercase font-bold whitespace-nowrap text-pressbox-text/45 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-pressbox-sage data-[state=active]:text-pressbox-text hover:text-pressbox-text transition-colors"
                 >
-                  <span className="sm:hidden">Trends</span>
+                  {/* "TRENDS & ANALYTICS" is ~131px in Barlow Condensed at
+                      13/.14em and the column is 98px at 393. The phone label
+                      is ANALYTICS rather than TRENDS on purpose: this tab is
+                      the insight surface other fantasy apps do not have, and
+                      "Trends" reads as a generic mover list. */}
+                  <span className="sm:hidden">Analytics</span>
                   <span className="hidden sm:inline">Trends &amp; Analytics</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="transactions"
-                  className="flex-none shrink-0 px-3 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.12em] sm:tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className="flex-1 min-w-0 px-1 h-[34px] rounded-none font-condensed text-[13px] tracking-[0.04em] sm:tracking-[0.14em] uppercase font-bold whitespace-nowrap text-pressbox-text/45 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-pressbox-sage data-[state=active]:text-pressbox-text hover:text-pressbox-text transition-colors"
                 >
                   Transactions
                 </TabsTrigger>
@@ -3879,6 +3922,14 @@ const Roster = () => {
                           cross-league ownership aggregate. The columns and
                           the grid that carries them return the day those
                           numbers exist, not before. */}
+                      {/* -mx-3 cancels the page column's phone padding for the
+                          LIST ONLY. Two nested gutters put the rows 24px in
+                          from each edge and made a dense list read as a panel
+                          floating in a box; the list's own px-3 is the gutter
+                          that stays. Scoped here rather than on the whole tab
+                          because the summary card above it still wants the
+                          page's padding. */}
+                      <div className="-mx-3 lg:mx-0">
                       {(() => {
                         const rows = buildRosterRows({
                           starters: displayRoster.starters,
@@ -3926,6 +3977,7 @@ const Roster = () => {
                           />
                         );
                       })()}
+                      </div>
                       {/* Fill sheet — slot-first counterpart of the Line
                           Change sheet; opens from an empty row (audit R2). */}
                       <FillSlotSheet

@@ -74,12 +74,42 @@ describe('the header card collapses to one line below lg', () => {
     expect(btn).toContain('lg:min-h-[48px]');
   });
 
-  it('the card and the tab body lose their desktop padding on phones', () => {
-    const cardOuter = ROSTER.lastIndexOf('<div className="bg-[#1A2A20]', cardStart);
+  it('the legacy card is DESKTOP ONLY — the phone gets the Press Box card', () => {
+    // The shape changed with the Press Box conversion (2026-09-04). This card
+    // still exists and still carries Rank, Total Pts and a 48px Auto Lineup
+    // button, none of which fit a 393px row; below lg it is not rendered at
+    // all and `PressBoxTeamCard` takes its place. The contract this case has
+    // always protected — a phone never sees the desktop card's padding — is
+    // now satisfied by not drawing the card, which is stronger than shrinking
+    // it, so the assertion moved rather than being dropped.
+    const cardOuter = ROSTER.lastIndexOf('<div className="hidden lg:block bg-[#1A2A20]', cardStart);
+    expect(cardOuter, 'the legacy header card must be hidden below lg').toBeGreaterThan(-1);
     const cls = ROSTER.slice(cardOuter, ROSTER.indexOf('>', cardOuter));
     expect(cls).toContain('p-3 lg:p-5');
     expect(cls).toContain('mb-3 lg:mb-4');
     expect(openingTag(ROSTER, '<TabsContent value="roster"')).toContain('px-3 py-4 lg:p-6');
+  });
+
+  it('the phone card is the Press Box one, with exactly one orange action', () => {
+    const at = ROSTER.indexOf('<PressBoxTeamCard');
+    expect(at, 'the phone team card must be mounted').toBeGreaterThan(-1);
+    const wrapper = openingTag(ROSTER, ROSTER.slice(ROSTER.lastIndexOf('<div', at), ROSTER.lastIndexOf('<div', at) + 20));
+    expect(wrapper, 'and only below lg').toContain('lg:hidden');
+    const card = ROSTER.slice(at, ROSTER.indexOf('/>', ROSTER.indexOf('actions=', at)));
+    for (const label of ['Optimize', 'Trade', 'Add', 'Log']) {
+      expect(card, `${label} action missing`).toContain(`label: '${label}'`);
+    }
+    expect(card.match(/primary: true/g) ?? [], 'exactly one primary action').toHaveLength(1);
+  });
+
+  it('the list escapes the tab body\'s gutter so its rules reach both edges', () => {
+    // The tab body keeps px-3 for the summary card above the list; the list
+    // cancels it with -mx-3 and supplies the only gutter the rows see. Two
+    // nested gutters put the rows 24px in from each edge, which is what made
+    // a dense list read as a panel floating in a box.
+    const at = ROSTER.indexOf('<PressBoxRosterList');
+    const wrapper = ROSTER.lastIndexOf('<div className="-mx-3 lg:mx-0">', at);
+    expect(wrapper, 'the list must cancel the page gutter below lg').toBeGreaterThan(-1);
   });
 });
 
