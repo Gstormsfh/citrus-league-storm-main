@@ -22,8 +22,10 @@
  * reason — the notification is not a side effect, it is half the action, and
  * the button names both.
  */
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { PB_TYPE } from './rowScale';
+import { PressBoxSheet } from './Sheet';
 
 /* ── header ────────────────────────────────────────────────────────── */
 
@@ -140,12 +142,22 @@ export interface PressBoxSettingRowProps {
   label: string;
   /** The rule, stated where the setting is. */
   help?: string | null;
-  /** `Rolling priority`. Renders with a chevron and makes the row tappable. */
+  /**
+   * `Rolling priority`. With `onPress` the row is tappable and carries a
+   * chevron; without one it is a fact (`12 players`) and carries none.
+   */
   value?: string | null;
   onPress?: () => void;
   /** A switch instead of a value. */
   checked?: boolean;
   onToggle?: (next: boolean) => void;
+  /**
+   * A small button instead of a value — `RUN`, `SYNC` — for the
+   * commissioner tools that do something now rather than set something.
+   */
+  action?: { label: string; onPress: () => void; busy?: boolean };
+  /** Locked (the draft is done). Shown at half strength, not tappable. */
+  disabled?: boolean;
   /** Last row in a group drops its rule. */
   last?: boolean;
   className?: string;
@@ -158,10 +170,13 @@ export function PressBoxSettingRow({
   onPress,
   checked,
   onToggle,
+  action,
+  disabled,
   last,
   className,
 }: PressBoxSettingRowProps) {
   const isSwitch = checked != null;
+  const tappable = !!onPress && !disabled;
   const body = (
     <>
       <span className="min-w-0 text-left">
@@ -171,13 +186,29 @@ export function PressBoxSettingRow({
         )}
       </span>
       {isSwitch ? (
-        <PressBoxToggle checked={!!checked} onChange={onToggle} label={label} />
+        <PressBoxToggle checked={!!checked} onChange={disabled ? undefined : onToggle} label={label} />
+      ) : action ? (
+        <button
+          type="button"
+          onClick={action.onPress}
+          disabled={action.busy || disabled}
+          className="focus-citrus flex-none h-8 px-3 rounded-[8px] bg-white/[0.06] border border-white/[0.12] font-plex font-semibold text-[10px] tracking-[0.08em] text-pressbox-text disabled:opacity-50"
+        >
+          {action.label}
+        </button>
       ) : (
-        <span className="flex items-center gap-1.5 flex-none font-plex font-medium text-[12px] text-pressbox-orange-soft">
+        <span
+          className={cn(
+            'flex items-center gap-1.5 flex-none font-plex font-medium text-[12px] tabular-nums',
+            tappable ? 'text-pressbox-orange-soft' : 'text-pressbox-text/70',
+          )}
+        >
           {value}
-          <span aria-hidden="true" className="text-pressbox-text/40">
-            &rsaquo;
-          </span>
+          {tappable && (
+            <span aria-hidden="true" className="text-pressbox-text/40">
+              &rsaquo;
+            </span>
+          )}
         </span>
       )}
     </>
@@ -186,16 +217,189 @@ export function PressBoxSettingRow({
   const shell = cn(
     'flex items-center justify-between gap-3 px-3.5 py-3 w-full',
     !last && 'border-b border-white/[0.06]',
+    disabled && 'opacity-50',
     className,
   );
 
-  if (isSwitch || !onPress) {
+  if (!tappable) {
     return <div className={shell}>{body}</div>;
   }
   return (
     <button type="button" onClick={onPress} className={cn(shell, 'focus-citrus text-left')}>
       {body}
     </button>
+  );
+}
+
+/* ── pickers ───────────────────────────────────────────────────────── */
+
+export interface PressBoxPickerOption {
+  value: string;
+  label: string;
+  help?: string | null;
+}
+
+export interface PressBoxOptionSheetProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  help?: string | null;
+  options: PressBoxPickerOption[];
+  value: string;
+  onSelect: (value: string) => void;
+}
+
+/**
+ * The value picker behind a setting row. One row per option, the current
+ * one marked, and choosing closes — the row it came from shows the new
+ * value the instant the sheet is gone, which is the confirmation.
+ */
+export function PressBoxOptionSheet({ open, onOpenChange, title, help, options, value, onSelect }: PressBoxOptionSheetProps) {
+  return (
+    <PressBoxSheet open={open} onOpenChange={onOpenChange} title={title} shape="bottom">
+      <div className="px-3.5 pt-3.5 pb-2">
+        <p className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text">{title}</p>
+        {help && <p className="mt-0.5 font-barlow text-[11px] text-pressbox-text/50">{help}</p>}
+      </div>
+      <div role="listbox" aria-label={title} className="overflow-y-auto px-3.5 pb-2">
+        <div className="rounded-[12px] bg-pressbox-tile border border-white/[0.08] overflow-hidden">
+          {options.map((o, i) => {
+            const active = o.value === value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => {
+                  onSelect(o.value);
+                  onOpenChange(false);
+                }}
+                className={cn(
+                  'focus-citrus flex items-center justify-between gap-3 w-full px-3.5 py-3 text-left',
+                  i < options.length - 1 && 'border-b border-white/[0.06]',
+                )}
+              >
+                <span className="min-w-0">
+                  <span className={cn('block font-barlow font-semibold text-[14px]', active ? 'text-pressbox-text' : 'text-pressbox-text/85')}>
+                    {o.label}
+                  </span>
+                  {o.help && <span className="block mt-px font-barlow text-[11px] text-pressbox-text/50">{o.help}</span>}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    'flex-none w-5 h-5 rounded-full border flex items-center justify-center font-plex text-[11px]',
+                    active ? 'bg-pressbox-sage border-pressbox-sage text-pressbox-surface' : 'border-white/[0.16]',
+                  )}
+                >
+                  {active ? '✓' : ''}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </PressBoxSheet>
+  );
+}
+
+export interface PressBoxNumberSheetProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  help?: string | null;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  /** `s`, `$`. */
+  unit?: string;
+  onCommit: (value: number) => void;
+}
+
+/**
+ * The number picker: a stepper with the figure typed or nudged, committed
+ * by DONE. `−`/`+` move by `step` and clamp; the field accepts anything
+ * and clamps on commit, so a fat-fingered 900 rounds becomes the max
+ * rather than an error.
+ */
+export function PressBoxNumberSheet({ open, onOpenChange, title, help, value, min, max, step = 1, unit, onCommit }: PressBoxNumberSheetProps) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => {
+    if (open) setDraft(String(value));
+  }, [open, value]);
+  const clamp = (n: number) => Math.min(max, Math.max(min, n));
+  const current = Number(draft);
+  const valid = Number.isFinite(current);
+  const decimals = (String(step).split('.')[1] ?? '').length;
+  const commit = () => {
+    if (!valid) return;
+    onCommit(Number(clamp(Math.round(current / step) * step).toFixed(decimals)));
+    onOpenChange(false);
+  };
+  const nudge = (dir: 1 | -1) =>
+    setDraft((d) => {
+      const n = Number(d);
+      return clamp((Number.isFinite(n) ? n : value) + dir * step).toFixed(decimals);
+    });
+  return (
+    <PressBoxSheet open={open} onOpenChange={onOpenChange} title={title} shape="bottom">
+      <div className="px-3.5 pt-3.5 pb-2">
+        <p className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text">{title}</p>
+        {help && <p className="mt-0.5 font-barlow text-[11px] text-pressbox-text/50">{help}</p>}
+      </div>
+      <div className="px-3.5 pb-2 flex items-center gap-2">
+        <button
+          type="button"
+          aria-label="Less"
+          onClick={() => nudge(-1)}
+          className="focus-citrus flex-none w-12 h-12 rounded-[10px] bg-pressbox-tile border border-white/[0.08] font-plex text-[18px] text-pressbox-text"
+        >
+          −
+        </button>
+        <label className="flex-1 flex items-center justify-center gap-1 h-12 rounded-[10px] bg-pressbox-tile border border-white/[0.08]">
+          <span className="sr-only">{title}</span>
+          {unit === '$' && <span className="font-plex font-medium text-[14px] text-pressbox-text/50">$</span>}
+          <input
+            type="number"
+            inputMode={step < 1 ? 'decimal' : 'numeric'}
+            value={draft}
+            min={min}
+            max={max}
+            step={step}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commit();
+            }}
+            className="w-24 bg-transparent text-center font-plex font-semibold text-[20px] tabular-nums text-pressbox-text outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+          {unit && unit !== '$' && <span className="font-plex font-medium text-[14px] text-pressbox-text/50">{unit}</span>}
+        </label>
+        <button
+          type="button"
+          aria-label="More"
+          onClick={() => nudge(1)}
+          className="focus-citrus flex-none w-12 h-12 rounded-[10px] bg-pressbox-tile border border-white/[0.08] font-plex text-[18px] text-pressbox-text"
+        >
+          +
+        </button>
+      </div>
+      <p className="px-3.5 font-plex font-medium text-[9px] tracking-[0.08em] text-pressbox-text/45">
+        {min} TO {max}
+        {step !== 1 ? ` · STEPS OF ${step}` : ''}
+      </p>
+      <div className="px-3.5 pt-3">
+        <button
+          type="button"
+          onClick={commit}
+          disabled={!valid}
+          className="focus-citrus w-full h-11 rounded-[10px] bg-pressbox-orange font-plex font-semibold text-[12px] tracking-[0.06em] text-pressbox-orange-ink disabled:opacity-40"
+        >
+          DONE
+        </button>
+      </div>
+    </PressBoxSheet>
   );
 }
 

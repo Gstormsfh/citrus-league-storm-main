@@ -31,6 +31,10 @@ import { waiverApi } from '@/api/waivers';
 import Navbar from '@/components/Navbar';
 import { LeagueHeader, LeagueMenu } from '@/components/pressbox';
 import { LeagueHQPhone, type LeagueHQMatchup } from '@/components/league/LeagueHQPhone';
+import { LeagueSettingsPhone } from '@/components/league/LeagueSettingsPhone';
+import { buildLeagueSettingsSections } from '@/components/league/leagueSettingsSections';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { useScoringRules } from '@/components/league/useScoringRules';
 import { matchupApi } from '@/api/matchups';
 import { isBye, scoreOf, teamNameOf, type WeekMatchupRow } from '@/components/matchup/scoreboard';
 import { clampToSeasonStart, getCurrentWeekNumber, getDraftCompletionDate, getFirstWeekStartDate } from '@/utils/weekCalculator';
@@ -131,6 +135,18 @@ const LeagueDashboard = () => {
 
   // Active settings tab
   const [activeSettingsTab, setActiveSettingsTab] = useState('waivers');
+  /**
+   * PRESS BOX (2026-09-04): which settings surface opens. The desktop
+   * dialog and the phone screen (`LeagueSettingsPhone`) share every piece
+   * of state above and the save handler below; only one of them mounts,
+   * because both portal to the body and a responsive class cannot hide a
+   * portal. `useIsMobile` is the one viewport answer (see the hook).
+   */
+  const isMobile = useIsMobile();
+  /* The phone screen's SCORING section reads the same catalog the desktop
+     editor does, through the same hook; it fetches only while the phone
+     screen is open, so a visit to HQ costs nothing. */
+  const scoringRules = useScoringRules(settingsOpen && isMobile && leagueId ? leagueId : null);
 
   const loadLeagueData = useCallback(async () => {
     if (!leagueId || !user) return;
@@ -604,9 +620,9 @@ const LeagueDashboard = () => {
     : null;
   const isCategoryLeague =
     leagueScoringFormat === 'h2h-categories' || leagueScoringFormat === 'roto';
-  // SETTINGS SECTIONS (2026-09-01): one list drives BOTH the desktop tab
-  // strip and the mobile section dropdown — "hard to use and navigate on
-  // mobile... utilize drop down menus."
+  // SETTINGS SECTIONS (2026-09-01): one list drives the desktop tab strip;
+  // the phone screen's chips come from leagueSettingsSections.ts, in the
+  // same order, with the same keys (2026-09-04).
   const settingsSections = isCategoryLeague
     ? (['waivers', 'categories', 'draft', 'trades', 'keeper', 'rosterslots', 'playoffs', 'rosters'] as const)
     : (['waivers', 'scoring', 'draft', 'trades', 'keeper', 'rosterslots', 'playoffs', 'rosters'] as const);
@@ -943,6 +959,51 @@ const LeagueDashboard = () => {
           invite={league.join_code && <InvitePlayersButton joinCode={league.join_code} leagueName={league.name} />}
         />
       </div>
+      {/* PRESS BOX (2026-09-04): the commissioner's settings as artboard
+          1a's screen. Same state, same save; the fields are stated once in
+          leagueSettingsSections.ts and this screen draws them. */}
+      {isCommissioner && (
+        <LeagueSettingsPhone
+          open={settingsOpen && isMobile}
+          onOpenChange={setSettingsOpen}
+          leagueName={league.name}
+          sections={buildLeagueSettingsSections({
+            draftCompleted: league.draft_status === 'completed',
+            teamCount: teams.length,
+            isCategoryLeague,
+            waiver: waiverSettings,
+            setWaiver: setWaiverSettings,
+            draft: draftSettings,
+            setDraft: setDraftSettings,
+            trade: tradeSettings,
+            setTrade: setTradeSettings,
+            keeper: keeperSettings,
+            setKeeper: setKeeperSettings,
+            categories: categorySettings,
+            setCategories: setCategorySettings,
+            rosterSlots: rosterSlotSettings,
+            setRosterSlots: setRosterSlotSettings,
+            playoff: playoffSettings,
+            setPlayoff: setPlayoffSettings,
+            processWaivers: { onPress: handleProcessWaivers, busy: processingWaivers },
+            syncRosters: { onPress: handleSyncRosters, busy: syncingRosters },
+            rosters: teams.map((t) => ({ name: t.team_name, count: rosterCounts[t.id] ?? null })),
+            rostersLoading: loadingRosterCounts,
+            scoring: scoringRules,
+          })}
+          activeKey={activeSettingsTab}
+          onSectionChange={setActiveSettingsTab}
+          onSave={handleSaveSettings}
+          saving={savingSettings}
+          onDiscard={() => {
+            // The dashboard's own reload puts every setting back to what
+            // the server has; the sheet closes on the same beat.
+            scoringRules.reset();
+            loadLeagueData();
+            setSettingsOpen(false);
+          }}
+        />
+      )}
       <main className="hidden lg:block w-full lg:pt-24 lg:pb-8">
         <div className="w-full m-0 p-0">
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
@@ -998,7 +1059,7 @@ const LeagueDashboard = () => {
                   <InvitePlayersButton joinCode={league.join_code} leagueName={league.name} />
                 )}
                 {isCommissioner && (
-                  <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+                  <Dialog open={settingsOpen && !isMobile} onOpenChange={setSettingsOpen}>
                     <DialogTrigger asChild>
                       <Button
                         variant="outline"
@@ -1009,15 +1070,13 @@ const LeagueDashboard = () => {
                         <span className="sr-only sm:hidden">League Settings</span>
                       </Button>
                     </DialogTrigger>
-                    {/* MOBILE SHEET (2026-09-01): below sm the centered 700px
-                        desktop modal crammed eight settings tabs onto a phone.
-                        Pin it as a full-height bottom sheet instead — top edge
-                        under the status bar, safe-area padding at the foot —
-                        while sm+ keeps the desktop modal unchanged. */}
-                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 text-pastel-cream max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-[max(env(safe-area-inset-top),1rem)] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:left-0 max-sm:max-w-none max-sm:w-full max-sm:max-h-none max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:p-4 max-sm:pb-[max(env(safe-area-inset-bottom),1.25rem)] max-sm:overflow-x-hidden">
-                      {/* text-left + pr-8: the sheet header wraps inside the
-                          viewport and clears the close button — the sim showed
-                          header text running past the right screen edge. */}
+                    {/* DESKTOP ONLY (2026-09-04). This dialog opens at `lg`
+                        and up; below it `LeagueSettingsPhone` is the screen
+                        (artboard 1a). The 09-01 phone sheet classes and the
+                        section dropdown that lived here were for viewports
+                        this dialog no longer opens on, so they are gone
+                        rather than left as dead code. */}
+                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 text-pastel-cream">
                       <DialogHeader className="text-left pr-8 max-w-full">
                         <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
                           ✦ Commissioner
@@ -1032,26 +1091,7 @@ const LeagueDashboard = () => {
                       </DialogHeader>
                       
                       <Tabs value={activeSettingsTab} onValueChange={setActiveSettingsTab} className="w-full">
-                        {/* MOBILE SECTION PICKER (2026-09-01): eight tabs in a
-                            horizontal scroll strip were unnavigable on a phone
-                            — half the sections hidden past the edge. One
-                            full-width dropdown replaces the strip below sm;
-                            the desktop tab strip returns at sm+. */}
-                        <div className="sm:hidden">
-                          <Select value={activeSettingsTab} onValueChange={setActiveSettingsTab}>
-                            <SelectTrigger className="w-full h-11 bg-[#0F1F15] ring-1 ring-white/10 border-0 rounded-xl font-bold text-pastel-cream">
-                              <SelectValue>{settingsSectionLabel(activeSettingsTab)} Settings</SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {settingsSections.map((tab) => (
-                                <SelectItem key={tab} value={tab}>
-                                  {settingsSectionLabel(tab)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="hidden sm:block overflow-x-auto -mx-2 px-2">
+                        <div className="overflow-x-auto -mx-2 px-2">
                           <TabsList className="inline-flex w-auto min-w-full bg-[#0F1F15] ring-1 ring-white/10 p-1 rounded-xl">
                             {settingsSections.map((tab) => (
                               <TabsTrigger

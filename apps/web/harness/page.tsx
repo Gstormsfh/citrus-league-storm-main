@@ -35,6 +35,7 @@ import { rosterApi } from '../src/api/rosters';
 import { waiverApi } from '../src/api/waivers';
 import { scoresApi } from '../src/api/scores';
 import { ScoringCalculator, extractScoringSettings } from '../src/utils/scoringUtils';
+import { LeagueSettingsService } from '../src/services/LeagueSettingsService';
 import { HARNESS_PLAYERS, harnessDirectoryPlayer, harnessPlayer } from './players';
 import { OPP as MATCHUP_OPP, USER as MATCHUP_USER } from './matchupFixtures';
 
@@ -397,6 +398,43 @@ const HARNESS_GAMES = new Map<string, any[]>(
     .filter((g) => g.game_date >= start && g.game_date <= end);
   return { games, error: null };
 };
+/**
+ * The commissioner's SCORING section (2026-09-04). The catalog is the real
+ * one's shape — stat_catalog joined to the league's rules — with the core
+ * twelve at their default multipliers and two of the newer stats, so the
+ * screen shows a `New this season` row and an `Off` row. Generated; says so.
+ */
+(LeagueSettingsService as any).getScoringRules = async () => ({
+  error: null,
+  stats: [
+    ['goals', 'Goals', 'skater', 3, true],
+    ['assists', 'Assists', 'skater', 2, true],
+    ['shots_on_goal', 'Shots on goal', 'skater', 0.5, true],
+    ['plus_minus', 'Plus / minus', 'skater', 0.5, true],
+    ['ppp', 'Power-play points', 'skater', 0.5, true],
+    ['shp', 'Short-handed points', 'skater', 1, true],
+    ['hits', 'Hits', 'skater', 0.25, true],
+    ['blocks', 'Blocked shots', 'skater', 0.5, true],
+    ['pim', 'Penalty minutes', 'skater', 0, true],
+    ['gwg', 'Game-winning goals', 'skater', 1, false],
+    ['faceoff_wins', 'Faceoff wins', 'skater', 0, false],
+    ['wins', 'Wins', 'goalie', 4, true],
+    ['saves', 'Saves', 'goalie', 0.2, true],
+    ['goals_against', 'Goals against', 'goalie', -1, true],
+    ['shutouts', 'Shutouts', 'goalie', 3, true],
+    ['ot_losses', 'Overtime losses', 'goalie', 1, false],
+  ].map(([stat_key, display_name, applies_to, multiplier, is_core], i) => ({
+    stat_key,
+    display_name,
+    applies_to,
+    default_multiplier: multiplier,
+    is_core,
+    sort_order: i,
+    multiplier,
+  })),
+});
+(LeagueSettingsService as any).updateScoringRules = async () => ({ success: true, error: null });
+
 (matchupApi as any).getPlayerGameLog = async (playerId: number, start: string, end: string) => {
   const p = PLAYERS.find((x: any) => String(x.id) === String(playerId)) as any;
   const goalie = p?.position === 'G';

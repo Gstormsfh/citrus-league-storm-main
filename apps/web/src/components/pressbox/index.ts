@@ -39,10 +39,16 @@ export {
   PressBoxToggle,
   PressBoxCallout,
   PressBoxSaveBar,
+  PressBoxOptionSheet,
+  PressBoxNumberSheet,
   type PressBoxSettingsHeaderProps,
   type PressBoxSettingRowProps,
   type PressBoxSaveBarProps,
+  type PressBoxPickerOption,
+  type PressBoxOptionSheetProps,
+  type PressBoxNumberSheetProps,
 } from './Settings';
+export { PressBoxSheet, type PressBoxSheetProps } from './Sheet';
 
 /** The player card (artboard 1a). One screen, six pieces. */
 export {
