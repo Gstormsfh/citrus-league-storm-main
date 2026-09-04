@@ -230,7 +230,10 @@ describe('harness fixtures render real players with real faces', () => {
       'harness/cards.tsx',
       'harness/today.tsx',
       'harness/slot.tsx',
-      'harness/matchup.tsx',
+      // matchup.tsx's rosters moved to matchupFixtures.ts (2026-09-04) so
+      // page.tsx can hand the same players to the whole Matchup page; the
+      // fixture module is the one that builds them, and the one held here.
+      'harness/matchupFixtures.ts',
       'harness/analytics.tsx',
       'harness/advanced.tsx',
       'harness/stubs/draftFixtures.ts',
