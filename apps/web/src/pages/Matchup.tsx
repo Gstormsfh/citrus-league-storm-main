@@ -52,6 +52,7 @@ import { leagueApi } from '@/api/leagues';
 import { playerApi } from '@/api/players';
 import { publicApi } from '@/api/public';
 import { syncLeagueFromUrl } from './matchupUrlSync';
+import { defaultMatchupDay } from './matchupDefaultDay';
 
 /** How long the FIRST matchup load may run before the page admits failure.
  *  Above the 15s in-flight timeout below, so a load that is merely slow still
@@ -834,7 +835,7 @@ const Matchup = () => {
             setSelectedWeek(weekToShow);
             log(' Using fallback matchup from week', weekToShow);
           } else {
-            throw new Error(`No matchups found in demo league. Please verify the migration ran successfully.`);
+            throw new Error(`The demo league has no matchups yet. Refresh to try again.`);
           }
         }
 
@@ -1483,46 +1484,28 @@ const Matchup = () => {
     fetchAllDailyStats();
   }, [fetchAllDailyStats]);
 
-  // Auto-select default date when matchup and daily stats are loaded
-  // Default to today if in matchup week, otherwise most recent date with games, otherwise first day of week
+  // Auto-select the default date once the daily stats are in hand. Only a
+  // PAST week still needs them (which day was last played); every other week
+  // was already decided by the effect further down, before the first paint.
+  // See pages/matchupDefaultDay.ts.
   useEffect(() => {
     if (!currentMatchup || dailyStatsByDate.size === 0 || selectedDate !== null) {
       return; // Don't override if user has already selected a date
     }
 
-    const todayStr = getTodayMST();
-    // Use string comparison to avoid timezone issues with new Date("YYYY-MM-DD") UTC parsing
-    const weekStartStr = currentMatchup.week_start_date;
-    const weekEndStr = currentMatchup.week_end_date;
-
-    // Check if today is in the matchup week (string comparison works for YYYY-MM-DD)
-    if (todayStr >= weekStartStr && todayStr <= weekEndStr) {
-      setSelectedDate(todayStr);
-      return;
-    }
-
-    // Find the most recent date with games within the matchup week
-    let mostRecentDate: string | null = null;
-
+    const datesWithStats: string[] = [];
     for (const [dateStr, dayStats] of dailyStatsByDate.entries()) {
-      // Only consider dates within the matchup week (string comparison)
-      if (dateStr >= weekStartStr && dateStr <= weekEndStr) {
-        // Check if this date has any stats (not empty map)
-        if (dayStats && dayStats.size > 0) {
-          if (!mostRecentDate || dateStr > mostRecentDate) {
-            mostRecentDate = dateStr;
-          }
-        }
-      }
+      if (dayStats && dayStats.size > 0) datesWithStats.push(dateStr);
     }
 
-    if (mostRecentDate) {
-      setSelectedDate(mostRecentDate);
-      return;
-    }
+    const day = defaultMatchupDay({
+      today: getTodayMST(),
+      weekStart: currentMatchup.week_start_date,
+      weekEnd: currentMatchup.week_end_date,
+      datesWithStats,
+    });
 
-    // Fallback: use first day of matchup week
-    setSelectedDate(weekStartStr);
+    if (day) setSelectedDate(day);
   }, [currentMatchup, dailyStatsByDate, selectedDate]);
 
   // Fetch projections for a specific date - memoized to prevent recreation
@@ -1653,7 +1636,7 @@ const Matchup = () => {
 
         if (!data) {
           logger.error('[Matchup] No data returned from getDailyGameStats');
-          throw new Error('No data returned');
+          throw new Error('Daily stats came back empty');
         }
         
         const statsDataArr = (data || []) as any[];
@@ -1831,18 +1814,32 @@ const Matchup = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, currentMatchup, userLeagueState, scoringSettings, playerIdsVersion, demoMyTeam, demoOpponentTeam]);
 
-  // Auto-select today's date on initial load (so user sees something immediately)
+  // THE DAY THE PAGE OPENS ON, DECIDED BEFORE THE FIRST PAINT (2026-09-03).
+  //
+  // This used to fire only when today fell inside the matchup week, and every
+  // other week was left to the stats-driven effect above - which waits on a
+  // seven-request fetch that does not even START until the loader has
+  // finished and the spinner has come down. The page therefore painted in
+  // WEEK scope and then re-assembled itself into DAY scope: the compact
+  // WeeklySchedule grew its "Full week" button and shoved the whole lineup
+  // down ~36px, and all 26 player rows swapped their week total for that
+  // day's number. On 2026-09-03 no matchup week in production contains
+  // today, so that was every load.
+  //
+  // `defaultMatchupDay` answers from the matchup alone wherever the stats
+  // cannot change the answer - which is every week except one already
+  // played - so the first frame is the settled one.
   useEffect(() => {
     if (!currentMatchup || selectedDate !== null) return; // Only run if no date selected yet
-    
-    const todayStr = getTodayMST();
-    const weekStart = currentMatchup.week_start_date;
-    const weekEnd = currentMatchup.week_end_date;
-    
-    // If today is in this matchup week, select it
-    if (todayStr >= weekStart && todayStr <= weekEnd) {
-      setSelectedDate(todayStr);
-    }
+
+    const day = defaultMatchupDay({
+      today: getTodayMST(),
+      weekStart: currentMatchup.week_start_date,
+      weekEnd: currentMatchup.week_end_date,
+      datesWithStats: null,
+    });
+
+    if (day) setSelectedDate(day);
   }, [currentMatchup, selectedDate]);
 
   // Helper function to enrich a player with daily stats for a specific date
@@ -3586,6 +3583,29 @@ const Matchup = () => {
     ? { my: matchupOutlook.myExpectedFinal, opp: matchupOutlook.oppExpectedFinal }
     : null;
 
+  // ARE THE FINALS COMING, OR ARE THEY NOT COMING? (2026-09-03)
+  //
+  // `projectedFinals` is null for four different reasons and the ScoreCard
+  // could not tell them apart, so it simply omitted the "proj 112.4" line -
+  // and grew by one 10px line per side the moment the week's projections
+  // landed, a few hundred ms AFTER the spinner came down, shoving the day
+  // strip and the whole lineup down with it.
+  //
+  // This is the one reason that is temporary: the remaining days' projections
+  // are still in flight. The card holds the line's height open for exactly
+  // that case, and for no other - a settled week, a week with nothing left to
+  // play, and a matchup whose finals never resolve all keep the tight card
+  // they have today rather than carrying a permanent blank line.
+  const expectedFinalsPending = useMemo(() => {
+    if (!currentMatchup || matchupOutlook) return false;
+    const remaining = enumerateWeekDates(
+      currentMatchup.week_start_date,
+      currentMatchup.week_end_date,
+    ).filter(d => d >= getTodayMST());
+    if (remaining.length === 0) return false;
+    return !remaining.every(d => projectionsByDate.has(d));
+  }, [currentMatchup, matchupOutlook, projectionsByDate]);
+
   const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   
   // Calculate daily points - only if matchup has started and has scores
@@ -3860,6 +3880,17 @@ const Matchup = () => {
         }
 
         log(' LeagueId from URL:', targetLeagueId);
+
+        // The user's team in this league is keyed on (leagueId, userId) — both
+        // already known here — but it was awaited further down, AFTER the
+        // leagues list and the draft-status gate, so it cost its own serial
+        // round trip in the middle of the loader. Start it now and read it at
+        // the same place as before. `LeagueService.getUserTeam` resolves to
+        // { team: null, error } rather than rejecting, so holding the promise
+        // across the awaits below cannot produce an unhandled rejection.
+        // (PERF 2026-09-04)
+        const userTeamPromise = LeagueService.getUserTeam(targetLeagueId, user.id);
+
         // Get league data (reuse cached if available)
         let userLeagues: League[] = [];
         let leagueError: any = null;
@@ -3920,8 +3951,8 @@ const Matchup = () => {
         });
 
         log(' Getting user team for league:', currentLeague.id);
-        // Get user's team
-        const { team: userTeamData } = await LeagueService.getUserTeam(currentLeague.id, user.id);
+        // Get user's team — request started above, alongside the leagues read.
+        const { team: userTeamData } = await userTeamPromise;
         if (!userTeamData) {
           logger.error('[MATCHUP] User team not found');
           setError('You do not have a team in this league');
@@ -4373,7 +4404,7 @@ const Matchup = () => {
             return;
           } else {
             // Original error handling for user's matchup
-            if (matchupError?.message?.includes('No matchup found') || matchupError?.message?.includes('timed out')) {
+            if (matchupError?.message?.includes('has no matchup yet') || matchupError?.message?.includes('No matchup found') || matchupError?.message?.includes('timed out')) {
               log(' No matchup found or timeout for week', weekToShow);
               setError(`Failed to load matchup for week ${weekToShow}. ${matchupError.message?.includes('timed out') ? 'Request timed out.' : 'Matchup may need to be generated.'} Please try refreshing the page.`);
               setLoading(false);
@@ -4399,7 +4430,7 @@ const Matchup = () => {
             loadingRef.current = false;
             return;
           } else {
-            setError(`No matchup found for week ${weekToShow}`);
+            setError(`Week ${weekToShow} has no matchup yet. Retry, or pick another week.`);
             setLoading(false);
             loadingRef.current = false;
             return;
@@ -5692,6 +5723,7 @@ const Matchup = () => {
             opponentTeamProjection={opponentTotalProjection}
             myTeamExpectedFinal={projectedFinals?.my}
             opponentTeamExpectedFinal={projectedFinals?.opp}
+            expectedFinalsPending={expectedFinalsPending}
             winProbability={matchupOutlook ? matchupOutlook.probability * 100 : undefined}
             // A stored Monte Carlo row (matchup_simulations) overrides the
             // formula when one exists and is fresh. Guests view a demo

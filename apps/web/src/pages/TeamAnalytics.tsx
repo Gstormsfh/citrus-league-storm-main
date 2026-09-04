@@ -385,7 +385,7 @@ const TeamAnalytics = () => {
                       {loading ? (
                         <div className="text-center py-4 text-sm text-white/55">Loading schedule data…</div>
                       ) : freeAgentTargets.filter(p => p.position !== 'G' && p.gamesThisWeek >= 3).length === 0 ? (
-                        <div className="text-center py-4 text-sm text-white/55">No schedule maximizers found this week.</div>
+                        <div className="text-center py-4 text-sm text-white/55">Nobody on the wire has three games this week.</div>
                       ) : (
                         <>
                           {freeAgentTargets.filter(p => p.position !== 'G' && p.gamesThisWeek >= 3).slice(0, 5).map(player => (

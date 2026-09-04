@@ -1483,9 +1483,10 @@ export class LobbyManager {
    * the cached promise is returned without re-running `processAction`.
    * Mobile retries on flaky networks collapse to one durable event.
    *
-   * Step 2 dispatches `submit_pick` to the snake/linear handler;
-   * `place_bid` and `nominate` return `'not_yet_implemented_chunk_11g6'`
-   * stubs until the auction state machine lands.
+   * Step 2 dispatches `submit_pick` to the snake/linear handler and
+   * `nominate` / `place_bid` to the auction handlers (processNominate,
+   * processPlaceBid). The `'not_yet_implemented_chunk_11g6'` reason string
+   * survives in types.ts / toasts.ts for old clients only.
    */
   async enqueueAction(action: DraftAction): Promise<DraftActionResult> {
     // Step 6b init guard. The LobbyManager state machine MUST be
@@ -3606,6 +3607,37 @@ export class LobbyManager {
    * advances `picksMade` and `draftStatus`.
    */
   private applyPickEvent(event: DraftEventRow): void {
+    // AUCTION FOREIGN-PICK GUARD (2026-09-03). Auction lobbies are
+    // constructed with `draftOrder: []` (index.ts:381), so the guard
+    // immediately below (`picksMade >= draftOrder.length`, i.e. 0 >= 0
+    // on the very first pick row) THROWS for every `pick` event that
+    // lands in an auction league's log. Those rows do still arrive in
+    // production: the pg_cron `draft-deadline-sweep` +
+    // `draft-autopick-keepalive` safety net is format-blind and wrote
+    // 53 of them into auction league a1a125c8 on 2026-09-01,
+    // taking that auction to `draft_completed` as a snake draft.
+    //
+    // The throw is far worse than the stray row it reports:
+    //   - LIVE rail: `processExternalEvent`'s per-event catch aborts
+    //     the whole NOTIFY batch with a bare `return`, so any later
+    //     event in the same fetch is dropped for that pass.
+    //   - BOOTSTRAP rail: `bootstrapFullEventReplay`'s switch has no
+    //     per-event try/catch, so the throw rejects `bootstrap()` and
+    //     therefore `init()`. An auction league whose log contains one
+    //     stray pick can then never have a lobby constructed again,
+    //     which takes the draft room down for good.
+    //
+    // A `pick` row is foreign to the auction state machine anyway
+    // (auction state is `currentNomination` / `teamBudgets` /
+    // `nominationsCompleted`, none of which a pick row addresses), so
+    // skip it loudly rather than wedging the room. Snake and linear
+    // behaviour is untouched.
+    if (this.format === 'auction') {
+      structuredLogger.warn(
+        `[lobby] pick event in auction lobby, skipped as foreign to the auction state machine lobbyId=${this.lobbyId} seq=${event.seq}`,
+      );
+      return;
+    }
     if (this.picksMade >= this.draftOrder.length) {
       throw new Error(
         `[lobby] bootstrap pick event past draft order ` +
@@ -5143,7 +5175,24 @@ export class LobbyManager {
       this.draftService.closeNomination({
         leagueId: this.leagueId,
         nominationId,
-        idempotencyKey: `close-${nominationId}`,
+        // ROOT CAUSE (2026-09-01, league a1a125c8). `close-<uuid>` is
+        // not a UUID, and `close_nomination_v2`'s `p_idempotency_key`
+        // parameter is typed `uuid`. Postgres rejected every call with
+        // 22P02 (invalid input syntax for type uuid:
+        // close-a207306d-a2d5-4ad8-8c7d-60e0de8648a2) in postgres_logs at
+        // 2026-09-01T17:16:23.027Z, exactly the bid-window deadline.
+        // The RPC threw, `handleNominationTimeout`'s catch cleared
+        // `currentNomination` + `currentTimerDeadline`, armed no
+        // successor timer and wrote no durable event: the auction was
+        // wedged at the first lot close, forever. The failure is
+        // DETERMINISTIC, so the one-shot retry above could never
+        // absorb it.
+        //
+        // Same seed, same value on every retry (the RPC's idempotency
+        // replay still collapses a re-close onto the first result),
+        // but now in a shape the `uuid` cast accepts. Same derivation
+        // the auto-nominate and skip keys already use.
+        idempotencyKey: md5UuidFromSeed(`close:${nominationId}`),
         actor: {
           kind: 'autopick',
           id: 'auction-engine',

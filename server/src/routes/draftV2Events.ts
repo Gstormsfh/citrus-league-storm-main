@@ -78,24 +78,38 @@ function rateLimitCheck(key: string): { allowed: boolean; retryAfterMs: number }
   if (entry.timestamps.length >= RATE_MAX) {
     const retryAfterMs = entry.timestamps[0] + RATE_WINDOW_MS - now;
     entry.touched = now;
+    // Delete-then-set keeps this key's position in recency order too, so a
+    // client that is being limited does not become the eviction candidate.
+    buckets.delete(key);
     buckets.set(key, entry);
     return { allowed: false, retryAfterMs: Math.max(0, retryAfterMs) };
   }
   entry.timestamps.push(now);
   entry.touched = now;
+  // Delete-then-set so Map iteration order IS recency order (a `set` on an
+  // existing key does not move it in a JS Map). See the eviction note below.
+  buckets.delete(key);
   buckets.set(key, entry);
 
   // LRU evict if bucket map is too large.
+  //
+  // SCALE (2026-09-04 load audit) — this used to be a full scan of the map
+  // on the `touched` field, run on EVERY request once the map passed
+  // RATE_LRU_MAX. The map is keyed `${userId}:${leagueId}`, so it holds one
+  // entry per manager per league they have a draft room open in. Twelve
+  // managers x 500 leagues on an opening-night Sunday is 6,000 keys — over
+  // the 5,000 cap — and because each eviction removes exactly one entry the
+  // map then SITS at the cap, so every subsequent replay request paid a
+  // 5,000-entry scan forever. Nothing errors; the endpoint just gets slower
+  // the more leagues are live, which is the wrong direction.
+  //
+  // Same eviction, O(1): with delete-then-set above, the Map's own insertion
+  // order is least-recently-used first, so the first key IS the entry the
+  // scan was looking for. `touched` is kept on the entry — it is part of the
+  // BucketEntry shape and cheap — but nothing scans it any more.
   if (buckets.size > RATE_LRU_MAX) {
-    let oldestKey: string | null = null;
-    let oldestTouched = Infinity;
-    for (const [k, v] of buckets) {
-      if (v.touched < oldestTouched) {
-        oldestTouched = v.touched;
-        oldestKey = k;
-      }
-    }
-    if (oldestKey !== null) buckets.delete(oldestKey);
+    const oldestKey = buckets.keys().next().value;
+    if (oldestKey !== undefined) buckets.delete(oldestKey);
   }
   return { allowed: true, retryAfterMs: 0 };
 }

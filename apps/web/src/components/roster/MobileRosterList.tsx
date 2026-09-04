@@ -8,7 +8,8 @@ import { SlotPickerMenu } from "./SlotPickerMenu";
 // Aliased: the list body already names its slot->position map `slotLabel`.
 import { slotLabel as labelForSlot } from "./slotLabel";
 import { LOCKED_CHIP } from "./slotChip";
-import { DEFAULT_IR_SLOT_COUNT, irSlotIds } from "./irSlots";
+import { DEFAULT_IR_SLOT_COUNT, irSlotIds, shouldMoveOffIr } from "./irSlots";
+import { multiPositionLabel } from "./positions";
 import { Mug } from "./Mug";
 import { useSwapHint } from "@/hooks/useSwapHint";
 import { useMemo } from "react";
@@ -61,7 +62,7 @@ interface MobileRosterListProps {
    */
   onFillSlot?: (slotId: string) => void;
   /**
-   * Show the one-time "Tap a position to swap" hint when this list is
+   * Show the one-time "Line Change" hint when this list is
    * editable. Off by default so read-only surfaces (demo league, guests)
    * never promise a gesture that only toasts "read only".
    */
@@ -217,6 +218,16 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
     WVR: { label: 'WVR', cls: 'bg-blue-500 text-white' },
   }[player.status] : null;
 
+  // MULTI-POSITION (2026-09-03, gap A). The chip is the SLOT; a C/LW player
+  // in UTIL or on the bench never said he could play LW. His own positions
+  // lead line 2, and only when there is more than one, so a single-position
+  // row prints exactly what it printed before.
+  const positionsLabel = player ? multiPositionLabel(player) : '';
+  // ILLEGAL IR OCCUPANT (2026-09-03, gap B). The NHL no longer lists him
+  // IR/LTIR; the server tolerates him where he is but the roster is not
+  // legal until he moves. Say so on the row, not only in a one-time toast.
+  const moveOffIr = player != null && slotId.startsWith('ir-slot-') && shouldMoveOffIr(player);
+
   // EMPTY ROW = ONE TARGET (2026-09-01, audit R2). The dashed box used to be
   // the only tappable part of an empty row, and with nothing selected the
   // tap did nothing at all. Now the whole row is the control: with a player
@@ -295,9 +306,20 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
               {statusBadge && (
                 /* 8px -> the MICRO rung. A solid saturated fill at 8px beside
                    a 15px name is a smudge rather than a word (the same note
-                   freeAgentRow.ts makes about its own status chip). */
+                   freeAgentRowKit.ts makes about its own status chip). */
                 <span className={cn(ROW_MICRO, "leading-none font-bold px-1 py-px rounded-sm flex-shrink-0", statusBadge.cls)}>
                   {statusBadge.label}
+                </span>
+              )}
+              {moveOffIr && (
+                // Orange is the page's action colour and this is an action.
+                // pastel-forest on it, not white: the text that survives the
+                // fill is part of the fill (see positionChip.ts).
+                <span
+                  data-testid="ir-move-off"
+                  className={cn(ROW_MICRO, "leading-none font-bold px-1 py-px rounded-sm flex-shrink-0 bg-pastel-orange text-pastel-forest")}
+                >
+                  Move off IR
                 </span>
               )}
             </div>
@@ -306,6 +328,12 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
                 `leading-tight` -> `mt-px`/`leading-none`, which is what keeps
                 the three-line row at 62px instead of 67 (see ROW_META). */}
             <div className={cn(ROW_META, "flex items-center gap-1 text-white/55 font-display mt-px overflow-hidden")}>
+              {positionsLabel && (
+                <>
+                  <span data-testid="row-positions" className="font-semibold flex-shrink-0 text-pastel-cream/80">{positionsLabel}</span>
+                  <span className="text-white/25 flex-shrink-0">·</span>
+                </>
+              )}
               <span className="font-semibold flex-shrink-0">{teamAbbr}</span>
               {player.nextGame?.opponent && (
                 <>

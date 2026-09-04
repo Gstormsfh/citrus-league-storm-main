@@ -284,7 +284,7 @@ const Navbar = () => {
                 >
                   <Bell className="h-5 w-5 text-white/70" />
                   {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-pastel-orange text-[9px] font-bold text-white">
+                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-pastel-orange text-[9px] font-bold text-[#581E00]">
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
@@ -420,7 +420,7 @@ const Navbar = () => {
               >
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
-                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-pastel-orange text-[9px] font-bold text-white">
+                  <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-pastel-orange text-[9px] font-bold text-[#581E00]">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
@@ -603,10 +603,10 @@ const Navbar = () => {
                     <p className="text-[11px] text-white/55 truncate">{user.email}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Link to="/profile" onClick={closeMobileMenu} className="p-2 rounded-md bg-white/5 hover:bg-white/10 transition-colors">
+                    <Link to="/profile" onClick={closeMobileMenu} className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-2 rounded-md bg-white/5 hover:bg-white/10 active:bg-white/10 transition-colors">
                       <CircleUser className="h-4 w-4 text-pastel-cream" />
                     </Link>
-                    <button onClick={handleSignOut} className="focus-citrus p-2 rounded-md bg-red-500/10 hover:bg-red-500/20 transition-colors" aria-label="Sign out">
+                    <button onClick={handleSignOut} className="focus-citrus inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-2 rounded-md bg-red-500/10 hover:bg-red-500/20 active:bg-red-500/20 transition-colors" aria-label="Sign out">
                       <LogOut className="h-4 w-4 text-red-400" />
                     </button>
                   </div>

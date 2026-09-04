@@ -16,6 +16,7 @@ function makeClient(rows: Row[], spy?: { ranges: Array<[number, number]>; orders
     const q: Record<string, unknown> = {};
     q.eq = (c: string, v: unknown) => { data = data.filter((r) => (r as never as Record<string, unknown>)[c] === v); return q; };
     q.in = (c: string, vs: unknown[]) => { data = data.filter((r) => vs.includes((r as never as Record<string, unknown>)[c])); return q; };
+    q.gt = (c: string, v: number) => { data = data.filter((r) => (r as never as Record<string, number>)[c] > v); return q; };
     q.gte = (c: string, v: number) => { data = data.filter((r) => (r as never as Record<string, number>)[c] >= v); return q; };
     q.lte = (c: string, v: number) => { data = data.filter((r) => (r as never as Record<string, number>)[c] <= v); return q; };
     q.order = (c: string) => { spy?.orders.push(c); data.sort((a, b) => Number((a as never as Record<string, number>)[c]) - Number((b as never as Record<string, number>)[c])); return q; };
@@ -30,7 +31,7 @@ function makeClient(rows: Row[], spy?: { ranges: Array<[number, number]>; orders
 
 function failingClient(message: string) {
   const q: Record<string, unknown> = {};
-  for (const m of ['eq', 'in', 'gte', 'lte', 'order']) q[m] = () => q;
+  for (const m of ['eq', 'in', 'gt', 'gte', 'lte', 'order']) q[m] = () => q;
   q.range = async () => ({ data: null, error: { message } });
   return { from: () => ({ select: () => q }) } as unknown as SupabaseClient;
 }
@@ -116,5 +117,54 @@ describe('pagedSelect', () => {
     const r = await pagedSelect<Row>(makeClient(rows(30000)), READ);
     expect(r.data).toHaveLength(25000);
     expect(r.error?.message).toMatch(/exceeded 25 pages/);
+  });
+});
+
+/**
+ * `gt` (added 2026-09-03 for `DraftServiceV2.listDraftEvents`).
+ *
+ * The draft_events replay resumes from a cursor: `seq > lastAppliedSeq`.
+ * That predicate has to stay EXCLUSIVE through the port to paging. `gte`
+ * would re-deliver the last event the lobby already applied, and the
+ * bootstrap path counts events as it replays them.
+ *
+ * The alternative to a real `gt` was open-coding `gte: cursor + 1`, which
+ * is only equivalent on an integer column. These pin the operator instead
+ * of that assumption.
+ */
+describe('pagedSelect gt', () => {
+  it('excludes the cursor row itself', async () => {
+    const r = await pagedSelect<Row>(makeClient(rows(10)), {
+      table: 't', columns: '*', orderBy: ['id'],
+      rangeFilters: [['id', 'gt', 4]],
+    });
+    expect(r.error).toBeNull();
+    expect(r.data.map((x) => x.id)).toEqual([5, 6, 7, 8, 9, 10]);
+  });
+
+  it('differs from gte by exactly the cursor row', async () => {
+    const spec = (op: 'gt' | 'gte') => ({
+      table: 't', columns: '*', orderBy: ['id'],
+      rangeFilters: [['id', op, 4]] as Array<[string, 'gt' | 'gte' | 'lte', number]>,
+    });
+    const exclusive = await pagedSelect<Row>(makeClient(rows(10)), spec('gt'));
+    const inclusive = await pagedSelect<Row>(makeClient(rows(10)), spec('gte'));
+    expect(inclusive.data).toHaveLength(exclusive.data.length + 1);
+    expect(inclusive.data[0].id).toBe(4);
+    expect(exclusive.data[0].id).toBe(5);
+  });
+
+  it('still pages past the clamp with a cursor applied', async () => {
+    // The whole point: a resumed replay is exactly the case where the
+    // remaining event count is large.
+    const spy = { ranges: [] as Array<[number, number]>, orders: [] as string[] };
+    const r = await pagedSelect<Row>(makeClient(rows(2500), spy), {
+      table: 't', columns: '*', orderBy: ['id'],
+      rangeFilters: [['id', 'gt', 100]],
+    });
+    expect(r.error).toBeNull();
+    expect(r.data).toHaveLength(2400);
+    expect(r.data[0].id).toBe(101);
+    expect(spy.ranges).toEqual([[0, 999], [1000, 1999], [2000, 2999]]);
   });
 });

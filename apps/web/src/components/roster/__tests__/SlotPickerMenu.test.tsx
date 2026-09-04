@@ -262,3 +262,16 @@ describe('SlotPickerMenu — header carries the decision context', () => {
     expect(header.getAllByText('C1').length).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('SlotPickerMenu: the header names both positions of a dual-eligible player (gap A, 2026-09-03)', () => {
+  it('prints "C/LW" for a C/LW centre, the reason LW spots are on his list', () => {
+    const DUAL = mk('1', 'Connor McDavid', 'C', { eligible_positions: ['C', 'LW'] });
+    renderMenu({ player: DUAL, allPlayers: [DUAL, DRAISAITL, MAKAR] });
+    expect(sheet().getByTestId('player-positions')).toHaveTextContent('C/LW');
+  });
+
+  it('prints nothing new for a single-position player', () => {
+    renderMenu();
+    expect(sheet().queryByTestId('player-positions')).toBeNull();
+  });
+});

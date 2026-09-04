@@ -11,46 +11,81 @@ import {
   type PlayerCohort,
 } from '@/utils/playerPercentiles';
 import type { DashboardIndexEntry } from '@/hooks/usePlayerDashboardIndex';
+import type { DashboardIndexEntry as WireIndexEntry, XgHistoryPoint } from '@citrus/shared';
 import type { PercentileCategory } from '@/components/citrus2/PercentileBullet';
+import type { SparklinePoint } from '@/components/citrus2/SparklineMicroChart';
+import { seasonLabel } from './playerDashboardData';
 
 /**
  * WHAT THE ADVANCED PLAYER CARD SAYS, AND WHY EACH NUMBER IS ALLOWED ON IT.
  *
- * A pure module — the house idiom (`roster/positionChip.ts`,
+ * A pure module, the house idiom (`roster/positionChip.ts`,
  * `phoneRowScale.ts`): a file that exports both a component and plain values
  * breaks react-refresh. It also means the verdict line, which is the one
  * piece of PROSE on the card, is unit-tested rather than eyeballed.
  *
- * EVERY FIELD BELOW WAS CHECKED AGAINST THE REAL PAYLOAD before it was used
- * — `DashboardIndexEntry` in `usePlayerDashboardIndex.ts`, which mirrors
- * `server/src/services/PlayerDashboardService.ts`. Anything the endpoint
- * does not carry is absent from this file rather than invented.
+ * EVERY FIELD BELOW WAS CHECKED AGAINST THE REAL PAYLOAD before it was used:
+ * `DashboardIndexEntry` in `packages/shared/src/types/playerDashboard.ts`,
+ * which `server/src/services/PlayerDashboardService.ts` fills. Anything the
+ * endpoint does not carry is absent from this file rather than invented.
  *
- * WHAT WE DELIBERATELY DO NOT SHOW, and why (all are server changes, none of
- * which belong on a UI branch):
+ * ── WHAT THE 2026-09-03 SERVER PASS ADDED, AND HOW THE CARD USES IT ────
  *
- *   * GSAx for goalies. `goalie_gsax_primary` holds `raw_gsax` /
- *     `regressed_gsax` for 98 goalies in 2025 and it is the single best
- *     goalie metric we own — but `PlayerDashboardService` does not join that
- *     table, so it is not on `DashboardIndexEntry` and cannot be rendered
- *     honestly here. FOLLOW-UP: add the join + four columns server-side,
- *     then a GSAx bullet is a ten-line change to this file.
- *   * A career trend sparkline. `player_xg_season` carries nine seasons
- *     (2017–2025) — genuinely a thing Sleeper cannot show — but the endpoint
- *     reads `getCurrentSeason()` only. `citrus2/SparklineMicroChart` is
- *     therefore NOT used on this card: with one season in hand the only way
- *     to draw a line would be to make points up. FOLLOW-UP: a
- *     `/api/players/:id/xg-history` read, or a `xg_history` array on this
- *     payload.
- *   * `citrus2/StaleDataBadge`. It needs an `asOf` timestamp and the
- *     payload has none; passing null makes it render a permanent "Very
- *     outdated · Update timestamp unavailable" chip on every card, which is
- *     itself a false claim. FOLLOW-UP: surface `player_season_stats`'
- *     refresh timestamp on the payload and the badge drops straight in.
- *   * `vopa_score`, `avg_toi_per_game` (`player_talent_metrics`) and
- *     `toi_total_minutes` (`player_gar_components`): the service SELECTs the
- *     last one and drops it; the other two it never reads.
+ * The first cut of this card (2026-09-02) listed four things it could not
+ * show honestly because the index payload did not carry them. All four were
+ * server changes; all four are now on the wire, and the rule for each is:
+ *
+ *   * GSAx for goalies. `goalie_gsax_primary` (98 goalies for 2025 in
+ *     production, counted 2026-09-03) is joined server-side. The bullet
+ *     prints `gsax_regressed`, NOT `gsax_raw`: the regressed value is what
+ *     the projection system consumes and what every other "GSAx" on a
+ *     Citrus surface already prints (`PlayerService` maps `regressed_gsax`
+ *     to the modal's own GSAx cell, which sits directly under this card).
+ *     Two numbers wearing one label on one screen is how surfaces start
+ *     disagreeing. GSAx leads the goalie set for the reason xG/60 leads
+ *     the skater set: it is the one number in the set that is ours.
+ *   * A career trend sparkline. `/api/players/:id/xg-history` returns every
+ *     `player_xg_season` season on record (nine, 2017 to 2025, in
+ *     production), merged per season so a mid-season trade cannot draw two
+ *     points for one year. `xgTrend()` below plots it, and refuses to plot
+ *     fewer than `MIN_TREND_SEASONS`: 413 of the 1,900 players in that
+ *     table have exactly one season, and a one-point line is a line made
+ *     up. The card renders nothing for them, not an empty tile.
+ *   * `citrus2/StaleDataBadge`. `as_of` is the newest `updated_at` among
+ *     the rows the index read for this player. The card passes it through
+ *     ONLY when it is non-null: null into that badge renders "Very
+ *     outdated / Update timestamp unavailable", a claim about freshness
+ *     nobody can back.
+ *   * `toi_total_minutes`, `avg_toi_per_game`, `vopa_score`. The sample and
+ *     the deployment, on the identity strip (`deploymentParts()`). TOI is
+ *     the denominator every per-60 row on this card is divided by, which
+ *     is exactly the number `utils/playerPercentiles.ts` said the payload
+ *     was missing. The other two are NULL on every 2025 row in production
+ *     today (940 talent rows, 0 non-null, counted 2026-09-03); they are
+ *     carried so that the day the pipeline fills them the card prints
+ *     them, and until then nothing is printed, not a zero.
  */
+
+/**
+ * WHAT THE CARD READS.
+ *
+ * The web app's copy of the index row, `DashboardIndexEntry` in
+ * `hooks/usePlayerDashboardIndex.ts`, is a hand-kept mirror of the server's.
+ * The columns the 2026-09-03 server pass added live on the shared wire type
+ * in `@citrus/shared`; until the hook re-exports that type, this
+ * intersection reads them as OPTIONAL. `Omit<Wire, keyof Hook>` is exactly
+ * the set of columns the hook does not yet know about, and the moment the
+ * hook adopts the shared type that set is empty and `CardEntry` collapses
+ * to the wire type with nothing to change here.
+ *
+ * Optional is also the honest reading at runtime. The web app and the API
+ * deploy separately (Firebase Hosting and Cloud Run), so for the minutes
+ * between the two a new card can be served an old payload. Every read of a
+ * new column below goes through `?? null`, and an old payload draws the
+ * card it always drew.
+ */
+export type CardEntry = DashboardIndexEntry &
+  Partial<Omit<WireIndexEntry, keyof DashboardIndexEntry>>;
 
 // ── Formatting ──────────────────────────────────────────────────────
 //
@@ -69,13 +104,31 @@ export function fmt1(v: number | null | undefined): string {
   return v == null || !Number.isFinite(v) ? '-' : (Math.round(v * 10) / 10).toFixed(1);
 }
 
-/** Signed, one decimal: `+4.2`, `-3.1`, `0.0`. */
-export function fmtSigned1(v: number | null | undefined): string {
+function signedFixed(v: number | null | undefined, digits: number): string {
   if (v == null || !Number.isFinite(v)) return '-';
-  const r = Math.round(v * 10) / 10;
+  const scale = 10 ** digits;
+  const r = Math.round(v * scale) / scale;
   // `-0.0` is a real IEEE value and reads as a claim the player is behind.
   const safe = Object.is(r, -0) ? 0 : r;
-  return `${safe > 0 ? '+' : ''}${safe.toFixed(1)}`;
+  return `${safe > 0 ? '+' : ''}${safe.toFixed(digits)}`;
+}
+
+/** Signed, one decimal: `+4.2`, `-3.1`, `0.0`. */
+export function fmtSigned1(v: number | null | undefined): string {
+  return signedFixed(v, 1);
+}
+
+/** Signed, two decimals. VOPA is stored to three and printed to two. */
+export function fmtSigned2(v: number | null | undefined): string {
+  return signedFixed(v, 2);
+}
+
+/**
+ * Whole numbers with a thousands separator: `1,885`. Minutes of ice and
+ * shots faced are counts, and a count is printed as a count.
+ */
+export function fmtInt(v: number | null | undefined): string {
+  return v == null || !Number.isFinite(v) ? '-' : Math.round(v).toLocaleString('en-US');
 }
 
 /**
@@ -122,7 +175,7 @@ export interface MetricSpec {
   context?: string;
   category: PercentileCategory;
   direction: MetricDirection;
-  select: (p: DashboardIndexEntry) => number | null | undefined;
+  select: (p: CardEntry) => number | null | undefined;
   format: (v: number | null | undefined) => string;
   /** Compact cards show only the first `COMPACT_METRIC_COUNT` of these. */
 }
@@ -216,14 +269,31 @@ export const SKATER_METRICS: MetricSpec[] = [
 ];
 
 /**
- * GOALIE METRICS. A goalie must never be shown an empty skater card — he
- * has no xG/60 and no GAR row in this payload at all — so he gets his own
- * set built from what the endpoint does carry.
+ * GOALIE METRICS. A goalie must never be shown an empty skater card (he has
+ * no xG/60 and no GAR row in this payload at all), so he gets his own set
+ * built from what the endpoint does carry.
+ *
+ * GSAx LEADS (2026-09-03), for the reason xG/60 leads the skater set: save
+ * rate, GAA, wins and shutouts are on every other site, and goals saved
+ * above expected off our own shot model is the read that is ours. It is the
+ * REGRESSED value; the header explains why raw would put two different
+ * "GSAx" numbers on one modal screen. The percentile is built inside G
+ * only, like every other row: `qualifiedCohort` never pools a goalie with a
+ * skater, and a goalie with no GSAx row is placed as "No data", not as 0.
  *
  * GAA is the one `lower`-is-better metric on the card; `MetricDirection`
  * exists for it.
  */
 export const GOALIE_METRICS: MetricSpec[] = [
+  {
+    key: 'gsax',
+    label: 'GSAx',
+    context: 'vs expected',
+    category: 'defense',
+    direction: 'higher',
+    select: (p) => p.gsax_regressed ?? null,
+    format: fmtSigned1,
+  },
   {
     key: 'save_pct',
     label: 'Save rate',
@@ -287,7 +357,7 @@ export function metricsFor(cohort: PlayerCohort): MetricSpec[] {
  * "+11.0 goals over expected" about a player we have modelled nothing for.
  * No xG, no finishing number.
  */
-export function finishing(p: DashboardIndexEntry): number | null {
+export function finishing(p: CardEntry): number | null {
   if (p.is_goalie) return null;
   if (!Number.isFinite(p.x_goals) || p.x_goals <= 0) return null;
   if (!Number.isFinite(p.goals)) return null;
@@ -325,8 +395,8 @@ export interface AdvancedCardData {
  * `usePlayerDashboardIndex`, so its identity is stable for the session.
  */
 export function buildAdvancedCardData(
-  player: DashboardIndexEntry,
-  index: readonly DashboardIndexEntry[],
+  player: CardEntry,
+  index: readonly CardEntry[],
 ): AdvancedCardData {
   const cohort = playerCohort(player);
   const members = qualifiedCohort(index, cohort);
@@ -414,7 +484,7 @@ export function buildAdvancedCardData(
  * pins, not a target.
  */
 export function deriveVerdict(
-  player: DashboardIndexEntry,
+  player: CardEntry,
   cohort: PlayerCohort,
   metrics: ResolvedMetric[],
   fin: number | null,
@@ -426,6 +496,28 @@ export function deriveVerdict(
   const by = (key: string) => metrics.find((m) => m.spec.key === key);
 
   if (cohort === 'G') {
+    // GSAx first (2026-09-03): it is the goalie read only Citrus can make,
+    // so it outranks a save rate every site prints. The sentence carries
+    // the sample (primary shots faced) because a goals-saved total with no
+    // denominator is a number a reader cannot weigh, and it prints the
+    // same regressed value the bullet does, so the card cannot disagree
+    // with itself. Falls through to save rate when the join is empty.
+    const gsax = by('gsax');
+    const shots = player.gsax_shots_faced ?? null;
+    if (gsax?.percentile != null && gsax.value != null && shots != null && shots > 0) {
+      const v = gsax.value;
+      const read =
+        Math.abs(v) < 0.05
+          ? 'level with expected'
+          : v > 0
+            ? `stopping ${fmt1(v)} goals more than expected`
+            : `conceding ${fmt1(-v)} goals more than expected`;
+      const tail = `Citrus GSAx has him ${read} on ${fmtInt(shots)} primary shots, ${ordinal(gsax.percentile)} among ${noun}.`;
+      if (gsax.percentile >= 75) return `Stopping more than his share. ${tail}`;
+      if (gsax.percentile <= 25) return `Leaking more than he should. ${tail}`;
+      return tail;
+    }
+
     const sv = by('save_pct');
     if (sv?.percentile != null && sv.value != null) {
       const rate = sv.display;
@@ -496,7 +588,10 @@ export function deriveVerdict(
  * PWS-1's "~80-100 chars" was written before the source-attribution rule.
  * Naming Citrus xG or Citrus GAR inside the sentence costs about ten
  * characters and it is not negotiable, so the ceiling moved to 140. The
- * longest branch as written measures 105. Measured at 353px (the width the
+ * longest skater branch as written measures 105; the goalie GSAx branch
+ * with a four-digit shot count and a three-digit percentile measures 133,
+ * which is why it is the one the unit test pins with the worst-case
+ * numbers rather than typical ones. Measured at 353px (the width the
  * card gets inside PlayerStatsModal on a 393px phone) a 140-character
  * verdict wraps to four lines, which is the most the tile can hold before
  * it pushes the metric rows off the card.
@@ -516,6 +611,92 @@ function capitalise(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// ── The career trend ────────────────────────────────────────────────
+
+/**
+ * Fewest seasons before the card will draw a line. Two points is the floor
+ * for a trend to be a trend; with one, the only way to draw anything is to
+ * invent the other end.
+ */
+export const MIN_TREND_SEASONS = 2;
+
+export interface XgTrend {
+  points: SparklinePoint[];
+  /** The newest season's value, already formatted to two decimals. */
+  endpoint: string;
+  firstSeason: number;
+  lastSeason: number;
+  seasons: number;
+}
+
+/**
+ * `/api/players/:id/xg-history` → the sparkline's series, or null.
+ *
+ * Regular season only by default: a 12-game playoff run next to an 82-game
+ * season reads as a collapse, which is the same reason
+ * `playerDashboardData.careerSeries` filters by game type. Rows are summed
+ * per season as a belt to the server's suspenders (the endpoint already
+ * merges a traded player's team rows), so this function can never emit two
+ * points for one season whatever it is fed. `x` is the season year and
+ * `gameDate` carries the "2024-25" label the primitive prints in its
+ * tooltip; there is no per-game date on a season row and inventing one
+ * would be a fabricated axis.
+ */
+export function xgTrend(
+  history: readonly XgHistoryPoint[] | null | undefined,
+  gameType: 'regular' | 'playoff' = 'regular',
+): XgTrend | null {
+  if (!history) return null;
+  const bySeason = new Map<number, number>();
+  for (const p of history) {
+    if (p.game_type !== gameType) continue;
+    if (!Number.isFinite(p.season) || !Number.isFinite(p.xg)) continue;
+    bySeason.set(p.season, (bySeason.get(p.season) ?? 0) + p.xg);
+  }
+  if (bySeason.size < MIN_TREND_SEASONS) return null;
+
+  const seasons = Array.from(bySeason.keys()).sort((a, b) => a - b);
+  const points: SparklinePoint[] = seasons.map((season) => ({
+    x: season,
+    y: Math.round((bySeason.get(season) ?? 0) * 100) / 100,
+    gameDate: seasonLabel(season),
+  }));
+
+  return {
+    points,
+    endpoint: points[points.length - 1].y.toFixed(2),
+    firstSeason: seasons[0],
+    lastSeason: seasons[seasons.length - 1],
+    seasons: seasons.length,
+  };
+}
+
+// ── Deployment: the sample behind the rates ─────────────────────────
+
+/**
+ * The identity strip's second line, as parts the card joins with " · ".
+ *
+ * Games, then minutes, then minutes a night, then VOPA, and each only when
+ * the payload carries it. TOI is `player_gar_components.toi_total_minutes`,
+ * the denominator of every GAR/60 row on the card, so a reader can see the
+ * sample the rates are divided by rather than infer it from games played.
+ * `avg_toi_per_game` and `vopa_score` are NULL on every 2025 production row
+ * as of 2026-09-03 and will simply not appear until the pipeline fills
+ * them; a `0.0 min/GP` in their place would be a claim about deployment
+ * the table does not make.
+ */
+export function deploymentParts(p: CardEntry): string[] {
+  const parts: string[] = [];
+  if (Number.isFinite(p.gp) && p.gp > 0) parts.push(`${p.gp} GP`);
+  const toi = p.toi_total_minutes ?? null;
+  if (toi != null && Number.isFinite(toi) && toi > 0) parts.push(`${fmtInt(toi)} min`);
+  const perGame = p.avg_toi_per_game ?? null;
+  if (perGame != null && Number.isFinite(perGame) && perGame > 0) parts.push(`${fmt1(perGame)} min/GP`);
+  const vopa = p.vopa_score ?? null;
+  if (vopa != null && Number.isFinite(vopa)) parts.push(`VOPA ${fmtSigned2(vopa)}`);
+  return parts;
+}
+
 // ── Lookup ──────────────────────────────────────────────────────────
 
 /**
@@ -530,9 +711,9 @@ function capitalise(s: string): string {
  * instead must degrade to "no card", not to the WRONG player's card.
  */
 export function findDashboardPlayer(
-  index: readonly DashboardIndexEntry[],
+  index: readonly CardEntry[],
   id: number | string | null | undefined,
-): DashboardIndexEntry | null {
+): CardEntry | null {
   if (id == null) return null;
   const numeric = typeof id === 'number' ? id : Number.parseInt(String(id), 10);
   if (!Number.isFinite(numeric)) return null;

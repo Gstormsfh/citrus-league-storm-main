@@ -140,7 +140,7 @@ export function PercentileBullet({
 
   const ariaLabel = useMemo(() => {
     if (isLoading) return `Loading ${label}`;
-    if (!hasPercentile) return `${label}: no data available`;
+    if (!hasPercentile) return `${label}: not charted yet`;
     const ordinal = `${Math.round(pct)}${ordinalSuffix(Math.round(pct))} percentile`;
     const rawText = rawValue != null && rawValue !== ''
       ? `, value ${rawValue}${rawUnit ?? ''}`
@@ -220,7 +220,7 @@ export function PercentileBullet({
                   captionSize,
                 )}
               >
-                No data
+                Not charted
               </span>
             )}
           </div>

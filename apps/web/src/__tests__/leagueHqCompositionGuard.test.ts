@@ -17,6 +17,11 @@
  *    commissioner whose league is full.
  *
  * jsdom has no layout engine — these are source contracts.
+ *
+ * THE RITUAL (2026-09-03, Sleeper-gap 4) adds a fifth pin, in the second
+ * describe below: the mock draft entry lives inside the Draft Room card as a
+ * tertiary ghost, only before the draft starts, and never as a second orange
+ * verb beside the real action.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -95,5 +100,70 @@ describe('League HQ composition', () => {
     expect(SOURCE).toMatch(
       /isCommissioner && league\.draft_status === 'not_started' && teams\.length >= \(league\.settings\?\.teamsCount \|\| 12\)/,
     );
+  });
+});
+
+/**
+ * THE RITUAL (2026-09-03, Sleeper-gap 4, "the mock draft"). A league learns
+ * to draft by drafting, so the practice entry sits where the real action
+ * is. Three things about it must survive every future HQ pass:
+ *
+ *   1. It is IN the Draft Room card, under the real button, and it goes to
+ *      the public client-side simulator (the target mockDraftNavGuard pins
+ *      for every other mock-draft affordance). No new surface, no writes.
+ *   2. It is a ghost. DESIGN_DIRECTION.md rule 3: one #FF6B1A verb per
+ *      screen. The Draft Room CTA owns the orange; the practice entry may
+ *      never take a hot fill, and the action grid keeps exactly one.
+ *   3. It is gone the moment the draft is live. A card with a hot "Join
+ *      Draft Room" and a practice link beside it is a card that asks a
+ *      manager which draft is real. Pre-draft only, and behind the flag so
+ *      a one-line commit can pull it.
+ *
+ * And the sentence under it stays on the page: a practice pick must never
+ * leave a manager wondering whether it counted.
+ */
+describe('League HQ practice entry', () => {
+  const MOCK_TARGET = '/armchair-gm?tab=mockdraft';
+  const LINK = `<Link to="${MOCK_TARGET}">`;
+  const cardStart = SOURCE.indexOf('{/* Draft Room - visible to ALL');
+  const cardEnd = SOURCE.indexOf('✦ Your Squad');
+  const DRAFT_CARD = SOURCE.slice(cardStart, cardEnd);
+
+  it('lives inside the Draft Room card and points at the public simulator', () => {
+    expect(cardStart, 'Draft Room card comment anchor').toBeGreaterThan(-1);
+    expect(cardEnd, 'squad card kicker anchor').toBeGreaterThan(cardStart);
+    expect(DRAFT_CARD).toContain(LINK);
+    expect(DRAFT_CARD).toContain('Run a mock draft');
+  });
+
+  it('is gated by the launch flag and only shown before the draft starts', () => {
+    expect(SOURCE).toMatch(/import \{ FEATURE_PRACTICE_DRAFT \} from '@\/lib\/featureFlags'/);
+    expect(DRAFT_CARD).toMatch(/FEATURE_PRACTICE_DRAFT && league\.draft_status === 'not_started' && \(/);
+    // The gate wraps the link: the flag check precedes it within the card and
+    // nothing renders the target outside that gate.
+    const gateAt = DRAFT_CARD.indexOf('FEATURE_PRACTICE_DRAFT &&');
+    const linkAt = DRAFT_CARD.indexOf(LINK);
+    expect(gateAt).toBeGreaterThan(-1);
+    expect(linkAt).toBeGreaterThan(gateAt);
+    expect(SOURCE.split(MOCK_TARGET).length - 1, 'one practice entry on HQ').toBe(1);
+  });
+
+  it('is a ghost, never a second orange verb beside Draft Room', () => {
+    const linkAt = DRAFT_CARD.indexOf(LINK);
+    const button = DRAFT_CARD.slice(DRAFT_CARD.lastIndexOf('<Button', linkAt), linkAt);
+    expect(button).toContain('asChild');
+    expect(button).toContain('bg-transparent');
+    expect(button).toContain('border-pastel-cream/25');
+    expect(button).not.toContain('bg-pastel-orange');
+    expect(button).not.toContain('shadow-[');
+    // Exactly one hot fill in the whole action grid, and it is the Draft
+    // Room CTA, which stays where the HQ pass put it.
+    const actions = SOURCE.slice(SOURCE.indexOf('{/* Actions */}'), SOURCE.indexOf('{/* T12 architect Entry 13'));
+    expect(actions.split('bg-pastel-orange text-[#581E00]').length - 1).toBe(1);
+    expect(actions.indexOf('bg-pastel-orange text-[#581E00]')).toBeLessThan(actions.indexOf(LINK));
+  });
+
+  it('says on the page that nothing there touches the league', () => {
+    expect(DRAFT_CARD).toContain('Nothing there touches this league.');
   });
 });

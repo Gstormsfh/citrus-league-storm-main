@@ -954,9 +954,14 @@ describe('AI-voice guard', () => {
     const body = prompt.slice(prompt.indexOf('export const STORMY_SYSTEM_PROMPT'));
 
     // Register: an assistant addressing his boss, capped so it is not a tic.
+    // The 2026-09-02 prompt licensed "Well boss," on one message in three and
+    // every exemplar opened with it, so it became every message. The cap is
+    // now once per conversation and never as an opener; these needles pin the
+    // rule itself, not the sentence that recounts the old one.
     expect(body).toMatch(/assistant GM/);
-    expect(body).toMatch(/Well boss/);
-    expect(body).toMatch(/one message in three/);
+    expect(body).toMatch(/once per conversation|once-per-conversation/);
+    expect(body).toMatch(/Never in the first sentence of an answer/);
+    expect(body).toMatch(/Open with the take/);
 
     // Every banned construction is named as banned.
     expect(body).toMatch(/NEVER use an em dash/);

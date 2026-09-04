@@ -255,7 +255,16 @@ draftRoutes.post('/league/:leagueId/initialize-order', commissionerMiddleware, v
   );
 
   if (error) {
-    return fail(c, AppError.badRequest('Failed to initialize draft order'));
+    // The service refuses a rebuild once a draft is running and says why
+    // (a string); a Postgres failure arrives as an object. Pass our own
+    // sentence through — the generic line sent the commissioner looking
+    // for a network problem that was not there.
+    return fail(
+      c,
+      AppError.badRequest(
+        typeof error === 'string' ? error : 'Failed to initialize draft order',
+      ),
+    );
   }
 
   return ok(c, { sessionId });

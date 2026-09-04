@@ -39,7 +39,13 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-const WEEKLY_LIMIT = 3; // 3 questions per matchup week
+// The server's WEEKLY_MESSAGE_LIMIT (server/src/services/
+// StormyAssistantService.ts), which is the number actually enforced:
+// checkUserWeeklyLimit counts stormy_chat_log rows in a rolling 7 days
+// and refuses at 15. This read 3, so the meter on this page filled to
+// 100 percent and showed 3/3 while the user still had 12 questions
+// left. Display only, but it is the only place the allowance is shown.
+const WEEKLY_LIMIT = 15;
 
 const StormyAssistant = () => {
   const { userLeagueState, activeLeagueId, activeLeague } = useLeague();
@@ -69,7 +75,7 @@ const StormyAssistant = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [messagesUsed, setMessagesUsed] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const defaultGreeting = "Well boss, Stormy here. I already have your league, your roster and picks, and the live playoff bracket in front of me. Ask me for a roster review, a start/sit, a waiver target, or a read on any matchup, and I'll show you the numbers behind the call.";
+  const defaultGreeting = "Stormy here. I already have your league, your roster and picks, and the live playoff bracket in front of me. Ask me for a roster review, a start/sit, a waiver target, or a read on any matchup, and I'll show you the numbers behind the call.";
   /**
    * The greeting is the loudest claim on the page and it fails the same way
    * the chips do: "the live playoff bracket in front of me" describes a
@@ -77,7 +83,7 @@ const StormyAssistant = () => {
    * answer until 2026-09-29. Same four subjects as the offseason chips, so
    * the opening line and the chips under it agree.
    */
-  const offseasonGreeting = `Well boss, Stormy here. The season is dark until ${seasonOpensOn ?? 'opening night'}, so there is no lineup to set and no matchup to read. What I do have is your league, your roster and picks, and the xG projections. Ask me about draft prep, keepers, or what any player is worth.`;
+  const offseasonGreeting = `Stormy here. The season is dark until ${seasonOpensOn ?? 'opening night'}, so there is no lineup to set and no matchup to read. What I do have is your league, your roster and picks, and the xG projections. Ask me about draft prep, keepers, or what any player is worth.`;
   const greeting = inOffseason ? offseasonGreeting : defaultGreeting;
   const apiHistoryRef = useRef<StormyMessage[]>((() => {
     try {

@@ -46,7 +46,9 @@ const POSITION_COLORS: Record<string, string> = {
  * Supports snake and linear draft types with configurable rounds and teams.
  */
 const MockDraftSimulator = () => {
-  const [numTeams, setNumTeams] = useState(10);
+  // 12 is what the homepage promises ("a 12-team mock") and the most common
+  // league size in production; the picker still offers 8/10/14.
+  const [numTeams, setNumTeams] = useState(12);
   const [numRounds, setNumRounds] = useState(15);
   const [draftType, setDraftType] = useState<'snake' | 'linear'>('snake');
   const [userTeamIndex, setUserTeamIndex] = useState(0);

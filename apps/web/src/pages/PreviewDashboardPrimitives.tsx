@@ -483,7 +483,7 @@ export default function PreviewDashboardPrimitives() {
                 />
               </div>
             </VariantCard>
-            <VariantCard caption="Empty state: no data yet">
+            <VariantCard caption="Empty state: nothing charted yet">
               <div className="w-full">
                 <SparklineMicroChart
                   data={[]}
@@ -977,7 +977,7 @@ export default function PreviewDashboardPrimitives() {
 
         <SubSection title="Special states">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <VariantCard caption="No data: empty track + caption">
+            <VariantCard caption="Not charted: empty track + caption">
               <div className="w-full">
                 <PercentileBullet label="xGA/60" context="5v5" percentile={null} category="defense" />
               </div>

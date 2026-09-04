@@ -100,6 +100,32 @@ interface MatchupLineRow {
   stats_breakdown?: Record<string, unknown>;
 }
 
+// Shape for daily lineup rows from the /daily-lineup route
+interface DailyLineupRow {
+  player_id: number;
+  player_name: string;
+  player_position: string;
+  nhl_team: string;
+  headshot_url: string | null;
+  slot_type: 'active' | 'bench' | 'ir';
+  slot_id: string | null;
+  is_locked: boolean;
+  daily_points: string | number;
+  goals?: number;
+  assists?: number;
+  shots_on_goal?: number;
+  blocks?: number;
+  hits?: number;
+  pim?: number;
+  ppp?: number;
+  shp?: number;
+  wins?: number;
+  saves?: number;
+  goals_against?: number;
+  shutouts?: number;
+  is_goalie?: boolean;
+}
+
 // Shape for raw stats breakdown JSONB from database
 interface RawStatsBreakdown {
   [key: string]: number;
@@ -463,14 +489,14 @@ export const MatchupService = {
       // Get league via API
       const { leagueApi } = await import('@/api/leagues');
       const leagueResponse = await leagueApi.getLeague(matchup.league_id);
-      const league = leagueResponse.data as Record<string, unknown> | null;
+      const league = leagueResponse.data || null;
       if (!league) {
         return { data: null, error: new Error('League not found') };
       }
 
       // Get first week start date
       // WEEK-MATH FIX (2026-08-22): clamp to season start like generation does
-      const draftCompletionDate = league.updated_at ? new Date(league.updated_at as string) : new Date();
+      const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
       const firstWeekStart = clampToSeasonStart(getFirstWeekStartDate(draftCompletionDate));
       const scheduleLength = getScheduleLength(firstWeekStart);
       const isPlayoffWeek = matchup.week_number > scheduleLength;
@@ -633,24 +659,40 @@ export const MatchupService = {
     targetDate?: string // Optional: if provided and is past date, load frozen roster for that date
   ): Promise<{ data: MatchupDataResponse | null; error: Error | null }> {
     try {
-      // Get league via API
+      // The league and the caller's team in this league are two independent
+      // reads — both keyed on `leagueId` alone, neither reading the other's
+      // response. They were awaited one after the other, so the page paid two
+      // serial round trips before it knew anything. Fire them together
+      // (PERF 2026-09-04).
+      //
+      // The team request's OUTCOME is captured rather than awaited, so this
+      // change cannot reorder errors: if the league read fails or comes back
+      // empty, the caller still gets that failure (or 'League not found')
+      // first, exactly as when the team read had not been issued yet. A team
+      // failure is re-thrown below, at the point the old code would have hit
+      // it. `apiClient` throws ApiError on any non-2xx, so both arms can
+      // reject.
       const { leagueApi } = await import('@/api/leagues');
+      const teamOutcome = leagueApi.getMyTeam(leagueId).then(
+        (response) => ({ response: response as { data?: unknown } | null, error: null as unknown }),
+        (error: unknown) => ({ response: null as { data?: unknown } | null, error }),
+      );
       const leagueResponse = await leagueApi.getLeague(leagueId);
-      const league = leagueResponse.data as Record<string, unknown> | null;
+
+      const league = leagueResponse.data || null;
       if (!league) {
         return { data: null, error: new Error('League not found') };
       }
 
       // Get first week start date
-      const draftCompletionDate = league.updated_at ? new Date(league.updated_at as string) : new Date();
+      const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
       const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
       const scheduleLength = getScheduleLength(firstWeekStart);
       const isPlayoffWeek = weekNumber > scheduleLength;
 
-      // Get user's team via API
-      const { leagueApi: leagueApiForTeam } = await import('@/api/leagues');
-      const teamResponse = await leagueApiForTeam.getMyTeam(leagueId);
-      const userTeam = teamResponse.data as Record<string, unknown> | null;
+      const teamResult = await teamOutcome;
+      if (teamResult.error) throw teamResult.error;
+      const userTeam = (teamResult.response?.data ?? null) as Record<string, unknown> | null;
       if (!userTeam) {
         return { data: null, error: new Error('User team not found') };
       }
@@ -670,7 +712,7 @@ export const MatchupService = {
 
       if (!matchup) {
         logger.warn('[MatchupService.getMatchupData] No matchup found for week:', weekNumber);
-        return { data: null, error: new Error(`No matchup found for week ${weekNumber}`) };
+        return { data: null, error: new Error(`Week ${weekNumber} has no matchup yet.`) };
       }
 
       // Determine which team the user is (team1 or team2)
@@ -775,9 +817,23 @@ export const MatchupService = {
       const userSlotAssignments = normalizeSlotAssignments(isTeam1 ? team1SlotAssignments : team2SlotAssignments);
       const opponentSlotAssignments = normalizeSlotAssignments(isTeam1 ? team2SlotAssignments : team1SlotAssignments);
 
-      // Get team records
-      const userRecord = await this.getTeamRecord(userTeamData.id, leagueId, userId);
-      const opponentRecord = opponentTeamObj ? await this.getTeamRecord(opponentTeamObj.id, leagueId, userId) : { wins: 0, losses: 0 };
+      // Team records and the stored daily-score rows: three reads that share
+      // no data, awaited one after another to fill three independent fields of
+      // the same response. /team-record for me, /team-record for the opponent
+      // and /daily-scores now go out together (PERF 2026-09-04). The
+      // daily-scores promise carries its own catch, so a failure still lands in
+      // the same "all zeroes" fallback the try/catch below produced and can
+      // never surface as an unhandled rejection while the records are in flight.
+      const dailyScoresPromise = matchupApi.getDailyScores(matchup.id).catch((error: unknown) => {
+        logger.error('[getMatchupData] Exception calculating daily scores:', error);
+        return null;
+      });
+      const [userRecord, opponentRecord] = await Promise.all([
+        this.getTeamRecord(userTeamData.id, leagueId, userId),
+        opponentTeamObj
+          ? this.getTeamRecord(opponentTeamObj.id, leagueId, userId)
+          : Promise.resolve({ wins: 0, losses: 0 }),
+      ]);
 
       // Calculate daily points
       const matchupStatus = matchup.status;
@@ -793,10 +849,11 @@ export const MatchupService = {
       const weekStartStr = matchup.week_start_date;
       const weekEndStr = matchup.week_end_date;
 
-      // Calculate daily scores via API (single call for both teams)
+      // Calculate daily scores via API (single call for both teams).
+      // The request was started above alongside the team records.
       try {
-        const response = await matchupApi.getDailyScores(matchup.id);
-        const dailyScoresData = response.data;
+        const response = await dailyScoresPromise;
+        const dailyScoresData = response?.data;
         if (dailyScoresData && Array.isArray(dailyScoresData)) {
           const parseDailyScores = (teamId: string) => {
             const teamEntries = (dailyScoresData as Array<{ team_id: string; roster_date: string; daily_score: string | number }>)
@@ -1159,18 +1216,9 @@ export const MatchupService = {
     // getMatchupRosters (which already extracts it at :1492). Undefined
     // → DEFAULT_SCORING, so default leagues are numerically identical.
     leagueScoring?: import('@citrus/shared').ScoringSettings,
-    matchupStats?: { 
-      goals: number; 
-      assists: number; 
-      sog: number; 
-      blocks: number; 
-      xGoals: number;
-      // Goalie stats (optional, only present for goalies)
-      wins?: number;
-      saves?: number;
-      shutouts?: number;
-      goals_against?: number;
-    },
+    // Weekly totals as fetchMatchupStatsForPlayers produces them -- the same
+    // MatchupWeekStats shape, which also carries ppp / shp / hits / pim.
+    matchupStats?: MatchupWeekStats,
     garPercentage?: number,
     dailyProjection?: DailyProjectionRow
   ): MatchupPlayer {
@@ -1345,6 +1393,10 @@ export const MatchupService = {
         gamesRemaining,
         games_remaining_total: gamesRemaining,
         games_remaining_active: isStarter ? gamesRemaining : 0,
+        // Placeholder: both branches below overwrite this with the
+        // position-specific values. Declared here because MatchupPlayer.stats
+        // is required.
+        stats: { goals: 0, assists: 0, sog: 0, blk: 0 },
         status: gameStatus,
         isStarter,
         isGoalie,
@@ -1583,7 +1635,13 @@ export const MatchupService = {
       } else {
         throw new Error('userId required for non-demo leagues');
       }
-      const scoringSettings = extractScoringSettings(league);
+      // League.scoring_settings is declared as the loose JSONB map (every
+      // category optional, plus an index signature), so it does not match the
+      // helper's strict ScoringSettings parameter. The rows the API returns
+      // carry the full object, so narrow it here rather than re-shaping it.
+      const scoringSettings = extractScoringSettings(
+        league as (League & { scoring_settings?: import('@citrus/shared').ScoringSettings }) | null
+      );
       const scorer = new ScoringCalculator(scoringSettings);
 
       // Get week date range
@@ -1718,7 +1776,7 @@ export const MatchupService = {
         let irSlotIndex = 1;
         
         // Sort players by points (best players first)
-        const sortedRoster = [...roster].sort((a, b) => (b.points || 0) - (a.points || 0));
+        const sortedRoster = [...roster].sort((a, b) => (b.stats?.points || 0) - (a.stats?.points || 0));
         
         sortedRoster.forEach(p => {
           // Handle IR/SUSP players
@@ -1765,7 +1823,16 @@ export const MatchupService = {
         const defaultLineup = organizeRosterIntoLineup(team1Roster);
         team1Lineup = defaultLineup;
         if (!isDemoLeague) {
-          await LeagueService.saveLineup(matchup.team1_id, matchup.league_id, defaultLineup);
+          // The opponent's team is not ours to write (403 from the route's
+          // owner check), and as of 2026-09-03 a server refusal can be
+          // surfaced rather than swallowed. A refused default-lineup write
+          // must not empty the matchup page: keep the in-memory default and
+          // move on.
+          try {
+            await LeagueService.saveLineup(matchup.team1_id, matchup.league_id, defaultLineup);
+          } catch (err) {
+            logger.warn('[MatchupService] default lineup not saved for team1', { teamId: matchup.team1_id, err });
+          }
         }
       }
 
@@ -1773,7 +1840,11 @@ export const MatchupService = {
         const defaultLineup = organizeRosterIntoLineup(team2Roster);
         team2Lineup = defaultLineup;
         if (!isDemoLeague) {
-          await LeagueService.saveLineup(matchup.team2_id, matchup.league_id, defaultLineup);
+          try {
+            await LeagueService.saveLineup(matchup.team2_id, matchup.league_id, defaultLineup);
+          } catch (err) {
+            logger.warn('[MatchupService] default lineup not saved for team2', { teamId: matchup.team2_id, err });
+          }
         }
       }
 
@@ -1885,7 +1956,10 @@ export const MatchupService = {
       
       // Debug: Log conversion results
       // Normalize slot assignment keys to numeric NHL IDs (convert UUIDs if needed)
-      const rawTeam1SlotAssignments = team1Lineup.slotAssignments || {};
+      // Both lineup producers (LineupService.getLineup / loadDailyRoster) and
+      // organizeRosterIntoLineup declare slotAssignments as Record<string, string>;
+      // team1Lineup itself is untyped here, so name the shape.
+      const rawTeam1SlotAssignments: Record<string, string> = team1Lineup.slotAssignments || {};
       const team1SlotAssignments: Record<string, string> = {};
       
       // Build UUID to numeric ID mapping for slot assignments
@@ -1933,7 +2007,7 @@ export const MatchupService = {
         ? new Set(Array.from(team2StartersNumeric).map(id => String(id)))
         : new Set();
       
-      const rawTeam2SlotAssignments = matchup.team2_id && team2Lineup
+      const rawTeam2SlotAssignments: Record<string, string> = matchup.team2_id && team2Lineup
         ? (team2Lineup.slotAssignments || {})
         : {};
       const team2SlotAssignments: Record<string, string> = {};
@@ -2030,10 +2104,7 @@ export const MatchupService = {
             return await this.fetchMatchupStatsForPlayers(allPlayerIds, weekStart, weekEnd, skipAuthedReads);
           } catch (error: unknown) {
             logger.error('[MatchupService] ❌ Failed to fetch matchup stats:', error);
-            return new Map<number, {
-              goals: number; assists: number; sog: number; blocks: number; xGoals: number;
-              wins?: number; saves?: number; shutouts?: number; goals_against?: number;
-            }>();
+            return new Map<number, MatchupWeekStats>();
           }
         })(),
 
@@ -2689,7 +2760,7 @@ export const MatchupService = {
       const bracketData = response.data as { teams?: Array<Record<string, unknown>>; matchups?: Matchup[]; settings?: Record<string, unknown> } | null;
 
       if (!bracketData) {
-        return { rounds: [], bracketSize: 0, error: new Error('Failed to fetch playoff bracket') };
+        return { rounds: [], bracketSize: 0, error: new Error('The playoff bracket did not load.') };
       }
 
       const numTeams = bracketData.teams?.length || 0;
@@ -3065,14 +3136,16 @@ export const MatchupService = {
     
     try {
       const response = await matchupApi.getDailyLineup(matchupId, teamId, date);
-      const data = response.data;
+      // apiClient.get is called without a generic for this route, so its rows
+      // arrive as unknown -- name the wire shape here.
+      const data = response.data as DailyLineupRow[] | undefined;
 
       if (!data) {
         logger.warn('[MatchupService] getDailyLineup returned no data');
         return [];
       }
       
-      const lineup: DailyLineupPlayer[] = (data || []).map((row: { player_id: number; player_name: string; player_position: string; nhl_team: string; headshot_url: string | null; slot_type: 'active' | 'bench' | 'ir'; slot_id: string | null; is_locked: boolean; daily_points: string | number; goals?: number; assists?: number; shots_on_goal?: number; blocks?: number; hits?: number; pim?: number; ppp?: number; shp?: number; wins?: number; saves?: number; goals_against?: number; shutouts?: number; is_goalie?: boolean }) => ({
+      const lineup: DailyLineupPlayer[] = (data || []).map((row: DailyLineupRow) => ({
         player_id: row.player_id,
         player_name: row.player_name,
         position: row.player_position,
@@ -3123,7 +3196,9 @@ export const MatchupService = {
   async autoCompleteMatchups(): Promise<{ success: boolean; error?: string }> {
     try {
       const response = await matchupApi.autoComplete();
-      return { success: !!response.data?.success };
+      // Untyped route (apiClient.post with no generic) -- name what we read.
+      const result = response.data as { success?: boolean } | undefined;
+      return { success: !!result?.success };
     } catch (error: unknown) {
       logger.error('[MatchupService] autoCompleteMatchups exception:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };

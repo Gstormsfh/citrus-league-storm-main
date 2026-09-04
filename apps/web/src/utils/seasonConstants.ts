@@ -13,6 +13,7 @@ export {
   SEASON_LABEL,
   DEFAULT_TEST_DATE,
   getCurrentSeason,
+  getProjectionsSeason,
   getSeasonGameCount,
   getHeadshotUrl,
   getSeasonStartDate,

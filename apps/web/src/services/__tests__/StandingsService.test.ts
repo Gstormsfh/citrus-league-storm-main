@@ -72,6 +72,7 @@ vi.mock('@/utils/scoringUtils', () => ({
 
 import { StandingsService } from '../StandingsService';
 import type { Team } from '../LeagueService';
+import { deriveStandings, type StandingsMatchup } from '@citrus/shared';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -277,6 +278,118 @@ describe('StandingsService.calculateTeamStandings', () => {
     // Should only count once
     expect(result['team-1'].wins).toBe(1);
     expect(result['team-1'].losses).toBe(0);
+  });
+
+  // ===========================================================================
+  // AN UNPLAYED WEEK IS NOT A TIE (2026-09-03)
+  //
+  // Production, league 750f4e1a-92ae-44cf-a798-2f3e06d0d5c9 ("Demo League -
+  // Citrus Storm Showcase"): both teams read 1-1-18. Twenty weeks of matchups
+  // exist and exactly two were ever scored -- weeks 7 and 8. The other
+  // eighteen sit at 0.000 / 0.000 because nothing was ever played in them,
+  // and the old rule read equal scores as a draw.
+  //
+  // The rule itself now lives in @citrus/shared (deriveStandings) and is
+  // shared with GET /api/leagues/:leagueId/standings. These tests pin the
+  // behaviour the page shows; packages/shared/src/utils/__tests__/standings.test.ts
+  // pins the rule's edges.
+  // ===========================================================================
+
+  // The demo league's real rows, statuses and all. Mocked "today" in this
+  // file is 2026-03-08, which is why weeks 9-11 need their real 'completed'
+  // status to be in the window at all.
+  const DEMO_LEAGUE_MATCHUPS: StandingsMatchup[] = [
+    { id: 'w1', week_number: 1, team1_id: 'team-1', team2_id: 'team-2', team1_score: '0.000', team2_score: '0.000', status: 'completed', week_end_date: '2026-01-16' },
+    { id: 'w2', week_number: 2, team1_id: 'team-1', team2_id: 'team-2', team1_score: '0.000', team2_score: '0.000', status: 'completed', week_end_date: '2026-01-23' },
+    { id: 'w3', week_number: 3, team1_id: 'team-1', team2_id: 'team-2', team1_score: '0.000', team2_score: '0.000', status: 'in_progress', week_end_date: '2026-01-30' },
+    { id: 'w4', week_number: 4, team1_id: 'team-1', team2_id: 'team-2', team1_score: '0.000', team2_score: '0.000', status: 'scheduled', week_end_date: '2026-02-06' },
+    { id: 'w5', week_number: 5, team1_id: 'team-1', team2_id: 'team-2', team1_score: '0.000', team2_score: '0.000', status: 'scheduled', week_end_date: '2026-02-13' },
+    // Week 6 is the Olympic break: 294 fantasy_daily_rosters rows, no NHL
+    // games, no scoring lines. Lineups were set; nothing was played.
+    { id: 'w6', week_number: 6, team1_id: 'team-1', team2_id: 'team-2', team1_score: '0.000', team2_score: '0.000', status: 'scheduled', week_end_date: '2026-02-20' },
+    { id: 'w7', week_number: 7, team1_id: 'team-1', team2_id: 'team-2', team1_score: '58.000', team2_score: '70.900', status: 'completed', week_end_date: '2026-02-27' },
+    { id: 'w8', week_number: 8, team1_id: 'team-1', team2_id: 'team-2', team1_score: '122.900', team2_score: '104.800', status: 'completed', week_end_date: '2026-03-06' },
+    { id: 'w9', week_number: 9, team1_id: 'team-1', team2_id: 'team-2', team1_score: '0.000', team2_score: '0.000', status: 'completed', week_end_date: '2026-03-13' },
+    { id: 'w10', week_number: 10, team1_id: 'team-1', team2_id: 'team-2', team1_score: '0.000', team2_score: '0.000', status: 'completed', week_end_date: '2026-03-20' },
+    { id: 'w11', week_number: 11, team1_id: 'team-1', team2_id: 'team-2', team1_score: '0.000', team2_score: '0.000', status: 'completed', week_end_date: '2026-03-27' },
+    { id: 'w12', week_number: 12, team1_id: 'team-1', team2_id: 'team-2', team1_score: '0.000', team2_score: '0.000', status: 'scheduled', week_end_date: '2026-04-03' },
+  ];
+
+  it('reads the demo league as 1-1-0, not 1-1-18', async () => {
+    mockGetLeagueMatchups.mockResolvedValue({ data: DEMO_LEAGUE_MATCHUPS });
+
+    const teams = makeTeams(['team-1', 'team-2']);
+    const result = await StandingsService.calculateTeamStandings('league-unplayed', teams, [], []);
+
+    expect(result['team-1'].wins).toBe(1);
+    expect(result['team-1'].losses).toBe(1);
+    expect(result['team-1'].ties).toBe(0);
+    expect(result['team-2'].ties).toBe(0);
+
+    // Only the two weeks that were played contribute points.
+    expect(result['team-1'].pointsFor).toBeCloseTo(180.9, 6);
+    expect(result['team-1'].pointsAgainst).toBeCloseTo(175.7, 6);
+  });
+
+  it('does not count an unscored week as a tie even when its status is completed', async () => {
+    // Weeks 1, 2, 9, 10 and 11 are 'completed' at 0-0 in production, so
+    // status alone cannot be the gate that decides a week was played.
+    mockGetLeagueMatchups.mockResolvedValue({
+      data: DEMO_LEAGUE_MATCHUPS.filter(m => m.status === 'completed' && m.team1_score === '0.000'),
+    });
+
+    const teams = makeTeams(['team-1', 'team-2']);
+    const result = await StandingsService.calculateTeamStandings('league-zero-completed', teams, [], []);
+
+    expect(result['team-1'].ties).toBe(0);
+    expect(result['team-1'].wins).toBe(0);
+    expect(result['team-1'].losses).toBe(0);
+    expect(result['team-1'].streak).toBe('-');
+  });
+
+  it('does not award a win for an unplayed bye week', async () => {
+    // Mirrors auto_complete_matchups()'s own bye predicate:
+    // (team2_id IS NULL AND team1_score > 0).
+    mockGetLeagueMatchups.mockResolvedValue({
+      data: [{ id: 'm1', team1_id: 'team-1', team2_id: null, team1_score: 0, team2_score: null, week_number: 1, status: 'completed', week_end_date: '2026-03-01' }],
+    });
+
+    const teams = makeTeams(['team-1', 'team-2']);
+    const result = await StandingsService.calculateTeamStandings('league-empty-bye', teams, [], []);
+
+    expect(result['team-1'].wins).toBe(0);
+    expect(result['team-1'].streak).toBe('-');
+  });
+
+  it('counts a real 0-0 week when the matchup carries played evidence', async () => {
+    // The vanishingly rare legitimate 0-0. The score cannot show it, so the
+    // rule takes explicit evidence instead of guessing -- a scored-at stamp
+    // or the existence of fantasy_matchup_lines, mapped to `played`.
+    mockGetLeagueMatchups.mockResolvedValue({
+      data: [{ id: 'm1', team1_id: 'team-1', team2_id: 'team-2', team1_score: 0, team2_score: 0, week_number: 1, status: 'completed', week_end_date: '2026-03-01', played: true }],
+    });
+
+    const teams = makeTeams(['team-1', 'team-2']);
+    const result = await StandingsService.calculateTeamStandings('league-real-draw', teams, [], []);
+
+    expect(result['team-1'].ties).toBe(1);
+    expect(result['team-2'].ties).toBe(1);
+    expect(result['team-1'].streak).toBe('T1');
+  });
+
+  it('matches the shared rule the API server derives standings with', async () => {
+    // PARITY. server/src/services/LeagueService.getStandings feeds the same
+    // COLUMNS.MATCHUP rows to this same function, so if this holds the
+    // Standings page and GET /api/leagues/:leagueId/standings cannot
+    // disagree about a league.
+    mockGetLeagueMatchups.mockResolvedValue({ data: DEMO_LEAGUE_MATCHUPS });
+
+    const teams = makeTeams(['team-1', 'team-2']);
+    const result = await StandingsService.calculateTeamStandings('league-parity', teams, [], []);
+
+    expect(result).toEqual(
+      deriveStandings(['team-1', 'team-2'], DEMO_LEAGUE_MATCHUPS, '2026-03-08'),
+    );
   });
 });
 

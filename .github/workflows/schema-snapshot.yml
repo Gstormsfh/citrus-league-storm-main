@@ -9,8 +9,9 @@ name: Schema Snapshot
 #
 # What it touches: nothing in prod. `pg_dump --schema-only` plus one SELECT on
 # cron.job, through scripts/ops/dump-prod-schema.sh -- the same script Garrett
-# can run from Cloud Shell. Output: supabase/schema/prod_schema.sql and
-# supabase/schema/prod_cron.sql.
+# can run from Cloud Shell. Output: supabase/schema/prod_schema.sql,
+# supabase/schema/prod_cron.sql and supabase/schema/prod_migration_history.sql
+# (the ledger prod kept, which is not the ledger the repo kept; see the script).
 #
 # Needs the repository secret PROD_DB_URL: the DIRECT connection string
 # (db.<ref>.supabase.co:5432), never the pooler (KI-E010; the script refuses
@@ -65,7 +66,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          FILES="supabase/schema/prod_schema.sql supabase/schema/prod_cron.sql"
+          FILES="supabase/schema/prod_schema.sql supabase/schema/prod_cron.sql supabase/schema/prod_migration_history.sql"
           # Intent-to-add so a first-ever snapshot (untracked files) is a diff too.
           git add --intent-to-add -- $FILES
           if git diff --quiet -- $FILES; then
@@ -90,7 +91,7 @@ jobs:
 
           {
             echo "## What"
-            echo "Weekly \`pg_dump --schema-only --no-owner --no-privileges\` of production (\`public\`) plus the \`cron.job\` manifest, taken $(date -u +'%Y-%m-%d %H:%MZ') by \`schema-snapshot.yml\` via \`scripts/ops/dump-prod-schema.sh\`."
+            echo "Weekly \`pg_dump --schema-only --no-owner --no-privileges\` of production (\`public\`) plus the \`cron.job\` manifest and the \`supabase_migrations.schema_migrations\` history, taken $(date -u +'%Y-%m-%d %H:%MZ') by \`schema-snapshot.yml\` via \`scripts/ops/dump-prod-schema.sh\`."
             echo
             echo "## Why"
             echo "The committed snapshot no longer matches prod. Every hunk below is either a migration that landed since the last snapshot (fine) or a change made in place on prod with no migration file (drift, \`docs/PROD_CHANGE_LEDGER.md\` Rule 1)."

@@ -330,6 +330,32 @@ const CreateLeague = () => {
   const showWaiverSettings = hasWaivers(leagueType);
   const isAuction = draftType === 'auction';
 
+  // ROUNDS vs ROSTER (2026-09-04 funnel audit). These two numbers are set
+  // in two different sections and are never reconciled: `roster_size` is
+  // the SUM of the slot boxes below, `draft_rounds` is this dropdown, and
+  // nothing — not the form, not the API validator (server/src/middleware/
+  // validate.ts createLeague), not the DB's validate_league_settings
+  // trigger — ever compares them. Production has six fantasy leagues where
+  // they disagree, and one click does it by itself: choosing the F/D/G
+  // position layout swaps in DEFAULT_FDG_ROSTER_SLOTS (23 spots) while the
+  // dropdown stays on its default 21.
+  //
+  // Divergence is a legal choice — plenty of leagues draft short and fill
+  // the last spots off waivers — so this warns, it does not clamp. What is
+  // not acceptable is that it happened silently.
+  const totalRosterSlots = Object.values(rosterSlots).reduce((sum, n) => sum + (n || 0), 0);
+  const roundsVsRoster = (() => {
+    if (!isFantasy) return null;
+    const rounds = parseInt(draftRounds, 10);
+    if (Number.isNaN(rounds)) return null;
+    if (rounds <= 0 || totalRosterSlots <= 0 || rounds === totalRosterSlots) return null;
+    const gap = Math.abs(rounds - totalRosterSlots);
+    const players = `${gap} ${gap === 1 ? 'spot' : 'spots'}`;
+    return rounds < totalRosterSlots
+      ? `Rosters have ${totalRosterSlots} spots but the draft runs ${rounds} rounds, so every team ends the draft ${players} short and fills the rest from free agents.`
+      : `The draft runs ${rounds} rounds but rosters only have ${totalRosterSlots} spots, so every team drafts ${players} more than it can hold.`;
+  })();
+
   const statsByCategory = useMemo(() => ({
     Offense: leagueStats.filter(s => s.category === "Offense"),
     Defense: leagueStats.filter(s => s.category === "Defense"),
@@ -1329,6 +1355,14 @@ const CreateLeague = () => {
                                 <SelectItem value="30">30 Rounds</SelectItem>
                               </SelectContent>
                             </Select>
+                            {roundsVsRoster && (
+                              <p
+                                className="text-xs text-pastel-orange-soft leading-relaxed"
+                                data-testid="create-league-rounds-roster-mismatch"
+                              >
+                                {roundsVsRoster}
+                              </p>
+                            )}
                           </div>
                         )}
 

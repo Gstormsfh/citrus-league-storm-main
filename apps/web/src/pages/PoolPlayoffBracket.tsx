@@ -23,6 +23,15 @@ import { supabase } from '@/integrations/supabase/client';
 // errors. The 2026-08-15 sweep that introduced API_BASE_URL missed this
 // file. Prefixed with API_BASE_URL, matching PoolPlayoffRoster.tsx.
 import { API_BASE_URL } from '@/api/client';
+// 2026-09-03 launch audit: the bracket and h2h URLs below carried a
+// literal `?season=2025`. The literal was RIGHT -- 2025 is the 2025-26
+// playoff run and stays the current one until April 2027 -- and swapping
+// it for getCurrentSeason() would have broken the page on 2026-09-29,
+// when the regular-season year flips to 2026 and no 2026 playoff row
+// exists yet. What it lacked was a rule and one place to change it.
+// getCurrentPlayoffSeason() returns exactly 2025 today and flips itself
+// on 2027-04-01. See packages/shared/src/constants/season.ts.
+import { getCurrentPlayoffSeason } from '@citrus/shared';
 import { onTeamColor } from '@/utils/teamColorContrast';
 
 interface Seed {
@@ -126,11 +135,11 @@ export default function PoolPlayoffBracket() {
     const load = async () => {
       try {
         const [bracketRes, picksRes, h2hRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/nhl-playoffs/bracket?season=2025`),
+          fetch(`${API_BASE_URL}/api/nhl-playoffs/bracket?season=${getCurrentPlayoffSeason()}`),
           fetch(`${API_BASE_URL}/api/playoff-pools/${leagueId}/picks?type=bracket`, {
             headers: { Authorization: `Bearer ${(await import('@/integrations/supabase/client')).supabase.auth.getSession ? (await (await import('@/integrations/supabase/client')).supabase.auth.getSession()).data.session?.access_token || '' : ''}` },
           }),
-          fetch(`${API_BASE_URL}/api/nhl-playoffs/h2h?season=2025`).catch(() => null),
+          fetch(`${API_BASE_URL}/api/nhl-playoffs/h2h?season=${getCurrentPlayoffSeason()}`).catch(() => null),
         ]);
         const bracket = await bracketRes.json();
         const picksData = await picksRes.json();

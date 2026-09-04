@@ -7,6 +7,7 @@ import { validateBody, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { PoolService } from '../services/PoolService';
 import { ok, handleError } from '../lib/responses';
+import { getCurrentSeason } from '@citrus/shared';
 
 const poolRoutes = new Hono<Env>();
 
@@ -74,12 +75,23 @@ poolRoutes.get('/team-records', async (c) => {
     const weekNumber = weekParam ? parseInt(weekParam, 10) : 0;
     const supabase = createUserClient(c.get('userToken'));
 
+    // 2026-09-03 launch audit: this route pinned the season to a literal
+    // 2025. Pool weeks are regular-season weeks, so team records and
+    // head-to-head must follow the season the pool is actually playing.
+    // Pinned, it serves the 2025-26 records forever: from 2026-09-29, when
+    // the 2026-27 season opens, every W-L-OTL record and streak on the
+    // pick'em page would be last season's, silently and indefinitely.
+    // Matches the ?season= override / getCurrentSeason() default already
+    // used throughout server/src/routes/nhl-playoffs.ts.
+    const seasonParam = c.req.query('season');
+    const season = seasonParam ? parseInt(seasonParam, 10) : getCurrentSeason();
+
     // Fetch ALL final season games (4 columns only, ~1200 rows)
     const { data: games, error } = await supabase
       .from('nhl_games')
       .select('home_team, away_team, home_score, away_score, period, game_date')
       .eq('status', 'final')
-      .eq('season', 2025)
+      .eq('season', season)
       .order('game_date', { ascending: false })
       .range(0, 1999);
 
@@ -152,6 +164,12 @@ poolRoutes.get('/h2h', async (c) => {
     const supabase = createUserClient(c.get('userToken'));
     const service = createPoolService(c);
 
+    // Same 2026-09-03 fix as /team-records above: this route also pinned
+    // the season to a literal 2025 and would have served the 2025-26
+    // head-to-head for every season after it.
+    const seasonParam = c.req.query('season');
+    const season = seasonParam ? parseInt(seasonParam, 10) : getCurrentSeason();
+
     // Get all games for the week to know which team pairs to check
     const weekGames = weekNumber > 0 ? await service.getGamesForWeek(weekNumber) : [];
 
@@ -173,7 +191,7 @@ poolRoutes.get('/h2h', async (c) => {
       .from('nhl_games')
       .select('home_team, away_team, home_score, away_score')
       .eq('status', 'final')
-      .eq('season', 2025)
+      .eq('season', season)
       .range(0, 1999);
 
     // Build H2H for each pair

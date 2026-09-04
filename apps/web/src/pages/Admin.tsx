@@ -230,7 +230,7 @@ const Admin = () => {
                     <TableCell className="text-xs text-white/55 font-mono">{u.id?.slice(0, 8)}...</TableCell>
                   </TableRow>
                 ))}
-                {users.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-white/55">No users found</TableCell></TableRow>}
+                {users.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-white/55">Nobody here yet</TableCell></TableRow>}
               </TableBody>
             </Table>
             <div className="flex items-center justify-between text-sm text-white/55">
@@ -259,7 +259,7 @@ const Admin = () => {
                     <TableCell className="text-xs text-white/55 font-mono">{l.id?.slice(0, 8)}...</TableCell>
                   </TableRow>
                 ))}
-                {leagues.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-white/55">No leagues found</TableCell></TableRow>}
+                {leagues.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-white/55">No leagues here yet</TableCell></TableRow>}
               </TableBody>
             </Table>
             <div className="flex items-center justify-between text-sm text-white/55">

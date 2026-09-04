@@ -166,10 +166,19 @@ describe('colour tokens', () => {
     // Same rule as positionChip.ts: a background and the text that survives
     // on it are one decision, so the base may not set a colour of its own.
     expect(STATUS_PILL_BASE).not.toMatch(/\btext-(?!\[)/);
-    for (const tone of ['good', 'attention', 'bad'] as const) {
+    for (const tone of ['good', 'attention', 'bad', 'neutral'] as const) {
       expect(STATUS_TONE_CLASSES[tone]).toMatch(/\bbg-/);
       expect(STATUS_TONE_CLASSES[tone]).toMatch(/\btext-/);
     }
+  });
+
+  it('the neutral pill is the chip token, not a dark surface that vanishes on the tile', () => {
+    // Every dark surface token sits at 1.0-1.3:1 against #1A2A20 (computed
+    // 2026-09-03), which is not a pill. `sage-soft` is the token the config
+    // labels "pale sage for chips/borders", and forest on it is 9.71:1.
+    expect(STATUS_TONE_CLASSES.neutral).toContain('bg-pastel-sage-soft');
+    expect(STATUS_TONE_CLASSES.neutral).toContain('text-pastel-forest');
+    expect(STATUS_TONE_CLASSES.neutral).not.toMatch(/\bbg-(?:pastel|premium)-surface/);
   });
 
   it('no muted text below the /50 the contrast guard allows', () => {

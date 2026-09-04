@@ -35,6 +35,8 @@ const LOBBY_REGISTRY_TS_PATH = resolve(HERE, '..', 'LobbyRegistry.ts');
 const indexTsSource = readFileSync(INDEX_TS_PATH, 'utf8');
 const lobbyManagerSource = readFileSync(LOBBY_MANAGER_TS_PATH, 'utf8');
 const lobbyRegistrySource = readFileSync(LOBBY_REGISTRY_TS_PATH, 'utf8');
+const PAGED_READ_TS_PATH = resolve(HERE, '..', '..', 'lib', 'pagedRead.ts');
+const pagedReadSource = readFileSync(PAGED_READ_TS_PATH, 'utf8');
 
 // ── Shared LobbyRegistry test scaffolding (matches LobbyRegistry.test.ts) ─
 
@@ -153,8 +155,10 @@ function makeEnumInvalidError(column: string, value: string): PostgresEnumError 
 
 /**
  * Build a fake admin Supabase client whose fluent chain resolves to
- * the given rows for the boot-scan query
- * `leagues.select('id').eq('draft_status', 'in_progress')`.
+ * the given rows for the boot-scan query, which since 2026-09-03 is
+ * PAGED:
+ * `leagues.select('id').eq('draft_status', 'in_progress')
+ *   .order('id', { ascending: true }).range(from, to)`.
  *
  * E109 REGRESSION GUARD: `.from` is defined with method-shorthand
  * (non-arrow) and reads `this._tag` — mirroring real supabase-js
@@ -175,11 +179,37 @@ function makeAdminForBootScan(
   activeLeagues: Array<{ id: string }>,
   probeError: { message: string } | null = null,
 ): SupabaseClient {
+  // PAGED-READ SHAPE (2026-09-03). performBootScan reads through
+  // `readAllPaged`, so the chain is now
+  //   .select(cols).eq(col, val).order(col, opts).range(from, to)
+  // and it is only AWAITED at `.range`. This stub defers its answer to
+  // `.range` and slices like PostgREST's window, which means an
+  // unbounded `.select()` regression never resolves here rather than
+  // quietly passing. The E109 (`this`-bound `.from`) and E111 (enum
+  // 22P02) guards are unchanged: enum validation still happens the
+  // moment `.eq` / `.in` is called.
+  const deferred = (result: {
+    data: Array<{ id: string }> | null;
+    error: { message: string } | null;
+  }): Record<string, unknown> => {
+    const builder: Record<string, unknown> = {};
+    const same = (): Record<string, unknown> => builder;
+    builder.eq = same;
+    builder.in = same;
+    builder.order = same;
+    builder.range = (from: number, to: number) =>
+      Promise.resolve(
+        result.error !== null
+          ? { data: null, error: result.error }
+          : { data: (result.data ?? []).slice(from, to + 1), error: null },
+      );
+    return builder;
+  };
   const eqMethod = (column: string, value: string) => {
     if (column === 'draft_status' && !(DB_DRAFT_STATUS_ENUM as readonly string[]).includes(value)) {
-      return Promise.resolve({ data: null, error: makeEnumInvalidError(column, value) });
+      return deferred({ data: null, error: makeEnumInvalidError(column, value) });
     }
-    return Promise.resolve({ data: activeLeagues, error: probeError });
+    return deferred({ data: activeLeagues, error: probeError });
   };
   const inMethod = (column: string, values: readonly string[]) => {
     if (column === 'draft_status') {
@@ -187,13 +217,13 @@ function makeAdminForBootScan(
         (v) => !(DB_DRAFT_STATUS_ENUM as readonly string[]).includes(v),
       );
       if (invalid !== undefined) {
-        return Promise.resolve({
+        return deferred({
           data: null,
           error: makeEnumInvalidError(column, invalid),
         });
       }
     }
-    return Promise.resolve({ data: activeLeagues, error: probeError });
+    return deferred({ data: activeLeagues, error: probeError });
   };
   const selectResult = { eq: eqMethod, in: inMethod };
   const admin = {
@@ -259,7 +289,12 @@ describe('ENGINE-EAR v3 Slice 1 item 2 — LobbyRegistry.performBootScan', () =>
     // paused-draft resume is a Slice-2+ decision (would require
     // reading draft_state alongside).
     const { registry } = makeRegistry();
-    const eqSpy = vi.fn(() => Promise.resolve({ data: [], error: null }));
+    // The chain resolves at `.range` now (readAllPaged); the filter
+    // assertion below is unchanged and is the point of this test.
+    const page: Record<string, unknown> = {};
+    page.order = () => page;
+    page.range = () => Promise.resolve({ data: [], error: null });
+    const eqSpy = vi.fn(() => page);
     const selectResult = { eq: eqSpy };
     const admin = {
       _tag: 'admin-stub-eq-spy',
@@ -489,11 +524,26 @@ describe('E109 unbound-`.from` extraction regression lock', () => {
     expect(lobbyRegistrySource).not.toMatch(/^\s*const\s+untypedFrom\s*=/m);
   });
 
-  it('LobbyRegistry.ts uses the safe (client.from(t) as any) pattern instead', () => {
-    // Positive lock on the corrected shape. `supabaseAdmin.from(...)`
-    // preserves `this` because it's a direct property access +
-    // invocation in the same expression.
-    expect(lobbyRegistrySource).toMatch(/\(supabaseAdmin\.from\(['"]leagues['"]\)\s+as\s+any\)/);
+  it('LobbyRegistry.ts delegates the boot scan to readAllPaged (supersedes the `as any` lock)', () => {
+    // 2026-09-03: the boot scan used to be an UNPAGED
+    // `(supabaseAdmin.from('leagues') as any).select('id').eq(...)`.
+    // The cast dodged TS deep-instantiation on the wide `leagues`
+    // type; the missing paging silently capped the scan at
+    // PostgREST's 1,000-row clamp, so past 1,000 concurrent drafts
+    // some were never resumed and nothing logged it.
+    //
+    // It now calls `readAllPaged(supabaseAdmin, {...})`. That is
+    // strictly SAFER for E109, not a weakening of this lock: the
+    // client crosses the boundary as a VALUE (never as an extracted
+    // method), and the helper's single client access is a direct
+    // property-access-plus-invocation in one expression, which is
+    // exactly the shape this lock has always required. The negative
+    // anti-pattern assertions above still apply verbatim.
+    expect(lobbyRegistrySource).toMatch(/readAllPaged<\{ id: string \}>\(\s*supabaseAdmin,/);
+    expect(lobbyRegistrySource).not.toMatch(/supabaseAdmin\.from\(/);
+    // The helper the scan now depends on must keep the safe shape.
+    expect(pagedReadSource).toMatch(/supabase\.from\(spec\.table\)\.select\(spec\.columns\)/);
+    expect(pagedReadSource).not.toMatch(/^\s*const\s+\w+\s*=\s*supabase\.from\s+as\s+unknown/m);
   });
 
   it('draft/index.ts must not extract `.from` as a free function', () => {

@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Draft clock: before and after</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700;800&family=Montserrat:wght@600;700;800&display=swap">
+<style>
+  :root{
+    --surface:#0F1F15; --tile:#1A2A20; --high:#243429;
+    --sage:#84A57D; --sage-soft:#C8DCC4; --cream:#FFF8F0;
+    --orange:#FF6B1A; --grapefruit:#FF6F80; --lemon:#F9E076;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--surface);color:var(--cream);
+       font-family:Montserrat,system-ui,sans-serif;padding:22px 16px 44px}
+  .wrap{max-width:880px;margin:0 auto}
+  h1{font-size:19px;font-weight:800;letter-spacing:-.02em;margin:0 0 4px}
+  .sub{font-size:12.5px;line-height:1.6;color:var(--sage-soft);opacity:.85;margin:0 0 26px;max-width:64ch}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:26px}
+  .col h2{font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:700;
+          letter-spacing:.16em;text-transform:uppercase;margin:0 0 10px}
+  .col.before h2{color:#9C8F72}
+  .col.after h2{color:var(--sage)}
+  .phone{width:100%;max-width:393px;background:var(--surface);
+         border:1px solid rgba(200,220,196,.14);border-radius:16px;padding:12px;
+         display:flex;flex-direction:column;gap:16px}
+  .cap{font-size:11px;line-height:1.55;color:var(--sage-soft);opacity:.7;margin:8px 2px 0}
+  .hdr{display:flex;align-items:center;justify-content:space-between;gap:8px;
+       padding-bottom:8px;border-bottom:1px solid rgba(200,220,196,.12)}
+  .hdr .meta{font-size:11px;color:var(--sage-soft);opacity:.65;font-variant-numeric:tabular-nums}
+  .mono{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+
+  /* ── before ───────────────────────────────────────────── */
+  .pill-old{display:inline-flex;align-items:center;gap:6px;border:1px solid #E2E8F0;
+            background:#fff;border-radius:6px;padding:4px 8px}
+  .pill-old .t{font-size:16px;font-weight:700;line-height:1}
+  .g600{color:#16a34a}.o600{color:#ea580c}.r600{color:#dc2626}
+  .bar-old{border-radius:6px;border:2px solid;padding:10px;display:flex;
+           flex-direction:column;gap:6px;box-shadow:0 10px 15px -3px rgba(0,0,0,.4)}
+  .bar-old.n{background:var(--lemon);border-color:var(--lemon);color:#0F1F15}
+  .bar-old.u{background:#dc2626;border-color:#b91c1c;color:#fff}
+  .bar-old .r1{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .bar-old .lab{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.9}
+  .bar-old .cd{font-size:24px;font-weight:700;line-height:1}
+  .bar-old .r2{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .bar-old .nm{font-size:15px;font-weight:600;line-height:1.2}
+  .btn-old{flex-shrink:0;background:#fff;color:#0F1F15;font-weight:700;font-size:13px;
+           padding:8px 16px;border:none;border-radius:6px}
+
+  /* ── after ────────────────────────────────────────────── */
+  .pill-new{display:inline-flex;align-items:center;gap:6px;background:var(--tile);
+            border-radius:8px;padding:4px 8px;box-shadow:inset 0 0 0 1px rgba(200,220,196,.2)}
+  .pill-new .t{font-size:16px;font-weight:700;line-height:1}
+  .sg{color:var(--sage)}.og{color:var(--orange)}.gf{color:var(--grapefruit)}
+  .bar-new{background:var(--tile);border-radius:16px;padding:12px;display:flex;
+           flex-direction:column;gap:12px;box-shadow:0 10px 15px -3px rgba(0,0,0,.4),inset 0 0 0 1px rgba(200,220,196,.2)}
+  .bar-new.u{box-shadow:0 10px 15px -3px rgba(0,0,0,.4),inset 0 0 0 1px rgba(255,111,128,.5)}
+  .bar-new .row1{display:flex;align-items:center;gap:12px}
+  .ring{position:relative;width:60px;height:60px;flex-shrink:0}
+  .ring svg{display:block;transform:rotate(-90deg)}
+  .ring .cd{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+            font-size:13px;font-weight:700;line-height:1}
+  .eyebrow{font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+           white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .eyebrow .co{letter-spacing:.08em;opacity:.75}
+  .nm-new{font-size:17px;font-weight:700;line-height:1.2;color:var(--cream);
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .nm-new .pos{font-size:14px;font-weight:400;color:rgba(200,220,196,.8);margin-left:8px}
+  .dec{font-size:11px;line-height:1;color:rgba(200,220,196,.8);
+       white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .btn-new{width:100%;height:48px;background:var(--orange);color:var(--surface);
+           font-size:15px;font-weight:800;border:none;border-radius:8px;cursor:pointer}
+  .scar{display:flex;align-items:center;gap:6px;overflow-x:auto}
+  .scar .k{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+           color:rgba(200,220,196,.6);flex-shrink:0}
+  .chip{flex-shrink:0;background:var(--high);border-radius:4px;padding:1px 6px;
+        font-size:11px;font-weight:700;line-height:1.3;color:var(--sage-soft)}
+  .chip.hot{color:var(--grapefruit);box-shadow:inset 0 0 0 1px rgba(255,111,128,.5)}
+  @media (max-width:720px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>The draft clock, before and after</h1>
+  <p class="sub">Both columns are the real markup, at 393px. The palette on the left is where the lemon comes from the mascot set and the urgent state drops to a stock Tailwind red; on the right everything is the same forest, sage and orange the rest of the room is built from, and the countdown is a ring that empties. The mm:ss format, every test id and every word are unchanged.</p>
+
+  <div class="grid">
+
+    <div class="col before">
+      <h2>Before</h2>
+      <div class="phone">
+        <div class="hdr">
+          <span class="meta">Round 3 &middot; Pick 29 / 252</span>
+          <span class="pill-old"><span class="mono t g600">00:47</span></span>
+        </div>
+        <div class="hdr" style="border:0;padding:0">
+          <span class="meta">tightening</span>
+          <span class="pill-old"><span class="mono t o600">00:20</span></span>
+          <span class="pill-old"><span class="mono t r600">00:06</span></span>
+        </div>
+
+        <div class="bar-old n">
+          <div class="r1">
+            <span class="lab">You're on the clock &middot; Round 3 &middot; Pick 29</span>
+            <span class="mono cd">00:47</span>
+          </div>
+          <div class="r2">
+            <span class="nm">Draft <b>Connor McDavid</b> (C &middot; EDM)</span>
+            <button class="btn-old">Draft</button>
+          </div>
+          <div class="mono" style="font-size:11px;opacity:.8">188.6 proj &middot; 1.9/gm over 71</div>
+        </div>
+
+        <div class="bar-old u">
+          <div class="r1">
+            <span class="lab">You're on the clock &middot; Round 3 &middot; Pick 29</span>
+            <span class="mono cd">00:06</span>
+          </div>
+          <div class="r2">
+            <span class="nm">Draft <b>Connor McDavid</b> (C &middot; EDM)</span>
+            <button class="btn-old">Draft</button>
+          </div>
+          <div class="mono" style="font-size:11px;opacity:.8">188.6 proj &middot; 1.9/gm over 71</div>
+        </div>
+      </div>
+      <p class="cap">A lemon slab and a stock red slab, and a white Draft pill wedged beside a name that can run twenty characters. The header pill is a shadcn card carrying green-600, orange-600, red-600.</p>
+    </div>
+
+    <div class="col after">
+      <h2>After</h2>
+      <div class="phone">
+        <div class="hdr">
+          <span class="meta">Round 3 &middot; Pick 29 / 252</span>
+          <span class="pill-new">
+            <svg width="18" height="18" viewBox="0 0 18 18" style="display:block;transform:rotate(-90deg)">
+              <circle cx="9" cy="9" r="7.5" fill="none" stroke="#84A57D" stroke-opacity=".22" stroke-width="2.5"/>
+              <circle cx="9" cy="9" r="7.5" fill="none" stroke="#84A57D" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="47.1" stroke-dashoffset="10.2"/>
+            </svg>
+            <span class="mono t sg">00:47</span>
+          </span>
+        </div>
+        <div class="hdr" style="border:0;padding:0">
+          <span class="meta">tightening</span>
+          <span class="pill-new">
+            <svg width="18" height="18" viewBox="0 0 18 18" style="display:block;transform:rotate(-90deg)">
+              <circle cx="9" cy="9" r="7.5" fill="none" stroke="#FF6B1A" stroke-opacity=".22" stroke-width="2.5"/>
+              <circle cx="9" cy="9" r="7.5" fill="none" stroke="#FF6B1A" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="47.1" stroke-dashoffset="31.4"/>
+            </svg>
+            <span class="mono t og">00:20</span>
+          </span>
+          <span class="pill-new">
+            <svg width="18" height="18" viewBox="0 0 18 18" style="display:block;transform:rotate(-90deg)">
+              <circle cx="9" cy="9" r="7.5" fill="none" stroke="#FF6F80" stroke-opacity=".22" stroke-width="2.5"/>
+              <circle cx="9" cy="9" r="7.5" fill="none" stroke="#FF6F80" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="47.1" stroke-dashoffset="42.4"/>
+            </svg>
+            <span class="mono t gf">00:06</span>
+          </span>
+        </div>
+
+        <div class="bar-new">
+          <div class="row1">
+            <div class="ring">
+              <svg width="60" height="60" viewBox="0 0 60 60">
+                <circle cx="30" cy="30" r="26" fill="none" stroke="#84A57D" stroke-opacity=".18" stroke-width="4.5"/>
+                <circle cx="30" cy="30" r="26" fill="none" stroke="#84A57D" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="163.4" stroke-dashoffset="35.4"/>
+              </svg>
+              <span class="mono cd" style="color:var(--cream)">00:47</span>
+            </div>
+            <div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:4px">
+              <div class="mono eyebrow sg">You're on the clock<span class="co"> &middot; Round 3 &middot; Pick 29</span></div>
+              <div class="nm-new">Draft <b>Connor McDavid</b><span class="pos">(C &middot; EDM)</span></div>
+            </div>
+          </div>
+          <div class="mono dec">188.6 proj &middot; 1.9/gm over 71 &middot; 88th %ile xG/60</div>
+          <button class="btn-new">Draft</button>
+          <div class="scar">
+            <span class="k">Starters left</span>
+            <span class="mono chip">C 6</span>
+            <span class="mono chip hot">LW 2</span>
+            <span class="mono chip">D 11</span>
+            <span class="mono chip">G 4</span>
+          </div>
+        </div>
+
+        <div class="bar-new u">
+          <div class="row1">
+            <div class="ring">
+              <svg width="60" height="60" viewBox="0 0 60 60">
+                <circle cx="30" cy="30" r="26" fill="none" stroke="#FF6F80" stroke-opacity=".18" stroke-width="4.5"/>
+                <circle cx="30" cy="30" r="26" fill="none" stroke="#FF6F80" stroke-width="4.5" stroke-linecap="round" stroke-dasharray="163.4" stroke-dashoffset="147.1"/>
+              </svg>
+              <span class="mono cd" style="color:var(--grapefruit)">00:06</span>
+            </div>
+            <div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:4px">
+              <div class="mono eyebrow gf">You're on the clock<span class="co"> &middot; Round 3 &middot; Pick 29</span></div>
+              <div class="nm-new">Draft <b>Connor McDavid</b><span class="pos">(C &middot; EDM)</span></div>
+            </div>
+          </div>
+          <div class="mono dec">188.6 proj &middot; 1.9/gm over 71 &middot; 88th %ile xG/60</div>
+          <button class="btn-new">Draft</button>
+          <div class="scar">
+            <span class="k">Starters left</span>
+            <span class="mono chip">C 6</span>
+            <span class="mono chip hot">LW 2</span>
+            <span class="mono chip">D 11</span>
+            <span class="mono chip">G 4</span>
+          </div>
+        </div>
+      </div>
+      <p class="cap">Time left is a shape before it is a number. Urgency moves the ring and the eyebrow to grapefruit and never floods the bar, so the orange Draft button stays the brightest thing on screen &mdash; under a shot clock the eye should land on the verb. The button is now the full width of the bar, 48px tall, under your thumb.</p>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

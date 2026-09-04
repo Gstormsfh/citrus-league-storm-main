@@ -115,6 +115,48 @@ export function getProjectionsSeason(d: Date = new Date()): number {
 }
 
 /**
+ * The NHL season whose PLAYOFF RUN is the current one at a given date.
+ *
+ * This is a different question from getSeasonYearForDate, and the two
+ * deliberately disagree for half the year. A season's playoffs are played in
+ * April-June of the FOLLOWING calendar year, so:
+ *   - Jan-Mar of year Y: the most recent playoffs were April-June of Y-1,
+ *     which belong to season Y-2. Season Y-1's playoffs have not started.
+ *   - Apr-Dec of year Y: the playoffs of April-June Y, which belong to
+ *     season Y-1.
+ *
+ * Concretely, this returns 2025 -- the 2025-26 run, played 2026-04-18 to
+ * 2026-06-14 -- for every date from 2026-04-01 until 2027-03-31, and flips to
+ * 2026 on 2027-04-01 when the 2026-27 run begins.
+ *
+ * Why this exists (found 2026-09-03, launch audit): five call sites across
+ * PoolPlayoffBracket, PoolPlayoffConfidence and PoolPlayoffHub carried a
+ * literal `?season=2025` in their bracket and h2h request URLs. The literal
+ * was CORRECT -- 2025 is the right playoff key until April 2027 -- and
+ * "fixing" it to getCurrentSeason() would have been a regression: that
+ * function flips to 2026 on 2026-09-29 when the 2026-27 REGULAR season
+ * opens, and nhl_playoff_seeds/series hold nothing for season 2026 until the
+ * following spring, so every playoff pool page would have gone blank
+ * twenty-two days after launch. What the literal lacked was a rule and a
+ * single place to change: this is that rule, and it needs no code change in
+ * April 2027.
+ *
+ * A pool that is scoring a SPECIFIC past run should prefer the season stored
+ * on the league (leagues.playoff_season, resolved server-side by
+ * public.pool_playoff_season) over this date-derived default. This answers
+ * "which playoff run is current" for a page with no league context.
+ */
+export function getPlayoffSeasonForDate(d: Date = new Date()): number {
+  // getMonth() is 0-indexed: 0-2 is Jan-Mar.
+  return d.getMonth() <= 2 ? d.getFullYear() - 2 : d.getFullYear() - 1;
+}
+
+/** Always-fresh current playoff-run season. See getPlayoffSeasonForDate. */
+export function getCurrentPlayoffSeason(): number {
+  return getPlayoffSeasonForDate();
+}
+
+/**
  * The first regular-season game date for a given season, or null when the
  * map does not carry that season. Companion to getUpcomingSeasonStartDate,
  * which answers the same question from a date rather than a season number.

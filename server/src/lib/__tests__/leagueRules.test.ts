@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest';
 import {
   resolveSlotConfig,
   validateSlotAssignments,
+  validateIrPlacements,
   resolveAddLimits,
   isPastTradeDeadline,
   evaluateGameLock,
@@ -214,5 +215,129 @@ describe('validateSlotAssignments — position-match enforcement (POSITION-MATCH
     expect(validateSlotAssignments({ p1: 'slot-C-1' }, cfg).ok).toBe(true);
     expect(validateSlotAssignments({ p1: 'slot-C-1' }, cfg, {}).ok).toBe(true);
     expect(validateSlotAssignments({ p1: 'slot-C-1' }, cfg, { other: ['G'] }).ok).toBe(true);
+  });
+});
+
+describe('validateSlotAssignments: multi-position eligibility (2026-09-03, WORLD_CLASS_READINESS gap A)', () => {
+  const cfg = resolveSlotConfig({}); // 2-2-2-4-2, UTIL 1
+
+  it('a C/LW player fills either a C slot or an LW slot', () => {
+    expect(validateSlotAssignments({ p1: 'slot-C-1' }, cfg, { p1: ['C', 'LW'] }).ok).toBe(true);
+    expect(validateSlotAssignments({ p1: 'slot-LW-1' }, cfg, { p1: ['C', 'LW'] }).ok).toBe(true);
+  });
+
+  it('a single-position player is still refused the other slot', () => {
+    const v = validateSlotAssignments({ p1: 'slot-LW-1' }, cfg, { p1: ['C'] });
+    expect(v.ok).toBe(false);
+    expect(v.error).toMatch(/cannot fill slot-LW-1/);
+  });
+
+  it('UTIL is unchanged: any skater, dual-eligible or not, never a goalie', () => {
+    expect(validateSlotAssignments({ p1: 'slot-UTIL' }, cfg, { p1: ['C', 'LW'] }).ok).toBe(true);
+    expect(validateSlotAssignments({ p1: 'slot-UTIL' }, cfg, { p1: ['D'] }).ok).toBe(true);
+    expect(validateSlotAssignments({ p1: 'slot-UTIL' }, cfg, { p1: ['G'] }).ok).toBe(false);
+  });
+
+  it('G is unchanged: goalies only, and a goalie fits nowhere else', () => {
+    expect(validateSlotAssignments({ p1: 'slot-G-1' }, cfg, { p1: ['G'] }).ok).toBe(true);
+    expect(validateSlotAssignments({ p1: 'slot-G-1' }, cfg, { p1: ['C', 'LW'] }).ok).toBe(false);
+    expect(validateSlotAssignments({ p1: 'slot-C-1' }, cfg, { p1: ['G'] }).ok).toBe(false);
+  });
+
+  it('the eligibility list is what the parser hands over: primary first, secondary after', () => {
+    // The listed primary is always in the list (parseEligiblePositions), so a
+    // player whose directory cell says only "RW" while position_code says C
+    // still fits his own C slot.
+    expect(validateSlotAssignments({ p1: 'slot-C-1' }, cfg, { p1: ['C', 'RW'] }).ok).toBe(true);
+    expect(validateSlotAssignments({ p1: 'slot-RW-1' }, cfg, { p1: ['C', 'RW'] }).ok).toBe(true);
+  });
+});
+
+describe('validateIrPlacements: only the injured go on IR (2026-09-03, WORLD_CLASS_READINESS gap B)', () => {
+  const cfg = resolveSlotConfig({}); // IR 3
+  const names = { '1': 'Connor McDavid', '2': 'Evander Kane' };
+
+  it('THE gap: a healthy player placed on IR REJECTS the save, and the sentence names him', () => {
+    const v = validateIrPlacements({ irPlayerIds: ['1'], irEligibleById: { '1': false }, nameOf: names }, cfg);
+    expect(v.ok).toBe(false);
+    expect(v.error).toBe(
+      "Connor McDavid isn't listed IR or LTIR, so an IR slot can't hold him. Bench him, or move a player with official IR/LTIR status there.",
+    );
+  });
+
+  it('a player the NHL lists IR/LTIR is accepted', () => {
+    expect(validateIrPlacements({ irPlayerIds: ['2'], irEligibleById: { '2': true }, nameOf: names }, cfg)).toEqual({ ok: true });
+  });
+
+  it('an unnamed player still gets a sentence, not a blank', () => {
+    const v = validateIrPlacements({ irPlayerIds: ['9'], irEligibleById: { '9': false } }, cfg);
+    expect(v.error).toMatch(/^That player isn't listed IR or LTIR/);
+  });
+
+  it('a player parked while injured stays tolerated after he heals (Yahoo: fix before your next add, not your next lineup change)', () => {
+    const v = validateIrPlacements(
+      { irPlayerIds: ['1'], irEligibleById: { '1': false }, alreadyOnIr: new Set(['1']), nameOf: names },
+      cfg,
+    );
+    expect(v.ok).toBe(true);
+  });
+
+  it('tolerating the old occupant does not wave through a new healthy one beside him', () => {
+    const v = validateIrPlacements(
+      { irPlayerIds: ['1', '2'], irEligibleById: { '1': false, '2': false }, alreadyOnIr: new Set(['1']), nameOf: names },
+      cfg,
+    );
+    expect(v.ok).toBe(false);
+    expect(v.error).toMatch(/^Evander Kane isn't listed IR or LTIR/);
+  });
+
+  it('fails OPEN on a lookup gap: no map, or no entry for the player', () => {
+    expect(validateIrPlacements({ irPlayerIds: ['1'] }, cfg).ok).toBe(true);
+    expect(validateIrPlacements({ irPlayerIds: ['1'], irEligibleById: {} }, cfg).ok).toBe(true);
+    expect(validateIrPlacements({ irPlayerIds: ['1'], irEligibleById: { other: false } }, cfg).ok).toBe(true);
+  });
+
+  it('nothing on IR is nothing to check', () => {
+    expect(validateIrPlacements({ irPlayerIds: [], irEligibleById: {} }, cfg)).toEqual({ ok: true });
+  });
+
+  it('the IR LIST is capped too, not only the slot ids: a fourth player in a 3-IR league is refused', () => {
+    // The snapshot writer stores every member of `ir`, slot id or not, so the
+    // old slot-id strip never bounded how many players a save could park.
+    const v = validateIrPlacements(
+      { irPlayerIds: ['1', '2', '3', '4'], irEligibleById: { '1': true, '2': true, '3': true, '4': true } },
+      cfg,
+    );
+    expect(v.ok).toBe(false);
+    expect(v.error).toBe('This league has 3 IR slots and 4 players are headed there. Bench one first.');
+  });
+
+  it('an over-cap roster that is entirely on record is left alone (nothing new is being placed)', () => {
+    const v = validateIrPlacements(
+      { irPlayerIds: ['1', '2', '3', '4'], irEligibleById: { '1': true, '2': true, '3': true, '4': true }, alreadyOnIr: new Set(['1', '2', '3', '4']) },
+      cfg,
+    );
+    expect(v.ok).toBe(true);
+  });
+
+  it('a league with no IR slots refuses the placement in words', () => {
+    const none = resolveSlotConfig({ rosterSlots: { IR: 0 } });
+    const v = validateIrPlacements({ irPlayerIds: ['2'], irEligibleById: { '2': true }, nameOf: names }, none);
+    expect(v.ok).toBe(false);
+    expect(v.error).toBe("This league has no IR slots, so Evander Kane can't go there. Bench him instead.");
+  });
+
+  it('a single IR slot reads as singular', () => {
+    const one = resolveSlotConfig({ rosterSlots: { IR: 1 } });
+    const v = validateIrPlacements({ irPlayerIds: ['1', '2'], irEligibleById: { '1': true, '2': true } }, one);
+    expect(v.error).toBe('This league has 1 IR slot and 2 players are headed there. Bench one first.');
+  });
+
+  it('the healthy-player refusal outranks the cap: the more specific reason wins', () => {
+    const v = validateIrPlacements(
+      { irPlayerIds: ['1', '2', '3', '4'], irEligibleById: { '1': true, '2': true, '3': true, '4': false }, nameOf: { '4': 'Bo Horvat' } },
+      cfg,
+    );
+    expect(v.error).toMatch(/^Bo Horvat isn't listed IR or LTIR/);
   });
 });

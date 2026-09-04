@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { ROW_META, ROW_NAME } from '@/components/phoneRowScale';
 import { Mug } from '@/components/roster/Mug';
 import type { MugPlayer } from '@/components/roster/headshot';
 import { CitrusLogo } from '@/components/icons/CitrusIcons';
@@ -23,6 +24,7 @@ import {
   type NotificationKind,
   type ToastStatus,
 } from './notificationKind';
+import { useNotificationCards } from './useNotificationCards';
 
 /**
  * The Citrus notification surface — a top-of-screen status card, not the
@@ -46,6 +48,31 @@ import {
  * every existing `toast({ title, description })` call site renders a title
  * and a description exactly as it did — pinned by
  * __tests__/CitrusToaster.test.tsx, which is the test that protects them.
+ *
+ * WHO FIRES THE RICH CARD (2026-09-03). Nobody did: a day after it shipped,
+ * no call site in the app passed `kind: 'player'` or `kind: 'move'`. The
+ * store the Navbar keeps subscribed for the active league was delivering
+ * ADD / DROP / TRADE rows with a player id and a name in their metadata, and
+ * they were painted only on the matchup page's rail. `useNotificationCards`
+ * (mounted below) is the bridge: a fresh row becomes a card, and the face
+ * is enriched by id after the card is already on screen. The mapping from
+ * row to card is `notificationCard.ts`, which is where the pill vocabulary
+ * and the "which events get a face" rule live.
+ *
+ * TYPE SITS ON THE PHONE ROW LADDER (`src/components/phoneRowScale.ts`):
+ * the name is ROW_NAME (15px) and the meta line ROW_META (12px), the same
+ * rungs the roster row and the matchup card climb, so a card announcing a
+ * player looks like the row that player lives on. The pill and the mark are
+ * 10px, the MICRO rung. There is no HEADLINE number on a notification.
+ *
+ * DISMISS IS THUMB-REACHABLE. The card sits at the TOP of a 393x852 phone,
+ * which is the one place a thumb does not go. So the whole card is the
+ * dismiss target: tap anywhere, or swipe up. The named close button stays
+ * for the keyboard and the screen reader, and its hit box is 36px, not the
+ * 24px the scaffold shipped. Radix suppresses the click that follows a
+ * swipe with a one-shot preventDefault (react-toast 1.2.15, the pointer-up
+ * handler), which is why the tap handler honours `defaultPrevented`: a
+ * cancelled swipe must not read as a tap.
  */
 
 /** The subset of a `ToasterToast` this file actually paints. */
@@ -139,7 +166,10 @@ function CitrusToastCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             {headline != null && (
-              <ToastPrimitives.Title className="min-w-0 flex-1 truncate font-varsity text-[15px] font-black leading-tight text-pastel-cream">
+              <ToastPrimitives.Title
+                data-testid="citrus-toast-headline"
+                className={cn(ROW_NAME, 'min-w-0 flex-1 text-pastel-cream')}
+              >
                 {headline}
               </ToastPrimitives.Title>
             )}
@@ -151,14 +181,19 @@ function CitrusToastCard({
                 // throws on one — a bad `at` must cost a timestamp, not the
                 // whole notification.
                 dateTime={Number.isFinite(stamp) ? new Date(stamp).toISOString() : undefined}
-                className="shrink-0 font-jbmono text-[12px] leading-none tabular-nums text-white/55"
+                // The META rung too, composed rather than restated as 12px, so
+                // the time and the meta line cannot drift apart by one pixel.
+                className={cn(ROW_META, 'shrink-0 font-jbmono tabular-nums text-white/55')}
               >
                 {relativeTime(stamp)}
               </time>
             )}
           </div>
           {secondary != null && (
-            <ToastPrimitives.Description className="mt-1 truncate text-[12px] leading-snug text-white/55">
+            <ToastPrimitives.Description
+              data-testid="citrus-toast-meta"
+              className={cn(ROW_META, 'mt-1 truncate font-display text-white/55')}
+            >
               {secondary}
             </ToastPrimitives.Description>
           )}
@@ -203,6 +238,10 @@ function CitrusToastCard({
 export function CitrusToaster() {
   const { toasts } = useToast();
 
+  // The realtime bridge (see the header). A hook rather than a sibling
+  // component so App.tsx keeps mounting exactly one thing for notifications.
+  useNotificationCards();
+
   // Read once. The toaster mounts at the App root and never unmounts, so a
   // per-render read would cost a matchMedia call on every toast for a
   // setting that effectively never changes mid-session.
@@ -214,20 +253,31 @@ export function CitrusToaster() {
     // --radix-toast-swipe-*-y, which is why TOAST_SWIPE_CLASSES translates
     // on Y where the shadcn scaffold translates on X.
     <ToastPrimitives.Provider swipeDirection="up">
-      {toasts.map(({ id, title, description, action, kind, player, meta, status, at, variant, className, ...props }) => {
+      {toasts.map(({ id, title, description, action, kind, player, meta, status, at, variant, className, onOpenChange, ...props }) => {
         const resolved = resolveKind(kind, variant);
         return (
           <ToastPrimitives.Root
             key={id}
             data-testid="citrus-toast"
             data-kind={resolved}
+            onOpenChange={onOpenChange}
+            // Tap anywhere to dismiss (thumb-reachable, see the header). The
+            // same path the close button takes: onOpenChange(false) is what
+            // the hook's dismiss listens for. A click that reaches here from
+            // the close button dismisses twice, and the second is a no-op.
+            onClick={(event) => {
+              if (event.defaultPrevented) return;
+              onOpenChange?.(false);
+            }}
             className={cn(
               // Glass tile. bg-pastel-surface-tile/95 + backdrop-blur over
               // border-white/10 — NOT bg-white/40..84, which composites to a
               // mid-grey on #0F1F15 where neither cream nor dark text reaches
               // 4.5:1 (darkThemeContrastGuard pins that range).
               'pointer-events-auto relative w-full overflow-hidden rounded-2xl border border-white/10',
-              'bg-pastel-surface-tile/95 p-3 pr-9 backdrop-blur',
+              // pr-10: the close button below is 36px wide and sits 4px in
+              // from the right edge, so the text column ends where it starts.
+              'bg-pastel-surface-tile/95 p-3 pr-10 backdrop-blur',
               'shadow-[0_18px_50px_-20px_rgba(0,0,0,0.75)] transition-all',
               TOAST_SWIPE_CLASSES,
               // Reduced motion drops the enter/exit classes ENTIRELY rather
@@ -256,7 +306,9 @@ export function CitrusToaster() {
               // appeared on hover — unreachable on a phone, unnameable to a
               // screen reader. Always visible, always named.
               aria-label="Dismiss notification"
-              className="absolute right-2 top-2 rounded-md p-1 text-white/55 transition-colors hover:bg-pastel-surface-high hover:text-pastel-cream focus:outline-none focus:ring-2 focus:ring-pastel-sage/60"
+              // 16px glyph + 10px padding a side = a 36px target, up from the
+              // 24px (h-4 + p-1) the scaffold shipped in the far corner.
+              className="absolute right-1 top-1 rounded-md p-2.5 text-white/55 transition-colors hover:bg-pastel-surface-high hover:text-pastel-cream focus:outline-none focus:ring-2 focus:ring-pastel-sage/60"
             >
               <X className="h-4 w-4" aria-hidden="true" />
             </ToastPrimitives.Close>

@@ -122,9 +122,15 @@ describe('reconcileOnResync (path 2)', () => {
         kind: 'auction_bid_placed',
         seq: 1,
         timestamp: 'x',
+        // 'idem-1' ON PURPOSE: it is the map's only key, so this event
+        // WOULD be reconciled if the kind gate ever went away. Any other
+        // value would let the test pass on a key miss instead, and stop
+        // proving the thing its name claims.
+        correlationId: 'idem-1',
         nominationId: 'nom-1',
-        teamId: 'team-1',
+        bidderTeamId: 'team-1',
         bidAmount: 25,
+        clockDeadline: 'x',
       },
     ];
     const after = reconcileOnResync(map, events);

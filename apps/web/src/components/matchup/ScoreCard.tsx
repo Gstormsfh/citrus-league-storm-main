@@ -32,6 +32,18 @@ interface ScoreCardProps {
   myTeamExpectedFinal?: number;
   opponentTeamExpectedFinal?: number;
   /**
+   * The finals are still being COMPUTED - the week's projections are in
+   * flight - as opposed to deliberately absent (a settled week, a dormant
+   * schedule, a bye). True only for the first, so the card can hold the
+   * line's height open instead of growing under the reader when the numbers
+   * land: `proj 112.4` is a 10px line per side, and the card sits above the
+   * day strip and the entire lineup, all of which used to jump down with it.
+   *
+   * Default false, so a caller that does not know keeps today's behaviour:
+   * no reserved space, and the same shift it always had.
+   */
+  expectedFinalsPending?: boolean;
+  /**
    * Win chance for the LEFT team, 0–100, from the same computation. When
    * omitted the card derives one from the finals / games-left it has —
    * never from the share of points scored so far, which is not a
@@ -108,6 +120,23 @@ const GamesLeftChip = ({ count, own = false }: { count: number; own?: boolean })
   </span>
 );
 
+/**
+ * The same box with nothing in it: `visibility: hidden` keeps the line's
+ * height while the projections are still loading, so the score column is
+ * the height it will BE. `aria-hidden` because there is nothing to read,
+ * and the widest realistic string ("proj 000.0") so the column never
+ * changes width either.
+ */
+const ProjectedFinalSlot = ({ className }: { className: string }) => (
+  <div
+    aria-hidden="true"
+    data-testid="projected-final-slot"
+    className={`font-jbmono tabular-nums leading-none whitespace-nowrap invisible ${className}`}
+  >
+    proj 000.0
+  </div>
+);
+
 /** "proj 112.4" — projected final under a score. Caller sets the size. */
 const ProjectedFinal = ({ value, className }: { value: number; className: string }) => (
   <div className={`font-jbmono text-white/55 tabular-nums leading-none whitespace-nowrap ${className}`}>
@@ -130,6 +159,7 @@ export const ScoreCard = ({
   opponentTeamProjection = 0,
   myTeamExpectedFinal,
   opponentTeamExpectedFinal,
+  expectedFinalsPending = false,
   winProbability: winProbabilityProp,
   matchupId,
   simulationPerspective,
@@ -228,13 +258,17 @@ export const ScoreCard = ({
           <div className="flex items-start gap-2 flex-shrink-0">
             <div className="flex flex-col items-center gap-0.5">
               <div className={`font-varsity text-2xl tabular-nums leading-8 ${isWinning ? 'text-pastel-sage' : 'text-white/70'}`}>{myTeamPoints}</div>
-              {hasExpectedFinals && <ProjectedFinal value={myTeamExpectedFinal} className="text-[10px]" />}
+              {hasExpectedFinals
+                ? <ProjectedFinal value={myTeamExpectedFinal} className="text-[10px]" />
+                : expectedFinalsPending && <ProjectedFinalSlot className="text-[10px]" />}
               {showsGamesLeft(myTeamGamesRemaining) && <GamesLeftChip count={myTeamGamesRemaining} own={isOwnTeam} />}
             </div>
             <span className="text-xs text-white/55 font-bold leading-8">vs</span>
             <div className="flex flex-col items-center gap-0.5">
               <div className={`font-varsity text-2xl tabular-nums leading-8 ${isLosing ? 'text-pastel-sage' : 'text-white/70'}`}>{opponentTeamPoints}</div>
-              {hasExpectedFinals && <ProjectedFinal value={opponentTeamExpectedFinal} className="text-[10px]" />}
+              {hasExpectedFinals
+                ? <ProjectedFinal value={opponentTeamExpectedFinal} className="text-[10px]" />
+                : expectedFinalsPending && <ProjectedFinalSlot className="text-[10px]" />}
               {showsGamesLeft(opponentTeamGamesRemaining) && <GamesLeftChip count={opponentTeamGamesRemaining} />}
             </div>
           </div>
@@ -298,12 +332,16 @@ export const ScoreCard = ({
             </div>
             <div className="text-center">
               <div className={`font-varsity text-6xl tabular-nums ${isWinning ? 'text-pastel-sage' : 'text-white/70'}`}>{myTeamPoints}</div>
-              {hasExpectedFinals && <ProjectedFinal value={myTeamExpectedFinal} className="mt-1 text-[11px]" />}
+              {hasExpectedFinals
+                ? <ProjectedFinal value={myTeamExpectedFinal} className="mt-1 text-[11px]" />
+                : expectedFinalsPending && <ProjectedFinalSlot className="mt-1 text-[11px]" />}
             </div>
             <div className="w-1 h-20 border-l-2 border-dashed border-white/10"></div>
             <div className="text-center">
               <div className={`font-varsity text-6xl tabular-nums ${isLosing ? 'text-pastel-sage' : 'text-white/70'}`}>{opponentTeamPoints}</div>
-              {hasExpectedFinals && <ProjectedFinal value={opponentTeamExpectedFinal} className="mt-1 text-[11px]" />}
+              {hasExpectedFinals
+                ? <ProjectedFinal value={opponentTeamExpectedFinal} className="mt-1 text-[11px]" />
+                : expectedFinalsPending && <ProjectedFinalSlot className="mt-1 text-[11px]" />}
             </div>
           </div>
 

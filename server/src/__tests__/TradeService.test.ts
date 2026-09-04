@@ -225,12 +225,32 @@ describe('TradeService', () => {
   });
 
   describe('commissionerDecision', () => {
+    /**
+     * T4 (2026-09-03): the trade used to be selected by id alone, with no status
+     * guard, so approve or veto acted on trades that were already rejected,
+     * cancelled, expired or executed. On production 2026-09-03 that is 18 of the
+     * 23 trade_offers rows (15 cancelled, 1 rejected, 1 vetoed, 1 expired). The
+     * sharp form: a commissioner who is also one of the two trading teams
+     * forcing through a deal the other side explicitly rejected.
+     */
+    const tradeRow = (status: string, leagueId = 'league-1') => ({
+      league_id: leagueId,
+      from_team_id: 'team-1',
+      to_team_id: 'team-2',
+      offered_player_ids: [100],
+      requested_player_ids: [200],
+      status,
+    });
+
+    const withTrade = (row: unknown) => vi.fn((table: string) => {
+      if (table === 'leagues') return createChain({ data: { commissioner_id: 'commish-1' }, error: null });
+      if (table === 'trade_offers') return createChain({ data: row, error: null });
+      if (table === 'teams') return createChain({ data: null, error: null });
+      return createChain({ data: null, error: null });
+    });
+
     it('vetoes a trade', async () => {
-      mockSupabase.from = vi.fn((table: string) => {
-        if (table === 'leagues') return createChain({ data: { commissioner_id: 'commish-1' }, error: null });
-        if (table === 'teams') return createChain({ data: null, error: null });
-        return createChain({ error: null });
-      });
+      mockSupabase.from = withTrade(tradeRow('under_review'));
       mockSupabase.rpc = vi.fn().mockResolvedValue({ data: null, error: null });
 
       const result = await service.commissionerDecision('trade-1', 'league-1', 'veto', 'commish-1');
@@ -238,20 +258,7 @@ describe('TradeService', () => {
     });
 
     it('approves and executes via RPC', async () => {
-      mockSupabase.from = vi.fn((table: string) => {
-        if (table === 'leagues') return createChain({ data: { commissioner_id: 'commish-1' }, error: null });
-        if (table === 'trade_offers') return createChain({
-          data: {
-            league_id: 'league-1',
-            from_team_id: 'team-1',
-            to_team_id: 'team-2',
-            offered_player_ids: [100],
-            requested_player_ids: [200],
-          },
-          error: null,
-        });
-        return createChain({ data: null, error: null });
-      });
+      mockSupabase.from = withTrade(tradeRow('under_review'));
       mockSupabase.rpc = vi.fn().mockResolvedValue({ data: { success: true }, error: null });
 
       const result = await service.commissionerDecision('trade-1', 'league-1', 'approve', 'commish-1');
@@ -261,6 +268,47 @@ describe('TradeService', () => {
         p_from_team_id: 'team-1',
         p_to_team_id: 'team-2',
       }));
+      expect(result.success).toBe(true);
+    });
+
+    it('refuses to approve a trade the recipient already rejected', async () => {
+      mockSupabase.from = withTrade(tradeRow('rejected'));
+      mockSupabase.rpc = vi.fn().mockResolvedValue({ data: { success: true }, error: null });
+
+      const result = await service.commissionerDecision('trade-1', 'league-1', 'approve', 'commish-1');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('already rejected');
+      // No rosters moved.
+      expect(mockSupabase.rpc).not.toHaveBeenCalled();
+    });
+
+    it('refuses to veto a trade that was already cancelled', async () => {
+      mockSupabase.from = withTrade(tradeRow('cancelled'));
+      mockSupabase.rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+
+      const result = await service.commissionerDecision('trade-1', 'league-1', 'veto', 'commish-1');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('already cancelled');
+      expect(mockSupabase.rpc).not.toHaveBeenCalled();
+    });
+
+    it('refuses when the trade belongs to a different league than the one authorised', async () => {
+      // requireCommissioner was checked against the body's leagueId. If the
+      // trade lives somewhere else, that check proved nothing about this trade.
+      mockSupabase.from = withTrade(tradeRow('pending', 'league-2'));
+      mockSupabase.rpc = vi.fn().mockResolvedValue({ data: { success: true }, error: null });
+
+      const result = await service.commissionerDecision('trade-1', 'league-1', 'approve', 'commish-1');
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('does not belong to this league');
+      expect(mockSupabase.rpc).not.toHaveBeenCalled();
+    });
+
+    it('still acts on a plain pending trade in a review-type = none league', async () => {
+      mockSupabase.from = withTrade(tradeRow('pending'));
+      mockSupabase.rpc = vi.fn().mockResolvedValue({ data: { success: true }, error: null });
+
+      const result = await service.commissionerDecision('trade-1', 'league-1', 'approve', 'commish-1');
       expect(result.success).toBe(true);
     });
   });
@@ -284,6 +332,36 @@ describe('TradeService', () => {
       const result = await service.submitTradeVote('trade-1', 'team-1', 'approve');
       expect(result.success).toBe(false);
       expect(result.error).toBe('Already voted');
+    });
+
+    /**
+     * submit_trade_vote is RETURNS TABLE(success, message, ...): supabase-js
+     * hands back an array of rows, and the RPC reports its own refusals in
+     * row.success / row.message rather than in `error`. Reading neither made
+     * every refusal look like a recorded vote - including the team-ownership
+     * refusal added on 2026-09-03 (T3), which would have been silently useless.
+     */
+    it('reports the RPC refusal row as a failure, not a phantom success', async () => {
+      mockSupabase.rpc = vi.fn().mockResolvedValue({
+        data: [{ success: false, message: 'You can only vote as a team you own', veto_count: 0, approve_count: 0, votes_needed: 0, is_vetoed: false }],
+        error: null,
+      });
+
+      const result = await service.submitTradeVote('trade-1', 'someone-elses-team', 'veto');
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('You can only vote as a team you own');
+    });
+
+    it('reads counts out of the row array the RPC actually returns', async () => {
+      mockSupabase.rpc = vi.fn().mockResolvedValue({
+        data: [{ success: true, message: 'Vote recorded', veto_count: 2, approve_count: 1, votes_needed: 3, is_vetoed: false }],
+        error: null,
+      });
+
+      const result = await service.submitTradeVote('trade-1', 'team-1', 'veto');
+      expect(result.success).toBe(true);
+      expect(result.vetoCount).toBe(2);
+      expect(result.votesNeeded).toBe(3);
     });
   });
 

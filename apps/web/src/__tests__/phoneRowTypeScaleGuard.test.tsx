@@ -49,7 +49,7 @@ import {
   ROW_MICRO,
   ROW_NAME,
 } from '@/components/phoneRowScale';
-import { FA_NAME, FA_PROJ, FA_RANK, FA_SUB } from '@/components/freeagents/freeAgentRow';
+import { FA_NAME, FA_PROJ, FA_RANK, FA_SUB } from '@/components/freeagents/freeAgentRowKit';
 import { FreeAgentRow } from '@/components/freeagents/FreeAgentRow';
 import MobileRosterList from '@/components/roster/MobileRosterList';
 import type { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';

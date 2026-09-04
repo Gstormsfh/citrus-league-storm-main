@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { TradeService } from '../services/TradeService';
+import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { SeasonStateService } from '../services/SeasonStateService';
 import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
@@ -222,9 +223,47 @@ tradeRoutes.post('/:tradeId/vote', validateBody(schemas.tradeVote), async (c) =>
   const service = new TradeService(supabase);
 
   const access = await service.verifyTradeAccess(tradeId, userId);
-  if (access.error) return fail(c, AppError.forbidden(access.error));
+  if (access.error || !access.leagueId) {
+    return fail(c, AppError.forbidden(access.error || 'Trade not found'));
+  }
 
-  const result = await service.submitTradeVote(tradeId, String(body.voterTeamId), body.vote);
+  // T3 (2026-09-03) - TRADE VOTE SPOOFING.
+  //
+  // body.voterTeamId used to be handed straight to submit_trade_vote. That RPC
+  // is SECURITY DEFINER, so the trade_votes_insert RLS policy (voter_team_id
+  // must be a team the caller owns) never ran against its INSERT, and the
+  // INSERT is ON CONFLICT (trade_offer_id, voter_team_id) DO UPDATE. Any league
+  // member could therefore cast a vote as every other team, and overwrite votes
+  // those managers had already cast - enough to veto any trade single-handed.
+  //
+  // The RPC now enforces ownership itself (migration 20260903232000), which is
+  // the check that matters, because EXECUTE is granted to `authenticated` and a
+  // browser can call the RPC directly without ever reaching this handler. This
+  // check is the second layer: it turns a silent refusal into a 403 that says
+  // what went wrong, and it means the server never forwards a team id it has
+  // not verified.
+  //
+  // getUserTeamIdFresh is the F14 canonical resolver: it always issues a direct
+  // teams query and never touches the membership cache, because team ownership
+  // is identity-critical.
+  const membership = new LeagueMembershipService(supabase);
+  const ownTeamId = await membership.getUserTeamIdFresh(access.leagueId, userId);
+  if (!ownTeamId) {
+    return fail(c, AppError.forbidden('You do not own a team in this league'));
+  }
+  if (String(body.voterTeamId) !== ownTeamId) {
+    logger.warn('[trades] vote rejected - voterTeamId is not the caller team', {
+      tradeId,
+      leagueId: access.leagueId,
+      requestedTeamId: String(body.voterTeamId),
+    });
+    return fail(c, AppError.forbidden('You can only vote as a team you own'));
+  }
+
+  // Deliberately the resolved id, not the body value: the two are now known to
+  // be equal, and passing the verified one means a future edit to the check
+  // cannot leave an unverified id flowing to the RPC.
+  const result = await service.submitTradeVote(tradeId, ownTeamId, body.vote);
   if (!result.success) {
     return fail(c, AppError.badRequest(typeof result.error === 'string' ? result.error : 'Vote failed'));
   }

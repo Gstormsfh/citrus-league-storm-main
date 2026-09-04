@@ -31,7 +31,7 @@ import {
   sortByProjection,
   statusChipFor,
   waiverClearsLabel,
-} from '../freeAgentRow';
+} from '../freeAgentRowKit';
 import type { NHLGame } from '@/services/ScheduleService';
 
 const TODAY = '2026-09-01';
@@ -191,7 +191,16 @@ describe('FreeAgentRow — the button says which transaction the tap is', () => 
   it('claim: W, and WHEN it clears', () => {
     row({
       action: 'claim',
-      player: player({ is_on_waivers: true, waiver_clears_at: '2026-09-03T09:00:00.000Z' }),
+      // Relative, not a literal. waiverClearsLabel prints a WEEKDAY inside its
+      // 0-6 day window and a month/day date outside it, and it defaults `now`
+      // to the wall clock. The literal this used to carry (2026-09-03T09:00Z)
+      // put the branch on the far side of a real morning: this suite went green
+      // to red at 09:00 UTC that day with no code change at all. Two days out
+      // always lands in the weekday branch.
+      player: player({
+        is_on_waivers: true,
+        waiver_clears_at: new Date(Date.now() + 2 * 86_400_000).toISOString(),
+      }),
     });
     const btn = screen.getByTestId('fa-action');
     expect(within(btn).getByText('W')).toBeTruthy();

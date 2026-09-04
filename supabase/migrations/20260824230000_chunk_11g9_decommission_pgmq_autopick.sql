@@ -40,6 +40,52 @@
 --  Until step 4, prod keeps the pgmq path. That is deliberate.
 --
 -- =====================================================================
+--  ADDENDUM 2026-09-03 (read-only verification against prod, same day)
+-- =====================================================================
+--
+--  The gating fact above has changed. Production now has its own engine:
+--  citrus-draft-engine-prod (deploy-engine.yml), reached at
+--  wss://draft.citrusfantasysports.com, which is in the prod CSP
+--  connect-src (apps/web/firebase.json) and is the DRAFT_WS_HOST the
+--  production API is deployed with (production-deploy.yml). Steps 1-3 of
+--  the order above are done. Step 4 (apply here) is now unblocked,
+--  subject to the deploy-order rule below.
+--
+--  What the pgmq path did while it stayed live, from draft_metrics:
+--
+--    2026-08-21  league f548834a  draftType=auction
+--                safety_net_hit 83, Edge autopick_fired 42
+--    2026-09-01  league a1a125c8  draftType=auction
+--                safety_net_hit 105 (first at 17:17:35Z, 72s after the
+--                engine's uuid-cast stall at 17:16:23Z), Edge
+--                autopick_fired 53 over the next 2h36m
+--
+--  The Edge worker has no notion of draft format. reconstruct_draft_state
+--  and submit_pick_v2 are snake semantics, so on both dates it "finished"
+--  an auction draft as a snake draft, one pick every ~3 minutes, until
+--  the league read completed. That is the second half of why the auction
+--  tests looked broken: the engine stall was the first half (fixed in
+--  LobbyManager.ts, close idempotency key), and this path was the second.
+--  It also fired 48 times on the 2026-08-31 snake league aaaa1111...d3b0,
+--  which says the engine's own autopick was not holding that clock either;
+--  that is a separate finding for the engine, not a reason to keep this.
+--
+--  Live body check: pg_get_functiondef(draft_deadline_sweep) on prod today
+--  is md5 edcd02ced675ff61d5b685e8ccbd6022, identical to the 2026-08-24
+--  body this file was authored against (capture:
+--  captures/2026-09-03_pre_chunk_11g9_decommission_pgmq_autopick.sql).
+--  Queue state today: 0 live messages, 307 archived, 0 leagues
+--  in_progress, wrapper RPCs already absent on prod.
+--
+--  DEPLOY ORDER FOR PROD, unchanged in spirit: redeploy the prod engine
+--  from a build that contains server/src/draft/orphanedDraftScanner.ts
+--  (present since 2026-08-24, so any current master build qualifies)
+--  and the auction close fix, THEN apply steps 1-3 of this file, THEN
+--  run the auction test. Applying before the redeploy leaves a window
+--  with neither safety net; testing an auction before applying repeats
+--  2026-09-01.
+--
+-- =====================================================================
 
 -- Chunk 11g.9: decommission the pgmq autopick path.
 --

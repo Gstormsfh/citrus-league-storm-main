@@ -30,6 +30,7 @@ import { waiverApi } from '@/api/waivers';
 import Navbar from '@/components/Navbar';
 import MobileMenuButton from '@/components/MobileMenuButton';
 import { LeagueTimelineCard } from '@/components/dashboard/LeagueTimelineCard';
+import { FEATURE_PRACTICE_DRAFT } from '@/lib/featureFlags';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -330,7 +331,7 @@ const LeagueDashboard = () => {
       
       if (simError) {
         logger.error('handleSimulateFill: Error from simulateLeagueFill:', simError);
-        const errorMessage = (simError as Error).message || JSON.stringify(simError) || 'Failed to simulate teams';
+        const errorMessage = userMessage(simError, "Couldn't create the simulated teams. Try again in a moment.");
         toast({
           title: 'Error Creating Teams',
           description: errorMessage,
@@ -410,17 +411,23 @@ const LeagueDashboard = () => {
     if (activeSettingsTab === 'rosters' && leagueId && teams.length > 0) {
       const loadRosterCounts = async () => {
         setLoadingRosterCounts(true);
+        // PERF (2026-09-04): one /roster/player-ids request per team, awaited
+        // in series — a 12-team league paid twelve round trips to fill twelve
+        // independent counters. Nothing here reads a previous response, so
+        // they all go out at once.
+        const entries = await Promise.all(
+          teams.map(async (team) => {
+            try {
+              const response = await rosterApi.getPlayerIds(leagueId, team.id);
+              const playerIds = (response.data || []) as unknown[];
+              return [team.id, playerIds.length] as const;
+            } catch {
+              return [team.id, 0] as const;
+            }
+          }),
+        );
         const counts: Record<string, number> = {};
-        
-        for (const team of teams) {
-          try {
-            const response = await rosterApi.getPlayerIds(leagueId, team.id);
-            const playerIds = (response.data || []) as unknown[];
-            counts[team.id] = playerIds.length;
-          } catch {
-            counts[team.id] = 0;
-          }
-        }
+        for (const [teamId, count] of entries) counts[teamId] = count;
         
         setRosterCounts(counts);
         setLoadingRosterCounts(false);
@@ -448,7 +455,7 @@ const LeagueDashboard = () => {
           { waiver_process_time, waiver_period_hours, waiver_game_lock, waiver_type, allow_trades_during_games }
         );
         saved = success;
-        errorMessage = (saveError as Error)?.message || 'Failed to save waiver settings';
+        errorMessage = userMessage(saveError, "Couldn't save the waiver settings. Try again in a moment.");
 
         // Also persist transaction limits + FAAB budget into JSONB settings column
         if (saved) {
@@ -476,7 +483,7 @@ const LeagueDashboard = () => {
           draftSettings
         );
         saved = success;
-        errorMessage = (saveError as Error)?.message || 'Failed to save draft settings';
+        errorMessage = userMessage(saveError, "Couldn't save the draft settings. Try again in a moment.");
       } else if (activeSettingsTab === 'trades') {
         const { success, error: tradeErr } = await TradeService.updateTradeReviewSettings(
           leagueId,
@@ -492,7 +499,7 @@ const LeagueDashboard = () => {
           keeperSettings
         );
         saved = success;
-        errorMessage = (keeperErr as Error)?.message || 'Failed to save keeper settings';
+        errorMessage = userMessage(keeperErr, "Couldn't save the keeper settings. Try again in a moment.");
       } else if (activeSettingsTab === 'categories') {
         const { success, error: catErr } = await LeagueService.updateCategorySettings(
           leagueId,
@@ -500,7 +507,7 @@ const LeagueDashboard = () => {
           categorySettings
         );
         saved = success;
-        errorMessage = (catErr as Error)?.message || 'Failed to save category settings';
+        errorMessage = userMessage(catErr, "Couldn't save the category settings. Try again in a moment.");
       } else if (activeSettingsTab === 'rosterslots') {
         const { success, error: slotErr } = await LeagueService.updateRosterSlotSettings(
           leagueId,
@@ -508,7 +515,7 @@ const LeagueDashboard = () => {
           rosterSlotSettings
         );
         saved = success;
-        errorMessage = (slotErr as Error)?.message || 'Failed to save roster slot settings';
+        errorMessage = userMessage(slotErr, "Couldn't save the roster slot settings. Try again in a moment.");
       } else if (activeSettingsTab === 'playoffs') {
         // Save playoff settings into the JSONB settings column
         const leagueResponse = await leagueApi.getLeague(leagueId);
@@ -1781,6 +1788,35 @@ const LeagueDashboard = () => {
                     <p className="text-xs text-white/55 mt-2 text-center">
                       You'll be able to participate once the commissioner starts the draft
                     </p>
+                  )}
+                  {/* THE RITUAL (2026-09-03, Sleeper-gap 4). A mock draft is how a
+                      league learns to draft before the real night, so the entry
+                      sits in the same card as the real action: a tertiary ghost
+                      under it, never a second orange verb (DESIGN_DIRECTION.md
+                      rule 3), and only while the draft has not started. Once the
+                      room is live the only thing to do here is join it.
+
+                      It goes to the client-side Mock Draft Simulator on
+                      /armchair-gm (React state only, one player read, no league
+                      writes), which is the one practice surface that exists.
+                      The T15 throwaway-league mode is design-only; see
+                      lib/featureFlags.ts for what this flag does and does not
+                      gate. The sentence under the button is load-bearing: a
+                      manager must never wonder whether a practice pick counted. */}
+                  {FEATURE_PRACTICE_DRAFT && league.draft_status === 'not_started' && (
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <Button
+                        asChild
+                        className="w-full h-10 normal-case font-sans tracking-normal text-sm bg-transparent border border-pastel-cream/25 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold rounded-xl"
+                      >
+                        <Link to="/armchair-gm?tab=mockdraft">
+                          <DraftIcon className="mr-1.5 h-4 w-4" strokeWidth={2} aria-hidden="true" /> Run a mock draft
+                        </Link>
+                      </Button>
+                      <p className="text-xs text-white/55 mt-2 text-center">
+                        Practice your picks against the computer. Nothing there touches this league.
+                      </p>
+                    </div>
                   )}
                 </CardContent>
               </Card>

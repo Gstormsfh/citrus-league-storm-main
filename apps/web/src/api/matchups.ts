@@ -184,7 +184,10 @@ export const matchupApi = {
 
   /** Batch: get all frozen roster entries for a matchup across multiple dates */
   getFrozenRosterBatch(matchupId: string, dates: string[]) {
-    const key = `matchups:frozen-batch:${matchupId}:${dates.sort().join(',')}`;
+    // Copy before sorting: `Array.prototype.sort` mutates in place, and the
+    // caller (Matchup.tsx's week-roster preload) keeps using the same array
+    // afterwards to index the response by date.
+    const key = `matchups:frozen-batch:${matchupId}:${[...dates].sort().join(',')}`;
     return cached(
       key,
       () => apiClient.post(`/api/matchups/${matchupId}/frozen-roster-batch`, { dates }),

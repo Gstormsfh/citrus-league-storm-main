@@ -52,6 +52,14 @@ export default defineConfig(({ mode }) => ({
     react(),
     removeCrossorigin(),
     VitePWA({
+      // No service worker inside the iOS shell. Capacitor serves dist straight
+      // from the .ipa, so there is nothing to cache for offline use, and a
+      // worker's precache is a stale-asset risk across builds: it stores one
+      // build's hashed assets and can keep serving them after an App Store
+      // update has replaced the files underneath. scripts/build-native.mjs
+      // sets VITE_NATIVE=1 and asserts that dist carries no sw.js /
+      // registerSW.js afterwards. Web builds are untouched.
+      disable: process.env.VITE_NATIVE === '1',
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "favicon.ico", "apple-touch-icon.png", "loading-citrus.png"],
       manifest: false, // Use existing public/manifest.json
@@ -126,6 +134,12 @@ export default defineConfig(({ mode }) => ({
             // Firebase — separate chunk (analytics/hosting, not needed on every page)
             if (id.includes('firebase') || id.includes('@firebase')) {
               return 'vendor-firebase';
+            }
+            // Sentry — loaded lazily by initSentry(). Without its own chunk it
+            // rides in the eager `vendor` bundle and the lazy import buys nothing
+            // (+164 kB gzip on first paint for code that only runs on an error).
+            if (id.includes('@sentry')) {
+              return 'vendor-sentry';
             }
             // Radix UI — separate chunk (UI primitives, loaded with first interaction)
             if (id.includes('@radix-ui')) {

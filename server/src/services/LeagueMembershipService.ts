@@ -44,6 +44,25 @@ const membershipCache = new Map<string, {
 
 const CACHE_TTL = 30000;
 
+/**
+ * Hard cap on membership-cache entries, with oldest-first eviction.
+ *
+ * MEMORY (2026-09-04 load audit) — before this, the map was write-only:
+ * entries were checked for expiry on READ but never deleted, so a key was
+ * born on the first request for a (league, user) pair and lived for the
+ * lifetime of the Cloud Run instance. Cloud Run runs this service at
+ * min-instances=1 with no CPU throttling, so an instance can stay warm for
+ * days and the map only ever grows — one entry per league per member who
+ * touched it, plus one per commissioner probe.
+ *
+ * The size is not alarming on its own (a 12-team league contributes ~12
+ * keys), but "grows forever and is never pruned" is a defect regardless of
+ * the constant, and it is one line to close. 20,000 entries covers ~1,600
+ * twelve-team leagues of simultaneously-active members, well past the
+ * Sept-29 shape, and bounds the map at roughly 2 MB.
+ */
+const CACHE_MAX_ENTRIES = 20_000;
+
 function getCacheKey(leagueId: string, userId: string): string {
   return `${leagueId}:${userId}`;
 }
@@ -63,8 +82,15 @@ export class LeagueMembershipService {
     // Check cache
     const key = getCacheKey(leagueId, userId);
     const cached = membershipCache.get(key);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      return cached.result;
+    if (cached) {
+      if (Date.now() - cached.timestamp < CACHE_TTL) {
+        return cached.result;
+      }
+      // Expired — drop it now rather than leaving a dead entry behind. The
+      // fresh value is written below; deleting first also re-inserts this
+      // key at the end of the Map, keeping insertion order ~= recency for
+      // the eviction below.
+      membershipCache.delete(key);
     }
 
     try {
@@ -98,6 +124,13 @@ export class LeagueMembershipService {
         isCommissioner,
       };
 
+      if (membershipCache.size >= CACHE_MAX_ENTRIES) {
+        // Map iteration order is insertion order, and every refresh deletes
+        // before re-inserting, so the first key is the least recently
+        // refreshed. O(1) — no scan.
+        const oldestKey = membershipCache.keys().next().value;
+        if (oldestKey !== undefined) membershipCache.delete(oldestKey);
+      }
       membershipCache.set(key, { result, timestamp: Date.now() });
       return result;
     } catch (error) {

@@ -105,6 +105,28 @@ jobs:
             python data-pipeline/monitoring/check_data_invariants.py 2>&1 | tee /tmp/invariants.log
           fi
 
+      # critical_table_checks.py declares 14 checks (raw_shots incl. the
+      # passer_id invariant added 2026-09-03, player_game_stats,
+      # player_directory, player_gar_components, freshness xref). Until this
+      # step existed nothing invoked its main(): none of its check names had
+      # ever appeared in integrity_check_results (18,599 rows, 2026-09-03).
+      # Exit 2 (any FAIL) fails the job; exit 1 (WARN only) annotates and
+      # continues, mirroring the freshness job above.
+      - name: Run critical table checks
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CITRUS_ALERT_SLACK_WEBHOOK: ${{ secrets.CITRUS_ALERT_SLACK_WEBHOOK }}
+          CITRUS_ALERT_PAGERDUTY_KEY: ${{ secrets.CITRUS_ALERT_PAGERDUTY_KEY }}
+        shell: bash
+        run: |
+          set +e
+          python data-pipeline/monitoring/critical_table_checks.py 2>&1 | tee -a /tmp/invariants.log
+          code=${PIPESTATUS[0]}
+          set -e
+          if [ "$code" -ge 2 ]; then echo "::error::critical_table_checks FAIL"; exit "$code"; fi
+          if [ "$code" -eq 1 ]; then echo "::warning::critical_table_checks reported WARN"; fi
+
       # One row in public.ops_ci_runs (last line of the checker's output as the
       # summary) so a failed invariant reaches Claude through the Supabase MCP
       # and not only the GitHub inbox. Never fails the job.

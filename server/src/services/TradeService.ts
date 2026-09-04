@@ -4,6 +4,22 @@ import { COLUMNS, getCurrentSeason } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
 /**
+ * The only trade statuses a commissioner decision can still act on.
+ *
+ * T4 (2026-09-03): commissionerDecision selected the trade by id alone, with no
+ * status guard, so approve or veto would act on a trade that was already
+ * rejected, cancelled, expired, vetoed or executed. The sharp form is a
+ * commissioner who is also one of the two trading teams forcing through a deal
+ * the other side explicitly rejected - and with the execute_trade commissioner
+ * allowance added the same day, that path now reaches the rosters.
+ *
+ * 'pending' is the review-type = 'none' league where the commissioner steps in
+ * anyway; 'under_review' is the review workflow's own state. Everything else in
+ * trade_offers_status_check is terminal.
+ */
+const COMMISSIONER_DECIDABLE_STATUSES = ['pending', 'under_review'];
+
+/**
  * TradeService — Server-side trade management with DI Supabase client.
  *
  * Extracted from apps/web/src/services/TradeService.ts.
@@ -237,7 +253,14 @@ export class TradeService {
         await this.supabase.from('notifications').insert({
           league_id: leagueId,
           user_id: toTeam.owner_id,
-          type: 'trade_offer',
+          // TYPE (2026-09-04 TestFlight audit). Was 'trade_offer', which
+          // notifications_type_check rejects (ADD, DROP, WAIVER, TRADE,
+          // CHAT, SYSTEM only), so the 23514 came back in the `error`
+          // field this call never reads and the catch below never saw it.
+          // The recipient has not been told about a trade offer once since
+          // this shipped on 2026-08-16, which is the exact gap it was
+          // written to close.
+          type: 'TRADE',
           title: 'New Trade Offer',
           message: 'You received a trade offer. Review it in the Trade Center.',
           metadata: {
@@ -472,13 +495,39 @@ export class TradeService {
       return { success: false, error: error.message };
     }
 
-    const result = typeof data === 'string' ? JSON.parse(data) : data;
+    // submit_trade_vote is RETURNS TABLE(success, message, ...), so supabase-js
+    // hands back an ARRAY of rows and reports its own refusals in
+    // row.success / row.message rather than in `error`. The old code read
+    // neither: it reported every call that did not throw as a successful vote,
+    // which would have masked the ownership refusal added on 2026-09-03 (T3)
+    // and has always masked 'Trade is not under review', 'Cannot vote on a
+    // trade you are involved in' and 'Review period has ended' as successes.
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    const row = (Array.isArray(parsed) ? parsed[0] : parsed) as
+      | {
+          success?: boolean;
+          message?: string;
+          veto_count?: number;
+          approve_count?: number;
+          votes_needed?: number;
+          is_vetoed?: boolean;
+        }
+      | null
+      | undefined;
+
+    if (!row) {
+      return { success: false, error: 'Vote failed' };
+    }
+    if (row.success === false) {
+      return { success: false, error: row.message || 'Vote failed' };
+    }
+
     return {
       success: true,
-      vetoCount: result?.veto_count || 0,
-      approveCount: result?.approve_count || 0,
-      votesNeeded: result?.votes_needed || 0,
-      isVetoed: result?.is_vetoed || false,
+      vetoCount: row.veto_count || 0,
+      approveCount: row.approve_count || 0,
+      votesNeeded: row.votes_needed || 0,
+      isVetoed: row.is_vetoed || false,
       error: null,
     };
   }
@@ -509,11 +558,46 @@ export class TradeService {
   ) {
     await this.membership.requireCommissioner(leagueId, commissionerId);
 
+    // T4 (2026-09-03): read the trade FIRST, for both branches, and refuse
+    // unless it is still awaiting a decision. This used to be an approve-only
+    // fetch keyed on id with no status filter, so a commissioner could approve
+    // a trade the recipient had already rejected, or veto one that had already
+    // executed.
+    const { data: tradeRow, error: fetchErr } = await this.supabase
+      .from('trade_offers')
+      .select('league_id, from_team_id, to_team_id, offered_player_ids, requested_player_ids, status')
+      .eq('id', tradeId)
+      .single();
+
+    if (fetchErr || !tradeRow) {
+      return { success: false, error: 'Trade not found' };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tr = tradeRow as any;
+
+    // leagueId arrives in the request body, and requireCommissioner above was
+    // checked against it. If the trade belongs to a different league, that
+    // check proved nothing about this trade.
+    if (String(tr.league_id) !== String(leagueId)) {
+      return { success: false, error: 'Trade does not belong to this league' };
+    }
+
+    if (!COMMISSIONER_DECIDABLE_STATUSES.includes(String(tr.status))) {
+      return {
+        success: false,
+        error: `Trade is already ${tr.status}; a commissioner decision no longer applies`,
+      };
+    }
+
     if (decision === 'veto') {
+      // The .in() repeats the guard at the write, so a concurrent reject or
+      // cancel between the read above and this update cannot be overwritten.
       const { error } = await this.supabase
         .from('trade_offers')
         .update({ status: 'vetoed', processed_at: new Date().toISOString() })
-        .eq('id', tradeId);
+        .eq('id', tradeId)
+        .in('status', COMMISSIONER_DECIDABLE_STATUSES);
 
       if (!error) {
         await this.supabase.rpc('notify_league_members', {
@@ -526,19 +610,15 @@ export class TradeService {
       return { success: !error, error: error?.message };
     }
 
-    // Approve: execute the trade — fetch trade payload to pass all 6 RPC args
-    const { data: tradeRow, error: fetchErr } = await this.supabase
-      .from('trade_offers')
-      .select('league_id, from_team_id, to_team_id, offered_player_ids, requested_player_ids')
-      .eq('id', tradeId)
-      .single();
-
-    if (fetchErr || !tradeRow) {
-      return { success: false, error: 'Trade not found' };
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tr = tradeRow as any;
+    // Approve: execute the trade — all 6 args come off the row read above.
+    //
+    // RESIDUAL RACE, NOT FIXED HERE: if the recipient rejects between the read
+    // above and execute_trade returning, the rosters have already moved and the
+    // status write below is what makes the record agree with them - so it is
+    // deliberately NOT guarded by .in(). Closing the window properly means
+    // moving the trade_offers status transition inside execute_trade's
+    // transaction, which changes that RPC's contract and belongs in its own
+    // change.
     const { data: rpcData, error } = await this.supabase.rpc('execute_trade', {
       p_trade_id: tradeId,
       p_league_id: String(tr.league_id),

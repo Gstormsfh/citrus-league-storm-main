@@ -360,6 +360,62 @@ def check_raw_shots_no_orphan_player_ids(db: SupabaseRest) -> CheckResult:
                        "orphan_sample": orphans[:5]})
 
 
+# The floor below which an integer cannot be an NHL player id. Every
+# player-keyed table on production bottoms out at 8,448,208 (measured
+# 2026-09-03); NHL ids are 7 digits and climb by draft class, so a debut is
+# always ABOVE the current max, never below the floor. Team ids are 1..68.
+NHL_PLAYER_ID_FLOOR = 8_000_000
+
+
+def check_raw_shots_passer_id_is_player_id(db: SupabaseRest) -> CheckResult:
+    """Every non-null raw_shots.passer_id must be a plausible NHL player id.
+
+    Why this exists: from 2017 through 2026-09-03 the column held 63,069
+    non-null values and ZERO of them were players. All were team ids, written
+    by a fallback in data_acquisition.find_pass_before_shot that substituted
+    eventOwnerTeamId when the per-event player key was missing. Nothing
+    noticed for nine seasons because the existing checks sample player_id,
+    not passer_id, and check MOAT columns for NULL, not for validity. A wrong
+    id is worse than a NULL: it looks like data, and the player-directory job
+    dutifully asked the NHL API for /v1/player/1/landing every night.
+
+    Recent-sample scan, same shape as check_raw_shots_no_orphan_player_ids:
+    the writer is fixed, so a single offender in recent rows means the
+    fallback (or a new one) is back. Any hit is a FAIL, not a WARN, because
+    the column is upstream of the assist-chain correlation in
+    simulate_matchups and a team id there is a silent zero.
+    """
+    name = "raw_shots_passer_id_is_player_id"
+    try:
+        recent = db.select(
+            "raw_shots",
+            select="passer_id,shot_id,season",
+            filters=[("passer_id", "not.is", "null")],
+            order="created_at.desc",
+            limit=2000,
+        )
+    except Exception as e:
+        return CheckResult(name, SEVERITY_WARN, STATUS_FAIL,
+                          {"error": f"query failed: {e}"})
+    # No recent passer ids is a legitimate state (pre-season, or a run that
+    # found no passes). It is not a failure of THIS invariant.
+    if not recent:
+        return CheckResult(name, SEVERITY_WARN, STATUS_PASS,
+                          {"sampled": 0, "note": "no non-null passer_id in recent rows"})
+    bad = [r for r in recent
+           if r.get("passer_id") is not None and int(r["passer_id"]) < NHL_PLAYER_ID_FLOOR]
+    status = STATUS_PASS if not bad else STATUS_FAIL
+    return CheckResult(name, SEVERITY_WARN, status,
+                      {"sampled": len(recent),
+                       "sub_floor_count": len(bad),
+                       "floor": NHL_PLAYER_ID_FLOOR,
+                       "sub_floor_sample": [
+                           {"shot_id": r.get("shot_id"), "passer_id": r["passer_id"], "season": r.get("season")}
+                           for r in bad[:5]
+                       ],
+                       "writer": "data-pipeline/acquisition/data_acquisition.py find_pass_before_shot"})
+
+
 def check_player_game_stats_nhl_columns_populated(db: SupabaseRest) -> CheckResult:
     """nhl_goals + nhl_assists are NOT NULL by schema; this is essentially a
     regression sentinel. We additionally verify a recent sample has reasonable
@@ -552,6 +608,9 @@ CHECKS: List[CheckSpec] = [
     CheckSpec("raw_shots_no_orphan_player_ids",          SEVERITY_WARN,
               "every player_id has a player_directory entry",
               check_raw_shots_no_orphan_player_ids, "raw_shots"),
+    CheckSpec("raw_shots_passer_id_is_player_id",        SEVERITY_WARN,
+              "every non-null passer_id is >= the NHL player-id floor (not a team id)",
+              check_raw_shots_passer_id_is_player_id, "raw_shots"),
     # player_game_stats
     CheckSpec("player_game_stats_nhl_columns_populated", SEVERITY_PAGE,
               "nhl_goals/nhl_assists scoring totals exceed sanity threshold",

@@ -234,9 +234,15 @@ const DraftRoomInner = () => {
       const lid = match?.[1];
       if (lid) {
         const cached = sessionStorage.getItem(`draft_phase_${lid}`);
-        if (cached) {
-          const n = parseInt(cached, 10);
-          if (Number.isFinite(n) && n >= 0 && n <= 3) return n as DraftPhase;
+        // DraftPhase is a STRING enum and every writer stores its string value
+        // ('lobby' | 'active' | 'completed'), so the cached value is matched
+        // against the enum members directly.
+        if (
+          cached === DraftPhase.LOBBY ||
+          cached === DraftPhase.ACTIVE ||
+          cached === DraftPhase.COMPLETED
+        ) {
+          return cached;
         }
       }
     } catch { /* sessionStorage disabled (private browsing) — fall through */ }
@@ -2165,7 +2171,7 @@ const DraftRoomInner = () => {
 
       if (!loadedState) {
         // State didn't load - show error
-        toast({ title: "Draft Hiccup", description: "Draft state not loaded. Please ensure the draft has been started. If you just started the draft, please wait a moment and try again.", variant: "destructive" });
+        toast({ title: "Draft Hiccup", description: "The draft board has not loaded yet. Start the draft, or give it a moment and try again.", variant: "destructive" });
         logger.error('handlePlayerDraft: Missing draftState after load attempt');
         return;
       }
@@ -3344,7 +3350,7 @@ const DraftRoomInner = () => {
       await loadDraftData();
       
       logger.log('Draft reset complete - ready for fresh start');
-      toast({ title: "Draft Ready", description: "Draft reset complete! You can now start a fresh draft. When you click \"Start Draft\", a new draft session will be created." });
+      toast({ title: "Draft Ready", description: "The board is clear. Hit Start Draft to open a fresh session." });
       
     } catch (error: unknown) {
       logger.error('Error resetting draft:', error);

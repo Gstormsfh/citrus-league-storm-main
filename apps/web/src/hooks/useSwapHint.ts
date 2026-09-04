@@ -10,6 +10,11 @@ import { useToast } from '@/hooks/use-toast';
  * too, so the gesture stays; this tells a manager once, the first time the
  * editable list appears, and then never again.
  *
+ * The title names the state (COPY_VOICE: a toast title is a state, four
+ * words at most) and the instruction is the body. It shipped as the
+ * five-word "Tap a position to swap", the one hooks/ entry in
+ * copyVoiceGuard's KNOWN_REMAINING list (2026-09-03).
+ *
  * Storage is best-effort. localStorage can throw (private mode, sandboxed
  * webviews, quota) and a hint is never worth a crash, so every access sits
  * in try/catch. If storage is unavailable the module-level guard still
@@ -43,8 +48,8 @@ export function useSwapHint(enabled: boolean): void {
     if (seen) return;
 
     toast({
-      title: 'Tap a position to swap',
-      description: 'The coloured chip on any row opens Line Change. Empty spots fill from the bench.',
+      title: 'Line Change',
+      description: 'Tap the coloured chip on any row to swap a position. Empty spots fill from the bench.',
     });
   }, [enabled, toast]);
 }

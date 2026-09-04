@@ -35,7 +35,7 @@ import { TodayStrip } from '@/components/roster/TodayStrip';
 import { computeTodaySummary } from '@/components/roster/todaySummary';
 import { AutoLineupSheet, type AutoLineupDay, type AutoLineupScope } from '@/components/roster/AutoLineupSheet';
 import { planAutoLineup, type AutoLineupPlan } from '@/components/roster/autoLineup';
-import { resolveIrSlotCount } from '@/components/roster/irSlots';
+import { irSlotIds, resolveIrSlotCount } from '@/components/roster/irSlots';
 import { gameOnDate, rowGameFor } from '@/components/roster/gameDay';
 import { ApiError } from '@/api/client';
 import MobileMenuButton from '@/components/MobileMenuButton';
@@ -95,6 +95,16 @@ function arrayMove<T>(list: T[], fromIndex: number, toIndex: number): T[] {
 const getFantasyPosition = (position: string, posType: PositionType = 'individual'): string => {
   const result = resolveFantasyPosition(position, posType);
   return result === 'OTHER' ? 'UTIL' : result;
+};
+
+// "C/LW" the way this league's slots name positions ("F" in a forward
+// league), for the sentence that says why a slot doesn't fit. Same union
+// the server validates against: the listed position plus eligible_positions.
+const slotPositionsLabel = (player: HockeyPlayer, posType: PositionType): string => {
+  const own = player.eligible_positions && player.eligible_positions.length > 0
+    ? player.eligible_positions
+    : [player.position];
+  return Array.from(new Set(own.map(p => getFantasyPosition(p, posType)))).join('/');
 };
 
 // Helper function to format position for display (L -> LW, R -> RW)
@@ -346,6 +356,13 @@ const Roster = () => {
   // Week and date selection state
   const [selectedWeek, setSelectedWeek] = useState<number>(0); // 0 = not yet calculated
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // The day on screen, readable from a callback that began on an earlier
+  // render: the save rollback in applyPlayerMove reloads from the server
+  // only while the manager is still on the day the move was made on.
+  const selectedDateRef = useRef(selectedDate);
+  useEffect(() => {
+    selectedDateRef.current = selectedDate;
+  }, [selectedDate]);
   const [currentMatchup, setCurrentMatchup] = useState<MatchupType | null>(null);
   const [matchupWeekDates, setMatchupWeekDates] = useState<string[]>([]);
   const [availableWeeks, setAvailableWeeks] = useState<number[]>([]);
@@ -487,6 +504,9 @@ const Roster = () => {
         const allPlayers = await PlayerService.getAllPlayers();
         
         let dbPlayers: Player[] = [];
+        // The league's roster slots as THIS load read them (the state copy
+        // is a render behind inside this callback); see irCap below.
+        let loadedRosterSlots: Record<string, number> | null = null;
         let teamId: string | number | null = null;
         let userTeamData: { id: string; league_id: string; team_name: string } | null = null;
 
@@ -604,6 +624,7 @@ const Roster = () => {
               setBestBallEnabled(true);
             }
             if (settings.rosterSlots) {
+              loadedRosterSlots = settings.rosterSlots;
               setLeagueRosterSlots(settings.rosterSlots);
             }
           }
@@ -1087,11 +1108,15 @@ const Roster = () => {
             : { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
           const slotsFilled: Record<string, number> = {};
           for (const k of Object.keys(slotsNeeded)) slotsFilled[k] = 0;
+          // This league's IR count (the server's rule, audit R8): a third
+          // IR player in a 2-IR league belongs on the bench, or the first
+          // save is refused for being over the cap.
+          const irCap = resolveIrSlotCount(loadedRosterSlots);
           let irSlotIndex = 1;
 
           transformedPlayers.forEach(p => {
             if (p.status === 'IR' || p.status === 'SUSP') {
-              if (irSlotIndex <= 3) {
+              if (irSlotIndex <= irCap) {
                 ir.push(p);
                 assignments[p.id] = `ir-slot-${irSlotIndex}`;
                 irSlotIndex++;
@@ -2462,6 +2487,44 @@ const Roster = () => {
       toast({ title: 'Cannot Edit Past Dates', description: 'Rosters for past dates are frozen and cannot be changed.', variant: 'destructive' });
       return;
     }
+    // OFFSEASON (2026-09-04). Reported from a phone: "Auto lineup button
+    // doesn't work brother."
+    //
+    // It did not work because it was `disabled` whenever `seasonDormant`, and
+    // dormant is true for every day between the last game and the next. On
+    // 4 September the earliest scheduled game in `nhl_games` is 29 September,
+    // so this control had already been dead for weeks and would have stayed
+    // dead through the TestFlight window and the whole of the Sept 8 test
+    // drafts - the first thing twelve managers do after a draft is open their
+    // roster and reach for it.
+    //
+    // The only explanation it offered was a `title` attribute, and a title is
+    // a HOVER affordance: on a touchscreen it does not exist. So the button
+    // greyed itself out and gave no reason, which is indistinguishable from
+    // broken. The sheet behind it has carried exactly the right sentence all
+    // along ("No games scheduled, so there is nothing to set") and no one
+    // could ever reach it.
+    //
+    // Every other refusal in this handler already speaks. This one does too
+    // now, and the button is no longer disabled for any of them: a tap that
+    // produces a sentence beats a tap that produces nothing.
+    if (seasonDormant) {
+      const opensOn = seasonStatus.nextGameDate
+        ? new Date(`${seasonStatus.nextGameDate}T00:00:00Z`).toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+            timeZone: 'UTC',
+          })
+        : null;
+      toast({
+        title: seasonHeadline ?? 'No games scheduled',
+        description: opensOn
+          ? `No hockey until ${opensOn}, so every player projects to zero and there is no lineup to optimize yet.`
+          : 'Nothing is scheduled, so there is no lineup to optimize yet.',
+      });
+      return;
+    }
     // Refuse to plan against unloaded projections rather than preview a
     // lineup in which nobody has a game.
     if (!projectionsReadyForSelectedDate) {
@@ -2853,7 +2916,9 @@ const Roster = () => {
     }
 
     // Identify if dropping onto a player or an empty slot
-    const droppedOnPlayer = allPlayers.find(p => p.id === targetId);
+    // targetId is a slot id or a player id; HockeyPlayer.id is number | string,
+    // so compare on the string form to match either id flavour.
+    const droppedOnPlayer = allPlayers.find(p => String(p.id) === targetId);
 
     // The other half of a swap is a move too (2026-09-01, audit R6): landing
     // on a locked player's slot would send HIM to the bench. tapEligibleSlots
@@ -2935,15 +3000,24 @@ const Roster = () => {
     if (isCurrentlyBench && isDroppingOnBench && !isDroppingOnBenchPlayer) return;
 
     if (!isPositionValid(player, finalTargetSlotId)) {
+        // The IR sentence is the server's own (validateIrPlacements in
+        // server/src/lib/leagueRules.ts), so the advisory check here and
+        // the refusal there read the same; the position one is the
+        // COPY_VOICE rewrite of "Player cannot be placed in that position."
         if (finalTargetSlotId.startsWith('ir-slot-')) {
-          toast({ title: "Invalid Move", description: "Only players with official IR/LTIR status can be placed in IR slots.", variant: "destructive" });
+          toast({ title: "Invalid Move", description: `${player.name} isn't listed IR or LTIR, so an IR slot can't hold him. Bench him, or move a player with official IR/LTIR status there.`, variant: "destructive" });
         } else {
-          toast({ title: "Invalid Position", description: "Player cannot play in this position.", variant: "destructive" });
+          const plays = slotPositionsLabel(player, leaguePositionType);
+          toast({ title: "Invalid Position", description: `That slot doesn't fit. ${player.name} plays ${plays}, so try a ${plays} or bench slot.`, variant: "destructive" });
         }
         return;
     }
 
-    setRoster(prev => {
+    // Build the move from the roster on screen. Every check above already
+    // read `roster`, and until the save below lands it is also what the
+    // server holds, so it doubles as the rollback (2026-09-03).
+    const rosterBeforeMove = roster;
+    const buildMove = (prev: RosterState): RosterState | null => {
         const newStarters = [...prev.starters];
         const newBench = [...prev.bench];
         const newIR = [...prev.ir];
@@ -3012,7 +3086,7 @@ const Roster = () => {
             const occupant = allPlayers.find(x => String(x.id) === String(occupantId));
             if (!occupant) {
               logger.error('[Roster] Swap failed: occupant not found in allPlayers', occupantId);
-              return prev;
+              return null;
             }
             const p2 = { ...occupant };
             
@@ -3027,18 +3101,10 @@ const Roster = () => {
               if (originalSlot && originalSlot.startsWith('ir-slot-')) {
                 swapBackTarget = originalSlot;
               } else {
-                // Find first available IR slot
+                // The first open IR slot THIS league has (audit R8 rule): a
+                // third slot a 2-IR league never had is stripped on save.
                 const usedSlots = Object.values(newAssignments).filter(s => s.startsWith('ir-slot-'));
-                if (usedSlots.length < 3) {
-                  for (let i = 1; i <= 3; i++) {
-                    if (!usedSlots.includes(`ir-slot-${i}`)) {
-                      swapBackTarget = `ir-slot-${i}`;
-                      break;
-                    }
-                  }
-                } else {
-                  swapBackTarget = 'bench-grid';
-                }
+                swapBackTarget = irSlotIds(irSlotCount).find(id => !usedSlots.includes(id)) ?? 'bench-grid';
               }
             }
             else if (sourceInfo?.loc === 'starter') {
@@ -3065,55 +3131,90 @@ const Roster = () => {
             }
         }
 
-        const updatedRoster = { starters: newStarters, bench: newBench, ir: newIR, slotAssignments: newAssignments };
-        
-        // Validate roster state - check if any IR players have returned to ACT
-        const validation = validateRosterState(updatedRoster);
-        if (!validation.isValid) {
-          const invalidNames = validation.invalidPlayers.map(p => p.name).join(', ');
-          toast({
-            title: "Invalid Roster State",
-            description: `The following players are in IR slots but have returned to active status: ${invalidNames}. Please move them to active slots.`,
-            variant: "destructive",
-            duration: 10000 // Show for 10 seconds
-          });
-        }
-        
-        // Save lineup to Supabase (only for logged-in users, not demo league)
-        if (userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
-          // Validate selected date - prevent saving to past dates
-          if (selectedDate) {
-            const todayStr = getTodayMST();
-            if (selectedDate < todayStr) {
-              toast({
-                title: "Cannot Edit Past Dates",
-                description: "Cannot edit past dates. Select a future date to make changes.",
-                variant: "destructive",
-                duration: 5000
-              });
-              return updatedRoster; // Don't save, return updated roster for UI
-            }
-          }
+        return { starters: newStarters, bench: newBench, ir: newIR, slotAssignments: newAssignments };
+    };
 
-          const lineupToSave = {
-            starters: newStarters.map(p => p.id),
-            bench: newBench.map(p => p.id),
-            ir: newIR.map(p => p.id),
-            slotAssignments: newAssignments
-          };
-          // Yahoo-style: Always save to a specific date (never fall through to base team_lineups)
-          // State is already updated optimistically via setRoster above.
-          // Do NOT call loadRoster in .then() — it captures a stale selectedDate
-          // from the closure and races with date-switch reloads.
-          LeagueService.saveLineup(userTeamId, userTeam.league_id, lineupToSave, selectedDate || getTodayMST())
-            .catch(err => {
-              logger.error('[Roster] Failed to save lineup:', err);
-            });
+    const updatedRoster = buildMove(rosterBeforeMove);
+    if (!updatedRoster) return;
+    setRoster(updatedRoster);
+
+    // Validate roster state - check if any IR players have returned to ACT
+    const validation = validateRosterState(updatedRoster);
+    if (!validation.isValid) {
+      const healed = validation.invalidPlayers;
+      const invalidNames = healed.map(p => p.name).join(', ');
+      toast({
+        title: "Invalid Roster State",
+        description: healed.length === 1
+          ? `${invalidNames} isn't listed IR or LTIR anymore, so he can't stay on IR. Move him to the bench or an open slot.`
+          : `${invalidNames} aren't listed IR or LTIR anymore, so they can't stay on IR. Move them to the bench or an open slot.`,
+        variant: "destructive",
+        duration: 10000 // Show for 10 seconds
+      });
+    }
+
+    // Save lineup to Supabase (only for logged-in users, not demo league)
+    if (userTeamId && user && userTeam?.league_id && !isDemoLeague(userTeam.league_id)) {
+      // Validate selected date - prevent saving to past dates
+      if (selectedDate) {
+        const todayStr = getTodayMST();
+        if (selectedDate < todayStr) {
+          toast({
+            title: "Cannot Edit Past Dates",
+            description: "Cannot edit past dates. Select a future date to make changes.",
+            variant: "destructive",
+            duration: 5000
+          });
+          return; // Not saved; the move stays on screen, as it always did here
         }
-        
-        return updatedRoster;
-    });
-    
+      }
+
+      const teamId = userTeamId;
+      const leagueId = userTeam.league_id;
+      const dateAtTap = selectedDate;
+      const lineupToSave = {
+        starters: updatedRoster.starters.map(p => p.id),
+        bench: updatedRoster.bench.map(p => p.id),
+        ir: updatedRoster.ir.map(p => p.id),
+        slotAssignments: updatedRoster.slotAssignments
+      };
+      // Yahoo-style: Always save to a specific date (never fall through to base team_lineups).
+      // The move is already on screen; the toast waits for the server. It
+      // used to fire here unconditionally while LineupService swallowed
+      // every refusal, so a position mismatch or the IR rule was invisible
+      // and the server kept a different lineup (2026-09-03).
+      LeagueService.saveLineup(teamId, leagueId, lineupToSave, dateAtTap || getTodayMST(), { rejectOnRefusal: true })
+        .then(() => {
+          toast({ title: "Lineup Updated", description: "Player moved successfully." });
+        })
+        .catch((err: unknown) => {
+          logger.error('[Roster] Failed to save lineup:', err);
+          // The server still holds the roster the move started from. Put it
+          // back at once if this move is still what is on screen, then let
+          // the server settle anything that happened in between (a second
+          // move built on this one). The reload runs only while the manager
+          // is still on the day the move was made on: this closure's
+          // loadRoster carries that day, and a switched day has its own
+          // load in flight (the old note about loadRoster in a save callback
+          // still stands).
+          setRoster(current => (current === updatedRoster ? rosterBeforeMove : current));
+          if (selectedDateRef.current === dateAtTap) {
+            clearRosterCaches(String(teamId), leagueId);
+            loadRoster(true);
+            fetchLockedPlayerIds();
+          }
+          const status = err instanceof ApiError ? err.status : 0;
+          const message = err instanceof Error ? err.message : '';
+          toast({
+            title: status === 409 ? 'Player Locked' : 'Lineup Not Saved',
+            description: message || `${player.name} is back where he started. Try the move again.`,
+            variant: 'destructive',
+            duration: 6000,
+          });
+        });
+      return;
+    }
+
     toast({ title: "Lineup Updated", description: "Player moved successfully." });
   };
 
@@ -3148,8 +3249,9 @@ const Roster = () => {
     // IR slots (2026-08-25): drag used to be the ONLY way to place a player
     // on IR — isPositionValid already gates this on is_ir_eligible. Now that
     // drag is gone everywhere, tap has to cover this too or IR placement
-    // becomes unreachable.
-    for (const irSlotId of ['ir-slot-1', 'ir-slot-2', 'ir-slot-3']) {
+    // becomes unreachable. Only the slots this league has (audit R8 rule):
+    // a 2-IR league was offered ir-slot-3, which the server strips on save.
+    for (const irSlotId of irSlotIds(irSlotCount)) {
       if (isPositionValid(player, irSlotId)) {
         eligible.add(irSlotId);
       }
@@ -3162,7 +3264,7 @@ const Roster = () => {
       if (lockedPlayerIds.has(String(pid))) eligible.delete(slotId);
     }
     return eligible;
-  }, [tapSelectedPlayerId, roster, ALL_STARTER_SLOT_IDS, isPositionValid, lockedPlayerIds]);
+  }, [tapSelectedPlayerId, roster, ALL_STARTER_SLOT_IDS, isPositionValid, lockedPlayerIds, irSlotCount]);
 
   // Tap-to-swap: player tapped (select for swap, or complete a swap against
   // the currently-selected player). Shared by mobile and desktop — the name
@@ -3222,12 +3324,19 @@ const Roster = () => {
 
     // Validate the source player can go to that slot
     if (!tapEligibleSlots.has(targetSlotId)) {
-      toast({ title: "Invalid Position", description: "Player cannot be placed in that position.", variant: "destructive" });
+      if (targetSlotId.startsWith('ir-slot-')) {
+        toast({ title: "Invalid Move", description: `${sourcePlayer.name} isn't listed IR or LTIR, so an IR slot can't hold him. Bench him, or move a player with official IR/LTIR status there.`, variant: "destructive" });
+      } else {
+        const plays = slotPositionsLabel(sourcePlayer, leaguePositionType);
+        toast({ title: "Invalid Position", description: `That slot doesn't fit. ${sourcePlayer.name} plays ${plays}, so try a ${plays} or bench slot.`, variant: "destructive" });
+      }
       setTapSelectedPlayerId(player.id); // Switch selection to the tapped player
       return;
     }
 
-    applyPlayerMove(sourcePlayer.id, player.id);
+    // applyPlayerMove takes targetId as a string (slot id or player id) and
+    // matches players on String(p.id), so hand it the string form.
+    applyPlayerMove(sourcePlayer.id, String(player.id));
     setTapSelectedPlayerId(null);
   };
 
@@ -3421,7 +3530,12 @@ const Roster = () => {
                   <Button
                     onClick={handleAutoLineup}
                     variant="outline"
-                    disabled={!projectionsReadyForSelectedDate || isPastDate || seasonDormant}
+                    /* NOT `disabled` (2026-09-04). It used to be, for all
+                       three of these, and `title` was the only thing that
+                       said why - a hover affordance on a product whose
+                       testers are all on iPhones. handleAutoLineup answers
+                       each case with a toast instead; the title stays for
+                       people on a desktop, where hover is real. */
                     title={
                       seasonDormant
                         ? 'No games scheduled for this date'
@@ -3431,7 +3545,7 @@ const Roster = () => {
                             ? 'Preview the best lineup for this date'
                             : 'Loading projections for this date…'
                     }
-                    className="flex gap-1.5 lg:gap-2 h-8 min-h-0 px-2.5 text-xs border-2 [&_svg]:size-4 lg:h-12 lg:min-h-[48px] lg:px-6 lg:text-base lg:border-4 lg:[&_svg]:size-5 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex gap-1.5 lg:gap-2 h-8 min-h-0 px-2.5 text-xs border-2 [&_svg]:size-4 lg:h-12 lg:min-h-[48px] lg:px-6 lg:text-base lg:border-4 lg:[&_svg]:size-5 bg-pastel-orange/10 border-pastel-orange/40 text-pastel-orange-soft hover:bg-pastel-orange/20 hover:border-pastel-orange/60 font-bold"
                   >
                     <Wand2 className="w-4 h-4" aria-hidden="true" />
                     Auto Lineup
@@ -3549,7 +3663,7 @@ const Roster = () => {
                           firstWeekStart={firstWeekStart}
                         />
                         {!currentMatchup && selectedWeek && (
-                          <span className="text-sm text-white/55">No matchup found for Week {selectedWeek}</span>
+                          <span className="text-sm text-white/55">Week {selectedWeek} has no matchup yet.</span>
                         )}
                       </div>
                     )}
@@ -3571,8 +3685,6 @@ const Roster = () => {
                         <WeeklySchedule
                           weekStart={currentMatchup.week_start_date}
                           weekEnd={currentMatchup.week_end_date}
-                          myStarters={[]}
-                          opponentStarters={[]}
                           onDayClick={(date) => {
                             setSelectedDate(date);
                             // loadRoster is triggered automatically by the useEffect
@@ -3582,7 +3694,6 @@ const Roster = () => {
                             // condition with the useEffect-triggered reload.
                           }}
                           selectedDate={selectedDate}
-                          dailyStatsByDate={new Map()}
                           hideScores={true}
                         />
                         {selectedDate && (
@@ -3606,7 +3717,7 @@ const Roster = () => {
 
                     {!currentMatchup && selectedWeek && (
                       <div className="bg-white/5 rounded-lg border p-4 text-center text-sm text-white/55">
-                        No matchup found for Week {selectedWeek}
+                        Week {selectedWeek} has no matchup yet.
                       </div>
                     )}
                   </div>
@@ -4035,7 +4146,7 @@ const Roster = () => {
                         {pendingWaivers.length > 0 && (
                           <div>
                             <div className="mb-3 flex items-center gap-2">
-                              <AlertCircle className="w-4 h-4 text-orange-600" aria-hidden="true" />
+                              <AlertCircle className="w-4 h-4 text-pastel-orange" aria-hidden="true" />
                               <h3 className="text-lg font-bold">Active Waiver Claims</h3>
                               <Badge variant="secondary" className="text-xs">{pendingWaivers.length}</Badge>
                             </div>
@@ -4050,7 +4161,7 @@ const Roster = () => {
                                 return (
                                   <div
                                     key={tx.id}
-                                    className="p-4 rounded-lg border-2 bg-gradient-to-r from-amber-50 to-orange-50 border-amber-500/60"
+                                    className="p-4 rounded-lg border-2 bg-pastel-surface-tile border-pastel-orange/60"
                                   >
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                       <div className="flex-1 min-w-[200px]">
@@ -4061,7 +4172,7 @@ const Roster = () => {
                                           </div>
                                         )}
                                         {tx.dropPlayerName && (
-                                          <div className="text-sm text-orange-700 mt-1">
+                                          <div className="text-sm text-pastel-orange-soft mt-1">
                                             Dropping: {tx.dropPlayerName}
                                             {(tx.dropPlayerPosition || tx.dropPlayerTeam) && (
                                               <> ({tx.dropPlayerPosition || ''}{tx.dropPlayerPosition && tx.dropPlayerTeam ? ' • ' : ''}{tx.dropPlayerTeam || ''})</>
@@ -4091,10 +4202,10 @@ const Roster = () => {
                                     {(clearsAtFormatted || nextProcessFormatted) && (
                                       <div className="mt-3 grid gap-2 sm:grid-cols-2 text-xs">
                                         {clearsAtFormatted && (
-                                          <div className="flex items-start gap-2 rounded-md bg-pastel-surface-tile border border-amber-500/40 p-2">
-                                            <Clock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" aria-hidden="true" />
+                                          <div className="flex items-start gap-2 rounded-md bg-pastel-surface-tile border border-pastel-orange/40 p-2">
+                                            <Clock className="w-4 h-4 text-pastel-orange mt-0.5 shrink-0" aria-hidden="true" />
                                             <div>
-                                              <div className="uppercase tracking-wide text-[10px] text-amber-700 font-bold">
+                                              <div className="uppercase tracking-wide text-[10px] text-pastel-orange-soft font-bold">
                                                 Waiver window clears
                                               </div>
                                               <div className="font-semibold">{clearsAtFormatted}</div>
@@ -4102,10 +4213,10 @@ const Roster = () => {
                                           </div>
                                         )}
                                         {nextProcessFormatted && (
-                                          <div className="flex items-start gap-2 rounded-md bg-pastel-surface-tile border border-green-600/40 p-2">
-                                            <Zap className="w-4 h-4 text-green-700 mt-0.5 shrink-0" aria-hidden="true" />
+                                          <div className="flex items-start gap-2 rounded-md bg-pastel-surface-tile border border-pastel-sage/40 p-2">
+                                            <Zap className="w-4 h-4 text-pastel-sage mt-0.5 shrink-0" aria-hidden="true" />
                                             <div>
-                                              <div className="uppercase tracking-wide text-[10px] text-green-700 font-bold">
+                                              <div className="uppercase tracking-wide text-[10px] text-pastel-sage-soft font-bold">
                                                 Claim processes
                                               </div>
                                               <div className="font-semibold">{nextProcessFormatted}</div>
@@ -4197,7 +4308,7 @@ const Roster = () => {
 
                                   {/* Failure reason (spans full row when present) */}
                                   {tx.status === 'failed' && tx.failureReason && (
-                                    <div className="col-span-12 text-xs text-red-600 mt-1 md:mt-0">
+                                    <div className="col-span-12 text-xs text-fantasy-grapefruit-red mt-1 md:mt-0">
                                       Reason: {tx.failureReason}
                                     </div>
                                   )}
@@ -4357,7 +4468,7 @@ const Roster = () => {
                       if (!dropSuccess) {
                         toast({
                           title: "Drop Didn't Take",
-                          description: dropError?.message || "Couldn't drop the player. Try again in a moment.",
+                          description: (dropError instanceof Error ? dropError.message : '') || "Couldn't drop the player. Try again in a moment.",
                           variant: "destructive"
                         });
                         return;

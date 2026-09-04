@@ -19,7 +19,7 @@ import { MatchupService } from '@/services/MatchupService';
 import { matchupApi } from '@/api/matchups';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 import { generatePlayerWriteup, WriteupTone } from '@/utils/playerWriteup';
-import { getUpcomingSeasonStartDate, getCurrentSeason } from '@citrus/shared';
+import { getCurrentSeason, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
 import { PlayerAdvancedCard } from '@/components/player/PlayerAdvancedCard';
 
@@ -143,6 +143,35 @@ const StatCell = ({ label, value, highlight, sub }: { label: string; value: stri
 );
 
 // ─── Main Component ──────────────────────────────────────────────────
+/** "2026-27" from 2026 - the way a season is written on every other site. */
+function seasonLabel(season: number): string {
+  return `${season}-${String((season + 1) % 100).padStart(2, '0')}`;
+}
+
+/**
+ * A season's calendar window.
+ *
+ * The end is the day before the NEXT season opens, so a prior-season window
+ * carries that season's playoffs (played the following April to June) and
+ * stops before the next opener. Without an end bound, asking for 2025 also
+ * returned every 2026-27 game, which is the "all of prior year combined"
+ * shape this modal was reported for, in reverse.
+ */
+function seasonWindow(season: number): { start: string; end: string } {
+  const start = getSeasonStartDate(season) ?? `${season}-09-01`;
+  const nextStart = getSeasonStartDate(season + 1);
+  if (nextStart) {
+    const d = new Date(`${nextStart}T00:00:00`);
+    d.setDate(d.getDate() - 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return { start, end: `${y}-${m}-${day}` };
+  }
+  // No entry for the following season yet: June 30 clears any playoff run.
+  return { start, end: `${season + 1}-06-30` };
+}
+
 const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = false, onPlayerDropped, action }: PlayerStatsModalProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -160,6 +189,34 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   /** GOALIE-PROJ SANITY (2026-09-01): start-aware remaining games for goalies. */
   const [goalieStartsRemaining, setGoalieStartsRemaining] = useState<number | null>(null);
   const [totalActual, setTotalActual] = useState(0);
+  /**
+   * WHICH SEASON THE GAME LOG IS ABOUT (2026-09-04).
+   *
+   * Defaults to the season ahead - the one with a schedule and projections in
+   * it - and lets the reader drop back to the season that was actually played.
+   * That is the shape every other fantasy product ships, and it is the only
+   * shape that works in September: the new season has 82 games and no stats,
+   * the old one has 82 stat lines and no future.
+   *
+   * Scoped to the GAME LOG on purpose. Overview and Detailed read last
+   * season's numbers because season 2026 has none yet (production 2026-09-04:
+   * player_season_stats holds 0 rows for 2026 and 1,063 for 2025), so a
+   * toggle over those two tabs would offer a choice between numbers and an
+   * empty card. When the season opens and both sides have data, this state is
+   * what those tabs hang off.
+   */
+  const [logSeason, setLogSeason] = useState<number>(() => getProjectionsSeason());
+
+  /** "September 29", or null when the map has no next opener. Same read the
+   *  off-season line above the tabs uses, hoisted so both agree. */
+  const openerLabel = useMemo(() => {
+    const opener = getUpcomingSeasonStartDate();
+    if (!opener) return null;
+    return new Date(`${opener}T00:00:00`).toLocaleDateString(undefined, {
+      month: 'long',
+      day: 'numeric',
+    });
+  }, []);
   const fetchedForPlayerRef = useRef<string | null>(null);
   const todayGameRef = useRef<HTMLDivElement | null>(null);
 
@@ -184,39 +241,91 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         setTotalProjected(0);
         setTotalActual(0);
         setGoalieStartsRemaining(null);
+        // The next player opens on the season ahead, whatever this reader
+        // chose for the last one.
+        setLogSeason(getProjectionsSeason());
         fetchedForPlayerRef.current = null;
       }
       return;
     }
 
-    const playerKey = `${player.id}-${player.team}`;
+    const playerKey = `${player.id}-${player.team}-${logSeason}`;
     if (fetchedForPlayerRef.current === playerKey) return;
     fetchedForPlayerRef.current = playerKey;
 
+    // STALE FRAME (2026-09-04). Reported: "pages load in incorrectly before
+    // the proper page loads... loads an old stale version, then refreshes."
+    //
+    // The reset below used to live only in the `!isOpen` branch above, so it
+    // ran when the modal CLOSED and never when the player CHANGED. Open a
+    // second player without a close in between and this component rendered
+    // his name and his team over the previous player's game log and totals,
+    // until the fetch landed and everything swapped underneath the reader.
+    //
+    // `gameLogLoading` did not save it: the log list is gated on that flag,
+    // but `heroProjectedPts` is not - it reads `totalProjected` straight out
+    // of state, at the top of the card, in the largest type on the screen.
+    // So the first thing a manager saw was the LAST player's projection
+    // attributed to this one.
+    //
+    // Cleared here, synchronously, in the same commit that changes the
+    // identity: an empty card for a moment is honest, a populated wrong one
+    // is not. `setGameLogLoading(true)` moves up here for the same reason -
+    // it used to be set inside the async body, one render too late, and the
+    // `!teamAbbrev` path bailed before ever setting it.
+    setGameLog([]);
+    setTotalProjected(0);
+    setTotalActual(0);
+    setGoalieStartsRemaining(null);
+    setGameLogLoading(true);
+
+    // A player change mid-flight must not let the OLD response win. Same
+    // guard usePlayerXgHistory carries, for the same reason.
+    let cancelled = false;
+
     const fetchGameLog = async () => {
       const teamAbbrev = player.teamAbbreviation || player.team || '';
-      if (!teamAbbrev) return;
+      if (!teamAbbrev) {
+        setGameLogLoading(false);
+        return;
+      }
 
-      setGameLogLoading(true);
       try {
         const todayStr = getTodayMST();
         const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
         const playerIsGoalie = player.position === 'Goalie' || player.position === 'G';
 
-        // Fetch ALL games for this team this season (past + future)
-        // Derived, not hardcoded. This read `new Date('2025-10-04')` — the
-        // 2025-26 opener — so from October 2026 this modal would have shown
-        // last season's schedule for every player, silently and forever. The
-        // same literal-season trap season.ts exists to close.
-        const seasonYear = getCurrentSeason();
-        const seasonStart = new Date(`${seasonYear}-09-01T00:00:00`);
-        const { games } = await ScheduleService.getGamesForTeam(teamAbbrev, seasonStart);
+        // WHICH SEASON'S GAMES (2026-09-04). Reported: "schedule in the game
+        // log is still showing 2025 - we need to have it show THIS year, and
+        // projections - and not all of prior year combined."
+        //
+        // This read `getCurrentSeason()`, which is the season being PLAYED.
+        // On 2026-09-04 that is still 2025, because the flip happens on the
+        // opener (2026-09-29) - so the window opened at 2025-09-01 and the
+        // modal returned all 82 games of the season that just finished.
+        // Every one of them was in the past, so the log was a wall of
+        // history with no projections in it at all.
+        //
+        // `getProjectionsSeason()` is the question this code is actually
+        // asking: the season being played, or, in the July-September run-up,
+        // the one about to be. Today it answers 2026; from the opener it
+        // equals getCurrentSeason() again, so nothing changes in-season.
+        // That is also the key the ingested projections are stored under,
+        // which is why the future rows had nothing to join to before.
+        //
+        // The window now starts at the real opener from SEASON_START_DATES
+        // rather than a hardcoded September 1st - the season that opens on
+        // the 29th should not have a month of nothing in front of it.
+        //
+        // NOTE the deliberate asymmetry with the rest of this modal: the
+        // SCHEDULE and PROJECTIONS look forward, while season stats and the
+        // advanced metrics keep reading last season, because that is the
+        // only season with numbers in it until games are played.
+        const { start: windowStart, end: windowEnd } = seasonWindow(logSeason);
+        const { games } = await ScheduleService.getGamesForTeam(teamAbbrev, windowStart, windowEnd);
 
         if (!games || games.length === 0) {
-          setGameLog([]);
-          setTotalProjected(0);
-          setTotalActual(0);
-          setGameLogLoading(false);
+          if (!cancelled) setGameLogLoading(false);
           return;
         }
 
@@ -353,18 +462,23 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
           setGoalieStartsRemaining(null);
         }
 
+        if (cancelled) return;
         setGameLog(entries);
         setTotalProjected(goalieAwareTotal);
         setTotalActual(actTotal);
       } catch (error) {
         logger.error('[PlayerStatsModal] Error fetching game log:', error);
       } finally {
-        setGameLogLoading(false);
+        if (!cancelled) setGameLogLoading(false);
       }
     };
 
     fetchGameLog();
-  }, [isOpen, player]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, player, logSeason]);
 
   // MUST sit above the `if (!player) return null` below — a hook called after
   // an early return runs conditionally, which breaks the Rules of Hooks and
@@ -563,6 +677,33 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
             {/* ─── Overview Tab ─── */}
             <TabsContent value="stats" className="mt-0 space-y-4">
+              {/* WHICH SEASON THESE NUMBERS ARE (2026-09-04).
+                  
+                  The Game Log carries a season picker and these two tabs do
+                  not, because there is nothing yet to pick between: on
+                  production today `player_season_stats` holds 1,063 rows for
+                  2025 and NONE for 2026, and `player_talent_metrics` holds 940
+                  for 2025 and none for 2026. A picker here would offer a
+                  choice between numbers and a blank card.
+                  
+                  What it must not do is leave the reader guessing. A stat line
+                  with no year on it is read as "this season" by default, which
+                  is exactly wrong right now. So the tab says which season it
+                  is, every time, and the day 2026 has rows this label is where
+                  the picker goes. */}
+              <div className="flex items-center justify-between gap-2 -mb-1">
+                <span
+                  data-testid="overview-season-label"
+                  className="font-jbmono text-[10px] uppercase tracking-[0.16em] text-pastel-cream/60"
+                >
+                  {seasonLabel(getCurrentSeason())} season
+                </span>
+                {openerLabel && getProjectionsSeason() !== getCurrentSeason() && (
+                  <span className="font-display text-[10px] text-pastel-cream/60">
+                    {seasonLabel(getProjectionsSeason())} starts {openerLabel}
+                  </span>
+                )}
+              </div>
               {/* Scouting report — leads the tab the way ESPN/Sleeper lead
                   with a blurb. Derived from the same stat line rendered
                   directly below it (see utils/playerWriteup), so the prose and
@@ -723,6 +864,14 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
             {/* ─── Detailed Stats Tab ─── */}
             <TabsContent value="advanced" className="mt-0 space-y-4">
+              {/* Same reason as Overview: say the year rather than let a
+                  reader assume it. See the note there. */}
+              <span
+                data-testid="advanced-season-label"
+                className="block font-jbmono text-[10px] uppercase tracking-[0.16em] text-pastel-cream/60 -mb-1"
+              >
+                {seasonLabel(getCurrentSeason())} season
+              </span>
               {/* PWS-1 ADVANCED CARD (2026-09-02) — the highest-leverage
                   single integration of the player-dashboard design system,
                   because THIS modal is the one player card the whole app
@@ -822,6 +971,38 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
             {/* ─── Game Log Tab ─── */}
             <TabsContent value="gamelog" className="mt-0 space-y-4">
+              {/* SEASON PICKER. Above the loading branch on purpose: a reader
+                  who lands on the wrong season must be able to leave it
+                  without waiting for it to arrive. Two seasons, because two
+                  is what exists - the one being projected and the one that
+                  was played. */}
+              <div
+                role="group"
+                aria-label="Season"
+                className="grid grid-cols-2 gap-0.5 rounded-lg bg-white/5 p-0.5"
+              >
+                {[getProjectionsSeason(), getProjectionsSeason() - 1].map((yr) => {
+                  const active = logSeason === yr;
+                  return (
+                    <button
+                      key={yr}
+                      type="button"
+                      data-testid={`gamelog-season-${yr}`}
+                      aria-pressed={active}
+                      onClick={() => setLogSeason(yr)}
+                      className={cn(
+                        'h-9 rounded-md font-display text-[12px] font-bold tabular-nums transition-colors',
+                        active
+                          ? 'bg-citrus-sage text-white'
+                          : 'text-pastel-cream/60 hover:text-pastel-cream',
+                      )}
+                    >
+                      {seasonLabel(yr)}
+                    </button>
+                  );
+                })}
+              </div>
+
               {gameLogLoading ? (
                 <div className="text-center py-10">
                   <Loader2 className="w-8 h-8 text-citrus-sage/40 mx-auto mb-3 animate-spin" />
@@ -1028,8 +1209,16 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
               ) : (
                 <div className="text-center py-10">
                   <Snowflake className="w-10 h-10 text-pastel-cream/60 mx-auto mb-3" />
-                  <p className="text-sm font-display text-pastel-cream/60">No games scheduled</p>
-                  <p className="text-xs font-display text-pastel-cream/60 mt-1">Game log appears when games are on the schedule</p>
+                  {/* Names the season (2026-09-04). With a picker above it,
+                      "No games scheduled" is ambiguous: the reader cannot tell
+                      whether the schedule is missing or they are simply
+                      looking at a season this player did not play. */}
+                  <p className="text-sm font-display text-pastel-cream/60">
+                    No games in {seasonLabel(logSeason)}
+                  </p>
+                  <p className="text-xs font-display text-pastel-cream/60 mt-1">
+                    Try the other season, or check back when the schedule lands
+                  </p>
                 </div>
               )}
             </TabsContent>

@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, logger } from '@citrus/shared';
+import { COLUMNS, logger, wasMatchupPlayed } from '@citrus/shared';
 
 export class AccountService {
   private supabase: SupabaseClient;
@@ -158,7 +158,20 @@ export class AccountService {
 
     const teamIdSet = new Set(teamIds);
 
+    // A career record must not count weeks nobody played. This read filters
+    // on status='completed', but 12 team-matchup rows in production are
+    // completed at 0.000-0.000 (seeded, not scored), and the old `else`
+    // branch booked every one of them as a career tie. Same defect the
+    // standings page carried as "1-1-18" on the demo league, so it shares
+    // the same rule rather than growing a second opinion of what a played
+    // week is: packages/shared/src/utils/standings.ts.
     ((matchups || []) as unknown as MatchupRow[]).forEach((m) => {
+      if (!wasMatchupPlayed({
+        team2_id: m.team2_id,
+        team1_score: m.team1_score,
+        team2_score: m.team2_score,
+      })) return;
+
       const isTeam1 = teamIdSet.has(m.team1_id);
       const myScore = parseFloat(String(isTeam1 ? m.team1_score : m.team2_score)) || 0;
       const oppScore = parseFloat(String(isTeam1 ? m.team2_score : m.team1_score)) || 0;

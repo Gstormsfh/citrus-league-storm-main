@@ -17,15 +17,33 @@ let _sentry: any = null;
 let sentryInitialized = false;
 
 /**
- * Dynamically load @sentry/react at runtime.
- * Uses variable-based module name to bypass Vite/Rollup static analysis,
- * allowing the build to succeed even when @sentry/react is not installed.
+ * Lazily load the Sentry SDK through ./sdk.ts.
+ *
+ * This MUST stay a plain `import()` with a static specifier. It used to build
+ * the module name at runtime (`['@sentry','react'].join('/')` fed through
+ * `Function`) to hide it from Rollup so the build would succeed with the
+ * package absent.
+ * That worked — and it also meant Sentry could NEVER load, installed or not:
+ * Rollup never bundled it, and a browser cannot resolve a bare specifier at
+ * runtime. The import threw, the catch below swallowed it, and monitoring was
+ * silently off while everything looked wired. Do not reintroduce that trick.
+ *
+ * Consequence of the honest version: @sentry/react is now a real build
+ * dependency. Remove the package and the build FAILS rather than quietly
+ * shipping without monitoring. That is the intended trade.
+ *
+ * Why './sdk' and not '@sentry/react' directly: a dynamic import of the whole
+ * package yields a namespace object, and Rollup must keep every export in it
+ * because any property might be read at runtime. That dragged
+ * replayIntegration, feedbackIntegration, browserTracingIntegration and
+ * replayCanvas into the vendor-sentry chunk although init() below never asks
+ * for them. sdk.ts re-exports only the bindings this file calls, so Rollup can
+ * tree-shake the rest out of the lazy chunk.
  */
 async function loadSentry() {
   if (_sentry) return _sentry;
   try {
-    const pkg = ['@sentry', 'react'].join('/');
-    _sentry = await (Function('p', 'return import(p)')(pkg));
+    _sentry = await import('./sdk');
     return _sentry;
   } catch {
     return null;

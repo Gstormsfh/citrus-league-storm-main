@@ -416,7 +416,20 @@ describe('PoolService', () => {
   // ── Confidence Pool ─────────────────────────────────────────────────
 
   describe('submitConfidencePicks', () => {
+    // Two open games in the requested week. Every honest case needs these:
+    // before 2026-09-03 the filter kept picks whose game was NOT in the week,
+    // so these tests passed with an empty schedule and were silently
+    // asserting the bug. See the OPEN/LOCKED helpers below.
+    const openWeekGames = () =>
+      mockGetGamesForDateRange.mockResolvedValueOnce({
+        games: [
+          { id: 'g1', home_team: 'TOR', away_team: 'MTL', status: 'scheduled', game_date: '2099-01-01', game_time: '2099-01-01T23:00:00Z' },
+          { id: 'g2', home_team: 'BOS', away_team: 'NYR', status: 'scheduled', game_date: '2099-01-01', game_time: '2099-01-01T23:00:00Z' },
+        ],
+      });
+
     it('submits valid confidence picks', async () => {
+      openWeekGames();
       mockSupabase.from = vi.fn(() => createChain({ error: null }));
 
       const result = await service.submitConfidencePicks('league-1', 'user-1', 1, [
@@ -427,9 +440,11 @@ describe('PoolService', () => {
       expect(result.success).toBe(true);
       expect(result.submitted).toBe(2);
       expect(result.locked).toBe(0);
+      expect(result.skipped).toBe(0);
     });
 
     it('rejects duplicate confidence point values', async () => {
+      openWeekGames();
       await expect(
         service.submitConfidencePicks('league-1', 'user-1', 1, [
           { game_id: 'g1', picked_team: 'TOR', confidence_points: 1 },
@@ -439,6 +454,7 @@ describe('PoolService', () => {
     });
 
     it('rejects non-sequential confidence point values', async () => {
+      openWeekGames();
       await expect(
         service.submitConfidencePicks('league-1', 'user-1', 1, [
           { game_id: 'g1', picked_team: 'TOR', confidence_points: 1 },
@@ -459,6 +475,79 @@ describe('PoolService', () => {
           { game_id: 'g1', picked_team: 'TOR', confidence_points: 1 },
         ]),
       ).rejects.toThrow('All selected games have already started');
+    });
+
+    // ── PL3: pick laundering ──────────────────────────────────────────
+    //
+    // The filter used to read `return !game || !this.isGameLocked(game)`.
+    // The leading `!game ||` KEPT any pick whose game was not in the week,
+    // so a member could submit week 1 carrying the id of a game already
+    // played in an earlier week and be graded against a known result.
+
+    it('refuses a pick naming a game that is not in the requested week', async () => {
+      // Only g1 is in week 1. gX is a finished game from some other week.
+      mockGetGamesForDateRange.mockResolvedValueOnce({
+        games: [
+          { id: 'g1', home_team: 'TOR', away_team: 'MTL', status: 'scheduled', game_date: '2099-01-01', game_time: '2099-01-01T23:00:00Z' },
+        ],
+      });
+      const upsertChain = createChain({ error: null });
+      mockSupabase.from = vi.fn(() => upsertChain);
+
+      const result = await service.submitConfidencePicks('league-1', 'user-1', 1, [
+        { game_id: 'g1', picked_team: 'TOR', confidence_points: 1 },
+        { game_id: 'gX', picked_team: 'BOS', confidence_points: 2 },
+      ]);
+
+      expect(result.submitted).toBe(1);
+      expect(result.skipped).toBe(1);
+      const rows = (upsertChain.upsert as any).mock.calls[0][0];
+      expect(rows).toHaveLength(1);
+      expect(rows[0].game_id).toBe('g1');
+    });
+
+    it('rejects a submission made entirely of out-of-week games', async () => {
+      mockGetGamesForDateRange.mockResolvedValueOnce({
+        games: [
+          { id: 'g1', home_team: 'TOR', away_team: 'MTL', status: 'scheduled', game_date: '2099-01-01', game_time: '2099-01-01T23:00:00Z' },
+        ],
+      });
+
+      await expect(
+        service.submitConfidencePicks('league-1', 'user-1', 1, [
+          { game_id: 'gX', picked_team: 'BOS', confidence_points: 1 },
+        ]),
+      ).rejects.toThrow('not in this week');
+    });
+
+    // ── PL3 secondary: honest partial submissions ─────────────────────
+    //
+    // The 1..N check ran on the POST-LOCK list, so a manager who ranked
+    // three games 1..3 and was late for the middle one was left holding
+    // {1,3} and had the whole slate refused for being on time twice.
+
+    it('accepts a partial slate when one ranked game has already locked', async () => {
+      mockGetGamesForDateRange.mockResolvedValueOnce({
+        games: [
+          { id: 'g1', home_team: 'TOR', away_team: 'MTL', status: 'scheduled', game_date: '2099-01-01', game_time: '2099-01-01T23:00:00Z' },
+          { id: 'g2', home_team: 'BOS', away_team: 'NYR', status: 'final', game_date: '2025-01-01' },
+          { id: 'g3', home_team: 'EDM', away_team: 'CGY', status: 'scheduled', game_date: '2099-01-01', game_time: '2099-01-01T23:00:00Z' },
+        ],
+      });
+      const upsertChain = createChain({ error: null });
+      mockSupabase.from = vi.fn(() => upsertChain);
+
+      const result = await service.submitConfidencePicks('league-1', 'user-1', 1, [
+        { game_id: 'g1', picked_team: 'TOR', confidence_points: 1 },
+        { game_id: 'g2', picked_team: 'BOS', confidence_points: 2 },
+        { game_id: 'g3', picked_team: 'EDM', confidence_points: 3 },
+      ]);
+
+      expect(result.submitted).toBe(2);
+      expect(result.locked).toBe(1);
+      expect(result.skipped).toBe(0);
+      const rows = (upsertChain.upsert as any).mock.calls[0][0];
+      expect(rows.map((r: { confidence_points: number }) => r.confidence_points)).toEqual([1, 3]);
     });
   });
 

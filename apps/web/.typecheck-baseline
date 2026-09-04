@@ -19,7 +19,29 @@
 # checked against the production catalog -- which is how the autopick column
 # bug (picked_player_id, not player_id) surfaced.
 #
-# LOWER THIS when armchair-gm lands after its visual review -- part of the
-# remaining gap is there. Lowering it is how a win gets locked in; the ratchet
-# only fails when the count RISES.
-62
+# 62 -> 0 (2026-09-03, second pass). Garrett's call before the TestFlight
+# archive: "I'd rather have perfect product." Four agents took the four
+# clusters (MatchupService 29, services 10, pages/components 12, tests 11),
+# then four more adversarially reviewed every change against the producers
+# and the routes. No `any`, no `@ts-ignore`, no `@ts-expect-error` was added;
+# the two `as unknown as` casts that remain are at Supabase client
+# boundaries where the generated types are stale, each with a comment.
+#
+# Three latent bugs surfaced and were fixed on the way:
+#   * MatchupService.ts organizeRosterIntoLineup sorted on `b.points`, which
+#     HockeyPlayer has never had (points live at stats.points). The
+#     comparator was 0 - 0 for every pair, so default lineups inherited
+#     whatever order the player cache happened to be in. Now sorts.
+#   * DraftRoomV2.tsx passed an Error object into a prop typed string that
+#     is rendered bare into JSX: "Objects are not valid as a React child"
+#     on any offline players-load failure.
+#   * DraftRoom.tsx restored a string enum through parseInt, so the
+#     sessionStorage phase restore could never fire (branch is unreachable
+#     today for other reasons too).
+#
+# THE RATCHET IS NOW A FLOOR. At 0 there is no gap left to lower, so any
+# rise is a real regression introduced by the change in front of you. Fix
+# it there; do not raise this number. If a new dependency or a generated
+# type forces a temporary rise, say so in this file with the count and the
+# date, the way every line above does.
+0

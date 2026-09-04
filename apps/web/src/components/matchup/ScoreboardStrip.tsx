@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { getTodayMST } from '@/utils/timezoneUtils';
+import { ROW_META } from '@/components/phoneRowScale';
 import { TeamDisc } from './TeamDisc';
 import {
   avatarOf,
@@ -9,6 +10,7 @@ import {
   isFinal,
   leaderOf,
   ownSideOf,
+  projectionOf,
   scoreboardState,
   teamNameOf,
   type ScoreboardSide,
@@ -39,9 +41,17 @@ import {
  * The opponent and every stranger stay cream/muted. Numbers are jbmono with
  * tabular figures; words are the display face at the text-white/55 floor.
  *
- * What it does NOT show: projected scores for other matchups. The league
- * endpoint (api/matchups.getLeagueMatchups) serves banked team1_score /
- * team2_score only — see scoreboard.ts. Live scores only, honestly labelled.
+ * Projected finals (2026-09-03): the league endpoint serves a projected
+ * total per side for the viewed week (scoreboard.ts, `projectionOf`), and
+ * each team line prints it as "proj 118.3" on a second line under the live
+ * score, the same words the sticky bar and ScoreCard use. The live score
+ * stays the headline; the projection sits on the muted ROW_META rung
+ * (phoneRowScale.ts) at the text-white/55 floor, never orange (orange means
+ * YOU) and never sage (sage means AHEAD, and only the live score is ahead).
+ * It goes UNDER the score rather than beside it because the chip is 150px:
+ * disc, gap and a five-figure mono score already leave the name ~66px, and
+ * "proj 118.3" is ~52px more, which would truncate every name to a syllable.
+ * A null projection draws nothing at all, never 0.
  */
 
 export interface ScoreboardStripProps {
@@ -99,36 +109,49 @@ interface TeamLineProps {
   side: ScoreboardSide;
   own: boolean;
   leading: boolean;
+  /** Projected final for this side, or null to draw nothing (scoreboard.projectionOf). */
+  projected: number | null;
   teamAvatars?: TeamAvatarMap;
 }
 
-const TeamLine = ({ row, side, own, leading, teamAvatars }: TeamLineProps) => {
+const TeamLine = ({ row, side, own, leading, projected, teamAvatars }: TeamLineProps) => {
   const name = teamNameOf(row, side);
   const score = side === 'team1' ? row.team1_score : row.team2_score;
   return (
-    <span className="flex items-center gap-1.5 min-w-0" data-testid={`scoreboard-${side}`} data-own={own || undefined}>
-      {/* The same disc the sticky bar and ScoreCard draw (TeamDisc):
-          owner avatar → team initial. */}
-      <TeamDisc size="xs" name={name} avatarUrl={avatarOf(row, side, teamAvatars)} own={own} />
-      <span
-        className={cn(
-          'flex-1 min-w-0 truncate font-display text-[11px] leading-4',
-          own ? 'text-pastel-orange-soft font-semibold' : 'text-pastel-cream',
-        )}
-        title={name}
-      >
-        {name}
+    <span className="flex flex-col min-w-0" data-testid={`scoreboard-${side}`} data-own={own || undefined}>
+      <span className="flex items-center gap-1.5 min-w-0">
+        {/* The same disc the sticky bar and ScoreCard draw (TeamDisc):
+            owner avatar → team initial. */}
+        <TeamDisc size="xs" name={name} avatarUrl={avatarOf(row, side, teamAvatars)} own={own} />
+        <span
+          className={cn(
+            'flex-1 min-w-0 truncate font-display text-[11px] leading-4',
+            own ? 'text-pastel-orange-soft font-semibold' : 'text-pastel-cream',
+          )}
+          title={name}
+        >
+          {name}
+        </span>
+        <span
+          data-testid="scoreboard-score"
+          data-leading={leading || undefined}
+          className={cn(
+            'font-jbmono text-[12px] font-bold tabular-nums leading-4 flex-shrink-0',
+            leading ? 'text-pastel-sage' : 'text-white/70',
+          )}
+        >
+          {formatScore(score)}
+        </span>
       </span>
-      <span
-        data-testid="scoreboard-score"
-        data-leading={leading || undefined}
-        className={cn(
-          'font-jbmono text-[12px] font-bold tabular-nums leading-4 flex-shrink-0',
-          leading ? 'text-pastel-sage' : 'text-white/70',
-        )}
-      >
-        {formatScore(score)}
-      </span>
+      {projected !== null && (
+        <span
+          data-testid="scoreboard-proj"
+          className={cn(ROW_META, 'mt-0.5 flex items-baseline justify-end gap-1 text-white/55 whitespace-nowrap')}
+        >
+          <span className="font-display">proj</span>
+          <span className="font-jbmono tabular-nums">{formatScore(projected)}</span>
+        </span>
+      )}
     </span>
   );
 };
@@ -147,18 +170,24 @@ interface ChipProps {
   ownSide: ScoreboardSide | null;
   viewed: boolean;
   final: boolean;
+  /** YYYY-MM-DD in Mountain Time, for the projection's final-week rule. */
+  today: string;
   onSelect: (id: string) => void;
   teamAvatars?: TeamAvatarMap;
 }
 
-const Chip = ({ row, layout, own, ownSide, viewed, final, onSelect, teamAvatars }: ChipProps) => {
+const Chip = ({ row, layout, own, ownSide, viewed, final, today, onSelect, teamAvatars }: ChipProps) => {
   const bye = isBye(row);
   const leader = leaderOf(row);
   const t1 = teamNameOf(row, 'team1');
   const t2 = bye ? 'bye week' : teamNameOf(row, 'team2');
+  const proj1 = projectionOf(row, 'team1', today);
+  const proj2 = projectionOf(row, 'team2', today);
+  const said = (score: number | string | null, projected: number | null) =>
+    projected === null ? formatScore(score) : `${formatScore(score)} proj ${formatScore(projected)}`;
   const label = bye
-    ? `${t1} ${formatScore(row.team1_score)}, ${t2}`
-    : `${t1} ${formatScore(row.team1_score)}, ${t2} ${formatScore(row.team2_score)}`;
+    ? `${t1} ${said(row.team1_score, proj1)}, ${t2}`
+    : `${t1} ${said(row.team1_score, proj1)}, ${t2} ${said(row.team2_score, proj2)}`;
   const suffix = [own ? 'your matchup' : null, viewed ? 'viewing' : null, final ? 'final' : null]
     .filter(Boolean)
     .join(', ');
@@ -177,7 +206,9 @@ const Chip = ({ row, layout, own, ownSide, viewed, final, onSelect, teamAvatars 
         if (!viewed) onSelect(row.id);
       }}
       className={cn(
-        'focus-citrus block text-left rounded-xl px-2 py-1.5 space-y-1 transition-colors active:scale-[0.98]',
+        // h-full: chips in one strip share a height, so a bye chip (one
+        // projection line fewer) does not sit shorter than its neighbours.
+        'focus-citrus block h-full text-left rounded-xl px-2 py-1.5 space-y-1 transition-colors active:scale-[0.98]',
         layout === 'strip' ? 'w-[150px]' : 'w-full',
         // Raised = on screen now. Dark-UI depth is lightness, not shadow.
         viewed ? 'bg-pastel-surface-high' : 'bg-pastel-surface-tile hover:bg-pastel-surface-high',
@@ -185,11 +216,11 @@ const Chip = ({ row, layout, own, ownSide, viewed, final, onSelect, teamAvatars 
         own ? 'ring-2 ring-pastel-orange/60' : viewed ? 'ring-1 ring-white/20' : 'ring-1 ring-white/10',
       )}
     >
-      <TeamLine row={row} side="team1" own={ownSide === 'team1'} leading={leader === 'team1'} teamAvatars={teamAvatars} />
+      <TeamLine row={row} side="team1" own={ownSide === 'team1'} leading={leader === 'team1'} projected={proj1} teamAvatars={teamAvatars} />
       {bye ? (
         <ByeLine />
       ) : (
-        <TeamLine row={row} side="team2" own={ownSide === 'team2'} leading={leader === 'team2'} teamAvatars={teamAvatars} />
+        <TeamLine row={row} side="team2" own={ownSide === 'team2'} leading={leader === 'team2'} projected={proj2} teamAvatars={teamAvatars} />
       )}
     </button>
   );
@@ -306,6 +337,7 @@ export function ScoreboardStrip({
         ownSide={ownSideOf(row, ownTeamId)}
         viewed={row.id === viewedMatchupId}
         final={isFinal(row, todayStr)}
+        today={todayStr}
         onSelect={handleSelect}
         teamAvatars={teamAvatars}
       />

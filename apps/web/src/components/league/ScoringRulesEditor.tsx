@@ -48,8 +48,8 @@ export function ScoringRulesEditor({ leagueId, canEdit }: ScoringRulesEditorProp
       if (cancelled) return;
       if (error) {
         toast({
-          title: 'Could not load scoring rules',
-          description: 'Please refresh and try again.',
+          title: "Scoring Rules Didn't Load",
+          description: "Refresh and we'll pull them again.",
           variant: 'destructive',
         });
       }
@@ -165,7 +165,7 @@ export function ScoringRulesEditor({ leagueId, canEdit }: ScoringRulesEditorProp
           <p className="text-sm text-muted-foreground py-8 text-center">Loading scoring rules…</p>
         ) : catalog.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">
-            No scoring catalog found for this league.
+            This league hasn't set its scoring yet.
           </p>
         ) : (
           <>

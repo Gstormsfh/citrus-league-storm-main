@@ -1,7 +1,7 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
 import { AlertCircle } from "lucide-react";
 import { logger } from '@/utils/logger';
-import { captureException } from '@/utils/sentry';
+import { captureException } from '@/integrations/sentry/config';
 
 interface Props {
   children: ReactNode;
@@ -46,10 +46,10 @@ export class ErrorBoundary extends Component<Props, State> {
         >
           <div className="flex items-center gap-2 mb-3 text-base font-calistoga text-red-400">
             <AlertCircle className="h-5 w-5" aria-hidden="true" />
-            <span>Something went wrong</span>
+            <span>This Screen Stalled</span>
           </div>
           <p className="text-sm text-white/55 mb-4 text-center max-w-md">
-            {this.state.error?.message || 'An unexpected error occurred.'}
+            {this.state.error?.message || "Citrus couldn't finish drawing this screen. Try again below."}
           </p>
           <button
             onClick={this.handleRetry}

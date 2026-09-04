@@ -206,7 +206,7 @@ export function GameDetailPanel({
 
       {leagueId && !data.league.rostersResolved ? (
         <p className="px-1 pt-1 font-display text-[10px] text-pastel-forest-dim leading-snug">
-          No rostered players found for your league, so nothing is marked as yours.
+          Nobody from your league is in this game, so nothing is marked as yours.
         </p>
       ) : null}
 

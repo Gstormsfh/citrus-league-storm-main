@@ -1,5 +1,20 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { getCurrentSeason, getProjectionsSeason, logger } from '@citrus/shared';
+import {
+  getCurrentSeason,
+  getProjectionsSeason,
+  logger,
+  type DashboardIndexEntry,
+  type PlayerXgHistoryPayload,
+  type XgHistoryPoint,
+} from '@citrus/shared';
+
+/**
+ * The index row shape moved to `packages/shared/src/types/playerDashboard.ts`
+ * on 2026-09-03 so the web hook can import it instead of hand-mirroring it.
+ * Re-exported under the name this file has always exported, so
+ * `DraftKitService` and the route keep their import.
+ */
+export type { DashboardIndexEntry, PlayerXgHistoryPayload, XgHistoryPoint };
 
 /**
  * PlayerDashboardService — read-model for the league-wide Players
@@ -9,9 +24,9 @@ import { getCurrentSeason, getProjectionsSeason, logger } from '@citrus/shared';
  *   - getAllPlayers feeds the draft pool / free agents and is cached
  *     with a narrow NormalizedPlayer shape. Bolting GAR + projections
  *     onto it would grow a hot draft-path payload for a browse page.
- *   - This service joins five tables (directory, season stats, GAR
- *     components, talent metrics, ROS projections) into a shape the
- *     dashboard UI consumes directly.
+ *   - This service joins six tables (directory, season stats, GAR
+ *     components, talent metrics, goalie GSAx, ROS projections) into a
+ *     shape the dashboard UI consumes directly.
  *
  * Join key is player_id everywhere; season-scoped tables are filtered
  * to getCurrentSeason() (2025 = the 2025-26 season until the 2026-27
@@ -52,6 +67,7 @@ interface StatsRow {
   nhl_gaa: number;
   nhl_shutouts: number;
   nhl_goals_against: number;
+  updated_at: string | null;
 }
 
 interface GarRow {
@@ -62,7 +78,9 @@ interface GarRow {
   ppd_gar_per_60: number | null;
   penalty_gar_per_60: number | null;
   total_gar_per_60: number | null;
-  toi_total_minutes: number | null;
+  /** `numeric` in Postgres; coerced through `num()` before it reaches the wire. */
+  toi_total_minutes: number | string | null;
+  updated_at: string | null;
 }
 
 interface TalentRow {
@@ -70,6 +88,10 @@ interface TalentRow {
   xg_per_60: number | null;
   xg_rating: string | null;
   roster_status: string | null;
+  /** Both `numeric`; both NULL on every 2025 production row as of 2026-09-03. */
+  vopa_score: number | string | null;
+  avg_toi_per_game: number | string | null;
+  updated_at: string | null;
 }
 
 interface RosRow {
@@ -86,76 +108,38 @@ interface RosRow {
   projected_wins_ros: number | null;
   projected_saves_ros: number | null;
   projected_shutouts_ros: number | null;
+  updated_at: string | null;
 }
 
+/**
+ * `goalie_gsax_primary`, as the INDEX reads it. `goalie_id` is that table's
+ * primary key (migration 20250114000001) and the same NHL id as
+ * `player_directory.player_id`; `season` was added later and is nullable.
+ * The `numeric` columns arrive as strings on some paths and numbers on
+ * others, so every one goes through `num()`.
+ */
+interface IndexGsaxRow {
+  goalie_id: number;
+  season: number | null;
+  total_shots_faced: number | null;
+  total_xga: number | string | null;
+  total_ga: number | null;
+  raw_gsax: number | string | null;
+  regressed_gsax: number | string | null;
+  updated_at: string | null;
+}
+
+// `updated_at` rides along on every season-scoped table so the index can
+// carry a real `as_of` per player (see the field's note in the shared type).
 const INDEX_STATS_COLS =
-  'player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_plus_minus, nhl_toi_seconds, x_goals, goalie_gp, nhl_wins, nhl_saves, nhl_save_pct, nhl_gaa, nhl_shutouts, nhl_goals_against';
+  'player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_plus_minus, nhl_toi_seconds, x_goals, goalie_gp, nhl_wins, nhl_saves, nhl_save_pct, nhl_gaa, nhl_shutouts, nhl_goals_against, updated_at';
 const GAR_COLS =
-  'player_id, evo_gar_per_60, evd_gar_per_60, ppo_gar_per_60, ppd_gar_per_60, penalty_gar_per_60, total_gar_per_60, toi_total_minutes';
-const TALENT_COLS = 'player_id, xg_per_60, xg_rating, roster_status';
+  'player_id, evo_gar_per_60, evd_gar_per_60, ppo_gar_per_60, ppd_gar_per_60, penalty_gar_per_60, total_gar_per_60, toi_total_minutes, updated_at';
+const TALENT_COLS = 'player_id, xg_per_60, xg_rating, roster_status, vopa_score, avg_toi_per_game, updated_at';
 const ROS_COLS =
-  'player_id, games_remaining, total_projected_points, avg_points_per_game, projected_goals, projected_assists, projected_sog, projected_ppp, projected_hits, projected_blocks, projected_wins_ros, projected_saves_ros, projected_shutouts_ros';
-
-export interface DashboardIndexEntry {
-  id: number;
-  name: string;
-  team: string;
-  position: string;
-  jersey: number | null;
-  headshot_url: string | null;
-  is_goalie: boolean;
-  roster_status: string | null;
-  // season actuals
-  gp: number;
-  goals: number;
-  assists: number;
-  points: number;
-  sog: number;
-  hits: number;
-  blocks: number;
-  ppp: number;
-  plus_minus: number;
-  x_goals: number;
-  // goalie actuals
-  wins: number;
-  saves: number;
-  save_pct: number;
-  gaa: number;
-  shutouts: number;
-  // advanced
-  xg_per_60: number | null;
-  xg_rating: string | null;
-  gar_per_60: number | null;
-  gar_evo: number | null;
-  gar_evd: number | null;
-  gar_ppo: number | null;
-  gar_ppd: number | null;
-  gar_pen: number | null;
-  // rolled-forward projection
-  proj_gp: number | null;
-  proj_fantasy_points: number | null;
-  proj_fantasy_ppg: number | null;
-  proj_goals: number | null;
-  proj_assists: number | null;
-  proj_sog: number | null;
-  proj_ppp: number | null;
-  /**
-   * Projected blocks and hits (2026-09-02). `player_ros_projections` has
-   * carried both since the table shipped and `ROS_COLS` has always SELECTed
-   * them — they were simply dropped on the way out of this mapper.
-   *
-   * They are not cosmetic. Blocks are worth 1 point in `DEFAULT_SCORING`, so
-   * a consumer scoring the rest-of-season projection through the league's own
-   * categories was short every skater's blocks — roughly fifty points a
-   * player under default scoring. The draft room is the first such consumer
-   * (`apps/web/src/components/draft/draftDecision.ts`).
-   */
-  proj_blocks: number | null;
-  proj_hits: number | null;
-  proj_wins: number | null;
-  proj_saves: number | null;
-  proj_shutouts: number | null;
-}
+  'player_id, games_remaining, total_projected_points, avg_points_per_game, projected_goals, projected_assists, projected_sog, projected_ppp, projected_hits, projected_blocks, projected_wins_ros, projected_saves_ros, projected_shutouts_ros, updated_at';
+const INDEX_GSAX_COLS =
+  'goalie_id, season, total_shots_faced, total_xga, total_ga, raw_gsax, regressed_gsax, updated_at';
 
 // 2-minute in-process cache, same TTL philosophy as PlayerService:
 // short enough to surface nightly-pipeline refreshes, long enough to
@@ -166,11 +150,11 @@ const CACHE_TTL_MS = 2 * 60 * 1000;
 /**
  * STAMPEDE GUARD (2026-09-02 scale audit).
  *
- * `getDashboardIndex` is the most expensive read in the app: five paged
- * table fan-outs plus a four-Map merge over every player in the
+ * `getDashboardIndex` is the most expensive read in the app: six paged
+ * table fan-outs plus a five-Map merge over every player in the
  * directory. Behind a plain check-then-fetch cache, the two-minute
  * expiry is a synchronised miss — every request in flight at that
- * instant does all five reads and the whole merge, concurrently.
+ * instant does all six reads and the whole merge, concurrently.
  *
  * One shared promise per season collapses that back to one load. Callers
  * that arrive while a load is running await the same promise; nobody sees
@@ -521,6 +505,106 @@ export function clearPlayerDashboardCache(): void {
   playerCache.clear();
 }
 
+/**
+ * Insert into a bounded Map. Insertion order is Map iteration order, so the
+ * first key is the oldest; evict before inserting so the map never exceeds
+ * `max`. Shared by the per-player caches below.
+ */
+function putBounded<V>(map: Map<string, V>, key: string, value: V, max: number): void {
+  if (!map.has(key) && map.size >= max) {
+    const oldest = map.keys().next();
+    if (!oldest.done) map.delete(oldest.value);
+  }
+  map.set(key, value);
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// XG HISTORY (2026-09-03): the career arc on its own, for the condensed
+// card's sparkline.
+//
+// `getPlayerDashboard` already reads every `player_xg_season` row a player
+// has, but it reads his shots too (up to SHOT_CAP rows, on the service-role
+// client). The condensed card opens inside PlayerStatsModal on ten host
+// surfaces, one of them a live draft room; paying for a shot map to draw a
+// nine-point line is the wrong trade. This is the same table read on the
+// same client with the shot read left out, and the rows MERGED per season:
+//
+//   player_xg_season's key is (season, game_type, player_id, team_id). A
+//   player traded mid-season has one row per team, and on 2026-09-03
+//   production held 687 such multi-row player-seasons (up to four rows).
+//   The dashboard payload ships those rows as-is because it also carries
+//   per-row averages (`avg_dist`, `avg_xg_per_shot`) that cannot be summed;
+//   this payload carries only the additive columns, so it can merge.
+
+const XG_HISTORY_COLS = 'season, game_type, player_id, team_id, shots, sog, goals, xg, updated_at';
+
+/** A `player_xg_season` row as PostgREST hands it back. */
+export interface RawXgHistoryRow {
+  season: number;
+  game_type: string;
+  player_id: number;
+  team_id: number | null;
+  shots: number | null;
+  sog: number | null;
+  goals: number | null;
+  xg: number | string | null;
+  updated_at: string | null;
+}
+
+const xgHistoryCache = new Map<string, { data: PlayerXgHistoryPayload; timestamp: number }>();
+
+/** Test hook: clears the xg-history cache. Sibling of clearPlayerDashboardCache(). */
+export function clearPlayerXgHistoryCache(): void {
+  xgHistoryCache.clear();
+}
+
+/**
+ * Raw rows → one point per (season, game_type), team rows summed.
+ *
+ * Exported and pure so the trade-merge is pinned by a test that needs no
+ * client. Rows whose `game_type` is neither `regular` nor `playoff` are
+ * dropped rather than guessed at; a third value would be a new table
+ * contract, not a client-side default.
+ */
+export function mergeXgHistory(rows: readonly RawXgHistoryRow[]): XgHistoryPoint[] {
+  const merged = new Map<string, XgHistoryPoint>();
+  for (const r of rows) {
+    const season = Number(r.season);
+    if (!Number.isFinite(season)) continue;
+    if (r.game_type !== 'regular' && r.game_type !== 'playoff') continue;
+    const key = `${season}:${r.game_type}`;
+    const point: XgHistoryPoint = merged.get(key) ?? {
+      season,
+      game_type: r.game_type,
+      shots: 0,
+      sog: 0,
+      goals: 0,
+      xg: 0,
+      finishing: 0,
+      teams: 0,
+    };
+    point.shots += Number(r.shots ?? 0);
+    point.sog += Number(r.sog ?? 0);
+    point.goals += Number(r.goals ?? 0);
+    point.xg += num(r.xg) ?? 0;
+    point.teams += 1;
+    merged.set(key, point);
+  }
+  const points = Array.from(merged.values());
+  for (const p of points) {
+    // Two decimals: `xg` is a sum of per-shot model outputs and the
+    // dashboard prints it to two, so the two surfaces cannot disagree.
+    p.xg = Math.round(p.xg * 100) / 100;
+    p.finishing = Math.round((p.goals - p.xg) * 100) / 100;
+  }
+  points.sort((a, b) =>
+    a.season !== b.season
+      ? a.season - b.season
+      : (a.game_type === 'regular' ? 0 : 1) - (b.game_type === 'regular' ? 0 : 1),
+  );
+  return points;
+}
+
 export interface PlayerDashboardRequest {
   playerId: number;
   season: number;
@@ -665,15 +749,15 @@ export class PlayerDashboardService {
     }
   }
 
-  /** The uncached five-table fan-out and merge behind `getDashboardIndex`. */
+  /** The uncached six-table fan-out and merge behind `getDashboardIndex`. */
   private async loadDashboardIndex(
     season: number,
   ): Promise<{ players: DashboardIndexEntry[]; error: Error | null }> {
-    // Parallel fan-out — these tables have no FKs between them, so
-    // this is 5 independent index-only scans, not an N+1. Each one is
-    // PAGED (see selectAllPaged) because an unbounded select would be
-    // silently truncated by PostgREST's max-rows clamp.
-    const [dirRes, statsRes, garRes, talentRes, rosRes] = await Promise.all([
+    // Parallel fan-out. These tables have no FKs between them, so this is
+    // 6 independent index-only scans, not an N+1. Each one is PAGED (see
+    // selectAllPaged) because an unbounded select would be silently
+    // truncated by PostgREST's max-rows clamp.
+    const [dirRes, statsRes, garRes, talentRes, rosRes, gsaxRes] = await Promise.all([
       selectAllPaged<DirectoryRow>(
         this.supabase,
         'player_directory',
@@ -688,11 +772,31 @@ export class PlayerDashboardService {
       // points at last season's actuals). Joining on `season` here read
       // zero rows all summer → "Proj FP —" for every player.
       selectAllPaged<RosRow>(this.supabase, 'player_ros_projections', ROS_COLS, getProjectionsSeason()),
+      // GOALIE GSAx (2026-09-03). Keyed on `goalie_id`, the table's primary
+      // key, so the paged sort is unique per row. Season-filtered like the
+      // other five: the table can only hold one season per goalie, and on
+      // the day the season number flips a 2025 row next to 2026 actuals
+      // would be a cross-season number wearing a current-season label.
+      // Read on the caller's client; the table's policy is public read.
+      pagedSelect<IndexGsaxRow>(this.supabase, {
+        table: 'goalie_gsax_primary',
+        columns: INDEX_GSAX_COLS,
+        filters: [['season', season]],
+        orderBy: ['goalie_id'],
+      }),
     ]);
 
     const firstError = dirRes.error || statsRes.error || garRes.error || talentRes.error || rosRes.error;
     if (firstError) {
       return { players: [], error: new Error(firstError.message) };
+    }
+
+    // The GSAx read is an enrichment for ~100 goalies, not the spine of a
+    // 2k-row index; a policy change on that one table must not 500 the
+    // whole Players page. Logged, and every goalie gets null GSAx, which the
+    // card renders as an absent row rather than a zero.
+    if (gsaxRes.error) {
+      logger.error('[PlayerDashboardService] goalie_gsax_primary read failed; GSAx omitted from index:', gsaxRes.error.message);
     }
 
     const statsBy = new Map<number, StatsRow>();
@@ -703,12 +807,17 @@ export class PlayerDashboardService {
     for (const t of (talentRes.data ?? []) as TalentRow[]) talentBy.set(t.player_id, t);
     const rosBy = new Map<number, RosRow>();
     for (const r of (rosRes.data ?? []) as RosRow[]) rosBy.set(r.player_id, r);
+    const gsaxBy = new Map<number, IndexGsaxRow>();
+    if (!gsaxRes.error) {
+      for (const x of (gsaxRes.data ?? []) as IndexGsaxRow[]) gsaxBy.set(x.goalie_id, x);
+    }
 
     const players: DashboardIndexEntry[] = ((dirRes.data ?? []) as DirectoryRow[]).map((d) => {
       const s = statsBy.get(d.player_id);
       const g = garBy.get(d.player_id);
       const t = talentBy.get(d.player_id);
       const r = rosBy.get(d.player_id);
+      const x = gsaxBy.get(d.player_id);
       const isGoalie = d.position_code === 'G';
       return {
         id: d.player_id,
@@ -742,6 +851,16 @@ export class PlayerDashboardService {
         gar_ppo: g?.ppo_gar_per_60 ?? null,
         gar_ppd: g?.ppd_gar_per_60 ?? null,
         gar_pen: g?.penalty_gar_per_60 ?? null,
+        // The three columns this service used to SELECT-and-drop (or never
+        // read). `num()` because all three are `numeric`.
+        toi_total_minutes: num(g?.toi_total_minutes),
+        avg_toi_per_game: num(t?.avg_toi_per_game),
+        vopa_score: num(t?.vopa_score),
+        gsax_raw: num(x?.raw_gsax),
+        gsax_regressed: num(x?.regressed_gsax),
+        gsax_shots_faced: num(x?.total_shots_faced),
+        gsax_xga: num(x?.total_xga),
+        gsax_ga: num(x?.total_ga),
         proj_gp: r?.games_remaining ?? null,
         proj_fantasy_points: r?.total_projected_points ?? null,
         proj_fantasy_ppg: r?.avg_points_per_game ?? null,
@@ -754,6 +873,10 @@ export class PlayerDashboardService {
         proj_wins: r?.projected_wins_ros ?? null,
         proj_saves: r?.projected_saves_ros ?? null,
         proj_shutouts: r?.projected_shutouts_ros ?? null,
+        // Freshness from the stamps on THIS player's rows, nothing
+        // synthesised: null when none of them carried one, and null hides
+        // the badge client-side. Same rule as `getPlayerDashboard`'s as_of.
+        as_of: newestTimestamp([s?.updated_at, g?.updated_at, t?.updated_at, r?.updated_at, x?.updated_at]),
       } as DashboardIndexEntry;
     });
 
@@ -986,14 +1109,46 @@ export class PlayerDashboardService {
       as_of,
     };
 
-    // Insertion order is Map iteration order, so the first key is the
-    // oldest. Evict before inserting so the map never exceeds the bound.
-    if (!playerCache.has(key) && playerCache.size >= PLAYER_CACHE_MAX_ENTRIES) {
-      const oldest = playerCache.keys().next();
-      if (!oldest.done) playerCache.delete(oldest.value);
-    }
-    playerCache.set(key, { data: payload, timestamp: Date.now() });
+    putBounded(playerCache, key, { data: payload, timestamp: Date.now() }, PLAYER_CACHE_MAX_ENTRIES);
 
+    return { payload, error: null };
+  }
+
+  /**
+   * XG HISTORY: every `player_xg_season` season on record for one player,
+   * merged per (season, game_type). See the block comment above
+   * `mergeXgHistory`. One paged read on the caller's RLS-scoped client
+   * (`read player_xg_season` FOR SELECT TO authenticated); no elevation.
+   */
+  async getXgHistory(
+    playerId: number,
+  ): Promise<{ payload: PlayerXgHistoryPayload | null; error: Error | null }> {
+    const key = String(playerId);
+    const cached = xgHistoryCache.get(key);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return { payload: cached.data, error: null };
+    }
+
+    const res = await pagedSelect<RawXgHistoryRow>(this.supabase, {
+      table: 'player_xg_season',
+      columns: XG_HISTORY_COLS,
+      filters: [['player_id', playerId]],
+      // The full primary key with player_id pinned, so the paged sort is
+      // unique per row even for a traded player's second team row.
+      orderBy: ['season', 'game_type', 'team_id'],
+    });
+    if (res.error) {
+      return { payload: null, error: new Error(res.error.message) };
+    }
+
+    const rows = res.data ?? [];
+    const payload: PlayerXgHistoryPayload = {
+      player_id: playerId,
+      points: mergeXgHistory(rows),
+      as_of: newestTimestamp(rows.map((r) => r.updated_at)),
+    };
+
+    putBounded(xgHistoryCache, key, { data: payload, timestamp: Date.now() }, PLAYER_CACHE_MAX_ENTRIES);
     return { payload, error: null };
   }
 }

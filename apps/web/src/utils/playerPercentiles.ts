@@ -68,12 +68,13 @@
  * single game can double a per-60 rate. Both numbers are pinned in
  * `__tests__/playerPercentiles.test.ts`.
  *
- * KNOWN LIMITATION, stated rather than hidden: the right denominator for a
- * rate stat is time on ice, not games. `PlayerDashboardService` already
- * SELECTS `toi_total_minutes` from `player_gar_components` but does not put
- * it on `DashboardIndexEntry`, so GP is the only sample field this payload
- * exposes. Surfacing TOI is a one-line server change and is the correct
- * follow-up; it is deliberately not made on this branch.
+ * The right denominator for a rate stat is time on ice, not games. As of
+ * 2026-09-03 `DashboardIndexEntry` carries `toi_total_minutes` (it is
+ * `player_gar_components.toi_total_minutes`, equal to NHL TOI seconds / 60,
+ * verified against `nhl_toi_seconds` for five named players), so the sample
+ * field exists on the payload. This module still gates on GP; switching the
+ * denominator to TOI is the follow-up, and it changes which players qualify,
+ * so it wants its own change with the thresholds re-measured.
  */
 
 /**
@@ -110,7 +111,7 @@ export interface PercentileResult {
   /**
    * 0–100, rounded, or null when the value is missing/non-finite or the
    * cohort is empty. Null is a first-class answer here: "we do not know"
-   * renders as "No data" in PercentileBullet, which is the truth.
+   * renders as "Not charted" in PercentileBullet, which is the truth.
    */
   percentile: number | null;
   /** How many players actually set this scale. Surface it, don't hide it. */

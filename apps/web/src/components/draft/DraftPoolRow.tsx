@@ -4,6 +4,7 @@ import { Mug } from '@/components/roster/Mug';
 import { mugFromDirectory } from '@/components/roster/headshot';
 import { positionChipClasses, positionChipKey } from '@/components/roster/positionChip';
 import { statusChipFor } from '@/components/player/statusChip';
+import type { PoolHeadline } from './draftPoolHeadline';
 import { ROW_HEADLINE, ROW_HEADLINE_LABEL, ROW_META, ROW_MICRO, ROW_NAME } from '@/components/phoneRowScale';
 import type { Player } from '@/services/PlayerService';
 import type { DraftProjection, QualitySignal } from './draftDecision';
@@ -56,6 +57,14 @@ export interface DraftPoolRowProps {
   projection: DraftProjection | null;
   /** The one cohort-relative advanced read. Null when absent. */
   signal: QualitySignal | null;
+  /**
+   * The stat the pool is currently sorted by, already resolved to a number
+   * and a label by `poolHeadlineFor`. When set it REPLACES the projection as
+   * the row's headline, because on a phone that number is the only thing the
+   * manager can compare two players on, and it has to be the thing they
+   * sorted by. Null (Overall Rank, Name) keeps the projection.
+   */
+  headlineOverride?: PoolHeadline | null;
   selected: boolean;
   drafted: boolean;
   queued: boolean;
@@ -76,6 +85,7 @@ export function DraftPoolRow({
   seasonFpts,
   projection,
   signal,
+  headlineOverride,
   selected,
   drafted,
   queued,
@@ -88,7 +98,17 @@ export function DraftPoolRow({
 }: DraftPoolRowProps) {
   const posKey = positionChipKey(player.position);
   const status = statusChipFor(player.status);
-  const headline = projection ? projection.total : seasonFpts;
+  const fallbackHeadline = projection ? projection.total : seasonFpts;
+  const headline = headlineOverride ? headlineOverride.value : fallbackHeadline;
+  const headlineDecimals = headlineOverride ? headlineOverride.decimals : 1;
+  const headlineLabel = headlineOverride
+    ? headlineOverride.label
+    : (projection ? 'proj' : 'fpts');
+  // +/- is the one stat where a leading sign carries meaning.
+  const headlineText =
+    headlineOverride?.label === '+/-' && headline > 0
+      ? `+${headline.toFixed(headlineDecimals)}`
+      : headline.toFixed(headlineDecimals);
 
   return (
     <div
@@ -180,13 +200,13 @@ export function DraftPoolRow({
           className={cn(ROW_HEADLINE, 'text-pastel-sage-soft')}
           data-testid="draft-pool-projection"
         >
-          {headline.toFixed(1)}
+          {headlineText}
         </span>
         <span
           className={cn(ROW_HEADLINE_LABEL, 'text-white/55 mt-1')}
           data-testid="draft-pool-projection-label"
         >
-          {projection ? 'proj' : 'fpts'}
+          {headlineLabel}
         </span>
       </div>
 
@@ -250,7 +270,7 @@ export function DraftPoolRow({
             type="button"
             className={cn(
               'ml-0.5 h-9 px-2 rounded-lg font-display font-bold text-[11px] leading-none whitespace-nowrap',
-              'bg-fantasy-primary text-[#0F1F15] active:scale-95 transition-transform',
+              'bg-pastel-orange text-pastel-surface active:scale-95 transition-transform',
               'disabled:opacity-50',
             )}
             disabled={submitting}

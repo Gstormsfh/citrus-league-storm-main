@@ -113,3 +113,19 @@ describe('FillSlotSheet — what it reports', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });
+
+describe('FillSlotSheet: a candidate with more than one position says so (gap A, 2026-09-03)', () => {
+  const HYMAN = mk('11', 'Zach Hyman', 'LW', { eligible_positions: ['LW', 'C'] });
+
+  it('prints "LW/C" beside a dual-eligible candidate, so his place on a C list needs no explaining', () => {
+    renderSheet({ candidates: [HYMAN, HORVAT] });
+    const hyman = sheet().getByText('Zach Hyman').closest('button')!;
+    expect(within(hyman).getByTestId('candidate-positions')).toHaveTextContent('LW/C');
+  });
+
+  it('prints nothing new beside a single-position candidate', () => {
+    renderSheet({ candidates: [HYMAN, HORVAT] });
+    const horvat = sheet().getByText('Bo Horvat').closest('button')!;
+    expect(within(horvat).queryByTestId('candidate-positions')).toBeNull();
+  });
+});

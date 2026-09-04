@@ -438,16 +438,20 @@ const Profile = () => {
       if (commSettingsTab !== 'rosters' || !selectedSettingsLeagueId || selectedLeagueTeams.length === 0) return;
       
       setLoadingRosterCounts(true);
+      // PERF (2026-09-04): same fix as LeagueDashboard's rosters tab — one
+      // request per team, awaited in series, for counts that share no data.
+      const entries = await Promise.all(
+        selectedLeagueTeams.map(async (team) => {
+          try {
+            const { data: playerIds } = await rosterApi.getPlayerIds(selectedSettingsLeagueId, team.id);
+            return [team.id, Array.isArray(playerIds) ? playerIds.length : 0] as const;
+          } catch {
+            return [team.id, 0] as const;
+          }
+        }),
+      );
       const counts: Record<string, number> = {};
-      
-      for (const team of selectedLeagueTeams) {
-        try {
-          const { data: playerIds } = await rosterApi.getPlayerIds(selectedSettingsLeagueId, team.id);
-          counts[team.id] = Array.isArray(playerIds) ? playerIds.length : 0;
-        } catch {
-          counts[team.id] = 0;
-        }
-      }
+      for (const [teamId, count] of entries) counts[teamId] = count;
       
       setCommRosterCounts(counts);
       setLoadingRosterCounts(false);
@@ -515,7 +519,7 @@ const Profile = () => {
     } catch (err: any) {
       toast({
         title: "Profile Hiccup",
-        description: err.message || 'Failed to save settings',
+        description: userMessage(err, "Couldn't save those settings. Try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -556,7 +560,7 @@ const Profile = () => {
     } catch (err: any) {
       toast({
         title: "Profile Hiccup",
-        description: err.message || 'Failed to process waivers',
+        description: userMessage(err, "Couldn't process the waiver run. Try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -597,13 +601,13 @@ const Profile = () => {
         logger.error('Failed to rebuild team_lineups after sync:', lineupErr);
         toast({
           title: 'Partial Sync',
-          description: `Synced ${playersSynced} players to roster_assignments, but team lineups may need a page refresh.`,
+          description: `Synced ${playersSynced} players. Refresh the page if a lineup still looks stale.`,
         });
       }
     } catch (err: any) {
       toast({
         title: "Profile Hiccup",
-        description: err.message || 'Failed to sync rosters',
+        description: userMessage(err, "Couldn't sync the rosters. Try again in a moment."),
         variant: 'destructive',
       });
     } finally {
@@ -749,7 +753,7 @@ const Profile = () => {
     } catch (error: any) {
       toast({
         title: "Profile Hiccup",
-        description: error.message || "Failed to update profile. Make sure all database columns exist.",
+        description: userMessage(error, "Couldn't save your profile. Try again in a moment."),
         variant: "destructive"
       });
     }
@@ -794,7 +798,7 @@ const Profile = () => {
     } catch (error: any) {
       toast({
         title: "Profile Hiccup",
-        description: error.message || "Failed to save team name.",
+        description: userMessage(error, "Couldn't save that team name. Try again in a moment."),
         variant: "destructive"
       });
     }
@@ -1003,7 +1007,7 @@ const Profile = () => {
     } catch (error: any) {
       toast({
         title: "Error resetting draft",
-        description: error.message || "Failed to reset the draft. Please try again.",
+        description: userMessage(error, "Couldn't reset the draft. Try again in a moment."),
         variant: "destructive"
       });
     }
@@ -1214,17 +1218,28 @@ const Profile = () => {
                         </div>
 
                         <div className="space-y-3">
+                          {/* EMAIL IS READ-ONLY HERE (2026-09-04).
+                              This rendered an editable Input in edit mode, and
+                              the value went nowhere. The save handler builds
+                              updateData from firstName/lastName/phone/location/
+                              bio only, and PUT /api/account/profile filters the
+                              body against an allowedFields list that has no
+                              'email' in it either. So a user could retype their
+                              address, press Save, get the success toast, and
+                              watch it revert on the next load. That bites
+                              OAuth users hardest: their account email is
+                              whatever the provider handed over, so they are the
+                              ones who go looking for this field.
+                              Showing the truth beats accepting keystrokes and
+                              discarding them. ProfileSetup.tsx already says the
+                              same thing ("Email is set from your account").
+                              Making it genuinely editable is a real change, not
+                              a hotfix: supabase.auth.updateUser({ email }) sends
+                              a confirmation to BOTH addresses and the account
+                              keeps the old one until the new one is confirmed. */}
                           <div className="flex items-center gap-2 text-sm">
                             <Mail className="h-4 w-4 text-pastel-orange shrink-0" />
-                            {isEditing ? (
-                              <Input
-                                value={formData.email}
-                                onChange={(e) => handleInputChange('email', e.target.value)}
-                                className="h-8 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
-                              />
-                            ) : (
-                              <span className="text-white/70">{formData.email || <span className="italic text-white/55">Not set</span>}</span>
-                            )}
+                            <span className="text-white/70">{formData.email || <span className="italic text-white/55">Not set</span>}</span>
                           </div>
                           <div className="flex items-center gap-2 text-sm">
                             <Phone className="h-4 w-4 text-pastel-orange shrink-0" />

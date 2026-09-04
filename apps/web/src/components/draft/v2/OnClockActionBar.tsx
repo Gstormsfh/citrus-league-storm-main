@@ -167,19 +167,49 @@ export function OnClockActionBar({
       : rawRemainingSec;
 
   const urgent = secondsRemaining !== null && secondsRemaining <= 10;
-  // 2026-08-19 visual audit — the most important surface in a live draft
-  // was unreadable in its normal state.
+  // ─────────────────────────────────────────────────────────────────────
+  // THE BAR IS PART OF THE PRODUCT NOW (2026-09-04).
   //
-  //   bg-fantasy-primary is #F9E076, a BRIGHT LEMON. Pairing it with
-  //   text-white put white on near-yellow at ~1.3:1, so "You're on the
-  //   clock", the player name, round and pick all but disappeared. The
-  //   urgent (red-600) state was fine at 4.8:1, which is likely why this
-  //   survived — it only looks broken when you are NOT about to time out.
+  // Founder verdict after the first live test draft: "Autopick is the
+  // ugliest button of all time, same with timer." He was right, and the
+  // reason is not taste, it is vocabulary.
   //
-  // Lemon is a light surface, so it takes dark text: #0F1F15 gives 13.7:1.
-  const barClass = urgent
-    ? 'bg-red-600 text-white border-red-700'
-    : 'bg-fantasy-primary text-[#0F1F15] border-fantasy-primary';
+  //   bg-fantasy-primary is #F9E076, and #F9E076 belongs to the MASCOT
+  //   palette, not the app's. Every other surface in this room is
+  //   pastel-surface forest, pastel-sage and pastel-orange, so a lemon slab
+  //   across the bottom read as a different product that had wandered in.
+  //   The urgent state then dropped to a stock red-600 that appears nowhere
+  //   else in Citrus at all.
+  //
+  // What replaces it: the same dark tile as every other card in the room,
+  // with the countdown drawn as a RING THAT EMPTIES. Remaining time becomes
+  // a shape before it is a number, which is what you actually read at a
+  // glance with eleven other managers watching. Urgency moves the ring and
+  // the eyebrow to grapefruit and never floods the whole bar, so the orange
+  // Draft button stays the single brightest thing on the screen. That is the
+  // point: under a shot clock the eye should land on the verb.
+  //
+  // The 2026-08-19 contrast fix that this replaces is not lost, it is moot.
+  // That entry paired white text with lemon at ~1.3:1 and fixed it with dark
+  // ink; on the forest tile the ink is cream at 14.9:1 in both states.
+  //
+  // Every data-testid, every text node and the exact mm:ss format are
+  // unchanged. The countdown contract in particular is load-bearing:
+  // countdownTick.test.tsx asserts the header timer's whole textContent
+  // equals this bar's countdown, character for character.
+  // ─────────────────────────────────────────────────────────────────────
+  const accent = urgent ? '#FF6F80' : '#84A57D';
+
+  // The ring can only be a fraction if we know the whole. `pickTimeLimitSec`
+  // is null until draft_started has been observed, and on that path the ring
+  // renders as a bare track: no arc, no lie about how much time is left.
+  const RING = 60;
+  const RING_R = 26;
+  const RING_C = 2 * Math.PI * RING_R;
+  const fractionLeft =
+    secondsRemaining !== null && pickTimeLimitSec !== null && pickTimeLimitSec > 0
+      ? Math.min(1, Math.max(0, secondsRemaining / pickTimeLimitSec))
+      : null;
 
   const canDraft = selectedPlayer !== null;
 
@@ -214,57 +244,93 @@ export function OnClockActionBar({
     .filter(Boolean)
     .join(' ');
 
-  // Dark ink on the lemon bar, white on the red urgent one. Alpha comes from
-  // `opacity-*` on the wrapper rather than a `text-white/NN` utility: on
-  // #F9E076 a white alpha is invisible, and the dark-theme contrast guard
-  // bans the mid-alpha range outright.
-  const inkMuted = urgent ? 'text-white' : 'text-[#0F1F15]';
-
   return (
     <div
-      className={`${barClass} rounded-md border-2 p-2.5 shadow-lg space-y-1.5`}
+      className={cn(
+        'space-y-3 rounded-2xl bg-pastel-surface-tile p-3 shadow-lg ring-1',
+        urgent ? 'ring-fantasy-grapefruit-red/50' : 'ring-pastel-sage-soft/20',
+      )}
       data-testid="on-clock-action-bar"
       role="region"
       aria-label="You are on the clock"
     >
-      {/* LINE 1 — who is up and how long is left. The label and the pick
-          coordinates used to share a flex row with a 30px countdown and a
-          large button, which is why "YOU'RE ON THE CLOCK" wrapped onto two
-          lines at 393px. They own their own row now. */}
-      <div className="flex items-baseline justify-between gap-2">
-        {/* 10px, and the pick coordinates un-tracked: at 11px with
-            `tracking-wider` on both halves the line measured 268px against a
-            373px row that also has to hold a 26px countdown, so "PICK 24"
-            truncated to "PICK…" at 393. */}
-        <div className="min-w-0 truncate text-[10px] font-bold uppercase tracking-wider opacity-90">
-          You're on the clock
-          {pickNumber !== null && roundNumber !== null && (
-            <span className="ml-1.5 font-normal tracking-normal opacity-75">
-              · Round {roundNumber} · Pick {pickNumber}
-            </span>
-          )}
+      {/* ROW 1 - the clock as a shape, and who it is for. */}
+      <div className="flex items-center gap-3">
+        {/* THE RING. Rotated so it drains from twelve o'clock, and
+            `aria-hidden` because the countdown inside it already carries the
+            spoken value. */}
+        <div className="relative shrink-0" style={{ width: RING, height: RING }}>
+          <svg
+            width={RING}
+            height={RING}
+            viewBox={`0 0 ${RING} ${RING}`}
+            className="block -rotate-90"
+            aria-hidden="true"
+          >
+            <circle
+              cx={RING / 2}
+              cy={RING / 2}
+              r={RING_R}
+              fill="none"
+              stroke={accent}
+              strokeOpacity={0.18}
+              strokeWidth={4.5}
+            />
+            {fractionLeft !== null && (
+              <circle
+                cx={RING / 2}
+                cy={RING / 2}
+                r={RING_R}
+                fill="none"
+                stroke={accent}
+                strokeWidth={4.5}
+                strokeLinecap="round"
+                strokeDasharray={RING_C}
+                strokeDashoffset={RING_C * (1 - fractionLeft)}
+              />
+            )}
+          </svg>
+          <div
+            className={cn(
+              'absolute inset-0 flex items-center justify-center font-jbmono text-[13px] font-bold tabular-nums leading-none',
+              urgent ? 'text-fantasy-grapefruit-red' : 'text-pastel-cream',
+            )}
+            data-testid="on-clock-countdown"
+            aria-label={
+              secondsRemaining !== null
+                ? `${secondsRemaining} seconds remaining`
+                : 'No deadline'
+            }
+          >
+            {secondsRemaining !== null ? formatCountdown(secondsRemaining) : '--:--'}
+          </div>
         </div>
-        <div
-          className="shrink-0 text-[24px] font-mono font-bold tabular-nums leading-none"
-          data-testid="on-clock-countdown"
-          aria-label={
-            secondsRemaining !== null
-              ? `${secondsRemaining} seconds remaining`
-              : 'No deadline'
-          }
-        >
-          {secondsRemaining !== null ? formatCountdown(secondsRemaining) : '--:--'}
-        </div>
-      </div>
 
-      {/* LINE 2 — the candidate and the verb. */}
-      <div className="flex items-center gap-2">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 space-y-1">
+          {/* The eyebrow keeps its words in both states and lets colour carry
+              the urgency. Swapping the copy to "Autopick imminent" at ten
+              seconds would move the one line a panicking manager uses to
+              orient, at the exact moment they can least afford to re-read
+              it. */}
+          <div
+            className={cn(
+              'min-w-0 truncate font-jbmono text-[9px] font-bold uppercase tracking-[0.14em]',
+              urgent ? 'text-fantasy-grapefruit-red' : 'text-pastel-sage',
+            )}
+          >
+            You're on the clock
+            {pickNumber !== null && roundNumber !== null && (
+              <span className="ml-1.5 tracking-[0.08em] opacity-75">
+                · Round {roundNumber} · Pick {pickNumber}
+              </span>
+            )}
+          </div>
+
           {canDraft ? (
-            <div className="truncate text-[15px] font-semibold leading-tight">
+            <div className="truncate text-[17px] font-bold leading-tight text-pastel-cream">
               Draft <span className="font-bold">{selectedPlayer.full_name}</span>
               {selectedPlayer.position && (
-                <span className="ml-2 text-sm font-normal opacity-75">
+                <span className="ml-2 text-sm font-normal text-pastel-sage-soft/80">
                   ({selectedPlayer.position}
                   {selectedPlayer.team ? ` · ${selectedPlayer.team}` : ''})
                 </span>
@@ -272,42 +338,24 @@ export function OnClockActionBar({
             </div>
           ) : (
             /* WRAPS, never truncates. The old copy was one `truncate` line
-               beside a large button and rendered as "Select a ..." at 393 —
+               beside a large button and rendered as "Select a ..." at 393 -
                a sentence clipped after nine characters, in the bar a manager
-               reads first. Two lines of 13px cost the same height as the
-               name-plus-numbers the selected state puts here. */
-            <div className="text-[13px] font-semibold leading-tight opacity-90">
+               reads first. */
+            <div className="text-[13px] font-semibold leading-tight text-pastel-sage-soft/90">
               Select a player, or tap Draft on any row.
             </div>
           )}
         </div>
-        <Button
-          size="lg"
-          // Was `bg-white text-fantasy-primary` — lemon-yellow label on a
-          // white button, ~1.2:1. The single most-clicked control in the
-          // product was effectively a blank white pill. Deep forest on
-          // white reads at 16.9:1 and works on both the lemon and the red
-          // urgent bar. (2026-08-19)
-          className="shrink-0 bg-white text-[#0F1F15] hover:bg-white/90 font-bold px-4"
-          disabled={!canDraft || isSubmitPending}
-          onClick={() => canDraft && !isSubmitPending && onDraft(selectedPlayer)}
-          data-testid="on-clock-draft-button"
-        >
-          {isSubmitPending ? 'Submitting…' : 'Draft'}
-        </Button>
       </div>
 
-      {/* LINE 2b — THE NUMBERS, FULL WIDTH. Beside the Draft button this line
-          had 240px and wanted 391; across the whole bar it has 353 and the
-          projection, the per-game rate, the games it covers and the cohort
-          percentile all survive. It is the one row on this screen where a
-          truncation costs a fact rather than a word. */}
+      {/* THE NUMBERS, FULL WIDTH. Beside the Draft button this line had 240px
+          and wanted 391; across the whole bar it has 353 and the projection,
+          the per-game rate, the games it covers and the cohort percentile all
+          survive. It is the one row on this screen where a truncation costs a
+          fact rather than a word. */}
       {canDraft && decisionLine && (
         <div
-          className={cn(
-            'truncate font-jbmono text-[11px] leading-none tabular-nums opacity-80',
-            inkMuted,
-          )}
+          className="truncate font-jbmono text-[11px] leading-none tabular-nums text-pastel-sage-soft/80"
           data-testid="on-clock-decision-line"
           /* The source is named, every time. This is Citrus's model, not a
              measurement, and the bar never claims otherwise. */
@@ -317,11 +365,26 @@ export function OnClockActionBar({
         </div>
       )}
 
-      {/* LINE 3 — POSITIONAL SCARCITY, the answer to the question a manager
-          is actually asking under a shot clock: not "who is best" but "what
-          runs out first". Counts only positions he still has to fill, and
-          only players somebody in this league would start; the arithmetic
-          and its deliberate conservatism are documented in
+      {/* THE VERB, FULL WIDTH. It was a small pill wedged beside a name that
+          could be twenty characters long, which is how the most-clicked
+          control in the product ended up the least reachable thing on the
+          screen. A 48px full-width target sits under the thumb of whichever
+          hand is holding the phone. */}
+      <Button
+        size="lg"
+        className="h-12 w-full bg-pastel-orange text-[15px] font-extrabold text-pastel-surface hover:bg-pastel-orange/90 disabled:bg-pastel-surface-high disabled:text-pastel-sage-soft/50 disabled:opacity-100"
+        disabled={!canDraft || isSubmitPending}
+        onClick={() => canDraft && !isSubmitPending && onDraft(selectedPlayer)}
+        data-testid="on-clock-draft-button"
+      >
+        {isSubmitPending ? 'Submitting…' : 'Draft'}
+      </Button>
+
+      {/* POSITIONAL SCARCITY, the answer to the question a manager is actually
+          asking under a shot clock: not "who is best" but "what runs out
+          first". Counts only positions he still has to fill, and only players
+          somebody in this league would start; the arithmetic and its
+          deliberate conservatism are documented in
           `draftDecision.startersLeft`. Renders nothing when the payload
           cannot support it. */}
       {scarcity.length > 0 && (
@@ -329,7 +392,7 @@ export function OnClockActionBar({
           className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide overscroll-x-contain"
           data-testid="on-clock-scarcity"
         >
-          <span className="shrink-0 text-[9px] font-bold uppercase tracking-[0.12em] opacity-70">
+          <span className="shrink-0 font-jbmono text-[9px] font-bold uppercase tracking-[0.12em] text-pastel-sage-soft/60">
             Starters left
           </span>
           {scarcity.map((row) => (
@@ -340,10 +403,8 @@ export function OnClockActionBar({
               data-urgent={row.urgent ? 'true' : 'false'}
               title={`${row.startersLeft} startable ${row.position} left in a league this size; you have ${row.openSlots} ${row.position} slot${row.openSlots === 1 ? '' : 's'} open`}
               className={cn(
-                'shrink-0 whitespace-nowrap rounded px-1.5 py-px font-jbmono text-[11px] font-bold leading-tight tabular-nums',
-                urgent ? 'bg-white/20' : 'bg-[#0F1F15]/10',
-                row.urgent && !urgent && 'ring-1 ring-[#0F1F15]/45',
-                row.urgent && urgent && 'ring-1 ring-white',
+                'shrink-0 whitespace-nowrap rounded bg-pastel-surface-high px-1.5 py-px font-jbmono text-[11px] font-bold leading-tight tabular-nums text-pastel-sage-soft',
+                row.urgent && 'text-fantasy-grapefruit-red ring-1 ring-fantasy-grapefruit-red/50',
               )}
             >
               {row.position} {row.startersLeft}

@@ -260,7 +260,7 @@ export async function lookupPlayers(
       if (st.is_goalie || d.is_goalie) {
         const sv = st.save_pct as number | null;
         lines.push(
-          `- ${who} — ${gp} GP, ${st.wins ?? 0} W, ${st.saves ?? 0} SV, ` +
+          `- ${who}: ${gp} GP, ${st.wins ?? 0} W, ${st.saves ?? 0} SV, ` +
           `${sv != null ? 'SV% ' + Number(sv).toFixed(3) : 'SV% n/a'}, ` +
           `${st.shutouts ?? 0} SO, ${st.goals_against ?? 0} GA`,
         );
@@ -272,7 +272,7 @@ export async function lookupPlayers(
           ? `, xG/60 ${Number(tl.xg_per_60).toFixed(2)}${tl.xg_rating ? ' [' + tl.xg_rating + ']' : ''}`
           : '';
         lines.push(
-          `- ${who} — ${gp} GP, ${st.goals ?? 0} G, ${ast} A, ${pts ?? 0} PTS, ` +
+          `- ${who}: ${gp} GP, ${st.goals ?? 0} G, ${ast} A, ${pts ?? 0} PTS, ` +
           `${ppg} PPG, ${st.shots_on_goal ?? 0} SOG, ${st.hits ?? 0} HIT, ` +
           `${st.blocks ?? 0} BLK, ${st.ppp ?? 0} PPP${xg}`,
         );
@@ -282,10 +282,10 @@ export async function lookupPlayers(
     if (!lines.length && !noStats.length) return '';
 
     const label = statSeason ? `${statSeason}-${String(statSeason + 1).slice(2)}` : 'most recent';
-    let block = `\n\n### VERIFIED PLAYER DATA — from the Citrus database. These numbers are REAL. Use them exactly.\nSeason ${label} (COMPLETED — see SEASON STATUS above; there is no rest-of-season)\n`;
+    let block = `\n\n### VERIFIED PLAYER DATA, from the Citrus database. These numbers are REAL. Use them exactly.\nSeason ${label} (COMPLETED, see SEASON STATUS above; there is no rest-of-season)\n`;
     if (lines.length) block += lines.join('\n') + '\n';
     if (noStats.length) {
-      block += `\nNO STATS ON FILE for: ${noStats.join(', ')}. You do NOT have their numbers — say so rather than estimating (RULE 0).\n`;
+      block += `\nNO STATS ON FILE for: ${noStats.join(', ')}. You do NOT have their numbers. Say so rather than estimating (RULE 0).\n`;
     }
     return block;
   } catch {

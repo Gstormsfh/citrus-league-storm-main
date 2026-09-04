@@ -12,6 +12,7 @@ import {
   isFinal,
   leaderOf,
   ownSideOf,
+  projectionOf,
   scoreOf,
   scoreboardState,
   teamNameOf,
@@ -134,6 +135,43 @@ describe('isFinal / scoreboardState', () => {
   it('LIVE wins over OPEN, and FINAL wins over a stale live flag', () => {
     expect(scoreboardState([row()], TODAY, true)).toBe('live');
     expect(scoreboardState([row({ status: 'completed' })], TODAY, true)).toBe('final');
+  });
+});
+
+// 2026-09-03: the league endpoint serves a projected final per side for
+// the viewed week (LeagueScoreboardMatchup). The rule here is only WHEN the
+// strip may repeat it; the arithmetic is the server's
+// (MatchupService.leagueScoreboard.test.ts).
+describe('projectionOf: null means nothing to say, and is never 0', () => {
+  it('reads numbers and numeric strings for either side', () => {
+    const r = row({ team1_projected_total: 118.34, team2_projected_total: '104.2' });
+    expect(projectionOf(r, 'team1', TODAY)).toBe(118.34);
+    expect(projectionOf(r, 'team2', TODAY)).toBe(104.2);
+  });
+
+  it('a zero is a real projected total, not an unknown', () => {
+    expect(projectionOf(row({ team1_projected_total: 0 }), 'team1', TODAY)).toBe(0);
+  });
+
+  it('is null when the row carries none, or carries junk', () => {
+    expect(projectionOf(row(), 'team1', TODAY)).toBeNull();
+    expect(projectionOf(row({ team1_projected_total: null }), 'team1', TODAY)).toBeNull();
+    expect(projectionOf(row({ team1_projected_total: '' }), 'team1', TODAY)).toBeNull();
+    expect(projectionOf(row({ team1_projected_total: 'abc' }), 'team1', TODAY)).toBeNull();
+    expect(projectionOf(row({ team1_projected_total: Number.NaN }), 'team1', TODAY)).toBeNull();
+  });
+
+  it('is null for a final matchup even when the server sent a number', () => {
+    expect(projectionOf(row({ status: 'completed', team1_projected_total: 118.3 }), 'team1', TODAY)).toBeNull();
+    // A week that ended on the calendar is final too (isFinal), and the
+    // projection would only restate the score.
+    expect(projectionOf(row({ week_end_date: '2026-10-13', team1_projected_total: 118.3 }), 'team1', TODAY)).toBeNull();
+  });
+
+  it('a bye has no second side to project', () => {
+    const bye = row({ team2_id: null, team1_projected_total: 118.3, team2_projected_total: 50 });
+    expect(projectionOf(bye, 'team2', TODAY)).toBeNull();
+    expect(projectionOf(bye, 'team1', TODAY)).toBe(118.3);
   });
 });
 

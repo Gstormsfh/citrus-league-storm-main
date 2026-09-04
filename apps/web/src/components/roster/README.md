@@ -75,7 +75,7 @@ locked player's chip goes neutral with a lock glyph (`LOCKED_CHIP` in
 `slotChip.ts`) while the rest of his row stays fully legible. An **empty
 starter row is one tap target**: with a player selected it is the move
 target, with nothing selected it opens the Fill sheet. Pass `swapHint` on
-editable lists to show the one-time "Tap a position to swap" toast
+editable lists to show the one-time "Line Change" toast
 (`useSwapHint`, localStorage-backed, try/catch). The **Injured Reserve
 section is always on the page**, headed `n/N` from `irSlotCount` (resolve it
 with `resolveIrSlotCount` in `irSlots.ts` — the server's rule,
@@ -84,6 +84,14 @@ IR-eligible player selected the open slot is a move target like any other.
 The row's `team · vs OPP · 7:00 PM` line comes from the selected date's
 schedule row (`gameDay.ts`: `gameOnDate` + `rowGameFor`), never from a
 placeholder — no opponent, no text.
+A player with more than one position leads that line with them (`C/LW ·
+EDM · vs CGY`; `multiPositionLabel` in `positions.ts`, the same reading the
+card and the three sheets print and the same union the server validates on
+save); a single-position row is unchanged. An IR occupant the NHL no longer
+lists IR/LTIR wears "Move off IR" (`shouldMoveOffIr` in `irSlots.ts`): the
+server tolerates him where he is and refuses only NEW placements of a player
+who is not listed IR/LTIR (`validateIrPlacements` in
+`server/src/lib/leagueRules.ts`).
 
 ### SlotPickerMenu ("Line change") and FillSlotSheet ("Fill a spot")
 Two directions of the same move, one bottom-sheet language. Line change is

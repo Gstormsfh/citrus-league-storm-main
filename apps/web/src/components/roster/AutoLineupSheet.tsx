@@ -6,6 +6,7 @@ import type { HockeyPlayer } from './HockeyPlayerCard';
 import { slotLabel } from './slotLabel';
 import { chipClassFor } from './slotChip';
 import { BENCH, summarisePlans, type AutoLineupPlan, type LineupMove } from './autoLineup';
+import { multiPositionLabel } from './positions';
 
 /**
  * AUTO LINEUP SHEET (2026-09-01, Sleeper parity audit R6)
@@ -108,6 +109,10 @@ function MoveRow({ move }: { move: LineupMove }) {
   const p = move.player;
   const plays = p.nextGame?.isToday === true;
   const proj = Number(p.projectedPoints) || 0;
+  // The planner already places a C/LW wherever the lineup is thinnest;
+  // the row now says he is C/LW, so "BN -> LW2" for a centre reads as a
+  // plan and not a mistake (gap A). Empty for a single-position player.
+  const positions = multiPositionLabel(p);
   return (
     <li
       data-testid="auto-move"
@@ -123,6 +128,12 @@ function MoveRow({ move }: { move: LineupMove }) {
       <span className="min-w-0 flex-1">
         <span className="block truncate font-display text-[14px] font-bold text-pastel-cream">{p.name}</span>
         <span className="block truncate text-[11px] font-display text-white/55">
+          {positions && (
+            <>
+              <span data-testid="move-positions" className="font-semibold text-pastel-cream/80">{positions}</span>
+              <span className="text-white/25" aria-hidden="true"> · </span>
+            </>
+          )}
           <span className="font-semibold">{teamOf(p)}</span>
           <span className="text-white/25" aria-hidden="true"> · </span>
           {gameLine(p)}

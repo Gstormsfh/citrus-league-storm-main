@@ -214,7 +214,12 @@ async function buildDemoPayload(week: number) {
       supabaseAdmin
         .from('player_season_stats')
         .select(
-          'player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_toi_seconds, goalie_gp, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_save_pct, nhl_gaa, nhl_shutouts, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, total_projected_points',
+          // projected_* and total_projected_points are NOT columns of
+          // player_season_stats (49 columns, checked 2026-09-03). Asking for
+          // them made PostgREST reject the whole select and the demo shipped
+          // empty stats from 2026-08-24. Projections live on
+          // player_ros_projections if the demo ever needs them.
+          'player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_toi_seconds, goalie_gp, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_save_pct, nhl_gaa, nhl_shutouts',
         )
         .in('player_id', playerIds),
     ]);
@@ -232,6 +237,8 @@ async function buildDemoPayload(week: number) {
       }
     }
     players = Array.from(newestByPlayer.values()).map((row) => ({ ...row, id: row.player_id }));
+    // A schema mismatch must be a loud failure, not an empty array.
+    if (statsResult.error) throw statsResult.error;
     playerStats = (statsResult.data ?? []) as Record<string, unknown>[];
   }
 

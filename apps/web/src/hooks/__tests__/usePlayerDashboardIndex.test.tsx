@@ -71,6 +71,9 @@ function row(id: number, name: string): DashboardIndexEntry {
     proj_wins: null,
     proj_saves: null,
     proj_shutouts: null,
+    toi_total_minutes: null, avg_toi_per_game: null, vopa_score: null,
+    gsax_raw: null, gsax_regressed: null, gsax_shots_faced: null, gsax_xga: null, gsax_ga: null,
+    as_of: null,
   };
 }
 

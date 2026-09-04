@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import type { DashboardIndexEntry } from '@/hooks/usePlayerDashboardIndex';
 import type { DashboardShot } from '@/hooks/usePlayerDashboard';
 import {
   GOALIE_METRICS,
   SKATER_METRICS,
   VERDICT_MAX_CHARS,
   deriveVerdict,
+  fmtSigned1,
+  type CardEntry,
 } from '../playerAdvancedMetrics';
 import {
   GOAL_LINE_X,
@@ -67,7 +68,7 @@ const CITRUS_SOURCE = /Citrus (?:xG|GAR|GSAx|ROS projection)|on the Citrus board
 // ── Fixtures ────────────────────────────────────────────────────────
 
 let nextId = 1;
-function entry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntry {
+function entry(over: Partial<CardEntry> = {}): CardEntry {
   return {
     id: nextId++,
     name: 'Test Player',
@@ -101,7 +102,7 @@ function entry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntry {
     gar_ppd: 0.05,
     gar_pen: 0.05,
     ...over,
-  } as DashboardIndexEntry;
+  } as CardEntry;
 }
 
 function skaterMetrics(spec: Record<string, { value: number | null; percentile: number | null }>) {
@@ -118,13 +119,28 @@ function skaterMetrics(spec: Record<string, { value: number | null; percentile: 
 function goalieMetrics(percentile: number) {
   return [
     {
-      spec: GOALIE_METRICS[0],
+      spec: GOALIE_METRICS.find((m) => m.key === 'save_pct')!,
       value: 0.918,
       display: '.918',
       percentile,
       cohortSize: 60,
       lowSample: false,
     },
+  ];
+}
+
+/** The GSAx row the goalie set now leads with (2026-09-03). */
+function gsaxMetrics(value: number, percentile: number) {
+  return [
+    {
+      spec: GOALIE_METRICS.find((m) => m.key === 'gsax')!,
+      value,
+      display: fmtSigned1(value),
+      percentile,
+      cohortSize: 60,
+      lowSample: false,
+    },
+    ...goalieMetrics(50),
   ];
 }
 
@@ -150,7 +166,8 @@ function shot(over: Partial<DashboardShot> = {}): DashboardShot {
  *
  * The skater cases walk the finishing decision table (elite/thin looks
  * crossed with hot/cold stick), the GAR driver rules in both directions, and
- * both fallbacks. The goalie cases walk all three save-rate readings. The
+ * both fallbacks. The goalie cases walk all three save-rate readings and
+ * the three GSAx readings that outrank them when the join is present. The
  * dashboard cases walk the three finishing phrases and both GSAx signs.
  */
 function everyVerdict(): Array<{ label: string; text: string }> {
@@ -172,6 +189,15 @@ function everyVerdict(): Array<{ label: string; text: string }> {
   for (const p of [84, 50, 12]) {
     push(`goalie save rate p${p}`, deriveVerdict(entry({ is_goalie: true, gp: 40 }), 'G', goalieMetrics(p), null, null));
   }
+  for (const [value, p] of [[8.2, 84], [1.2, 50], [-4.2, 12]] as Array<[number, number]>) {
+    push(
+      // Not prefixed `goalie GSAx`: that prefix is the DASHBOARD verdict's,
+      // which the length test below exempts. This one is a card line and
+      // must stay inside the tile budget.
+      `card GSAx p${p}`,
+      deriveVerdict(entry({ is_goalie: true, gp: 40, gsax_regressed: value, gsax_shots_faced: 1204 }), 'G', gsaxMetrics(value, p), null, null),
+    );
+  }
 
   const season = Array.from({ length: 60 }, () => shot({ x: 77, y: 1 }));
   push('shot verdict / ahead', deriveShotVerdict(summariseShots(season), 7.5));
@@ -190,9 +216,10 @@ describe('derived writeups: register conformance', () => {
   const CASES = everyVerdict();
 
   it('covers every branch of all three generators', () => {
-    // 25 sentences. A refactor that quietly collapses a branch would leave
-    // this file testing fewer sentences than it claims to.
-    expect(CASES.length).toBe(25);
+    // 28 sentences (25 until the goalie GSAx branch landed on 2026-09-03).
+    // A refactor that quietly collapses a branch would leave this file
+    // testing fewer sentences than it claims to.
+    expect(CASES.length).toBe(28);
     expect(new Set(CASES.map((c) => c.text)).size).toBe(CASES.length);
   });
 

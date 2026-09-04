@@ -1,8 +1,8 @@
 /**
  * THE AVAILABILITY CHIP THAT SITS BESIDE A PLAYER'S NAME, ON ANY LIST.
  *
- * Lifted out of `components/freeagents/freeAgentRow.ts` on 2026-09-02 so the
- * draft pool can wear the same chip. Not a style preference: `freeAgentRow.ts`
+ * Lifted out of `components/freeagents/freeAgentRowKit.ts` on 2026-09-02 so the
+ * draft pool can wear the same chip. Not a style preference: `freeAgentRowKit.ts`
  * imports `ScheduleService` for its game line, which reaches `@/api/client` and
  * therefore the Supabase client, and that module CALLS `createClient()` at
  * module scope and throws when `VITE_SUPABASE_*` are unset — which the vitest
@@ -14,7 +14,7 @@
  * `roster/positionChip.ts` give: a file that exports both a component and
  * plain values breaks react-refresh.
  *
- * `freeAgentRow.ts` re-exports both symbols, so every existing Free Agents
+ * `freeAgentRowKit.ts` re-exports both symbols, so every existing Free Agents
  * call site and test keeps working against the name it already uses.
  */
 

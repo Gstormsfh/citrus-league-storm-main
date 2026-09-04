@@ -318,13 +318,35 @@ def find_pass_before_shot(play, previous_plays, current_team_id):
         
         # Must be within 3 seconds (same as rebound detection)
         if 0 < time_diff <= 3.0:
-            # Extract passer ID from pass event
-            # Try playerId first, fallback to eventOwnerTeamId (team-level, less accurate)
-            passer_id = prev_details.get('playerId')
-            if not passer_id:
-                # Fallback: use eventOwnerTeamId (but this is team-level, not player-level)
-                # This is less ideal but better than nothing
-                passer_id = prev_team_id
+            # api-web names the acting player DIFFERENTLY per event type. Only
+            # giveaway and takeaway carry a bare `playerId`; shot-on-goal and
+            # missed-shot use `shootingPlayerId`, goal uses `scoringPlayerId`,
+            # hit uses `hittingPlayerId`, blocked-shot uses `blockingPlayerId`.
+            # So the primary lookup below missed on almost every event and the
+            # old fallback wrote `eventOwnerTeamId`, a TEAM id, into a
+            # player-keyed column.
+            #
+            # Measured on production 2026-09-03: 63,069 non-null passer_id
+            # values across seasons 2017-2025, of which ZERO were real player
+            # ids. All 63,069 equalled event_owner_team_id, and the 32 distinct
+            # values mapped one-to-one onto team codes. min 1, max 68, over
+            # 1,024,625 shots. The column was not partly wrong; it was entirely
+            # wrong, and the daily player-directory job then asked the NHL API
+            # for "player 1" thirty-two times a night.
+            #
+            # No xG feature reads passer_id: the 7 MOAT pass features and
+            # has_pass_before_shot are all gated on `pass_play`, so the V4
+            # feature vector is byte-identical either way and no retrain is
+            # implied. A missing actor is NULL. Never substitute a team id: a
+            # wrong id is worse than no id, because it looks like data.
+            passer_id = (
+                prev_details.get('playerId')
+                or prev_details.get('shootingPlayerId')
+                or prev_details.get('scoringPlayerId')
+                or prev_details.get('hittingPlayerId')
+                or prev_details.get('blockingPlayerId')
+                or None
+            )
             
             return {
                 'pass_play': prev_play,

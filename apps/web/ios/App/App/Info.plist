@@ -44,6 +44,20 @@
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- PRIVACY PURPOSE STRINGS (2026-09-04 ship audit). apps/web/src/pages/Profile.tsx
+	     renders <input type="file" accept="image/*"> for the avatar (line ~1091).
+	     In WKWebView that presents iOS's own picker, and its "Take Photo" option
+	     opens the camera. Touching the camera with NO NSCameraUsageDescription is
+	     not a soft failure: iOS kills the process on the spot (SIGABRT, "attempted
+	     to access privacy-sensitive data without a usage description"). A reviewer
+	     tapping the profile avatar would have crashed the app. Apple also requires
+	     a purpose string for the key to clear review at all (5.1.1).
+	     Both keys describe real, user-initiated functionality; nothing else in the
+	     app touches either API. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Citrus uses the camera only when you choose to take a new profile photo.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Citrus accesses your photos only when you choose one as your profile picture.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

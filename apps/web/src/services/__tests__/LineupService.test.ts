@@ -557,6 +557,79 @@ describe('LineupService.saveLineup', () => {
       })
     );
   });
+
+  // THE SERVER SAID NO (2026-09-03). The catch block treated a 4xx like a
+  // dead network: stash the lineup in localStorage and resolve. So every
+  // refusal the server writes for the manager (validateSlotAssignments and
+  // validateIrPlacements in server/src/lib/leagueRules.ts, the game-lock
+  // 409) vanished, the roster page toasted "Lineup Updated", and the server
+  // kept a different lineup. The shapes below are what api/client.ts throws:
+  // an ApiError carries the HTTP status and the server's sentence; a request
+  // the server never answered is a fetch TypeError, a TimeoutError, or the
+  // client's own status-0 ApiError once its retries are spent.
+  describe('when the server refuses the lineup (a 4xx)', () => {
+    const LEAGUE = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+    const lineup = { starters: ['101'], bench: ['201'], ir: ['301'], slotAssignments: { '101': 'slot-C-1', '301': 'ir-slot-1' } };
+    const refusal = (status: number, message: string) =>
+      Object.assign(new Error(message), { name: 'ApiError', status });
+
+    it.each([
+      [400, "Connor McDavid isn't listed IR or LTIR, so an IR slot can't hold him. Bench him, or move a player with official IR/LTIR status there."],
+      [400, 'This league has 3 IR slots and 4 players are headed there. Bench one first.'],
+      [400, 'A G player cannot fill slot-C-1.'],
+      [409, "Connor McDavid's game has started."],
+      [403, 'You can only edit your own lineup'],
+    ])('rejects with the server sentence and status %s when asked to, and writes nothing to localStorage', async (status, message) => {
+      const thrown = refusal(status, message);
+      mockRosterApi.saveLineup.mockRejectedValue(thrown);
+
+      const err = await LineupService.saveLineup('team-1', LEAGUE, lineup, '2026-03-08', { rejectOnRefusal: true })
+        .then(() => null, (e: unknown) => e);
+
+      // The very error the client threw, so the page can read .status and .message.
+      expect(err).toBe(thrown);
+      expect((err as Error).message).toBe(message);
+      expect((err as { status: number }).status).toBe(status);
+      expect(localStorageMock.setItem).not.toHaveBeenCalled();
+      // The server still holds the lineup it had; the caches stay valid.
+      expect(MatchupService.clearRosterCache).not.toHaveBeenCalled();
+      expect(RosterCacheService.clearCache).not.toHaveBeenCalled();
+    });
+
+    it('resolves for a caller that did not ask (the background initialisers), still writing nothing', async () => {
+      mockRosterApi.saveLineup.mockRejectedValue(refusal(403, 'You can only edit your own lineup'));
+
+      await expect(LineupService.saveLineup('team-1', LEAGUE, lineup)).resolves.toBeUndefined();
+
+      expect(localStorageMock.setItem).not.toHaveBeenCalled();
+      expect(MatchupService.clearRosterCache).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when the server never answered', () => {
+    const LEAGUE = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+    const lineup = { starters: ['101'], bench: [], ir: [], slotAssignments: {} };
+
+    it.each([
+      ['a fetch TypeError', new TypeError('Failed to fetch')],
+      ['a timeout', Object.assign(new Error('The operation was aborted'), { name: 'TimeoutError' })],
+      ['the client\'s status-0 ApiError after its retries', Object.assign(new Error('Network error, retrying'), { name: 'ApiError', status: 0 })],
+      ['a 503 the retries never got past', Object.assign(new Error('Server returned 503'), { name: 'ApiError', status: 503 })],
+      ['an error with no status at all', new Error('API unavailable')],
+    ])('%s falls back to localStorage as before, even when refusals would reject', async (_label, thrown) => {
+      mockRosterApi.saveLineup.mockRejectedValue(thrown);
+
+      await expect(
+        LineupService.saveLineup('team-1', LEAGUE, lineup, '2026-03-08', { rejectOnRefusal: true }),
+      ).resolves.toBeUndefined();
+
+      expect(localStorageMock.setItem).toHaveBeenCalledWith('lineup_team_team-1', expect.any(String));
+      const stored = JSON.parse(localStorageMock.setItem.mock.calls[0][1] as string);
+      expect(stored).toEqual({ starters: ['101'], bench: [], ir: [], slotAssignments: {} });
+      expect(MatchupService.clearRosterCache).toHaveBeenCalledWith('team-1', LEAGUE);
+      expect(RosterCacheService.clearCache).toHaveBeenCalledWith('team-1', LEAGUE);
+    });
+  });
 });
 
 // =============================================================================

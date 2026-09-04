@@ -5,7 +5,13 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  // `dist` is the web build; `ios/App/App/public` is the same build after
+  // `cap sync` copies it into the Capacitor shell, and `android/` would be
+  // its twin. Neither is source: they are generated, untracked, and they
+  // carry vendored files (workbox) whose own eslint-disable comments name
+  // rules this config does not load, which is what turned `npm run lint`
+  // red on 2026-09-03 with 10 errors that no source change could fix.
+  { ignores: ["dist", "ios/**", "android/**"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

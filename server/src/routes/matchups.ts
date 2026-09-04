@@ -4,12 +4,12 @@ import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware, commissionerMiddleware } from '../middleware/membership';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
-import { createUserClient } from '../lib/supabase';
+import { createUserClient, getSupabaseAdmin } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
-import { logger, COLUMNS, getCurrentSeason } from '@citrus/shared';
+import { logger, COLUMNS, getCurrentSeason, countsTowardRecord, toMatchupScore, getTodayMST } from '@citrus/shared';
 
 const matchupRoutes = new Hono<Env>();
 
@@ -18,16 +18,23 @@ matchupRoutes.use('*', authMiddleware);
 // ── League-scoped routes (membership verified via :leagueId) ─────────
 
 // GET /api/matchups/league/:leagueId — Get all matchups for a league
+//
+// With ?week=N this is the league scoreboard (audit M7): every row also
+// carries team1_projected_total / team2_projected_total, the projected
+// final per side, computed server-side from the same tables the matchup
+// page reads (MatchupService.getLeagueScoreboard). Without a week it is the
+// season-wide list standings and the timeline read, and no projection is
+// computed. The wire shape is LeagueScoreboardMatchup in @citrus/shared.
 matchupRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const week = c.req.query('week');
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
 
-  const { matchups, error } = await service.getLeagueMatchups(
-    leagueId,
-    week ? parseInt(week, 10) : undefined,
-  );
+  const weekNumber = week ? parseInt(week, 10) : undefined;
+  const { matchups, error } = weekNumber !== undefined && Number.isFinite(weekNumber)
+    ? await service.getLeagueScoreboard(leagueId, weekNumber)
+    : await service.getLeagueMatchups(leagueId, weekNumber);
 
   if (error) {
     return handleError(c, error, 'Failed to fetch matchups');
@@ -99,25 +106,44 @@ matchupRoutes.get('/league/:leagueId/team-record/:teamId', membershipMiddleware,
 
   let wins = 0;
   let losses = 0;
+  let ties = 0;
 
   interface MatchupRecord {
+    week_number: number;
     team1_id: string;
-    team2_id: string;
+    team2_id: string | null;
     team1_score: number | string | null;
     team2_score: number | string | null;
     status: string;
+    week_end_date: string | null;
   }
 
+  // THE RULE IS NOT WRITTEN HERE (2026-09-04 post-draft audit).
+  // `countsTowardRecord` in @citrus/shared is the one implementation of
+  // "does this week count", and LeagueService.getStandings +
+  // apps/web StandingsService already call it. This endpoint feeds the
+  // record under the team names on the Matchup ScoreCard, and it used to
+  // carry its own rule: `status === 'completed'` only, and no tie bucket.
+  // Two disagreements followed from that, both visible on one screen:
+  //   1. A week that is fully scored but not yet stamped 'completed' by
+  //      auto_complete_matchups (it runs on a schedule) counted on the
+  //      Standings page and not here.
+  //   2. A real tie was silently dropped by both counters, so a 4-3-1 team
+  //      read "4-3" here and "4-3-1" on Standings.
+  // A second implementation of this rule is how the "1-1-18 phantom ties"
+  // bug happened; see packages/shared/src/utils/standings.ts.
+  const todayStr = getTodayMST();
   ((matchups || []) as unknown as MatchupRecord[]).forEach((m) => {
-    if (m.status !== 'completed') return;
+    if (!countsTowardRecord(m, todayStr)) return;
     const isTeam1 = m.team1_id === teamId;
-    const myScore = parseFloat(String(isTeam1 ? m.team1_score : m.team2_score)) || 0;
-    const oppScore = parseFloat(String(isTeam1 ? m.team2_score : m.team1_score)) || 0;
+    const myScore = toMatchupScore(isTeam1 ? m.team1_score : m.team2_score);
+    const oppScore = toMatchupScore(isTeam1 ? m.team2_score : m.team1_score);
     if (myScore > oppScore) wins++;
     else if (oppScore > myScore) losses++;
+    else ties++;
   });
 
-  return ok(c, { wins, losses });
+  return ok(c, { wins, losses, ties });
 });
 
 // GET /api/matchups/league/:leagueId/simulations — Get simulation data for a league week
@@ -141,6 +167,12 @@ matchupRoutes.get('/league/:leagueId/simulations', membershipMiddleware, async (
 
   const { data, error } = await query;
   if (error) {
+    // 42P01 = relation does not exist. matchup_simulations has no migration
+    // and no scheduled writer (simulate_matchups.py is CATEGORY: UTILITY,
+    // manual), so as of 2026-09-03 this route 500'd on every call. An empty
+    // array is the honest answer the client already handles: no simulations.
+    // Any other error is still a failure.
+    if ((error as { code?: string }).code === '42P01') return ok(c, []);
     return handleError(c, error, 'Failed to fetch simulations');
   }
 
@@ -183,19 +215,107 @@ matchupRoutes.delete('/league/:leagueId', commissionerMiddleware, async (c) => {
   return ok(c, { success: true });
 });
 
-// POST /api/matchups/league/:leagueId/generate — Generate matchups (commissioner only)
-matchupRoutes.post('/league/:leagueId/generate', commissionerMiddleware, validateBody(schemas.matchupGenerate), async (c) => {
+// POST /api/matchups/league/:leagueId/generate — Generate matchups
+//
+// WHO MAY CALL THIS, AND WHY IT IS NO LONGER COMMISSIONER-ONLY (2026-09-04).
+//
+// The season schedule is built lazily. Nothing creates it when a draft ends:
+// the v2 engine's `draft_completed` trigger syncs rosters and stops, and the
+// only other caller of MatchupService.generateMatchupsForLeague is the v1
+// client pick path, which the v2 draft room never touches. So for a league
+// that has just drafted, THIS ROUTE is the only thing in the product that
+// ever writes a schedule, and Matchup.tsx reaches it by noticing the void and
+// asking for one.
+//
+// While it was commissioner-only, the first eleven managers of a twelve-team
+// league to open the Matchup tab after their draft hit a dead end: the
+// generate call 403'd, Matchup.tsx surfaced it as a full-page error reading
+// "Access denied: Commissioner privileges required", and there they stayed
+// until the commissioner happened to open that same tab. Verified against
+// production: league "Test at golf" finished a clean 252-pick draft with 252
+// roster rows across 12 teams, and 0 matchups.
+//
+// A member may now fill that void, under three conditions that together make
+// his schedule the same one the commissioner would have produced:
+//   1. the league must currently hold NO matchups. A member can create a
+//      schedule where none exists; he can never edit or extend one.
+//   2. every team id in the body must belong to this league, so a foreign
+//      team cannot be smuggled into the round robin.
+//   3. forceRegenerate is forced to false for a member. It DELETES the
+//      schedule, and that is not a repair, it is an act of authority. Note
+//      that REFUSING the flag would have been wrong: Matchup.tsx computes it
+//      as `!hasAnyMatchups`, so the empty league this route exists to serve
+//      is precisely the one whose client asks to force. Normalizing it costs
+//      the member nothing (there is nothing to delete) and closes the path
+//      permanently.
+// The write then goes through the admin client on purpose: the sole INSERT
+// policy on `matchups` is "Commissioners can manage matchups", so RLS would
+// refuse the member's own token even after these checks pass.
+//
+// The commissioner's path is unchanged in every respect - his own token, his
+// own client, forceRegenerate available.
+matchupRoutes.post('/league/:leagueId/generate', membershipMiddleware, validateBody(schemas.matchupGenerate), async (c) => {
   const leagueId = c.req.param('leagueId');
   const body = getValidatedBody<z.infer<typeof schemas.matchupGenerate>>(c);
+  const userId = c.get('userId') as string;
 
-  const supabase = createUserClient(c.get('userToken'));
+  const userClient = createUserClient(c.get('userToken'));
+  const { isCommissioner } = await new LeagueMembershipService(userClient)
+    .checkMembership(leagueId, userId);
+
+  let supabase = userClient;
+
+  if (!isCommissioner) {
+    const admin = getSupabaseAdmin();
+
+    const { count: existingMatchups, error: countError } = await admin
+      .from('matchups')
+      .select('id', { count: 'exact', head: true })
+      .eq('league_id', leagueId);
+
+    if (countError) {
+      return handleError(c, countError, 'Failed to generate matchups');
+    }
+
+    if ((existingMatchups ?? 0) > 0) {
+      return fail(c, AppError.forbidden('Access denied: Commissioner privileges required'));
+    }
+
+    const { data: leagueTeams, error: teamsError } = await admin
+      .from('teams')
+      .select('id')
+      .eq('league_id', leagueId);
+
+    if (teamsError) {
+      return handleError(c, teamsError, 'Failed to generate matchups');
+    }
+
+    const ownTeams = new Set((leagueTeams ?? []).map((t) => (t as { id: string }).id));
+    const requested = (body.teams as Array<{ id: string }>).map((t) => t.id);
+
+    if (requested.length === 0 || requested.some((id) => !ownTeams.has(id))) {
+      return fail(c, AppError.forbidden('A schedule must be built from this league\'s own teams'));
+    }
+
+    supabase = admin;
+  }
+
   const service = new MatchupService(supabase);
 
   const { error } = await service.generateMatchupsForLeague(
     leagueId,
     body.teams as Array<{ id: string }>,
     body.fantasyWeeks as Array<{ week_number: number; start_date: string; end_date: string }>,
-    body.forceRegenerate,
+    // A member's request is NORMALIZED, not merely refused. Matchup.tsx sets
+    // forceRegenerate from `!hasAnyMatchups` - so in exactly the empty-league
+    // case this route exists to unblock, the client asks to force. Refusing
+    // the flag would have 403'd every one of those managers and left the fix
+    // doing nothing at all. The emptiness check above already proves there is
+    // nothing to delete; pinning the flag to false as well means a member
+    // cannot reach the DELETE inside generateMatchupsForLeague by any route,
+    // even if that check is later loosened or the client starts sending the
+    // flag for a different reason.
+    isCommissioner ? body.forceRegenerate : false,
   );
 
   if (error) {
@@ -292,6 +412,43 @@ matchupRoutes.get('/:matchupId/lines', async (c) => {
   return ok(c, lines);
 });
 
+// ── Matchup-scoped reads that bypass RLS ────────────────────────────────
+/**
+ * IDOR guard for the matchup routes that read through the service-role client.
+ *
+ * MatchupService.getDailyLineup and getFrozenRoster both call getSupabaseAdmin()
+ * so that AI-team rows stay visible, which bypasses RLS on
+ * fantasy_daily_rosters entirely. Both routes take `teamId` from the query
+ * string. Without this check any signed-in user could read any team's frozen
+ * lineup for any matchup just by supplying the two UUIDs — including leagues
+ * they have never belonged to, and leagues they were removed from (RLS would
+ * deny them now, but the admin client never consults it).
+ *
+ * The lookup below deliberately uses the CALLER's token, not the admin client,
+ * so the `matchups` SELECT policy ("Users can view matchups in their leagues")
+ * is the gate: a caller outside the league gets no row back. The team check
+ * then pins the request to the two teams actually in that matchup, so
+ * membership in one league cannot be traded for a read of another league's
+ * team by pairing a visible matchupId with a foreign teamId.
+ */
+async function assertMatchupTeamVisible(
+  supabase: ReturnType<typeof createUserClient>,
+  matchupId: string,
+  teamId: string,
+): Promise<AppError | null> {
+  const { data, error } = await supabase
+    .from('matchups')
+    .select('team1_id, team2_id')
+    .eq('id', matchupId)
+    .maybeSingle();
+
+  if (error || !data) return AppError.notFound('Matchup');
+  if (teamId !== data.team1_id && teamId !== data.team2_id) {
+    return AppError.forbidden('That team is not in this matchup');
+  }
+  return null;
+}
+
 // GET /api/matchups/:matchupId/daily-lineup — Get frozen daily lineup
 matchupRoutes.get('/:matchupId/daily-lineup', async (c) => {
   const matchupId = c.req.param('matchupId');
@@ -304,6 +461,9 @@ matchupRoutes.get('/:matchupId/daily-lineup', async (c) => {
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
+
+  const denied = await assertMatchupTeamVisible(supabase, matchupId, teamId);
+  if (denied) return fail(c, denied);
 
   const { lineup, error } = await service.getDailyLineup(teamId, matchupId, date);
   if (error) {
@@ -325,6 +485,9 @@ matchupRoutes.get('/:matchupId/frozen-roster', async (c) => {
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
+
+  const denied = await assertMatchupTeamVisible(supabase, matchupId, teamId);
+  if (denied) return fail(c, denied);
 
   const { roster, error } = await service.getFrozenRoster(teamId, matchupId, date);
   if (error) {

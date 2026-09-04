@@ -18,6 +18,16 @@ import { logger } from '@/utils/logger';
 import { publicApi } from '@/api/public';
 import type { PostgrestError } from '@supabase/supabase-js';
 
+/**
+ * Shape of the `leagues` row this service reads back after creating the demo
+ * league. The COLUMNS.* constants widen to `string`, and supabase-js can only
+ * parse a select string it sees as a literal, so the row type is supplied
+ * explicitly at the call site instead of being inferred from the select.
+ */
+interface CreatedLeagueRow {
+  id: string;
+}
+
 /** Shape of a row from the `teams` table, used for demo league operations. */
 interface TeamRow {
   id: string;
@@ -129,10 +139,15 @@ export const DemoLeagueService = {
       }
       
       // Delete existing lineups
+      // The generated `team_lineups` Row is stale - production has `league_id`
+      // (see supabase/schema/production_snapshot_*.sql) but the checked-in type
+      // does not, so `.eq('league_id', ...)` falls into the filter-value
+      // resolver's JSON-path branch and exceeds the instantiation depth.
+      // `.filter(column, 'eq', value)` builds the identical PostgREST query.
       const { error: deleteLineupsError } = await supabase
         .from('team_lineups')
         .delete()
-        .eq('league_id', DEMO_LEAGUE_ID);
+        .filter('league_id', 'eq', DEMO_LEAGUE_ID);
       
       if (deleteLineupsError) {
         logger.warn('[DemoLeagueService] Error deleting lineups:', deleteLineupsError);
@@ -269,7 +284,7 @@ export const DemoLeagueService = {
             draft_status: 'completed',
             settings: {},
           })
-          .select(COLUMNS.LEAGUE)
+          .select<string, CreatedLeagueRow>(COLUMNS.LEAGUE)
           .single();
 
         if (leagueError) {
@@ -293,7 +308,7 @@ export const DemoLeagueService = {
               owner_id: null, // No user ownership - pillar of isolation
               team_name: teamData.name,
             })
-            .select(COLUMNS.TEAM)
+            .select<string, TeamRow>(COLUMNS.TEAM)
             .single();
 
           if (teamError) {
@@ -310,7 +325,7 @@ export const DemoLeagueService = {
         logger.log('[DemoLeagueService] Demo league exists but rosters not populated, getting existing teams...');
         const { data: existingTeams } = await supabase
           .from('teams')
-          .select(COLUMNS.TEAM)
+          .select<string, TeamRow>(COLUMNS.TEAM)
           .eq('league_id', DEMO_LEAGUE_ID);
         teams = existingTeams || [];
         logger.log(`[DemoLeagueService] Found ${teams.length} existing teams`);
@@ -531,7 +546,7 @@ export const DemoLeagueService = {
               full_name: hp.name,
               position: hp.position,
               team: hp.team || '',
-              points: hp.points || 0,
+              points: hp.stats?.points || 0,
             } as Player;
           }
           return player;
