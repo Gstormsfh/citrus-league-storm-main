@@ -42,10 +42,15 @@ export interface PressBoxChipsProps {
    * six fit, so they do not need it.
    */
   outlined?: boolean;
+  /**
+   * The Players screen's row: `5px 10px` where the settings screen's is
+   * `6px 10px`. One pixel, and the artboard is explicit about it on both.
+   */
+  compact?: boolean;
   className?: string;
 }
 
-export function PressBoxChips({ chips, activeKey, onSelect, label, outlined, className }: PressBoxChipsProps) {
+export function PressBoxChips({ chips, activeKey, onSelect, label, outlined, compact, className }: PressBoxChipsProps) {
   return (
     <div
       role="group"
@@ -66,7 +71,7 @@ export function PressBoxChips({ chips, activeKey, onSelect, label, outlined, cla
             onClick={() => onSelect?.(c.key)}
             className={cn(
               'rounded-full whitespace-nowrap',
-              outlined ? 'px-2.5 py-1.5' : 'px-[11px] py-[5px]',
+              outlined ? (compact ? 'px-2.5 py-[5px]' : 'px-2.5 py-1.5') : 'px-[11px] py-[5px]',
               c.trailing && 'ml-auto',
               active
                 ? 'bg-pressbox-text text-pressbox-surface'

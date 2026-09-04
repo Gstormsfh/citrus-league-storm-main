@@ -22,6 +22,24 @@ import type { FreeAgentRowProps } from './FreeAgentRow';
 /** Trending rows carry a 24-hour add count; the other two lists do not. */
 type WithAdds = { adds?: number; gamesThisWeek?: number | null };
 
+/**
+ * PLAYERS PAGE (2026-09-04): what the 60px column holds when the list is not
+ * the trending one. `movement` overrides the row's own `adds` (the DROPS
+ * view passes a negative count; `null` prints no movement at all, and the
+ * rank badge then shows no arrow). `figure` is a cream number for that same
+ * column — the projection on AVAILABLE, the game count on GAMES — and
+ * `seasonLine` is the second meta line while the projection is up in the
+ * column, so it is never printed twice on one row.
+ */
+export interface FreeAgentRowPressBoxExtras {
+  movement?: number | null;
+  figure?: string | null;
+  seasonLine?: string | null;
+  /** The watch-list star over the rank; see `PressBoxPlayerRow.onStar`. */
+  starred?: boolean;
+  onStar?: () => void;
+}
+
 export function FreeAgentRowPressBox({
   rank,
   player,
@@ -34,8 +52,15 @@ export function FreeAgentRowPressBox({
   disabled = false,
   onOpen,
   onAction,
-}: FreeAgentRowProps) {
+  movement,
+  figure = null,
+  seasonLine = null,
+  starred,
+  onStar,
+}: FreeAgentRowProps & FreeAgentRowPressBoxExtras) {
   const extra = player as unknown as WithAdds;
+  const adds24h =
+    movement !== undefined ? movement : typeof extra.adds === 'number' ? extra.adds : null;
   return (
     <PressBoxPlayerRow
       rank={rank}
@@ -48,7 +73,11 @@ export function FreeAgentRowPressBox({
       })}
       // The movement column is the trending list's; elsewhere the page's own
       // sub-label ("3 games") takes the slot under it, which is what it had.
-      adds24h={typeof extra.adds === 'number' ? extra.adds : null}
+      adds24h={adds24h}
+      figure={figure}
+      seasonLine={seasonLine}
+      starred={starred}
+      onStar={onStar}
       destination={subLabel ?? null}
       action={toPressBoxAction(action)}
       claimDay={claimDayFor(player, action)}

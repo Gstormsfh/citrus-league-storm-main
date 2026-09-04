@@ -26,6 +26,7 @@
  * movement column, and a player with no game gets no game clause rather than
  * "No game" manufactured at this layer.
  */
+import { Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Mug } from '@/components/roster/Mug';
 import type { MugPlayer } from '@/components/roster/headshot';
@@ -61,8 +62,31 @@ export interface PressBoxPlayerRowProps {
   rank?: number | null;
   /** Net adds over 24h. Positive is sage, negative grapefruit. */
   adds24h?: number | null;
+  /**
+   * PLAYERS PAGE (2026-09-04): the same 15px column carrying a number that
+   * is not a movement — the week's projection on the AVAILABLE list, the
+   * game count on the GAMES list. Cream, because it asserts no direction.
+   * Ignored when `adds24h` is given; the movement wins the column.
+   */
+  figure?: string | null;
   /** `→ Puck Norris`, `FREE AGENT`, `ON YOUR TEAM`. */
   destination?: string | null;
+  /**
+   * PLAYERS PAGE (2026-09-04): the watch-list star over the rank — the draft
+   * pool's queue star, same slot, same glyph, same meaning (keep an eye on
+   * him). Drawn only when the row carries no 24-hour movement, whose badge
+   * owns that slot on the TREND list; the phone had no way to star anyone
+   * before this, the toggle lived in a desktop table column.
+   */
+  starred?: boolean;
+  onStar?: () => void;
+  /**
+   * PLAYERS PAGE (2026-09-04): the second meta line when the projection has
+   * moved up into the column — `31 G · 45 A · 76 P`, the directory's season
+   * counts. Replaces the `WK PROJ` line rather than joining it, so a number
+   * is never printed twice on one row.
+   */
+  seasonLine?: string | null;
   action?: PressBoxPlayerAction;
   /** `THU` — the day a waiver claim clears, under the W. */
   claimDay?: string | null;
@@ -91,7 +115,11 @@ export function PressBoxPlayerRow({
   player,
   rank,
   adds24h,
+  figure = null,
   destination,
+  seasonLine = null,
+  starred = false,
+  onStar,
   action = 'add',
   claimDay,
   actionDisabled,
@@ -100,7 +128,13 @@ export function PressBoxPlayerRow({
   className,
 }: PressBoxPlayerRowProps) {
   const teamColor = player.teamAbbreviation ? getTeamColor(player.teamAbbreviation) : null;
-  const rising = adds24h != null && adds24h >= 0;
+  /**
+   * `null` when the row carries no 24-hour movement: the rank badge then
+   * shows the number alone. Until 2026-09-04 an absent count read as
+   * "falling" — every row of the AVAILABLE list wore a grapefruit `–`
+   * because `undefined >= 0` is false, which is not a fact about anyone.
+   */
+  const rising = adds24h != null ? adds24h >= 0 : null;
   const ownership: string[] = [];
   if (player.rosteredPct != null) ownership.push(`ROS ${player.rosteredPct}%`);
   if (player.startedPct != null) ownership.push(`START ${player.startedPct}%`);
@@ -112,17 +146,42 @@ export function PressBoxPlayerRow({
     >
       {rank != null && (
         <span className="w-[22px] flex-none flex flex-col items-center gap-0.5">
-          <span
-            aria-hidden="true"
-            className={cn(
-              'w-[18px] h-[18px] rounded-full flex items-center justify-center font-plex font-bold text-[11px]',
-              rising
-                ? 'bg-pressbox-sage/20 text-pressbox-sage'
-                : 'bg-pressbox-grapefruit/20 text-pressbox-grapefruit-text',
-            )}
-          >
-            {rising ? '+' : '–'}
-          </span>
+          {rising !== null ? (
+            <span
+              aria-hidden="true"
+              className={cn(
+                'w-[18px] h-[18px] rounded-full flex items-center justify-center font-plex font-bold text-[11px]',
+                rising
+                  ? 'bg-pressbox-sage/20 text-pressbox-sage'
+                  : 'bg-pressbox-grapefruit/20 text-pressbox-grapefruit-text',
+              )}
+            >
+              {rising ? '+' : '–'}
+            </span>
+          ) : (
+            onStar && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStar();
+                }}
+                aria-pressed={starred}
+                aria-label={starred ? `Remove ${player.name} from your watch list` : `Watch ${player.name}`}
+                data-testid="player-row-star"
+                className="focus-citrus relative flex h-[18px] w-[18px] items-center justify-center after:absolute after:-inset-[13px] after:content-['']"
+              >
+                <Star
+                  className={cn(
+                    'h-3.5 w-3.5',
+                    starred ? 'fill-pressbox-orange-soft text-pressbox-orange-soft' : 'text-pressbox-text/45',
+                  )}
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
+              </button>
+            )
+          )}
           <span className="font-plex font-semibold text-[11px] text-pressbox-text/60">{rank}</span>
         </span>
       )}
@@ -161,23 +220,30 @@ export function PressBoxPlayerRow({
           {player.note && <> · {player.note}</>}
         </span>
 
-        {(ownership.length > 0 || player.weekProjection != null) && (
+        {seasonLine ? (
           <span className={cn(PB_ROW_META, 'block mt-0.5 text-pressbox-text/55')}>
-            {ownership.join(' · ')}
-            {player.weekProjection != null && (
-              <>
-                {ownership.length ? ' · ' : ''}WK PROJ{' '}
-                <b className="text-pressbox-text font-semibold">{player.weekProjection.toFixed(1)}</b>
-              </>
-            )}
-            {player.gamesThisWeek != null && <> · {player.gamesThisWeek} GP</>}
+            {ownership.length ? `${ownership.join(' · ')} · ` : ''}
+            {seasonLine}
           </span>
+        ) : (
+          (ownership.length > 0 || player.weekProjection != null) && (
+            <span className={cn(PB_ROW_META, 'block mt-0.5 text-pressbox-text/55')}>
+              {ownership.join(' · ')}
+              {player.weekProjection != null && (
+                <>
+                  {ownership.length ? ' · ' : ''}WK PROJ{' '}
+                  <b className="text-pressbox-text font-semibold">{player.weekProjection.toFixed(1)}</b>
+                </>
+              )}
+              {player.gamesThisWeek != null && <> · {player.gamesThisWeek} GP</>}
+            </span>
+          )
         )}
       </button>
 
-      {(adds24h != null || destination) && (
+      {(adds24h != null || figure || destination) && (
         <span className="w-[60px] flex-none text-right">
-          {adds24h != null && (
+          {adds24h != null ? (
             <span
               className={cn(
                 'block font-plex font-semibold text-[15px] tabular-nums',
@@ -186,6 +252,12 @@ export function PressBoxPlayerRow({
             >
               {formatAdds(adds24h)}
             </span>
+          ) : (
+            figure && (
+              <span className="block font-plex font-semibold text-[15px] tabular-nums text-pressbox-text">
+                {figure}
+              </span>
+            )
           )}
           {destination && (
             <span className="block font-plex font-medium text-[9px] text-pressbox-text/45 truncate">

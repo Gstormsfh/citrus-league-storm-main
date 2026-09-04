@@ -26,6 +26,7 @@ export {
 export { PressBoxSegmented, type PressBoxSegmentedProps, type PressBoxSegment } from './Segmented';
 export { PressBoxTabs, type PressBoxTabsProps, type PressBoxTab } from './Tabs';
 export { PressBoxChips, type PressBoxChipsProps, type PressBoxChip } from './Chips';
+export { PressBoxActionGrid, type PressBoxActionGridProps, type PressBoxActionCell } from './ActionGrid';
 export { PressBoxSectionHead, type PressBoxSectionHeadProps } from './SectionHead';
 export { PressBoxTile, type PressBoxTileProps } from './Tile';
 export { PressBoxAppHeader, type PressBoxAppHeaderProps } from './AppHeader';

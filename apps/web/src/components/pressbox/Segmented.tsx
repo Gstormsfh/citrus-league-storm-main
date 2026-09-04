@@ -31,6 +31,18 @@ export interface PressBoxSegmentedProps {
   onSelect?: (key: string) => void;
   /** Names the group for a screen reader. `Standings view`, not `Tabs`. */
   label: string;
+  /**
+   * The Players screen's `▲ ADDS / ▼ DROPS`: a 6px well with `3px 9px`
+   * segments at 4px radius — smaller than the standings control because it
+   * shares a line with a section head rather than owning a row.
+   */
+  size?: 'default' | 'sm';
+  /**
+   * `sage` is the artboard's fill for that same toggle: the active segment
+   * is a DIRECTION of movement, not a neutral filter, and sage is what has
+   * happened. Everything else keeps the cream.
+   */
+  tone?: 'cream' | 'sage';
   className?: string;
 }
 
@@ -39,15 +51,19 @@ export function PressBoxSegmented({
   activeKey,
   onSelect,
   label,
+  size = 'default',
+  tone = 'cream',
   className,
 }: PressBoxSegmentedProps) {
+  const sm = size === 'sm';
   return (
     <div
       role="group"
       aria-label={label}
       className={cn(
         PB_TYPE,
-        'inline-flex gap-0.5 p-0.5 rounded-[8px] bg-pressbox-tile',
+        'inline-flex gap-0.5 p-0.5 bg-pressbox-tile',
+        sm ? 'rounded-[6px]' : 'rounded-[8px]',
         'font-plex font-semibold text-[10px] tracking-[0.06em]',
         className,
       )}
@@ -61,9 +77,15 @@ export function PressBoxSegmented({
             aria-pressed={active}
             onClick={() => onSelect?.(s.key)}
             className={cn(
-              'px-2.5 py-[5px] whitespace-nowrap',
+              'whitespace-nowrap',
+              sm ? 'px-[9px] py-[3px]' : 'px-2.5 py-[5px]',
               active
-                ? 'rounded-[6px] bg-pressbox-text text-pressbox-surface'
+                ? cn(
+                    sm ? 'rounded-[4px]' : 'rounded-[6px]',
+                    tone === 'sage'
+                      ? 'bg-pressbox-sage text-pressbox-surface'
+                      : 'bg-pressbox-text text-pressbox-surface',
+                  )
                 : 'text-pressbox-text/60',
             )}
           >

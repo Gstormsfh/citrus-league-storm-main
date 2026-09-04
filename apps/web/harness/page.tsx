@@ -323,6 +323,9 @@ const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   league: { path: '/league/:leagueId', at: '/league/harness-league' },
   // Roster reads the league off the QUERY STRING, not a path param.
   roster: { path: '/roster', at: '/roster?league=harness-league' },
+  // So does Free Agents — and the LeagueHeader's PLAYERS underline matches on
+  // the pathname, so under the harness's own path it lit LEAGUE instead.
+  freeagents: { path: '/free-agents', at: '/free-agents?league=harness-league' },
   // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
   // the week into the URL as soon as it resolves one. Under the old
   // `/matchup/:leagueId?` the very first push ("/matchup/harness-league/1")
