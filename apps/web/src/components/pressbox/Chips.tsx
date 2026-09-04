@@ -35,10 +35,17 @@ export interface PressBoxChipsProps {
   onSelect?: (key: string) => void;
   /** Names the row for a screen reader. `Position filter`, not `Chips`. */
   label: string;
+  /**
+   * The settings screen's chip: a hairline around the inactive ones. There
+   * the row scrolls off the right edge with six sections in it, and the
+   * outline is what tells you the chips continue past the fold — the draft's
+   * six fit, so they do not need it.
+   */
+  outlined?: boolean;
   className?: string;
 }
 
-export function PressBoxChips({ chips, activeKey, onSelect, label, className }: PressBoxChipsProps) {
+export function PressBoxChips({ chips, activeKey, onSelect, label, outlined, className }: PressBoxChipsProps) {
   return (
     <div
       role="group"
@@ -58,9 +65,12 @@ export function PressBoxChips({ chips, activeKey, onSelect, label, className }: 
             aria-pressed={active}
             onClick={() => onSelect?.(c.key)}
             className={cn(
-              'px-[11px] py-[5px] rounded-full whitespace-nowrap',
+              'rounded-full whitespace-nowrap',
+              outlined ? 'px-2.5 py-1.5' : 'px-[11px] py-[5px]',
               c.trailing && 'ml-auto',
-              active ? 'bg-pressbox-text text-pressbox-surface' : 'bg-pressbox-tile text-pressbox-text/70',
+              active
+                ? 'bg-pressbox-text text-pressbox-surface'
+                : cn('bg-pressbox-tile text-pressbox-text/70', outlined && 'border border-white/10'),
             )}
           >
             {c.label}
