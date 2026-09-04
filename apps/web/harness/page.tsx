@@ -20,6 +20,8 @@ import { PlayerService } from '../src/services/PlayerService';
 import { LeagueService } from '../src/services/LeagueService';
 import { ScheduleService } from '../src/services/ScheduleService';
 import { MatchupService } from '../src/services/MatchupService';
+import { DraftService } from '../src/services/DraftService';
+import { PlayoffService } from '../src/services/PlayoffService';
 import { matchupApi } from '../src/api/matchups';
 import { leagueApi } from '../src/api/leagues';
 import { rosterApi } from '../src/api/rosters';
@@ -94,7 +96,56 @@ const PRIORITY = Array.from({ length: 10 }, (_, i) => ({
   leagues: [{ id: 'harness-league', name: 'Harness League', commissioner_id: 'harness-user', draft_status: 'completed' }],
   error: null,
 });
-(LeagueService as any).getLeagueTeamsWithOwners = async () => ({ teams: PRIORITY.map(p => ({ id: p.team_id, name: p.team_name })), error: null });
+/**
+ * STANDINGS RENDER (2026-09-04). This returned `{ id, name }`, and the
+ * Standings page reads `team_name` off each row — so it threw on
+ * `undefined.substring`, swallowed it, and rendered "the league is still
+ * filling up" for a ten-team league. Every page that reads this fixture now
+ * gets the real shape, and the standings path is stubbed the rest of the way
+ * down: picks (so the stats path runs), the stats themselves, the score
+ * refresh no-ops, and a playoff picture with a clinch and an elimination in
+ * it so the sub-line has something to say.
+ */
+(LeagueService as any).getLeagueTeamsWithOwners = async () => ({
+  teams: PRIORITY.map((p, i) => ({
+    id: p.team_id, name: p.team_name, team_name: p.team_name, owner_name: p.owner_name,
+    owner_id: i === 1 ? 'harness-user' : `owner-${i + 1}`,
+  })),
+  error: null,
+});
+(DraftService as any).getDraftPicks = async () => ({
+  picks: MY_ROSTER.slice(0, 1).map((p: any) => ({ player_id: Number(p.id), team_id: 't1', round: 1, pick: 1 })),
+  error: null,
+});
+const HARNESS_RECORDS = [
+  [5, 0, 612.4, 498.1, 'W5', 5, 0], [4, 1, 588.9, 521.3, 'W2', 4, 1], [4, 1, 561.2, 530.0, 'L1', 4, 1],
+  [3, 2, 549.8, 540.2, 'W1', 3, 2], [3, 2, 533.0, 529.7, 'W1', 3, 2], [3, 2, 512.6, 515.9, 'L2', 3, 2],
+  [2, 3, 498.2, 538.1, 'L1', 2, 3], [2, 3, 487.7, 522.9, 'W1', 2, 3], [1, 4, 466.0, 551.4, 'L3', 1, 4],
+  [1, 4, 451.3, 560.8, 'L4', 1, 4],
+] as const;
+(LeagueService as any).calculateTeamStandings = async () =>
+  Object.fromEntries(
+    PRIORITY.map((p, i) => {
+      const [wins, losses, pointsFor, pointsAgainst, streak, w5, l5] = HARNESS_RECORDS[i];
+      return [p.team_id, { wins, losses, ties: 0, pointsFor, pointsAgainst, streak, last5: { wins: w5, losses: l5, ties: 0 }, gamesPlayed: 5 }];
+    }),
+  );
+(MatchupService as any).autoCompleteMatchups = async () => ({ error: null });
+(MatchupService as any).updateMatchupScores = async () => ({ error: null, updatedCount: 0 });
+(PlayoffService as any).getPlayoffPicture = async () => ({
+  picture: {
+    playoff_teams: 6,
+    teams: PRIORITY.map((p, i) => ({
+      team_id: p.team_id, team_name: p.team_name, rank: i + 1,
+      wins: HARNESS_RECORDS[i][0], losses: HARNESS_RECORDS[i][1], ties: 0,
+      pf: HARNESS_RECORDS[i][2], pa: HARNESS_RECORDS[i][3],
+      clinch_status: i === 0 ? 'clinched' : i === 9 ? 'eliminated' : 'in_contention',
+      magic_number: i > 0 && i < 6 ? 6 - i : 0,
+    })),
+  },
+  error: null,
+});
+(PlayoffService as any).getBracket = async () => ({ bracket: null, error: null });
 (WaiverService as any).getTeamWaiverClaims = async () => CLAIMS;
 (WaiverService as any).getWaiverPriority = async () => PRIORITY;
 (WaiverService as any).getAvailablePlayers = async () =>
