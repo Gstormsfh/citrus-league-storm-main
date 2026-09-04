@@ -29,7 +29,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
-import { PressBoxRosterList, PressBoxTeamCard } from '@/components/pressbox';
+import { LeagueHeader, LeagueMenu, PressBoxRosterList, PressBoxTeamCard } from '@/components/pressbox';
 import { buildRosterRows } from '@/components/pressbox/rosterRows';
 import { buildSlotConfig } from '@/components/roster/slotConfig';
 import { FillSlotSheet } from '@/components/roster/FillSlotSheet';
@@ -2142,6 +2142,28 @@ const Roster = () => {
 
   const stripDayLabel = useMemo(() => dayLabelFor(selectedDate || getTodayMST()), [selectedDate]);
 
+  /**
+   * `WK 3` for the Press Box header. Null until the week resolves — the
+   * header renders no week label at all rather than `WK 0`, which is what the
+   * page's own `selectedWeek === 0` sentinel would otherwise print.
+   */
+  /**
+   * The league menu, opened from the header's settings control. The page used
+   * to carry `MobileMenuButton` in its own phone header; the Press Box header
+   * replaced that bar, and for one commit the roster had NO menu at all on a
+   * phone. `mobileHeaderMenuGuard` did not catch it — it scans for pages
+   * containing the legacy header string, so this page simply dropped out of
+   * its list and the case vanished instead of failing. A guard that stops
+   * covering a screen is worse than one that fails on it; the guard now has a
+   * Press Box case too.
+   */
+  const [leagueMenuOpen, setLeagueMenuOpen] = useState(false);
+
+  const weekLabelForHeader = useMemo(
+    () => (selectedWeek > 0 ? `WK ${selectedWeek}` : null),
+    [selectedWeek],
+  );
+
   // OFFSEASON (2026-09-02). The gate below is roster-shaped, so a drafted
   // roster in September rendered the strip and it read "0/13 starters play ·
   // 0 on bench with games · proj 0.0" — with 27 days to the season opener and
@@ -3428,26 +3450,41 @@ const Roster = () => {
       </div>
       
       {/* MOBILE: Compact sticky header with roster context + hamburger menu */}
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-calistoga font-bold text-pastel-cream truncate">
-              {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Roster')}
-            </h1>
-            {activeLeague?.name && (
-              <div className="text-xs font-jbmono text-white/55 truncate -mt-0.5">
-                {activeLeague.name}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-            <span className="text-xs font-calistoga font-bold text-pastel-orange-soft">
-              {teamStats.record}
-            </span>
-            <MobileMenuButton />
-          </div>
-        </div>
+      {/* PRESS BOX HEADER (2026-09-04). This was a 48px bar carrying the team
+          name, the league name and the record — all three of which the team
+          card below it repeats, which is why the first player row started
+          343px down a 852px screen. The Press Box header carries the LEAGUE:
+          crest, name, the week, and the settings control.
+
+          `showSubTabs={false}`: this screen already has a strip (Roster /
+          Stats / Analytics / Transactions), and that is a different axis from
+          Match / Team / Players / League. Two condensed underline strips
+          stacked on one phone is a puzzle, not a header — the bottom nav is
+          what moves you between league screens. */}
+      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+        <LeagueHeader
+          weekLabel={weekLabelForHeader}
+          showSubTabs={false}
+          onSettingsPress={() => setLeagueMenuOpen(true)}
+        />
       </div>
+      <LeagueMenu
+        open={leagueMenuOpen}
+        onClose={() => setLeagueMenuOpen(false)}
+        leagueId={userTeam?.league_id ?? ''}
+        leagueName={activeLeague?.name ?? ''}
+        user={
+          profile
+            ? {
+                displayName:
+                  profile.display_name
+                  || (profile.username && !/^user_[0-9a-f]{6,}$/i.test(profile.username) ? profile.username : null)
+                  || 'You',
+                handle: profile.username ?? null,
+              }
+            : null
+        }
+      />
       
       {/* MOBILE: Full-screen scrollable content / DESKTOP: Grid layout */}
       <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
@@ -3777,7 +3814,19 @@ const Roster = () => {
                     wear the badge is desktop-only now. */}
                 {showTodayStrip && (
                   <TodayStrip
-                    className="mb-3 lg:mb-4"
+                    /* PRESS BOX (2026-09-04). The strip keeps every word and
+                       every number — it is the first thing a manager reads on
+                       a game day — but stops being a floating pill. On phones
+                       it is flush with the list below it: no rounding, no
+                       fill, a hairline top and bottom, and it spans the full
+                       column like the rows do. `TodayStrip` merges `className`
+                       last through `cn`, so this overrides its container
+                       without touching the component or the two test files
+                       that pin its content. The card returns at lg. */
+                    className={cn(
+                      'mb-0 -mx-3 rounded-none bg-transparent ring-0 border-y border-white/[0.08] px-3 py-2.5',
+                      'lg:mx-0 lg:mb-4 lg:rounded-xl lg:bg-pastel-surface-high lg:ring-1 lg:ring-white/10 lg:border-y-0',
+                    )}
                     summary={todaySummary}
                     dayLabel={stripDayLabel}
                     tense={isPastDate ? 'past' : 'present'}

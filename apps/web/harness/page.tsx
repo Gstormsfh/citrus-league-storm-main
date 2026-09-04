@@ -5,6 +5,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Suspense, lazy } from 'react';
 import '../src/index.css';
 import { CitrusToaster } from '../src/components/notifications/CitrusToaster';
+/**
+ * THE APP'S BOTTOM NAV (2026-09-04). `App.tsx` renders this on every route;
+ * this harness renders the PAGE only, so every screen reviewed here was
+ * missing the chrome a manager actually sees -- and the roster looked like it
+ * had lost its bottom buttons when nothing had changed. A page harness that
+ * omits the app frame answers a question nobody asked.
+ */
+import MobileBottomNav from '../src/components/MobileBottomNav';
 
 // Every network call the pages make, stubbed at the module object.
 import { WaiverService } from '../src/services/WaiverService';
@@ -341,6 +349,7 @@ createRoot(document.getElementById('root')!).render(
       )}
     </Suspense>
     <CitrusToaster />
+    <MobileBottomNav />
   </MemoryRouter>
   </QueryClientProvider>,
 );

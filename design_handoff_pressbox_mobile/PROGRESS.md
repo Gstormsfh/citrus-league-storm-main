@@ -750,3 +750,51 @@ header changes navigation, so it is its own commit.
 
 446/446 source-walking guards (three of them new), 71/71 Press Box, `tsc` exit
 0, `eslint` 0 errors.
+
+---
+
+## PR4g — the rest of the roster's chrome (2026-09-04)
+
+**The harness was still hiding the app frame.** `App.tsx` renders
+`MobileBottomNav` on every route; `page.html` mounted the PAGE only, so every
+screen reviewed there was missing the nav a manager actually sees — and the
+roster looked like it had lost its bottom buttons when nothing had changed.
+The harness renders it now. (The four team-card actions were never missing:
+measured at 32px, y=110, all four visible.)
+
+**The page header is `LeagueHeader`.** The old bar carried the team name, the
+league name and the record — all three repeated by the card directly beneath
+it, which is why the first player row started **343px down an 852px screen**.
+The Press Box header carries the LEAGUE: crest, name, week, settings.
+
+`showSubTabs={false}` is new on that component. This screen already has a
+strip (Roster / Stats / Analytics / Transactions) and that is a different axis
+from Match / Team / Players / League; two condensed underline strips stacked
+on one phone is a puzzle, not a header. The bottom nav is what moves between
+league screens.
+
+**A regression I caused and nearly shipped.** Dropping the old header dropped
+`MobileMenuButton` with it, so for one commit the roster had NO menu on a
+phone. `mobileHeaderMenuGuard` did not fail — it scans for pages containing
+the legacy header string, so the page fell out of its list and the case
+VANISHED. One fewer passing test, no failure. A guard that quietly narrows its
+own scope is worse than one that fails.
+
+Fixed both ways: `LeagueMenu` is mounted and opens from the header's settings
+control, and the guard gained a Press Box describe — a page mounting
+`LeagueHeader` must mount `LeagueMenu` and must wire `onSettingsPress`. The
+two describes together now cover every phone header in the app, old or new.
+
+**The TODAY strip stops being a floating pill** and goes flush with the list:
+no rounding, no fill, hairline top and bottom, full column width. Done from
+the CALL SITE — `TodayStrip` merges `className` last through `cn` — so the
+shared component and the two test files pinning its content are untouched, and
+the card returns at lg.
+
+**Still legacy: the bottom nav.** `PressBoxBottomNav` exists and is tested, but
+`MobileBottomNav` carries route-hiding that keeps it off every draft route,
+pinned by fifteen cases. Swapping it blind would put a nav in the draft room
+four days before the rehearsal, so the swap happens with the draft-room work,
+where those routes are already under test.
+
+446/446 source-walking guards, `tsc` exit 0, `eslint` 0 errors.

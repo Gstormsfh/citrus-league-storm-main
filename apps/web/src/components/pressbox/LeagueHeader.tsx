@@ -39,6 +39,15 @@ export interface LeagueHeaderProps {
    * else the icon takes the manager to League HQ, where the sheet lives.
    */
   onSettingsPress?: () => void;
+  /**
+   * Draw the four-column sub-tab strip. OFF on a screen that already carries
+   * its own strip: the Roster page has Roster / Stats / Analytics /
+   * Transactions, which is a different axis from Match / Team / Players /
+   * League, and two condensed underline strips stacked on one phone is a
+   * navigation puzzle rather than a header. The identity row is what that
+   * screen needs from this component.
+   */
+  showSubTabs?: boolean;
   className?: string;
 }
 
@@ -57,7 +66,13 @@ const SUB_TABS: SubTab[] = [
   { key: 'league', label: 'League', to: (id) => `/league/${id}`, match: (p) => p.startsWith('/league') || p.startsWith('/standings') },
 ];
 
-export function LeagueHeader({ weekLabel, onWeekPress, onSettingsPress, className }: LeagueHeaderProps) {
+export function LeagueHeader({
+  weekLabel,
+  onWeekPress,
+  onSettingsPress,
+  showSubTabs = true,
+  className,
+}: LeagueHeaderProps) {
   const league = useLeague();
   const location = useLocation();
   const navigate = useNavigate();
@@ -128,6 +143,7 @@ export function LeagueHeader({ weekLabel, onWeekPress, onSettingsPress, classNam
       </div>
 
       {/* Row 2 — the four-column sub-tab strip */}
+      {showSubTabs && (
       <nav
         className="grid grid-cols-4 border-b border-white/[0.08]"
         style={{ height: HEADER_SUBTAB_H }}
@@ -160,6 +176,7 @@ export function LeagueHeader({ weekLabel, onWeekPress, onSettingsPress, classNam
           );
         })}
       </nav>
+      )}
     </header>
   );
 }

@@ -29,6 +29,36 @@ const pagesWithHeader: Array<[string, string]> = readdirSync(pagesDir)
   .map((f) => [f, readFileSync(join(pagesDir, f), 'utf-8')] as [string, string])
   .filter(([, text]) => text.includes(HEADER));
 
+/**
+ * PRESS BOX (2026-09-04). A converted screen drops the legacy header string
+ * entirely, so it falls out of `pagesWithHeader` and this guard silently
+ * STOPS COVERING IT — which is exactly what happened to Roster.tsx: it shipped
+ * for one commit with no menu on a phone at all, and no case failed, because
+ * the case had disappeared. A guard that quietly narrows its own scope is
+ * worse than one that fails.
+ *
+ * So the Press Box header gets the same contract: a page that mounts
+ * `LeagueHeader` must mount `LeagueMenu` and must wire the header's settings
+ * control to open it. The two describes together cover every phone header in
+ * the app, old chrome or new.
+ */
+const pagesWithPressBoxHeader: Array<[string, string]> = readdirSync(pagesDir)
+  .filter((f) => f.endsWith('.tsx'))
+  .map((f) => [f, readFileSync(join(pagesDir, f), 'utf-8')] as [string, string])
+  .filter(([, text]) => text.includes('<LeagueHeader'));
+
+describe('every Press Box header reaches the league menu', () => {
+  it.each(pagesWithPressBoxHeader.map(([f]) => [f] as const))(
+    '%s mounts LeagueMenu and opens it from the header',
+    (file) => {
+      const text = pagesWithPressBoxHeader.find(([f]) => f === file)![1];
+      expect(text, `${file} mounts LeagueHeader without LeagueMenu`).toContain('<LeagueMenu');
+      const header = text.slice(text.indexOf('<LeagueHeader'), text.indexOf('/>', text.indexOf('<LeagueHeader')) + 2);
+      expect(header, `${file} header has no way to open the menu`).toContain('onSettingsPress');
+    },
+  );
+});
+
 describe('every mobile chrome header carries the menu button', () => {
   it('the header pattern is in use', () => {
     expect(pagesWithHeader.length).toBeGreaterThanOrEqual(9);
