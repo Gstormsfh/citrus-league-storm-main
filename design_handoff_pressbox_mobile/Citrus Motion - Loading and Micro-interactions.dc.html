@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Barlow:wght@400;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#07100b;color:#F3EFE6;font-family:Barlow,sans-serif}
+a{color:#FF9F66}a:hover{color:#FF6B1A}
+@keyframes cz-spin{to{transform:rotate(360deg)}}
+@keyframes cz-puck{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-10px) scale(1.04)}}
+@keyframes cz-shadow{0%,100%{transform:scaleX(1);opacity:.35}50%{transform:scaleX(.7);opacity:.18}}
+@keyframes cz-bar{0%{width:8%}40%{width:46%}70%{width:71%}100%{width:92%}}
+@keyframes cz-tips{0%,28%{opacity:1;transform:translateY(0)}33%,95%{opacity:0;transform:translateY(-6px)}100%{opacity:1;transform:translateY(0)}}
+@keyframes cz-tips2{0%,30%{opacity:0;transform:translateY(6px)}33%,61%{opacity:1;transform:translateY(0)}66%,100%{opacity:0;transform:translateY(-6px)}}
+@keyframes cz-tips3{0%,63%{opacity:0;transform:translateY(6px)}66%,94%{opacity:1;transform:translateY(0)}98%,100%{opacity:0}}
+@keyframes cz-scan{0%{transform:translateY(-100%)}100%{transform:translateY(100%)}}
+@keyframes cz-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(1.35)}}
+@keyframes cz-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes cz-fill{0%{width:0}100%{width:64%}}
+@keyframes cz-tick{0%{transform:translateY(0)}45%{transform:translateY(0)}55%{transform:translateY(-20px)}100%{transform:translateY(-20px)}}
+@keyframes cz-flash{0%,40%{background:transparent}50%{background:rgba(132,165,125,.22)}100%{background:transparent}}
+@keyframes cz-swap-a{0%,30%{transform:translateY(0)}55%,100%{transform:translateY(56px)}}
+@keyframes cz-swap-b{0%,30%{transform:translateY(0)}55%,100%{transform:translateY(-56px)}}
+@keyframes cz-underline{0%,35%{transform:translateX(0)}55%,100%{transform:translateX(100%)}}
+@keyframes cz-goal{0%{transform:scale(.6);opacity:0}15%{transform:scale(1.05);opacity:1}25%{transform:scale(1)}80%{opacity:1}100%{opacity:0}}
+@keyframes cz-dots{0%,20%{opacity:.2}50%{opacity:1}100%{opacity:.2}}
+</style>
+</helmet>
+<section style="padding:40px;display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><span style="font:600 12px/1 'IBM Plex Mono',monospace;letter-spacing:.22em;color:#FF9F66;text-transform:uppercase">Turn 2</span><span style="font:700 22px 'Barlow Condensed',sans-serif;text-transform:uppercase">Motion — loading screen + micro-interactions (Press Box)</span><span style="font:400 13px Barlow,sans-serif;color:rgba(243,239,230,.6)">All timings below are the spec. Everything loops so reviewers can watch it.</span></div>
+  <div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">
+
+    <!-- LOADING SCREEN -->
+    <div id="2a" data-screen-label="2a · App loading" style="width:390px;height:844px;flex:none;background:#0C1811;border-radius:44px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.08)">
+      <a href="#2a" style="position:absolute;left:16px;top:16px;font:700 11px 'IBM Plex Mono',monospace;background:#FF6B1A;color:#2a1000;padding:4px 7px;border-radius:4px;text-decoration:none;z-index:2">2a</a>
+      <div style="position:absolute;inset:0;background:radial-gradient(ellipse 70% 45% at 50% 38%,rgba(255,107,26,.16),transparent 70%)"></div>
+      <div style="position:absolute;inset:0;background:repeating-linear-gradient(180deg,rgba(255,255,255,.02) 0 1px,transparent 1px 3px)"></div>
+      <div style="position:absolute;left:0;right:0;top:0;height:140px;background:linear-gradient(180deg,transparent,rgba(255,255,255,.04),transparent);animation:cz-scan 3.2s linear infinite;pointer-events:none"></div>
+      <div style="position:absolute;left:0;right:0;top:250px;display:flex;flex-direction:column;align-items:center">
+        <div style="position:relative;width:120px;height:140px;display:flex;align-items:flex-start;justify-content:center">
+          <div style="width:96px;height:96px;animation:cz-puck 1.6s cubic-bezier(.45,0,.55,1) infinite"><div style="width:96px;height:96px;animation:cz-spin 6s linear infinite"><img src="apps/web/public/favicon.svg" alt="" style="width:96px;height:96px;display:block;filter:drop-shadow(0 12px 24px rgba(255,107,26,.35))"></div></div>
+          <div style="position:absolute;bottom:14px;width:70px;height:10px;border-radius:50%;background:#000;filter:blur(6px);animation:cz-shadow 1.6s cubic-bezier(.45,0,.55,1) infinite"></div>
+        </div>
+        <div style="font:800 30px 'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.06em;margin-top:8px">Citrus</div>
+        <div style="font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.3em;color:#FF9F66;text-transform:uppercase;margin-top:6px">Fantasy hockey</div>
+        <div style="width:200px;height:3px;border-radius:2px;background:rgba(255,255,255,.08);margin-top:34px;overflow:hidden"><div style="height:100%;background:linear-gradient(90deg,#FF6B1A,#FF9F66);animation:cz-bar 2.8s cubic-bezier(.2,.7,.3,1) infinite"></div></div>
+        <div style="position:relative;height:40px;width:300px;margin-top:18px;text-align:center;font:400 13px Barlow,sans-serif;color:rgba(243,239,230,.7)">
+          <div style="position:absolute;inset:0;animation:cz-tips 8.4s ease-in-out infinite"><b style="color:#F3EFE6">Pulling tonight's lines</b><br>9 games · 27 of your players dressed</div>
+          <div style="position:absolute;inset:0;opacity:0;animation:cz-tips2 8.4s ease-in-out infinite"><b style="color:#F3EFE6">Stormy tip</b><br>Tap a position chip to swap without leaving the page</div>
+          <div style="position:absolute;inset:0;opacity:0;animation:cz-tips3 8.4s ease-in-out infinite"><b style="color:#F3EFE6">Waivers run 2:00 AM MT</b><br>You're #7 in Finalsz</div>
+        </div>
+      </div>
+      <div style="position:absolute;left:0;right:0;bottom:44px;display:flex;flex-direction:column;align-items:center;gap:8px"><img src="apps/web/public/mascots/mascot-stormy.webp" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,159,102,.4)"><div style="font:500 9px 'IBM Plex Mono',monospace;letter-spacing:.2em;color:rgba(243,239,230,.45);text-transform:uppercase;display:flex;gap:4px;align-items:center">Live xG scoring<span style="display:inline-flex;gap:3px;margin-left:4px"><i style="width:3px;height:3px;border-radius:50%;background:#FF9F66;animation:cz-dots 1.2s infinite"></i><i style="width:3px;height:3px;border-radius:50%;background:#FF9F66;animation:cz-dots 1.2s .2s infinite"></i><i style="width:3px;height:3px;border-radius:50%;background:#FF9F66;animation:cz-dots 1.2s .4s infinite"></i></span></div></div>
+    </div>
+
+    <!-- SKELETON PAGE LOAD -->
+    <div id="2b" data-screen-label="2b · Page skeleton" style="width:390px;height:844px;flex:none;background:#0C1811;border-radius:44px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.08)">
+      <a href="#2b" style="position:absolute;left:16px;top:16px;font:700 11px 'IBM Plex Mono',monospace;background:#FF6B1A;color:#2a1000;padding:4px 7px;border-radius:4px;text-decoration:none;z-index:2">2b</a>
+      <div style="height:54px"></div>
+      <div style="background:repeating-linear-gradient(180deg,rgba(255,255,255,.025) 0 1px,transparent 1px 3px);padding:6px 12px 0">
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:18px;color:rgba(243,239,230,.7)">‹</span><div style="width:30px;height:30px;border-radius:8px;background:#1f3327;display:flex;align-items:center;justify-content:center;font:800 12px 'Barlow Condensed',sans-serif">FZ</div><span style="font:800 22px 'Barlow Condensed',sans-serif;text-transform:uppercase;flex:1">Finalsz</span></div>
+        <div style="display:flex;margin-top:10px;font:700 13px 'Barlow Condensed',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:rgba(243,239,230,.5)"><div style="flex:1;text-align:center;padding:8px 0 10px">Match</div><div style="flex:1;text-align:center;padding:8px 0 10px;color:#F3EFE6;border-bottom:2px solid #84A57D">Team</div><div style="flex:1;text-align:center;padding:8px 0 10px">Players</div><div style="flex:1;text-align:center;padding:8px 0 10px">League</div></div>
+      </div>
+      <div style="border-top:1px solid rgba(255,255,255,.08);padding:10px 12px 0;display:flex;flex-direction:column;gap:10px">
+        <div style="height:92px;border-radius:14px;background:linear-gradient(90deg,#16241B 25%,#1d2e23 50%,#16241B 75%);background-size:200% 100%;animation:cz-shimmer 1.6s ease-in-out infinite"></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 2px"><div style="width:110px;height:14px;border-radius:4px;background:linear-gradient(90deg,#16241B 25%,#1d2e23 50%,#16241B 75%);background-size:200% 100%;animation:cz-shimmer 1.6s ease-in-out infinite"></div><div style="width:120px;height:14px;border-radius:4px;background:linear-gradient(90deg,#16241B 25%,#1d2e23 50%,#16241B 75%);background-size:200% 100%;animation:cz-shimmer 1.6s ease-in-out infinite"></div></div>
+        <div style="display:flex;flex-direction:column">
+          <div style="display:grid;grid-template-columns:30px 30px 1fr 52px 44px;gap:8px;align-items:center;height:56px;border-top:1px solid rgba(255,255,255,.06)"><div style="width:30px;height:30px;border-radius:6px;background:#84A57D;opacity:.5"></div><div style="width:30px;height:30px;border-radius:50%;background:#1d2e23"></div><div><div style="width:64%;height:12px;border-radius:3px;background:linear-gradient(90deg,#16241B 25%,#1d2e23 50%,#16241B 75%);background-size:200% 100%;animation:cz-shimmer 1.6s ease-in-out infinite"></div><div style="width:84%;height:8px;border-radius:3px;margin-top:6px;background:linear-gradient(90deg,#16241B 25%,#1d2e23 50%,#16241B 75%);background-size:200% 100%;animation:cz-shimmer 1.6s ease-in-out .1s infinite"></div></div><div style="height:16px;border-radius:3px;background:#16241B"></div><div style="height:12px;border-radius:3px;background:#16241B"></div></div>
+          <div style="display:grid;grid-template-columns:30px 30px 1fr 52px 44px;gap:8px;align-items:center;height:56px;border-top:1px solid rgba(255,255,255,.06)"><div style="width:30px;height:30px;border-radius:6px;background:#84A57D;opacity:.5"></div><div style="width:30px;height:30px;border-radius:50%;background:#1d2e23"></div><div><div style="width:52%;height:12px;border-radius:3px;background:linear-gradient(90deg,#16241B 25%,#1d2e23 50%,#16241B 75%);background-size:200% 100%;animation:cz-shimmer 1.6s ease-in-out .15s infinite"></div><div style="width:78%;height:8px;border-radius:3px;margin-top:6px;background:linear-gradient(90deg,#16241B 25%,#1d2e23 50%,#16241B 75%);background-size:200% 100%;animation:cz-shimmer 1.6s ease-in-out .25s infinite"></div></div><div style="height:16px;border-radius:3px;background:#16241B"></div><div style="height:12px;border-radius:3px;background:#16241B"></div></div>
+          <div style="display:grid;grid-template-columns:30px 30px 1fr 52px 44px;gap:8px;align-items:center;height:56px;border-top:1px solid rgba(255,255,255,.06)"><div style="width:30px;height:30px;border-radius:6px;background:#C8DCC4;opacity:.5"></div><div style="width:30px;height:30px;border-radius:50%;background:#1d2e23"></div><div><div style="width:70%;height:12px;border-radius:3px;background:linear-gradient(90deg,#16241B 25%,#1d2e23 50%,#16241B 75%);background-size:200% 100%;animation:cz-shimmer 1.6s ease-in-out .3s infinite"></div><div style="width:60%;height:8px;border-radius:3px;margin-top:6px;background:linear-gradient(90deg,#16241B 25%,#1d2e23 50%,#16241B 75%);background-size:200% 100%;animation:cz-shimmer 1.6s ease-in-out .4s infinite"></div></div><div style="height:16px;border-radius:3px;background:#16241B"></div><div style="height:12px;border-radius:3px;background:#16241B"></div></div>
+          <div style="display:grid;grid-template-columns:30px 30px 1fr 52px 44px;gap:8px;align-items:center;height:56px;border-top:1px solid rgba(255,255,255,.06)"><div style="width:30px;height:30px;border-radius:6px;background:#FF6B1A;opacity:.5"></div><div style="width:30px;height:30px;border-radius:50%;background:#1d2e23"></div><div><div style="width:58%;height:12px;border-radius:3px;background:linear-gradient(90deg,#16241B 25%,#1d2e23 50%,#16241B 75%);background-size:200% 100%;animation:cz-shimmer 1.6s ease-in-out .45s infinite"></div><div style="width:80%;height:8px;border-radius:3px;margin-top:6px;background:linear-gradient(90deg,#16241B 25%,#1d2e23 50%,#16241B 75%);background-size:200% 100%;animation:cz-shimmer 1.6s ease-in-out .55s infinite"></div></div><div style="height:16px;border-radius:3px;background:#16241B"></div><div style="height:12px;border-radius:3px;background:#16241B"></div></div>
+        </div>
+        <div style="font:500 10px 'IBM Plex Mono',monospace;color:rgba(243,239,230,.4);text-align:center;margin-top:8px;letter-spacing:.1em">SKELETON MIRRORS FINAL LAYOUT · CHIPS KEEP THEIR COLOUR AT 50%</div>
+      </div>
+    </div>
+
+    <!-- MICRO-INTERACTIONS BOARD -->
+    <div id="2c" data-screen-label="2c · Micro-interactions" style="width:820px;flex:none;background:#0C1811;border-radius:24px;padding:24px;border:1px solid rgba(255,255,255,.08);position:relative;display:grid;grid-template-columns:1fr 1fr;gap:18px">
+      <a href="#2c" style="position:absolute;left:16px;top:-14px;font:700 11px 'IBM Plex Mono',monospace;background:#FF6B1A;color:#2a1000;padding:4px 7px;border-radius:4px;text-decoration:none">2c</a>
+      <div style="grid-column:1/-1;font:700 15px 'Barlow Condensed',sans-serif;text-transform:uppercase;letter-spacing:.08em">Micro-interactions · one loop each</div>
+
+      <div style="background:#16241B;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px"><div style="font:500 9px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(243,239,230,.45)">01 · LIVE DOT + SCORE TICK — 700ms ease-out, number rolls up, row flashes sage</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:12px;padding:8px;border-radius:8px;animation:cz-flash 3s infinite"><span style="width:8px;height:8px;border-radius:50%;background:#84A57D;animation:cz-pulse 1.6s ease-in-out infinite"></span><div style="flex:1"><div style="font:700 15px Barlow,sans-serif">Connor McDavid <span style="font:500 10px 'IBM Plex Mono',monospace;color:rgba(243,239,230,.5)">EDM</span></div><div style="font:500 10px 'IBM Plex Mono',monospace;color:#84A57D">vs TOR 3RD · 1G 2A 4S</div></div><div style="height:20px;overflow:hidden;font:600 17px/20px 'IBM Plex Mono',monospace;color:#84A57D;text-align:right"><div style="animation:cz-tick 3s cubic-bezier(.2,.7,.2,1) infinite"><div>6.4</div><div>8.4</div></div></div></div></div>
+
+      <div style="background:#16241B;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px"><div style="font:500 9px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(243,239,230,.45)">02 · WIN-PROB BAR — width 700ms ease-out on data change; ice track, orange fill</div>
+        <div style="margin-top:14px;display:flex;justify-content:space-between;font:500 10px 'IBM Plex Mono',monospace"><span style="color:#FF9F66">64% WIN</span><span style="color:#8DCDFF">36% WIN</span></div><div style="margin-top:6px;height:6px;border-radius:3px;background:#8DCDFF;overflow:hidden;position:relative"><div style="height:100%;background:#FF6B1A;animation:cz-fill 2.4s cubic-bezier(.2,.7,.2,1) infinite alternate"></div><div style="position:absolute;left:50%;top:-2px;width:1px;height:10px;background:rgba(255,255,255,.6)"></div></div></div>
+
+      <div style="background:#16241B;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;overflow:hidden"><div style="font:500 9px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(243,239,230,.45)">03 · LINE CHANGE — rows swap places 320ms spring; chip pulses on eligible slot</div>
+        <div style="position:relative;height:112px;margin-top:10px">
+          <div style="position:absolute;left:0;right:0;top:0;height:56px;display:flex;align-items:center;gap:10px;border-top:1px solid rgba(255,255,255,.06);animation:cz-swap-a 3.2s cubic-bezier(.34,1.3,.5,1) infinite"><div style="width:30px;height:30px;border-radius:6px;background:#C8DCC4;color:#0C1811;font:800 11px 'Barlow Condensed',sans-serif;display:flex;align-items:center;justify-content:center">LW</div><div style="flex:1"><div style="font:700 15px Barlow,sans-serif">Filip Forsberg <span style="background:rgba(255,111,128,.18);color:#FF8A98;font:700 9px 'IBM Plex Mono',monospace;padding:1px 4px;border-radius:3px">DTD</span></div><div style="font:500 10px 'IBM Plex Mono',monospace;color:#FF8A98">NO WARMUPS</div></div><div style="font:600 17px 'IBM Plex Mono',monospace;color:rgba(243,239,230,.5)">–</div></div>
+          <div style="position:absolute;left:0;right:0;top:56px;height:56px;display:flex;align-items:center;gap:10px;border-top:1px solid rgba(255,255,255,.06);animation:cz-swap-b 3.2s cubic-bezier(.34,1.3,.5,1) infinite"><div style="width:30px;height:30px;border-radius:6px;background:rgba(255,255,255,.08);color:rgba(243,239,230,.55);font:800 11px 'Barlow Condensed',sans-serif;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px rgba(132,165,125,.6);animation:cz-pulse 1.6s ease-in-out infinite">BN</div><div style="flex:1"><div style="font:700 15px Barlow,sans-serif">Nick Suzuki</div><div style="font:500 10px 'IBM Plex Mono',monospace;color:#84A57D">vs OTT 1ST · 1A</div></div><div style="font:600 17px 'IBM Plex Mono',monospace;color:#FF9F66">4.9</div></div>
+        </div></div>
+
+      <div style="background:#16241B;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px"><div style="font:500 9px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(243,239,230,.45)">04 · SUB-TAB UNDERLINE — slides 200ms ease-out, never fades</div>
+        <div style="margin-top:14px;position:relative;display:flex;font:700 13px 'Barlow Condensed',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:rgba(243,239,230,.5);border-bottom:1px solid rgba(255,255,255,.08)"><div style="flex:1;text-align:center;padding:8px 0 10px;color:#F3EFE6">Match</div><div style="flex:1;text-align:center;padding:8px 0 10px">Team</div><div style="flex:1;text-align:center;padding:8px 0 10px">Players</div><div style="flex:1;text-align:center;padding:8px 0 10px">League</div><div style="position:absolute;left:0;bottom:-1px;width:25%;height:2px;background:#84A57D;animation:cz-underline 2.6s cubic-bezier(.2,.7,.2,1) infinite alternate"></div></div></div>
+
+      <div style="background:#16241B;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px"><div style="font:500 9px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(243,239,230,.45)">05 · GOAL TOAST — scale .6→1.05→1 in 250ms, hold 4s, fade; haptic on native</div>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:#0C1811;border:1px solid rgba(132,165,125,.45);animation:cz-goal 5s cubic-bezier(.34,1.3,.5,1) infinite"><div style="width:32px;height:32px;border-radius:50%;background:repeating-linear-gradient(135deg,#1f3327 0 3px,#243a2c 3px 6px);border:2px solid #FF4C00"></div><div style="flex:1"><div style="font:700 11px 'Barlow Condensed',sans-serif;letter-spacing:.14em;color:#84A57D">GOAL · EDM</div><div style="font:700 14px Barlow,sans-serif">McDavid (PP) · <span style="font:600 13px 'IBM Plex Mono',monospace;color:#84A57D">+3.0</span></div></div><div style="font:600 17px 'IBM Plex Mono',monospace;color:#84A57D">121.4</div></div></div>
+
+      <div style="background:#16241B;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px"><div style="font:500 9px 'IBM Plex Mono',monospace;letter-spacing:.14em;color:rgba(243,239,230,.45)">06 · BUTTON PRESS — scale .97 + 8% darker, 100ms; success turns sage with check for 900ms</div>
+        <div style="display:flex;gap:8px;margin-top:14px;font:600 11px 'IBM Plex Mono',monospace;letter-spacing:.06em"><div style="flex:1;height:40px;border-radius:9px;background:#FF6B1A;color:#2a1000;display:flex;align-items:center;justify-content:center">+ ADD</div><div style="flex:1;height:40px;border-radius:9px;background:#e35f17;color:#2a1000;display:flex;align-items:center;justify-content:center;transform:scale(.97)">+ ADD</div><div style="flex:1;height:40px;border-radius:9px;background:#84A57D;color:#0C1811;display:flex;align-items:center;justify-content:center">✓ ADDED</div></div></div>
+
+      <div style="grid-column:1/-1;font:400 12px/1.5 Barlow,sans-serif;color:rgba(243,239,230,.6)">Rules: durations 100 / 200 / 320 / 700ms only (`citrus-fast/normal/entrance` already in tailwind + one `data` tier at 700). Easing `cubic-bezier(.2,.7,.2,1)` for movement, spring `cubic-bezier(.34,1.3,.5,1)` for swaps/toasts. Respect `prefers-reduced-motion`: keep colour changes, drop transforms. Nothing bounces forever except the live dot and the loading puck.</div>
+    </div>
+  </div>
+</section>
+</x-dc>
+</body>
+</html>
