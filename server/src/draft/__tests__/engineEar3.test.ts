@@ -671,10 +671,17 @@ describe('E111 draft_status enum-domain regression lock', () => {
     // stub accidentally accepts arbitrary strings, this sentinel
     // goes red and the value-domain guards go blind.
     const admin = makeAdminForBootScan([{ id: 'lg-x' }]);
+    // The chain is only AWAITED at `.range` — see the PAGED-READ SHAPE note on
+    // makeAdminForBootScan. Awaiting the builder itself resolves to the builder
+    // (a plain object has no `.then`), so `result.error` would be undefined and
+    // this sentinel would report "no error" for both a working stub and a
+    // broken one. Drive the full chain the way readAllPaged does.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await (admin.from('leagues') as any)
       .select('id')
-      .eq('draft_status', 'paused');
+      .eq('draft_status', 'paused')
+      .order('id', { ascending: true })
+      .range(0, 999);
     expect(result.error).not.toBeNull();
     expect(result.error?.code).toBe('22P02');
     expect(result.error?.message).toContain('invalid input value for enum draft_status');
@@ -689,10 +696,14 @@ describe('E111 draft_status enum-domain regression lock', () => {
     // this behavioral test fails with the same 22P02 shape the DB
     // returned in staging.
     const admin = makeAdminForBootScan([{ id: 'lg-x' }]);
+    // Awaited at `.range`, same reason as the `.eq` sentinel above.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await (admin.from('leagues') as any)
       .select('id')
-      .in('draft_status', ['in_progress', 'paused']);
+      .in('draft_status', ['in_progress', 'paused'])
+      .order('id', { ascending: true })
+      .range(0, 999);
+    expect(result.error).not.toBeNull();
     expect(result.error?.code).toBe('22P02');
     expect(result.error?.message).toContain('"paused"');
   });

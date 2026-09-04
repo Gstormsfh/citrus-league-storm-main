@@ -10,7 +10,7 @@ import { LeagueService } from '@/services/LeagueService';
 import { ScheduleService } from '@/services/ScheduleService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { CitrusSparkle } from '@/components/icons/CitrusIcons';
 import { getTodayMST } from '@/utils/timezoneUtils';
 import { logger } from '@/utils/logger';

@@ -63,6 +63,64 @@ export const getPoolRoute = (leagueType: string, leagueId: string, tab?: string)
   return `${base}?${params.toString()}`;
 };
 
+/**
+ * WHERE A LEAGUE LIVES — the single answer to "the user picked league X from
+ * the switcher; where do they go?"
+ *
+ * Reported 2026-09-04: "I'm in an old league that had playoff brackets. I
+ * switched to it, now I'm completely stuck in this section and can't switch
+ * back." Both halves of that were true, and this function is where both were
+ * decided -- three times, in three copies, in Navbar (twice) and
+ * MobileMenuButton.
+ *
+ * WHAT WAS WRONG
+ *
+ * 1. THE SELF-PIN. The old chain had a branch
+ *
+ *      else if (pathname.match(/^\/league\/[^/]+\/playoffs$/))
+ *        navigate(`/league/${l.id}/playoffs`)
+ *
+ *    so from a playoffs page EVERY league you could pick landed you on that
+ *    league's playoffs page. There was no selection that left the section.
+ *    That is not a switcher, it is a tab bar with extra steps. Gone: a league
+ *    you deliberately switch to opens at its front door.
+ *
+ * 2. THE MISSING `?league=`. The old chain navigated to `/league/${l.id}`
+ *    with no query. LeagueContext resolves the active league from
+ *    `searchParams.get('league')` and NEVER from the path segment, so on that
+ *    URL it saw no league, fell through to the localStorage value -- still
+ *    the pool -- and rewrote the URL to advertise it. LeagueDashboard then
+ *    read a pool league and redirected to the pool route. The user picked the
+ *    fantasy league and arrived back in the playoff pool, which is exactly
+ *    what "can't switch back" felt like from the outside.
+ *
+ *    Naming the league in the query is the small, local fix: the URL now
+ *    says which league it means, so nothing has to guess. (The deeper fix --
+ *    LeagueContext treating the PATH as a source of truth, the way
+ *    matchupUrlSync.ts already argues it must -- is a bigger change than the
+ *    night before a submission deserves. This closes the trap without it.)
+ *
+ * Pure, and exported on its own, so the rules above are pinned by a test
+ * instead of living in three JSX callbacks nobody diffs against each other.
+ */
+export const leagueSwitchDestination = (
+  leagueId: string,
+  leagueType: string | undefined | null,
+  currentPathname: string,
+): string => {
+  // A pool league only exists at its pool route -- unchanged.
+  if (isPoolLeague(leagueType)) return getPoolRoute(leagueType as string, leagueId);
+
+  // Stay on the surface the user is already looking at, where that surface
+  // exists for every league. Matchup does; a playoffs bracket does not.
+  if (currentPathname.startsWith('/matchup')) return `/matchup/${leagueId}`;
+
+  // Switching leagues out of a draft room means leaving the draft room.
+  if (currentPathname.startsWith('/draft-room') || currentPathname === '/draft') return '/gm-office';
+
+  return `/league/${leagueId}?league=${leagueId}`;
+};
+
 /** Returns a display label for the pool type */
 export const getPoolLabel = (leagueType: string): string => {
   const labels: Record<string, string> = {

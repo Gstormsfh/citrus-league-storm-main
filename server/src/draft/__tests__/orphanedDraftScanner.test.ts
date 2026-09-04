@@ -190,12 +190,26 @@ describe('OrphanedDraftScanner', () => {
   it('prunes grace state for leagues that stop being in_progress', async () => {
     // A draft that completes while inside the grace window must not
     // leave an entry behind in a long-lived engine process.
-    const eq = vi
+    // PAGED-READ SHAPE (2026-09-03). scan() reads through `readAllPaged`, so
+    // the chain is .select(cols).eq(col, val).order(col, opts).range(from, to)
+    // and it is only AWAITED at `.range`. This stub used to resolve at `.eq`,
+    // which is why it fell over with "query.order is not a function" the first
+    // time it ran after the scanner was paged. It is a hand-rolled stub rather
+    // than makeSupabase() because this test needs a DIFFERENT answer on each
+    // of its three scans.
+    //
+    // One `.range` call per scan: each answer is shorter than PAGE_SIZE, so
+    // readAllPaged stops after the first window.
+    const range = vi
       .fn()
-      .mockResolvedValueOnce({ data: [{ id: 'lg-1' }] })
-      .mockResolvedValueOnce({ data: [] })
-      .mockResolvedValueOnce({ data: [{ id: 'lg-1' }] });
-    const client = { from: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ eq }) }) };
+      .mockResolvedValueOnce({ data: [{ id: 'lg-1' }], error: null })
+      .mockResolvedValueOnce({ data: [], error: null })
+      .mockResolvedValueOnce({ data: [{ id: 'lg-1' }], error: null });
+    const order = vi.fn(() => ({ order, range }));
+    const eq = vi.fn(() => ({ eq, order, range }));
+    const client = {
+      from: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ eq, order, range }) }),
+    };
     const { registry } = makeRegistry([]);
     const scanner = new OrphanedDraftScanner({
       registry,
@@ -209,6 +223,10 @@ describe('OrphanedDraftScanner', () => {
     const third = await scanner.scan();        // lg-1 back: must restart grace
 
     expect(third).toMatchObject({ orphaned: 0, adopted: 0 });
+    // Three scans, three windowed reads - and each one asked for a bounded
+    // window. An unbounded regression would never reach `.range` at all.
+    expect(range).toHaveBeenCalledTimes(3);
+    expect(order).toHaveBeenCalledWith('id', { ascending: true });
   });
 
   it('start() is a no-op when the scan interval is disabled', () => {

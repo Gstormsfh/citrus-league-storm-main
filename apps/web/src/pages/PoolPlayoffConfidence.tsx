@@ -109,7 +109,11 @@ export default function PoolPlayoffConfidence() {
   const totalSeries = series.length;
 
   useEffect(() => {
-    if (!leagueId || !user) return;
+    // `loading` is initialised true and only cleared in the loader's
+    // `finally`. Returning here without clearing it left the page in a
+    // permanent loading state -- which, before the fix above, meant a page
+    // with no navigation on it at all.
+    if (!leagueId || !user) { setLoading(false); return; }
     const load = async () => {
       try {
         const [bracketRes, picksRes, h2hRes] = await Promise.all([
@@ -194,7 +198,25 @@ export default function PoolPlayoffConfidence() {
 
   const totalConfidence = useMemo(() => Array.from(picks.values()).reduce((s, p) => s + (p.confidence_value || 0), 0), [picks]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-white/55">Loading...</div>;
+  // NAVIGATION MUST SURVIVE THE LOADING STATE (2026-09-04).
+  //
+  // This branch used to return a bare div. The Navbar carries the league
+  // switcher -- on the pool pages it is the ONLY way out of the pool, because
+  // the pool tab set has no fantasy destination in it. So while `loading` was
+  // true there was no way to leave this page, and `loading` starts true and is
+  // only cleared in the loader's `finally`, which the `if (!leagueId || !user)
+  // return` guard above skips entirely. Reaching this route without a
+  // ?league= therefore left a chromeless dead end that only the back button
+  // could escape. PoolPlayoffHub and PoolPlayoffRoster already render the
+  // Navbar in their loading branch; these two were the odd ones out.
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-pastel-surface">
+        <Navbar />
+        <div className="flex items-center justify-center pt-32 text-white/55">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <>
