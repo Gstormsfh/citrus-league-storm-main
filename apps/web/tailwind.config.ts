@@ -10,6 +10,19 @@ export default {
 		"./components/**/*.{ts,tsx}",
 		"./app/**/*.{ts,tsx}",
 		"./src/**/*.{ts,tsx}",
+		// harness/ IS SCANNED, and it has to be. The harness pages exist to
+		// measure a screen against the design reference, and Tailwind only
+		// emits a class it has seen in a scanned file: an arbitrary value used
+		// ONLY in a harness page — `pt-[18px]`, a one-off grid template —
+		// silently does not exist, the page renders without it, and the
+		// measurement that was supposed to catch a 6px error reports a clean
+		// match against a rule that was never applied. That is a measuring
+		// instrument that lies, which is worse than no instrument.
+		//
+		// The cost is a handful of harness-only utilities in the production
+		// stylesheet. The alternative cost is trusting a comparison that
+		// silently compared nothing.
+		"./harness/**/*.{ts,tsx,html}",
 	],
 	prefix: "",
 	theme: {

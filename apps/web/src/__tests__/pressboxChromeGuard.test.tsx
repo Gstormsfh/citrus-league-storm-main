@@ -40,6 +40,7 @@ const NAV = strip(read('PressBoxBottomNav.tsx'));
 const CHAT = strip(read('ChatBar.tsx'));
 const MENU = strip(read('LeagueMenu.tsx'));
 const TILES = strip(read('leagueMenuTiles.ts'));
+const TILE = strip(read('Tile.tsx'));
 
 describe('app-level nav and league-level nav stay separate', () => {
   it('the bottom nav is exactly the five app destinations', () => {
@@ -94,7 +95,23 @@ describe('menu tiles', () => {
   });
 
   it('renders the stat line only when there is one', () => {
-    expect(MENU).toContain('{stat && (');
+    // The rule did not change; the file did. The menu's hand-rolled tile
+    // became `PressBoxTile` on 2026-09-04 so League HQ could use the same
+    // one, and this assertion moved with it — a guard belongs to the
+    // behaviour, not to the file the behaviour happened to start in. The
+    // menu is still checked for MOUNTING it, so deleting the tile from the
+    // menu still fails here.
+    expect(TILE).toContain('{stat && (');
+    expect(MENU).toContain('<PressBoxTile');
+  });
+
+  it('the tile stat is Barlow, not mono', () => {
+    // Everywhere else in Press Box a number is mono because it is being
+    // compared, column against column. Six unrelated tile stats read as
+    // sentences, and the mono face made them look like a table. Artboard 1a
+    // sets them in `400 11px Barlow`.
+    expect(TILE).toContain('font-barlow text-[11px]');
+    expect(TILE).not.toMatch(/font-plex[^']*text-\[11px\]/);
   });
 });
 

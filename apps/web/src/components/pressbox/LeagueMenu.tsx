@@ -27,6 +27,7 @@ import { X, ChevronDown, Settings } from 'lucide-react';
 import { defaultLeagueTiles, type LeagueMenuTile } from './leagueMenuTiles';
 import { cn } from '@/lib/utils';
 import { PB_TYPE } from './rowScale';
+import { PressBoxTile } from './Tile';
 
 export interface LeagueMenuProps {
   open: boolean;
@@ -103,26 +104,14 @@ export function LeagueMenu({
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 pb-6">
+        {/* The artboard's tile, now a component: `PressBoxTile`. The stat
+            line is Barlow 400 at 11px and NOT mono — everywhere else in Press
+            Box a number is mono because it is being compared column against
+            column; here six unrelated numbers are read as sentences, and the
+            mono face made them look like a table. */}
         <div className="grid grid-cols-2 gap-2">
           {items.map(({ key, title, to, Icon, stat }) => (
-            <Link
-              key={key}
-              to={to}
-              onClick={onClose}
-              className="focus-citrus flex flex-col justify-between min-h-[88px] p-3 rounded-[14px] bg-pressbox-tile ring-1 ring-white/[0.08]"
-            >
-              <Icon className="w-[18px] h-[18px] text-pressbox-orange-soft" strokeWidth={2} aria-hidden="true" />
-              <span className="mt-3">
-                <span className="block font-barlow font-bold text-[15px] text-pressbox-text">
-                  {title}
-                </span>
-                {stat && (
-                  <span className="block mt-0.5 font-plex font-medium text-[11px] whitespace-nowrap overflow-hidden text-ellipsis text-pressbox-text/55">
-                    {stat}
-                  </span>
-                )}
-              </span>
-            </Link>
+            <PressBoxTile key={key} title={title} stat={stat} to={to} Icon={Icon} onNavigate={onClose} />
           ))}
         </div>
 
