@@ -30,6 +30,7 @@ import {
   ordinal,
   playerDashboardHref,
   xgTrend,
+  finishingTrend,
   VERDICT_MAX_CHARS,
   type CardEntry,
 } from '../playerAdvancedMetrics';
@@ -685,5 +686,30 @@ describe('playerDashboardHref', () => {
     // `/players/:playerId` OUTSIDE the import.meta.env.DEV gate, so the
     // card's "Full dashboard →" finally goes to the dashboard.
     expect(playerDashboardHref(8478402)).toBe('/players/8478402');
+  });
+});
+
+describe('finishingTrend (2026-09-05)', () => {
+  const pt = (season: number, goals: number, xg: number, game_type: 'regular' | 'playoff' = 'regular') =>
+    ({ season, game_type, shots: 0, sog: 0, goals, xg, finishing: goals - xg, teams: 1 });
+
+  it('plots goals over expected per regular season and reads the newest season both ways', () => {
+    const t = finishingTrend([pt(2024, 20, 24), pt(2025, 39, 31), pt(2025, 3, 2, 'playoff')]);
+    expect(t).not.toBeNull();
+    expect(t!.points.map((p) => p.y)).toEqual([-4, 8]);
+    expect(t!.endpoint).toBe('+8.0');
+    expect(t!.pctOfExpected).toBe('126%');
+    expect(t!.seasons).toBe(2);
+  });
+
+  it('merges a traded season into one point', () => {
+    const t = finishingTrend([pt(2024, 10, 12), pt(2025, 10, 8), pt(2025, 5, 4)]);
+    expect(t!.points.map((p) => p.y)).toEqual([-2, 3]);
+    expect(t!.pctOfExpected).toBe('125%');
+  });
+
+  it('refuses one season', () => {
+    expect(finishingTrend([pt(2025, 39, 31)])).toBeNull();
+    expect(finishingTrend(null)).toBeNull();
   });
 });

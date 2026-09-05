@@ -19,6 +19,7 @@ import {
   fmt2,
   playerDashboardHref,
   xgTrend,
+  finishingTrend,
   type AdvancedCardData,
   type CardEntry,
 } from './playerAdvancedMetrics';
@@ -237,6 +238,10 @@ export function PlayerAdvancedCard({
     () => (showAll ? xgTrend(historyOverride === undefined ? history.points : historyOverride) : null),
     [showAll, historyOverride, history.points],
   );
+  const finishing = useMemo(
+    () => (showAll ? finishingTrend(historyOverride === undefined ? history.points : historyOverride) : null),
+    [showAll, historyOverride, history.points],
+  );
 
   // Memoised on the index's IDENTITY, which is stable for the session — the
   // hook hands out one frozen array from a module-level cache — so the
@@ -453,6 +458,28 @@ export function PlayerAdvancedCard({
             data={trend.points}
             endpointValue={trend.endpoint}
             tooltipUnit=" xG"
+            height={72}
+            className="rounded-xl ring-0"
+          />
+        </Band>
+      )}
+
+      {/* ── Finishing by season (2026-09-05) ─────────────────────────
+          Goals over Citrus expected, per regular season, beside the xG line
+          it is measured against. The newest season reads both ways: the
+          goals over expected and the goals as a share of expected. */}
+      {showAll && finishing && (
+        <Band testId="advanced-card-finishing-trend">
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <Eyebrow>Finishing by season</Eyebrow>
+            <span className={cn(ROW_MICRO, 'font-jbmono max-lg:font-plex tabular-nums uppercase tracking-[0.12em] text-white/55')}>
+              G − xG{finishing.pctOfExpected ? ` · ${finishing.pctOfExpected} of expected` : ''}
+            </span>
+          </div>
+          <SparklineMicroChart
+            data={finishing.points}
+            endpointValue={finishing.endpoint}
+            tooltipUnit=" G−xG"
             height={72}
             className="rounded-xl ring-0"
           />

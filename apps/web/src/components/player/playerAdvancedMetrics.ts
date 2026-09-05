@@ -737,3 +737,52 @@ export function playerDashboardHref(id: number): string {
 // Re-exported so the card imports one module, not three.
 export { DISTRIBUTION_MIN_GP, buildMetricScale, playerCohort };
 export type { PlayerCohort, MetricDirection };
+
+/**
+ * FINISHING BY SEASON (2026-09-05, Garrett: "can we add finishing % as one
+ * of the graphs as well?"). Goals minus Citrus expected goals, summed per
+ * regular season the same way `xgTrend` sums xG, so a trade cannot draw two
+ * points for one year. The endpoint carries both readings of the newest
+ * season: the goals over expected, and the goals as a share of expected
+ * (`39 G on 31.0 xG` is +8.0 and 126%). Same two-season floor: a one-point
+ * finishing line is a line made up.
+ */
+export interface FinishingTrend extends XgTrend {
+  /** Newest season's goals as a share of expected, `126%`. Null without xG. */
+  pctOfExpected: string | null;
+}
+
+export function finishingTrend(
+  history: readonly XgHistoryPoint[] | null | undefined,
+  gameType: 'regular' | 'playoff' = 'regular',
+): FinishingTrend | null {
+  if (!history) return null;
+  const goalsBySeason = new Map<number, number>();
+  const xgBySeason = new Map<number, number>();
+  for (const p of history) {
+    if (p.game_type !== gameType) continue;
+    if (!Number.isFinite(p.season) || !Number.isFinite(p.xg) || !Number.isFinite(p.goals)) continue;
+    goalsBySeason.set(p.season, (goalsBySeason.get(p.season) ?? 0) + p.goals);
+    xgBySeason.set(p.season, (xgBySeason.get(p.season) ?? 0) + p.xg);
+  }
+  if (xgBySeason.size < MIN_TREND_SEASONS) return null;
+
+  const seasons = Array.from(xgBySeason.keys()).sort((a, b) => a - b);
+  const points: SparklinePoint[] = seasons.map((season) => ({
+    x: season,
+    y: Math.round(((goalsBySeason.get(season) ?? 0) - (xgBySeason.get(season) ?? 0)) * 10) / 10,
+    gameDate: seasonLabel(season),
+  }));
+  const last = seasons[seasons.length - 1];
+  const lastGoals = goalsBySeason.get(last) ?? 0;
+  const lastXg = xgBySeason.get(last) ?? 0;
+  const end = points[points.length - 1].y;
+  return {
+    points,
+    endpoint: `${end > 0 ? '+' : ''}${end.toFixed(1)}`,
+    pctOfExpected: lastXg > 0 ? `${Math.round((lastGoals / lastXg) * 100)}%` : null,
+    firstSeason: seasons[0],
+    lastSeason: last,
+    seasons: seasons.length,
+  };
+}
