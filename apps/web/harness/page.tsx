@@ -517,6 +517,19 @@ const HARNESS_GAMES = new Map<string, any[]>(
   return { data: games, error: null };
 };
 (rosterApi as any).getLineup = async () => ({ data: null });
+/**
+ * Another manager's team (2026-09-04): the page reads the roster through
+ * MatchupService.getTeamRoster and the day's games through the batch
+ * reads. Team 2 holds the next eighteen names in the directory.
+ */
+(MatchupService as any).getTeamRoster = async () =>
+  PLAYERS.slice(18, 36).map((p: any) => ({
+    id: p.id, name: p.full_name, position: p.position, number: Number(p.jersey_number || 0), starter: false,
+    stats: { gamesPlayed: p.games_played || 0, goals: p.goals || 0, assists: p.assists || 0, points: p.points || 0, plusMinus: p.plus_minus || 0, shots: p.shots || 0 },
+    team: p.team, teamAbbreviation: p.team, image: p.headshot_url || undefined, status: null,
+  }));
+(ScheduleService as any).hasGamesTodayBatch = async (teams: string[] = []) =>
+  new Map(teams.map((t) => [t.toUpperCase(), (HARNESS_GAMES.get(t.toUpperCase()) ?? []).some((g: any) => g.game_date === isoDay(0))]));
 (matchupApi as any).getPlayerGameLog = async (playerId: number, start: string, end: string) => {
   const p = PLAYERS.find((x: any) => String(x.id) === String(playerId)) as any;
   const goalie = p?.position === 'G';
@@ -676,6 +689,7 @@ const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
   players: () => import('../src/pages/Players'),
   news: () => import('../src/pages/News'),
   schedule: () => import('../src/pages/ScheduleManager'),
+  team: () => import('../src/pages/OtherTeam'),
 };
 
 const which = new URLSearchParams(location.search).get('p') || 'waivers';
@@ -699,6 +713,7 @@ const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   players: { path: '/players', at: '/players' },
   news: { path: '/news', at: '/news' },
   schedule: { path: '/schedule-manager', at: '/schedule-manager?league=harness-league' },
+  team: { path: '/team/:teamId', at: '/team/t2?league=harness-league' },
   trade: { path: '/trade-analyzer', at: '/trade-analyzer?league=harness-league' },
   waivers: { path: '/waiver-wire', at: '/waiver-wire?league=harness-league' },
   // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
