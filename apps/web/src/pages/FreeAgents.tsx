@@ -75,6 +75,7 @@ import {
   waiverClearsLabel,
 } from '@/components/freeagents/freeAgentRowKit';
 import { cn } from '@/lib/utils';
+import { useOwnership } from '@/hooks/useRosterWeek';
 import { ArrowLeftRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -107,6 +108,8 @@ const FreeAgents = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
+  // Rostered% / started% across Citrus, for the phone rows (2026-09-05).
+  const ownership = useOwnership(true);
   const [positionFilter, setPositionFilter] = useState('ALL');
   const [activeTab, setActiveTab] = useState('available');
   const [viewMode, setViewMode] = useState<'summary' | 'all'>('summary');
@@ -1542,12 +1545,17 @@ const FreeAgents = () => {
         : { rows: watchRows, total: watchRows.length };
 
   const renderPhoneRow = (player: PhoneRow, i: number) => {
+    const own = ownership.get(String(player.id));
     const common = {
       rank: i + 1,
       player,
       projection: player.weeklyProjection,
       games: player.games,
       todayStr,
+      // `ROS 38% · START 31%` (artboard 1a · Players), from the ownership
+      // aggregate; absent until it exists.
+      rosteredPct: own?.rosteredPct ?? null,
+      startedPct: own?.startedPct ?? null,
       action: freeAgentAction(player, rosterFull),
       pending: addingPlayerId === toNumericId(player.id),
       disabled: addingPlayerId !== null,
@@ -1645,6 +1653,7 @@ const FreeAgents = () => {
         <PlayersPhone
           view={phoneView}
           onView={setPhoneView}
+          ownership={ownership.size > 0}
           leadersTo="/players"
           tradeTo={activeLeagueId ? `/trade-analyzer?league=${activeLeagueId}` : '/trade-analyzer'}
           trendMode={trendMode}

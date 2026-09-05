@@ -38,6 +38,8 @@ export interface FreeAgentRowPressBoxExtras {
   /** The watch-list star over the rank; see `PressBoxPlayerRow.onStar`. */
   starred?: boolean;
   onStar?: () => void;
+  /** `START 31%` beside the rostered figure (2026-09-05). */
+  startedPct?: number | null;
 }
 
 export function FreeAgentRowPressBox({
@@ -57,6 +59,7 @@ export function FreeAgentRowPressBox({
   seasonLine = null,
   starred,
   onStar,
+  startedPct,
 }: FreeAgentRowProps & FreeAgentRowPressBoxExtras) {
   const extra = player as unknown as WithAdds;
   const adds24h =
@@ -70,6 +73,7 @@ export function FreeAgentRowPressBox({
         weekProjection: projection,
         gamesThisWeek: extra.gamesThisWeek ?? null,
         rosteredPct: rosteredPct ?? null,
+        startedPct: startedPct ?? null,
       })}
       // The movement column is the trending list's; elsewhere the page's own
       // sub-label ("3 games") takes the slot under it, which is what it had.

@@ -135,9 +135,14 @@ export function PressBoxPlayerRow({
    * because `undefined >= 0` is false, which is not a fact about anyone.
    */
   const rising = adds24h != null ? adds24h >= 0 : null;
+  // `46% · 10%` under a head that says ROS% / START% (2026-09-05): the
+  // labelled form (`ROS 46% · START 10% · WK PROJ 55.3 · 7 GP`) is 41
+  // characters of 10px mono in a 171px column and truncated at `WK PR…`
+  // on the artboard too. The head carries the labels; the row carries the
+  // numbers, and all four fit.
   const ownership: string[] = [];
-  if (player.rosteredPct != null) ownership.push(`ROS ${player.rosteredPct}%`);
-  if (player.startedPct != null) ownership.push(`START ${player.startedPct}%`);
+  if (player.rosteredPct != null) ownership.push(`${player.rosteredPct}%`);
+  if (player.startedPct != null) ownership.push(`${player.startedPct}%`);
 
   return (
     <div
@@ -231,7 +236,7 @@ export function PressBoxPlayerRow({
               {ownership.join(' · ')}
               {player.weekProjection != null && (
                 <>
-                  {ownership.length ? ' · ' : ''}WK PROJ{' '}
+                  {ownership.length ? ' · WK ' : 'WK PROJ '}
                   <b className="text-pressbox-text font-semibold">{player.weekProjection.toFixed(1)}</b>
                 </>
               )}

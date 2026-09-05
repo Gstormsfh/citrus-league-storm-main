@@ -80,9 +80,15 @@ describe('PlayersPhone', () => {
     expect(calls).toContain('trend:drops');
     const head = container.querySelector('[aria-hidden="true"].grid')!;
     expect(head.textContent).toMatch(/24H adds/i);
-    // Not drawn, on purpose — see the component's header comment.
-    expect(head.textContent).not.toMatch(/ROS%/);
+    // Without the ownership aggregate the head names no percentages.
+    expect(head.textContent).not.toMatch(/ROS%/i);
     expect(screen.queryByRole('button', { name: /FA ONLY/i })).toBeNull();
+  });
+
+  it('with the ownership aggregate on the page, the head names ROS% / START% (2026-09-05)', () => {
+    const { container } = mount({ ownership: true });
+    const head = container.querySelector('[aria-hidden="true"].grid')!;
+    expect(head.textContent).toMatch(/Player · Ros% \/ Start% · WK proj/i);
   });
 
   it('AVAILABLE: the count in the head, a PROJ/GAMES toggle, and the column follows it', () => {

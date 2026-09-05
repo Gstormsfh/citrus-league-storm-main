@@ -52,6 +52,12 @@ export type PlayersAvailableMode = 'proj' | 'games';
 export interface PlayersPhoneProps<P> {
   view: PlayersPhoneView;
   onView: (view: PlayersPhoneView) => void;
+  /**
+   * The ownership aggregate is on the page (2026-09-05): the column head
+   * names the `ROS% / START%` segment the rows carry. Off, the head reads
+   * as it did, since the rows then carry no percentages.
+   */
+  ownership?: boolean;
   /** Routes for the two cells that leave the screen. */
   leadersTo: string;
   tradeTo: string;
@@ -103,6 +109,7 @@ const VIEW_LABEL: Record<PlayersPhoneView, string> = {
 export function PlayersPhone<P>({
   view,
   onView,
+  ownership = false,
   leadersTo,
   tradeTo,
   trendMode,
@@ -143,6 +150,7 @@ export function PlayersPhone<P>({
 
   const headCount =
     view === 'trend' ? '24H' : total > 0 ? String(total) : null;
+  const playerHead = ownership ? 'Player · Ros% / Start% · WK proj' : 'Player · WK proj';
 
   return (
     <div className={cn(PB_TYPE, 'px-3.5 pt-3', className)} data-testid="players-phone">
@@ -257,7 +265,7 @@ export function PlayersPhone<P>({
               aria-hidden="true"
             >
               <span>#</span>
-              <span>Player · WK proj</span>
+              <span>{playerHead}</span>
               <span className="text-right">{movementHead}</span>
               <span />
             </div>
@@ -287,7 +295,7 @@ export function PlayersPhone<P>({
             aria-hidden="true"
           >
             <span>#</span>
-            <span>Player · WK proj</span>
+            <span>{playerHead}</span>
             <span className="text-right">{movementHead}</span>
             <span />
           </div>
