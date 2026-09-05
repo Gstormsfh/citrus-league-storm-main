@@ -4626,6 +4626,9 @@ export class LobbyManager {
    */
   private maybeSubmitKeeperPick(): void {
     if (this.format === 'auction' || this.keeperBySlot.size === 0) return;
+    // Bootstrap replays historical arms slot by slot; only the live slot
+    // after init (or init's own catch-up arm) may make a keeper pick.
+    if (!this.initialized) return;
     if (this.draftStatus !== 'in_progress' || this.pauseState !== null) return;
     const slot = this.draftOrder[this.picksMade];
     if (!slot) return;
