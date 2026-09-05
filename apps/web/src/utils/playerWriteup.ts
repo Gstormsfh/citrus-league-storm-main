@@ -270,12 +270,12 @@ function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
   if (Number.isFinite(gsax as number) && Math.abs(gsax as number) >= 1) {
     if ((gsax as number) > 0) {
       parts.push(
-        `He has stopped ${fmt(gsax as number)} goals more than an average goalie would have on the same shots.`,
+        `He has stopped ${fmt(gsax as number)} goals more than expected on the shots he has faced.`,
       );
       tags.push({ label: 'Beating expected', tone: 'positive' });
     } else {
       parts.push(
-        `He has conceded ${fmt(Math.abs(gsax as number))} goals more than the shot quality says he should have.`,
+        `He has conceded ${fmt(Math.abs(gsax as number))} goals more than expected on the shots he has faced.`,
       );
       tags.push({ label: 'Underperforming xG', tone: 'caution' });
     }

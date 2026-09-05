@@ -511,7 +511,7 @@ describe('deriveVerdict — derived, or nothing', () => {
     expect(mid).toBe('Stopping 1.2 goals more than expected on 900 primary shots, 54th among goalies.');
 
     const level = deriveVerdict(goalie({ gp: 40, gsax_shots_faced: 900 }), 'G', g(0.02, 50), null, null)!;
-    expect(level).toContain('level with expected');
+    expect(level).toMatch(/level with expected/i);
 
     // GSAx outranks the save rate, so none of these are the save-rate line.
     for (const v of [hi, lo, mid, level]) expect(v).not.toContain('save rate');

@@ -16,6 +16,7 @@ vi.mock('@/api/client', () => ({ apiClient: { get: getMock } }));
 import type { XgHistoryPoint } from '@citrus/shared';
 import { PlayerAdvancedCard } from '../PlayerAdvancedCard';
 import { type CardEntry } from '../playerAdvancedMetrics';
+import { projectionFraming } from '../projectionFraming';
 import { resetPlayerDashboardIndex } from '@/hooks/usePlayerDashboardIndex';
 
 let seq = 900;
@@ -273,13 +274,16 @@ describe('PlayerAdvancedCard — skater', () => {
     }
   });
 
-  it('shows the rest-of-season projection only on the expanded variant', () => {
+  it('shows the projection only on the expanded variant, framed for the date', () => {
+    // Before the opener the eyebrow is `2026-27 projection`; once the season
+    // is under way it is `Rest of season` (projectionFraming.ts).
+    const eyebrow = projectionFraming().eyebrow;
     const { unmount } = renderCard({ playerId: 8478402, indexOverride: index });
-    expect(screen.queryByText(/Rest of season/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(eyebrow)).not.toBeInTheDocument();
     unmount();
 
     renderCard({ playerId: 8478402, indexOverride: index, variant: 'expanded' });
-    expect(screen.getByText(/Rest of season/i)).toBeInTheDocument();
+    expect(screen.getByText(eyebrow)).toBeInTheDocument();
     expect(screen.getByText(/7.58/)).toBeInTheDocument();
     expect(screen.getByText(/318.4 total/)).toBeInTheDocument();
   });

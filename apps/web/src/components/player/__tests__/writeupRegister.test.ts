@@ -62,8 +62,11 @@ const ACCURACY_CLAIMS: Array<[string, RegExp]> = [
   ['beats a named competitor', /\bbeat(?:s|ing)?\s+(?:espn|yahoo|sleeper|fantrax)\b/i],
 ];
 
-/** Any of the names the copy brief allows for a Citrus number. */
-const CITRUS_SOURCE = /Citrus (?:xG|GAR|GSAx|ROS projection)|on the Citrus board/;
+/**
+ * The brand, in any of the forms the copy used to ship it in. Reversed
+ * 2026-09-05: a writeup quotes the number and never the brand.
+ */
+const CITRUS_SOURCE = /Citrus (?:xG|GAR|GSAx|ROS projection)|on the Citrus board|\bCitrus\b/;
 
 // ── Fixtures ────────────────────────────────────────────────────────
 
@@ -239,8 +242,8 @@ describe('derived writeups: register conformance', () => {
     }
   });
 
-  it.each(CASES.map((c) => [c.label, c.text]))('%s: names a Citrus source', (_label, text) => {
-    expect(CITRUS_SOURCE.test(text as string), `no source named in: ${text}`).toBe(true);
+  it.each(CASES.map((c) => [c.label, c.text]))('%s: never names the brand', (_label, text) => {
+    expect(CITRUS_SOURCE.test(text as string), `brand named in: ${text}`).toBe(false);
   });
 
   it.each(CASES.map((c) => [c.label, c.text]))('%s: no template hole', (_label, text) => {
@@ -263,6 +266,7 @@ describe('derived writeups: register conformance', () => {
     // leave a permanently-green test guarding nothing.
     const old = 'Elite looks, cold stick — 88th-percentile xG/60 and 3.1 goals under expected.';
     expect(EM_DASH.test(old)).toBe(true);
+    expect(CITRUS_SOURCE.test('Citrus xG has him 3.1 goals under expected.')).toBe(true);
     expect(CITRUS_SOURCE.test(old)).toBe(false);
     expect(BANNED_PHRASES.find(([, re]) => re.test('Unlock the upside'))?.[0]).toBe('unlock');
     expect(ACCURACY_CLAIMS.find(([, re]) => re.test('the most accurate model'))?.[0]).toBe(
