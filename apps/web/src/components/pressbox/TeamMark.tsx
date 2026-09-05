@@ -13,6 +13,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { teamCrestUrl } from '@/components/roster/headshot';
+import { PB_TYPE } from './rowScale';
 
 export type PressBoxTeamMarkSize = 'xs' | 'sm' | 'md';
 
@@ -38,7 +39,7 @@ export function PressBoxTeamMark({ abbrev, size = 'sm', label, className }: Pres
   const ok = url !== null && failed !== url;
   return (
     <span
-      className={cn('relative shrink-0 flex items-center justify-center', s.box, className)}
+      className={cn(PB_TYPE, 'relative shrink-0 flex items-center justify-center', s.box, className)}
       data-testid="team-mark"
       data-mark-state={ok ? 'crest' : 'text'}
       role="img"

@@ -43,18 +43,25 @@ describe('the homepage is the app home on a phone, the storefront everywhere els
     expect(SOURCE).toMatch(/#0C1811/);
   });
 
-  it('renders the Press Box home for a signed-in manager with leagues, native or below lg', () => {
+  it('renders the app home for EVERY signed-in phone, leagues or none (2026-09-05: a manager whose leagues had not loaded got the storefront)', () => {
     expect(SOURCE).toMatch(/<PressBoxHome/);
-    expect(SOURCE).toMatch(/auth\?\.user && hasLeagues && \(native \|\| isMobile\)/);
-    expect(SOURCE).toMatch(/userLeagues\?\.length/);
+    expect(SOURCE).toMatch(/auth\?\.user && \(native \|\| isMobile\)/);
+    expect(SOURCE).not.toMatch(/auth\?\.user && hasLeagues/);
   });
 
-  it('no longer redirects the native shell to League HQ — the LEAGUES tab has to come back here', () => {
-    expect(SOURCE).not.toMatch(/<Navigate/);
-    expect(SOURCE).not.toMatch(/\/league\/\$\{activeLeagueId\}/);
+  it('League HQ is home (2026-09-05): the active league\'s HQ, unless ?all=1 asks for the list — which is how the LEAGUES tab comes back here', () => {
+    expect(SOURCE).toMatch(/get\('all'\) === '1'/);
+    expect(SOURCE).toMatch(/<Navigate to=\{`\/league\/\$\{activeId\}`\} replace \/>/);
+    // Only when that league is one of the manager's; a stale active id shows the list.
+    expect(SOURCE).toMatch(/userLeagues\?\.some\(\(l\) => l\.id === activeId\)/);
   });
 
-  it('still renders the storefront for the web at desktop width and for users without leagues', () => {
+  it('the native shell signed out opens on the door, not the storefront', () => {
+    expect(SOURCE).toMatch(/native && !auth\?\.loading && !auth\?\.user/);
+    expect(SOURCE).toMatch(/<Navigate to="\/auth" replace \/>/);
+  });
+
+  it('still renders the storefront for the web at desktop width and for a signed-out visitor', () => {
     expect(SOURCE).toMatch(/<Homepage \/>/);
   });
 });

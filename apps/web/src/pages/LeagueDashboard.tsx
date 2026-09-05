@@ -38,7 +38,6 @@ import { useScoringRules } from '@/components/league/useScoringRules';
 import { matchupApi } from '@/api/matchups';
 import { gamesLeftOf, isBye, scoreOf, teamNameOf, winChanceOf, type WeekMatchupRow } from '@/components/matchup/scoreboard';
 import { standingsLine, type StandingsLineRow } from '@/components/league/hqLines';
-import { tradeApi } from '@/api/trades';
 import { clampToSeasonStart, getCurrentWeekNumber, getDraftCompletionDate, getFirstWeekStartDate } from '@/utils/weekCalculator';
 import { LeagueTimelineCard } from '@/components/dashboard/LeagueTimelineCard';
 import { FEATURE_PRACTICE_DRAFT } from '@/lib/featureFlags';
@@ -825,6 +824,10 @@ const LeagueDashboard = () => {
     queryKey: ['league-pending-trades', leagueId],
     enabled: !!leagueId && league?.draft_status === 'completed',
     queryFn: async () => {
+      // Imported when the read runs: `@/api/client` builds the Supabase
+      // client at module scope, and this page's tests mock the services,
+      // not the API modules.
+      const { tradeApi } = await import('@/api/trades');
       const res = await tradeApi.getLeagueTrades(leagueId!, 'pending');
       const rows = ((res as { data?: unknown }).data ?? res) as unknown;
       return Array.isArray(rows) ? (rows as Array<{ to_team_id?: string | null }>) : [];

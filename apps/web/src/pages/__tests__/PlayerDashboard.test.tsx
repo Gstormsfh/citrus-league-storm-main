@@ -407,7 +407,10 @@ describe('PlayerDashboard — the shipped page', () => {
     renderAt(MCDAVID);
     await screen.findByLabelText(/shot heatmap/i);
     expect(screen.queryByText(/no update timestamp/i)).toBeNull();
-    expect(screen.getByText(/xg model/i)).toBeInTheDocument();
+    // The badge names itself for assistive tech (`xG model. <date>, <age>.`);
+    // the old text match had been passing against the marketing footer's
+    // "31-feature xG model" line, which the app footer no longer carries.
+    expect(screen.getByRole('note', { name: /xg model/i })).toBeInTheDocument();
   });
 
   // The league index is a SEPARATE endpoint behind the same gate. Losing it

@@ -2540,7 +2540,10 @@ const Roster = () => {
             }
             
             setAnalyticsLoaded(true);
-            toast({ title: "CitrusPuck Loaded", description: "Advanced stats and projections ready." });
+            // No toast (2026-09-05). "CitrusPuck Loaded -- Advanced stats and
+            // projections ready" fired over the header on every Team visit;
+            // a background enrichment that worked is not news. Its failure
+            // still logs below.
         } catch (e) {
             logger.error("Failed to load analytics", e);
         }

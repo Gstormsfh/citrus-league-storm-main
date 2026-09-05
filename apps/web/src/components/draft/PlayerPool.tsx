@@ -11,6 +11,8 @@ import { Player } from '@/services/PlayerService';
 import { ScoringCalculator, ScoringSettings } from '@citrus/shared';
 import { DraftPoolRow } from './DraftPoolRow';
 import { poolHeadlineFor } from './draftPoolHeadline';
+import { draftPoolSeasonLine, positionRanks } from './draftPoolLine';
+import { draftNeedLine } from './draftNeed';
 // Direct file imports, not the `@/components/pressbox` barrel: the barrel
 // re-exports LeagueHeader, which reaches LeagueContext and the Supabase
 // client at module scope. The pool is a draft-room surface with its own
@@ -73,6 +75,12 @@ interface PlayerPoolProps {
    */
   isYourTurn?: boolean;
   /**
+   * STORMY'S NEED LINE (2026-09-05, artboard 4a): the league's slots per
+   * position, the positions you have drafted, and the picks before your
+   * next turn. See draftNeed.ts. Absent draws no line.
+   */
+  need?: { caps: Record<string, number> | null; myPositions: string[]; picksAway: number | null } | null;
+  /**
    * DR-4 (2026-07-30) — F11 fix (layer 1 GUARD): while the caller has
    * a pending pick in-flight for their team, every Draft button in
    * the pool disables + shows "Submitting…". Prevents the
@@ -127,6 +135,7 @@ export const PlayerPool = memo(({
   projectedFptsMap = EMPTY_PROJECTIONS,
   qualitySignals = EMPTY_SIGNALS,
   isYourTurn = false,
+  need = null,
   isSubmitPending = false,
 }: PlayerPoolProps) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -137,6 +146,8 @@ export const PlayerPool = memo(({
   const [sortBy, setSortBy] = useState('projRank');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [showDrafted, setShowDrafted] = useState(false);
+  /** `★ 6` (artboard 4a): the pool narrowed to your queue, in the pool's own order. */
+  const [queuedOnly, setQueuedOnly] = useState(false);
 
   // PERF: Use pre-built Set for O(1) lookups instead of O(n) Array.includes on every player
   const draftedSet = useMemo(() => {
@@ -207,6 +218,21 @@ export const PlayerPool = memo(({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availablePlayers, scorer, projectedFptsMap]);
 
+  /** `D1`, `LW3`: rank at his position in the pool's projection order (artboard 4a). */
+  const positionRankMap = useMemo(() => {
+    const byId = new Map(availablePlayers.map((p) => [p.id, p]));
+    const ordered = [...rankMap.entries()].sort((a, b) => a[1] - b[1]).map(([id]) => id);
+    return positionRanks(ordered, (id) => byId.get(id)?.position);
+  }, [availablePlayers, rankMap]);
+
+  /** Stormy's line under the chips, from the pool's own order minus the drafted. */
+  const needLine = useMemo(() => {
+    if (!need) return null;
+    const byId = new Map(availablePlayers.map((p) => [p.id, p]));
+    const ordered = [...rankMap.entries()].sort((a, b) => a[1] - b[1]).map(([id]) => id).filter((id) => !draftedSet.has(id));
+    return draftNeedLine({ caps: need.caps, myPositions: need.myPositions, orderedIds: ordered, positionOf: (id) => byId.get(id)?.position, picksAway: need.picksAway });
+  }, [need, availablePlayers, rankMap, draftedSet]);
+
   // Compute data freshness from the most recent last_updated timestamp across all players
   const dataFreshnessLabel = useMemo(() => {
     if (!availablePlayers || availablePlayers.length === 0) return null;
@@ -251,8 +277,9 @@ export const PlayerPool = memo(({
         (selectedPosition === 'F' && ['C', 'LW', 'RW'].includes(normalizedPlayerPos));
       const isDrafted = draftedSet.has(player.id);
       const matchesDraftStatus = showDrafted ? true : !isDrafted;
-      
-      return matchesSearch && matchesPosition && matchesDraftStatus;
+      const matchesQueue = !queuedOnly || queue.includes(player.id);
+
+      return matchesSearch && matchesPosition && matchesDraftStatus && matchesQueue;
     });
 
     // Sort goalies and skaters separately to avoid cross-type NaN comparisons
@@ -334,14 +361,14 @@ export const PlayerPool = memo(({
     }
 
     return filtered;
-  }, [debouncedSearch, selectedPosition, sortBy, sortDirection, draftedSet, showDrafted, availablePlayers, fptsMap, projectedFptsMap, rankMap]);
+  }, [debouncedSearch, selectedPosition, sortBy, sortDirection, draftedSet, showDrafted, queuedOnly, queue, availablePlayers, fptsMap, projectedFptsMap, rankMap]);
 
   // PERF: Paginate to avoid rendering 500+ DOM nodes at once
   const PAGE_SIZE = 75;
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   // Reset visible count when filters change (user expects fresh results from top)
-  const filterKey = `${debouncedSearch}|${selectedPosition}|${sortBy}|${sortDirection}|${showDrafted}`;
+  const filterKey = `${debouncedSearch}|${selectedPosition}|${sortBy}|${sortDirection}|${showDrafted}|${queuedOnly}`;
   const prevFilterKey = useRef(filterKey);
   if (filterKey !== prevFilterKey.current) {
     prevFilterKey.current = filterKey;
@@ -572,24 +599,50 @@ export const PlayerPool = memo(({
             activeKey={selectedPosition}
             onSelect={setSelectedPosition}
             label="Position filter"
-            className="min-w-0 overflow-x-auto scrollbar-none"
+            className="min-w-0 overflow-x-auto scrollbar-hide"
           />
-          {/* Show-drafted is a toggle, not a position, so it is not one of the
-              chips above — but it wears the chip's clothes and takes the
-              artboard's trailing slot at the row's far edge. */}
+          {/* `★ 6` (artboard 4a): your queue as a filter, at the row's far edge,
+              with the count. Show-drafted is the other toggle beside it; both
+              wear the chip's clothes and neither is a position. */}
+          {onAddToQueue && queue.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setQueuedOnly((v) => !v)}
+              aria-pressed={queuedOnly}
+              title={queuedOnly ? 'Show every player' : 'Show only your queue'}
+              data-testid="pool-queued-only"
+              className={cn(
+                'ml-auto flex-none px-[11px] py-[5px] rounded-full font-plex font-semibold text-[10px] tracking-[0.06em] whitespace-nowrap',
+                queuedOnly ? 'bg-pressbox-orange text-pressbox-orange-ink' : 'bg-pressbox-tile text-pressbox-orange-soft',
+              )}
+            >
+              &#9733; {queue.length}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowDrafted(!showDrafted)}
             aria-pressed={showDrafted}
             title={showDrafted ? 'Hide drafted players' : 'Show drafted players'}
             className={cn(
-              'ml-auto flex-none px-[11px] py-[5px] rounded-full font-plex font-semibold text-[10px] tracking-[0.06em] whitespace-nowrap',
+              'flex-none px-[11px] py-[5px] rounded-full font-plex font-semibold text-[10px] tracking-[0.06em] whitespace-nowrap',
+              !(onAddToQueue && queue.length > 0) && 'ml-auto',
               showDrafted ? 'bg-pressbox-text text-pressbox-surface' : 'bg-pressbox-tile text-pressbox-text/70',
             )}
           >
             DRAFTED
           </button>
         </div>
+
+        {needLine && (
+          <p
+            className="mt-2.5 flex items-center gap-2 rounded-[10px] bg-pressbox-tile border border-white/[0.08] px-3 py-2 font-barlow text-[12px] text-pressbox-text/85"
+            data-testid="draft-need-line"
+          >
+            <span aria-hidden="true" className="w-[18px] h-[18px] flex-none rounded-full bg-pressbox-orange/20 border border-pressbox-orange flex items-center justify-center font-condensed font-bold text-[9px] text-pressbox-orange-soft">S</span>
+            <span className="min-w-0 truncate"><span className="font-plex font-semibold text-[9px] uppercase tracking-[0.1em] text-pressbox-orange-soft">Stormy</span> · {needLine.text}</span>
+          </p>
+        )}
 
         <div
           aria-hidden="true"
@@ -615,6 +668,8 @@ export const PlayerPool = memo(({
               seasonFpts={fptsMap.get(player.id) || 0}
               projection={projectedFptsMap.get(player.id) ?? null}
               signal={qualitySignals.get(player.id) ?? null}
+              seasonLine={draftPoolSeasonLine(player)}
+              positionRank={positionRankMap.get(player.id) ?? null}
               headlineOverride={poolHeadlineFor(sortBy, {
                 seasonFpts: fptsMap.get(player.id) || 0,
                 projectionTotal: projectedFptsMap.get(player.id)?.total ?? null,

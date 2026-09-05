@@ -499,6 +499,29 @@ export default function DraftRoomV2() {
   // (the F14 incident's user-visible surface).
   useMyTeamIdCrossCheck({ leagueId });
 
+  /**
+   * `FINALSZ DRAFT` (artboard 4a, 2026-09-05): the league's name for the
+   * header, off the league row. One small GET at room open, the same row
+   * MainTabs reads for the roster shape; never LeagueContext, which may
+   * point at another league for the whole draft (ARCHITECT 2026-08-12).
+   * Null until it lands, and on any failure: the header says DRAFT ROOM.
+   */
+  const [leagueName, setLeagueName] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { apiClient } = await import('@/api/client');
+        const res = await apiClient.get<{ name?: string }>(`/api/leagues/${leagueId}`);
+        const name = (res?.data as { name?: string } | undefined)?.name;
+        if (!cancelled && typeof name === 'string' && name.trim()) setLeagueName(name.trim());
+      } catch {
+        // The header keeps its generic title.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [leagueId]);
+
   const handleRetryNow = useMemo(
     () => () => {
       const runner = runnerRef.current;
@@ -580,6 +603,7 @@ export default function DraftRoomV2() {
         */}
       <StickyHeader
         leagueId={leagueId}
+        leagueName={leagueName}
         onRetryNow={handleRetryNow}
         clockOffsetMs={clockOffsetMs}
         teams={teams}
@@ -677,6 +701,13 @@ function IdentityFailureBanner() {
 interface StickyHeaderProps {
   /** Exit-link target — the header owns the room's way back to League HQ. */
   leagueId: string;
+  /**
+   * `FINALSZ DRAFT` (artboard 4a, 2026-09-05). The name off the league row
+   * MainTabs already reads for the roster shape -- one fetch, not two, and
+   * never LeagueContext (which may point at another league for the whole
+   * draft; see the title note below). Null until it lands: `DRAFT ROOM`.
+   */
+  leagueName: string | null;
   onRetryNow: () => void;
   clockOffsetMs: number;
   /**
@@ -1448,7 +1479,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
 // round/pick/status, and the countdown as a compact pill. The h1 stays
 // for screen readers and the page-heading test; sighted users don't
 // need a sign saying "Draft Room" — they need the clock and the way out.
-function StickyHeader({ leagueId, onRetryNow, clockOffsetMs, teams }: StickyHeaderProps) {
+function StickyHeader({ leagueId, leagueName, onRetryNow, clockOffsetMs, teams }: StickyHeaderProps) {
   const connectionState = useDraftConnectionState();
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
@@ -1476,11 +1507,10 @@ function StickyHeader({ leagueId, onRetryNow, clockOffsetMs, teams }: StickyHead
    * clock beside presence so the room still tells the time OFF the clock
    * (the pick bar below only exists on it).
    *
-   * The title says DRAFT ROOM, not `<league> DRAFT`: the room reads its
-   * league from the path, LeagueContext may point at a different league for
-   * the whole draft (ARCHITECT 2026-08-12, below), and the in-draft render
-   * path is deliberately free of extra network work. The name lands with
-   * the LeagueContext proposal, not with a fetch here.
+   * The title says `<league> DRAFT` once the league row MainTabs fetches
+   * for the roster shape has landed, and DRAFT ROOM until then. Never from
+   * LeagueContext, which may point at a different league for the whole
+   * draft (ARCHITECT 2026-08-12, below), and never a second fetch.
    *
    * The progress line keeps the exact text it had — `Round 1 · Pick 6 / 36
    * · in progress` — uppercased by CSS. Its textContent is a DR-1b/DR-4
@@ -1531,6 +1561,8 @@ function StickyHeader({ leagueId, onRetryNow, clockOffsetMs, teams }: StickyHead
             &lsaquo;
           </Link>
         }
+        /* `FINALSZ DRAFT` (artboard 4a), once the league row is in hand. */
+        leagueName={leagueName}
         progress={progress}
         connected={ownedTeams.length > 0 ? connectedCount : null}
         total={ownedTeams.length > 0 ? ownedTeams.length : null}
@@ -2525,6 +2557,20 @@ function MainTabs({
                  season fantasy points exactly as before. */
               projectedFptsMap={projectedFptsMap}
               qualitySignals={qualitySignals}
+              /* STORMY'S NEED LINE (2026-09-05, artboard 4a): the league's
+                 slots, the positions already drafted, the picks before the
+                 next turn -- all held here already. Not in an auction. */
+              need={
+                !isAuctionRoom && myTeamId !== null
+                  ? {
+                      caps: rosterCaps,
+                      myPositions: (derived?.teamRosters.get(myTeamId) ?? [])
+                        .map((r) => playersById.get(String(r.playerId))?.position ?? null)
+                        .filter((p): p is string => p !== null),
+                      picksAway: typeof offClockNextPick === 'object' ? offClockNextPick.picksAway : null,
+                    }
+                  : null
+              }
             />
           )}
         </TabsContent>

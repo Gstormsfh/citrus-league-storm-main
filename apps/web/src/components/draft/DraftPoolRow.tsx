@@ -5,6 +5,7 @@ import { mugFromDirectory } from '@/components/roster/headshot';
 import { positionChipKey } from '@/components/roster/positionChip';
 import { statusChipFor } from '@/components/player/statusChip';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
+import { getTeamColor } from '@/utils/teamColors';
 import type { PoolHeadline } from './draftPoolHeadline';
 import type { Player } from '@/services/PlayerService';
 import type { DraftProjection, QualitySignal } from './draftDecision';
@@ -74,6 +75,10 @@ export interface DraftPoolRowProps {
   queued: boolean;
   /** 1-based place in the caller's queue. Renders the artboard's `★ Q2`. */
   queuePosition?: number | null;
+  /** `90 PTS · 26:10` -- last season, on the second line (artboard 4a). */
+  seasonLine?: string | null;
+  /** `D1` -- rank at his position in the pool's projection order (artboard 4a's `TIER 2 · D1`, the half the data supports). */
+  positionRank?: string | null;
   /** Show the inline Draft button: on the clock, or this row is selected. */
   canDraft: boolean;
   submitting: boolean;
@@ -99,6 +104,8 @@ export function DraftPoolRow({
   drafted,
   queued,
   queuePosition = null,
+  seasonLine = null,
+  positionRank = null,
   canDraft,
   submitting,
   onSelect,
@@ -173,9 +180,17 @@ export function DraftPoolRow({
         </span>
       </span>
 
-      {/* 2 — the player. */}
+      {/* 2 — the player. The Players screen's row (2026-09-05): the 40px face
+          in the team's ring, the position as the tinted tag, then two meta
+          lines -- the season, and the read. "Draft should lean closer to
+          free agents." */}
       <span className="flex items-center gap-2.5 min-w-0">
-        <Mug p={mugFromDirectory(player)} size="sm" crest />
+        <span
+          className="w-10 h-10 flex-none box-border rounded-full overflow-hidden border-[1.5px] border-white/[0.16]"
+          style={player.team ? { borderColor: getTeamColor(player.team) } : undefined}
+        >
+          <Mug p={mugFromDirectory(player)} size="md" className="w-full h-full" crest />
+        </span>
         <span className="min-w-0">
           <span className="block font-barlow font-bold text-[15px] truncate text-pressbox-text">
             {player.full_name}
@@ -207,15 +222,22 @@ export function DraftPoolRow({
           </span>
           <span className="block mt-[3px] font-plex font-medium text-[10px] text-pressbox-text/55 truncate">
             {posKey && (
-              <b data-testid="draft-pool-position-chip" className="font-bold text-pressbox-text">
+              <b data-testid="draft-pool-position-chip" className="font-bold px-1.5 py-px rounded-[3px] bg-pressbox-sage/20 text-pressbox-sage-soft">
                 {posKey}
               </b>
             )}
-            {posKey && player.team ? ' · ' : ''}
+            {posKey && player.team ? ' ' : ''}
             {player.team}
-            {signal ? (
+            {seasonLine ? (
               <>
                 {' · '}
+                <span data-testid="draft-pool-season">{seasonLine}</span>
+              </>
+            ) : null}
+          </span>
+          <span className="block mt-0.5 font-plex font-medium text-[10px] text-pressbox-text/55 truncate empty:hidden">
+            {signal ? (
+              <>
                 {/* The moat, on the row. `title` carries the cohort in full;
                     the row itself has 393px and prints the short form. */}
                 <span
@@ -226,7 +248,10 @@ export function DraftPoolRow({
                   {signal.shortMetric} {ordinalPercentile(signal.percentile)}
                   {signal.lowSample ? '*' : ''}
                 </span>
+                {positionRank ? <span> · {positionRank}</span> : null}
               </>
+            ) : positionRank ? (
+              <span>{positionRank}</span>
             ) : null}
           </span>
         </span>

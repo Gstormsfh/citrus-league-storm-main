@@ -42,7 +42,7 @@ export function PressBoxScoreTicker({ label = 'NHL', games, className }: PressBo
       <span className="h-full px-2.5 flex items-center flex-none bg-pressbox-orange text-pressbox-orange-ink tracking-[0.1em]">
         {label}
       </span>
-      <div className="flex gap-[18px] px-3 whitespace-nowrap overflow-x-auto text-pressbox-text/85 scrollbar-none">
+      <div className="flex gap-[18px] px-3 whitespace-nowrap overflow-x-auto text-pressbox-text/85 scrollbar-hide">
         {games.map((g) => (
           <span key={g.id}>
             {g.line}
