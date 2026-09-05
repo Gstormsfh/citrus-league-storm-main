@@ -353,24 +353,34 @@ const Auth = () => {
     } finally { setResetLoading(false); }
   };
 
-  const darkInputClass = 'bg-pastel-surface border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 focus-visible:border-pastel-orange/50 h-11';
+  // Below lg the field is Press Box (PR18 paint sweep, 2026-09-05): a 48px
+  // tile with the hairline border and Barlow at 15px, so the first screen a
+  // manager sees on a phone is the same app as the second. The desktop keeps
+  // the Citrus 2.0 field. Same element, same handlers -- classes only.
+  const darkInputClass = 'bg-pastel-surface border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 focus-visible:border-pastel-orange/50 h-11 max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-tile max-lg:border-white/[0.08] max-lg:font-barlow max-lg:text-[15px] max-lg:text-pressbox-text max-lg:placeholder:text-pressbox-text/40';
 
   return (
     <DarkLayout>
-      <Navbar />
+      {/* PRESS BOX BELOW lg (PR18 paint sweep, 2026-09-05). The sign-in screen
+          is the first thing every manager sees on a phone, and it wore the
+          marketing site's chrome: the storefront Navbar with its hamburger,
+          Poppins and Montserrat, the Citrus 2.0 card. One tree, re-skinned
+          with `max-lg:` classes so every handler, id and label is the same
+          element on both layers -- the desktop is untouched from lg. */}
+      <div className="hidden lg:block"><Navbar /></div>
       <div
         aria-hidden="true"
         className="fixed inset-0 pointer-events-none z-page-backdrop"
         style={{ background: 'radial-gradient(ellipse 50% 40% at 80% 15%, rgba(255,107,26,0.08) 0%, transparent 60%)' }}
       />
-      <main className="relative z-10 flex items-center justify-center px-4 pt-[calc(6rem+env(safe-area-inset-top))] pb-12 lg:pt-28 lg:pb-20 min-h-[calc(100vh-92px)]">
+      <main className="pb-type-phone relative z-10 flex items-center justify-center px-4 pt-[calc(2.5rem+env(safe-area-inset-top))] pb-12 lg:pt-28 lg:pb-20 min-h-[calc(100vh-92px)] max-lg:min-h-screen max-lg:bg-pressbox-surface max-lg:text-pressbox-text max-lg:px-5">
         <div className="w-full max-w-[440px]">
           <div className="flex flex-col items-center mb-6">
-            <CitrusLogo className="w-10 h-10 mb-3" variant="on-dark" />
-            <h1 className="font-sans font-black text-[1.75rem] tracking-[-0.025em] text-pastel-cream leading-none">
+            <CitrusLogo className="w-14 h-14 mb-4 lg:w-10 lg:h-10 lg:mb-3" variant="on-dark" />
+            <h1 className="font-sans font-black text-[1.75rem] tracking-[-0.025em] text-pastel-cream leading-none max-lg:font-condensed max-lg:font-extrabold max-lg:text-[28px] max-lg:uppercase max-lg:tracking-[0.02em] max-lg:text-pressbox-text">
               {activeTab === 'signin' ? 'Welcome back' : 'Join Citrus'}
             </h1>
-            <p className="text-[13px] text-white/55 mt-2">
+            <p className="text-[13px] text-white/55 mt-2 max-lg:font-barlow max-lg:text-pressbox-text/60">
               {activeTab === 'signin' ? (
                 <>New to Citrus?{' '}
                   <button type="button" onClick={() => { setActiveTab('signup'); setError(null); }} className="text-pastel-orange-soft hover:text-pastel-orange font-bold underline-offset-4 hover:underline transition-colors">
@@ -387,7 +397,7 @@ const Auth = () => {
             </p>
           </div>
 
-          <CitrusCard padding="spacious" accent="orange">
+          <CitrusCard padding="spacious" accent="orange" className="max-lg:bg-transparent max-lg:ring-0 max-lg:p-0 max-lg:rounded-none max-lg:shadow-none">
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'signin' | 'signup')} className="w-full">
               <TabsList className="sr-only">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
@@ -401,12 +411,12 @@ const Auth = () => {
                     than other providers, hence first + brand-white style. */}
                 {OAUTH_SIGN_IN_ENABLED && (
                   <>
-                <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('apple')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'apple'} className="bg-white text-[#111111] ring-white/80 hover:bg-white/90 hover:text-black hover:ring-white">
+                <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('apple')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'apple'} className="bg-white text-[#111111] ring-white/80 hover:bg-white/90 hover:text-black hover:ring-white max-lg:h-12 max-lg:rounded-[12px] max-lg:ring-0 max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.06em]">
                   {oauthLoading !== 'apple' && <Apple className="w-4 h-4 fill-current" />}
                   Continue with Apple
                 </CitrusButton>
 
-                <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('google')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'google'}>
+                <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('google')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'google'} className="max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-tile max-lg:ring-white/[0.08] max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.06em]">
                   {oauthLoading !== 'google' && <Chrome className="w-4 h-4" />}
                   Continue with Google
                 </CitrusButton>
@@ -423,28 +433,28 @@ const Auth = () => {
                     text-white/55, not /45: darkThemeContrastGuard measures white
                     alpha against #0F1F15 and /45 is 4.43:1. No em dash either,
                     aiVoiceGuard bans them in user-facing copy. */}
-                <p className="text-[11px] leading-snug text-center text-white/55 px-2">
+                <p className="text-[11px] leading-snug text-center text-white/55 px-2 max-lg:font-barlow max-lg:text-[12px] max-lg:text-pressbox-text/55">
                   Use the same email for both. Apple&apos;s Hide My Email creates a
                   separate account with none of your leagues.
                 </p>
 
                 <div className="relative py-1">
                   <div className="absolute inset-0 flex items-center"><div className="w-full h-px bg-white/10" /></div>
-                  <div className="relative flex justify-center"><span className="bg-pastel-surface-tile px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/55">or with email</span></div>
+                  <div className="relative flex justify-center"><span className="bg-pastel-surface-tile px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/55 max-lg:bg-pressbox-surface max-lg:font-plex max-lg:font-medium max-lg:text-[9px] max-lg:tracking-[0.12em] max-lg:text-pressbox-text/45">or with email</span></div>
                 </div>
                   </>
                 )}
 
                 <form onSubmit={handleSignIn} className="space-y-3">
                   {error && (
-                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200">
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200 max-lg:rounded-[10px] max-lg:bg-pressbox-grapefruit/10 max-lg:ring-pressbox-grapefruit/30 max-lg:text-pressbox-grapefruit-text max-lg:font-barlow">
                       <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} aria-hidden="true" />
                       <span className="text-[13px] font-medium leading-snug">{error}</span>
                     </div>
                   )}
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="signin-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Email</Label>
+                    <Label htmlFor="signin-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:text-pressbox-text/55">Email</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/55" strokeWidth={2.5} aria-hidden="true" />
                       <Input id="signin-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
@@ -453,7 +463,7 @@ const Auth = () => {
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="signin-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Password</Label>
+                      <Label htmlFor="signin-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:text-pressbox-text/55">Password</Label>
                       <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
                         <DialogTrigger asChild>
                           <button type="button" className="text-[11px] text-pastel-orange-soft hover:text-pastel-orange transition-colors flex items-center gap-1 font-bold" onClick={() => { setResetEmail(email); setResetSuccess(false); setError(null); }}>
@@ -461,10 +471,10 @@ const Auth = () => {
                             Forgot password?
                           </button>
                         </DialogTrigger>
-                        <DialogContent className="bg-pastel-surface-tile border-white/10 text-pastel-cream">
+                        <DialogContent className="pb-type-phone bg-pastel-surface-tile border-white/10 text-pastel-cream max-lg:bg-pressbox-tile max-lg:border-white/[0.08] max-lg:text-pressbox-text max-lg:font-barlow">
                           <DialogHeader>
-                            <DialogTitle className="font-sans font-black text-[1.5rem] tracking-[-0.02em] text-pastel-cream">Reset <span className="text-pastel-orange">password</span></DialogTitle>
-                            <DialogDescription className="text-white/65">Enter your email and we will send you a link to reset your password.</DialogDescription>
+                            <DialogTitle className="font-sans font-black text-[1.5rem] tracking-[-0.02em] text-pastel-cream max-lg:font-condensed max-lg:font-extrabold max-lg:text-[24px] max-lg:uppercase max-lg:tracking-[0.02em] max-lg:text-pressbox-text">Reset <span className="text-pastel-orange">password</span></DialogTitle>
+                            <DialogDescription className="text-white/65 max-lg:text-[13px] max-lg:text-pressbox-text/60">Enter your email and we will send you a link to reset your password.</DialogDescription>
                           </DialogHeader>
                           <div className="space-y-4 py-2">
                             {resetSuccess ? (
@@ -475,16 +485,16 @@ const Auth = () => {
                             ) : (
                               <>
                                 <div className="space-y-1.5">
-                                  <Label htmlFor="reset-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Email</Label>
+                                  <Label htmlFor="reset-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:text-pressbox-text/55">Email</Label>
                                   <Input id="reset-email" type="email" placeholder="you@example.com" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} className={darkInputClass} required />
                                 </div>
                                 {error && (
-                                  <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200">
+                                  <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200 max-lg:rounded-[10px] max-lg:bg-pressbox-grapefruit/10 max-lg:ring-pressbox-grapefruit/30 max-lg:text-pressbox-grapefruit-text max-lg:font-barlow">
                                     <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} aria-hidden="true" />
                                     <span className="text-[13px] font-medium leading-snug">{error}</span>
                                   </div>
                                 )}
-                                <CitrusButton type="button" variant="primary" size="lg" fullWidth onClick={handleForgotPassword} loading={resetLoading}>
+                                <CitrusButton type="button" variant="primary" size="lg" fullWidth onClick={handleForgotPassword} loading={resetLoading} className="max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-orange max-lg:text-pressbox-orange-ink max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.08em] max-lg:uppercase">
                                   {resetLoading ? 'Sending...' : 'Send reset link'}
                                 </CitrusButton>
                               </>
@@ -499,7 +509,7 @@ const Auth = () => {
                     </div>
                   </div>
 
-                  <CitrusButton type="submit" variant="primary" size="lg" fullWidth loading={loading} disabled={oauthLoading !== null} className="mt-2">
+                  <CitrusButton type="submit" variant="primary" size="lg" fullWidth loading={loading} disabled={oauthLoading !== null} className="mt-2 max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-orange max-lg:text-pressbox-orange-ink max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.08em] max-lg:uppercase">
                     {loading ? 'Signing in...' : 'Sign in'}
                   </CitrusButton>
                 </form>
@@ -508,12 +518,12 @@ const Auth = () => {
               <TabsContent value="signup" className="space-y-4 mt-0">
                 {OAUTH_SIGN_IN_ENABLED && (
                   <>
-                <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('apple')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'apple'} className="bg-white text-[#111111] ring-white/80 hover:bg-white/90 hover:text-black hover:ring-white">
+                <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('apple')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'apple'} className="bg-white text-[#111111] ring-white/80 hover:bg-white/90 hover:text-black hover:ring-white max-lg:h-12 max-lg:rounded-[12px] max-lg:ring-0 max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.06em]">
                   {oauthLoading !== 'apple' && <Apple className="w-4 h-4 fill-current" />}
                   Continue with Apple
                 </CitrusButton>
 
-                <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('google')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'google'}>
+                <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('google')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'google'} className="max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-tile max-lg:ring-white/[0.08] max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.06em]">
                   {oauthLoading !== 'google' && <Chrome className="w-4 h-4" />}
                   Continue with Google
                 </CitrusButton>
@@ -530,28 +540,28 @@ const Auth = () => {
                     text-white/55, not /45: darkThemeContrastGuard measures white
                     alpha against #0F1F15 and /45 is 4.43:1. No em dash either,
                     aiVoiceGuard bans them in user-facing copy. */}
-                <p className="text-[11px] leading-snug text-center text-white/55 px-2">
+                <p className="text-[11px] leading-snug text-center text-white/55 px-2 max-lg:font-barlow max-lg:text-[12px] max-lg:text-pressbox-text/55">
                   Use the same email for both. Apple&apos;s Hide My Email creates a
                   separate account with none of your leagues.
                 </p>
 
                 <div className="relative py-1">
                   <div className="absolute inset-0 flex items-center"><div className="w-full h-px bg-white/10" /></div>
-                  <div className="relative flex justify-center"><span className="bg-pastel-surface-tile px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/55">or with email</span></div>
+                  <div className="relative flex justify-center"><span className="bg-pastel-surface-tile px-3 font-jbmono text-[10px] uppercase tracking-[0.22em] text-white/55 max-lg:bg-pressbox-surface max-lg:font-plex max-lg:font-medium max-lg:text-[9px] max-lg:tracking-[0.12em] max-lg:text-pressbox-text/45">or with email</span></div>
                 </div>
                   </>
                 )}
 
                 <form onSubmit={handleSignUp} className="space-y-3">
                   {error && (
-                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200">
+                    <div className="flex items-start gap-2 px-3 py-2.5 rounded-md bg-red-500/10 ring-1 ring-red-500/30 text-red-200 max-lg:rounded-[10px] max-lg:bg-pressbox-grapefruit/10 max-lg:ring-pressbox-grapefruit/30 max-lg:text-pressbox-grapefruit-text max-lg:font-barlow">
                       <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" strokeWidth={2.5} aria-hidden="true" />
                       <span className="text-[13px] font-medium leading-snug">{error}</span>
                     </div>
                   )}
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="signup-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Email</Label>
+                    <Label htmlFor="signup-email" className="text-[12px] font-bold text-white/65 uppercase tracking-wider max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:text-pressbox-text/55">Email</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/55" strokeWidth={2.5} aria-hidden="true" />
                       <Input id="signup-email" type="email" placeholder="you@example.com" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
@@ -559,7 +569,7 @@ const Auth = () => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="signup-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Password</Label>
+                    <Label htmlFor="signup-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:text-pressbox-text/55">Password</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/55" strokeWidth={2.5} aria-hidden="true" />
                       <Input id="signup-password" type="password" placeholder="••••••••" value={password} onChange={(e) => { setPassword(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required minLength={8} />
@@ -568,7 +578,7 @@ const Auth = () => {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="confirm-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider">Confirm Password</Label>
+                    <Label htmlFor="confirm-password" className="text-[12px] font-bold text-white/65 uppercase tracking-wider max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:text-pressbox-text/55">Confirm Password</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/55" strokeWidth={2.5} aria-hidden="true" />
                       <Input id="confirm-password" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); setError(null); }} className={`${darkInputClass} pl-10`} required />
@@ -585,7 +595,7 @@ const Auth = () => {
                     </Label>
                   </div>
 
-                  <CitrusButton type="submit" variant="primary" size="lg" fullWidth loading={loading} disabled={oauthLoading !== null || !tosAccepted} className="mt-2">
+                  <CitrusButton type="submit" variant="primary" size="lg" fullWidth loading={loading} disabled={oauthLoading !== null || !tosAccepted} className="mt-2 max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-orange max-lg:text-pressbox-orange-ink max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.08em] max-lg:uppercase">
                     {loading ? 'Creating account...' : 'Create account'}
                   </CitrusButton>
                 </form>
@@ -593,7 +603,7 @@ const Auth = () => {
             </Tabs>
           </CitrusCard>
 
-          <p className="text-center text-[10px] font-jbmono uppercase tracking-[0.32em] text-white/55 mt-6">
+          <p className="text-center text-[10px] font-jbmono uppercase tracking-[0.32em] text-white/55 mt-6 max-lg:font-plex max-lg:font-medium max-lg:text-[9px] max-lg:tracking-[0.2em] max-lg:text-pressbox-text/45">
             Free during launch · Founders pricing locked in
           </p>
         </div>

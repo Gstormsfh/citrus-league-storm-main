@@ -581,6 +581,21 @@
      out in sentence case for exactly that reason. */
   text-transform: inherit;
   }
+
+  /* The same reset, below lg only (PR18 paint sweep, 2026-09-05): for a page
+     that is one tree re-skinned with `max-lg:` classes -- Auth -- where the
+     desktop must keep Montserrat and the phone must get Plex and Barlow. */
+  @media (max-width: 1023.98px) {
+    .pb-type-phone {
+    line-height: normal;
+    }
+    .pb-type-phone :where(p, span, button, h1, h2, h3, h4, h5, h6) {
+    font-family: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    }
+  }
   
   /* 2026-08-19: citrus-charcoal (#5C5C5C) measured 2.25:1 on the dark
      tiles — this is what made the "My Team" / "Team 2" manager list in

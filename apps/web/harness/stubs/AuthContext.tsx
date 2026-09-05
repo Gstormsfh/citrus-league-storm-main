@@ -3,15 +3,20 @@ import type { ReactNode } from 'react';
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => <>{children}</>;
 
+// `?signedout=1` reviews the signed-out screens (Auth) -- a signed-in user
+// is sent away from them.
+const SIGNED_OUT = new URLSearchParams(location.search).get('signedout') === '1';
+
 const AUTH = {
-  user: { id: 'harness-user', email: 'harness@example.com' },
-  session: { access_token: 'harness-token' },
+  user: SIGNED_OUT ? null : { id: 'harness-user', email: 'harness@example.com' },
+  session: SIGNED_OUT ? null : { access_token: 'harness-token' },
   loading: false,
   signIn: async () => ({ error: null }),
   signUp: async () => ({ error: null }),
   signOut: async () => {},
   signInWithGoogle: async () => ({ error: null }),
   signInWithApple: async () => ({ error: null }),
+  signInWithOAuth: async () => ({ error: null }),
   resetPassword: async () => ({ error: null }),
   updatePassword: async () => ({ error: null }),
 };

@@ -84,3 +84,9 @@ describe('the floor', () => {
     }
   });
 });
+
+describe('one loader per wait', () => {
+  it("Roster's league-switch overlay stays on the desktop; the phone has the skeleton", () => {
+    expect(read('pages/Roster.tsx')).toMatch(/showLoadingOverlay && \(\s*<div className="fixed inset-0 [^"]*z-overlay hidden lg:flex/);
+  });
+});

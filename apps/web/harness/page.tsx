@@ -733,7 +733,9 @@ const ANALYTICS_ROWS = (
  */
 (accountApi as any).getProfile = async () => ({
   data: {
-    id: 'harness-user', username: 'gstorms', display_name: 'Garrett', first_name: 'Garrett', last_name: 'Storms',
+    // `?fresh=1`: the auto-generated username a new email signup carries,
+    // which is what keeps ProfileSetup on screen.
+    id: 'harness-user', username: new URLSearchParams(location.search).get('fresh') === '1' ? 'user_9f3a' : 'gstorms', display_name: 'Garrett', first_name: 'Garrett', last_name: 'Storms',
     phone: '', location: 'Kelowna, BC', bio: 'Commissioner. Oilers fan. Never trades a goalie.', default_team_name: 'Finalsz',
     timezone: 'America/Vancouver', avatar_url: null, push_notifications: true, created_at: '2025-08-01T00:00:00.000Z', updated_at: '2026-09-01T00:00:00.000Z',
   },
@@ -777,6 +779,9 @@ const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
   playoffs: () => import('../src/pages/PlayoffBracket'),
   stormy: () => import('../src/pages/StormyAssistant'),
   createleague: () => import('../src/pages/CreateLeague'),
+  auth: () => import('../src/pages/Auth'),
+  profilesetup: () => import('../src/pages/ProfileSetup'),
+  verifyemail: () => import('../src/pages/VerifyEmail'),
 };
 
 const which = new URLSearchParams(location.search).get('p') || 'waivers';
@@ -812,6 +817,11 @@ const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   createleague: { path: '/create-league', at: `/create-league${location.search.replace(/^\?p=[^&]*/, '?_')}` },
   // `&tab=stats|achievements|settings` for the other panes.
   profile: { path: '/profile', at: `/profile${location.search.replace(/^\?p=[^&]*/, '?_')}` },
+  // `&tab=signup` for the other pane. The stub's user is signed in, and the
+  // page redirects a signed-in user away, so `&signedout=1` on the stub.
+  auth: { path: '/auth', at: `/auth${location.search.replace(/^\?p=[^&]*/, '?_')}` },
+  profilesetup: { path: '/profile-setup', at: '/profile-setup' },
+  verifyemail: { path: '/verify-email', at: '/verify-email' },
   // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
   // the week into the URL as soon as it resolves one. Under the old
   // `/matchup/:leagueId?` the very first push ("/matchup/harness-league/1")

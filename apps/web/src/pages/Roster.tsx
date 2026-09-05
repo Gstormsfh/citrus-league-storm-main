@@ -3444,9 +3444,12 @@ const Roster = () => {
 
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
-      {/* Loading overlay during league switch - non-blocking */}
+      {/* Loading overlay during league switch - non-blocking. DESKTOP ONLY
+          since PR3 (2026-09-05): below lg the roster skeleton is already on
+          screen for the same state, and a blurred spinner sheet over a
+          skeleton is two loaders for one wait. */}
       {showLoadingOverlay && (
-        <div className="fixed inset-0 bg-[#0F1F15]/90 backdrop-blur-lg z-overlay flex items-center justify-center">
+        <div className="fixed inset-0 bg-[#0F1F15]/90 backdrop-blur-lg z-overlay hidden lg:flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pastel-orange mx-auto mb-4"></div>
             <p className="text-lg font-medium text-pastel-cream">Switching leagues…</p>
