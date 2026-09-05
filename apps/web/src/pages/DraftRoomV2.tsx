@@ -2309,8 +2309,18 @@ function MainTabs({
     });
   }, [leagueId]);
 
+  // KEEPERS (2026-09-05): a keeper slot is the engine's pick, not ours.
+  // `derived.keepers` is carried through every fold by reference, so this
+  // recomputes only when the round changes.
+  const keeperRound = derived?.currentRoundNumber ?? null;
+  const keepersRef = derived?.keepers;
+  const isMyKeeperSlot = useMemo(
+    () => !!(myTeamId && keeperRound != null && (keepersRef ?? []).some((k) => k.teamId === myTeamId && k.round === keeperRound)),
+    [myTeamId, keeperRound, keepersRef],
+  );
+
   useEffect(() => {
-    if (!autodraftOn || !amIOnClock || isSubmitPending) return;
+    if (!autodraftOn || !amIOnClock || isSubmitPending || isMyKeeperSlot) return;
     const pickNo = derived?.currentPickNumber ?? null;
     // One attempt per pick slot: if the submit fails (e.g. the engine
     // refuses the player), we deliberately do NOT retry this slot — the
@@ -2369,7 +2379,7 @@ function MainTabs({
       }
     }, 1500);
     return () => clearTimeout(timer);
-  }, [autodraftOn, amIOnClock, isSubmitPending, derived?.currentPickNumber, availablePlayers, queue, handleDraftFromPool, rosterCaps, myTeamId, playersById, leagueScoring]);
+  }, [autodraftOn, amIOnClock, isSubmitPending, isMyKeeperSlot, derived?.currentPickNumber, availablePlayers, queue, handleDraftFromPool, rosterCaps, myTeamId, playersById, leagueScoring]);
 
   return (
     <div className="space-y-3">
