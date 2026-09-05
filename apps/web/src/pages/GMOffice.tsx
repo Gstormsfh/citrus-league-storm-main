@@ -247,7 +247,10 @@ const GMOffice = () => {
                 </div>
               );
             }
-            return <PressBoxTile key={action.title} title={title} to={action.link} Icon={Icon} />;
+            // The desktop card's one-line description as the tile's line
+            // (2026-09-05): a tile with a title alone said nothing about
+            // whether to open it. A label, not a figure.
+            return <PressBoxTile key={action.title} title={title} to={action.link} Icon={Icon} stat={action.description} />;
           })}
         </div>
       </div>

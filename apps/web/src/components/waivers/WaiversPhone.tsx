@@ -26,7 +26,9 @@ import { PressBoxSectionHead } from '@/components/pressbox/SectionHead';
 import { PressBoxSkeletonRows } from '@/components/pressbox/Skeleton';
 import { PressBoxSheet } from '@/components/pressbox/Sheet';
 import { PressBoxOptionSheet, PressBoxSaveBar, PressBoxSettingGroup, PressBoxSettingRow } from '@/components/pressbox/Settings';
-import { pressBoxPositionChipClasses, positionChipKey } from '@/components/pressbox/positionChip';
+import { positionChipKey } from '@/components/pressbox/positionChip';
+import { Mug } from '@/components/roster/Mug';
+import { getTeamColor } from '@/utils/teamColors';
 import type { WaiverClaim } from '@/services/WaiverService';
 
 /** The wire's row, as WaiverService.getAvailablePlayers hands it. */
@@ -35,6 +37,7 @@ export interface WirePlayer {
   full_name: string;
   position_code?: string | null;
   team_abbrev?: string | null;
+  headshot_url?: string | null;
   is_goalie?: boolean;
   games_played?: number | null;
   points?: number | null;
@@ -232,8 +235,15 @@ export function WaiversPhone(p: WaiversPhoneProps) {
             const note = clears !== null ? `On waivers · clears ${p.formatMoment(clears) ?? 'soon'}` : locked ? 'Game-locked' : null;
             return (
               <li key={pl.player_id} data-testid="waivers-phone-row" className="border-t border-white/[0.06]">
-                <div className="flex items-center gap-2.5 min-h-[56px] py-1.5 px-0.5">
-                  <span className={pressBoxPositionChipClasses(positionChipKey(pl.position_code ?? ''))}>{pl.position_code ?? '–'}</span>
+                <div className="flex items-center gap-2.5 min-h-[64px] py-1.5 px-0.5">
+                  {/* The face in the team's ring (2026-09-05): the Players row's
+                      own vocabulary, so the wire reads like the rest of the app. */}
+                  <span
+                    className="w-10 h-10 flex-none box-border rounded-full overflow-hidden border-[1.5px] border-white/[0.16]"
+                    style={pl.team_abbrev ? { borderColor: getTeamColor(pl.team_abbrev) } : undefined}
+                  >
+                    <Mug p={{ name: pl.full_name, image: pl.headshot_url ?? null, team: pl.team_abbrev ?? null }} size="md" className="w-full h-full" crest />
+                  </span>
                   <button
                     type="button"
                     onClick={() => p.onSelect(pl)}
@@ -242,6 +252,7 @@ export function WaiversPhone(p: WaiversPhoneProps) {
                   >
                     <span className="block font-barlow font-bold text-[14px] leading-tight text-pressbox-text truncate">{pl.full_name}</span>
                     <span className="block mt-0.5 font-plex font-medium text-[10px] text-pressbox-text/50 tabular-nums truncate">
+                      <span className="font-bold px-1.5 py-px rounded-[3px] bg-pressbox-sage/20 text-pressbox-sage-soft mr-1">{positionChipKey(pl.position_code ?? '') || '–'}</span>
                       {meta}
                       {note && <span className="text-pressbox-orange-soft">{meta ? ' · ' : ''}{note}</span>}
                     </span>

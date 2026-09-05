@@ -409,6 +409,8 @@ export class WaiverService {
         full_name: p.full_name,
         position_code: p.position,
         team_abbrev: p.team,
+        // The face (2026-09-05): the wire's rows wear the Players row's mug.
+        headshot_url: p.headshot_url ?? null,
         jersey_number: p.jersey_number || '',
         is_goalie: p.position === 'G',
         games_played: p.position === 'G' ? (p.goalie_gp ?? p.games_played ?? 0) : (p.games_played ?? 0),

@@ -108,7 +108,7 @@ const CONSENT_PRESENTATION: Record<
 
 const Profile = () => {
   const { user, signOut, resetPassword } = useAuth();
-  const { userLeagueState } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeague } = useLeague();
   const { data: profile } = useProfile();
   const updateProfile = useUpdateProfile();
   const { toast } = useToast();
@@ -684,6 +684,28 @@ const Profile = () => {
       });
     return () => { cancelled = true; };
   }, [user]);
+
+  /**
+   * CURRENT RANK (2026-09-05): the place in the active league's ranked
+   * standings -- the same read League HQ's Standings tile and the Home
+   * card make -- once the draft is done. `–` before that, and when the
+   * manager's team is not in the table.
+   */
+  useEffect(() => {
+    if (!user || !activeLeagueId || activeLeague?.draft_status !== 'completed') return;
+    let cancelled = false;
+    Promise.all([leagueApi.getStandings(activeLeagueId), leagueApi.getMyTeam(activeLeagueId)])
+      .then(([standingsRes, teamRes]) => {
+        if (cancelled) return;
+        const rows = ((standingsRes as { data?: unknown }).data ?? standingsRes) as unknown;
+        const myId = ((teamRes as { data?: { id?: string } | null }).data ?? null)?.id ?? null;
+        if (!Array.isArray(rows) || !myId) return;
+        const index = (rows as Array<{ team_id: string }>).findIndex((r) => r.team_id === myId);
+        if (index >= 0) setUserStats((prev) => ({ ...prev, currentRank: index + 1 }));
+      })
+      .catch((err) => logger.error('Failed to fetch the current rank', err));
+    return () => { cancelled = true; };
+  }, [user, activeLeagueId, activeLeague?.draft_status]);
 
   // Achievements - empty for new users
   const achievements: Array<{ title: string; year?: string; description?: string; icon: any; color: string }> = [];

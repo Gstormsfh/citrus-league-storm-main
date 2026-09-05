@@ -2307,7 +2307,7 @@ const CreateLeague = () => {
 
         </div>
       </main>}
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </div>
   );
 };

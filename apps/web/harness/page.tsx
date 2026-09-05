@@ -341,6 +341,7 @@ const mineLine = (who: string, projected: number, actual: number | null, actuals
     full_name: p.full_name,
     position_code: p.position,
     team_abbrev: p.team,
+    headshot_url: p.headshot_url ?? null,
     jersey_number: p.jersey_number,
     games_played: p.games_played,
     points: p.points,

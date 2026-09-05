@@ -253,7 +253,7 @@ const Contact = () => {
             </div>
         </div>
       </main>
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </DarkLayout>
   );
 };

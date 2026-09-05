@@ -358,7 +358,7 @@ export default function NHLPlayoffBracket() {
         ctaHref="/create-league?type=playoff"
       />
 
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </DarkLayout>
   );
 }
