@@ -18,7 +18,10 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (p: string) => readFileSync(resolve(here, p), 'utf-8');
-const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+// `accept="image/*"` is not the start of a comment; blank it before stripping
+// or everything up to the next `*/` disappears (the Account screen's rows did).
+const strip = (s: string) =>
+  s.replace(/"image\/\*"/g, '""').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 const APP = strip(read('../App.tsx'));
 const AUTH = strip(read('../pages/Auth.tsx'));

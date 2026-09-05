@@ -895,6 +895,16 @@ const Profile = () => {
         newPassword,
         hasPassword && user?.email ? { email: user.email, currentPassword } : undefined,
       );
+      if (!result.success && result.needsReauth && user?.email) {
+        // Supabase wants a recent sign-in for this and the account has no
+        // password to sign in with: the reset link is the same proof, by email.
+        const { error: linkError } = await resetPassword(user.email);
+        if (linkError) throw linkError;
+        setSettingsMessage({ type: 'success', text: `For safety we emailed a link to ${user.email} to set it. It expires in an hour.` });
+        setNewPassword('');
+        setConfirmPassword('');
+        return;
+      }
       if (!result.success) throw new Error(result.error);
       setSettingsMessage({ type: 'success', text: 'Password updated successfully!' });
       setCurrentPassword('');

@@ -32,7 +32,7 @@ export class UserAccountService {
   static async changePassword(
     newPassword: string,
     verify?: { email: string; currentPassword: string },
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ success: boolean; error?: string; needsReauth?: boolean }> {
     try {
       if (verify) {
         const { error: checkError } = await supabase.auth.signInWithPassword({
@@ -45,7 +45,14 @@ export class UserAccountService {
       }
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) {
-        return { success: false, error: error.message };
+        // "Secure password change" is ON for the project (Auth > Providers >
+        // Email, checked 2026-09-05): a session older than 24h may not set a
+        // password without reauthentication. The sign-in above makes the
+        // session fresh, so this is the no-current-password path only (a
+        // Google or Apple account adding one). The caller sends the reset
+        // link instead, which is the same proof by email.
+        const needsReauth = /reauth|nonce/i.test(`${error.message} ${(error as { code?: string }).code ?? ''}`);
+        return { success: false, error: error.message, needsReauth };
       }
       return { success: true };
     } catch (error: unknown) {
