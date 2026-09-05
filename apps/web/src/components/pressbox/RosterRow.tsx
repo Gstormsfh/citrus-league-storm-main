@@ -262,8 +262,15 @@ export function PressBoxRosterRow({
         >
           {showOwnership && player.rosteredPct != null && player.startedPct != null && (
             <>
-              {player.rosteredPct}% · {player.startedPct}%{' '}
-              <span className="text-pressbox-text/25">|</span>{' '}
+              {player.rosteredPct}% · {player.startedPct}%
+              {/* The bar only divides two things: a day with no game keeps
+                  the percentages alone (2026-09-05). */}
+              {(player.gameLabel || player.statLine) && (
+                <>
+                  {' '}
+                  <span className="text-pressbox-text/25">|</span>{' '}
+                </>
+              )}
             </>
           )}
           <span className={cn(happened && !dtd && 'text-pressbox-sage')}>

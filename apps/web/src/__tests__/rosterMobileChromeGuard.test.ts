@@ -113,40 +113,58 @@ describe('the header card collapses to one line below lg', () => {
   });
 });
 
-// ── R4: week + day are one row on phones; the Viewing line is desktop's ──
+// ── PRESS BOX (2026-09-05): the day lives on the STARTERS header ─────────
+//
+// Artboard 1a's Team screen has no week/day row under the team card: the
+// day is THU · FRI · SAT · WEEK on the STARTERS header, and the WK column
+// and the ownership segment ride on the rows. The R4 phone row (compact
+// week trigger + day chips) and the game-day strip are the desktop's now.
 
-describe('week and day selectors share one row on phones', () => {
-  const rowAt = ROSTER.indexOf('data-testid="roster-week-day-row"');
-  const branchStart = ROSTER.lastIndexOf('isMobile ? (', rowAt);
-  const stripAt = ROSTER.indexOf('<TodayStrip', rowAt);
-  // The desktop branch opens with the block the page always had.
-  const split = ROSTER.indexOf('<div className="mb-6 space-y-4">', rowAt);
-  const mobile = ROSTER.slice(branchStart, split);
-  const desktop = ROSTER.slice(split, stripAt);
+describe('the phone has no week/day row; the day toggles ride on the list', () => {
+  const branchAt = ROSTER.indexOf("the day lives on the STARTERS header's");
+  const listAt = ROSTER.indexOf('<PressBoxRosterList');
+  const stripAt = ROSTER.indexOf('<TodayStrip');
 
-  it('the phone branch mounts the compact week trigger beside the day chips', () => {
-    expect(rowAt).toBeGreaterThan(-1);
-    expect(branchStart).toBeGreaterThan(-1);
-    expect(mobile).toMatch(/<MatchupScheduleSelector\s+compact/);
-    expect(mobile).toMatch(/<WeeklySchedule\s+chips/);
-  });
-
-  it('the phone branch carries no "Viewing:" line, no Read Only badge, no Lineup heading', () => {
-    expect(mobile).not.toContain('Viewing:');
-    expect(mobile).not.toContain('Read Only');
-    expect(mobile).not.toContain('>Lineup<');
+  it('the phone branch of the week/day selector renders nothing', () => {
+    expect(branchAt).toBeGreaterThan(-1);
+    const branch = ROSTER.slice(ROSTER.lastIndexOf('isMobile ? (', branchAt), ROSTER.indexOf(') : (', branchAt));
+    expect(branch).toContain('null');
+    expect(branch).not.toMatch(/<MatchupScheduleSelector/);
+    expect(branch).not.toMatch(/<WeeklySchedule/);
+    expect(ROSTER).not.toContain('data-testid="roster-week-day-row"');
   });
 
   it('the desktop branch is the one that was there: varsity week bar, day card, Viewing line', () => {
+    const desktop = ROSTER.slice(ROSTER.indexOf('<div className="mb-6 space-y-4">', branchAt), stripAt);
     expect(desktop).not.toMatch(/<MatchupScheduleSelector\s+compact/);
-    expect(desktop).not.toMatch(/<WeeklySchedule\s+chips/);
     expect(desktop).toContain('Viewing:');
     expect(desktop).toContain('Read Only');
   });
 
-  it('a past day\'s read-only mark moves into the strip on phones', () => {
+  it('the game-day strip is hidden below lg', () => {
     const strip = ROSTER.slice(stripAt, ROSTER.indexOf('/>', stripAt));
-    expect(strip).toContain('readOnly={isMobile && isPastDate}');
+    expect(strip).toContain("'max-lg:hidden");
+  });
+
+  it('the list gets the day toggles, the WK column and the ownership segment', () => {
+    const list = ROSTER.slice(listAt, ROSTER.indexOf('starters={rows.starters}', listAt));
+    expect(list).toContain('days={[...pressBoxDays.map((d) => d.label)');
+    expect(list).toContain("['WEEK']");
+    expect(list).toContain('showWeek={rosterWeek.ready}');
+    expect(list).toContain('showOwnership={ownership.size > 0}');
+    expect(ROSTER).toContain('extras: rowExtras,');
+  });
+
+  it('the team card gets the win bar and the score pair', () => {
+    const card = ROSTER.slice(ROSTER.indexOf('<PressBoxTeamCard'), ROSTER.indexOf('actions=[', ROSTER.indexOf('<PressBoxTeamCard')));
+    expect(card).toContain('winPct={teamCardNumbers.winPct}');
+    expect(card).toContain('yourScore={teamCardNumbers.yourScore}');
+    expect(card).toContain('theirScore={teamCardNumbers.theirScore}');
+  });
+
+  it('the view switcher under the team card is desktop-only', () => {
+    const tabs = ROSTER.slice(ROSTER.indexOf('<TabsList'), ROSTER.indexOf('>', ROSTER.indexOf('<TabsList')));
+    expect(tabs).toContain('max-lg:hidden');
   });
 });
 

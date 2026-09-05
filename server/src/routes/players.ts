@@ -96,6 +96,29 @@ playerRoutes.get('/trending', authMiddleware, async (c) => {
   return ok(c, data);
 });
 
+// GET /api/players/ownership — rostered% / started% per player, every Citrus
+// team with a roster (2026-09-05). Aggregate counts, cached ten minutes: the
+// numbers move on a waiver run, not a tap. `[]` until the RPC exists.
+let ownershipCache: { at: number; data: Array<Record<string, unknown>> } | null = null;
+const OWNERSHIP_TTL_MS = 10 * 60 * 1000;
+playerRoutes.get('/ownership', authMiddleware, async (c) => {
+  if (ownershipCache && Date.now() - ownershipCache.at < OWNERSHIP_TTL_MS) {
+    return ok(c, ownershipCache.data);
+  }
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new PlayerService(supabase);
+  const { ownership, error } = await service.getOwnership();
+  if (error) {
+    // The function is not there yet, or the read failed: an empty list is
+    // "no percentages", which the client draws as no percentages.
+    logger.warn('[players/ownership] unavailable:', error.message ?? error);
+    return ok(c, []);
+  }
+  const data = Array.from(ownership.entries()).map(([player_id, o]) => ({ player_id, ...o }));
+  ownershipCache = { at: Date.now(), data };
+  return ok(c, data);
+});
+
 // GET /api/players/by-ids — Get players by IDs (batch)
 playerRoutes.get('/by-ids', authMiddleware, async (c) => {
   const ids = c.req.query('ids');

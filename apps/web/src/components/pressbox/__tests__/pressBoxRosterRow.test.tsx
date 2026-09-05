@@ -149,6 +149,14 @@ describe('the meta line', () => {
     expect(hasClass(el, 'text-pressbox-sage')).toBe(true);
   });
 
+  it('with no game on the day, the percentages stand alone: no trailing pipe', () => {
+    // A day off (or a day before the opener) has no game label and no stat
+    // line; `100% · 99% |` with nothing after it read as a broken row.
+    const el = row({ player: player({ gameLabel: undefined, statLine: undefined, isLiveOrFinal: false, todayActual: null }) });
+    expect(el.textContent).toContain('100% · 99%');
+    expect(el.textContent).not.toContain('|');
+  });
+
   it('with ownership off, the percentages AND the pipe both go', () => {
     // A bare leading pipe reads as a rendering bug, not a placeholder.
     // The WK trend also ends in a %, so the check is for the ownership PAIR.

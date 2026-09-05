@@ -11,10 +11,15 @@ const LEAGUE = {
   // The Press Box header reads `activeLeague` for the name and the crest
   // (2026-09-04). Without it the header rendered an empty title and a "?"
   // disc, which reads as a broken component rather than a thin fixture.
+  // draft_status + created_at (2026-09-05): Roster resolves its week from
+  // these; without them the harness never showed the week-bound chrome.
   activeLeague: {
     id: 'harness-league',
     name: 'Finalsz',
-    settings: { crestTeam: 'EDM' },
+    commissioner_id: 'harness-user',
+    draft_status: 'completed',
+    created_at: '2026-09-01T18:00:00.000Z',
+    settings: { crestTeam: 'EDM', teamsCount: 12, scoringFormat: 'h2h-points' },
   },
   activeLeagueFormat: { leagueType: 'fantasy', scoringFormat: 'h2h-points' },
   leagues: [{ id: 'harness-league', name: 'Harness League' }],

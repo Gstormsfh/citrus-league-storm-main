@@ -31,7 +31,10 @@ import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
 import { PressBoxRosterList, PressBoxSkeletonRoster, PressBoxTeamCard } from '@/components/pressbox';
 import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
-import { buildRosterRows } from '@/components/pressbox/rosterRows';
+import { buildRosterRows, type RosterRowExtras } from '@/components/pressbox/rosterRows';
+import { sideOutlook } from '@/components/pressbox/rosterWeek';
+import { useOwnership, useRosterWeek } from '@/hooks/useRosterWeek';
+import { winProbabilityFromTotals } from '@/utils/winProbability';
 import { buildSlotConfig } from '@/components/roster/slotConfig';
 import { FillSlotSheet } from '@/components/roster/FillSlotSheet';
 import { TodayStrip } from '@/components/roster/TodayStrip';
@@ -2188,6 +2191,124 @@ const Roster = () => {
     userLeagueState !== 'logged-in-no-league' &&
     (displayRoster.starters.length > 0 || displayRoster.bench.length > 0);
 
+  // ===========================================================================
+  // PRESS BOX · THE TEAM SCREEN'S NUMBERS (2026-09-05, artboard 1a).
+  //
+  // The artboard's rows carry `100% · 99% | vs TOR 3RD` and a WK column with
+  // a trend; the team card carries `64% WIN` over the live score pair. The
+  // components drew all of it since PR4 and the page fed none of it. Two
+  // hooks now do: the week read (matchup-stats + batch projections, scored
+  // with the league's settings) and the ownership aggregate. The opponent's
+  // side of the win bar is their frozen starters for today, read through the
+  // same week hook; no starters on file means no bar, not a 50% one.
+  // See components/pressbox/rosterWeek.ts.
+  // ===========================================================================
+  const pressBoxOn = isMobile && userLeagueState === 'active-user';
+  const weekPlayers = useMemo(
+    () =>
+      [...roster.starters, ...roster.bench, ...roster.ir].map((p) => ({
+        id: p.id,
+        isGoalie: p.position === 'Goalie' || p.position === 'G',
+      })),
+    [roster.starters, roster.bench, roster.ir],
+  );
+  const leagueScoring = (activeLeague as { scoring_settings?: unknown } | null)?.scoring_settings;
+  const rosterWeek = useRosterWeek({
+    enabled: pressBoxOn,
+    players: weekPlayers,
+    weekStart: currentMatchup?.week_start_date,
+    weekEnd: currentMatchup?.week_end_date,
+    scoring: leagueScoring,
+  });
+  const ownership = useOwnership(pressBoxOn);
+
+  const rowExtras = useMemo(() => {
+    const m = new Map<string, RosterRowExtras>();
+    for (const p of weekPlayers) {
+      const id = String(p.id);
+      const w = rosterWeek.entries.get(id);
+      const o = ownership.get(id);
+      m.set(id, {
+        weekPoints: w ? w.weekPoints : null,
+        weekTrendPct: w ? w.weekTrendPct : null,
+        rosteredPct: o ? o.rosteredPct : null,
+        startedPct: o ? o.startedPct : null,
+      });
+    }
+    return m;
+  }, [weekPlayers, rosterWeek.entries, ownership]);
+
+  // The opponent's starters for today, from the frozen daily roster.
+  const opponentTeamId = useMemo(() => {
+    if (!currentMatchup || !userTeamId) return null;
+    const mine = String(userTeamId);
+    if (String(currentMatchup.team1_id) === mine) return currentMatchup.team2_id;
+    if (String(currentMatchup.team2_id ?? '') === mine) return currentMatchup.team1_id;
+    return null;
+  }, [currentMatchup, userTeamId]);
+  const [opponentStarters, setOpponentStarters] = useState<Array<{ id: string; isGoalie: boolean }>>([]);
+  useEffect(() => {
+    if (!pressBoxOn || !currentMatchup || !opponentTeamId) {
+      setOpponentStarters([]);
+      return;
+    }
+    let cancelled = false;
+    matchupApi
+      .getFrozenRoster(currentMatchup.id, opponentTeamId, getTodayMST())
+      .then((res) => {
+        if (cancelled) return;
+        const rows = ((res as { data?: unknown }).data ?? []) as Array<{ player_id: string | number; slot_type?: string; slot_id?: string }>;
+        setOpponentStarters(
+          rows
+            .filter((r) => (r.slot_type ?? 'starter') === 'starter')
+            .map((r) => ({ id: String(r.player_id), isGoalie: /^g/i.test(String(r.slot_id ?? '')) })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setOpponentStarters([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pressBoxOn, currentMatchup, opponentTeamId]);
+  const opponentWeek = useRosterWeek({
+    enabled: pressBoxOn && opponentStarters.length > 0,
+    players: opponentStarters,
+    weekStart: currentMatchup?.week_start_date,
+    weekEnd: currentMatchup?.week_end_date,
+    scoring: leagueScoring,
+  });
+
+  const teamCardNumbers = useMemo(() => {
+    if (!currentMatchup || !userTeamId) return { winPct: null, yourScore: null, theirScore: null };
+    const mine = String(currentMatchup.team1_id) === String(userTeamId);
+    const yourScore = mine ? currentMatchup.team1_score : currentMatchup.team2_score;
+    const theirScore = mine ? currentMatchup.team2_score : currentMatchup.team1_score;
+    if (!rosterWeek.ready || !opponentWeek.ready || opponentStarters.length === 0) {
+      return { winPct: null, yourScore: yourScore ?? null, theirScore: theirScore ?? null };
+    }
+    const my = sideOutlook(roster.starters.map((p) => p.id), rosterWeek.entries);
+    const opp = sideOutlook(opponentStarters.map((p) => p.id), opponentWeek.entries);
+    const { probability } = winProbabilityFromTotals({
+      myExpectedFinal: (yourScore ?? 0) + (my.expectedFinal - my.banked),
+      oppExpectedFinal: (theirScore ?? 0) + (opp.expectedFinal - opp.banked),
+      myGamesLeft: my.gamesLeft,
+      oppGamesLeft: opp.gamesLeft,
+    });
+    return { winPct: Math.round(probability * 100), yourScore: yourScore ?? null, theirScore: theirScore ?? null };
+  }, [currentMatchup, userTeamId, rosterWeek.ready, rosterWeek.entries, opponentWeek.ready, opponentWeek.entries, opponentStarters, roster.starters]);
+
+  // The day toggles: today and the next two days of the week, then WEEK.
+  const pressBoxDays = useMemo(() => {
+    const today = getTodayMST();
+    const upcoming = matchupWeekDates.filter((d) => d >= today).slice(0, 3);
+    return upcoming.map((date) => ({ date, label: dayLabelFor(date).slice(0, 3).toUpperCase() }));
+  }, [matchupWeekDates]);
+  const [weekView, setWeekView] = useState(false);
+  const activePressBoxDay = weekView
+    ? 'WEEK'
+    : (pressBoxDays.find((d) => d.date === (selectedDate || getTodayMST()))?.label ?? pressBoxDays[0]?.label);
+
   // Load CitrusPuck Analytics
   useEffect(() => {
     // Only load if roster is loaded and not already loaded
@@ -3443,7 +3564,7 @@ const Roster = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
+    <div className="min-h-screen bg-[#0F1F15] max-lg:bg-pressbox-surface text-pastel-cream relative">
       {/* Loading overlay during league switch - non-blocking. DESKTOP ONLY
           since PR3 (2026-09-05): below lg the roster skeleton is already on
           screen for the same state, and a blurred spinner sheet over a
@@ -3519,7 +3640,7 @@ const Roster = () => {
                   payload and this page does not fetch it — the component
                   draws no bar rather than a 50% one, and the bar returns when
                   the roster starts asking for the number. */}
-              <div className="lg:hidden mb-3">
+              <div className="lg:hidden">
                 <PressBoxTeamCard
                   teamName={userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Team')}
                   /* teamStats.rank is the literal string "-" until standings
@@ -3527,6 +3648,9 @@ const Roster = () => {
                      reads as a broken field rather than a pending one. */
                   rank={teamStats.rank && teamStats.rank !== '-' ? String(teamStats.rank) : null}
                   record={teamStats.record && teamStats.record !== '-' ? teamStats.record : null}
+                  winPct={teamCardNumbers.winPct}
+                  yourScore={teamCardNumbers.yourScore}
+                  theirScore={teamCardNumbers.theirScore}
                   actions={[
                     ...(userLeagueState === 'active-user'
                       ? [{ glyph: '⚡', label: 'Optimize', primary: true, onPress: handleAutoLineup }]
@@ -3652,7 +3776,10 @@ const Roster = () => {
                     #16241B well, 2px of padding, cream on the active pill —
                     and the underline strip from lg, where the header's
                     sub-tabs are not drawn. Still four equal columns. */}
-                <TabsList className="w-full grid grid-cols-4 gap-0.5 p-0.5 h-auto rounded-[8px] bg-pressbox-tile mx-3 max-lg:w-[calc(100%-24px)] mt-2 lg:mx-0 lg:mt-0 lg:w-full lg:p-0 lg:gap-0 lg:h-[34px] lg:rounded-none lg:bg-transparent lg:border-b lg:border-white/[0.08]">
+                {/* PHONE (2026-09-05): the artboard has no view switcher
+                    under the team card; LOG opens Transactions and the
+                    other two views are the desktop's. Hidden below lg. */}
+                <TabsList className="max-lg:hidden w-full grid grid-cols-4 gap-0.5 p-0.5 h-auto rounded-[8px] bg-pressbox-tile mx-3 max-lg:w-[calc(100%-24px)] mt-2 lg:mx-0 lg:mt-0 lg:w-full lg:p-0 lg:gap-0 lg:h-[34px] lg:rounded-none lg:bg-transparent lg:border-b lg:border-white/[0.08]">
                 <TabsTrigger
                   value="roster"
                   className={ROSTER_VIEW_TAB}
@@ -3686,7 +3813,7 @@ const Roster = () => {
                 </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="roster" className="m-0 px-3 py-4 lg:p-6">
+                <TabsContent value="roster" className="m-0 px-3 py-4 max-lg:pt-0 lg:p-6">
                 {/* Read-only banner for demo/guest users */}
                 {(userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league' || (userTeam && isDemoLeague(userTeam.league_id))) && (
                   <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
@@ -3710,49 +3837,10 @@ const Roster = () => {
                     week bar, the day card and the Viewing line as they were. */}
                 {userTeam?.league_id && availableWeeks.length > 0 && firstWeekStart && selectedWeek > 0 && (
                   isMobile ? (
-                  <div className="mb-3">
-                    {currentMatchup && matchupWeekDates.length > 0 ? (
-                      <div
-                        data-testid="roster-week-day-row"
-                        className="flex items-center gap-2 bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-2"
-                      >
-                        <MatchupScheduleSelector
-                          compact
-                          currentWeek={selectedWeek}
-                          scheduleLength={availableWeeks.length}
-                          availableWeeks={availableWeeks}
-                          onWeekChange={handleWeekChange}
-                          firstWeekStart={firstWeekStart}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <WeeklySchedule
-                            chips
-                            weekStart={currentMatchup.week_start_date}
-                            weekEnd={currentMatchup.week_end_date}
-                            // loadRoster follows selectedDate through its own
-                            // effect — never call it here (stale closure race).
-                            onDayClick={(date) => setSelectedDate(date)}
-                            selectedDate={selectedDate}
-                            hideScores={true}
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        <MatchupScheduleSelector
-                          compact
-                          currentWeek={selectedWeek}
-                          scheduleLength={availableWeeks.length}
-                          availableWeeks={availableWeeks}
-                          onWeekChange={handleWeekChange}
-                          firstWeekStart={firstWeekStart}
-                        />
-                        {!currentMatchup && selectedWeek && (
-                          <span className="text-sm text-white/55">Week {selectedWeek} has no matchup yet.</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  /* PHONE (2026-09-05): the day lives on the STARTERS header's
+                     THU · FRI · SAT · WEEK toggles now (artboard 1a); this
+                     row and the strip under it are the desktop's. */
+                  null
                   ) : (
                   <div className="mb-6 space-y-4">
                     {/* Week Selector */}
@@ -3827,7 +3915,7 @@ const Roster = () => {
                        without touching the component or the two test files
                        that pin its content. The card returns at lg. */
                     className={cn(
-                      'mb-0 -mx-3 rounded-none bg-transparent ring-0 border-y border-white/[0.08] px-3 py-2.5',
+                      'max-lg:hidden mb-0 -mx-3 rounded-none bg-transparent ring-0 border-y border-white/[0.08] px-3 py-2.5',
                       'lg:mx-0 lg:mb-4 lg:rounded-xl lg:bg-pastel-surface-high lg:ring-1 lg:ring-white/10 lg:border-y-0',
                     )}
                     summary={todaySummary}
@@ -4004,9 +4092,24 @@ const Roster = () => {
                           lockedPlayerIds,
                           tapSelectedPlayerId,
                           tapEligibleSlots,
+                          extras: rowExtras,
+                          // WEEK (2026-09-05): the day column carries the week
+                          // number (banked + remaining projection) as a
+                          // projection, and the WK column steps aside.
+                          weekView,
                         });
                         return (
                           <PressBoxRosterList
+                            days={[...pressBoxDays.map((d) => d.label), ...(pressBoxDays.length > 0 ? ['WEEK'] : [])]}
+                            activeDay={activePressBoxDay}
+                            onDayChange={(label) => {
+                              if (label === 'WEEK') { setWeekView(true); return; }
+                              const day = pressBoxDays.find((d) => d.label === label);
+                              if (day) { setWeekView(false); setSelectedDate(day.date); }
+                            }}
+                            dayHeading={weekView ? 'Week' : pressBoxDays[0]?.date === getTodayMST() && activePressBoxDay === pressBoxDays[0]?.label ? 'Today' : (activePressBoxDay ?? 'Today')}
+                            showWeek={rosterWeek.ready && !weekView}
+                            showOwnership={ownership.size > 0}
                             starters={rows.starters}
                             bench={rows.bench}
                             ir={rows.ir}

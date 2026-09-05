@@ -32,6 +32,7 @@ import { MatchupService } from '../src/services/MatchupService';
 import { DraftService } from '../src/services/DraftService';
 import { PlayoffService } from '../src/services/PlayoffService';
 import { matchupApi } from '../src/api/matchups';
+import { playerApi } from '../src/api/players';
 import { leagueApi } from '../src/api/leagues';
 import { accountApi } from '../src/api/account';
 import { rosterApi } from '../src/api/rosters';
@@ -356,7 +357,11 @@ const mineLine = (who: string, projected: number, actual: number | null, actuals
 (waiverApi as any).getPriority = async () => ({ data: PRIORITY });
 (waiverApi as any).getSettings = async () => ({ data: { waiver_type: 'rolling', process_day: 3, process_hour: 3 } });
 (waiverApi as any).getPlayersOnWaivers = async () => ({ data: [] });
-(leagueApi as any).getMyTeam = async () => ({ data: { id: 't1', name: 'Harness Team', waiver_priority: 3, faab_budget: 100 } });
+// league_id and team_name (2026-09-05): Roster reads `userTeam.league_id`
+// before it resolves a week, so without it the harness never showed the
+// week-bound chrome -- the day toggles, the WK column, the win bar -- and
+// the review missed what the real app drew.
+(leagueApi as any).getMyTeam = async () => ({ data: { id: 't1', league_id: 'harness-league', team_name: 'Team 1', name: 'Harness Team', waiver_priority: 3, faab_budget: 100 } });
 (leagueApi as any).getTeams = async () => ({ data: PRIORITY.map((p, i) => ({ id: p.team_id, name: p.team_name, team_name: p.team_name, owner_id: i === 0 ? 'harness-user' : i < 6 ? `owner-${i + 1}` : null })) });
 (leagueApi as any).getLeague = async () => ({ data: { id: 'harness-league', name: 'Harness League', settings: {}, scoring_settings: HARNESS_SCORING, team_count: 10, waiver_type: 'rolling', draft_status: 'completed', commissioner_id: 'harness-user', created_at: '2026-09-01T18:00:00.000Z', join_code: 'HARNESS' } });
 /**
@@ -635,6 +640,50 @@ const HARNESS_GAMES = new Map<string, any[]>(
       return [Number(id), { total_projected_points: Number((base + spread).toFixed(1)), is_goalie: p?.position === 'G' }];
     }),
   );
+
+/**
+ * THE TEAM SCREEN'S NUMBERS (2026-09-05, artboard 1a): the week read behind
+ * the WK column and the win bar, the ownership aggregate behind
+ * `100% · 99% |`, and the opponent's frozen starters. Per-player spreads so
+ * no column repeats one value; two players carry a played-days trend.
+ */
+(matchupApi as any).getMatchupStats = async (ids: (string | number)[] = []) => ({
+  data: Object.fromEntries(
+    ids.slice(0, 6).map((id, i) => [
+      String(id),
+      { player_id: Number(id), goals: i % 3, assists: (i + 1) % 3, shots_on_goal: 3 + i, blocks: i % 2, ppp: i % 2, shp: 0, hits: 1 + (i % 3), pim: 0, plus_minus: (i % 3) - 1 },
+    ]),
+  ),
+});
+(playerApi as any).getBatchProjections = async (ids: string[], opts?: { startDate?: string; endDate?: string }) => {
+  const start = opts?.startDate ?? '2026-09-27';
+  const end = opts?.endDate ?? '2026-10-03';
+  const dates: string[] = [];
+  for (let d = new Date(`${start}T00:00:00`); d.toISOString().slice(0, 10) <= end && dates.length < 10; d.setDate(d.getDate() + 1)) {
+    dates.push(d.toISOString().slice(0, 10));
+  }
+  return {
+    data: ids.flatMap((id) =>
+      dates
+        .filter((_, di) => (Number(id) + di) % 7 !== 3)
+        .map((date) => {
+          const p = PLAYERS.find((x: any) => String(x.id) === String(id)) as any;
+          const base = p?.position === 'G' ? 9 : 3;
+          return { player_id: Number(id), projection_date: date, total_projected_points: Number((base + ((Number(id) % 17) / 17) * 6).toFixed(1)) };
+        }),
+    ),
+  };
+};
+(playerApi as any).getOwnership = async () => ({
+  data: PLAYERS.slice(0, 60).map((p: any, i: number) => ({
+    player_id: String(p.id), rostered_pct: Math.max(4, 100 - i * 3), started_pct: Math.max(10, 99 - i * 5), rostered_teams: 51 - i, total_teams: 51,
+  })),
+});
+(matchupApi as any).getFrozenRoster = async (_m: string, teamId: string) => ({
+  data: (teamId === 't1' ? MY_ROSTER : PLAYERS.slice(18, 31)).slice(0, 13).map((p: any, i: number) => ({
+    player_id: Number(p.id), slot_type: 'starter', slot_id: p.position === 'G' ? `g-${i}` : `${String(p.position).toLowerCase()}-${i}`,
+  })),
+});
 
 /** Actual stats for the games the fixture above marks live or final. */
 (matchupApi as any).getDailyGameStats = async (ids: (string | number)[] = [], date: string) => ({

@@ -54,6 +54,8 @@ export interface PressBoxRosterListProps {
   days?: string[];
   activeDay?: string;
   onDayChange?: (day: string) => void;
+  /** The day column's heading: `Today` unless another day is up (2026-09-05). */
+  dayHeading?: string;
   starters: PressBoxRosterSlotRow[];
   bench: PressBoxRosterSlotRow[];
   startersFilled: number;
@@ -90,6 +92,7 @@ export function PressBoxRosterList({
   days = [],
   activeDay,
   onDayChange,
+  dayHeading = 'Today',
   starters,
   bench,
   startersFilled,
@@ -161,7 +164,7 @@ export function PressBoxRosterList({
         <span />
         <span />
         <span>Player{showOwnership && ' · Ros% / Start%'}</span>
-        <span className="text-right">Today</span>
+        <span className="text-right">{dayHeading}</span>
         {showWeek && <span className="text-right">Wk</span>}
       </div>
 

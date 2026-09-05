@@ -80,9 +80,9 @@ export function projectionFor(p: HockeyPlayer): number | null {
 }
 
 /** One roster player, flattened to exactly what the row draws. */
-export function toRowPlayer(p: HockeyPlayer): PressBoxRosterRowPlayer {
+export function toRowPlayer(p: HockeyPlayer, extra?: RosterRowExtras, weekView = false): PressBoxRosterRowPlayer {
   const status = p.nextGame?.gameStatus;
-  const live = !!status && LIVE_STATES.has(status);
+  const live = !weekView && !!status && LIVE_STATES.has(status);
   const positions = multiPositionLabel(p);
   return {
     ...p,
@@ -98,15 +98,31 @@ export function toRowPlayer(p: HockeyPlayer): PressBoxRosterRowPlayer {
     statLine: statLineFor(p) ?? undefined,
     isLiveOrFinal: live,
     todayActual: live ? (p.daily_actual_points ?? 0) : null,
-    todayProjection: projectionFor(p),
-    // No per-player week total exists on this payload; the column is off.
-    weekPoints: null,
+    todayProjection: weekView ? (extra?.weekPoints ?? null) : projectionFor(p),
+    // The week and the ownership figures ride in from the page's own reads
+    // (hooks/useRosterWeek); null keeps the column empty for that row.
+    weekPoints: extra?.weekPoints ?? null,
+    weekTrendPct: extra?.weekTrendPct ?? null,
+    rosteredPct: extra?.rosteredPct ?? null,
+    startedPct: extra?.startedPct ?? null,
   };
+}
+
+/** Per-player week and ownership figures, keyed by player id (2026-09-05). */
+export interface RosterRowExtras {
+  weekPoints?: number | null;
+  weekTrendPct?: number | null;
+  rosteredPct?: number | null;
+  startedPct?: number | null;
 }
 
 export interface BuildRosterRowsInput {
   starters: HockeyPlayer[];
   bench: HockeyPlayer[];
+  /** The WK column and the `100% · 99% |` segment, when the page has them. */
+  extras?: Map<string, RosterRowExtras>;
+  /** WEEK toggle: the day column shows the week number as a projection. */
+  weekView?: boolean;
   /** Everyone the page is holding on injured reserve. */
   ir?: HockeyPlayer[];
   /** IR slots this league defines. The section renders even when empty. */
@@ -139,6 +155,8 @@ const isDtd = (p: HockeyPlayer) => p.status === 'GTD' || p.status === 'IR' || p.
 export function buildRosterRows({
   starters,
   bench,
+  extras,
+  weekView = false,
   ir = [],
   irSlotCount = 0,
   slotConfig,
@@ -163,7 +181,7 @@ export function buildRosterRows({
     return {
       slotId,
       slot: slotConfig.labels[slotId] || 'UTIL',
-      player: p ? toRowPlayer(p) : null,
+      player: p ? toRowPlayer(p, extras?.get(String(p.id)), weekView) : null,
       locked: p ? lockedPlayerIds.has(String(p.id)) : false,
       dtd: p ? isDtd(p) : false,
       selected,
@@ -185,7 +203,7 @@ export function buildRosterRows({
     return {
       slotId,
       slot: 'IR',
-      player: p ? toRowPlayer(p) : null,
+      player: p ? toRowPlayer(p, extras?.get(String(p.id)), weekView) : null,
       locked: false,
       dtd: p ? isDtd(p) : false,
       selected: p != null && String(p.id) === String(tapSelectedPlayerId ?? ''),
@@ -196,7 +214,7 @@ export function buildRosterRows({
   const benchRows: PressBoxRosterSlotRow[] = bench.map((p, i) => ({
     slotId: `bench-${p.id ?? i}`,
     slot: 'BN',
-    player: toRowPlayer(p),
+    player: toRowPlayer(p, extras?.get(String(p.id)), weekView),
     locked: lockedPlayerIds.has(String(p.id)),
     dtd: isDtd(p),
     selected: String(p.id) === String(tapSelectedPlayerId ?? ''),
