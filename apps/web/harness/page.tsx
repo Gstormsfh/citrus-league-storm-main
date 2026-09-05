@@ -157,7 +157,67 @@ const HARNESS_RECORDS = [
   },
   error: null,
 });
-(PlayoffService as any).getBracket = async () => ({ bracket: null, error: null });
+/**
+ * The bracket (2026-09-04, PR10l). Standings asks for it too and wants NONE
+ * during the season -- so the fixture is served only to the playoffs page.
+ * A six-team, round-two bracket: two byes, one final, one series live, the
+ * championship still to be set, and the third-place game pending.
+ */
+const HARNESS_BRACKET = {
+  id: 'pb1', league_id: 'harness-league', season: 2026, bracket_size: 6, status: 'active' as const,
+  current_round: 2, total_rounds: 3, seeding_method: 'standings' as const, reseed_each_round: false,
+  consolation_enabled: false, two_week_matchups: false, champion_team_id: null, runner_up_team_id: null,
+  third_place_team_id: null, generated_by: 'harness-user', started_at: '2026-03-16T00:00:00.000Z',
+  completed_at: null, created_at: '2026-03-15T00:00:00.000Z', updated_at: '2026-03-23T00:00:00.000Z',
+};
+const HARNESS_SEEDS = PRIORITY.slice(0, 6).map((p, i) => ({
+  id: `seed-${i + 1}`, bracket_id: 'pb1', team_id: p.team_id, seed_number: i + 1,
+  regular_season_wins: HARNESS_RECORDS[i][0], regular_season_losses: HARNESS_RECORDS[i][1], regular_season_ties: 0,
+  regular_season_points_for: HARNESS_RECORDS[i][2], source: 'standings' as const, created_at: '2026-03-15T00:00:00.000Z',
+}));
+const series = (
+  id: string, round: number, match: number, home: [number | null, number], away: [number | null, number],
+  status: 'pending' | 'bye' | 'active' | 'completed', weeks: [number | null, number | null], winner: number | null = null,
+) => ({
+  id, bracket_id: 'pb1', round_number: round, match_number: match, bracket_position: 'winners' as const,
+  home_seed: home[0], away_seed: away[0],
+  home_team_id: home[0] ? `t${home[0]}` : null, away_team_id: away[0] ? `t${away[0]}` : null,
+  home_score: home[1], away_score: away[1],
+  winner_team_id: winner ? `t${winner}` : null,
+  loser_team_id: winner ? (winner === home[0] ? (away[0] ? `t${away[0]}` : null) : `t${home[0]}`) : null,
+  status, matchup_week_1: weeks[0], matchup_week_2: weeks[1],
+  winner_advances_to: null, winner_slot: null, loser_drops_to: null, loser_slot: null, created_at: '2026-03-15T00:00:00.000Z',
+});
+const HARNESS_SERIES = [
+  series('s1', 1, 1, [1, 0], [null, 0], 'bye', [null, null], 1),
+  series('s2', 1, 2, [2, 0], [null, 0], 'bye', [null, null], 2),
+  series('s3', 1, 3, [3, 112.4], [6, 98.1], 'completed', [23, null], 3),
+  series('s4', 1, 4, [4, 101.7], [5, 104.2], 'completed', [23, null], 5),
+  series('s5', 2, 1, [1, 88.3], [5, 79.6], 'active', [24, null]),
+  series('s6', 2, 2, [2, 61.0], [3, 74.9], 'active', [24, null]),
+  series('s7', 3, 1, [null, 0], [null, 0], 'pending', [25, null]),
+  { ...series('s8', 3, 2, [null, 0], [null, 0], 'pending', [25, null]), bracket_position: 'third_place' as const },
+];
+/** `?p=playoffs&bracket=none|done` shows the pre-season and the champion states. */
+(PlayoffService as any).getBracket = async () => {
+  const q = new URLSearchParams(location.search);
+  if (q.get('p') !== 'playoffs' || q.get('bracket') === 'none') return { bracket: null, seeds: [], series: [], error: null };
+  if (q.get('bracket') === 'done') {
+    return {
+      bracket: { ...HARNESS_BRACKET, status: 'completed' as const, current_round: 3, champion_team_id: 't1', runner_up_team_id: 't3', third_place_team_id: 't5', completed_at: '2026-04-06T00:00:00.000Z' },
+      seeds: HARNESS_SEEDS,
+      series: [
+        ...HARNESS_SERIES.slice(0, 4),
+        series('s5', 2, 1, [1, 131.2], [5, 117.8], 'completed', [24, null], 1),
+        series('s6', 2, 2, [2, 109.4], [3, 122.6], 'completed', [24, null], 3),
+        series('s7', 3, 1, [1, 126.0], [3, 119.3], 'completed', [25, null], 1),
+        { ...series('s8', 3, 2, [5, 108.7], [2, 97.5], 'completed', [25, null], 5), bracket_position: 'third_place' as const },
+      ],
+      error: null,
+    };
+  }
+  return { bracket: HARNESS_BRACKET, seeds: HARNESS_SEEDS, series: HARNESS_SERIES, error: null };
+};
 
 /**
  * THE MATCHUP PAGE RENDERS (2026-09-04). Until now `page.html?p=matchup`
@@ -691,6 +751,7 @@ const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
   schedule: () => import('../src/pages/ScheduleManager'),
   team: () => import('../src/pages/OtherTeam'),
   gmoffice: () => import('../src/pages/GMOffice'),
+  playoffs: () => import('../src/pages/PlayoffBracket'),
 };
 
 const which = new URLSearchParams(location.search).get('p') || 'waivers';
@@ -718,6 +779,7 @@ const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   gmoffice: { path: '/gm-office', at: '/gm-office?league=harness-league' },
   trade: { path: '/trade-analyzer', at: '/trade-analyzer?league=harness-league' },
   waivers: { path: '/waiver-wire', at: '/waiver-wire?league=harness-league' },
+  playoffs: { path: '/league/:leagueId/playoffs', at: '/league/harness-league/playoffs' },
   // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
   // the week into the URL as soon as it resolves one. Under the old
   // `/matchup/:leagueId?` the very first push ("/matchup/harness-league/1")
