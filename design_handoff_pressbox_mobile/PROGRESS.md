@@ -3,9 +3,12 @@
 ## EVENING RUN, 2026-09-04 — read this first
 
 **Every screen in artboard 1a, 4a and 4b is on its real page, the player
-card's panes and the commissioner's settings included.** Twenty-four
-commits on `redesign/pressbox` since PR7 (`2fea1029..7cda66f6`). Nothing is
-pushed, nothing is applied to production. The working tree is clean.
+card's panes and the commissioner's settings included — and the whole app
+nav is Press Box: SCORES, PLAYERS, NEWS and ACCOUNT are converted, every
+league screen wears one chrome, and the old hamburger menu is gone.**
+Thirty commits on `redesign/pressbox` since PR7 (`2fea1029..6dbe7257`).
+Nothing is pushed, nothing is applied to production. The working tree is
+clean.
 
 | screen | state | see it |
 |---|---|---|
@@ -19,6 +22,11 @@ pushed, nothing is applied to production. The working tree is clean.
 | Player card (1a) — hero, team ground, tabs, Overview / Detailed / Game log as the artboard's tiles, log table, upcoming cards | done (PR7d) | open any row; Game log renders in `page.html?p=freeagents` now |
 | League settings (1a) — chips, value rows with the rule under each label, option + stepper pickers, DISCARD / SAVE & NOTIFY LEAGUE | done (PR9), phone only; desktop dialog untouched | `page.html?p=league` → League settings tile |
 | App nav + Stormy bar | mounted app-wide; pool leagues keep their old tabs | any page |
+| Scores tab (no artboard) — `‹ day ›` strip, game tiles, expand-in-place detail | done (PR10c) | `page.html?p=scores` |
+| News tab (no artboard) — chips, lead tile + rows | done (PR10d) | `page.html?p=news` |
+| Players tab (no artboard) — the league-wide browser as a list, one figure per row, sort/team pickers, row → the shared card | done (PR10e) | `page.html?p=players` |
+| League chrome on every league screen (`PressBoxLeagueChrome`), app header on Profile / Create League / Stormy; `MobileMenuButton` deleted | done (PR10f) | `page.html?p=waivers`, `?p=profile` |
+| BODIES still v1 (chrome is Press Box): Waivers, Trades, Schedule, GM office, Team view, Analytics, Playoffs, Profile, Create League | open | via the league menu |
 
 **First thing to run** (five draft suites, the MatchupComparison suites, the
 hideRoutes suite and every page suite cannot load on my offline runner):
@@ -61,8 +69,23 @@ cd ~/dev/citrus/apps/web && npm run lint && npm run test
    that dialog — it never opens below `lg` now. `ScoringRulesEditor` and
    the phone share `useScoringRules`.
 
+8. **The home league cards switch through `leagueSwitchDestination`**
+   (PR10f). They linked `/league/:id` with no `?league=`, which is the
+   exact defect leagueSwitchAndMockDraftReach documents: LeagueContext
+   reads only the query, so the header over the next screen named the
+   previous league.
+9. **The league menu carries a Mock draft tile** (`/armchair-gm?tab=mockdraft`)
+   because the deleted hamburger menu was the phone's only link to the
+   simulator from inside a league.
+10. **PressBoxAppHeader draws each control only with a handler** — the
+   orange `+ LEAGUE` belongs to the screen that lists leagues.
+
 ### Still open
 
+- The BODIES of Waivers, Trades, Schedule, GM office, Team view,
+  Analytics, Playoffs, Profile, Create League — chrome is Press Box,
+  content is v1 (Calistoga heads, pastel tiles). Waivers and Trades first;
+  they are what a manager opens after Tuesday's draft.
 - Two migrations, unapplied: `20260904100000`, `20260904101000`.
 - `FreeAgentRow` + its tests, once Players is signed off.
 - PR3 skeletons, PR12 aggregates, PR13 motion, PR14/15 moments, PR17, PR18.
