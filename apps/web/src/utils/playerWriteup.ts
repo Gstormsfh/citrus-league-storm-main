@@ -162,6 +162,39 @@ function firstName(fullName: string): string {
   return trimmed.split(/\s+/)[0];
 }
 
+function fullName(player: HockeyPlayer): string {
+  const trimmed = (player.name || '').trim();
+  return trimmed || 'This player';
+}
+
+/**
+ * THE VOICE ROTATES (2026-09-05). "All of the top players ALL SOUND THE
+ * SAME": one template, one sentence order, one set of stock phrases, so
+ * McDavid, MacKinnon and Kucherov read as the same card with the numbers
+ * swapped. Each fact below now has several honest ways of being said, and
+ * the player's own id and name pick which one he gets, so two cards side
+ * by side differ in shape and not only in figures. Deterministic: the same
+ * player reads the same way every time he is opened, which is what makes
+ * it prose rather than a slot machine.
+ */
+function seedOf(player: HockeyPlayer): number {
+  const key = `${player.id ?? ''}|${player.name ?? ''}`;
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i += 1) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h;
+}
+
+function pickerFor(seed: number) {
+  let n = seed;
+  return <T,>(options: readonly T[]): T => {
+    n = (Math.imul(n, 1103515245) + 12345) >>> 0;
+    return options[(n >>> 8) % options.length];
+  };
+}
+
 function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
   const s = player.stats || {};
   const gp = s.gamesPlayed ?? 0;
@@ -206,17 +239,31 @@ function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
     tags.push({ label: 'Below league average', tone: 'caution' });
   }
 
+  const pick = pickerFor(seedOf(player));
+  const full = fullName(player);
+  const gaaClause = gaa !== null ? ` and a ${fmt(gaa, 2)} goals-against average` : '';
+  const apps = `${gp} appearance${gp === 1 ? '' : 's'}`;
   const parts: string[] = [];
   parts.push(
-    `${name} is carrying a ${fmtSavePct(savePct)} save percentage${
-      gaa !== null ? ` and a ${fmt(gaa, 2)} goals-against average` : ''
-    } across ${gp} appearance${gp === 1 ? '' : 's'}.`,
+    pick([
+      `${full} is carrying a ${fmtSavePct(savePct)} save percentage${gaaClause} across ${apps}.`,
+      `${full} has a ${fmtSavePct(savePct)} save percentage${gaaClause} through ${apps}.`,
+      `Through ${apps}, ${full} sits at a ${fmtSavePct(savePct)} save percentage${gaaClause}.`,
+      `${full}: ${fmtSavePct(savePct)} save percentage${gaaClause}, ${apps} in.`,
+    ]),
   );
 
   const wins = s.wins ?? 0;
   const losses = s.losses ?? 0;
   if (wins + losses > 0) {
-    parts.push(`He's ${wins}-${losses} in decisions${s.shutouts ? ` with ${s.shutouts} shutout${s.shutouts === 1 ? '' : 's'}` : ''}.`);
+    const so = s.shutouts ? ` with ${s.shutouts} shutout${s.shutouts === 1 ? '' : 's'}` : '';
+    parts.push(
+      pick([
+        `He's ${wins}-${losses} in decisions${so}.`,
+        `The record is ${wins}-${losses}${so}.`,
+        `${wins} wins against ${losses} losses${so ? `,${so.replace(' with', '')}` : ''}.`,
+      ]),
+    );
   }
 
   const gsax = s.goalsSavedAboveExpected;
@@ -347,9 +394,22 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
     }
   }
 
+  const pick = pickerFor(seedOf(player));
+  const full = fullName(player);
+  const pts = `${points} point${points === 1 ? '' : 's'}`;
+  const rate = `${fmt(ppg, 2)} per game`;
+  const plusMinus = s.plusMinus;
+  const shots = s.shots ?? 0;
+  const shootingPct = shots > 0 ? (goals / shots) * 100 : null;
+
   const parts: string[] = [];
   parts.push(
-    `${name} has ${points} point${points === 1 ? '' : 's'} (${goals}G, ${assists}A) in ${gp} games, ${fmt(ppg, 2)} per game.`,
+    pick([
+      `${full} has ${pts} (${goals}G, ${assists}A) in ${gp} games, ${rate}.`,
+      `${full} is at ${pts} through ${gp} games, ${goals} goals and ${assists} assists, ${rate}.`,
+      `${gp} games, ${pts} for ${full}: ${goals} goals, ${assists} assists, ${rate}.`,
+      `${full} has put up ${goals} goals and ${assists} assists in ${gp} games, ${pts} at ${rate}.`,
+    ]),
   );
 
   // Usage. Ice time is the single best predictor of opportunity, which is what
@@ -357,21 +417,65 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
   if (toiMinutes !== null) {
     const heavy = defenceman ? toiMinutes >= 22 : toiMinutes >= 19;
     const light = defenceman ? toiMinutes < 17 : toiMinutes < 13;
+    const mins = fmt(toiMinutes);
     if (heavy) {
-      parts.push(`He's playing ${fmt(toiMinutes)} minutes a night, genuine top-of-the-lineup usage.`);
+      parts.push(
+        pick([
+          `He's playing ${mins} minutes a night, top-of-the-lineup usage.`,
+          `${mins} minutes a night is a first-unit workload, and the coach keeps handing it to him.`,
+          `The ${mins} minutes a night say the coaching staff trusts him in every situation.`,
+        ]),
+      );
       tags.push({ label: 'Heavy minutes', tone: 'positive' });
     } else if (light) {
-      parts.push(`At ${fmt(toiMinutes)} minutes a night, the opportunity just isn't there yet.`);
+      parts.push(
+        pick([
+          `At ${mins} minutes a night, the opportunity just isn't there yet.`,
+          `${mins} minutes a night caps what he can produce, however well he plays them.`,
+        ]),
+      );
       tags.push({ label: 'Limited ice time', tone: 'caution' });
     } else {
-      parts.push(`He's seeing ${fmt(toiMinutes)} minutes a night.`);
+      parts.push(pick([`He's seeing ${mins} minutes a night.`, `Ice time sits at ${mins} minutes a night.`]));
     }
   }
 
-  // Shot volume — the floor under a scorer's production.
+  // Shot volume, the floor under a scorer's production.
   if (shotsPerGame >= 3.0) {
-    parts.push(`The ${fmt(shotsPerGame)} shots a game give him a high floor even in a cold stretch.`);
+    const spg = fmt(shotsPerGame);
+    parts.push(
+      pick([
+        `The ${spg} shots a game give him a high floor even in a cold stretch.`,
+        `He fires ${spg} shots a game, which keeps the floor high when the puck stops going in.`,
+        `${spg} shots a night is volume that scores through a slump.`,
+      ]),
+    );
     tags.push({ label: 'Shot volume', tone: 'positive' });
+  }
+
+  // The rest of the box score, when it says something: the power play,
+  // the plus-minus, the shooting percentage.
+  if (ppPoints >= 10) {
+    parts.push(
+      pick([
+        `${ppPoints} of the points came on the power play.`,
+        `The power play is a real share of it: ${ppPoints} points with the man advantage.`,
+      ]),
+    );
+  }
+  if (typeof plusMinus === 'number' && Math.abs(plusMinus) >= 10) {
+    parts.push(
+      plusMinus > 0
+        ? pick([`He's a plus-${plusMinus}.`, `The plus-minus is a plus-${plusMinus}, which the coaches notice.`])
+        : pick([`He's a minus-${Math.abs(plusMinus)}, though that says as much about the team as the player.`, `The minus-${Math.abs(plusMinus)} is the one blemish on the line.`]),
+    );
+  }
+  if (shootingPct !== null && shots >= 60 && (shootingPct >= 15 || shootingPct <= 7)) {
+    parts.push(
+      shootingPct >= 15
+        ? pick([`He's shooting ${fmt(shootingPct)}%, hot by any standard.`, `A ${fmt(shootingPct)}% shooting percentage is well above the league line.`])
+        : pick([`He's shooting ${fmt(shootingPct)}%, which is cold for the looks he gets.`, `The ${fmt(shootingPct)}% shooting is the number most likely to move.`]),
+    );
   }
 
   const bangers = hitsPerGame + blocksPerGame;
@@ -398,11 +502,18 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
     const light = defenceman ? toiMinutes < 17 : toiMinutes < 13;
     if (heavy) {
       analysis.push(
-        `The ice time is the part that matters most: coaches don't hand ${fmt(toiMinutes)} minutes a night to players they intend to scratch, so the role is about as secure as it gets.`,
+        pick([
+          `The ice time is the part that matters most: coaches don't hand ${fmt(toiMinutes)} minutes a night to players they intend to scratch, so the role is about as secure as it gets.`,
+          `Start him and forget him. ${fmt(toiMinutes)} minutes a night is a role that survives a cold week.`,
+          `Nobody loses ${fmt(toiMinutes)} minutes a night over a slump. The deployment is the floor.`,
+        ]),
       );
     } else if (light) {
       analysis.push(
-        `There's a hard ceiling here until the deployment changes. Production can't outrun opportunity, and ${fmt(toiMinutes)} minutes a night isn't enough of it.`,
+        pick([
+          `There's a hard ceiling here until the deployment changes. Production can't outrun opportunity, and ${fmt(toiMinutes)} minutes a night isn't enough of it.`,
+          `Until the minutes move, treat the ceiling as fixed: ${fmt(toiMinutes)} a night only produces so much.`,
+        ]),
       );
     }
   }
@@ -441,8 +552,15 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
   if (analysis.length === 0) {
     analysis.push(
       ppg >= 0.5
-        ? `Nothing in the profile suggests a role change coming. He's a steady weekly starter in most formats.`
-        : `Better as a matchup-based streamer or depth piece than a set-and-forget starter.`,
+        ? pick([
+            `Nothing in the profile suggests a role change coming. He's a steady weekly starter in most formats.`,
+            `A weekly starter in most formats, and the profile has no red flag in it.`,
+            `Set the lineup and leave him in it. The production is steady and the role is settled.`,
+          ])
+        : pick([
+            `Better as a matchup-based streamer or depth piece than a set-and-forget starter.`,
+            `A depth piece for the right week, not a set-and-forget starter.`,
+          ]),
     );
   }
 

@@ -527,3 +527,42 @@ describe('player writeups: voice conformance', () => {
     );
   });
 });
+
+describe('the voice (2026-09-05)', () => {
+  const goalie = (overrides: Partial<HockeyPlayer> = {}): HockeyPlayer =>
+    ({
+      id: 30, name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
+      stats: { gamesPlayed: 50, savePct: 0.925, gaa: 2.35, wins: 30, losses: 15, shutouts: 4 },
+      ...overrides,
+    }) as HockeyPlayer;
+
+  it('opens with the full name, not the first name', () => {
+    const w = generatePlayerWriteup(skater({ name: 'Connor McDavid' }));
+    expect(w.summary).toMatch(/Connor McDavid/);
+    expect(w.summary.indexOf('Connor McDavid')).toBeLessThan(20);
+    const g = generatePlayerWriteup(goalie({ name: 'Igor Shesterkin' }));
+    expect(g.summary.indexOf('Igor Shesterkin')).toBeLessThan(20);
+  });
+
+  it('gives two players with the same line different prose, and the same player the same prose twice', () => {
+    const a = generatePlayerWriteup(skater({ id: 8478402, name: 'Connor McDavid' }));
+    const b = generatePlayerWriteup(skater({ id: 8477492, name: 'Nathan MacKinnon' }));
+    const c = generatePlayerWriteup(skater({ id: 8476453, name: 'Nikita Kucherov' }));
+    const shapes = new Set([a, b, c].map((w) => w.summary.replace(/Connor McDavid|Nathan MacKinnon|Nikita Kucherov/g, 'X')));
+    expect(shapes.size).toBeGreaterThan(1);
+    expect(generatePlayerWriteup(skater({ id: 8478402, name: 'Connor McDavid' })).summary).toBe(a.summary);
+  });
+
+  it('never prints an em dash', () => {
+    for (const w of [generatePlayerWriteup(skater()), generatePlayerWriteup(goalie()), generatePlayerWriteup(skater({}, { gamesPlayed: 3 }))]) {
+      expect(`${w.headline} ${w.summary} ${w.analysis} ${w.cardNote}`).not.toContain('—');
+    }
+  });
+
+  it('says more than points when the box score does: the power play, the plus-minus, the shooting', () => {
+    const w = generatePlayerWriteup(skater({}, { gamesPlayed: 70, points: 100, goals: 40, assists: 60, shots: 250, powerPlayPoints: 30, plusMinus: 22 }));
+    expect(w.summary).toMatch(/power play/i);
+    expect(w.summary).toMatch(/plus-22/);
+    expect(w.summary).toMatch(/16%/);
+  });
+});
