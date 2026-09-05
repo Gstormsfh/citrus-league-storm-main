@@ -583,7 +583,108 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
  * a card that renders a blank space where a scouting note should be looks more
  * broken than one that admits the sample is thin.
  */
-export function generatePlayerWriteup(player: HockeyPlayer | null | undefined): PlayerWriteup {
+/**
+ * WHAT THE STAT LINE CANNOT SAY (2026-09-05). Garrett, from the card: "Our
+ * qualitative information is ass. Ovechkin going into another season as an
+ * NHL legend and we have no mention of it." The base writeup reads one
+ * season's box score. These are the other things the card already has in
+ * memory, handed in by the host so this stays pure: his age, the seasons
+ * on Citrus's books with the goals in each, the cohort-relative reads the
+ * XG tab draws, and the season projection. Every sentence below is a fact
+ * from a table; nothing is a claim about the league we cannot back.
+ */
+export interface WriteupExtras {
+  /** From player_directory.birthdate. */
+  age?: number | null;
+  /** Regular-season goals per season on record, oldest first. From player_xg_season. */
+  goalsBySeason?: ReadonlyArray<{ season: number; goals: number }> | null;
+  /** Cohort-relative percentiles from the dashboard index, 0-100. */
+  xgPercentile?: number | null;
+  garPercentile?: number | null;
+  cohortNoun?: string | null;
+  cohortSize?: number | null;
+  /** The projection, and how to frame it ("for 2026-27" before the opener). */
+  projFp?: number | null;
+  projGp?: number | null;
+  posRank?: string | null;
+  projectionLabel?: string | null;
+}
+
+/** 2025 -> "2025-26". */
+function seasonWord(season: number): string {
+  return `${season}-${String((season + 1) % 100).padStart(2, '0')}`;
+}
+
+function ordinalWord(n: number): string {
+  const r = n % 100;
+  if (r >= 11 && r <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1: return `${n}st`;
+    case 2: return `${n}nd`;
+    case 3: return `${n}rd`;
+    default: return `${n}th`;
+  }
+}
+
+const COUNT_WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+const countWord = (n: number) => COUNT_WORDS[n] ?? String(n);
+
+export function applyWriteupExtras(writeup: PlayerWriteup, player: HockeyPlayer, extras: WriteupExtras | undefined): PlayerWriteup {
+  if (!extras || !writeup.hasEnoughData) return writeup;
+  const goalie = isGoalie(player.position);
+  const summary: string[] = [];
+  const analysis: string[] = [];
+  const tags = [...writeup.tags];
+
+  // The career on our books. Nine seasons of 30 goals is the sentence a
+  // legend earns; a rookie's one season says so plainly.
+  const seasons = (extras.goalsBySeason ?? []).filter((r) => Number.isFinite(r.goals));
+  if (!goalie && seasons.length >= 2) {
+    const n = seasons.length;
+    const minGoals = Math.min(...seasons.map((r) => r.goals));
+    const best = seasons.reduce((a, b) => (b.goals > a.goals ? b : a));
+    const agePart = extras.age != null ? `He is ${extras.age}, with ` : 'He has ';
+    let line = `${agePart}${countWord(n)} seasons on Citrus's books`;
+    if (minGoals >= 30) line += `, and 30 goals or more in every one of them`;
+    else if (minGoals >= 20) line += `, and 20 goals or more in every one of them`;
+    else if (best.goals >= 30) line += `, with a best of ${best.goals} goals in ${seasonWord(best.season)}`;
+    summary.push(line + '.');
+    if (minGoals >= 30 && n >= 5) tags.push({ label: `${n} straight 30-goal seasons`, tone: 'positive' });
+  } else if (extras.age != null && !goalie) {
+    summary.push(`He is ${extras.age}.`);
+  }
+  if (extras.age != null && extras.age >= 36) tags.push({ label: 'Veteran', tone: 'neutral' });
+
+  // The cohort reads the XG tab draws, said once in words.
+  const noun = extras.cohortNoun ?? null;
+  const size = extras.cohortSize ?? null;
+  if (!goalie && noun && size && (extras.xgPercentile != null || extras.garPercentile != null)) {
+    const bits: string[] = [];
+    if (extras.xgPercentile != null) bits.push(`Citrus xG/60 sits in the ${ordinalWord(extras.xgPercentile)} percentile`);
+    if (extras.garPercentile != null) bits.push(`${extras.xgPercentile != null ? 'total' : 'Total'} GAR/60 in the ${ordinalWord(extras.garPercentile)}`);
+    analysis.push(`${bits.join(' and ')} of ${size} ${noun}.`);
+    if (extras.garPercentile != null && extras.garPercentile >= 90) tags.push({ label: 'Elite GAR', tone: 'positive' });
+  }
+
+  // The projection, framed by the host: a season before the opener, the
+  // rest of it after.
+  if (extras.projFp != null && Number.isFinite(extras.projFp)) {
+    const fp = Math.round(extras.projFp);
+    const gp = extras.projGp != null ? ` over ${Math.round(extras.projGp)} games` : '';
+    const rank = extras.posRank ? `, ${extras.posRank} at the position` : '';
+    const when = extras.projectionLabel ? ` ${extras.projectionLabel}` : '';
+    analysis.push(`Citrus projects ${fp} fantasy points${gp}${when}${rank}.`);
+  }
+
+  return {
+    ...writeup,
+    summary: [writeup.summary, ...summary].filter(Boolean).join(' '),
+    analysis: [writeup.analysis, ...analysis].filter(Boolean).join(' '),
+    tags,
+  };
+}
+
+export function generatePlayerWriteup(player: HockeyPlayer | null | undefined, extras?: WriteupExtras): PlayerWriteup {
   if (!player) {
     return {
       headline: 'No player selected',
@@ -596,7 +697,8 @@ export function generatePlayerWriteup(player: HockeyPlayer | null | undefined): 
     };
   }
 
-  const writeup = isGoalie(player.position) ? buildGoalieWriteup(player) : buildSkaterWriteup(player);
+  const base = isGoalie(player.position) ? buildGoalieWriteup(player) : buildSkaterWriteup(player);
+  const writeup = applyWriteupExtras(base, player, extras);
 
   // Injury status outranks anything the stat line says: a 1.2 PPG winger on IR
   // is a bench decision tonight regardless of how good the season has been.

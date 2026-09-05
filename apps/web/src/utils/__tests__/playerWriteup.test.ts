@@ -582,3 +582,57 @@ describe('ice time that is not there says nothing (2026-09-05)', () => {
     expect(w.tags.some((t) => t.label === 'Limited ice time')).toBe(false);
   });
 });
+
+describe('writeup extras (2026-09-05): what the stat line cannot say', () => {
+  const ovi = {
+    id: '8471214',
+    name: 'Alex Ovechkin',
+    position: 'LW',
+    team: 'WSH',
+    stats: { gamesPlayed: 82, points: 64, goals: 32, assists: 32, shots: 244, powerPlayPoints: 19, toi: '17:24' },
+  } as unknown as Parameters<typeof generatePlayerWriteup>[0];
+  const nine = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025].map((season, i) => ({ season, goals: [49, 51, 48, 24, 50, 42, 31, 44, 32][i] }));
+
+  it('says his age and the seasons on our books, and earns the tag a legend earns', () => {
+    const w = generatePlayerWriteup(ovi, { age: 40, goalsBySeason: nine.map((r) => ({ ...r, goals: Math.max(r.goals, 30) })) });
+    expect(w.summary).toContain('He is 40, with nine seasons on Citrus');
+    expect(w.summary).toContain('30 goals or more in every one of them');
+    expect(w.tags.some((t) => t.label === '9 straight 30-goal seasons')).toBe(true);
+    expect(w.tags.some((t) => t.label === 'Veteran')).toBe(true);
+  });
+
+  it('a dip in one season drops the streak claim and keeps the best season', () => {
+    const w = generatePlayerWriteup(ovi, { age: 40, goalsBySeason: nine });
+    expect(w.summary).toContain('20 goals or more in every one of them');
+    expect(w.tags.some((t) => t.label.includes('30-goal'))).toBe(false);
+  });
+
+  it('puts the cohort reads and the projection in the analysis, framed by the host', () => {
+    const w = generatePlayerWriteup(ovi, {
+      xgPercentile: 92,
+      garPercentile: 98,
+      cohortNoun: 'forwards',
+      cohortSize: 515,
+      projFp: 611.4,
+      projGp: 74,
+      posRank: 'LW8',
+      projectionLabel: 'for 2026-27',
+    });
+    expect(w.analysis).toContain('Citrus xG/60 sits in the 92nd percentile and total GAR/60 in the 98th of 515 forwards.');
+    expect(w.analysis).toContain('Citrus projects 611 fantasy points over 74 games for 2026-27, LW8 at the position.');
+    expect(w.tags.some((t) => t.label === 'Elite GAR')).toBe(true);
+  });
+
+  it('adds nothing when there is nothing to add', () => {
+    const base = generatePlayerWriteup(ovi);
+    const w = generatePlayerWriteup(ovi, {});
+    expect(w.summary).toBe(base.summary);
+    expect(w.analysis).toBe(base.analysis);
+    expect(w.tags).toEqual(base.tags);
+  });
+
+  it('never writes an em dash', () => {
+    const w = generatePlayerWriteup(ovi, { age: 40, goalsBySeason: nine, xgPercentile: 92, garPercentile: 98, cohortNoun: 'forwards', cohortSize: 515, projFp: 611, projGp: 74, posRank: 'LW8', projectionLabel: 'for 2026-27' });
+    expect(`${w.summary} ${w.analysis}`).not.toMatch(/—/);
+  });
+});

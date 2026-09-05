@@ -16,7 +16,10 @@ import { playerApi } from '@/api/players';
 import { MatchupService } from '@/services/MatchupService';
 import { matchupApi } from '@/api/matchups';
 import { ScoringCalculator } from '@/utils/scoringUtils';
-import { generatePlayerWriteup, WriteupTone } from '@/utils/playerWriteup';
+import { generatePlayerWriteup, WriteupTone, type WriteupExtras } from '@/utils/playerWriteup';
+import { buildAdvancedCardData, type CardEntry } from '@/components/player/playerAdvancedMetrics';
+import { usePlayerXgHistory } from '@/components/player/usePlayerXgHistory';
+import { projectionFraming } from '@/components/player/projectionFraming';
 import { getCurrentSeason, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
 import { PlayerAdvancedCard } from '@/components/player/PlayerAdvancedCard';
@@ -590,6 +593,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
     const id = Number(player?.id);
     return Number.isFinite(id) ? index.players.find((p) => p.id === id) ?? null : null;
   }, [index.players, player?.id]);
+  // THE WRITEUP'S EXTRAS (2026-09-05): what the card already holds beyond
+  // one season's box score. Age from the directory strip, the seasons on
+  // our books from the xG history, the cohort reads the XG tab draws, and
+  // the projection with the framing the card uses. See WriteupExtras.
+  const xgHistory = usePlayerXgHistory(Number(player?.id) || null, { enabled: isOpen });
   const positionRank = useMemo(() => {
     if (!indexEntry) return null;
     const cohort = index.players.filter((p) => p.position === indexEntry.position);
@@ -635,9 +643,38 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
   const isGoalie = player.position === 'Goalie' || player.position === 'G';
   const stats = player.stats || {};
-  // Pure function of `player` — cheap enough to run inline, and deliberately
-  // not memoised on a value that changes identity every render anyway.
-  const writeup = generatePlayerWriteup(player);
+  // Pure function of `player` and the extras — cheap enough to run inline,
+  // and deliberately not memoised on a value that changes identity anyway.
+  const writeupExtras: WriteupExtras = (() => {
+    const ageVital = directoryVitals.find((v) => v.label === 'AGE');
+    const age = ageVital ? Number(ageVital.value) : null;
+    const goalsBySeason = (xgHistory.points ?? [])
+      .filter((p) => p.game_type === 'regular')
+      .reduce<Map<number, number>>((m, p) => m.set(p.season, (m.get(p.season) ?? 0) + p.goals), new Map());
+    let advanced: ReturnType<typeof buildAdvancedCardData> | null = null;
+    if (indexEntry && index.players.length > 0) {
+      try {
+        advanced = buildAdvancedCardData(indexEntry as CardEntry, index.players as CardEntry[]);
+      } catch {
+        advanced = null;
+      }
+    }
+    const pct = (key: string) => advanced?.metrics.find((m) => m.spec.key === key)?.percentile ?? null;
+    const framing = projectionFraming();
+    return {
+      age: Number.isFinite(age as number) ? age : null,
+      goalsBySeason: [...goalsBySeason.entries()].sort((a, b) => a[0] - b[0]).map(([season, goals]) => ({ season, goals })),
+      xgPercentile: pct('xg_per_60'),
+      garPercentile: pct('gar_per_60'),
+      cohortNoun: advanced?.cohortNoun ?? null,
+      cohortSize: advanced?.cohortSize ?? null,
+      projFp: indexEntry?.proj_fantasy_points ?? null,
+      projGp: indexEntry?.proj_gp ?? null,
+      posRank: positionRank,
+      projectionLabel: framing.beforeOpener ? `for ${framing.eyebrow.replace(' projection', '')}` : 'the rest of the way',
+    };
+  })();
+  const writeup = generatePlayerWriteup(player, writeupExtras);
 
   const posAbbr = getPositionAbbr(player.position);
   const teamAbbr = player.teamAbbreviation || player.team?.split(' ').pop()?.substring(0, 3).toUpperCase() || '';
