@@ -25,6 +25,7 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Camera, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { interceptExternal } from '@/lib/openExternal';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { PressBoxChips } from '@/components/pressbox/Chips';
 import { PressBoxSheet } from '@/components/pressbox/Sheet';
@@ -94,12 +95,21 @@ export interface ProfilePhoneProps {
     savingDisplayName: boolean;
     onSaveDisplayName: () => void;
     email: string;
+    /** Supabase identity providers on this account: `email`, `google`, `apple`. */
+    signInProviders: string[];
+    /** An `email` identity exists, so a current password can be asked for. */
+    hasPassword: boolean;
+    currentPassword: string;
     newPassword: string;
     confirmPassword: string;
+    onCurrentPassword: (v: string) => void;
     onNewPassword: (v: string) => void;
     onConfirmPassword: (v: string) => void;
     changingPassword: boolean;
     onChangePassword: (e: React.FormEvent) => void;
+    sendingReset: boolean;
+    onSendResetLink: () => void;
+    onSignOut: () => void;
     team: {
       name: string;
       abbr: string;
@@ -165,6 +175,13 @@ const DANGER =
   'focus-citrus w-full h-11 rounded-[10px] bg-pressbox-grapefruit/[0.18] border border-pressbox-grapefruit/40 font-condensed font-bold text-[15px] uppercase tracking-[0.06em] text-pressbox-grapefruit-text disabled:opacity-40';
 
 const or = (v: string) => (v.trim() ? v : 'Not set');
+const PROVIDER_LABEL: Record<string, string> = { email: 'Email & password', google: 'Google', apple: 'Apple' };
+const providerNames = (providers: string[]) =>
+  providers.map((p) => PROVIDER_LABEL[p] ?? p).join(' · ') || 'Not recorded';
+/** The policy pages: a new tab on the web, the system browser sheet in the shell. */
+const openPolicy = (href: string) => {
+  if (!interceptExternal(href)) window.open(href, '_blank', 'noopener');
+};
 
 export function ProfilePhone({ tab, onTabChange, hero, identity, stats, activity, achievements, hasLeague, settings, className }: ProfilePhoneProps) {
   const avatarInput = useRef<HTMLInputElement | null>(null);
@@ -365,11 +382,34 @@ export function ProfilePhone({ tab, onTabChange, hero, identity, stats, activity
                 action={{ label: settings.savingDisplayName ? 'SAVING…' : 'SAVE', onPress: settings.onSaveDisplayName, busy: settings.savingDisplayName || !settings.canSaveDisplayName }}
               />
               <PressBoxSettingRow label="Email" help="Set from your account" value={settings.email} />
+              <PressBoxSettingRow label="Sign-in method" help="How this account gets in" value={providerNames(settings.signInProviders)} />
               <PressBoxSettingRow label="Appearance" help="Rink-side dark, tuned for the whole app" value="Citrus Dark" last />
             </PressBoxSettingGroup>
 
-            <form onSubmit={settings.onChangePassword}>
+            {/* PASSWORD (2026-09-05). An account with a password proves it
+                knows the current one before it can set a new one, the way
+                every bank and every Sleeper does it. A Google or Apple
+                account has no password to prove; it gets the reset link,
+                which is also how it adds email sign-in. Both get the link:
+                "forgot it" is the honest state of most password changes. */}
+            <form onSubmit={settings.onChangePassword} data-testid="password-form">
               <PressBoxSettingGroup label="PASSWORD">
+                {settings.hasPassword ? (
+                  <PressBoxTextRow
+                    label="Current password"
+                    help="Proves it is you before anything changes"
+                    inputType="password"
+                    autoComplete="current-password"
+                    value={settings.currentPassword}
+                    onChange={settings.onCurrentPassword}
+                    disabled={settings.changingPassword}
+                  />
+                ) : (
+                  <p className="px-3.5 py-3 border-b border-white/[0.06] font-barlow text-[13px] leading-[1.45] text-pressbox-text/70">
+                    You sign in with {providerNames(settings.signInProviders.filter((p) => p !== 'email'))}. Setting a password here adds
+                    email sign-in to the same account.
+                  </p>
+                )}
                 <PressBoxTextRow
                   label="New password"
                   help="At least 8 characters"
@@ -380,21 +420,31 @@ export function ProfilePhone({ tab, onTabChange, hero, identity, stats, activity
                   disabled={settings.changingPassword}
                 />
                 <PressBoxTextRow
-                  label="Confirm"
+                  label="Confirm new password"
                   inputType="password"
                   autoComplete="new-password"
                   value={settings.confirmPassword}
                   onChange={settings.onConfirmPassword}
                   disabled={settings.changingPassword}
+                />
+                <PressBoxSettingRow
+                  label="Forgot it?"
+                  help={`A reset link goes to ${settings.email || 'your email'}`}
+                  action={{ label: settings.sendingReset ? 'SENDING…' : 'EMAIL LINK', onPress: settings.onSendResetLink, busy: settings.sendingReset }}
                   last
                 />
               </PressBoxSettingGroup>
               <button
                 type="submit"
                 className={cn(PRIMARY, 'mt-2')}
-                disabled={settings.changingPassword || !settings.newPassword || !settings.confirmPassword}
+                disabled={
+                  settings.changingPassword ||
+                  !settings.newPassword ||
+                  !settings.confirmPassword ||
+                  (settings.hasPassword && !settings.currentPassword)
+                }
               >
-                {settings.changingPassword ? 'Updating…' : 'Update password'}
+                {settings.changingPassword ? 'Updating…' : settings.hasPassword ? 'Update password' : 'Set password'}
               </button>
             </form>
 
@@ -481,14 +531,23 @@ export function ProfilePhone({ tab, onTabChange, hero, identity, stats, activity
             </PressBoxSettingGroup>
 
             <PressBoxSettingGroup label="LEGAL & DATA">
-              <PressBoxSettingRow label="Privacy policy" onPress={() => window.open('/privacy-policy.html', '_blank', 'noopener')} value="Open" />
-              <PressBoxSettingRow label="Terms of service" onPress={() => window.open('/terms-of-service.html', '_blank', 'noopener')} value="Open" />
+              <PressBoxSettingRow label="Terms of service" onPress={() => openPolicy('/terms-of-service.html')} value="Read" />
+              <PressBoxSettingRow label="Privacy policy" onPress={() => openPolicy('/privacy-policy.html')} value="Read" />
               <PressBoxSettingRow
                 label="Export your data"
                 help="A JSON file: profile, teams, leagues, transactions, drafts"
                 action={{ label: settings.exporting ? 'EXPORTING…' : 'EXPORT', onPress: settings.onExport, busy: settings.exporting }}
               />
               <PressBoxSettingRow label="Plan" help="Everything is free during the beta" value="Free" last />
+            </PressBoxSettingGroup>
+
+            <PressBoxSettingGroup label="SESSION">
+              <PressBoxSettingRow
+                label="Sign out"
+                help="This device only. Your leagues stay where they are"
+                action={{ label: 'SIGN OUT', onPress: settings.onSignOut }}
+                last
+              />
             </PressBoxSettingGroup>
 
             <PressBoxSettingGroup label="DANGER">

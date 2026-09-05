@@ -14,6 +14,7 @@ import MobileBottomNav from "./components/MobileBottomNav";
 import NativeBootSplash from "./components/NativeBootSplash";
 import { reportBootStage } from "@/lib/bootStages";
 import { LeagueLoadErrorBanner } from "./components/LeagueLoadErrorBanner";
+import { TermsGate } from "./components/TermsGate";
 import { CookieConsent } from "./components/CookieConsent";
 import ScrollToTop from "./components/ScrollToTop";
 import PushDeepLink from "./components/PushDeepLink";
@@ -202,6 +203,9 @@ const App = () => {
                     silently became "you have no leagues, create one".
                     Mounted here so every page inherits it. */}
                 <LeagueLoadErrorBanner />
+                {/* Terms sign-off (2026-09-05): one sheet, once, on the
+                    first session a policy is due. See lib/consent.ts. */}
+                <TermsGate />
                 <Suspense fallback={<PageLoader />}>
                   <main id="main-content">
                   <Routes>

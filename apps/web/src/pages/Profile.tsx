@@ -10,6 +10,7 @@ import { accountApi } from '@/api/account';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import { UserAccountService, type ConsentStatus } from '@/services/UserAccountService';
+import { CONSENT_CHANGED_EVENT } from '@/lib/consent';
 import { LeagueService } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { WaiverService } from '@/services/WaiverService';
@@ -106,12 +107,13 @@ const CONSENT_PRESENTATION: Record<
 };
 
 const Profile = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, resetPassword } = useAuth();
   const { userLeagueState } = useLeague();
   const { data: profile } = useProfile();
   const updateProfile = useUpdateProfile();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
 
   // Active Tab State Management — support ?tab= URL param
@@ -223,9 +225,22 @@ const Profile = () => {
   const [consentError, setConsentError] = useState<string | null>(null);
   const [consentBusy, setConsentBusy] = useState<string | null>(null);
   const [settingsMessage, setSettingsMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [sendingReset, setSendingReset] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+
+  // HOW THIS ACCOUNT SIGNS IN (2026-09-05). Supabase lists every linked
+  // identity; `email` means a password exists. A Google- or Apple-only
+  // account has none, so the change-password form would only ever fail for
+  // it -- that account gets the reset link instead, which is also how it
+  // adds a password if it wants one.
+  const signInProviders: string[] = Array.from(new Set(
+    (user?.identities?.map((i) => i.provider) ?? user?.app_metadata?.providers ?? [])
+      .filter((p): p is string => typeof p === 'string'),
+  ));
+  const hasPassword = signInProviders.includes('email');
   // 2026-08-24 click-sweep: the Light/Dark/System appearance toggle is gone.
   // The shipped design system is single-theme — the forest-dark palette lives
   // on the :root tokens. Adding `.dark` flipped every token to an unmaintained
@@ -851,11 +866,16 @@ const Profile = () => {
     }
   };
 
-  // Real password change handler (from old Settings page)
+  // Real password change handler (from old Settings page). The current
+  // password is checked first for an account that has one (2026-09-05).
   const handleChangePasswordReal = async (e: React.FormEvent) => {
     e.preventDefault();
     setSettingsMessage(null);
 
+    if (hasPassword && !currentPassword) {
+      setSettingsMessage({ type: 'error', text: 'Enter your current password first' });
+      return;
+    }
     if (newPassword.length < 8) {
       setSettingsMessage({ type: 'error', text: 'Password must be at least 8 characters' });
       return;
@@ -864,12 +884,20 @@ const Profile = () => {
       setSettingsMessage({ type: 'error', text: 'Passwords do not match' });
       return;
     }
+    if (hasPassword && newPassword === currentPassword) {
+      setSettingsMessage({ type: 'error', text: 'The new password is the same as the current one' });
+      return;
+    }
 
     setChangePasswordLoading(true);
     try {
-      const result = await UserAccountService.changePassword(newPassword);
+      const result = await UserAccountService.changePassword(
+        newPassword,
+        hasPassword && user?.email ? { email: user.email, currentPassword } : undefined,
+      );
       if (!result.success) throw new Error(result.error);
       setSettingsMessage({ type: 'success', text: 'Password updated successfully!' });
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: unknown) {
@@ -881,6 +909,32 @@ const Profile = () => {
     } finally {
       setChangePasswordLoading(false);
     }
+  };
+
+  // FORGOT IT (2026-09-05): the same recovery email the sign-in screen
+  // sends. It is the only path for a Google or Apple account that wants a
+  // password, and the honest one for anyone who cannot type the current one.
+  const handleSendResetLink = async () => {
+    if (!user?.email || sendingReset) return;
+    setSendingReset(true);
+    setSettingsMessage(null);
+    try {
+      const { error } = await resetPassword(user.email);
+      if (error) throw error;
+      setSettingsMessage({ type: 'success', text: `Reset link sent to ${user.email}. It expires in an hour.` });
+    } catch (error: unknown) {
+      logger.error('Reset link error:', error);
+      setSettingsMessage({ type: 'error', text: userMessage(error, 'Could not send the reset link. Try again.') });
+    } finally {
+      setSendingReset(false);
+    }
+  };
+
+  // SIGN OUT (2026-09-05). The phone had no way out of an account: the
+  // desktop's is in the Navbar the phone does not draw.
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth', { replace: true });
   };
 
   // ── GDPR consent ──────────────────────────────────────────────────
@@ -905,6 +959,10 @@ const Profile = () => {
   useEffect(() => {
     if (!user) return;
     void loadConsent();
+    // The terms gate records over this screen; its rows re-read on the event.
+    const onChanged = () => void loadConsent();
+    window.addEventListener(CONSENT_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(CONSENT_CHANGED_EVENT, onChanged);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
@@ -975,6 +1033,7 @@ const Profile = () => {
       const result = await UserAccountService.deleteAccount();
       if (!result.success) throw new Error(result.error || 'Deletion failed');
       await signOut();
+      navigate('/auth', { replace: true });
     } catch (error: unknown) {
       logger.error('Account deletion error:', error);
       setSettingsMessage({
@@ -1033,7 +1092,6 @@ const Profile = () => {
    * of strings. Every handler is the page's own.
    */
   const isMobile = useIsMobile();
-  const navigate = useNavigate();
 
   // If user is not logged in, show signup prompt
   if (!user) {
@@ -1148,12 +1206,19 @@ const Profile = () => {
             savingDisplayName,
             onSaveDisplayName: handleSaveDisplayName,
             email: user.email ?? '',
+            signInProviders,
+            hasPassword,
+            currentPassword,
             newPassword,
             confirmPassword,
+            onCurrentPassword: setCurrentPassword,
             onNewPassword: setNewPassword,
             onConfirmPassword: setConfirmPassword,
             changingPassword: changePasswordLoading,
             onChangePassword: handleChangePasswordReal,
+            sendingReset,
+            onSendResetLink: () => void handleSendResetLink(),
+            onSignOut: () => void handleSignOut(),
             team: {
               name: formData.teamName,
               abbr: formData.teamAbbr,
@@ -1711,6 +1776,25 @@ const Profile = () => {
                     </CardHeader>
                     <CardContent>
                       <form onSubmit={handleChangePasswordReal} className="space-y-4">
+                        {hasPassword ? (
+                          <div className="space-y-2">
+                            <Label htmlFor="settings-currentPassword" className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Current Password</Label>
+                            <Input
+                              id="settings-currentPassword"
+                              type="password"
+                              autoComplete="current-password"
+                              placeholder="Your current password"
+                              value={currentPassword}
+                              onChange={(e) => setCurrentPassword(e.target.value)}
+                              disabled={changePasswordLoading}
+                              className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 disabled:opacity-50"
+                            />
+                          </div>
+                        ) : (
+                          <p className="text-sm text-white/65">
+                            You sign in with {signInProviders.map((p) => p === 'google' ? 'Google' : p === 'apple' ? 'Apple' : p).join(' and ') || 'a linked account'}. Setting a password here adds email sign-in to this account.
+                          </p>
+                        )}
                         <div className="space-y-2">
                           <Label htmlFor="settings-newPassword" className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">New Password</Label>
                           <Input
@@ -1737,7 +1821,7 @@ const Profile = () => {
                         </div>
                         <Button
                           type="submit"
-                          disabled={changePasswordLoading || !newPassword || !confirmPassword}
+                          disabled={changePasswordLoading || !newPassword || !confirmPassword || (hasPassword && !currentPassword)}
                           className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50"
                         >
                           {changePasswordLoading ? (
@@ -1746,6 +1830,14 @@ const Profile = () => {
                             'Update Password'
                           )}
                         </Button>
+                        <button
+                          type="button"
+                          onClick={() => void handleSendResetLink()}
+                          disabled={sendingReset}
+                          className="w-full text-center text-sm text-pastel-orange-soft hover:text-pastel-orange underline-offset-4 hover:underline disabled:opacity-50"
+                        >
+                          {sendingReset ? 'Sending…' : 'Forgot it? Email me a reset link'}
+                        </button>
                       </form>
                     </CardContent>
                   </Card>

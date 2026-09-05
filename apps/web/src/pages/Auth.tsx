@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { useAuth } from '@/contexts/AuthContext';
 import { interceptExternal } from '@/lib/openExternal';
+import { rememberSignupConsent, SIGNUP_POLICY_VERSION } from '@/lib/consent';
 import { supabase } from '@/integrations/supabase/client';
 import { UserAccountService } from '@/services/UserAccountService';
 import { Input } from '@/components/ui/input';
@@ -286,13 +287,17 @@ const Auth = () => {
     if (password !== confirmPassword) { setError("Those passwords don't match. Try typing the second one again."); return; }
     if (!tosAccepted) { setError("Check the Terms box to keep going."); return; }
     setLoading(true);
+    // The box was checked: keep which version, so the first signed-in
+    // session records it (lib/consent.ts). A confirm-your-email signup has
+    // no session here, and the recordConsent below has nothing to write as.
+    rememberSignupConsent(SIGNUP_POLICY_VERSION);
     try {
       const { data, error } = await signUp(email, password);
       if (error) { setError(getBetterErrorMessage(error.message)); setLoading(false); return; }
       // Record consent for ToS and Privacy Policy (best-effort)
-      if (data?.session || data?.user) {
-        UserAccountService.recordConsent('terms_of_service', '2026-01-13');
-        UserAccountService.recordConsent('privacy_policy', '2026-01-13');
+      if (data?.session) {
+        UserAccountService.recordConsent('terms_of_service', SIGNUP_POLICY_VERSION);
+        UserAccountService.recordConsent('privacy_policy', SIGNUP_POLICY_VERSION);
       }
       // If email confirmation is required (no session), navigate to verify page
       if (data?.user && !data?.session) {
@@ -322,6 +327,9 @@ const Auth = () => {
     setError(null);
     setOauthLoading(provider);
     const providerLabel = provider === 'apple' ? 'Apple' : 'Google';
+    // "By continuing you agree" sits under both buttons; the first session
+    // after this hand-off records that version (lib/consent.ts).
+    rememberSignupConsent(SIGNUP_POLICY_VERSION);
     try {
       const { error } = await signInWithOAuth(provider);
       // No error means "the hand-off happened", not "signed in": on native
@@ -420,6 +428,13 @@ const Auth = () => {
                   {oauthLoading !== 'google' && <Chrome className="w-4 h-4" />}
                   Continue with Google
                 </CitrusButton>
+
+                <p className="text-[11px] leading-snug text-center text-white/55 px-2 max-lg:font-barlow max-lg:text-[12px] max-lg:text-pressbox-text/55" data-testid="oauth-consent-line">
+                  By continuing you agree to the{' '}
+                  <a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" onClick={(e) => { if (interceptExternal('/terms-of-service.html')) e.preventDefault(); }} className="text-pastel-orange-soft font-semibold underline-offset-4 hover:underline max-lg:text-pressbox-orange-soft">Terms of Service</a>{' '}
+                  and{' '}
+                  <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" onClick={(e) => { if (interceptExternal('/privacy-policy.html')) e.preventDefault(); }} className="text-pastel-orange-soft font-semibold underline-offset-4 hover:underline max-lg:text-pressbox-orange-soft">Privacy Policy</a>.
+                </p>
 
                 {/* HIDE MY EMAIL (2026-09-04). Supabase links a new identity to an
                     existing user by VERIFIED EMAIL. Apple lets a user hand over
@@ -527,6 +542,13 @@ const Auth = () => {
                   {oauthLoading !== 'google' && <Chrome className="w-4 h-4" />}
                   Continue with Google
                 </CitrusButton>
+
+                <p className="text-[11px] leading-snug text-center text-white/55 px-2 max-lg:font-barlow max-lg:text-[12px] max-lg:text-pressbox-text/55" data-testid="oauth-consent-line">
+                  By continuing you agree to the{' '}
+                  <a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" onClick={(e) => { if (interceptExternal('/terms-of-service.html')) e.preventDefault(); }} className="text-pastel-orange-soft font-semibold underline-offset-4 hover:underline max-lg:text-pressbox-orange-soft">Terms of Service</a>{' '}
+                  and{' '}
+                  <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" onClick={(e) => { if (interceptExternal('/privacy-policy.html')) e.preventDefault(); }} className="text-pastel-orange-soft font-semibold underline-offset-4 hover:underline max-lg:text-pressbox-orange-soft">Privacy Policy</a>.
+                </p>
 
                 {/* HIDE MY EMAIL (2026-09-04). Supabase links a new identity to an
                     existing user by VERIFIED EMAIL. Apple lets a user hand over

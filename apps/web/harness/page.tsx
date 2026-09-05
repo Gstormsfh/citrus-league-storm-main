@@ -21,6 +21,7 @@ import MobileBottomNav from '../src/components/MobileBottomNav';
  * it will have.
  */
 import { StormyChatBubble } from '../src/components/StormyChatBubble';
+import { TermsGate } from '../src/components/TermsGate';
 
 // Every network call the pages make, stubbed at the module object.
 import { WaiverService } from '../src/services/WaiverService';
@@ -742,12 +743,37 @@ const ANALYTICS_ROWS = (
   },
 });
 (accountApi as any).getStats = async () => ({ data: { totalSeasons: 2, wins: 21, losses: 13, ties: 2, totalPoints: 3412.6 } });
-(accountApi as any).getConsentStatus = async () => ({
-  data: [
-    { policy_type: 'privacy_policy', status: 'current', required_version: '2026-08', consented_version: '2026-08', consented_at: '2026-08-14T00:00:00.000Z', withdrawn_at: null },
-    { policy_type: 'terms_of_service', status: 'outdated', required_version: '2026-09', consented_version: '2026-06', consented_at: '2026-06-02T00:00:00.000Z', withdrawn_at: null },
-  ],
-});
+// `?consent=due`: nothing on record, which is what every account on prod
+// had the night the gate was written (TermsGate). `?consent=updated`: the
+// terms moved on since. Agreeing in the harness flips the stub to current.
+const CONSENT_KNOB = new URLSearchParams(location.search).get('consent');
+const consentRows: Array<Record<string, unknown>> =
+  CONSENT_KNOB === 'due'
+    ? [
+        { policy_type: 'terms_of_service', status: 'never_given', required_version: '2026-01-13', consented_version: null, consented_at: null, withdrawn_at: null },
+        { policy_type: 'privacy_policy', status: 'never_given', required_version: '2026-01-13', consented_version: null, consented_at: null, withdrawn_at: null },
+      ]
+    : CONSENT_KNOB === 'updated'
+      ? [
+          { policy_type: 'terms_of_service', status: 'outdated', required_version: '2026-09-01', consented_version: '2026-01-13', consented_at: '2026-01-20T00:00:00.000Z', withdrawn_at: null },
+          { policy_type: 'privacy_policy', status: 'current', required_version: '2026-01-13', consented_version: '2026-01-13', consented_at: '2026-01-20T00:00:00.000Z', withdrawn_at: null },
+        ]
+      : [
+          { policy_type: 'privacy_policy', status: 'current', required_version: '2026-08', consented_version: '2026-08', consented_at: '2026-08-14T00:00:00.000Z', withdrawn_at: null },
+          { policy_type: 'terms_of_service', status: 'outdated', required_version: '2026-09', consented_version: '2026-06', consented_at: '2026-06-02T00:00:00.000Z', withdrawn_at: null },
+        ];
+// A fresh array each read, as the network gives: React skips a state set to the same reference.
+(accountApi as any).getConsentStatus = async () => ({ data: consentRows.map((r) => ({ ...r })) });
+(accountApi as any).recordConsent = async (policyType: string, version: string) => {
+  const row = consentRows.find((r) => r.policy_type === policyType);
+  if (row) Object.assign(row, { status: 'current', consented_version: version, consented_at: new Date().toISOString(), withdrawn_at: null });
+  return { data: { ok: true } };
+};
+(accountApi as any).withdrawConsent = async (policyType: string) => {
+  const row = consentRows.find((r) => r.policy_type === policyType);
+  if (row) Object.assign(row, { status: 'withdrawn', withdrawn_at: new Date().toISOString() });
+  return { data: { ok: true } };
+};
 (accountApi as any).updateProfile = async (fields: Record<string, unknown>) => ({ data: fields });
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -855,6 +881,7 @@ createRoot(document.getElementById('root')!).render(
     <CitrusToaster />
     <StormyChatBubble />
     <MobileBottomNav />
+    <TermsGate />
   </MemoryRouter>
   </QueryClientProvider>,
 );

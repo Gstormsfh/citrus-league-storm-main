@@ -7,8 +7,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => <>{childr
 // is sent away from them.
 const SIGNED_OUT = new URLSearchParams(location.search).get('signedout') === '1';
 
+// `?oauth=google|apple`: an account with no password, for the Account
+// screen's password group. Default is an email identity.
+const PROVIDER = new URLSearchParams(location.search).get('oauth') || 'email';
+
 const AUTH = {
-  user: SIGNED_OUT ? null : { id: 'harness-user', email: 'harness@example.com' },
+  user: SIGNED_OUT
+    ? null
+    : {
+        id: 'harness-user',
+        email: 'harness@example.com',
+        identities: [{ provider: PROVIDER }],
+        app_metadata: { providers: [PROVIDER] },
+      },
   session: SIGNED_OUT ? null : { access_token: 'harness-token' },
   loading: false,
   signIn: async () => ({ error: null }),
