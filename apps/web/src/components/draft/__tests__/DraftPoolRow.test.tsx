@@ -213,3 +213,19 @@ describe('DraftPoolRow — identity', () => {
     expect(screen.queryByTestId('draft-pool-status-chip')).toBeNull();
   });
 });
+
+describe('DraftPoolRow — the Players-row cut (2026-09-05, artboard 4a)', () => {
+  it('prints the season line after the team, and the position rank after the read', () => {
+    render(<DraftPoolRow {...base} signal={SIGNAL} seasonLine="90 PTS · 26:10" positionRank="D1" />);
+    expect(screen.getByTestId('draft-pool-season').textContent).toBe('90 PTS · 26:10');
+    const meta = screen.getByTestId('draft-pool-signal').parentElement!;
+    expect(meta.textContent).toContain('xG 88th');
+    expect(meta.textContent).toContain('D1');
+  });
+
+  it('draws neither when the caller has neither', () => {
+    render(<DraftPoolRow {...base} signal={null} />);
+    expect(screen.queryByTestId('draft-pool-season')).toBeNull();
+    expect(screen.queryByText(/D1/)).toBeNull();
+  });
+});

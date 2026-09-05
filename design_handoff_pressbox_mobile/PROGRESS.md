@@ -235,6 +235,40 @@ Not drawn, still: Power/Playoff odds/Median on Standings (no simulation);
 Commish note, Scoring & legend, League history tiles (no route); the
 Players `FA ONLY` chip (every row is already a free agent).
 
+### Second sweep, 2026-09-05 (after the phone screenshot)
+
+Garrett's screenshot: the Citrus 2.0 storefront under the Press Box nav.
+Root cause was a real bug, not a styling miss -- `/` fell through to
+`<Homepage />` for a signed-in phone until its leagues had loaded
+(`efffa35a`). Then the sweep:
+
+- Every in-app route a phone can reach is Press Box now: the three pools
+  (league chrome, week chevrons, crests, underline tabs; `fb6e0842`), the
+  player dashboard, draft kit, Contact, NHL bracket and four playoff-pool
+  screens (app header + twins; `7f2a94c9`). `~/twins.py` on the dev VM is
+  the `max-lg:` twin tool (variant prefixes and opacity suffixes kept).
+- Draft room vs 4a/4b (`e9b01c27`): the pool row leans on the Players row
+  (team-ring face, tinted position tag, `RW ANA · 75 PTS · 15:43` over
+  `xG 82nd · RW1`); Stormy's need line (`Need 4 D · 2 of the top-8 D go
+  before your next pick`, draftNeed.ts); the `★ n` queue chip; the header
+  reads `<LEAGUE> DRAFT`. Not drawn: TIER (no model), ADP (no data).
+  `draft.html?format=auction` renders the AuctionPanel.
+- Sweep fixes (`ac7eb880`): waiver rows wear the face; GM office tiles
+  carry lines; Account's Current rank is the standings place; three
+  in-app pages dropped the marketing footer; the Team screen's
+  "CitrusPuck Loaded" toast is gone.
+- Workflows walked in the harness at 393px: snake draft (on the clock,
+  Draft on a row, the pick lands, the bar advances), the lobby, the
+  auction room render, trade propose (partner → both sides → THE TAKE →
+  PROPOSE TRADE reaches the API), waiver claim sheet, create league with
+  `?type=pickem` preselected. Not walked: a live auction bid (needs the
+  engine), accept/reject on a real offer.
+- Suites fixed from the full run: nativeBootGuard, pressboxTypeGuard
+  (TeamMark), LeagueDashboard.* (trades import), WaiverService,
+  PlayerDashboard (freshness by role), ResetPassword.pkce (crest by
+  direct import), mobileHeaderMenuGuard, Standings.offseason (menu reads
+  mount only while open).
+
 ### Still open
 
 - **Fantasy points above replacement (Garrett, 2026-09-05 00:30): a
