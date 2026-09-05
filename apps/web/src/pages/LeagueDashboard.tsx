@@ -21,7 +21,7 @@ import { getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSeasonStatus } from '@/hooks/useSeasonStatus';
 import { shortDateLabel } from '@/components/scores/scoresFormat';
-import { LeagueService, League, Team, getLeagueFormat } from '@/services/LeagueService';
+import { LeagueService, League, Team } from '@/services/LeagueService';
 import { getTodayMST } from '@/utils/timezoneUtils';
 import { WaiverService } from '@/services/WaiverService';
 import { leagueApi } from '@/api/leagues';
@@ -847,7 +847,9 @@ const LeagueDashboard = () => {
   }, [transactionsThisWeek, pendingTradesQuery.data]);
   const draftStat = useMemo(() => {
     if (!league) return null;
-    const type = getLeagueFormat(league).draftType;
+    // Through extractFormatSettings, which this page already uses for the
+    // scoring format: the page tests mock LeagueService to its class alone.
+    const type = extractFormatSettings((league.settings as LeagueSettings) || {}).draftType ?? 'snake';
     const label = type === 'auction' ? 'Auction' : type === 'linear' ? 'Linear' : type === 'offline' ? 'Offline' : 'Snake';
     return `${draftSettings.draft_rounds} rds · ${label}`;
   }, [league, draftSettings.draft_rounds]);
