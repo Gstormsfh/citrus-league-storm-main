@@ -249,7 +249,7 @@ scheduledRoutes.post('/waiver-process', async (c) => {
             title: won ? 'Waiver Claim Successful' : 'Waiver Claim Missed',
             message: won
               ? `${player} is now on your roster.`
-              : `Your claim for ${player} did not go through${cl.failure_reason ? ` — ${cl.failure_reason}` : '.'}`,
+              : `Your claim for ${player} did not go through${cl.failure_reason ? `: ${cl.failure_reason}` : '.'}`,
             metadata: { claim_id: cl.id, player_id: cl.player_id, status: cl.status },
           }];
         });

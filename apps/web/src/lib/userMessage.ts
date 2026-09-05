@@ -30,7 +30,7 @@ const INTERNAL: ReadonlyArray<{ test: RegExp; say: string }> = [
     // Chrome "Failed to fetch", Firefox "NetworkError when attempting...",
     // Safari "Load failed" / "The Internet connection appears to be offline."
     test: /failed to fetch|networkerror|load failed|connection appears to be offline|err_(internet|network|connection)/i,
-    say: "Can't reach Citrus right now — check your connection and try again.",
+    say: "Can't reach Citrus right now. Check your connection and try again.",
   },
   {
     // Deliberately NOT a bare /timeout/ match. "Your pick timed out" and
@@ -38,13 +38,13 @@ const INTERNAL: ReadonlyArray<{ test: RegExp; say: string }> = [
     // app sends; swallowing them would be worse than the bug being fixed.
     // Only the platform's own abort strings are matched here.
     test: /^aborterror|the (user|operation) aborted|signal is aborted/i,
-    say: 'That took longer than expected — try again in a moment.',
+    say: 'That took longer than expected. Try again in a moment.',
   },
   {
     // "Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON" — an HTML
     // error page parsed as JSON, i.e. the API returned the SPA shell.
     test: /unexpected token|is not valid json|json\.parse|unexpected end of (json|input)/i,
-    say: 'Citrus sent something we could not read — try again in a moment.',
+    say: 'Citrus sent something we could not read. Try again in a moment.',
   },
   {
     // Programming errors that leaked to the UI. Show the caller's copy instead.

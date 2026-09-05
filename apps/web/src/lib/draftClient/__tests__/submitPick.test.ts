@@ -249,7 +249,7 @@ describe('submitPick — network / timeout', () => {
     // Matches api/client.ts:212 — apiClient throws ApiError with
     // status=0 after retries are exhausted for timeout/network paths.
     apiClientPostMock.mockRejectedValueOnce(
-      new MockApiError('Request timed out — retrying', 0),
+      new MockApiError('Request timed out. Retrying', 0),
     );
     const r = await submitPick(BASE);
     expect(r.ok).toBe(false);

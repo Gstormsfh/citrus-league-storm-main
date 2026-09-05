@@ -34,7 +34,7 @@ export const MASCOTS: Record<MascotId, Mascot> = {
     position: 'Assistant GM',
     tagline: "The narwhal who reads xGF%. Trained on every shift.",
     description:
-      "Stormy is the AI assistant GM behind Citrus. Plugged into your roster, scoring, and matchup — answers in real hockey advanced stats, not boilerplate. Her horn doubles as a hockey stick.",
+      "Stormy is the AI assistant GM behind Citrus. Plugged into your roster, scoring, and matchup, she answers in real hockey advanced stats, not boilerplate. Her horn doubles as a hockey stick.",
     image: '/mascots/mascot-stormy.webp',
   },
   lemon: {

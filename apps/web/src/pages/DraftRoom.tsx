@@ -1819,7 +1819,7 @@ const DraftRoomInner = () => {
 
       // Tab title flash — visible when tab is in background
       const originalTitle = document.title;
-      document.title = "\uD83D\uDFE2 Your Turn \u2014 Citrus Draft";
+      document.title = "\uD83D\uDFE2 Your Turn \u00B7 Citrus Draft";
       const restoreTitle = () => {
         document.title = originalTitle;
         document.removeEventListener('visibilitychange', onVisible);

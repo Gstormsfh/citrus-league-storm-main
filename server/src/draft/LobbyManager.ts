@@ -1499,7 +1499,7 @@ export class LobbyManager {
     // (visible to `await enqueueAction`) rather than getting masked
     // by the queue's catch-and-convert-to-internal_error pattern.
     if (!this.initialized) {
-      const msg = `[lobby] enqueueAction called before init() — caller MUST await LobbyManager.init() lobbyId=${this.lobbyId} actionKind=${action.kind}`;
+      const msg = `[lobby] enqueueAction called before init(): caller MUST await LobbyManager.init() lobbyId=${this.lobbyId} actionKind=${action.kind}`;
       structuredLogger.error(msg);
       throw new Error(msg);
     }

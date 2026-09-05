@@ -70,6 +70,7 @@ import {
   logStormyUsage,
   lookupPlayers,
 } from '../services/StormyAssistantService';
+import { plainDashes } from '../lib/stormy/plainDashes';
 
 const stormyRoutes = new Hono<Env>();
 
@@ -164,7 +165,7 @@ stormyRoutes.post('/chat', async (c) => {
       return fail(
         c,
         new AppError(
-          'Stormy is resting — daily capacity reached. Try again tomorrow!',
+          'Stormy is resting. Daily capacity reached, try again tomorrow!',
           429,
           'RATE_LIMITED',
         ),
@@ -239,7 +240,7 @@ stormyRoutes.post('/chat', async (c) => {
       if (upstream.status === 429) {
         return fail(
           c,
-          new AppError('Stormy is busy right now — try again shortly.', 429, 'RATE_LIMITED'),
+          new AppError('Stormy is busy right now. Try again shortly.', 429, 'RATE_LIMITED'),
         );
       }
       return fail(
@@ -253,7 +254,9 @@ stormyRoutes.post('/chat', async (c) => {
       usage?: { input_tokens?: number; output_tokens?: number };
     };
 
-    const aiResponse = data.content?.[0]?.text ?? "Sorry, I couldn't generate a response.";
+    // NO EM DASHES (2026-09-05): the prompt forbids them and the model still
+    // writes them. The reply is cleaned here, once, before it leaves.
+    const aiResponse = plainDashes(data.content?.[0]?.text ?? "Sorry, I couldn't generate a response.");
     const inputTokens = data.usage?.input_tokens ?? 0;
     const outputTokens = data.usage?.output_tokens ?? 0;
 

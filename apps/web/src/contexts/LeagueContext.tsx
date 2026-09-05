@@ -420,7 +420,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
             navigate('/');
             toast({
               title: "Access Check Failed",
-              description: "Couldn't verify your league access — try again in a moment.",
+              description: "Couldn't verify your league access. Try again in a moment.",
               variant: "destructive"
             });
             return;
@@ -467,7 +467,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
           navigate(isPool ? '/' : '/gm-office');
           toast({
             title: "Access Check Failed",
-            description: "Couldn't verify your league access — try again in a moment.",
+            description: "Couldn't verify your league access. Try again in a moment.",
             variant: "destructive"
           });
         }
