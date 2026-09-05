@@ -6,6 +6,7 @@ import { useLeague } from '@/contexts/LeagueContext';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useSeasonStatus } from '@/hooks/useSeasonStatus';
 import { PressBoxHome } from '@/components/home/PressBoxHome';
+import LoadingScreen from '@/components/LoadingScreen';
 
 /**
  * Production homepage. Renders the Citrus 2.0 Homepage composition (dark
@@ -44,6 +45,14 @@ const Index = () => {
     if (authSettling || leagueSettling) {
       return <div style={{ minHeight: '100vh', background: '#0C1811' }} aria-busy="true" />;
     }
+  }
+
+  // A signed-in phone in a browser (no boot splash): while the leagues are
+  // still loading, hold the home's skeleton rather than flash the storefront
+  // and then swap it for the Press Box home (PR3, 2026-09-05). LoadingScreen
+  // below lg is the skeleton of the screen the URL names -- here, home.
+  if (auth?.user && !native && isMobile && (auth.loading || league?.loading)) {
+    return <LoadingScreen />;
   }
 
   const hasLeagues = (league?.userLeagues?.length ?? 0) > 0;

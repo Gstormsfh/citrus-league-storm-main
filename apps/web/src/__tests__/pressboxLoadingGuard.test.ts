@@ -90,3 +90,10 @@ describe('one loader per wait', () => {
     expect(read('pages/Roster.tsx')).toMatch(/showLoadingOverlay && \(\s*<div className="fixed inset-0 [^"]*z-overlay hidden lg:flex/);
   });
 });
+
+describe('home on a phone in a browser', () => {
+  it('holds the home skeleton while the leagues load, never the storefront', () => {
+    const src = read('pages/Index.tsx');
+    expect(src).toMatch(/if \(auth\?\.user && !native && isMobile && \(auth\.loading \|\| league\?\.loading\)\) \{\s*return <LoadingScreen \/>;/);
+  });
+});
