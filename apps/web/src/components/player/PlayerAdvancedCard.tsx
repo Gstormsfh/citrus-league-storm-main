@@ -200,7 +200,7 @@ function Band({
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <div className={cn(ROW_MICRO, 'font-jbmono uppercase tracking-[0.18em] text-white/55')}>
+    <div className={cn(ROW_MICRO, 'font-jbmono max-lg:font-plex uppercase tracking-[0.18em] text-white/55')}>
       {children}
     </div>
   );
@@ -292,8 +292,8 @@ export function PlayerAdvancedCard({
       data-variant={variant}
       aria-label={`${player.name}: advanced metrics`}
       className={cn(
-        'w-full min-w-0 overflow-hidden rounded-2xl',
-        'bg-pastel-surface-tile ring-1 ring-white/10',
+        'w-full min-w-0 overflow-hidden rounded-2xl max-lg:rounded-[12px]',
+        'bg-pastel-surface-tile max-lg:bg-pressbox-tile ring-1 ring-white/10',
         className,
       )}
     >
@@ -311,8 +311,8 @@ export function PlayerAdvancedCard({
           crest
         />
         <div className="min-w-0 flex-1">
-          <div className={cn(ROW_NAME, 'text-pastel-cream')}>{player.name}</div>
-          <div className={cn(ROW_META, 'mt-1 font-jbmono uppercase tracking-[0.12em] text-white/55')}>
+          <div className={cn(ROW_NAME, 'text-pastel-cream max-lg:text-pressbox-text')}>{player.name}</div>
+          <div className={cn(ROW_META, 'mt-1 font-jbmono max-lg:font-plex uppercase tracking-[0.12em] text-white/55')}>
             {player.position} · {player.team}
             {player.jersey != null && ` · #${player.jersey}`}
           </div>
@@ -324,7 +324,7 @@ export function PlayerAdvancedCard({
           {deployment.length > 0 && (
             <div
               data-testid="advanced-card-deployment"
-              className={cn(ROW_MICRO, 'mt-0.5 font-jbmono uppercase tracking-[0.12em] text-white/55')}
+              className={cn(ROW_MICRO, 'mt-0.5 font-jbmono max-lg:font-plex uppercase tracking-[0.12em] text-white/55')}
             >
               {deployment.join(' · ')}
             </div>
@@ -341,7 +341,7 @@ export function PlayerAdvancedCard({
                 title={`${player.gp} games played, too thin a sample to trust a per-60 rate`}
                 className={cn(
                   ROW_MICRO,
-                  'rounded-md px-1.5 py-0.5 font-jbmono font-bold uppercase tracking-[0.18em]',
+                  'rounded-md px-1.5 py-0.5 font-jbmono max-lg:font-plex font-bold uppercase tracking-[0.18em]',
                   'bg-pastel-butter/15 text-pastel-butter ring-1 ring-pastel-butter/40',
                 )}
               >
@@ -399,7 +399,7 @@ export function PlayerAdvancedCard({
         <Band>
           <div className="mb-2 flex items-baseline justify-between gap-2">
             <Eyebrow>vs {data.cohortNoun}</Eyebrow>
-            <span className={cn(ROW_MICRO, 'font-jbmono tabular-nums text-white/55')}>
+            <span className={cn(ROW_MICRO, 'font-jbmono max-lg:font-plex tabular-nums text-white/55')}>
               n={data.cohortSize}
             </span>
           </div>
@@ -443,7 +443,7 @@ export function PlayerAdvancedCard({
         <Band testId="advanced-card-trend">
           <div className="mb-2 flex items-baseline justify-between gap-2">
             <Eyebrow>Citrus xG by season</Eyebrow>
-            <span className={cn(ROW_MICRO, 'font-jbmono tabular-nums uppercase tracking-[0.12em] text-white/55')}>
+            <span className={cn(ROW_MICRO, 'font-jbmono max-lg:font-plex tabular-nums uppercase tracking-[0.12em] text-white/55')}>
               {seasonLabel(trend.firstSeason)} to {seasonLabel(trend.lastSeason)} · {trend.seasons} seasons
             </span>
           </div>
@@ -472,7 +472,7 @@ export function PlayerAdvancedCard({
             </div>
           </div>
           <div className="flex-shrink-0 text-right">
-            <div className={cn(ROW_HEADLINE, 'text-pastel-orange-soft')}>{fmt2(projPpg)}</div>
+            <div className={cn(ROW_HEADLINE, 'text-pastel-orange-soft max-lg:text-pressbox-orange-soft')}>{fmt2(projPpg)}</div>
             <div className={cn(ROW_HEADLINE_LABEL, 'mt-1 text-white/55')}>
               FP/G · {fmt1(projFp)} total
             </div>
@@ -489,7 +489,7 @@ export function PlayerAdvancedCard({
         <Band className="bg-white/5">
           <p
             data-testid="advanced-card-verdict"
-            className={cn(ROW_META, 'italic leading-snug text-pastel-orange-soft')}
+            className={cn(ROW_META, 'italic leading-snug text-pastel-orange-soft max-lg:text-pressbox-orange-soft')}
           >
             {data.verdict}
           </p>
@@ -510,7 +510,7 @@ export function PlayerAdvancedCard({
             data-testid="advanced-card-link"
             className={cn(
               ROW_MICRO,
-              'font-jbmono uppercase tracking-[0.18em] text-white/70 transition-colors hover:text-pastel-orange-soft',
+              'font-jbmono max-lg:font-plex uppercase tracking-[0.18em] text-white/70 transition-colors hover:text-pastel-orange-soft hover:max-lg:text-pressbox-orange-soft',
             )}
           >
             Full dashboard →

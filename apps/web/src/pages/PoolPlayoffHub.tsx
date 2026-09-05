@@ -17,6 +17,7 @@ import {
   Mail, MessageSquare, Link as LinkIcon, Eye, Calendar, Share2,
 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { buildInviteLink, canSystemShare, emailInvite, isNativeApp, shareInvite, smsInvite } from '@/utils/inviteShare';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -420,13 +421,13 @@ export default function PoolPlayoffHub() {
   };
 
   if (loading) {
-    return <><Navbar /><div className="min-h-screen pt-24 flex items-center justify-center text-white/55">Loading pool...</div></>;
+    return <><div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div><div className="min-h-screen pt-24 flex items-center justify-center text-white/55">Loading pool...</div></>;
   }
 
   if (!league) {
     return (
       <>
-        <Navbar />
+        <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div>
         <div className="min-h-screen pt-24 flex items-center justify-center">
           <Card className="p-6 text-center">
             <p className="text-sm">Pool not found.</p>
@@ -439,29 +440,29 @@ export default function PoolPlayoffHub() {
 
   return (
     <>
-      <Navbar />
-      <div className="min-h-screen bg-[#0F1F15] text-pastel-cream pt-24 pb-12 px-4">
+      <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div>
+      <div className="min-h-screen bg-[#0F1F15] max-lg:bg-pressbox-surface text-pastel-cream max-lg:text-pressbox-text pt-24 pb-12 px-4">
         <div className="max-w-7xl mx-auto">
           {/* Hero */}
           <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Trophy className="h-6 w-6 text-pastel-orange" aria-hidden="true" />
-                <h1 className="text-2xl sm:text-3xl font-calistoga text-pastel-cream tracking-tight">{league.name}</h1>
+                <Trophy className="h-6 w-6 text-pastel-orange max-lg:text-pressbox-orange" aria-hidden="true" />
+                <h1 className="text-2xl sm:text-3xl font-calistoga max-lg:font-condensed text-pastel-cream max-lg:text-pressbox-text tracking-tight">{league.name}</h1>
               </div>
               <div className="flex items-center gap-2 text-sm text-white/70">
                 <Badge variant="outline" className="border-pastel-sage/40">{poolLabel}</Badge>
-                {isCommissioner && <Badge className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft border-0"><Crown className="h-3 w-3 mr-1" />Commissioner</Badge>}
+                {isCommissioner && <Badge className="bg-pastel-orange/20 max-lg:bg-pressbox-orange/20 ring-1 ring-pastel-orange/40 max-lg:ring-pressbox-orange/40 text-pastel-orange-soft max-lg:text-pressbox-orange-soft border-0"><Crown className="h-3 w-3 mr-1" />Commissioner</Badge>}
               </div>
             </div>
             {lockCountdown && (
               <div className="text-right">
-                <div className="text-[10px] font-display uppercase text-white/55">
+                <div className="text-[10px] font-display max-lg:font-barlow uppercase text-white/55">
                   {lockCountdown.locked ? 'Status' : 'Pick deadline'}
                 </div>
                 <div className={cn(
                   'text-base font-bold flex items-center gap-1 justify-end',
-                  lockCountdown.locked ? 'text-red-500' : 'text-pastel-orange'
+                  lockCountdown.locked ? 'text-red-500' : 'text-pastel-orange max-lg:text-pressbox-orange'
                 )}>
                   {lockCountdown.locked ? <Lock className="h-4 w-4" aria-hidden="true" /> : <Clock className="h-4 w-4" aria-hidden="true" />}
                   {lockCountdown.label}
@@ -474,10 +475,10 @@ export default function PoolPlayoffHub() {
             {/* Main */}
             <div className="space-y-4">
               {/* Your Picks CTA */}
-              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.15)]">
+              <Card className="bg-[#1A2A20] max-lg:bg-pressbox-tile border-0 ring-1 ring-pastel-orange/30 max-lg:ring-pressbox-orange/30 rounded-2xl max-lg:rounded-[12px] shadow-[0_16px_40px_-12px_rgba(255,168,87,0.15)]">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Target className="h-4 w-4 text-pastel-orange" />
+                    <Target className="h-4 w-4 text-pastel-orange max-lg:text-pressbox-orange" />
                     Your Picks
                   </CardTitle>
                 </CardHeader>
@@ -491,7 +492,7 @@ export default function PoolPlayoffHub() {
                           ? 'Pick winners and assign confidence values to each series.'
                           : 'Pick the winner and # of games for each playoff series.'}
                   </p>
-                  <Button asChild className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
+                  <Button asChild className="bg-pastel-orange max-lg:bg-pressbox-orange text-[#581E00] max-lg:text-pressbox-orange-ink hover:bg-pastel-orange-soft hover:max-lg:bg-pressbox-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]">
                     <Link to={`${makePicksRoute}?league=${leagueId}`}>
                       {lockCountdown?.locked ? 'View Picks' : 'Make My Picks'} <ChevronRight className="h-4 w-4 ml-1" />
                     </Link>
@@ -531,15 +532,15 @@ export default function PoolPlayoffHub() {
                 if (gamesWithMyPlayers.length === 0 && rosterCtx.length === 0) return null;
 
                 return (
-                  <Card className="bg-[#1A2A20] border-0 ring-2 ring-pastel-orange/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.2)]">
+                  <Card className="bg-[#1A2A20] max-lg:bg-pressbox-tile border-0 ring-2 ring-pastel-orange/40 max-lg:ring-pressbox-orange/40 rounded-2xl max-lg:rounded-[12px] shadow-[0_16px_40px_-12px_rgba(255,168,87,0.2)]">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base flex items-center justify-between gap-2">
                         <span className="flex items-center gap-2">
-                          <Calendar className="h-5 w-5 text-pastel-orange" aria-hidden="true" />
+                          <Calendar className="h-5 w-5 text-pastel-orange max-lg:text-pressbox-orange" aria-hidden="true" />
                           Today&apos;s Games: Your Players
                         </span>
-                        <span className="text-xl font-calistoga font-black text-pastel-cream">
-                          {totalRosterFpts.toFixed(1)} <span className="text-[10px] font-display text-white/55">FPTS</span>
+                        <span className="text-xl font-calistoga max-lg:font-condensed font-black text-pastel-cream max-lg:text-pressbox-text">
+                          {totalRosterFpts.toFixed(1)} <span className="text-[10px] font-display max-lg:font-barlow text-white/55">FPTS</span>
                         </span>
                       </CardTitle>
                     </CardHeader>
@@ -570,12 +571,12 @@ export default function PoolPlayoffHub() {
                               <div className="relative">
                                 <div className="grid grid-cols-[1fr_auto_1fr] items-stretch">
                                   <div
-                                    className="flex items-center justify-center py-3 px-2 text-white font-calistoga font-black text-xl tracking-tight"
+                                    className="flex items-center justify-center py-3 px-2 text-white font-calistoga max-lg:font-condensed font-black text-xl tracking-tight"
                                     style={{ background: awayInfo?.primaryColor || '#7A9B7A', color: onTeamColor(awayInfo?.primaryColor || '#7A9B7A') }}
                                   >
                                     {g.away_team}
                                   </div>
-                                  <div className="flex flex-col items-center justify-center py-2 px-3 bg-[#0F1F15] ring-1 ring-white/10 text-pastel-cream min-w-[96px]">
+                                  <div className="flex flex-col items-center justify-center py-2 px-3 bg-[#0F1F15] max-lg:bg-pressbox-surface ring-1 ring-white/10 text-pastel-cream max-lg:text-pressbox-text min-w-[96px]">
                                     {hasGameData ? (
                                       <div className="flex items-center gap-1 font-mono font-black text-xl tabular-nums">
                                         <span>{g.away_score}</span>
@@ -583,10 +584,10 @@ export default function PoolPlayoffHub() {
                                         <span>{g.home_score}</span>
                                       </div>
                                     ) : (
-                                      <div className="font-display font-bold text-xs uppercase tracking-wider">VS</div>
+                                      <div className="font-display max-lg:font-barlow font-bold text-xs uppercase tracking-wider">VS</div>
                                     )}
                                     <div className={cn(
-                                      'text-[10px] font-display uppercase tracking-wider mt-0.5',
+                                      'text-[10px] font-display max-lg:font-barlow uppercase tracking-wider mt-0.5',
                                       isLive ? 'text-red-300' : 'text-white/70'
                                     )}>
                                       {isLive && (
@@ -602,7 +603,7 @@ export default function PoolPlayoffHub() {
                                     </div>
                                   </div>
                                   <div
-                                    className="flex items-center justify-center py-3 px-2 text-white font-calistoga font-black text-xl tracking-tight"
+                                    className="flex items-center justify-center py-3 px-2 text-white font-calistoga max-lg:font-condensed font-black text-xl tracking-tight"
                                     style={{ background: homeInfo?.primaryColor || '#7A9B7A', color: onTeamColor(homeInfo?.primaryColor || '#7A9B7A') }}
                                   >
                                     {g.home_team}
@@ -610,13 +611,13 @@ export default function PoolPlayoffHub() {
                                 </div>
                                 {/* Live period/clock strip — only during live play */}
                                 {isLive && (
-                                  <div className="bg-red-950/40 border-t border-red-400/30 px-3 py-1 text-center text-[11px] font-display font-bold text-red-400 tabular-nums">
+                                  <div className="bg-red-950/40 border-t border-red-400/30 px-3 py-1 text-center text-[11px] font-display max-lg:font-barlow font-bold text-red-400 tabular-nums">
                                     {timeLabel}
                                   </div>
                                 )}
                                 {/* Series game + tip strip for scheduled/final */}
                                 {!isLive && (g.series_game_number || isFinal) && (
-                                  <div className="bg-white/5 border-t border-white/10 px-3 py-1 text-center text-[10px] font-display uppercase tracking-wider text-white/70">
+                                  <div className="bg-white/5 border-t border-white/10 px-3 py-1 text-center text-[10px] font-display max-lg:font-barlow uppercase tracking-wider text-white/70">
                                     {g.series_game_number ? `Game ${g.series_game_number}` : ''}
                                     {g.series_game_number && isFinal ? ' · ' : ''}
                                     {isFinal ? 'Final' : ''}
@@ -627,11 +628,11 @@ export default function PoolPlayoffHub() {
                               {/* Your players in this game */}
                               <div className="p-3 space-y-1.5">
                                 <div className="flex items-center justify-between mb-1 pb-1 border-b border-pastel-sage/10">
-                                  <span className="text-[10px] uppercase font-display font-bold text-white/50 tracking-wider">
+                                  <span className="text-[10px] uppercase font-display max-lg:font-barlow font-bold text-white/50 tracking-wider">
                                     Your Players ({g.myPlayers.length})
                                   </span>
                                   {hasGameData && (
-                                    <span className="text-[10px] uppercase font-display font-bold text-pastel-cream tabular-nums">
+                                    <span className="text-[10px] uppercase font-display max-lg:font-barlow font-bold text-pastel-cream max-lg:text-pressbox-text tabular-nums">
                                       {g.myPlayers.reduce((sum, p) => sum + p.fpts, 0).toFixed(1)} FPTS
                                     </span>
                                   )}
@@ -646,7 +647,7 @@ export default function PoolPlayoffHub() {
                                     <div key={p.player_id} className="flex items-center justify-between gap-2 text-xs">
                                       <div className="flex items-center gap-2 min-w-0 flex-1">
                                         <span className={cn(
-                                          'text-[9px] font-display font-black uppercase px-1.5 py-0.5 rounded border tabular-nums w-7 text-center flex-shrink-0',
+                                          'text-[9px] font-display max-lg:font-barlow font-black uppercase px-1.5 py-0.5 rounded border tabular-nums w-7 text-center flex-shrink-0',
                                           posColor
                                         )}>{p.position}</span>
                                         <span className="font-medium truncate">{p.full_name}</span>
@@ -658,7 +659,7 @@ export default function PoolPlayoffHub() {
                                               ? `${p.saves}SV`
                                               : `${p.goals}G ${p.assists}A`}
                                           </span>
-                                          <span className="text-sm font-bold text-pastel-cream tabular-nums w-10 text-right">
+                                          <span className="text-sm font-bold text-pastel-cream max-lg:text-pressbox-text tabular-nums w-10 text-right">
                                             {p.fpts.toFixed(1)}
                                           </span>
                                         </div>
@@ -704,10 +705,10 @@ export default function PoolPlayoffHub() {
                   return 'Scheduled';
                 };
                 return (
-                  <Card className="bg-[#1A2A20] border-0 ring-2 ring-pastel-orange/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.2)]">
+                  <Card className="bg-[#1A2A20] max-lg:bg-pressbox-tile border-0 ring-2 ring-pastel-orange/40 max-lg:ring-pressbox-orange/40 rounded-2xl max-lg:rounded-[12px] shadow-[0_16px_40px_-12px_rgba(255,168,87,0.2)]">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-pastel-orange" aria-hidden="true" />
+                        <Calendar className="h-4 w-4 text-pastel-orange max-lg:text-pressbox-orange" aria-hidden="true" />
                         Today&apos;s Playoff Games
                       </CardTitle>
                     </CardHeader>
@@ -735,10 +736,10 @@ export default function PoolPlayoffHub() {
                               'relative rounded-lg border p-3 transition-colors',
                               isLive ? 'border-red-400 bg-red-950/30 ring-1 ring-red-400/30' :
                               isFinal ? 'ring-1 ring-white/10 bg-white/5' :
-                              'ring-1 ring-pastel-sage/30 bg-[#1A2A20]'
+                              'ring-1 ring-pastel-sage/30 bg-[#1A2A20] max-lg:bg-pressbox-tile'
                             )}>
                               {isLive && (
-                                <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-calistoga px-2 py-0.5 rounded-full shadow-md">
+                                <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-calistoga max-lg:font-condensed px-2 py-0.5 rounded-full shadow-md">
                                   <span className="relative flex h-1.5 w-1.5">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
                                     <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
@@ -747,7 +748,7 @@ export default function PoolPlayoffHub() {
                                 </div>
                               )}
                               <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-1.5 text-sm font-display font-bold text-pastel-cream">
+                                <div className="flex items-center gap-1.5 text-sm font-display max-lg:font-barlow font-bold text-pastel-cream max-lg:text-pressbox-text">
                                   <span className={cn(myPickAbbrev === g.away_team && 'underline decoration-pastel-orange decoration-2 underline-offset-4')}>{g.away_team}</span>
                                   <span className="text-white/55">@</span>
                                   <span className={cn(myPickAbbrev === g.home_team && 'underline decoration-pastel-orange decoration-2 underline-offset-4')}>{g.home_team}</span>
@@ -778,8 +779,8 @@ export default function PoolPlayoffHub() {
                               </div>
                               {myPickAbbrev && (
                                 <div className="mt-2 text-[10px] text-white/55">
-                                  <span className="font-display font-semibold">Your pick:</span>{' '}
-                                  <span className="font-mono font-bold text-pastel-orange">{myPickAbbrev}</span>
+                                  <span className="font-display max-lg:font-barlow font-semibold">Your pick:</span>{' '}
+                                  <span className="font-mono font-bold text-pastel-orange max-lg:text-pressbox-orange">{myPickAbbrev}</span>
                                 </div>
                               )}
                             </div>
@@ -817,14 +818,14 @@ export default function PoolPlayoffHub() {
                             'flex items-center gap-2 p-2 rounded border',
                             isCorrect && 'border-green-400 bg-green-950/40',
                             isWrong && 'border-red-400/60 bg-red-950/30',
-                            !isFinal && pick && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/8',
+                            !isFinal && pick && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/8 max-lg:bg-pressbox-sage/8',
                             !pick && 'border-2 border-dashed border-white/15 bg-white/5'
                           )}>
                             <span className="text-[9px] font-mono text-white/50 w-8">{roundName}-{String.fromCharCode(64 + s.bracket_slot)}</span>
                             {pick && pickedInfo ? (
                               <>
                                 <div
-                                  className="w-7 h-7 rounded flex items-center justify-center text-[9px] font-calistoga font-black text-white flex-shrink-0"
+                                  className="w-7 h-7 rounded flex items-center justify-center text-[9px] font-calistoga max-lg:font-condensed font-black text-white flex-shrink-0"
                                   style={{ background: pickedInfo.primaryColor, color: onTeamColor(pickedInfo.primaryColor) }}
                                 >
                                   {pickedInfo.abbrev}
@@ -858,7 +859,7 @@ export default function PoolPlayoffHub() {
               <Card className="border-pastel-sage/30">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <Trophy className="h-4 w-4 text-pastel-orange" aria-hidden="true" />
+                    <Trophy className="h-4 w-4 text-pastel-orange max-lg:text-pressbox-orange" aria-hidden="true" />
                     Leaderboard
                     <span className="text-[10px] text-white/50 font-normal ml-auto">
                       {teams.length} {teams.length === 1 ? 'member' : 'members'} · updates every 60s
@@ -873,9 +874,9 @@ export default function PoolPlayoffHub() {
                       <table className="w-full text-sm">
                         <thead className="bg-white/5 border-b border-white/10">
                           <tr>
-                            <th className="px-3 py-2 text-left text-[10px] uppercase font-display font-bold text-white/55 w-10">#</th>
-                            <th className="px-3 py-2 text-left text-[10px] uppercase font-display font-bold text-white/55">Team</th>
-                            <th className="px-3 py-2 text-right text-[10px] uppercase font-display font-bold text-white/55">FPTS</th>
+                            <th className="px-3 py-2 text-left text-[10px] uppercase font-display max-lg:font-barlow font-bold text-white/55 w-10">#</th>
+                            <th className="px-3 py-2 text-left text-[10px] uppercase font-display max-lg:font-barlow font-bold text-white/55">Team</th>
+                            <th className="px-3 py-2 text-right text-[10px] uppercase font-display max-lg:font-barlow font-bold text-white/55">FPTS</th>
                             {leagueType === 'playoff-roster-pool' && (
                               <th className="px-3 py-2 w-10"></th>
                             )}
@@ -897,29 +898,29 @@ export default function PoolPlayoffHub() {
                                   key={t.id}
                                   className={cn(
                                     'border-b border-pastel-sage/10 last:border-b-0',
-                                    isMe && 'bg-pastel-sage/8 ring-1 ring-pastel-sage/20',
-                                    isRosterPool && 'cursor-pointer hover:bg-pastel-orange/10 transition-colors',
+                                    isMe && 'bg-pastel-sage/8 max-lg:bg-pressbox-sage/8 ring-1 ring-pastel-sage/20',
+                                    isRosterPool && 'cursor-pointer hover:bg-pastel-orange/10 hover:max-lg:bg-pressbox-orange/10 transition-colors',
                                   )}
                                   onClick={isRosterPool ? () => navigate(`/pool/playoff-roster?league=${leagueId}&view=${t.owner_id}`) : undefined}
                                 >
                                   <td className="px-3 py-2 text-xs font-mono text-white/50 tabular-nums">
-                                    {i === 0 ? <span className="text-pastel-orange text-base">🏆</span> : i + 1}
+                                    {i === 0 ? <span className="text-pastel-orange max-lg:text-pressbox-orange text-base">🏆</span> : i + 1}
                                   </td>
                                   <td className="px-3 py-2 text-sm">
                                     <div className="flex items-center gap-2">
-                                      <div className="h-7 w-7 rounded-full bg-pastel-sage/20 ring-1 ring-pastel-sage/40 flex items-center justify-center text-xs font-bold text-pastel-sage-soft flex-shrink-0">
+                                      <div className="h-7 w-7 rounded-full bg-pastel-sage/20 max-lg:bg-pressbox-sage/20 ring-1 ring-pastel-sage/40 flex items-center justify-center text-xs font-bold text-pastel-sage-soft flex-shrink-0">
                                         {(t.team_name || '?').charAt(0).toUpperCase()}
                                       </div>
                                       <div className="min-w-0">
                                         <div className="font-medium truncate">{t.team_name}</div>
                                         <div className="flex items-center gap-1.5 text-[10px]">
-                                          {isCommish && <span className="text-pastel-orange flex items-center gap-0.5"><Crown className="h-2.5 w-2.5" />Commissioner</span>}
+                                          {isCommish && <span className="text-pastel-orange max-lg:text-pressbox-orange flex items-center gap-0.5"><Crown className="h-2.5 w-2.5" />Commissioner</span>}
                                           {isMe && <span className="text-pastel-sage-soft">You</span>}
                                         </div>
                                       </div>
                                     </div>
                                   </td>
-                                  <td className="px-3 py-2 text-base text-right font-calistoga font-black text-pastel-cream tabular-nums">
+                                  <td className="px-3 py-2 text-base text-right font-calistoga max-lg:font-condensed font-black text-pastel-cream max-lg:text-pressbox-text tabular-nums">
                                     {t.pts.toFixed(1)}
                                   </td>
                                   {isRosterPool && (
@@ -941,17 +942,17 @@ export default function PoolPlayoffHub() {
             {/* Sidebar */}
             <div className="space-y-3">
               {/* Invite */}
-              <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
+              <Card className="bg-[#1A2A20] max-lg:bg-pressbox-tile border-0 ring-1 ring-pastel-orange/30 max-lg:ring-pressbox-orange/30 rounded-2xl max-lg:rounded-[12px] shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-display">Invite Friends</CardTitle>
+                  <CardTitle className="text-sm font-display max-lg:font-barlow">Invite Friends</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div className="text-[10px] uppercase font-display text-white/50">Join Code</div>
+                  <div className="text-[10px] uppercase font-display max-lg:font-barlow text-white/50">Join Code</div>
                   <button
                     onClick={copyJoinCode}
-                    className="w-full flex items-center justify-between p-2 rounded ring-1 ring-pastel-sage/30 bg-pastel-sage/[0.08] hover:bg-pastel-sage/15 transition-colors"
+                    className="w-full flex items-center justify-between p-2 rounded ring-1 ring-pastel-sage/30 bg-pastel-sage/[0.08] hover:bg-pastel-sage/15 hover:max-lg:bg-pressbox-sage/15 transition-colors"
                   >
-                    <span className="text-lg font-mono font-bold text-pastel-cream tracking-wider">{league.join_code}</span>
+                    <span className="text-lg font-mono font-bold text-pastel-cream max-lg:text-pressbox-text tracking-wider">{league.join_code}</span>
                     {copied ? <Check className="h-4 w-4 text-green-400" aria-hidden="true" /> : <Copy className="h-4 w-4 text-white/50" aria-hidden="true" />}
                   </button>
 
@@ -1003,9 +1004,9 @@ export default function PoolPlayoffHub() {
               </Card>
 
               {/* Rules recap */}
-              <Card className="ring-1 ring-pastel-sage/30 bg-[#1A2A20] rounded-2xl">
+              <Card className="ring-1 ring-pastel-sage/30 bg-[#1A2A20] max-lg:bg-pressbox-tile rounded-2xl max-lg:rounded-[12px]">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-display">Pool Rules</CardTitle>
+                  <CardTitle className="text-sm font-display max-lg:font-barlow">Pool Rules</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ul className="text-[11px] text-white/70 space-y-1 list-disc pl-3">

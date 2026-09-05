@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
+import { PB_TYPE } from '@/components/pressbox/rowScale';
 import {
   DarkLayout,
   HockeyFooter,
@@ -141,7 +143,7 @@ function ChapterEyebrow({
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       <span className="h-px flex-1 bg-white/[0.08]" aria-hidden="true" />
-      <span className="font-jbmono uppercase tracking-[0.32em] text-[11px] sm:text-[12px] font-bold text-pastel-orange-soft whitespace-nowrap">
+      <span className="font-jbmono max-lg:font-plex uppercase tracking-[0.32em] text-[11px] sm:text-[12px] font-bold text-pastel-orange-soft max-lg:text-pressbox-orange-soft whitespace-nowrap">
         Chapter {chapterNumber} · {title}
       </span>
       <span className="h-px flex-1 bg-white/[0.08]" aria-hidden="true" />
@@ -153,7 +155,7 @@ function Eyebrow({ children, className }: { children: React.ReactNode; className
   return (
     <div
       className={cn(
-        'font-jbmono uppercase tracking-[0.22em] text-[10px] font-bold text-white/55',
+        'font-jbmono max-lg:font-plex uppercase tracking-[0.22em] text-[10px] font-bold text-white/55',
         className,
       )}
     >
@@ -185,7 +187,7 @@ function StatCell({
   return (
     <div className="min-w-0">
       <Eyebrow>{label}</Eyebrow>
-      <div className={cn('mt-1.5 font-jbmono font-bold tabular-nums text-[22px] leading-none', tone)}>
+      <div className={cn('mt-1.5 font-jbmono max-lg:font-plex font-bold tabular-nums text-[22px] leading-none', tone)}>
         {value}
       </div>
       {sub && <div className="mt-1.5 text-[11px] leading-tight text-white/70">{sub}</div>}
@@ -193,13 +195,20 @@ function StatCell({
   );
 }
 
-/** One page-wide shell so every state below wears the same chrome. */
+/**
+ * One page-wide shell so every state below wears the same chrome: the
+ * Press Box app header on the phone (2026-09-05; the page is reached from
+ * the player card's DASHBOARD action), the Navbar from lg.
+ */
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <DarkLayout>
-      <Navbar />
-      <main className="relative pt-20 pb-12">{children}</main>
-      <HockeyFooter />
+      <div className="hidden lg:block"><Navbar /></div>
+      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+        <PressBoxAppHeader title="Player" logoSrc="/favicon.svg" />
+      </div>
+      <main className={cn(PB_TYPE, 'relative pt-20 max-lg:pt-3 pb-12 pb-app-chrome max-lg:font-barlow')}>{children}</main>
+      <HockeyFooter variant="app" />
     </DarkLayout>
   );
 }
@@ -226,7 +235,7 @@ function MessageState({
     <Shell>
       <div className="mx-auto max-w-[560px] px-5 py-16 text-center">
         <Eyebrow className="mb-4">{eyebrow}</Eyebrow>
-        <h1 className="font-sans font-black normal-case text-pastel-cream text-[32px] sm:text-[44px] leading-[0.95] tracking-[-0.03em]">
+        <h1 className="font-sans max-lg:font-barlow font-black normal-case text-pastel-cream max-lg:text-pressbox-text text-[32px] sm:text-[44px] leading-[0.95] tracking-[-0.03em]">
           {title}
         </h1>
         <p className="mt-5 text-[14px] leading-relaxed text-white/70">{body}</p>
@@ -249,9 +258,9 @@ function MessageState({
 function DashboardSkeleton() {
   return (
     <div aria-busy="true" aria-label="Loading player dashboard" className="mx-auto max-w-[1280px] px-4 sm:px-6">
-      <div className="h-[220px] sm:h-[420px] rounded-2xl bg-pastel-surface-tile animate-pulse" />
-      <div className="mt-6 h-[160px] rounded-2xl bg-pastel-surface-tile animate-pulse" />
-      <div className="mt-6 h-[280px] rounded-2xl bg-pastel-surface-tile animate-pulse" />
+      <div className="h-[220px] sm:h-[420px] rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile animate-pulse" />
+      <div className="mt-6 h-[160px] rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile animate-pulse" />
+      <div className="mt-6 h-[280px] rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile animate-pulse" />
     </div>
   );
 }
@@ -306,12 +315,12 @@ function HeroFallback({
   return (
     <section
       aria-labelledby="player-hero-name"
-      className="relative w-full max-w-[1100px] mx-auto overflow-hidden rounded-2xl bg-pastel-surface ring-1 ring-white/10 px-6 sm:px-10 py-8 sm:py-12"
+      className="relative w-full max-w-[1100px] mx-auto overflow-hidden rounded-2xl max-lg:rounded-[12px] bg-pastel-surface max-lg:bg-pressbox-surface ring-1 ring-white/10 px-6 sm:px-10 py-8 sm:py-12"
     >
       {identity.jersey != null && (
         <span
           aria-hidden="true"
-          className="pointer-events-none absolute -bottom-6 left-2 select-none font-sans font-black leading-none tracking-tighter text-pastel-cream/[0.07] text-[120px] sm:text-[180px]"
+          className="pointer-events-none absolute -bottom-6 left-2 select-none font-sans max-lg:font-barlow font-black leading-none tracking-tighter text-pastel-cream/[0.07] text-[120px] sm:text-[180px]"
         >
           {identity.jersey}
         </span>
@@ -319,7 +328,7 @@ function HeroFallback({
 
       <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
-          <div className="font-jbmono uppercase tracking-[0.22em] text-[11px] sm:text-[12px] font-bold text-white/55 mb-1.5">
+          <div className="font-jbmono max-lg:font-plex uppercase tracking-[0.22em] text-[11px] sm:text-[12px] font-bold text-white/55 mb-1.5">
             {identity.eyebrow}
           </div>
           {/* `normal-case` is load-bearing: index.css sets
@@ -329,7 +338,7 @@ function HeroFallback({
               the harness at 393. */}
           <h1
             id="player-hero-name"
-            className="font-sans font-black normal-case text-pastel-cream text-[36px] sm:text-[52px] md:text-[64px] leading-[0.92] tracking-[-0.04em]"
+            className="font-sans max-lg:font-barlow font-black normal-case text-pastel-cream max-lg:text-pressbox-text text-[36px] sm:text-[52px] md:text-[64px] leading-[0.92] tracking-[-0.04em]"
           >
             {identity.name}
           </h1>
@@ -341,7 +350,7 @@ function HeroFallback({
             {headlineLabel && <Eyebrow className="mb-3">{headlineLabel}</Eyebrow>}
             <div
               className={cn(
-                'font-sans font-black tabular-nums leading-[0.85] tracking-[-0.04em]',
+                'font-sans max-lg:font-barlow font-black tabular-nums leading-[0.85] tracking-[-0.04em]',
                 'text-[64px] sm:text-[80px] lg:text-[96px]',
                 tone,
               )}
@@ -349,7 +358,7 @@ function HeroFallback({
               {headline}
             </div>
             {headlineSub && (
-              <div className="mt-4 font-jbmono uppercase tracking-[0.22em] text-[10px] sm:text-[11px] font-bold text-white/55">
+              <div className="mt-4 font-jbmono max-lg:font-plex uppercase tracking-[0.22em] text-[10px] sm:text-[11px] font-bold text-white/55">
                 {headlineSub}
               </div>
             )}
@@ -358,11 +367,11 @@ function HeroFallback({
       </div>
 
       {verdict && (
-        <div className="relative z-10 mt-8 max-w-[560px] rounded-xl bg-pastel-surface-tile/85 p-3.5 ring-1 ring-white/10">
-          <div className="font-jbmono uppercase tracking-[0.22em] text-[9px] font-bold text-white/55 mb-1">
+        <div className="relative z-10 mt-8 max-w-[560px] rounded-xl bg-pastel-surface-tile/85 max-lg:bg-pressbox-tile/85 p-3.5 ring-1 ring-white/10">
+          <div className="font-jbmono max-lg:font-plex uppercase tracking-[0.22em] text-[9px] font-bold text-white/55 mb-1">
             Stormy verdict
           </div>
-          <div className="font-sans italic text-[13px] sm:text-[14px] leading-snug text-pastel-orange-soft">
+          <div className="font-sans max-lg:font-barlow italic text-[13px] sm:text-[14px] leading-snug text-pastel-orange-soft max-lg:text-pressbox-orange-soft">
             {verdict}
           </div>
         </div>
@@ -402,25 +411,25 @@ function ZoneShareRow({
   return (
     <div className="py-3 first:pt-0 last:pb-0">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-jbmono uppercase tracking-[0.18em] text-[10px] font-bold text-pastel-cream truncate">
+        <span className="font-jbmono max-lg:font-plex uppercase tracking-[0.18em] text-[10px] font-bold text-pastel-cream max-lg:text-pressbox-text truncate">
           {zone}
         </span>
-        <span className="flex-shrink-0 font-jbmono font-bold tabular-nums text-[13px] text-pastel-cream">
+        <span className="flex-shrink-0 font-jbmono max-lg:font-plex font-bold tabular-nums text-[13px] text-pastel-cream max-lg:text-pressbox-text">
           {attempts}
           <span className="ml-1 font-medium text-white/55">att</span>
         </span>
       </div>
       <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
         <div
-          className={cn('h-full rounded-full', isTop ? 'bg-pastel-orange' : 'bg-pastel-sage')}
+          className={cn('h-full rounded-full', isTop ? 'bg-pastel-orange max-lg:bg-pressbox-orange' : 'bg-pastel-sage max-lg:bg-pressbox-sage')}
           style={{ width: `${Math.max(0, Math.min(100, share))}%` }}
         />
       </div>
       <div className="mt-1.5 flex items-baseline justify-between gap-2">
-        <span className="font-jbmono uppercase tracking-[0.18em] text-[9px] font-bold text-white/55 tabular-nums">
+        <span className="font-jbmono max-lg:font-plex uppercase tracking-[0.18em] text-[9px] font-bold text-white/55 tabular-nums">
           {share.toFixed(0)}% of attempts · {goals} G
         </span>
-        <span className="font-jbmono uppercase tracking-[0.18em] text-[9px] font-bold text-white/55 tabular-nums">
+        <span className="font-jbmono max-lg:font-plex uppercase tracking-[0.18em] text-[9px] font-bold text-white/55 tabular-nums">
           {xgPerShot != null ? `${xgPerShot.toFixed(3)} xG/shot` : '-'}
         </span>
       </div>
@@ -434,9 +443,9 @@ function ShotBreakdownTile({ summary, modeLabel }: { summary: ShotSummary; modeL
     <div
       role="group"
       aria-label="Shot breakdown by zone"
-      className="flex h-full flex-col rounded-2xl bg-pastel-surface-tile p-5 ring-1 ring-white/10 sm:p-6"
+      className="flex h-full flex-col rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile p-5 ring-1 ring-white/10 sm:p-6"
     >
-      <div className="mb-1 font-jbmono text-[10px] font-bold uppercase tracking-[0.22em] text-white/55">
+      <div className="mb-1 font-jbmono max-lg:font-plex text-[10px] font-bold uppercase tracking-[0.22em] text-white/55">
         Shot Breakdown · {modeLabel}
       </div>
       <div className="mb-4 text-[11px] leading-snug text-white/70">
@@ -860,7 +869,7 @@ export default function PlayerDashboard() {
 
         {payload.shots_truncated && (
           <div className="mx-auto mt-3 max-w-[1100px]">
-            <span className="font-jbmono text-[9px] font-bold uppercase tracking-[0.22em] text-pastel-butter">
+            <span className="font-jbmono max-lg:font-plex text-[9px] font-bold uppercase tracking-[0.22em] text-pastel-butter">
               Shot list capped at {payload.shots_cap}. The map shows the first {payload.shots_cap} attempts of the season
             </span>
           </div>
@@ -896,7 +905,7 @@ export default function PlayerDashboard() {
             />
           </>
         ) : (
-          <div className="rounded-2xl bg-pastel-surface-tile p-5 ring-1 ring-white/10 sm:p-7">
+          <div className="rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile p-5 ring-1 ring-white/10 sm:p-7">
             <Eyebrow>Expected goals by season · our model</Eyebrow>
             <p className="mt-3 text-[13px] leading-snug text-white/70">
               {arc.points.length === 1
@@ -907,7 +916,7 @@ export default function PlayerDashboard() {
         )}
 
         {xgRow && (
-          <div className="mt-5 grid grid-cols-2 gap-5 rounded-2xl bg-pastel-surface-tile p-5 ring-1 ring-white/10 sm:mt-6 sm:grid-cols-4 sm:gap-6 sm:p-7">
+          <div className="mt-5 grid grid-cols-2 gap-5 rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile p-5 ring-1 ring-white/10 sm:mt-6 sm:grid-cols-4 sm:gap-6 sm:p-7">
             <StatCell label="Attempts" value={String(xgRow.shots)} sub={`${xgRow.sog} on goal`} />
             <StatCell label="Goals" value={String(xgRow.goals)} sub="measured" />
             <StatCell
@@ -946,7 +955,7 @@ export default function PlayerDashboard() {
         )}
 
         {arc.firstSeason != null && arc.lastSeason != null && (
-          <div className="mt-3 font-jbmono text-[9px] font-bold uppercase tracking-[0.22em] text-white/55">
+          <div className="mt-3 font-jbmono max-lg:font-plex text-[9px] font-bold uppercase tracking-[0.22em] text-white/55">
             {seasonLabel(arc.firstSeason)} – {seasonLabel(arc.lastSeason)} · {arc.points.length}{' '}
             {arc.points.length === 1 ? 'season' : 'seasons'} on record · {gameTypeLabel}
           </div>
@@ -964,7 +973,7 @@ export default function PlayerDashboard() {
           {showRink && summary.plotted > 0 ? (
             <ShotBreakdownTile summary={summary} modeLabel={`${seasonLabel(payload.season)} · all situations`} />
           ) : (
-            <div className="flex h-full flex-col rounded-2xl bg-pastel-surface-tile p-5 ring-1 ring-white/10 sm:p-6">
+            <div className="flex h-full flex-col rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile p-5 ring-1 ring-white/10 sm:p-6">
               {/* Deliberately NOT the hero's sentence again. The hero says
                   WHY there is no map; this tile says what stands in for the
                   zone rows. Printing one explanation twice on one screen
@@ -1002,7 +1011,7 @@ export default function PlayerDashboard() {
             </div>
           )}
 
-          <div className="flex flex-col items-center justify-center rounded-2xl bg-pastel-surface-tile p-5 ring-1 ring-white/10 sm:p-6">
+          <div className="flex flex-col items-center justify-center rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile p-5 ring-1 ring-white/10 sm:p-6">
             {rings.length > 0 ? (
               <PercentileRingCluster
                 metrics={rings}
@@ -1046,7 +1055,7 @@ export default function PlayerDashboard() {
                 className="h-full"
               />
             ) : (
-              <div className="flex h-full flex-col justify-center rounded-2xl bg-pastel-surface-tile p-5 ring-1 ring-white/10 sm:p-6">
+              <div className="flex h-full flex-col justify-center rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile p-5 ring-1 ring-white/10 sm:p-6">
                 <Eyebrow className="mb-2">Stormy verdict</Eyebrow>
                 <p className="text-[12px] leading-snug text-white/70">
                   Not enough on record to say anything worth reading. A shot-location claim off a
@@ -1059,12 +1068,12 @@ export default function PlayerDashboard() {
         </div>
 
         {/* Standard percentiles — every one against a named, counted cohort. */}
-        <div className="mt-5 rounded-2xl bg-pastel-surface-tile p-5 ring-1 ring-white/10 sm:mt-6 sm:p-7">
+        <div className="mt-5 rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile p-5 ring-1 ring-white/10 sm:mt-6 sm:p-7">
           <div className="mb-5 flex items-baseline justify-between gap-3">
-            <div className="font-jbmono text-[10px] font-bold uppercase tracking-[0.22em] text-white/55 sm:text-[11px]">
+            <div className="font-jbmono max-lg:font-plex text-[10px] font-bold uppercase tracking-[0.22em] text-white/55 sm:text-[11px]">
               Percentiles · vs {COHORT_NOUN[cohort]}
             </div>
-            <div className="font-jbmono text-[9px] font-bold uppercase tabular-nums tracking-[0.22em] text-white/55">
+            <div className="font-jbmono max-lg:font-plex text-[9px] font-bold uppercase tabular-nums tracking-[0.22em] text-white/55">
               {indexEntry ? `${indexEntry.gp} GP · n=${placed.cohortSize}` : 'cohort unavailable'}
             </div>
           </div>
@@ -1098,11 +1107,11 @@ export default function PlayerDashboard() {
           {payload.as_of ? (
             <StaleDataBadge asOf={payload.as_of} label="xG model" />
           ) : (
-            <span className="font-jbmono text-[9px] font-bold uppercase tracking-[0.22em] text-white/55">
+            <span className="font-jbmono max-lg:font-plex text-[9px] font-bold uppercase tracking-[0.22em] text-white/55">
               No update timestamp on this payload
             </span>
           )}
-          <span className="font-jbmono text-[9px] font-bold uppercase tracking-[0.22em] text-white/55">
+          <span className="font-jbmono max-lg:font-plex text-[9px] font-bold uppercase tracking-[0.22em] text-white/55">
             · {placed.cohortSize} {COHORT_NOUN[cohort]} benchmarked
           </span>
         </div>
@@ -1152,7 +1161,7 @@ export default function PlayerDashboard() {
       <div className="mx-auto mt-12 max-w-[1280px] px-4 sm:px-6">
         <Link
           to="/players"
-          className="font-jbmono text-[10px] font-bold uppercase tracking-[0.22em] text-white/70 transition-colors hover:text-pastel-orange-soft"
+          className="font-jbmono max-lg:font-plex text-[10px] font-bold uppercase tracking-[0.22em] text-white/70 transition-colors hover:text-pastel-orange-soft hover:max-lg:text-pressbox-orange-soft"
         >
           ← All players
         </Link>

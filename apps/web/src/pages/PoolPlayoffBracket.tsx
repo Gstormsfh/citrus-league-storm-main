@@ -8,6 +8,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Trophy, Lock, Check, Save, AlertTriangle, ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -270,8 +271,8 @@ export default function PoolPlayoffBracket() {
   // Navbar in their loading branch; these two were the odd ones out.
   if (loading) {
     return (
-      <div className="min-h-screen bg-pastel-surface">
-        <Navbar />
+      <div className="min-h-screen bg-pastel-surface max-lg:bg-pressbox-surface">
+        <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div>
         <div className="flex items-center justify-center pt-32 text-white/55">Loading...</div>
       </div>
     );
@@ -279,10 +280,10 @@ export default function PoolPlayoffBracket() {
 
   return (
     <>
-    <Navbar />
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream py-6 px-4 pt-24">
+    <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div>
+    <div className="min-h-screen bg-[#0F1F15] max-lg:bg-pressbox-surface text-pastel-cream max-lg:text-pressbox-text py-6 px-4 pt-24">
       <div className="max-w-6xl mx-auto mb-3">
-        <Link to={`/pool/playoff-hub?league=${leagueId}`} className="text-sm text-pastel-sage-soft hover:text-pastel-cream inline-flex items-center gap-1">
+        <Link to={`/pool/playoff-hub?league=${leagueId}`} className="text-sm text-pastel-sage-soft hover:text-pastel-cream hover:max-lg:text-pressbox-text inline-flex items-center gap-1">
           <ArrowLeft className="h-4 w-4" />Back to Pool Home
         </Link>
       </div>
@@ -291,12 +292,12 @@ export default function PoolPlayoffBracket() {
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div>
             <div className="flex items-center gap-2">
-              <Trophy className="h-6 w-6 text-pastel-orange" aria-hidden="true" />
-              <h1 className="text-xl sm:text-2xl font-calistoga text-pastel-cream">Bracket Challenge</h1>
+              <Trophy className="h-6 w-6 text-pastel-orange max-lg:text-pressbox-orange" aria-hidden="true" />
+              <h1 className="text-xl sm:text-2xl font-calistoga max-lg:font-condensed text-pastel-cream max-lg:text-pressbox-text">Bracket Challenge</h1>
               {pickMode === 'full-bracket' && (
                 <Badge className={cn(
-                  'text-[10px] font-display font-bold',
-                  isGloballyLocked ? 'bg-white/5 ring-1 ring-white/10 text-white/55' : 'bg-pastel-orange text-[#581E00]'
+                  'text-[10px] font-display max-lg:font-barlow font-bold',
+                  isGloballyLocked ? 'bg-white/5 ring-1 ring-white/10 text-white/55' : 'bg-pastel-orange max-lg:bg-pressbox-orange text-[#581E00] max-lg:text-pressbox-orange-ink'
                 )}>
                   {isGloballyLocked ? <><Lock className="h-3 w-3 mr-1" />BRACKET LOCKED</> : 'FULL BRACKET MODE'}
                 </Badge>
@@ -310,14 +311,14 @@ export default function PoolPlayoffBracket() {
                 : 'Pick winners & game counts. Points double each round (2 → 4 → 8 → 16).'}
             </p>
             {pickMode === 'full-bracket' && !isGloballyLocked && (
-              <div className="mt-2 text-[11px] font-display text-white/70">
+              <div className="mt-2 text-[11px] font-display max-lg:font-barlow text-white/70">
                 <span className="font-bold">Picks made:</span> {picks.size} / 15
-                {picks.size < 15 && <span className="text-pastel-orange ml-2">· {15 - picks.size} remaining</span>}
+                {picks.size < 15 && <span className="text-pastel-orange max-lg:text-pressbox-orange ml-2">· {15 - picks.size} remaining</span>}
               </div>
             )}
           </div>
           {dirty && (
-            <Button onClick={savePicks} disabled={saving} className="bg-pastel-sage text-[#0F1F15] hover:bg-pastel-sage-soft font-bold shadow-[0_4px_12px_-4px_rgba(166,211,160,0.4)]">
+            <Button onClick={savePicks} disabled={saving} className="bg-pastel-sage max-lg:bg-pressbox-sage text-[#0F1F15] hover:bg-pastel-sage-soft font-bold shadow-[0_4px_12px_-4px_rgba(166,211,160,0.4)]">
               <Save className="h-4 w-4 mr-2" />{saving ? 'Saving...' : 'Save Picks'}
             </Button>
           )}
@@ -372,7 +373,7 @@ export default function PoolPlayoffBracket() {
                           disabled={!team || locked}
                           className={cn(
                             'relative overflow-hidden rounded-lg border-2 p-2.5 text-left transition-all',
-                            picked ? 'ring-2 ring-pastel-sage/60 bg-pastel-sage/10 shadow-[0_4px_12px_-4px_rgba(166,211,160,0.3)]' : 'ring-1 ring-white/10 bg-white/5 hover:ring-pastel-sage/40',
+                            picked ? 'ring-2 ring-pastel-sage/60 bg-pastel-sage/10 max-lg:bg-pressbox-sage/10 shadow-[0_4px_12px_-4px_rgba(166,211,160,0.3)]' : 'ring-1 ring-white/10 bg-white/5 hover:ring-pastel-sage/40',
                             !team && 'opacity-40',
                           )}
                           style={picked && info ? { background: `linear-gradient(135deg, ${info.primaryColor}12, ${info.secondaryColor}08)` } : undefined}
@@ -384,7 +385,7 @@ export default function PoolPlayoffBracket() {
                           <div className="flex items-center gap-2.5 pl-1.5">
                             {/* Team abbrev badge in team's primary color */}
                             <div
-                              className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-calistoga font-black text-white flex-shrink-0 shadow-sm"
+                              className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-calistoga max-lg:font-condensed font-black text-white flex-shrink-0 shadow-sm"
                               style={info ? { background: info.primaryColor, color: onTeamColor(info.primaryColor) } : { background: '#6b7280', color: onTeamColor('#6b7280') }}
                             >
                               {team?.team_abbrev || '?'}
@@ -392,7 +393,7 @@ export default function PoolPlayoffBracket() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1">
                                 <span className="text-[10px] font-mono text-white/55">#{team?.seed || '-'}</span>
-                                <span className="text-sm font-display font-bold truncate" style={info ? { color: info.primaryColor } : undefined}>
+                                <span className="text-sm font-display max-lg:font-barlow font-bold truncate" style={info ? { color: info.primaryColor } : undefined}>
                                   {info?.name || team?.team_abbrev || 'TBD'}
                                 </span>
                               </div>
@@ -408,7 +409,7 @@ export default function PoolPlayoffBracket() {
                               </div>
                             )}
                             {(isActive || locked) && wins !== undefined && (
-                              <div className={cn('font-calistoga text-xl flex-shrink-0', wins >= 4 ? 'text-pastel-cream font-black' : 'text-white/70')}>
+                              <div className={cn('font-calistoga max-lg:font-condensed text-xl flex-shrink-0', wins >= 4 ? 'text-pastel-cream max-lg:text-pressbox-text font-black' : 'text-white/70')}>
                                 {wins}
                               </div>
                             )}
@@ -428,12 +429,12 @@ export default function PoolPlayoffBracket() {
                     return (
                       <div key={s.series_id} className={cn('border-2 rounded-xl p-3 space-y-2 bg-white/5 relative',
                           gameIsLive && 'border-red-400 bg-red-950/30 ring-1 ring-red-400/20',
-                          locked && s.series_status === 'final' && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/8',
+                          locked && s.series_status === 'final' && 'ring-1 ring-pastel-sage/30 bg-pastel-sage/8 max-lg:bg-pressbox-sage/8',
                           !gameIsLive && !locked && 'border-fantasy-border',
                       )}>
                         {/* LIVE ribbon — only when a game is ACTUALLY in progress */}
                         {gameIsLive && (
-                          <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-calistoga px-2 py-0.5 rounded-full shadow-md">
+                          <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-calistoga max-lg:font-condensed px-2 py-0.5 rounded-full shadow-md">
                             <span className="relative flex h-1.5 w-1.5">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
                               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
@@ -443,25 +444,25 @@ export default function PoolPlayoffBracket() {
                         )}
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] uppercase font-display font-bold text-white/55">Series {String.fromCharCode(64 + s.bracket_slot)}</span>
+                            <span className="text-[10px] uppercase font-display max-lg:font-barlow font-bold text-white/55">Series {String.fromCharCode(64 + s.bracket_slot)}</span>
                             {s.conference && (
-                              <Badge variant="outline" className={cn('text-[9px] px-1 py-0', s.conference === 'Eastern' ? 'border-pastel-sage/50 text-pastel-sage' : 'border-orange-400/50 text-orange-400')}>
+                              <Badge variant="outline" className={cn('text-[9px] px-1 py-0', s.conference === 'Eastern' ? 'border-pastel-sage/50 text-pastel-sage max-lg:text-pressbox-sage' : 'border-orange-400/50 text-orange-400')}>
                                 {s.conference === 'Eastern' ? 'EAST' : 'WEST'}
                               </Badge>
                             )}
                           </div>
-                          {s.series_status === 'final' && <Badge className="bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0 text-[9px] font-jbmono uppercase tracking-[0.18em] font-bold">Series Final</Badge>}
-                          {isActive && !gameIsLive && <Badge className="text-[9px] bg-pastel-orange/15 ring-1 ring-pastel-orange/40 text-pastel-orange-soft border-0 font-jbmono tabular-nums">{s.high_seed_wins}-{s.low_seed_wins}</Badge>}
+                          {s.series_status === 'final' && <Badge className="bg-pastel-sage/20 max-lg:bg-pressbox-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft border-0 text-[9px] font-jbmono max-lg:font-plex uppercase tracking-[0.18em] font-bold">Series Final</Badge>}
+                          {isActive && !gameIsLive && <Badge className="text-[9px] bg-pastel-orange/15 max-lg:bg-pressbox-orange/15 ring-1 ring-pastel-orange/40 max-lg:ring-pressbox-orange/40 text-pastel-orange-soft max-lg:text-pressbox-orange-soft border-0 font-jbmono max-lg:font-plex tabular-nums">{s.high_seed_wins}-{s.low_seed_wins}</Badge>}
                           {!isActive && !locked && <Badge variant="outline" className="text-[9px]">PENDING</Badge>}
                         </div>
                         {/* Live game score overlay */}
                         {seriesGame && (seriesGame.status === 'live' || seriesGame.status === 'final') && (
                           <div className={cn(
                             'flex items-center justify-between px-3 py-1.5 rounded-lg text-sm',
-                            gameIsLive ? 'bg-red-400/20 ring-1 ring-red-400/40' : 'bg-pastel-sage/10 ring-1 ring-pastel-sage/30'
+                            gameIsLive ? 'bg-red-400/20 ring-1 ring-red-400/40' : 'bg-pastel-sage/10 max-lg:bg-pressbox-sage/10 ring-1 ring-pastel-sage/30'
                           )}>
                             <span className="font-mono font-bold">{seriesGame.away_team} {seriesGame.away_score}</span>
-                            <span className={cn('text-[10px] font-display', gameIsLive && 'text-red-400 font-bold animate-pulse')}>
+                            <span className={cn('text-[10px] font-display max-lg:font-barlow', gameIsLive && 'text-red-400 font-bold animate-pulse')}>
                               {gameIsLive ? `${seriesGame.period || ''} ${seriesGame.period_time || ''}`.trim() : 'Final'}
                             </span>
                             <span className="font-mono font-bold">{seriesGame.home_score} {seriesGame.home_team}</span>
@@ -497,7 +498,7 @@ export default function PoolPlayoffBracket() {
                                 onClick={() => handleGames(s.bracket_slot, g)}
                                 className={cn(
                                   'px-2 py-0.5 rounded border text-[11px] transition-colors',
-                                  myPick.predicted_games === g ? 'ring-2 ring-pastel-orange/60 bg-pastel-orange/15 text-pastel-orange-soft font-bold' : 'ring-1 ring-white/10 bg-white/5 text-white/55 hover:ring-pastel-orange/40 hover:text-pastel-cream',
+                                  myPick.predicted_games === g ? 'ring-2 ring-pastel-orange/60 max-lg:ring-pressbox-orange/60 bg-pastel-orange/15 max-lg:bg-pressbox-orange/15 text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-bold' : 'ring-1 ring-white/10 bg-white/5 text-white/55 hover:ring-pastel-orange/40 hover:max-lg:ring-pressbox-orange/40 hover:text-pastel-cream hover:max-lg:text-pressbox-text',
                                 )}
                               >
                                 {g}
@@ -511,7 +512,7 @@ export default function PoolPlayoffBracket() {
                           <div className="flex items-center justify-between text-xs pt-1 border-t border-fantasy-border/30">
                             <div className="flex items-center gap-1.5 text-white/70">
                               <Check className="h-3 w-3 text-pastel-sage-soft" aria-hidden="true" />
-                              <span className="font-display font-semibold">
+                              <span className="font-display max-lg:font-barlow font-semibold">
                                 {(() => {
                                   const pickedSeed = teamById.get(myPick.picked_team_id);
                                   const pickedInfo = pickedSeed ? NHL_TEAMS.find(t => t.abbrev === pickedSeed.team_abbrev) : null;

@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import Navbar from '@/components/Navbar';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 /*
@@ -119,14 +120,14 @@ const Contact = () => {
     <DarkLayout>
 
 
-      <Navbar />
-      <main className="relative max-w-[1100px] mx-auto px-6 pt-16 pb-24">
+      <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Contact" logoSrc="/favicon.svg" /></div>
+      <main className="relative max-w-[1100px] mx-auto px-6 pt-16 pb-24 max-lg:pt-3 max-lg:px-3 pb-app-chrome">
         <div className="text-center mb-12">
-          <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">
+          <div className="font-jbmono max-lg:font-plex text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft max-lg:text-pressbox-orange-soft mb-3 font-bold">
             Contact
           </div>
-          <h1 className="font-sans font-black text-[3rem] md:text-[4rem] leading-tight tracking-[-0.03em] text-pastel-cream mb-4">
-            Get in <span className="text-pastel-orange">touch</span>.
+          <h1 className="font-sans max-lg:font-barlow font-black text-[3rem] md:text-[4rem] leading-tight tracking-[-0.03em] text-pastel-cream max-lg:text-pressbox-text mb-4">
+            Get in <span className="text-pastel-orange max-lg:text-pressbox-orange">touch</span>.
           </h1>
           <p className="text-[16px] text-white/65 max-w-xl mx-auto leading-relaxed">
             Questions, feedback, or just want to chirp at us? Drop a line. We read every message.
