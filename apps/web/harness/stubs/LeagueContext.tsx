@@ -20,6 +20,11 @@ const LEAGUE = {
     draft_status: 'completed',
     created_at: '2026-09-01T18:00:00.000Z',
     settings: { crestTeam: 'EDM', teamsCount: 12, scoringFormat: 'h2h-points' },
+    // The league menu's lines (2026-09-05): the waiver clock, the draft's
+    // length, the join code behind `share link`.
+    waiver_process_time: '02:00:00',
+    draft_rounds: 18,
+    join_code: 'HARNESS',
   },
   activeLeagueFormat: { leagueType: 'fantasy', scoringFormat: 'h2h-points' },
   leagues: [{ id: 'harness-league', name: 'Harness League' }],

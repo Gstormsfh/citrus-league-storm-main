@@ -1,7 +1,7 @@
 import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   HockeyFooter,
   CupIcon,
@@ -592,6 +592,21 @@ const LeagueDashboard = () => {
   const isCommissioner = league?.commissioner_id === user?.id;
 
   /**
+   * `/league/:id?settings=1` opens the commissioner's settings sheet
+   * (2026-09-05): the league menu's League settings tile routes here, since
+   * a tile must route and the sheet is this page's. The param is consumed
+   * once -- cleared as the sheet opens -- so back does not reopen it.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (!league || !isCommissioner || searchParams.get('settings') !== '1') return;
+    setSettingsOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('settings');
+    setSearchParams(next, { replace: true });
+  }, [league, isCommissioner, searchParams, setSearchParams]);
+
+  /**
    * THERE IS NO WEEK (2026-09-02 offseason audit).
    *
    * The last game in `nhl_games` was 2026-06-14 and the next is 2026-09-29.
@@ -812,7 +827,7 @@ const LeagueDashboard = () => {
     queryFn: async () => {
       const res = await tradeApi.getLeagueTrades(leagueId!, 'pending');
       const rows = ((res as { data?: unknown }).data ?? res) as unknown;
-      return Array.isArray(rows) ? rows.length : 0;
+      return Array.isArray(rows) ? (rows as Array<{ to_team_id?: string | null }>) : [];
     },
     staleTime: 60_000,
   });
@@ -823,7 +838,7 @@ const LeagueDashboard = () => {
   const transactionsStat = useMemo(() => {
     const parts: string[] = [];
     if (transactionsThisWeek !== null) parts.push(`${transactionsThisWeek} this week`);
-    const pending = pendingTradesQuery.data;
+    const pending = pendingTradesQuery.data?.length ?? 0;
     if (pending) parts.push(`${pending} trade${pending === 1 ? '' : 's'} pending`);
     return parts.length ? parts.join(' · ') : null;
   }, [transactionsThisWeek, pendingTradesQuery.data]);

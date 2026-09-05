@@ -30,6 +30,7 @@ import { LeagueHeader, type LeagueHeaderProps } from './LeagueHeader';
 import { LeagueMenu } from './LeagueMenu';
 import type { LeagueMenuTile } from './leagueMenuTiles';
 import { menuUserFromProfile } from './menuUser';
+import { useLeagueMenuTiles } from './useLeagueMenuTiles';
 
 export interface PressBoxLeagueChromeProps extends Omit<LeagueHeaderProps, 'onSettingsPress' | 'className'> {
   /** Tiles beyond the defaults, for a screen that earns one. */
@@ -61,6 +62,9 @@ export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, .
     const abbr = (league?.activeLeague?.settings as { crestTeam?: string } | null)?.crestTeam;
     return abbr ? teamCrestUrl(abbr) : null;
   }, [resolvedId, league?.activeLeagueId, league?.activeLeague]);
+  // The tiles with their lines (2026-09-05); the reads start when the menu
+  // opens. A page that hands its own tiles keeps them.
+  const menuTiles = useLeagueMenuTiles(resolvedId, menuOpen);
   return (
     <>
       <div className={cn(PB_TYPE, 'lg:hidden pt-[env(safe-area-inset-top)]', className)}>
@@ -77,7 +81,7 @@ export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, .
         onClose={() => setMenuOpen(false)}
         leagueId={resolvedId}
         leagueName={resolvedName}
-        tiles={tiles}
+        tiles={tiles ?? menuTiles}
         user={menuUserFromProfile(profile)}
         /* SWITCH ▾ goes to the league list (the artboard's home). `/` itself
            opens the active league's HQ since 2026-09-05; `?all=1` is the list. */

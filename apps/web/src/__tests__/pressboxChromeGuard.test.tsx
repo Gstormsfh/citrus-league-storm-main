@@ -93,7 +93,10 @@ describe('menu tiles', () => {
     for (const t of defaultLeagueTiles('lg-1')) {
       expect(t.stat ?? null, `${t.key} must not ship a canned stat`).toBeNull();
     }
-    expect(TILES).not.toMatch(/stat:\s*'/);
+    // A literal stat with a figure in it is the canned number; a literal
+    // that only names what the tile holds (`Commissioner · rosters,
+    // waivers, playoffs`) is a label, and the artboard's.
+    expect(TILES).not.toMatch(/stat:\s*'[^']*\d/);
   });
 
   it('renders the stat line only when there is one', () => {
