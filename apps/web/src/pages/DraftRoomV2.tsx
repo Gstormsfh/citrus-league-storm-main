@@ -117,6 +117,7 @@ import type { Player } from '@/services/PlayerService';
 import { Button } from '@/components/ui/button';
 import type { Team } from '@/services/LeagueService';
 import { userMessage } from '@/lib/userMessage';
+import { logger } from '@/utils/logger';
 
 export default function DraftRoomV2() {
   const params = useParams<{ leagueId: string; draftId?: string }>();
@@ -165,15 +166,19 @@ export default function DraftRoomV2() {
               useDraftClientStore.getState().setIdentityFailure(null);
             }
             return;
-          } catch {
+          } catch (attemptErr) {
+            // Named, not swallowed: the banner below says "couldn't verify";
+            // this says why, in the console and in a test's stderr.
+            logger.warn(`[draft-room] my-team fetch attempt ${attempt + 1} failed:`, attemptErr);
             if (attempt < 2) {
               await new Promise((resolve) => setTimeout(resolve, 400 * 2 ** attempt));
             }
           }
         }
-      } catch {
+      } catch (importErr) {
         // Fall through to the loud failure below (covers a dynamic
         // import failure as well as an exhausted retry loop).
+        logger.warn('[draft-room] my-team resolution failed:', importErr);
       }
       if (cancelled) return;
       useDraftClientStore.getState().setIdentityFailure({ reason: 'my_team_unverifiable' });
