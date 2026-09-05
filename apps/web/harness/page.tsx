@@ -780,6 +780,7 @@ const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   trade: { path: '/trade-analyzer', at: '/trade-analyzer?league=harness-league' },
   waivers: { path: '/waiver-wire', at: '/waiver-wire?league=harness-league' },
   playoffs: { path: '/league/:leagueId/playoffs', at: '/league/harness-league/playoffs' },
+  teamanalytics: { path: '/team-analytics', at: '/team-analytics?league=harness-league' },
   // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
   // the week into the URL as soon as it resolves one. Under the old
   // `/matchup/:leagueId?` the very first push ("/matchup/harness-league/1")
