@@ -373,7 +373,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         // The schedule and the log in parallel: the log's range is the
         // season window, known before the schedule answers. One round trip
         // on a phone, not two in a row.
-        const [{ games }, logResponse] = await Promise.all([
+        const [{ games: scheduled }, logResponse] = await Promise.all([
           ScheduleService.getGamesForTeam(teamAbbrev, windowStart, windowEnd),
           matchupApi.getPlayerGameLog(playerId, windowStart, windowEnd).catch((err: unknown) => {
             logger.warn('[PlayerStatsModal] Could not fetch the game log:', err);
@@ -381,7 +381,17 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
           }),
         ]);
 
-        if (!games || games.length === 0) {
+        // REGULAR SEASON ONLY (2026-09-05). The season window runs to the
+        // eve of the next opener so a full run of playoff games sat in the
+        // log: Quinn Hughes read "93 Games" and 666.9 FPTS for 2025-26 with
+        // May dates against COL and DAL. Fantasy is the regular season;
+        // nhl_games carries game_type, and the stats map is keyed by these
+        // rows' dates, so the playoff stats fall away with the rows.
+        const games = (scheduled ?? []).filter(
+          (g: { game_type?: string | null }) => g.game_type === 'regular',
+        );
+
+        if (games.length === 0) {
           if (!cancelled) setGameLogLoading(false);
           return;
         }
