@@ -149,7 +149,7 @@ export function PlayersBrowsePhone({
         onSelect={(k) => onGroup(k as 'skaters' | 'goalies')}
       />
 
-      <div className="mt-2.5 -mx-3.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mt-2.5 -mx-3.5 py-2.5 -my-2.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <PressBoxChips
           chips={chips}
           activeKey={chipActive}

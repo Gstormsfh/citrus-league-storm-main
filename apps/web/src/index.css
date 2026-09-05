@@ -172,6 +172,33 @@
      One class, because twenty pages carried `pb-[calc(5rem+…)]` for the nav
      alone and the bar would have covered the last row on every one of them.
      pressboxChromeGuard pins this number to BOTTOM_CHROME_H. */
+  /* TAP TARGETS (PR18, 2026-09-05). The artboard draws a chip 25px tall, a
+     segmented pill 30, a tab 27, a slot chip 30 -- and Apple wants 44pt
+     under the finger. The visual stays the artboard's; the hit area is a
+     pseudo-element. `pb-hit-y` grows the target to 44px tall only, for a
+     pill in a row of pills (sideways growth would hand a tap to the
+     neighbour); `pb-hit` grows it both ways, for something standing alone.
+     The element must be positioned; both classes set `relative`. The
+     week arrows, the star and the day arrows already carry their own
+     `after:` insets and are left as they are. */
+  .pb-hit,
+  .pb-hit-y {
+    position: relative;
+  }
+  .pb-hit::after,
+  .pb-hit-y::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: max(100%, 44px);
+  }
+  .pb-hit::after {
+    width: max(100%, 44px);
+  }
+
   .pb-app-chrome {
     padding-bottom: calc(116px + env(safe-area-inset-bottom));
   }

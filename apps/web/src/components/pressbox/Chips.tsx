@@ -70,7 +70,7 @@ export function PressBoxChips({ chips, activeKey, onSelect, label, outlined, com
             aria-pressed={active}
             onClick={() => onSelect?.(c.key)}
             className={cn(
-              'rounded-full whitespace-nowrap',
+              'pb-hit-y rounded-full whitespace-nowrap',
               outlined ? (compact ? 'px-2.5 py-[5px]' : 'px-2.5 py-1.5') : 'px-[11px] py-[5px]',
               c.trailing && 'ml-auto',
               active

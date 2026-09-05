@@ -236,7 +236,7 @@ export function PlayersPhone<P>({
       />
 
       <PressBoxChips
-        className="mt-2.5 overflow-x-auto scrollbar-hide"
+        className="mt-2.5 py-2.5 -my-2.5 overflow-x-auto scrollbar-hide"
         label="Position filter"
         outlined
         compact

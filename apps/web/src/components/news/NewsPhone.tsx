@@ -108,7 +108,7 @@ export function NewsPhone({
         </div>
       )}
 
-      <div className="-mx-3.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-3.5 py-2.5 -my-2.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <PressBoxChips
           chips={categories.map((c) => ({ key: c.key, label: c.label.toUpperCase() }))}
           activeKey={category}

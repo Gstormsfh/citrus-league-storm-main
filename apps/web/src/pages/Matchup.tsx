@@ -5741,7 +5741,10 @@ const Matchup = () => {
                   for the others live on League HQ's cards. */}
               {userLeagueState === 'active-user' && allWeekMatchups.length > 1 && (
                 <PressBoxChips
-                  className={`${PB_TYPE} lg:hidden px-3 pt-2 pb-0.5 overflow-x-auto scrollbar-hide`}
+                  /* pb-2.5 -mb-2 (PR18): the chips' 44px hit areas (pb-hit-y)
+                     are clipped by this scroller, so its padding box is
+                     grown and the margin pulls the layout back. */
+                  className={`${PB_TYPE} lg:hidden px-3 pt-2 pb-2.5 -mb-2 overflow-x-auto scrollbar-hide`}
                   label="League matchups"
                   outlined
                   compact

@@ -212,7 +212,7 @@ export function PressBoxRosterRow({
         aria-label={`${slot} slot, ${player.name}. Change lineup`}
         className={cn(
           PB_POSITION_CHIP_BASE,
-          'active:scale-95 transition-transform',
+          'pb-hit active:scale-95 transition-transform',
           bench ? PB_CHIP_BENCH : PB_CHIP_STARTER,
           selected && 'ring-2 ring-pressbox-orange',
           eligibleTarget && !selected && 'ring-2 ring-pressbox-sage',

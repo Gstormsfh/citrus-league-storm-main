@@ -67,7 +67,7 @@ export function PressBoxTabs({ tabs, activeKey, onSelect, label, fill, className
             aria-selected={active}
             onClick={() => onSelect?.(t.key)}
             className={cn(
-              'whitespace-nowrap uppercase',
+              'pb-hit-y whitespace-nowrap uppercase',
               /* `fill` divides a PHONE's width. From lg the same strip goes
                  back to word-sized tabs on the left: three words spread
                  across a 900px column is the artboard's rule applied to a

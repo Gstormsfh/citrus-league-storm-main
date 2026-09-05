@@ -153,7 +153,7 @@ export function LeagueHQPhone({
         title="Matchups"
         action={
           week ? (
-            <Link to={week.to} className="focus-citrus font-plex font-medium text-[11px] text-pressbox-orange-soft">
+            <Link to={week.to} className="pb-hit-y focus-citrus font-plex font-medium text-[11px] text-pressbox-orange-soft">
               WEEK {week.number} &rsaquo;
             </Link>
           ) : undefined
@@ -188,7 +188,7 @@ export function LeagueHQPhone({
           {more > 0 && (
             <Link
               to={week.to}
-              className="focus-citrus text-center font-plex font-medium text-[11px] text-pressbox-text/45"
+              className="pb-hit-y focus-citrus text-center font-plex font-medium text-[11px] text-pressbox-text/45"
             >
               + {more} MORE {more === 1 ? 'MATCHUP' : 'MATCHUPS'}
             </Link>

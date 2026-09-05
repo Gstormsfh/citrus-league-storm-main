@@ -58,3 +58,31 @@ describe('the first paint does not wait on Google', () => {
     }
   });
 });
+
+describe('44pt under the finger', () => {
+  it('the hit-area utilities exist and grow the target to 44px without moving the visual', () => {
+    const css = read('src/index.css');
+    expect(css).toMatch(/\.pb-hit,\s*\.pb-hit-y \{\s*position: relative;/);
+    expect(css).toMatch(/\.pb-hit::after,\s*\.pb-hit-y::after \{[^}]*height: max\(100%, 44px\);/);
+    expect(css).toMatch(/\.pb-hit::after \{\s*width: max\(100%, 44px\);/);
+  });
+
+  it('every chip, segment, tab and roster slot chip carries one', () => {
+    expect(read('src/components/pressbox/Chips.tsx')).toContain("'pb-hit-y rounded-full whitespace-nowrap'");
+    expect(read('src/components/pressbox/Segmented.tsx')).toContain("'pb-hit-y whitespace-nowrap'");
+    expect(read('src/components/pressbox/Tabs.tsx')).toContain("'pb-hit-y whitespace-nowrap uppercase'");
+    expect(read('src/components/pressbox/RosterRow.tsx')).toContain("'pb-hit active:scale-95 transition-transform'");
+  });
+
+  it('a chip strip that scrolls sideways is tall enough not to clip the hit area', () => {
+    for (const f of [
+      'src/components/freeagents/PlayersPhone.tsx',
+      'src/components/news/NewsPhone.tsx',
+      'src/components/players/PlayersBrowsePhone.tsx',
+      'src/components/waivers/WaiversPhone.tsx',
+    ]) {
+      expect(read(f), f).toMatch(/py-2\.5 -my-2\.5 overflow-x-auto/);
+    }
+    expect(read('src/pages/Matchup.tsx')).toMatch(/pt-2 pb-2\.5 -mb-2 overflow-x-auto scrollbar-hide/);
+  });
+});

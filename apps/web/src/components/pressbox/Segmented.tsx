@@ -77,7 +77,7 @@ export function PressBoxSegmented({
             aria-pressed={active}
             onClick={() => onSelect?.(s.key)}
             className={cn(
-              'whitespace-nowrap',
+              'pb-hit-y whitespace-nowrap',
               sm ? 'px-[9px] py-[3px]' : 'px-2.5 py-[5px]',
               active
                 ? cn(

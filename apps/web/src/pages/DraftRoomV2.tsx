@@ -1251,7 +1251,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                       if (result === 'copied') toast.success('Invite copied. Paste it anywhere');
                       if (result === 'failed') toast.error('Could not share. Use Copy Link');
                     }}
-                    className="rounded-full bg-pastel-orange text-[#2A0F00] hover:bg-pastel-orange-soft font-black px-6"
+                    className="h-11 rounded-[12px] px-6 border-0 outline-none shadow-none bg-pressbox-orange text-pressbox-orange-ink hover:bg-pressbox-orange-soft font-plex font-semibold text-[12px] tracking-[0.08em] uppercase"
                   >
                     Share Invite
                   </Button>
@@ -1262,7 +1262,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                     void navigator.clipboard.writeText(buildInviteLink(league.join_code as string));
                     toast.success('Invite link copied');
                   }}
-                  className="rounded-full border-white/20 bg-white/5 text-pastel-cream hover:bg-white/10"
+                  className="h-11 rounded-[12px] border-white/[0.08] bg-pressbox-tile-high text-pressbox-text hover:bg-pressbox-tile-high font-plex font-semibold text-[12px] tracking-[0.06em] uppercase"
                 >
                   Copy Link
                 </Button>
