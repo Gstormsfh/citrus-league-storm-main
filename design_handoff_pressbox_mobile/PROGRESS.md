@@ -6,7 +6,7 @@
 card's panes and the commissioner's settings included — and the whole app
 nav is Press Box: SCORES, PLAYERS, NEWS and ACCOUNT are converted, every
 league screen wears one chrome, and the old hamburger menu is gone.**
-Thirty commits on `redesign/pressbox` since PR7 (`2fea1029..6dbe7257`).
+Thirty-six commits on `redesign/pressbox` since PR7 (`2fea1029..345b7170`).
 Nothing is pushed, nothing is applied to production. The working tree is
 clean.
 
@@ -26,7 +26,12 @@ clean.
 | News tab (no artboard) — chips, lead tile + rows | done (PR10d) | `page.html?p=news` |
 | Players tab (no artboard) — the league-wide browser as a list, one figure per row, sort/team pickers, row → the shared card | done (PR10e) | `page.html?p=players` |
 | League chrome on every league screen (`PressBoxLeagueChrome`), app header on Profile / Create League / Stormy; `MobileMenuButton` deleted | done (PR10f) | `page.html?p=waivers`, `?p=profile` |
-| BODIES still v1 (chrome is Press Box): Waivers, Trades, Schedule, GM office, Team view, Analytics, Playoffs, Profile, Create League | open | via the league menu |
+| Waivers (no artboard) — priority / FAAB + next run, the rules, the wire with ADD / CLAIM, claims, the claim sheet | done (PR10g) | `page.html?p=waivers` |
+| Trades (no artboard) — PROPOSE (partner → send → get → the take → propose) and OFFERS (received / sent / history) | done (PR10h) | `page.html?p=trade` |
+| Schedule (no artboard) — seven-day bars, games by club, back-to-backs, the games | done (PR10i) | `page.html?p=schedule` |
+| Team view (another manager) — the roster list, read-only, PROPOSE TRADE on the card | done (PR10j) | `page.html?p=team` |
+| GM office — the season's state as rows, the six actions as tiles | done (PR10k) | `page.html?p=gmoffice` |
+| BODIES still v1 (chrome is Press Box): Analytics, Playoffs, Profile, Create League, Stormy | open | via the league menu / ACCOUNT |
 
 **First thing to run** (five draft suites, the MatchupComparison suites, the
 hideRoutes suite and every page suite cannot load on my offline runner):
@@ -82,10 +87,10 @@ cd ~/dev/citrus/apps/web && npm run lint && npm run test
 
 ### Still open
 
-- The BODIES of Waivers, Trades, Schedule, GM office, Team view,
-  Analytics, Playoffs, Profile, Create League — chrome is Press Box,
-  content is v1 (Calistoga heads, pastel tiles). Waivers and Trades first;
-  they are what a manager opens after Tuesday's draft.
+- The BODIES of Analytics, Playoffs, Profile (2,400 lines of forms),
+  Create League and Stormy — chrome is Press Box, content is v1. Profile
+  and Create League are yours to call before I rebuild them; Playoffs is
+  a spring screen.
 - Two migrations, unapplied: `20260904100000`, `20260904101000`.
 - `FreeAgentRow` + its tests, once Players is signed off.
 - PR3 skeletons, PR12 aggregates, PR13 motion, PR14/15 moments, PR17, PR18.
