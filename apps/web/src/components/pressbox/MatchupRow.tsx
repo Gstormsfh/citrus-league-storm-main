@@ -81,7 +81,7 @@ function Side({
 }) {
   if (!player) {
     return (
-      <span className={cn(PB_ROW_META, 'text-pressbox-text/35 px-2', !mine && 'text-right block')}>
+      <span className={cn(PB_ROW_META, 'uppercase tracking-[0.08em] text-pressbox-text/35 px-2', !mine && 'text-right block')}>
         Empty
       </span>
     );
