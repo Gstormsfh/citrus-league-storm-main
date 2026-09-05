@@ -33,8 +33,15 @@ export function mugFromDirectory(p: {
   return { name: p.full_name, image: p.headshot_url ?? null, team: p.team ?? null };
 }
 
+/**
+ * The NHL's crest for a team, in the variant drawn for a dark ground
+ * (2026-09-05): `_light` is the crest for a white page, and on Press Box
+ * green the Leafs' navy leaf was a smudge. Every surface that draws a
+ * crest -- the league header, the Mug's fallback, the Scores rows -- is
+ * dark, so this is the one variant.
+ */
 export function teamCrestUrl(abbr: string): string {
-  return `https://assets.nhle.com/logos/nhl/svg/${abbr}_light.svg`;
+  return `https://assets.nhle.com/logos/nhl/svg/${abbr}_dark.svg`;
 }
 
 /**

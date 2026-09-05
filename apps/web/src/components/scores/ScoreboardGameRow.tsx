@@ -32,7 +32,7 @@ import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import type { ScoreboardGame, ScoreboardTeam } from '@citrus/shared';
-import { TeamChip } from '@/components/citrus2/TeamChip';
+import { PressBoxTeamMark } from '@/components/pressbox/TeamMark';
 import { LivePulse } from '@/components/citrus2/LivePulse';
 import {
   citrusSummaryText,
@@ -68,7 +68,7 @@ function TeamLine({
 }) {
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <TeamChip abbrev={team.abbrev} size="sm" />
+      <PressBoxTeamMark abbrev={team.abbrev} size="sm" label={teamFullName(team)} />
       <span
         className={cn(
           'font-barlow text-[14px] truncate flex-1 min-w-0',

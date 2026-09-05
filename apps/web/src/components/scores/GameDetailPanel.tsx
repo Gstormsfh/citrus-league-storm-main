@@ -25,7 +25,6 @@ import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { PressBoxSkeletonBar } from '@/components/pressbox/Skeleton';
 import type { ScoresGameDetailResponse, ScoresPlayerLine } from '@citrus/shared';
-import { TeamChip } from '@/components/citrus2/TeamChip';
 import { scoresApi } from '@/api/scores';
 import { formatPoints, formatToi, hasUnconfirmedGoalieDuel } from './scoresFormat';
 

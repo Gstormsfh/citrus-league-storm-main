@@ -23,7 +23,7 @@
 
 import { cn } from '@/lib/utils';
 import type { ScoresGameCitrus, ScoresPlayerLine } from '@citrus/shared';
-import { TeamChip } from '@/components/citrus2/TeamChip';
+import { Mug } from '@/components/roster/Mug';
 import { formatPoints, hasUnconfirmedGoalieDuel } from './scoresFormat';
 
 /** Confidence label to a tone. Anything unrecognised gets the muted tone. */
@@ -49,7 +49,9 @@ function PlayerPill({ player }: { player: ScoresPlayerLine }) {
         player.roster?.isMine ? 'bg-pressbox-orange/[0.08] border-pressbox-orange/30' : 'bg-white/[0.03] border-white/[0.06]',
       )}
     >
-      {player.teamAbbrev ? <TeamChip abbrev={player.teamAbbrev} size="xs" /> : null}
+      {/* The face, not a circle with letters in it (2026-09-05): the
+          headshot the scores read carries, the crest when it has none. */}
+      <Mug p={{ name: player.name, image: player.headshotUrl ?? null, team: player.teamAbbrev ?? null }} size="xs" />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-1 min-w-0">
           <span className="font-barlow font-semibold text-[11px] text-pressbox-text truncate leading-tight">
