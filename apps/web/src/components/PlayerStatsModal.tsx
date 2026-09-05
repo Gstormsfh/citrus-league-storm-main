@@ -160,6 +160,24 @@ function seasonLabel(season: number): string {
  * returned every 2026-27 game, which is the "all of prior year combined"
  * shape this modal was reported for, in reverse.
  */
+/**
+ * THE LOG, REMEMBERED (2026-09-05). "Game log takes forever to load stats
+ * and prior stats." Every open of the card, and every tap between the two
+ * seasons, refetched the schedule and the whole log. Now the built log is
+ * kept per player and season for five minutes: the second season is one
+ * fetch, and the flip back is instant. Module scope so it survives the
+ * modal unmounting between cards.
+ */
+interface GameLogBuilt {
+  entries: GameLogEntry[];
+  totalProjected: number;
+  totalActual: number;
+  goalieStartsRemaining: number | null;
+  at: number;
+}
+const GAME_LOG_TTL_MS = 5 * 60 * 1000;
+const gameLogCache = new Map<string, GameLogBuilt>();
+
 function seasonWindow(season: number): { start: string; end: string } {
   const start = getSeasonStartDate(season) ?? `${season}-09-01`;
   const nextStart = getSeasonStartDate(season + 1);
@@ -298,6 +316,16 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         return;
       }
 
+      const cached = gameLogCache.get(playerKey);
+      if (cached && Date.now() - cached.at < GAME_LOG_TTL_MS) {
+        setGameLog(cached.entries);
+        setTotalProjected(cached.totalProjected);
+        setTotalActual(cached.totalActual);
+        setGoalieStartsRemaining(cached.goalieStartsRemaining);
+        setGameLogLoading(false);
+        return;
+      }
+
       try {
         const todayStr = getTodayMST();
         const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
@@ -330,7 +358,16 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         // advanced metrics keep reading last season, because that is the
         // only season with numbers in it until games are played.
         const { start: windowStart, end: windowEnd } = seasonWindow(logSeason);
-        const { games } = await ScheduleService.getGamesForTeam(teamAbbrev, windowStart, windowEnd);
+        // The schedule and the log in parallel: the log's range is the
+        // season window, known before the schedule answers. One round trip
+        // on a phone, not two in a row.
+        const [{ games }, logResponse] = await Promise.all([
+          ScheduleService.getGamesForTeam(teamAbbrev, windowStart, windowEnd),
+          matchupApi.getPlayerGameLog(playerId, windowStart, windowEnd).catch((err: unknown) => {
+            logger.warn('[PlayerStatsModal] Could not fetch the game log:', err);
+            return null;
+          }),
+        ]);
 
         if (!games || games.length === 0) {
           if (!cancelled) setGameLogLoading(false);
@@ -354,15 +391,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
          * whole log in one query: measured against production, 82 rows in
          * 12.9ms. Projections come back from the same call.
          */
-        const seasonStartStr = games[0].game_date.split('T')[0];
-        const seasonEndStr = games[games.length - 1].game_date.split('T')[0];
-
         const actualStatsMap = new Map<string, any>();
         const projectionMap = new Map<string, any>();
 
-        try {
-          const response = await matchupApi.getPlayerGameLog(playerId, seasonStartStr, seasonEndStr);
-          const payload = (response?.data ?? {}) as {
+        {
+          const payload = (logResponse?.data ?? {}) as {
             games?: Array<Record<string, unknown>>;
             projections?: Array<Record<string, unknown>>;
           };
@@ -375,8 +408,6 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
             const d = String(row.projection_date ?? '').split('T')[0];
             if (d) projectionMap.set(d, row);
           }
-        } catch (err) {
-          logger.warn('[PlayerStatsModal] Could not fetch the game log:', err);
         }
 
         // Build game log entries
@@ -445,6 +476,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         // label read from it for goalies. Skater sums stay as-is —
         // team games ≈ player games for them.
         let goalieAwareTotal = projTotal;
+        let startsRemaining: number | null = null;
         if (playerIsGoalie) {
           try {
             const rosRes = await playerApi.getRosProjectionForPlayer(playerId);
@@ -458,22 +490,26 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
             if (Number.isFinite(rosTotal) && rosTotal > 0) {
               goalieAwareTotal = rosTotal;
             }
-            setGoalieStartsRemaining(
-              Number.isFinite(rosGames) && rosGames > 0 ? Math.round(rosGames) : null,
-            );
+            startsRemaining = Number.isFinite(rosGames) && rosGames > 0 ? Math.round(rosGames) : null;
           } catch {
             // ROS row unavailable — keep the summed value rather than
             // showing nothing; the label falls back to team games.
-            setGoalieStartsRemaining(null);
+            startsRemaining = null;
           }
-        } else {
-          setGoalieStartsRemaining(null);
         }
+        setGoalieStartsRemaining(startsRemaining);
 
         if (cancelled) return;
         setGameLog(entries);
         setTotalProjected(goalieAwareTotal);
         setTotalActual(actTotal);
+        gameLogCache.set(playerKey, {
+          entries,
+          totalProjected: goalieAwareTotal,
+          totalActual: actTotal,
+          goalieStartsRemaining: startsRemaining,
+          at: Date.now(),
+        });
       } catch (error) {
         logger.error('[PlayerStatsModal] Error fetching game log:', error);
       } finally {

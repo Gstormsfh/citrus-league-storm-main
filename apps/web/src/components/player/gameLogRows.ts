@@ -164,6 +164,40 @@ const fixed = (v: unknown, digits: number) => {
   return Number.isFinite(n) && v != null ? n.toFixed(digits) : '–';
 };
 
+/**
+ * THE LIKELY RANGE (2026-09-05). `likely_low`/`likely_high` are NULL on
+ * every 2026 row of player_projected_stats; the 50% interval and the
+ * standard deviation are populated on all of them. So: the stored range
+ * when it exists, else the interquartile band, else mean ± 0.67σ (the same
+ * band for a normal), else nothing. A range that is not a range (low ≥
+ * high) is not shown.
+ */
+export function likelyRange(
+  p: Record<string, unknown>,
+  projectedPoints: number,
+): string | null {
+  const num = (v: unknown): number | null => {
+    const n = Number(v);
+    return v != null && Number.isFinite(n) ? n : null;
+  };
+  let low = num(p.likely_low);
+  let high = num(p.likely_high);
+  if (low == null || high == null) {
+    low = num(p.projection_ci_50_lower);
+    high = num(p.projection_ci_50_upper);
+  }
+  if (low == null || high == null) {
+    const sd = num(p.projection_std_dev);
+    const mean = num(p.projection_mean) ?? num(p.total_projected_points) ?? projectedPoints;
+    if (sd != null && sd > 0 && mean != null) {
+      low = Math.max(0, mean - 0.674 * sd);
+      high = mean + 0.674 * sd;
+    }
+  }
+  if (low == null || high == null || high <= low) return null;
+  return `${Math.max(0, low).toFixed(1)}–${high.toFixed(1)}`;
+}
+
 /** Remaining games in order, projection columns, likely range in the tail. */
 export function upcomingRows(entries: GameLogEntry[], isGoalie: boolean): LogRow[] {
   return entries
@@ -186,10 +220,7 @@ export function upcomingRows(entries: GameLogEntry[], isGoalie: boolean): LogRow
               fixed(p.projected_ppp, 2),
               fixed(p.projected_hits, 1),
             ];
-      const range =
-        p && p.likely_low != null && p.likely_high != null
-          ? `${Number(p.likely_low).toFixed(1)}–${Number(p.likely_high).toFixed(1)}`
-          : null;
+      const range = p ? likelyRange(p, e.projectedPoints) : null;
       return {
         key: e.date,
         date: shortDate(e.date),

@@ -6,6 +6,7 @@ import {
   shortDate,
   toiLabel,
   type GameLogEntry,
+  likelyRange,
 } from '../gameLogRows';
 
 /**
@@ -107,6 +108,28 @@ describe('upcomingRows', () => {
     expect(rows[1].cells).toEqual(['–', '–', '–', '–', '–']);
     expect(rows[1].toi).toBeNull();
     expect(rows[1].latest).toBe(true);
+  });
+});
+
+describe('likelyRange', () => {
+  // player_projected_stats, season 2026, measured 2026-09-05: likely_low and
+  // likely_high NULL on all 66,024 rows; std dev and the 50% interval on
+  // every one of them. The card had printed an empty Range for a season.
+  it('uses the stored range when it exists', () => {
+    expect(likelyRange({ likely_low: 4.4, likely_high: 9.4 }, 7.1)).toBe('4.4–9.4');
+  });
+  it('falls back to the 50% interval', () => {
+    expect(likelyRange({ likely_low: null, likely_high: null, projection_ci_50_lower: 5.2, projection_ci_50_upper: 8.9 }, 7.1)).toBe('5.2–8.9');
+  });
+  it('falls back to mean ± 0.67σ, floored at zero', () => {
+    expect(likelyRange({ projection_std_dev: 3, projection_mean: 7 }, 7)).toBe('5.0–9.0');
+    expect(likelyRange({ projection_std_dev: 3, total_projected_points: 1 }, 1)).toBe('0.0–3.0');
+    expect(likelyRange({ projection_std_dev: 2 }, 6)).toBe('4.7–7.3');
+  });
+  it('shows nothing when there is no distribution, or the band is not a band', () => {
+    expect(likelyRange({}, 7.1)).toBeNull();
+    expect(likelyRange({ projection_std_dev: 0, projection_mean: 7 }, 7)).toBeNull();
+    expect(likelyRange({ projection_ci_50_lower: 8, projection_ci_50_upper: 8 }, 8)).toBeNull();
   });
 });
 

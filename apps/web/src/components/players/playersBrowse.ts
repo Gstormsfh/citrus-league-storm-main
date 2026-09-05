@@ -52,6 +52,14 @@ export const GOALIE_SORTS: SortOption<GoalieSortKey>[] = [
 ];
 
 /** The shared card's shape, from what the index holds and nothing more. */
+/** Season ice time over games played, as the card prints it: `18:42`. */
+export function toiPerGame(seasonSeconds: number, gp: number): string {
+  const per = Math.round(seasonSeconds / gp);
+  const m = Math.floor(per / 60);
+  const s = per % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 export function dashboardEntryToHockeyPlayer(p: DashboardIndexEntry): HockeyPlayer {
   return {
     id: p.id,
@@ -68,10 +76,13 @@ export function dashboardEntryToHockeyPlayer(p: DashboardIndexEntry): HockeyPlay
       ? {
           gamesPlayed: p.gp,
           wins: p.wins,
+          losses: p.losses,
+          otl: p.ot_losses,
           saves: p.saves,
           savePct: p.save_pct,
           gaa: p.gaa,
           shutouts: p.shutouts,
+          goalsAgainst: p.goals_against,
         }
       : {
           gamesPlayed: p.gp,
@@ -82,8 +93,12 @@ export function dashboardEntryToHockeyPlayer(p: DashboardIndexEntry): HockeyPlay
           hits: p.hits,
           blockedShots: p.blocks,
           powerPlayPoints: p.ppp,
+          shortHandedPoints: p.shp,
+          pim: p.pim,
           plusMinus: p.plus_minus,
           xGoals: p.x_goals,
+          // The card prints TOI per game as mm:ss; the index carries the season total.
+          toi: p.gp > 0 && p.toi_seconds > 0 ? toiPerGame(p.toi_seconds, p.gp) : undefined,
         },
   };
 }

@@ -38,6 +38,12 @@ const entry = (id: number, over: Partial<DashboardIndexEntry> = {}): DashboardIn
     save_pct: 0,
     gaa: 0,
     shutouts: 0,
+    pim: 0,
+    shp: 0,
+    toi_seconds: 0,
+    losses: 0,
+    ot_losses: 0,
+    goals_against: 0,
     xg_per_60: id === 1 ? null : 1.234,
     xg_rating: null,
     gar_per_60: 0.5,
@@ -166,14 +172,20 @@ describe('PlayersBrowsePhone', () => {
 });
 
 describe('dashboardEntryToHockeyPlayer', () => {
-  it('carries the season line the index holds and nothing more', () => {
-    const p = dashboardEntryToHockeyPlayer(entry(7, { roster_status: 'IR' }));
+  it('carries the season line the index holds, PIM, SHP and TOI per game included', () => {
+    // 2026-09-05: the card printed PIM 0, SHP 0 and TOI/G "-" for every
+    // skater. The index SELECTed pim and toi and dropped them; shp was never
+    // read; this mapper carried none of the three.
+    const p = dashboardEntryToHockeyPlayer(entry(7, { roster_status: 'IR', pim: 14, shp: 2, toi_seconds: 11_220 }));
     expect(p).toMatchObject({ id: 7, name: 'Player 7', position: 'C', number: 7, teamAbbreviation: 'EDM', status: 'IR' });
     expect(p.stats).toEqual({
-      gamesPlayed: 10, goals: 7, assists: 2, points: 9, shots: 30, hits: 1, blockedShots: 2, powerPlayPoints: 3, plusMinus: 4, xGoals: 5.5,
+      gamesPlayed: 10, goals: 7, assists: 2, points: 9, shots: 30, hits: 1, blockedShots: 2, powerPlayPoints: 3, shortHandedPoints: 2, pim: 14, plusMinus: 4, xGoals: 5.5,
+      toi: '18:42',
     });
-    const g = dashboardEntryToHockeyPlayer(entry(8, { is_goalie: true, position: 'G', wins: 30, saves: 900, save_pct: 0.912, gaa: 2.4, shutouts: 3 }));
-    expect(g.stats).toEqual({ gamesPlayed: 10, wins: 30, saves: 900, savePct: 0.912, gaa: 2.4, shutouts: 3 });
+    // No ice time on record: no invented "0:00".
+    expect(dashboardEntryToHockeyPlayer(entry(9, { toi_seconds: 0 })).stats.toi).toBeUndefined();
+    const g = dashboardEntryToHockeyPlayer(entry(8, { is_goalie: true, position: 'G', wins: 30, losses: 12, ot_losses: 4, saves: 900, save_pct: 0.912, gaa: 2.4, shutouts: 3, goals_against: 118 }));
+    expect(g.stats).toEqual({ gamesPlayed: 10, wins: 30, losses: 12, otl: 4, saves: 900, savePct: 0.912, gaa: 2.4, shutouts: 3, goalsAgainst: 118 });
     expect(g.status).toBeNull();
   });
 

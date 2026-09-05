@@ -1439,7 +1439,15 @@ export class MatchupService {
         'player_id, projection_date, total_projected_points, projected_goals, projected_assists, ' +
         'projected_sog, projected_blocks, projected_hits, projected_pim, projected_ppp, projected_shp, ' +
         'projected_wins, projected_saves, projected_shutouts, projected_gaa, projected_save_pct, ' +
-        'is_goalie, opponent_abbrev, is_home_game'
+        'is_goalie, opponent_abbrev, is_home_game, ' +
+        // THE RANGE (2026-09-05). The card's "likely range" column read
+        // likely_low/likely_high, which this SELECT never carried, and which
+        // are NULL on all 66,024 rows of season 2026 anyway. The
+        // distribution columns ARE populated on every row (std dev, the 50%
+        // and 90% intervals, the median, the dynamic confidence), so they
+        // travel and the client derives the range from the 50% interval.
+        'likely_low, likely_high, projection_std_dev, projection_ci_50_lower, projection_ci_50_upper, ' +
+        'projection_ci_lower, projection_ci_upper, projection_median, dynamic_confidence, confidence_score, confidence_label'
       )
       .eq('player_id', playerId)
       .gte('projection_date', startDate)
