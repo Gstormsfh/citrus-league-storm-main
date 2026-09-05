@@ -380,7 +380,7 @@ describe('PlayerAdvancedCard — goalie', () => {
     const vasy = goalieEntry({ id: 8476883, gsax_regressed: 8.2, gsax_shots_faced: 1204 });
     renderCard({ playerId: 8476883, indexOverride: [...league(), vasy] });
     const verdict = screen.getByTestId('advanced-card-verdict');
-    expect(verdict).toHaveTextContent('Citrus GSAx');
+    expect(verdict).toHaveTextContent('goals more than expected');
     expect(verdict).toHaveTextContent('1,204 primary shots');
     expect(verdict).toHaveTextContent('among goalies');
   });

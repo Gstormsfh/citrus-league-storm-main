@@ -512,7 +512,7 @@ export function deriveVerdict(
           : v > 0
             ? `stopping ${fmt1(v)} goals more than expected`
             : `conceding ${fmt1(-v)} goals more than expected`;
-      const tail = `Citrus GSAx has him ${read} on ${fmtInt(shots)} primary shots, ${ordinal(gsax.percentile)} among ${noun}.`;
+      const tail = `${read.charAt(0).toUpperCase()}${read.slice(1)} on ${fmtInt(shots)} primary shots, ${ordinal(gsax.percentile)} among ${noun}.`;
       if (gsax.percentile >= 75) return `Stopping more than his share. ${tail}`;
       if (gsax.percentile <= 25) return `Leaking more than he should. ${tail}`;
       return tail;
@@ -524,12 +524,12 @@ export function deriveVerdict(
       // The rate itself is NHL.com's; the ranking is ours, off the cohort
       // this module builds. The sentence keeps the two apart on purpose.
       if (sv.percentile >= 75) {
-        return `Stopping more than his share. ${rate} save rate, ${ordinal(sv.percentile)} among ${noun} on the Citrus board.`;
+        return `Stopping more than his share. ${rate} save rate, ${ordinal(sv.percentile)} among ${noun}.`;
       }
       if (sv.percentile <= 25) {
-        return `Leaking more than he should. ${rate} save rate, ${ordinal(sv.percentile)} among ${noun} on the Citrus board.`;
+        return `Leaking more than he should. ${rate} save rate, ${ordinal(sv.percentile)} among ${noun}.`;
       }
-      return `${rate} save rate over ${player.gp} appearances, ${ordinal(sv.percentile)} among ${noun} on the Citrus board.`;
+      return `${rate} save rate over ${player.gp} appearances, ${ordinal(sv.percentile)} among ${noun}.`;
     }
     return null;
   }
@@ -540,16 +540,16 @@ export function deriveVerdict(
   // Shot quality vs finishing. `fin` is already guarded on real xG data.
   if (xgPct != null && fin != null && Math.abs(fin) >= 1.5) {
     if (xgPct >= 75 && fin <= -1.5) {
-      return `Elite looks, cold stick. Citrus xG has him ${fmt1(Math.abs(fin))} goals under expected on ${ordinal(xgPct)}-percentile chances. Buy low.`;
+      return `Elite looks, cold stick. ${fmt1(Math.abs(fin))} goals under expected on ${ordinal(xgPct)}-percentile chances. Buy low.`;
     }
     if (xgPct >= 75 && fin >= 1.5) {
-      return `Elite looks and burying them. Citrus xG has him ${fmtSigned1(fin)} goals over expected on ${ordinal(xgPct)}-percentile chances.`;
+      return `Elite looks and burying them. ${fmtSigned1(fin)} goals over expected on ${ordinal(xgPct)}-percentile chances.`;
     }
     if (xgPct <= 40 && fin >= 1.5) {
-      return `Outrunning his chances. Citrus xG has him ${fmtSigned1(fin)} goals over expected on ${ordinal(xgPct)}-percentile looks. Sell high.`;
+      return `Outrunning his chances. ${fmtSigned1(fin)} goals over expected on ${ordinal(xgPct)}-percentile looks. Sell high.`;
     }
     if (xgPct <= 40 && fin <= -1.5) {
-      return `Thin looks and not burying them. Citrus xG has him ${fmt1(Math.abs(fin))} goals under expected on ${ordinal(xgPct)}-percentile chances.`;
+      return `Thin looks and not burying them. ${fmt1(Math.abs(fin))} goals under expected on ${ordinal(xgPct)}-percentile chances.`;
     }
   }
 
@@ -564,20 +564,20 @@ export function deriveVerdict(
     const v = driver.value as number;
     const name = DRIVER_PHRASE[driver.spec.key] ?? driver.spec.label.toLowerCase();
     if (v > 0 && driver.percentile != null && driver.percentile >= 60) {
-      return `Value is mostly ${name}. Citrus GAR has him at ${fmt2(v)} there, ${ordinal(driver.percentile)} among ${noun}.`;
+      return `Value is mostly ${name}: ${fmt2(v)} GAR/60 there, ${ordinal(driver.percentile)} among ${noun}.`;
     }
     if (v < 0 && driver.percentile != null && driver.percentile <= 40) {
-      return `${capitalise(name)} is the drag. Citrus GAR has him at ${fmt2(v)}, ${ordinal(driver.percentile)} among ${noun}.`;
+      return `${capitalise(name)} is the drag: ${fmt2(v)} GAR/60, ${ordinal(driver.percentile)} among ${noun}.`;
     }
   }
 
   // Nothing sharper survived; fall back to the honest headline, if we have it.
   const gar = by('gar_per_60');
   if (gar?.percentile != null && gar.value != null) {
-    return `Citrus GAR puts him ${ordinal(gar.percentile)}-percentile for total impact among ${noun} over ${player.gp} games.`;
+    return `${ordinal(gar.percentile).replace(/^./, (c) => c.toUpperCase())}-percentile GAR/60 for total impact among ${noun} over ${player.gp} games.`;
   }
   if (finPercentile != null && fin != null) {
-    return `Citrus xG has him ${fmtSigned1(fin)} goals over expected, ${ordinal(finPercentile)} among ${noun} at finishing.`;
+    return `${fmtSigned1(fin)} goals over expected, ${ordinal(finPercentile)} among ${noun} at finishing.`;
   }
   return null;
 }

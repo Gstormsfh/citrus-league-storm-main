@@ -351,7 +351,8 @@ describe('verdicts — assembled from measured values, never generated', () => {
     expect(v).toContain('He takes 100% of his attempts from the low slot');
     // The model is NAMED (2026-09-02 voice brief): "our model" was
     // unattributable and the copy rules require the source in the sentence.
-    expect(v).toContain('0.250 expected goals apiece on Citrus xG v3');
+    expect(v).toContain('0.250 expected goals apiece');
+    expect(v).not.toContain('Citrus');
     expect(v).toContain('7.5 goals ahead');
   });
 

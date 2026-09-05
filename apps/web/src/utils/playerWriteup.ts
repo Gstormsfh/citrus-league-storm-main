@@ -270,12 +270,12 @@ function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
   if (Number.isFinite(gsax as number) && Math.abs(gsax as number) >= 1) {
     if ((gsax as number) > 0) {
       parts.push(
-        `Citrus GSAx has him stopping ${fmt(gsax as number)} goals more than an average goalie would have on the same shots.`,
+        `He has stopped ${fmt(gsax as number)} goals more than an average goalie would have on the same shots.`,
       );
       tags.push({ label: 'Beating expected', tone: 'positive' });
     } else {
       parts.push(
-        `Citrus GSAx has him conceding ${fmt(Math.abs(gsax as number))} goals more than the shot quality says he should have.`,
+        `He has conceded ${fmt(Math.abs(gsax as number))} goals more than the shot quality says he should have.`,
       );
       tags.push({ label: 'Underperforming xG', tone: 'caution' });
     }
@@ -537,11 +537,11 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
     const expected = xg as number;
     if (goals >= expected * 1.3) {
       analysis.push(
-        `Citrus xG has him at ${goals} goals on ${fmt(expected)} expected, finishing well clear of the quality of his chances. That gap rarely holds across a full season. Sell high if someone in your league is paying for the goal total.`,
+        `${goals} goals on ${fmt(expected)} expected, finishing well clear of the quality of his chances. That gap rarely holds across a full season. Sell high if someone in your league is paying for the goal total.`,
       );
     } else if (goals <= expected * 0.7) {
       analysis.push(
-        `Citrus xG has him at ${goals} goals on ${fmt(expected)} expected. The chances are there and the finishing hasn't been, and that gap usually closes. Buy low rather than drop him.`,
+        `${goals} goals on ${fmt(expected)} expected. The chances are there and the finishing hasn't been, and that gap usually closes. Buy low rather than drop him.`,
       );
     }
   }
@@ -636,44 +636,48 @@ export function applyWriteupExtras(writeup: PlayerWriteup, player: HockeyPlayer,
   const analysis: string[] = [];
   const tags = [...writeup.tags];
 
-  // The career on our books. Nine seasons of 30 goals is the sentence a
-  // legend earns; a rookie's one season says so plainly.
+  // The career on record. "Nine straight 30-goal seasons" is a stat; it is
+  // the one sentence a legend's card owes him. Plain numbers, no brand.
   const seasons = (extras.goalsBySeason ?? []).filter((r) => Number.isFinite(r.goals));
   if (!goalie && seasons.length >= 2) {
     const n = seasons.length;
     const minGoals = Math.min(...seasons.map((r) => r.goals));
     const best = seasons.reduce((a, b) => (b.goals > a.goals ? b : a));
-    const agePart = extras.age != null ? `He is ${extras.age}, with ` : 'He has ';
-    let line = `${agePart}${countWord(n)} seasons on Citrus's books`;
-    if (minGoals >= 30) line += `, and 30 goals or more in every one of them`;
-    else if (minGoals >= 20) line += `, and 20 goals or more in every one of them`;
-    else if (best.goals >= 30) line += `, with a best of ${best.goals} goals in ${seasonWord(best.season)}`;
-    summary.push(line + '.');
-    if (minGoals >= 30 && n >= 5) tags.push({ label: `${n} straight 30-goal seasons`, tone: 'positive' });
+    const age = extras.age != null ? `At ${extras.age}, ` : '';
+    if (minGoals >= 30) {
+      summary.push(`${age}${age ? 'he' : 'He'} has ${countWord(n)} straight seasons of 30 goals or more on record.`);
+      if (n >= 5) tags.push({ label: `${n} straight 30-goal seasons`, tone: 'positive' });
+    } else if (minGoals >= 20) {
+      summary.push(`${age}${age ? 'he' : 'He'} has ${countWord(n)} straight seasons of 20 goals or more on record.`);
+    } else if (best.goals >= 30) {
+      summary.push(`${age}${age ? 'his' : 'His'} best season on record is ${best.goals} goals in ${seasonWord(best.season)}.`);
+    } else if (age) {
+      summary.push(`He is ${extras.age}.`);
+    }
   } else if (extras.age != null && !goalie) {
     summary.push(`He is ${extras.age}.`);
   }
   if (extras.age != null && extras.age >= 36) tags.push({ label: 'Veteran', tone: 'neutral' });
 
-  // The cohort reads the XG tab draws, said once in words.
+  // The cohort reads, only when they say something: the top or bottom fifth.
   const noun = extras.cohortNoun ?? null;
-  const size = extras.cohortSize ?? null;
-  if (!goalie && noun && size && (extras.xgPercentile != null || extras.garPercentile != null)) {
+  const notable = (p: number | null | undefined) => p != null && (p >= 80 || p <= 20);
+  if (!goalie && noun && (notable(extras.xgPercentile) || notable(extras.garPercentile))) {
     const bits: string[] = [];
-    if (extras.xgPercentile != null) bits.push(`Citrus xG/60 sits in the ${ordinalWord(extras.xgPercentile)} percentile`);
-    if (extras.garPercentile != null) bits.push(`${extras.xgPercentile != null ? 'total' : 'Total'} GAR/60 in the ${ordinalWord(extras.garPercentile)}`);
-    analysis.push(`${bits.join(' and ')} of ${size} ${noun}.`);
-    if (extras.garPercentile != null && extras.garPercentile >= 90) tags.push({ label: 'Elite GAR', tone: 'positive' });
+    if (notable(extras.xgPercentile)) bits.push(`xG/60 in the ${ordinalWord(extras.xgPercentile as number)} percentile`);
+    if (notable(extras.garPercentile)) bits.push(`GAR/60 in the ${ordinalWord(extras.garPercentile as number)}`);
+    analysis.push(`${bits.join(', ')} of ${noun}.`.replace(/^x/, 'X'));
+    if ((extras.garPercentile ?? 0) >= 90) tags.push({ label: 'Elite GAR', tone: 'positive' });
   }
 
   // The projection, framed by the host: a season before the opener, the
-  // rest of it after.
+  // rest of it after. Numbers only.
   if (extras.projFp != null && Number.isFinite(extras.projFp)) {
     const fp = Math.round(extras.projFp);
     const gp = extras.projGp != null ? ` over ${Math.round(extras.projGp)} games` : '';
-    const rank = extras.posRank ? `, ${extras.posRank} at the position` : '';
+    const rank = extras.posRank ? ` (${extras.posRank})` : '';
     const when = extras.projectionLabel ? ` ${extras.projectionLabel}` : '';
-    analysis.push(`Citrus projects ${fp} fantasy points${gp}${when}${rank}.`);
+    analysis.push(`Projects to ${fp} fantasy points${gp}${when}${rank}.`);
   }
 
   return {

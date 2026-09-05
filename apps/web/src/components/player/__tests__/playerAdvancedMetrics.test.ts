@@ -402,9 +402,9 @@ describe('deriveVerdict — derived, or nothing', () => {
     expect(v).toContain('Elite looks, cold stick');
     expect(v).toContain('88th-percentile');
     expect(v).toContain('3.1 goals under expected');
-    // The source is named and the fantasy call is stated, per the
-    // 2026-09-02 voice brief. Both are the point of the sentence.
-    expect(v).toContain('Citrus xG');
+    // No brand in the prose (2026-09-05, Garrett: "don't mention Citrus at
+    // all; just mention stats"); the fantasy call is stated.
+    expect(v).not.toContain('Citrus');
     expect(v).toContain('Buy low');
     expect(v.length).toBeLessThanOrEqual(VERDICT_MAX_CHARS);
   });
@@ -440,7 +440,7 @@ describe('deriveVerdict — derived, or nothing', () => {
       gar_evo: { value: 0.05, percentile: 40 },
     });
     const v = deriveVerdict(entry({ gp: 40 }), 'D', m, null, null)!;
-    expect(v).toBe('Value is mostly even-strength defence. Citrus GAR has him at 0.42 there, 91st among defencemen.');
+    expect(v).toBe('Value is mostly even-strength defence: 0.42 GAR/60 there, 91st among defencemen.');
   });
 
   it('names the biggest negative component as the drag', () => {
@@ -449,7 +449,7 @@ describe('deriveVerdict — derived, or nothing', () => {
       gar_evo: { value: 0.05, percentile: 40 },
     });
     const v = deriveVerdict(entry({ gp: 40 }), 'F', m, null, null)!;
-    expect(v).toBe('Penalties drawn is the drag. Citrus GAR has him at -0.31, 6th among forwards.');
+    expect(v).toBe('Penalties drawn is the drag: -0.31 GAR/60, 6th among forwards.');
   });
 
   it('falls back to total impact when no component stands out', () => {
@@ -458,7 +458,7 @@ describe('deriveVerdict — derived, or nothing', () => {
       gar_evo: { value: 0.2, percentile: 50 },
     });
     const v = deriveVerdict(entry({ gp: 41 }), 'F', m, null, null)!;
-    expect(v).toBe('Citrus GAR puts him 72nd-percentile for total impact among forwards over 41 games.');
+    expect(v).toBe('72nd-percentile GAR/60 for total impact among forwards over 41 games.');
   });
 
   it('returns null when nothing at all is known', () => {
@@ -499,16 +499,16 @@ describe('deriveVerdict — derived, or nothing', () => {
 
     const hi = deriveVerdict(tendy, 'G', g(8.2, 88), null, null)!;
     expect(hi).toBe(
-      'Stopping more than his share. Citrus GSAx has him stopping 8.2 goals more than expected on 1,204 primary shots, 88th among goalies.',
+      'Stopping more than his share. Stopping 8.2 goals more than expected on 1,204 primary shots, 88th among goalies.',
     );
 
     const lo = deriveVerdict(goalie({ gp: 40, gsax_shots_faced: 640 }), 'G', g(-4.2, 12), null, null)!;
     expect(lo).toBe(
-      'Leaking more than he should. Citrus GSAx has him conceding 4.2 goals more than expected on 640 primary shots, 12th among goalies.',
+      'Leaking more than he should. Conceding 4.2 goals more than expected on 640 primary shots, 12th among goalies.',
     );
 
     const mid = deriveVerdict(goalie({ gp: 40, gsax_shots_faced: 900 }), 'G', g(1.2, 54), null, null)!;
-    expect(mid).toBe('Citrus GSAx has him stopping 1.2 goals more than expected on 900 primary shots, 54th among goalies.');
+    expect(mid).toBe('Stopping 1.2 goals more than expected on 900 primary shots, 54th among goalies.');
 
     const level = deriveVerdict(goalie({ gp: 40, gsax_shots_faced: 900 }), 'G', g(0.02, 50), null, null)!;
     expect(level).toContain('level with expected');

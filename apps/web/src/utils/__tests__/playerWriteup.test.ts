@@ -188,9 +188,9 @@ describe('generatePlayerWriteup — goalies', () => {
 
   it('reports goals saved above expected in both directions', () => {
     const good = generatePlayerWriteup(goalie({ goalsSavedAboveExpected: 12.4 }));
-    expect(good.summary).toMatch(/Citrus GSAx has him stopping 12\.4 goals more/);
+    expect(good.summary).toMatch(/He has stopped 12\.4 goals more/);
     const bad = generatePlayerWriteup(goalie({ goalsSavedAboveExpected: -8.2 }));
-    expect(bad.summary).toMatch(/Citrus GSAx has him conceding 8\.2 goals more/);
+    expect(bad.summary).toMatch(/He has conceded 8\.2 goals more/);
     expect(bad.tags.map((t) => t.label)).toContain('Underperforming xG');
   });
 
@@ -295,7 +295,7 @@ describe('analysis paragraph — the "what should I do" half', () => {
     const w = generatePlayerWriteup(
       skater({}, { gamesPlayed: 70, goals: 30, assists: 20, points: 50, xGoals: 15 }),
     );
-    expect(w.analysis).toMatch(/Citrus xG has him at 30 goals on 15 expected/);
+    expect(w.analysis).toMatch(/30 goals on 15 expected/);
     expect(w.analysis).toMatch(/sell high/i);
   });
 
@@ -303,7 +303,7 @@ describe('analysis paragraph — the "what should I do" half', () => {
     const w = generatePlayerWriteup(
       skater({}, { gamesPlayed: 70, goals: 8, assists: 30, points: 38, xGoals: 18 }),
     );
-    expect(w.analysis).toMatch(/Citrus xG has him at 8 goals on 18 expected/);
+    expect(w.analysis).toMatch(/8 goals on 18 expected/);
     expect(w.analysis).toMatch(/buy low/i);
   });
 
@@ -482,21 +482,24 @@ describe('player writeups: voice conformance', () => {
     }
   });
 
-  // The attribution rule, stated twice: once as a property of any sentence
-  // that reaches for expected goals, and once as a fixture-driven check on
-  // the four branches that actually quote one.
+  // THE BRAND RULE, REVERSED (2026-09-05, Garrett: "don't mention Citrus
+  // at all; just mention stats if relevant"). The old brief had every
+  // expected-goals sentence name the model behind it; the card now reads
+  // as a scout's note, not a product's. Stated twice: as a property of any
+  // sentence that reaches for expected goals, and on the four branches that
+  // used to name it.
   it.each(CASES.map((c) => [c.label] as const))(
-    '%s: any sentence quoting expected goals names the Citrus model behind it',
+    '%s: no sentence names the brand',
     (label) => {
       const w = CASES.find((c) => c.label === label)!.w;
       for (const text of [w.summary, w.analysis]) {
-        if (!QUOTES_EXPECTED_GOALS.test(text)) continue;
-        expect(CITRUS_SOURCE.test(text), `no source named in: ${text}`).toBe(true);
+        expect(CITRUS_SOURCE.test(text), `brand named in: ${text}`).toBe(false);
+        expect(text).not.toMatch(/\bCitrus\b/);
       }
     },
   );
 
-  it('the four branches built on a Citrus number all name it', () => {
+  it('the four branches built on an expected-goals number quote the number and not the brand', () => {
     const named = [
       'finishing above his chances',
       'finishing below his chances',
@@ -506,7 +509,8 @@ describe('player writeups: voice conformance', () => {
     for (const label of named) {
       const w = CASES.find((c) => c.label === label)!.w;
       const text = `${w.summary} ${w.analysis}`;
-      expect(CITRUS_SOURCE.test(text), `${label} quotes a Citrus number without naming it: ${text}`).toBe(true);
+      expect(QUOTES_EXPECTED_GOALS.test(text), `${label} should quote the number: ${text}`).toBe(true);
+      expect(CITRUS_SOURCE.test(text), `${label} names the brand: ${text}`).toBe(false);
     }
   });
 
@@ -593,21 +597,20 @@ describe('writeup extras (2026-09-05): what the stat line cannot say', () => {
   } as unknown as Parameters<typeof generatePlayerWriteup>[0];
   const nine = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025].map((season, i) => ({ season, goals: [49, 51, 48, 24, 50, 42, 31, 44, 32][i] }));
 
-  it('says his age and the seasons on our books, and earns the tag a legend earns', () => {
+  it('says the streak as a stat, with his age, and earns the tag a legend earns', () => {
     const w = generatePlayerWriteup(ovi, { age: 40, goalsBySeason: nine.map((r) => ({ ...r, goals: Math.max(r.goals, 30) })) });
-    expect(w.summary).toContain('He is 40, with nine seasons on Citrus');
-    expect(w.summary).toContain('30 goals or more in every one of them');
+    expect(w.summary).toContain('At 40, he has nine straight seasons of 30 goals or more on record.');
     expect(w.tags.some((t) => t.label === '9 straight 30-goal seasons')).toBe(true);
     expect(w.tags.some((t) => t.label === 'Veteran')).toBe(true);
   });
 
-  it('a dip in one season drops the streak claim and keeps the best season', () => {
+  it('a dip in one season drops the 30-goal claim to the one the numbers support', () => {
     const w = generatePlayerWriteup(ovi, { age: 40, goalsBySeason: nine });
-    expect(w.summary).toContain('20 goals or more in every one of them');
+    expect(w.summary).toContain('nine straight seasons of 20 goals or more on record');
     expect(w.tags.some((t) => t.label.includes('30-goal'))).toBe(false);
   });
 
-  it('puts the cohort reads and the projection in the analysis, framed by the host', () => {
+  it('cohort reads only when notable, the projection as a number, and never the brand', () => {
     const w = generatePlayerWriteup(ovi, {
       xgPercentile: 92,
       garPercentile: 98,
@@ -618,9 +621,15 @@ describe('writeup extras (2026-09-05): what the stat line cannot say', () => {
       posRank: 'LW8',
       projectionLabel: 'for 2026-27',
     });
-    expect(w.analysis).toContain('Citrus xG/60 sits in the 92nd percentile and total GAR/60 in the 98th of 515 forwards.');
-    expect(w.analysis).toContain('Citrus projects 611 fantasy points over 74 games for 2026-27, LW8 at the position.');
+    expect(w.analysis).toContain('XG/60 in the 92nd percentile, GAR/60 in the 98th of forwards.');
+    expect(w.analysis).toContain('Projects to 611 fantasy points over 74 games for 2026-27 (LW8).');
     expect(w.tags.some((t) => t.label === 'Elite GAR')).toBe(true);
+    expect(`${w.summary} ${w.analysis}`).not.toMatch(/Citrus/);
+  });
+
+  it('a middling percentile says nothing', () => {
+    const w = generatePlayerWriteup(ovi, { xgPercentile: 55, garPercentile: 48, cohortNoun: 'forwards', cohortSize: 515 });
+    expect(w.analysis).not.toMatch(/percentile/);
   });
 
   it('adds nothing when there is nothing to add', () => {
@@ -631,8 +640,8 @@ describe('writeup extras (2026-09-05): what the stat line cannot say', () => {
     expect(w.tags).toEqual(base.tags);
   });
 
-  it('never writes an em dash', () => {
+  it('never writes an em dash or the brand', () => {
     const w = generatePlayerWriteup(ovi, { age: 40, goalsBySeason: nine, xgPercentile: 92, garPercentile: 98, cohortNoun: 'forwards', cohortSize: 515, projFp: 611, projGp: 74, posRank: 'LW8', projectionLabel: 'for 2026-27' });
-    expect(`${w.summary} ${w.analysis}`).not.toMatch(/—/);
+    expect(`${w.summary} ${w.analysis}`).not.toMatch(/—|Citrus/);
   });
 });
