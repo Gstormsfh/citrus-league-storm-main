@@ -312,3 +312,24 @@ export function evaluateGameLock(games: GameRow[], teamAbbrev: string, nowMs: nu
   }
   return false;
 }
+
+/**
+ * The first NHL team in a trade whose game has started (2026-09-05). The
+ * `allow_trades_during_games` toggle was stored and never read; when it is
+ * OFF, a trade that moves a player whose team is on the ice waits until the
+ * games are over, the way Yahoo holds it. Same fail-open rule as the
+ * waiver lock: an unknown team or an empty schedule locks nothing.
+ */
+export function lockedTeamForTrade(
+  teamAbbrevs: ReadonlyArray<string | null | undefined>,
+  games: GameRow[],
+  nowMs: number,
+): string | null {
+  const seen = new Set<string>();
+  for (const abbrev of teamAbbrevs) {
+    if (!abbrev || seen.has(abbrev)) continue;
+    seen.add(abbrev);
+    if (evaluateGameLock(games, abbrev, nowMs)) return abbrev;
+  }
+  return null;
+}
