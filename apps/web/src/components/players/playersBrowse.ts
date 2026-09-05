@@ -83,6 +83,8 @@ export function dashboardEntryToHockeyPlayer(p: DashboardIndexEntry): HockeyPlay
           gaa: p.gaa,
           shutouts: p.shutouts,
           goalsAgainst: p.goals_against,
+          // The card's GSAx cell reads this; the index carries the regressed figure.
+          goalsSavedAboveExpected: p.gsax_regressed ?? undefined,
         }
       : {
           gamesPlayed: p.gp,

@@ -232,10 +232,15 @@ playerRoutes.get('/directory', authMiddleware, async (c) => {
   const supabase = createUserClient(c.get('userToken'));
 
   try {
+    // THE VITALS (2026-09-05): the artboard's player card prints AGE · HT ·
+    // WT · SHOOTS under the name, and player_directory holds all four for
+    // every 2026 row (1,277 of 1,277 checked on prod). This route had no
+    // caller and selected two columns; it now carries the bio strip.
     let query = supabase
       .from('player_directory')
-      .select('player_id, position_code')
-      .in('player_id', playerIds);
+      .select('player_id, season, position_code, full_name, team_abbrev, jersey_number, shoots_catches, height_in, weight_lb, birthdate')
+      .in('player_id', playerIds)
+      .order('season', { ascending: false });
 
     if (season) {
       query = query.eq('season', parseInt(season, 10));

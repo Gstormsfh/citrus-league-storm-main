@@ -184,8 +184,8 @@ describe('dashboardEntryToHockeyPlayer', () => {
     });
     // No ice time on record: no invented "0:00".
     expect(dashboardEntryToHockeyPlayer(entry(9, { toi_seconds: 0 })).stats.toi).toBeUndefined();
-    const g = dashboardEntryToHockeyPlayer(entry(8, { is_goalie: true, position: 'G', wins: 30, losses: 12, ot_losses: 4, saves: 900, save_pct: 0.912, gaa: 2.4, shutouts: 3, goals_against: 118 }));
-    expect(g.stats).toEqual({ gamesPlayed: 10, wins: 30, losses: 12, otl: 4, saves: 900, savePct: 0.912, gaa: 2.4, shutouts: 3, goalsAgainst: 118 });
+    const g = dashboardEntryToHockeyPlayer(entry(8, { is_goalie: true, position: 'G', wins: 30, losses: 12, ot_losses: 4, saves: 900, save_pct: 0.912, gaa: 2.4, shutouts: 3, goals_against: 118, gsax_regressed: 6.4 }));
+    expect(g.stats).toEqual({ gamesPlayed: 10, wins: 30, losses: 12, otl: 4, saves: 900, savePct: 0.912, gaa: 2.4, shutouts: 3, goalsAgainst: 118, goalsSavedAboveExpected: 6.4 });
     expect(g.status).toBeNull();
   });
 

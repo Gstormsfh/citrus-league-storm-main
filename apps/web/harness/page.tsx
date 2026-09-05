@@ -674,6 +674,12 @@ const HARNESS_GAMES = new Map<string, any[]>(
     ),
   };
 };
+(playerApi as any).getDirectory = async (ids: string[]) => ({
+  data: ids.map((id) => {
+    const p = PLAYERS.find((x: any) => String(x.id) === String(id)) as any;
+    return { player_id: Number(id), season: 2026, position_code: p?.position ?? 'C', shoots_catches: Number(id) % 3 ? 'L' : 'R', height_in: 71 + (Number(id) % 5), weight_lb: 180 + (Number(id) % 30), birthdate: `${1993 + (Number(id) % 10)}-04-1${Number(id) % 9}` };
+  }),
+});
 (playerApi as any).getOwnership = async () => ({
   data: PLAYERS.slice(0, 60).map((p: any, i: number) => ({
     player_id: String(p.id), rostered_pct: Math.max(4, 100 - i * 3), started_pct: Math.max(10, 99 - i * 5), rostered_teams: 51 - i, total_teams: 51,
