@@ -12,8 +12,6 @@ import {
   type RingMetric,
   SparklineMicroChart,
   VerdictTile,
-  WrappedChapter,
-  KDEDistribution,
   PercentileBullet,
   type PercentileCategory,
   StaleDataBadge,
@@ -42,7 +40,6 @@ import {
   careerSeries,
   deriveGoalieVerdict,
   deriveShotVerdict,
-  ordinal,
   seasonLabel,
   seasonRow,
   signed,
@@ -643,28 +640,12 @@ export default function PlayerDashboard() {
     return candidates.filter((r): r is RingMetric => r !== null);
   }, [placed, isGoalie]);
 
-  // The Wrapped chapter's distribution. One source for the curve AND the
-  // marker — mixing two sources of "the same" metric is how a page ends up
-  // marking a player outside his own distribution.
-  const chapter = useMemo(() => {
-    if (!indexEntry) return null;
-    const spec = isGoalie ? GOALIE_METRICS[0] : SKATER_METRICS[0];
-    const scale = buildMetricScale(index.players, cohort, spec.select, spec.direction);
-    const value = spec.select(indexEntry);
-    if (scale.values.length < 30 || typeof value !== 'number' || !Number.isFinite(value)) return null;
-    const sorted = scale.values;
-    const median = sorted[Math.floor(sorted.length / 2)];
-    const placedResult = placeOnScale(scale, value, indexEntry.gp);
-    return {
-      spec,
-      samples: [...sorted],
-      value,
-      median,
-      delta: value - median,
-      percentile: placedResult.percentile,
-      cohortSize: placedResult.cohortSize,
-    };
-  }, [indexEntry, index.players, cohort, isGoalie]);
+  // CHAPTER 4 REMOVED (2026-09-05, Garrett): "it's just an xG number
+  // against the median and it looks like we're grading a great passer as a
+  // bad player." Mitch Marner at the 28th percentile of xG/60 is not a
+  // verdict on Mitch Marner. The percentiles block above already places
+  // every metric with its cohort; one metric blown up to 96px was the wrong
+  // emphasis.
 
   // ── States that replace the whole page ─────────────────────────────
 
@@ -1115,47 +1096,6 @@ export default function PlayerDashboard() {
             · {placed.cohortSize} {COHORT_NOUN[cohort]} benchmarked
           </span>
         </div>
-      </section>
-
-      {/* ── SHARE ZONE — the Wrapped chapter ──────────────────────── */}
-      <section
-        aria-label="Position vs league"
-        className="relative mx-auto mt-12 max-w-[1280px] px-4 sm:px-6 sm:mt-16"
-      >
-        {chapter ? (
-          <WrappedChapter
-            chapterNumber={4}
-            title="POSITION VS LEAGUE"
-            subtitle={`${chapter.spec.label.toUpperCase()} · ALL ${COHORT_NOUN[cohort].toUpperCase()} · ${chapter.cohortSize} PLAYERS`}
-            callout={{
-              value: signed(chapter.delta, chapter.spec.key === 'svpct' ? 3 : 2),
-              label: 'vs cohort median',
-              support:
-                chapter.percentile != null
-                  ? `${ordinal(chapter.percentile)} percentile · ${chapter.cohortSize} ${COHORT_NOUN[cohort]}`
-                  : undefined,
-              accent: 'cream',
-            }}
-          >
-            <KDEDistribution
-              samples={chapter.samples}
-              playerValue={chapter.value}
-              accent="orange"
-              markerValueLabel={`${(identity?.name ?? '').toUpperCase()} · ${chapter.spec.format(chapter.value)}`}
-              height={isMobile ? 180 : 220}
-            />
-          </WrappedChapter>
-        ) : (
-          <WrappedChapter
-            chapterNumber={4}
-            title="POSITION VS LEAGUE"
-            emptyText={
-              index.status === 'error'
-                ? 'League cohort unavailable'
-                : 'Not enough of the cohort measured to draw a distribution'
-            }
-          />
-        )}
       </section>
 
       <div className="mx-auto mt-12 max-w-[1280px] px-4 sm:px-6">
