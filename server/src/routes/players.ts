@@ -236,17 +236,20 @@ playerRoutes.get('/directory', authMiddleware, async (c) => {
     // WT · SHOOTS under the name, and player_directory holds all four for
     // every 2026 row (1,277 of 1,277 checked on prod). This route had no
     // caller and selected two columns; it now carries the bio strip.
-    let query = supabase
-      .from('player_directory')
-      .select('player_id, season, position_code, full_name, team_abbrev, jersey_number, shoots_catches, height_in, weight_lb, birthdate')
-      .in('player_id', playerIds)
-      .order('season', { ascending: false });
-
-    if (season) {
-      query = query.eq('season', parseInt(season, 10));
+    // CAREER (2026-09-05): `career` is the directory refresh's career
+    // document (migration 20260905230000). Asked for first; if this database
+    // has not taken that migration yet the read is repeated without it, so
+    // the vitals strip never goes dark over an optional column.
+    const BASE = 'player_id, season, position_code, full_name, team_abbrev, jersey_number, shoots_catches, height_in, weight_lb, birthdate';
+    const read = async (columns: string) => {
+      let query = supabase.from('player_directory').select(columns).in('player_id', playerIds).order('season', { ascending: false });
+      if (season) query = query.eq('season', parseInt(season, 10));
+      return query;
+    };
+    let { data, error } = await read(`${BASE}, career`);
+    if (error && /career/i.test(error.message ?? '')) {
+      ({ data, error } = await read(BASE));
     }
-
-    const { data, error } = await query;
 
     if (error) {
       return handleError(c, error, 'Failed to fetch player directory');

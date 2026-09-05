@@ -12,6 +12,8 @@ import {
   generatePlayerWriteup,
   parseToiToMinutes,
   normalizeSavePct,
+  careerSentences,
+  shortTrophy,
 } from '../playerWriteup';
 import type { PlayerWriteup } from '../playerWriteup';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
@@ -638,6 +640,50 @@ describe('writeup extras (2026-09-05): what the stat line cannot say', () => {
     expect(w.summary).toBe(base.summary);
     expect(w.analysis).toBe(base.analysis);
     expect(w.tags).toEqual(base.tags);
+  });
+
+  it('the career is a sentence of plain numbers, the trophies with counts, and the tags a legend earns', () => {
+    const career = {
+      gp: 1491,
+      goals: 897,
+      assists: 726,
+      points: 1623,
+      seasons: 21,
+      first_season: 20052006,
+      draft: { year: 2004, round: 1, overall: 1, team: 'WSH' },
+      awards: [
+        { name: 'Maurice "Rocket" Richard Trophy', count: 9 },
+        { name: 'Hart Memorial Trophy', count: 3 },
+        { name: 'Art Ross Trophy', count: 1 },
+        { name: 'Calder Memorial Trophy', count: 1 },
+      ],
+    };
+    const w = generatePlayerWriteup(ovi, { age: 40, career });
+    expect(w.summary).toContain('Career: 897 goals and 1,623 points in 1,491 games over 21 NHL seasons.');
+    expect(w.summary).toContain('Trophies: Rocket Richard x9, Hart x3, Art Ross.');
+    expect(w.summary).toContain('Drafted 1st overall in 2004 by WSH.');
+    for (const label of ['500-goal club', '1,000-point club', '1,000 games', 'Veteran']) {
+      expect(w.tags.some((t) => t.label === label), label).toBe(true);
+    }
+    expect(`${w.summary} ${w.analysis}`).not.toMatch(/—|Citrus/);
+  });
+
+  it('a goalie career counts wins and shutouts; a late pick is not mentioned; undrafted is', () => {
+    const g = careerSentences({ gp: 620, wins: 312, shutouts: 45, seasons: 12, draft: { year: 2010, round: 5, overall: 140, team: 'BOS' }, awards: [] }, true);
+    expect(g.summary).toEqual(['Career: 312 wins and 45 shutouts in 620 games over 12 NHL seasons.']);
+    expect(g.tags.map((t) => t.label)).toEqual(['300 wins']);
+    const u = careerSentences({ gp: 200, goals: 40, points: 90, seasons: 3, draft: null, awards: [] }, false);
+    expect(u.summary).toEqual(['Career: 40 goals and 90 points in 200 games over 3 NHL seasons.', 'Undrafted.']);
+    expect(u.tags).toEqual([]);
+    expect(careerSentences(null, false)).toEqual({ summary: [], tags: [] });
+    expect(careerSentences({ gp: 0 }, false).summary).toEqual([]);
+  });
+
+  it('shortTrophy keeps the name a fan uses', () => {
+    expect(shortTrophy('Maurice "Rocket" Richard Trophy')).toBe('Rocket Richard');
+    expect(shortTrophy('Hart Memorial Trophy')).toBe('Hart');
+    expect(shortTrophy('Vezina Trophy')).toBe('Vezina');
+    expect(shortTrophy('Ted Lindsay Award')).toBe('Ted Lindsay');
   });
 
   it('never writes an em dash or the brand', () => {

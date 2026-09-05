@@ -12,6 +12,8 @@ export interface DirectoryVitalsRow {
   birthdate?: string | null;
   is_goalie?: boolean | null;
   position_code?: string | null;
+  /** CAREER (2026-09-05): the directory refresh's career document, when fetched. */
+  career?: unknown;
 }
 
 export interface Vital {

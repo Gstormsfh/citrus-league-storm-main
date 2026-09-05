@@ -16,7 +16,7 @@ import { playerApi } from '@/api/players';
 import { MatchupService } from '@/services/MatchupService';
 import { matchupApi } from '@/api/matchups';
 import { ScoringCalculator } from '@/utils/scoringUtils';
-import { generatePlayerWriteup, WriteupTone, type WriteupExtras } from '@/utils/playerWriteup';
+import { generatePlayerWriteup, WriteupTone, type CareerSummary, type WriteupExtras } from '@/utils/playerWriteup';
 import { NewsItemRow } from '@/components/news/NewsItemRow';
 import { buildAdvancedCardData, type CardEntry } from '@/components/player/playerAdvancedMetrics';
 import { usePlayerXgHistory } from '@/components/player/usePlayerXgHistory';
@@ -569,10 +569,13 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   // The bio strip from player_directory (age, height, weight, shoots), when
   // the player object did not bring its own.
   const [directoryVitals, setDirectoryVitals] = useState<Vital[]>([]);
+  // CAREER (2026-09-05): the directory's career document, for the writeup.
+  const [career, setCareer] = useState<CareerSummary | null>(null);
   useEffect(() => {
     const id = Number(player?.id);
     if (!isOpen || !Number.isFinite(id) || id <= 0) {
       setDirectoryVitals([]);
+      setCareer(null);
       return;
     }
     let cancelled = false;
@@ -581,10 +584,15 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
       .then((res) => {
         if (cancelled) return;
         const rows = ((res as { data?: unknown }).data ?? []) as DirectoryVitalsRow[];
-        setDirectoryVitals(vitalsFrom(newestRowFor(rows, id)));
+        const newest = newestRowFor(rows, id);
+        setDirectoryVitals(vitalsFrom(newest));
+        setCareer((newest?.career as CareerSummary | null | undefined) ?? null);
       })
       .catch(() => {
-        if (!cancelled) setDirectoryVitals([]);
+        if (!cancelled) {
+          setDirectoryVitals([]);
+          setCareer(null);
+        }
       });
     return () => {
       cancelled = true;
@@ -673,6 +681,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
       projGp: indexEntry?.proj_gp ?? null,
       posRank: positionRank,
       projectionLabel: framing.beforeOpener ? `for ${framing.eyebrow.replace(' projection', '')}` : 'the rest of the way',
+      career,
     };
   })();
   const writeup = generatePlayerWriteup(player, writeupExtras);

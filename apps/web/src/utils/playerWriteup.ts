@@ -608,6 +608,75 @@ export interface WriteupExtras {
   projGp?: number | null;
   posRank?: string | null;
   projectionLabel?: string | null;
+  /** From player_directory.career (NHL landing endpoint, regular season only). */
+  career?: CareerSummary | null;
+}
+
+/** The career document the directory refresh writes (populate_career_totals.py). */
+export interface CareerSummary {
+  gp?: number | null;
+  goals?: number | null;
+  assists?: number | null;
+  points?: number | null;
+  wins?: number | null;
+  shutouts?: number | null;
+  seasons?: number | null;
+  first_season?: number | null;
+  draft?: { year?: number | null; round?: number | null; overall?: number | null; team?: string | null } | null;
+  awards?: ReadonlyArray<{ name: string; count: number }> | null;
+}
+
+const fmtN = (n: number) => n.toLocaleString('en-US');
+
+/**
+ * The career, as one sentence and the tags a legend has earned. Regular
+ * season only, plain numbers, no adjectives: "897 goals" says legend on
+ * its own. Awards are the trophies with a count, the three most won.
+ */
+export function careerSentences(career: CareerSummary | null | undefined, goalie: boolean): { summary: string[]; tags: WriteupTag[] } {
+  const summary: string[] = [];
+  const tags: WriteupTag[] = [];
+  if (!career) return { summary, tags };
+  const gp = career.gp ?? 0;
+  const seasons = career.seasons ?? 0;
+  if (gp > 0) {
+    const over = seasons > 1 ? ` over ${seasons} NHL seasons` : '';
+    if (goalie) {
+      const wins = career.wins ?? 0;
+      const so = career.shutouts ?? 0;
+      summary.push(`Career: ${fmtN(wins)} wins and ${fmtN(so)} shutouts in ${fmtN(gp)} games${over}.`);
+      if (wins >= 300) tags.push({ label: '300 wins', tone: 'positive' });
+    } else {
+      const g = career.goals ?? 0;
+      const p = career.points ?? 0;
+      summary.push(`Career: ${fmtN(g)} goals and ${fmtN(p)} points in ${fmtN(gp)} games${over}.`);
+      if (g >= 500) tags.push({ label: '500-goal club', tone: 'positive' });
+      if (p >= 1000) tags.push({ label: '1,000-point club', tone: 'positive' });
+    }
+    if (gp >= 1000) tags.push({ label: '1,000 games', tone: 'neutral' });
+  }
+  const awards = [...(career.awards ?? [])].filter((a) => a.count > 0).sort((a, b) => b.count - a.count).slice(0, 3);
+  if (awards.length) {
+    summary.push(`Trophies: ${awards.map((a) => (a.count > 1 ? `${shortTrophy(a.name)} x${a.count}` : shortTrophy(a.name))).join(', ')}.`);
+  }
+  const d = career.draft;
+  if (d && d.overall != null && d.year != null && d.overall <= 10) {
+    summary.push(`Drafted ${ordinalWord(d.overall)} overall in ${d.year}${d.team ? ` by ${d.team}` : ''}.`);
+  } else if (career.gp && career.gp > 0 && d === null) {
+    summary.push('Undrafted.');
+  }
+  return { summary, tags };
+}
+
+/** "Maurice \"Rocket\" Richard Trophy" -> "Rocket Richard"; "Hart Memorial Trophy" -> "Hart". */
+export function shortTrophy(name: string): string {
+  const quoted = name.match(/"([^"]+)"\s+(\w+)/);
+  if (quoted) return `${quoted[1]} ${quoted[2]}`;
+  return name
+    .replace(/\bMemorial\b/g, '')
+    .replace(/\bTrophy\b|\bAward\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /** 2025 -> "2025-26". */
@@ -658,6 +727,11 @@ export function applyWriteupExtras(writeup: PlayerWriteup, player: HockeyPlayer,
     summary.push(`He is ${extras.age}.`);
   }
   if (extras.age != null && extras.age >= 36) tags.push({ label: 'Veteran', tone: 'neutral' });
+
+  // The career on record, from the directory: what a legend's card owes him.
+  const career = careerSentences(extras.career, goalie);
+  summary.push(...career.summary);
+  for (const t of career.tags) if (!tags.some((x) => x.label === t.label)) tags.push(t);
 
   // The cohort reads, only when they say something: the top or bottom fifth.
   const noun = extras.cohortNoun ?? null;
