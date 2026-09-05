@@ -2,13 +2,14 @@
 
 ## EVENING RUN, 2026-09-04 — read this first
 
-**Every screen in artboard 1a, 4a and 4b is on its real page, the player
-card's panes and the commissioner's settings included — and the whole app
-nav is Press Box: SCORES, PLAYERS, NEWS and ACCOUNT are converted, every
-league screen wears one chrome, and the old hamburger menu is gone.**
-Thirty-six commits on `redesign/pressbox` since PR7 (`2fea1029..345b7170`).
-Nothing is pushed, nothing is applied to production. The working tree is
-clean.
+**Every screen a manager can reach on a phone is Press Box — body and
+chrome. Artboards 1a, 4a and 4b are on their real pages; the screens with
+no artboard (Scores, News, Players, Waivers, Trades, Schedule, Team view,
+GM office, Playoffs, Analytics, Stormy, Create League, Account) are built
+from the artboards' vocabulary; the whole app nav is Press Box and the
+old hamburger menu is gone.** Forty-two commits on `redesign/pressbox`
+since PR7 (`2fea1029..f1374a7d`). Nothing is pushed, nothing is applied
+to production. The working tree is clean.
 
 | screen | state | see it |
 |---|---|---|
@@ -31,7 +32,11 @@ clean.
 | Schedule (no artboard) — seven-day bars, games by club, back-to-backs, the games | done (PR10i) | `page.html?p=schedule` |
 | Team view (another manager) — the roster list, read-only, PROPOSE TRADE on the card | done (PR10j) | `page.html?p=team` |
 | GM office — the season's state as rows, the six actions as tiles | done (PR10k) | `page.html?p=gmoffice` |
-| BODIES still v1 (chrome is Press Box): Analytics, Playoffs, Profile, Create League, Stormy | open | via the league menu / ACCOUNT |
+| Playoffs — the bracket as two-sided rows (sage winner, leader in sage while live, orange champion), round heads, the champion tile, commissioner panel, seeds | done (PR10l), shared with desktop | `page.html?p=playoffs`, `&bracket=none`, `&bracket=done` |
+| Analytics — projected vs actual tile, the Roster signpost, goalies and schedule maximizers as Players rows | done (PR10m) | `page.html?p=teamanalytics` |
+| Stormy — a chat that owns the viewport: transcript, starter chips, composer above the nav; ABOUT with the allowance and clear | done (PR10n) | `page.html?p=stormy` |
+| Create League — every setting as data in the settings screen's rows (six sections; one row per stat); JOIN | done (PR10o) | `page.html?p=createleague`, `&type=playoff` |
+| Account — avatar, name, OVERVIEW / STATS / TROPHIES / SETTINGS as rows; delete behind a typed sheet | done (PR10p) | `page.html?p=profile`, `&tab=settings` |
 
 **First thing to run** (five draft suites, the MatchupComparison suites, the
 hideRoutes suite and every page suite cannot load on my offline runner):
@@ -84,13 +89,33 @@ cd ~/dev/citrus/apps/web && npm run lint && npm run test
    simulator from inside a league.
 10. **PressBoxAppHeader draws each control only with a handler** — the
    orange `+ LEAGUE` belongs to the screen that lists leagues.
+11. **The playoff bracket is restyled for both layouts** (PR10l): the
+   MatchupCard and RoundColumn are shared, so the desktop bracket wears
+   the Press Box rows too. Same dark family; a spring screen. A bye or
+   a pending series shows `–`, never `0.0`.
+12. **Analytics goalies carry no points line** (PR10m). The directory's
+   `points` is skater scoring; the 09-01 card printed `0.0 Avg Pts` for
+   every goalie. They are ranked by games this week and the copy says so.
+13. **Stormy's page does not draw what did nothing** (PR10n): the three
+   unwired switches, the `Upgrade to Unlimited` button and the meter that
+   reset to 0/15 on reload. The allowance is a fact row (15 a week,
+   rolling); `Clear chat history` is real now on both layouts. The Stormy
+   bar stands down on `/gm-office/stormy`.
+14. **Create League is data** (`createLeagueSections.ts`, PR10o), drawn by
+   the same rows as League settings (`SettingFields.tsx` is the one switch
+   statement). A stat is ONE row whose first option is `Off`; the desktop
+   form is untouched and the two share every piece of state. The phone's
+   JOIN pane has no clipboard-copy button beside the code.
+15. **The account screen does not draw the two preference switches**
+   (`handlePreferenceChange` sets local state and toasts "saved
+   automatically"; nothing persists) **or the commissioner-settings copy**
+   (a 340-line duplicate of League HQ's dialog); a commissioner's league
+   is a row into League HQ, where the Press Box settings screen already
+   is. The desktop keeps both. Wire the switches to real preferences and
+   they can come back as toggle rows in one line each.
 
 ### Still open
 
-- The BODIES of Analytics, Playoffs, Profile (2,400 lines of forms),
-  Create League and Stormy — chrome is Press Box, content is v1. Profile
-  and Create League are yours to call before I rebuild them; Playoffs is
-  a spring screen.
 - Two migrations, unapplied: `20260904100000`, `20260904101000`.
 - `FreeAgentRow` + its tests, once Players is signed off.
 - PR3 skeletons, PR12 aggregates, PR13 motion, PR14/15 moments, PR17, PR18.
