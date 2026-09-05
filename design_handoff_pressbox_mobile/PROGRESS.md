@@ -1173,3 +1173,20 @@ the shape.
 Not yet: tapping a player's name on a row to open the card, and the
 career-totals ingest (NHL landing endpoint → `player_directory.notes`) for
 the writeups.
+
+**Settings pass-through (b2fc96a9, 192fcea2, 4bc1519f, 2f65a166).** "All
+create a league settings are CRUCIAL that they are passed through in EVERY
+SINGLE WAY." Four that were not: the auction bid window was never written
+(every auction ran 30s) and the room hardcoded a $1 minimum and increment
+the engine did not (Create League has a Bid Timer; `auctionRules.ts` reads
+the league's minimum, tiers and budget, `minimumNextBid` mirrors the
+engine); a scoring-rule edit reached only the SQL scorer (the route folds
+the effective rules back into `scoring_settings`, `scoringMirror.ts`); the
+trade deadline was create-time only and the TRADES screen read a key
+nothing writes, then reloaded through two caches nobody invalidated
+(deadline editable, columns read, caches cleared before reload);
+`allow_trades_during_games` was stored and never read (OFF holds a trade
+with a player on the ice, `lockedTeamForTrade`). Still open, and deliberate
+for after Tuesday: keepers lock (`lock_keepers_for_season`) but the v2
+engine does not seat them or skip the consumed rounds; `roster_slots` is
+never written and `settings.stats[]` never read.
