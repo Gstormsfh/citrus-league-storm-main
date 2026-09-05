@@ -90,10 +90,12 @@ Tick every box before merging. The four **bold** items are the ones that actuall
 - [ ] Analyst card prints letter-landscape without reflowing
 
 ## PR18 — App Store
-- [ ] Launch screen = static frame of Motion `2a`
-- [ ] Icon: `favicon.svg` mark on `#0C1811`, all required sizes
-- [ ] Store screenshots: Matchup, Roster, Players, `3b` live momentum, `3f` awards
-- [ ] Privacy manifest complete
-- [ ] Reduced-motion audit: no transforms or loops when the setting is on
-- [ ] VoiceOver labels on every row, bar and chip
-- [ ] First league page interactive under 1.5s on 4G
+- [x] Launch screen = static frame of Motion `2a` — `Splash.imageset` regenerated: `#0C1811` ground, the glow, the puck at the overlay's exact spot, the empty track. The wordmark is NOT in the image (no Barlow in the launch image; it lands with the web view). Storyboard ground `#0C1811`, was white; capacitor `backgroundColor`, `html`, `body`, `#root` and the native hold in `Index.tsx` are the same colour, so the cold start is one ground (`capacitorShellGuard`)
+- [x] Icon: `favicon.svg` mark on `#0C1811`, 1024 universal (Xcode 14+ derives the sizes)
+- [ ] Store screenshots: Matchup, Roster, Players, `3b` live momentum, `3f` awards — Garrett, from the simulator
+- [x] Privacy manifest complete (audited 2026-08-15; nothing new touches a required-reason API)
+- [x] Status bar: `UIStatusBarStyle` light content + `UIUserInterfaceStyle` Dark in Info.plist — Capacitor defaulted to `.default`, i.e. black time/battery over the header on every light-appearance phone
+- [x] Fonts off the render path: the Google Fonts sheet is a non-blocking `<link>` in `index.html`, no longer an `@import` at the top of `index.css` that held the first paint on a round trip to Google. Self-hosting the three Press Box faces (`@fontsource`) is the follow-up — needs `npm i` on the Mac
+- [x] Reduced-motion audit: the global rule at `index.css` `@media (prefers-reduced-motion: reduce)` zeroes every animation and transition; the boot splash and the shimmer have their own static states on top
+- [ ] VoiceOver labels on every row, bar and chip — rows and chips carry `aria-label`s by construction (`PressBoxPlayerRow`, `PressBoxRosterRow`, chips); a device pass with VoiceOver on is still owed
+- [ ] First league page interactive under 1.5s on 4G — measure on device after the fonts are self-hosted

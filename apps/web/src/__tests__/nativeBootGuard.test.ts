@@ -38,7 +38,9 @@ describe('the homepage is the app home on a phone, the storefront everywhere els
     expect(SOURCE).toMatch(/Capacitor\.isNativePlatform\(\)/);
     expect(SOURCE).toMatch(/auth\?\.loading/);
     expect(SOURCE).toMatch(/league\?\.loading/);
-    expect(SOURCE).toMatch(/#0F1F15/);
+    // The Press Box surface -- the same ground as the launch image and the
+    // boot splash (PR18), so the hold is invisible.
+    expect(SOURCE).toMatch(/#0C1811/);
   });
 
   it('renders the Press Box home for a signed-in manager with leagues, native or below lg', () => {

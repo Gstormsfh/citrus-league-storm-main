@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<html lang="en" style="background: #0F1F15;">
+<html lang="en" style="background: #0C1811;">
   <head>
     <meta charset="UTF-8" />
     <script>
@@ -13,6 +13,15 @@
     <!-- Preconnect to Google Fonts for faster font loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- PR18 (2026-09-05): the fonts load WITHOUT blocking the first paint.
+         This sheet used to be an @import at the top of index.css, which
+         made the whole app stylesheet -- and so the first frame -- wait on
+         a round trip to Google: on a cold native start with a slow or
+         absent network, the launch image sat there until the fetch gave
+         up. `media="print"` fetches it off the render path; `onload`
+         switches it live and the faces swap in (display=swap). -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&family=Graduate&family=Alfa+Slab+One&family=Pacifico&family=Bangers&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,700&family=Bebas+Neue&family=Calistoga&family=JetBrains+Mono:wght@400;500;600&family=Barlow+Condensed:wght@700;800&family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&family=Graduate&family=Alfa+Slab+One&family=Pacifico&family=Bangers&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,700&family=Bebas+Neue&family=Calistoga&family=JetBrains+Mono:wght@400;500;600&family=Barlow+Condensed:wght@700;800&family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" /></noscript>
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -20,7 +29,8 @@
 
     <!-- iOS PWA Meta Tags -->
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0C1811" />
     <meta name="apple-mobile-web-app-title" content="Citrus" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
@@ -46,7 +56,7 @@
   </head>
 
   <body>
-    <div id="root" style="padding: 20px; font-family: sans-serif; text-align: center; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #0F1F15;">
+    <div id="root" style="padding: 20px; font-family: sans-serif; text-align: center; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #0C1811;">
       <div>
         <h1 style="color: #FFF8F0; margin-bottom: 20px;">Citrus</h1>
         <div style="border: 4px solid rgba(255,255,255,0.1); border-top: 4px solid #FF6B1A; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
@@ -90,7 +100,7 @@
           if (window.__REACT_MOUNTED) return;
           var root = document.getElementById('root');
           if (root) {
-            root.innerHTML = '<div style="padding:40px;font-family:sans-serif;text-align:center;max-width:600px;margin:0 auto;background:#0F1F15;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center"><h2 style="color:#fca5a5;margin-bottom:16px">Page failed to load</h2><p style="color:rgba(255,255,255,0.55);margin-bottom:16px">JavaScript could not start. Try refreshing or clearing your cache.</p><button onclick="location.reload()" style="padding:8px 24px;background:#FF6B1A;color:#0F1F15;border:none;border-radius:6px;cursor:pointer;font-weight:bold">Reload</button></div>';
+            root.innerHTML = '<div style="padding:40px;font-family:sans-serif;text-align:center;max-width:600px;margin:0 auto;background:#0C1811;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center"><h2 style="color:#fca5a5;margin-bottom:16px">Page failed to load</h2><p style="color:rgba(255,255,255,0.55);margin-bottom:16px">JavaScript could not start. Try refreshing or clearing your cache.</p><button onclick="location.reload()" style="padding:8px 24px;background:#FF6B1A;color:#0F1F15;border:none;border-radius:6px;cursor:pointer;font-weight:bold">Reload</button></div>';
           }
         }, 15000);
       })();

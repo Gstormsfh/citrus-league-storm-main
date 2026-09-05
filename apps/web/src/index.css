@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&family=Graduate&family=Alfa+Slab+One&family=Pacifico&family=Bangers&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,700&family=Bebas+Neue&family=Calistoga&family=JetBrains+Mono:wght@400;500;600&family=Barlow+Condensed:wght@700;800&family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+/* The Google Fonts sheet is linked from index.html, off the render path (PR18). */
 
 @tailwind base;
 @tailwind components;
@@ -435,7 +435,13 @@
   }
   
   html {
-  background: #0F1F15;
+  /* PRESS BOX (PR18, 2026-09-05): the ground under the app is the Press
+     Box surface, so the launch image, the native web view
+     (capacitor.config backgroundColor), the pre-paint frame and the boot
+     splash are one colour and the cold start is one motion. Desktop pages
+     paint their own #0F1F15; this shows only at overscroll and before the
+     first paint. capacitorShellGuard pins the three together. */
+  background: #0C1811;
   }
 
   .dark html, html.dark {
@@ -448,7 +454,7 @@
      (hidden forces overflow-y into auto per spec, which created the
      second scroller that broke wheel routing). No overflow-y here ever. */
   overflow-x: clip;
-  background: #0F1F15;
+  background: #0C1811;
   /* 2026-08-19: was `text-citrus-forest` (#4A5F4D) — a DARK green
      default on this DARK background. tailwind.config.ts warns in its
      own comment that forest* are TEXT colours for LIGHT surfaces and

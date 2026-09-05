@@ -110,6 +110,20 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- STATUS BAR + APPEARANCE (PR18, 2026-09-05). Capacitor's bridge view
+	     controller reads UIStatusBarStyle from this file (CAPBridgeViewController
+	     .setStatusBarDefaults) and defaults to .default, which is DARK text
+	     whenever the phone is in light appearance: black time and battery
+	     over the #0C1811 Press Box header, i.e. no status bar at all for most
+	     managers. The app has one appearance, dark, so the status bar is light
+	     content and the system's own surfaces (alerts, the photo picker, the
+	     keyboard, the share sheet) are asked to match it. The legacy `.dark`
+	     class is keyed on a localStorage value the app no longer writes, so
+	     the web view reporting prefers-color-scheme: dark changes nothing. -->
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleLightContent</string>
+	<key>UIUserInterfaceStyle</key>
+	<string>Dark</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 </dict>

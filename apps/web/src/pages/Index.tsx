@@ -42,7 +42,7 @@ const Index = () => {
     const authSettling = auth?.loading ?? false;
     const leagueSettling = Boolean(auth?.user) && (league?.loading ?? false);
     if (authSettling || leagueSettling) {
-      return <div style={{ minHeight: '100vh', background: '#0F1F15' }} aria-busy="true" />;
+      return <div style={{ minHeight: '100vh', background: '#0C1811' }} aria-busy="true" />;
     }
   }
 
