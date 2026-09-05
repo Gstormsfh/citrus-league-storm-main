@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, fireEvent, within } from '@testing-library/react';
 import { PlayersBrowsePhone, PAGE_SIZE } from '../PlayersBrowsePhone';
-import { dashboardEntryToHockeyPlayer, svp } from '../playersBrowse';
+import { dashboardEntryToHockeyPlayer, svp, browseStatLine } from '../playersBrowse';
 import type { DashboardIndexEntry } from '@/hooks/usePlayerDashboardIndex';
 
 afterEach(() => {
@@ -168,6 +168,15 @@ describe('PlayersBrowsePhone', () => {
     cleanup();
     mount({ rows: [], total: 0 });
     expect(screen.getByTestId('players-browse-empty')).toBeInTheDocument();
+  });
+});
+
+describe('browseStatLine', () => {
+  it('prints the counting stats a pool is scanned by, and nothing for a player with no games', () => {
+    expect(browseStatLine(entry(1, { gp: 82, goals: 55, assists: 80, sog: 320, ppp: 40, plus_minus: 20 }))).toBe('82 GP · 55G 80A · 320 SOG · 40 PPP');
+    expect(browseStatLine(entry(7, { gp: 10, plus_minus: -3 }))).toBe('10 GP · 7G 2A · 30 SOG · 3 PPP');
+    expect(browseStatLine(entry(3, { gp: 0 }))).toBeNull();
+    expect(browseStatLine(entry(4, { is_goalie: true, position: 'G', gp: 58, wins: 30, save_pct: 0.912, gaa: 2.31, shutouts: 3 }))).toBe('58 GP · 30W · .912 SV% · 2.31 GAA');
   });
 });
 

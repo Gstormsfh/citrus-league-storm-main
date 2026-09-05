@@ -30,7 +30,7 @@ import { pressBoxPositionChipClasses, positionChipKey } from '@/components/press
 import { Mug } from '@/components/roster/Mug';
 import type { MugPlayer } from '@/components/roster/headshot';
 import type { DashboardIndexEntry } from '@/hooks/usePlayerDashboardIndex';
-import { GOALIE_SORTS, SKATER_SORTS, type GoalieSortKey, type SkaterSortKey } from './playersBrowse';
+import { GOALIE_SORTS, SKATER_SORTS, browseStatLine, type GoalieSortKey, type SkaterSortKey } from './playersBrowse';
 
 export const PAGE_SIZE = 50;
 
@@ -179,12 +179,11 @@ export function PlayersBrowsePhone({
       {loading ? (
         <div data-testid="players-browse-loading">
           <div
-            className="grid grid-cols-[22px_1fr_44px_64px] gap-2 pt-3 pb-1 px-0.5 font-plex font-medium text-[9px] tracking-[0.06em] uppercase text-pressbox-text/40"
+            className="grid grid-cols-[22px_1fr_64px] gap-2 pt-3 pb-1 px-0.5 font-plex font-medium text-[9px] tracking-[0.06em] uppercase text-pressbox-text/40"
             aria-hidden="true"
           >
             <span>#</span>
-            <span>Player · team · pos</span>
-            <span className="text-right">GP</span>
+            <span>Player · team · season line</span>
             <span className="text-right">{sort.label}</span>
           </div>
           <PressBoxSkeletonRows rows={8} height={56} rank />
@@ -211,12 +210,11 @@ export function PlayersBrowsePhone({
       ) : (
         <>
           <div
-            className="grid grid-cols-[22px_1fr_44px_64px] gap-2 pt-3 pb-1 px-0.5 font-plex font-medium text-[9px] tracking-[0.06em] uppercase text-pressbox-text/40"
+            className="grid grid-cols-[22px_1fr_64px] gap-2 pt-3 pb-1 px-0.5 font-plex font-medium text-[9px] tracking-[0.06em] uppercase text-pressbox-text/40"
             aria-hidden="true"
           >
             <span>#</span>
-            <span>Player · team · pos</span>
-            <span className="text-right">GP</span>
+            <span>Player · team · season line</span>
             <span className="text-right">{sort.label}</span>
           </div>
           <ol className="border-b border-white/[0.06]" data-testid="players-browse-list">
@@ -226,7 +224,7 @@ export function PlayersBrowsePhone({
                   type="button"
                   onClick={() => onOpen(p)}
                   aria-label={`Open player card for ${p.name}`}
-                  className="focus-citrus grid grid-cols-[22px_1fr_44px_64px] gap-2 items-center w-full min-h-[56px] py-1.5 px-0.5 text-left border-t border-white/[0.06]"
+                  className="focus-citrus grid grid-cols-[22px_1fr_64px] gap-2 items-center w-full min-h-[60px] py-1.5 px-0.5 text-left border-t border-white/[0.06]"
                 >
                   <span className="font-plex font-medium text-[10px] tabular-nums text-pressbox-text/45">{i + 1}</span>
                   <span className="flex items-center gap-2 min-w-0">
@@ -240,9 +238,13 @@ export function PlayersBrowsePhone({
                         {p.team}
                         {p.jersey != null && ` · #${p.jersey}`}
                       </span>
+                      {browseStatLine(p) && (
+                        <span className="mt-0.5 block font-plex font-medium text-[10px] text-pressbox-text/55 tabular-nums whitespace-nowrap overflow-hidden text-ellipsis" data-testid="players-browse-statline">
+                          {browseStatLine(p)}
+                        </span>
+                      )}
                     </span>
                   </span>
-                  <span className="font-plex font-medium text-[11px] tabular-nums text-right text-pressbox-text/60">{p.gp}</span>
                   <span
                     className={cn(
                       'font-plex font-semibold text-[17px] tabular-nums text-right leading-none',

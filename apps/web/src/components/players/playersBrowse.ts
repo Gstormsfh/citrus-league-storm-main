@@ -60,6 +60,27 @@ export function toiPerGame(seasonSeconds: number, gp: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+/**
+ * THE STAT LINE (2026-09-05). "Players needs to show more statistics, not
+ * just proj points." One line under the club: the counting stats a
+ * manager scans a pool by, in the order the scoring counts them. A goalie
+ * gets his own four. Nothing a row does not have is printed as a zero:
+ * a player with no games played gets no line at all.
+ */
+export function browseStatLine(p: DashboardIndexEntry): string | null {
+  if (!p.gp) return null;
+  if (p.is_goalie) {
+    const sv = p.save_pct > 0 ? (p.save_pct > 1 ? (p.save_pct / 100).toFixed(3) : p.save_pct.toFixed(3)).replace(/^0/, '') : null;
+    return [`${p.gp} GP`, `${p.wins}W`, sv ? `${sv} SV%` : null, p.gaa > 0 ? `${p.gaa.toFixed(2)} GAA` : null]
+      .filter(Boolean)
+      .join(' · ');
+  }
+  // GP leads the line (the column it replaced). The name column holds ~34
+  // characters of 10px mono at 393 wide, so goals and assists share a
+  // cell the way a box score writes them: `55G 80A`.
+  return `${p.gp} GP · ${p.goals}G ${p.assists}A · ${p.sog} SOG · ${p.ppp} PPP`;
+}
+
 export function dashboardEntryToHockeyPlayer(p: DashboardIndexEntry): HockeyPlayer {
   return {
     id: p.id,
