@@ -17,6 +17,7 @@ import { MatchupService } from '@/services/MatchupService';
 import { matchupApi } from '@/api/matchups';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 import { generatePlayerWriteup, WriteupTone, type WriteupExtras } from '@/utils/playerWriteup';
+import { NewsItemRow } from '@/components/news/NewsItemRow';
 import { buildAdvancedCardData, type CardEntry } from '@/components/player/playerAdvancedMetrics';
 import { usePlayerXgHistory } from '@/components/player/usePlayerXgHistory';
 import { projectionFraming } from '@/components/player/projectionFraming';
@@ -552,7 +553,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   // MUST sit above the `if (!player) return null` below — a hook called after
   // an early return runs conditionally, which breaks the Rules of Hooks and
   // desyncs every hook after it the moment `player` goes null on close.
-  const { notes: citrusNotes } = useCitrusPlayerNotes(player?.id, isOpen);
+  const { notes: citrusNotes, items: wireItems } = useCitrusPlayerNotes(player?.id, isOpen);
   // Same rule: the log's rows are derived above the early return. They read
   // the goalie flag off `player` directly because `isGoalie` is declared
   // below it.
@@ -868,7 +869,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 { key: 'log', label: 'Game log' },
                 { key: 'splits', label: 'Splits' },
                 { key: 'xg', label: 'xG' },
-                { key: 'news', label: citrusNotes.length > 0 ? `News · ${citrusNotes.length}` : 'News' },
+                { key: 'news', label: citrusNotes.length + wireItems.length > 0 ? `News · ${citrusNotes.length + wireItems.length}` : 'News' },
               ]}
             />
 
@@ -1107,6 +1108,22 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
             {/* ─── News Tab: Citrus notes from our own shot-quality data ─── */}
             <TabsContent value="news" className="mt-0 space-y-4">
+              {/* NEWS ROOM (2026-09-05): the wire stories that name him, from
+                  NHL.com, ESPN and the publishers' feeds. A summary, the
+                  source and the link out, the way Sleeper and Yahoo do it. */}
+              {wireItems.length > 0 && (
+                <div className="rounded-[12px] bg-pressbox-tile border border-white/[0.08] overflow-hidden" data-testid="card-wire-news">
+                  <div className="flex items-center justify-between gap-2 px-3.5 pt-3 pb-1">
+                    <span className="font-plex font-semibold text-[9px] uppercase tracking-[0.12em] text-pressbox-orange-soft">From the wires</span>
+                    <span className="font-plex font-medium text-[9px] text-pressbox-text/45">{wireItems.length} {wireItems.length === 1 ? 'story' : 'stories'}</span>
+                  </div>
+                  <div className="divide-y divide-white/[0.06]">
+                    {wireItems.map((item) => (
+                      <NewsItemRow key={item.id} item={item} />
+                    ))}
+                  </div>
+                </div>
+              )}
               {/* Latest News — Citrus notes generated from our own shot-quality
                   data (citrus_news). Same slot Sleeper fills with Rotowire.
                   Renders nothing at all when there are no notes; an empty
@@ -1154,13 +1171,13 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                     ))}
                   </div>
                 </div>
-              ) : (
+              ) : wireItems.length === 0 ? (
                 <div className="text-center py-10">
                   <Newspaper className="w-8 h-8 text-pressbox-text/45 mx-auto mb-3" aria-hidden="true" />
-                  <p className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text/70">No notes yet</p>
-                  <p className="font-plex font-medium text-[10px] text-pressbox-text/45 mt-1">Citrus writes one when his shot quality moves</p>
+                  <p className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text/70">Nothing on the wires yet</p>
+                  <p className="font-plex font-medium text-[10px] text-pressbox-text/45 mt-1">Stories that name him land here as they are published</p>
                 </div>
-              )}
+              ) : null}
             </TabsContent>
 
             {/* ─── Game Log Tab ─── */}

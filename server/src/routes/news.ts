@@ -4,6 +4,7 @@ import { ok, fail } from '../lib/responses';
 import { AppError } from '../lib/errors';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { logger } from '@citrus/shared';
+import { NewsRoomService } from '../services/NewsRoomService';
 
 /**
  * News routes — server-side proxy for third-party NHL news feeds.
@@ -171,21 +172,72 @@ newsRoutes.get('/player/:playerId', async (c) => {
 
   try {
     const supabase = getSupabaseAdmin();
-    const { data, error } = await supabase
-      .from('citrus_news')
-      .select('id, kind, headline, body, analysis, severity, tags, published_at, season')
-      .eq('player_id', playerId)
-      .order('published_at', { ascending: false })
-      .limit(5);
+    // NEWS ROOM (2026-09-05): the wire stories that name him ride along with
+    // our notes, so the card's NEWS tab reads like Sleeper's: a summary and
+    // a link to the writer. Either read failing leaves the other standing.
+    const [notesRes, items] = await Promise.all([
+      supabase
+        .from('citrus_news')
+        .select('id, kind, headline, body, analysis, severity, tags, published_at, season')
+        .eq('player_id', playerId)
+        .order('published_at', { ascending: false })
+        .limit(5),
+      new NewsRoomService(supabase).forPlayer(playerId, 10).catch((err: unknown) => {
+        logger.warn(`[news] wire items unavailable for ${playerId}:`, err instanceof Error ? err.message : String(err));
+        return [];
+      }),
+    ]);
 
-    if (error) {
-      logger.warn(`[news] player notes query failed for ${playerId}:`, error.message);
-      return ok(c, { notes: [] });
+    if (notesRes.error) {
+      logger.warn(`[news] player notes query failed for ${playerId}:`, notesRes.error.message);
+      return ok(c, { notes: [], items });
     }
-    return ok(c, { notes: data || [] });
+    return ok(c, { notes: notesRes.data || [], items });
   } catch (error) {
     logger.warn(`[news] player notes unavailable for ${playerId}:`, error);
     return ok(c, { notes: [] });
+  }
+});
+
+/**
+ * GET /api/news/items?player_ids=1,2&team=EDM&limit=40&before=<iso>
+ *
+ * The News Room's list: stored wire stories, newest first, narrowed to the
+ * players a manager cares about or a team. Read by the News Room screen.
+ */
+newsRoutes.get('/items', async (c) => {
+  const idsRaw = c.req.query('player_ids') ?? '';
+  const playerIds = idsRaw
+    .split(',')
+    .map((s) => Number.parseInt(s, 10))
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .slice(0, 400);
+  const team = c.req.query('team') || null;
+  if (team && !/^[A-Za-z]{2,4}$/.test(team)) return fail(c, AppError.badRequest('team must be a 2-4 letter abbreviation'));
+  const limit = Number.parseInt(c.req.query('limit') ?? '40', 10);
+  const before = c.req.query('before') || null;
+  if (before && Number.isNaN(new Date(before).getTime())) return fail(c, AppError.badRequest('before must be an ISO timestamp'));
+  try {
+    const service = new NewsRoomService(getSupabaseAdmin());
+    const items = await service.list({ playerIds, team, limit: Number.isFinite(limit) ? limit : 40, before });
+    const players = await service.namesFor(items).catch((err) => {
+      logger.warn('[news] player names unavailable:', err instanceof Error ? err.message : String(err));
+      return [] as Array<{ id: number; name: string }>;
+    });
+    return ok(c, { items, players });
+  } catch (error) {
+    logger.warn('[news] items unavailable:', error instanceof Error ? error.message : String(error));
+    return ok(c, { items: [], players: [] });
+  }
+});
+
+/** GET /api/news/health: when the wires were last read, and what they gave. */
+newsRoutes.get('/health', async (c) => {
+  try {
+    return ok(c, await new NewsRoomService(getSupabaseAdmin()).health());
+  } catch (error) {
+    logger.warn('[news] health unavailable:', error instanceof Error ? error.message : String(error));
+    return ok(c, { lastRunAt: null, sources: 0, seen24h: 0, inserted24h: 0, errors24h: 0 });
   }
 });
 

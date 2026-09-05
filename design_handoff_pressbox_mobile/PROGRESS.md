@@ -1103,3 +1103,73 @@ four days before the rehearsal, so the swap happens with the draft-room work,
 where those routes are already under test.
 
 446/446 source-walking guards, `tsc` exit 0, `eslint` 0 errors.
+
+## 2026-09-05 — the phone's first real day, and the News Room
+
+Everything below came from Garrett's thumb on the TestFlight build, in the
+order it arrived, each a commit on `redesign/pressbox`.
+
+**Cut-offs everywhere (e42a0e60).** Not a layout bug: iOS zooms the page
+when a field under 16px takes focus and never zooms back, so the DONE bar
+and everything after it sat off-screen. The viewport meta now carries
+`maximum-scale=1.0, user-scalable=no` and every Press Box field is 16px.
+The 2-team league "needing 11 more" was the same bug: the league-size
+control was below the fold the zoom created.
+
+**Auction (694a36a7, 89cb5e81).** Four picks in, the pool did not shrink
+and the board did not fill: `deriveDraftState.foldEvents` folded only
+snake/linear events, so a sold lot never became a RosterEntry. It awards on
+`auction_nomination_closed` and on the commissioner overrides now. The
+room's chrome is Press Box: `AuctionPanel` (lot tile, red ≤5s clock, BID $n
+/ custom, YOU LEAD in sage, budgets with YOU first), `AuctionBoard` (a
+column per team, price under the name, because an auction board fills at
+every team's own pace, not round by round). The (i) button is gone from the
+pool: the action is on every row, `Draft` or `Nominate` by format, press
+then `Confirm` (6s), off-turn disabled with "Not your turn"; the card opens
+from the name, mug or stats.
+
+**Player card and dashboard.** TOI was 0 because the loader never selected
+`nhl_toi_seconds` (b16d0b87): "Limited ice time" on McDavid and every
+TOI/60 came from that. The game log counts regular season only (ad12ba57:
+93 GP was 82 plus playoffs). Chapter 4 (xG against median) is removed
+(e2396dea): it graded a passer as a bad player. The dashboard has a back
+chevron in the app header (f4455d70), the duplicate mobile verdict is gone,
+and the heatmap's LIMITED SAMPLE reads the plotted attempts, not the goals
+layer. The projection eyebrow says `2026-27 projection … in a projected 74
+GP` until the opener (c87d3914); "Finishing by season" is a band on the
+expanded card (4e8fd3e4).
+
+**Writeups (58b6ee59, c05d8378, 9e94e9b4).** Age, the goals-by-season
+streak ("nine straight seasons of 30 goals or more"), cohort percentiles
+when notable, the projection as a number and rank. Garrett's rule after the
+first read: never name the brand; a number is a number. Tests reversed to
+match. The Metric Ledger artifact reconciled 778 skaters: goals, xG, xG/60
+and TOI all match `player_season_stats`; NHL is the source of truth.
+
+**Em dashes (1e57d559, 952e61eb).** Rewritten out of every client and
+server string; Stormy's replies pass `plainDashes`; the voice guard's
+quarantine list is empty.
+
+**The News Room (this commit).** "It should come through like Sleeper and
+Yahoo do where it summarizes and links the source." Server: `news_sources`
+(NHL.com, ESPN, Daily Faceoff, Dobber, TSN, Sportsnet, THN), `news_items`
+(url UNIQUE, `player_ids int[]` matched by full name against the current
+directory, one-sentence summary through Haiku with the snippet as the
+fallback), `news_ingest_runs` (one row per source per run, the affirmative
+health signal). `POST /api/scheduled/news-ingest` every 30 minutes from
+`.github/workflows/news-ingest.yml`; `GET /api/news/items` (player_ids,
+team, limit, before; returns the names behind the ids), `GET
+/api/news/health`; `/api/news/player/:id` carries `items`. Phone: the NEWS
+tab is `NewsRoomPhone`: MY PLAYERS / ALL segmented (MY PLAYERS is the
+roster of the league in the header, default when it exists), a chip per
+team with a story, stories grouped by day in one tile per day, every row
+the link to the writer with the players it names, `Read 12m ago · 7
+sources` under the segments. Until the migration and the first ingest have
+run, the wires are empty and the tab shows the headline feed it showed
+before. The player card's NEWS tab has "From the wires" above the Citrus
+notes. `newsRoomRows.ts` is pure and tested; `NewsRoomPhone.test.tsx` pins
+the shape.
+
+Not yet: tapping a player's name on a row to open the card, and the
+career-totals ingest (NHL landing endpoint → `player_directory.notes`) for
+the writeups.

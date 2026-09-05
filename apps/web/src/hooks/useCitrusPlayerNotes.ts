@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { logger } from '@/utils/logger';
+import type { WireNewsItem } from '@/services/NewsRoomService';
 
 /**
  * Citrus notes for a single player — the "Latest News" block on the player
@@ -26,14 +27,24 @@ export interface CitrusNote {
   season: number;
 }
 
+/**
+ * A wire story that names this player (NEWS ROOM, 2026-09-05): the headline,
+ * a one-sentence summary, the source and the link out. Never the article.
+ * The type lives with the News Room's client service; re-exported here so
+ * the player card keeps one import.
+ */
+export type { WireNewsItem };
+
 export function useCitrusPlayerNotes(playerId: number | string | null | undefined, enabled = true) {
   const [notes, setNotes] = useState<CitrusNote[]>([]);
+  const [items, setItems] = useState<WireNewsItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const numericId = typeof playerId === 'string' ? Number.parseInt(playerId, 10) : playerId;
     if (!enabled || !numericId || !Number.isFinite(numericId)) {
       setNotes([]);
+      setItems([]);
       return;
     }
 
@@ -46,10 +57,11 @@ export function useCitrusPlayerNotes(playerId: number | string | null | undefine
     // this import chain. Keeping it inside the effect makes this hook safe to
     // import anywhere.
     import('@/api/client')
-      .then(({ apiClient }) => apiClient.get<{ notes: CitrusNote[] }>(`/api/news/player/${numericId}`))
+      .then(({ apiClient }) => apiClient.get<{ notes: CitrusNote[]; items?: WireNewsItem[] }>(`/api/news/player/${numericId}`))
       .then((response) => {
         if (cancelled) return;
         setNotes(response.data?.notes ?? []);
+        setItems(response.data?.items ?? []);
       })
       .catch((error) => {
         if (cancelled) return;
@@ -57,6 +69,7 @@ export function useCitrusPlayerNotes(playerId: number | string | null | undefine
         // console full of red for an optional block trains people to ignore it.
         logger.debug('[citrus-notes] unavailable:', error);
         setNotes([]);
+        setItems([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -67,5 +80,5 @@ export function useCitrusPlayerNotes(playerId: number | string | null | undefine
     };
   }, [playerId, enabled]);
 
-  return { notes, loading };
+  return { notes, items, loading };
 }
