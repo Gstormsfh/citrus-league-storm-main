@@ -3,6 +3,8 @@ import { useLeague } from '@/contexts/LeagueContext';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
 import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
+import { StormyPhone } from '@/components/stormy/StormyPhone';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import {
   HockeyFooter,
   XGModelIcon,
@@ -75,6 +77,10 @@ const StormyAssistant = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [messagesUsed, setMessagesUsed] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // One transcript at a time: the phone layer and the desktop card are
+  // gated on the viewport rather than stacked under `lg:hidden`, so one
+  // element owns the scroll ref and the page's tests see one set of strings.
+  const isMobile = useIsMobile();
   const defaultGreeting = "Stormy here. I already have your league, your roster and picks, and the live playoff bracket in front of me. Ask me for a roster review, a start/sit, a waiver target, or a read on any matchup, and I'll show you the numbers behind the call.";
   /**
    * The greeting is the loudest claim on the page and it fails the same way
@@ -175,6 +181,39 @@ const StormyAssistant = () => {
     return () => cancelAnimationFrame(raf);
   }, [messages, activeTab, isLoading]);
 
+  /**
+   * PRESS BOX (2026-09-04): the one Stormy setting that was ever real. The
+   * 09-01 page drew a "Clear Chat History" button with no handler; this
+   * empties the transcript and the API history on this device and seeds the
+   * greeting again, which is what the button always said it did.
+   */
+  const handleClearHistory = useCallback(() => {
+    apiHistoryRef.current = [];
+    try {
+      localStorage.removeItem('stormyMessages');
+      localStorage.removeItem('stormyApiHistory');
+    } catch { /* storage unavailable */ }
+    setMessages([{ id: '1', text: greeting, sender: 'stormy', timestamp: new Date() }]);
+  }, [greeting]);
+
+  /** A starter chip is a promise that the question has an answer; see the chips note below. */
+  const starters = inOffseason
+    ? [
+        { Icon: CrossedSticksIcon, label: 'Draft prep' },
+        { Icon: MaskIcon,          label: 'Keeper advice' },
+        { Icon: ShiftIcon,         label: 'Roster targets' },
+        { Icon: XGModelIcon,       label: 'Player research' },
+      ]
+    : [
+        { Icon: CrossedSticksIcon, label: 'Review my roster' },
+        { Icon: ScoreboardIcon,    label: 'Start/sit help' },
+        { Icon: ShiftIcon,         label: 'Waiver targets' },
+        { Icon: PuckIcon,          label: 'Trade advice' },
+      ];
+  const seesLine = inOffseason
+    ? `Your active league, your roster and picks, and the xG projection model. No games until ${seasonOpensOn ?? 'the season opens'}, so there is no live matchup to read.`
+    : "Your active league, current roster, this week's matchup, and the live xG model. All loaded before you hit send.";
+
   const buildContext = useCallback(async (): Promise<StormyContext> => {
     const ctx: StormyContext = { page: 'Stormy Assistant (full page)' };
     if (activeLeague) {
@@ -272,16 +311,36 @@ const StormyAssistant = () => {
   }, [inputValue, isLoading, buildContext]);
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
+    <div className="min-h-screen bg-pressbox-surface text-pastel-cream flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
       {/* PRESS BOX (2026-09-04): the app header in place of the 09-01 title
           bar and its hamburger, which opened the old menu sheet. The app
           nav is the way around; the header names the screen. */}
-      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
-        <PressBoxAppHeader title="Stormy" logoSrc="/favicon.svg" />
-      </div>
-
-      <main className="w-full lg:pt-24 lg:pb-8 pb-app-chrome relative z-10">
+      {/* PRESS BOX (2026-09-04, PR10n): the phone is a chat, not a page --
+          the layer owns the viewport above the nav and the transcript is the
+          only thing that scrolls. The desktop grid below is untouched. */}
+      {isMobile && <StormyPhone
+        header={<PressBoxAppHeader title="Stormy" logoSrc="/favicon.svg" />}
+        messages={messages}
+        isLoading={isLoading}
+        inputValue={inputValue}
+        onInputChange={setInputValue}
+        onSend={handleSend}
+        starters={starters}
+        onStarter={(label) => setInputValue(label + ' please')}
+        scrollRef={scrollRef}
+        seesLine={seesLine}
+        weeklyLimit={WEEKLY_LIMIT}
+        onClearHistory={handleClearHistory}
+        banner={isGuestMode(userLeagueState) ? (
+          <LeagueCreationCTA
+            title="You're chatting with demo Stormy"
+            description="Sign up so Stormy can read your own league."
+            variant="compact"
+          />
+        ) : null}
+      />}
+      {!isMobile && <main className="hidden lg:block w-full lg:pt-24 lg:pb-8 pb-app-chrome relative z-10">
         <div className="w-full m-0 p-0">
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             {/* Main Content */}
@@ -458,20 +517,7 @@ const StormyAssistant = () => {
                         covers. */}
                     {messages.length <= 2 && (
                       <div className="max-w-3xl mx-auto mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {(inOffseason
-                          ? [
-                              { icon: CrossedSticksIcon, label: 'Draft prep' },
-                              { icon: MaskIcon,          label: 'Keeper advice' },
-                              { icon: ShiftIcon,         label: 'Roster targets' },
-                              { icon: XGModelIcon,       label: 'Player research' },
-                            ]
-                          : [
-                              { icon: CrossedSticksIcon, label: 'Review my roster' },
-                              { icon: ScoreboardIcon,    label: 'Start/sit help' },
-                              { icon: ShiftIcon,         label: 'Waiver targets' },
-                              { icon: PuckIcon,          label: 'Trade advice' },
-                            ]
-                        ).map(({ icon: Icon, label }) => (
+                        {starters.map(({ Icon, label }) => (
                           <button
                             key={label}
                             type="button"
@@ -584,6 +630,7 @@ const StormyAssistant = () => {
                             <Button
                               variant="outline"
                               size="sm"
+                              onClick={handleClearHistory}
                               className="w-full bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold"
                             >
                               Clear Chat History
@@ -628,11 +675,7 @@ const StormyAssistant = () => {
                       xG model is live — it is projecting a season that has not
                       started. Naming what is missing, and the date it returns,
                       costs one clause and keeps the tile honest. */}
-                  <p className="text-[11px] text-white/70 leading-relaxed">
-                    {inOffseason
-                      ? `Your active league, your roster and picks, and the xG projection model. No games until ${seasonOpensOn ?? 'the season opens'}, so there is no live matchup to read.`
-                      : "Your active league, current roster, this week's matchup, and the live xG model. All loaded before you hit send."}
-                  </p>
+                  <p className="text-[11px] text-white/70 leading-relaxed">{seesLine}</p>
                 </div>
               </div>
             </aside>
@@ -647,7 +690,7 @@ const StormyAssistant = () => {
             )}
           </div>
         </div>
-      </main>
+      </main>}
       <HockeyFooter variant="app" />
     </div>
   );

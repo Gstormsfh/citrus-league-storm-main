@@ -326,7 +326,8 @@ export const StormyChatBubble = () => {
    * the draft rooms handled above. Desktop keeps the FAB.
    */
   if (!isOpen && isMobile) {
-    const navHidden = ['/auth', '/profile-setup', '/verify-email', '/reset-password'].some((r) =>
+    // The Stormy page itself is on the list: a bar there opens a second chat over the first.
+    const navHidden = ['/auth', '/profile-setup', '/verify-email', '/reset-password', '/gm-office/stormy'].some((r) =>
       location.pathname.startsWith(r),
     );
     if (navHidden || textFieldFocused) return null;
