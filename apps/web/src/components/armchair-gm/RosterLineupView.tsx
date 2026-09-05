@@ -19,7 +19,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
    labels 1.58:1 against it. There is no text colour that fixes a
    mid-grey surface; the surface itself is the bug. Swapped to the dark
    tile family the rest of the app uses (ui/card.tsx is
-   bg-pastel-surface-tile + ring-white/10), so cream text lands at 13:1. */
+   bg-pastel-surface-tile max-lg:bg-pressbox-tile + ring-white/10), so cream text lands at 13:1. */
 
 
 interface RosterLineupViewProps {
@@ -135,14 +135,14 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
               <div className="flex items-center gap-2 mb-2">
                 <div className="flex items-center gap-1.5">
                   <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-pastel-sage/30 to-[#7CB518]/20 border border-pastel-sage/40 flex items-center justify-center">
-                    <span className="text-[9px] font-varsity font-black text-pastel-cream">{i + 1}</span>
+                    <span className="text-[9px] font-varsity max-lg:font-condensed font-black text-pastel-cream max-lg:text-pressbox-text">{i + 1}</span>
                   </div>
-                  <span className="text-[10px] font-varsity text-pastel-cream tracking-wider uppercase">
+                  <span className="text-[10px] font-varsity max-lg:font-condensed text-pastel-cream max-lg:text-pressbox-text tracking-wider uppercase">
                     {LINE_LABELS[i]}
                   </span>
                 </div>
                 <div className="flex-1 h-px bg-gradient-to-r from-pastel-sage/30 to-transparent" />
-                <span className="text-[9px] font-varsity text-white/55">
+                <span className="text-[9px] font-varsity max-lg:font-condensed text-white/55">
                   {formatCap(line.lineCap)}
                 </span>
               </div>
@@ -158,8 +158,8 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
                     <CompactPlayerRow key={player.name} player={player} maxCapHit={lineup.maxCapHit} />
                   ) : (
                     <div key={pos} className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-dashed border-pastel-sage/20 bg-white/20">
-                      <span className="text-[10px] font-varsity text-pastel-sage/40 w-7 text-center">{pos}</span>
-                      <span className="text-[10px] font-display text-white/25">Open Slot</span>
+                      <span className="text-[10px] font-varsity max-lg:font-condensed text-pastel-sage/40 max-lg:text-pressbox-sage/40 w-7 text-center">{pos}</span>
+                      <span className="text-[10px] font-display max-lg:font-barlow text-white/25">Open Slot</span>
                     </div>
                   )
                 )}
@@ -170,13 +170,13 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
                 {/* Position column labels */}
                 <div className="grid grid-cols-3 gap-2 md:gap-3 mb-1">
                   <div className="text-center">
-                    <span className="text-[8px] font-varsity text-pastel-sage/50 uppercase tracking-[0.15em]">LW</span>
+                    <span className="text-[8px] font-varsity max-lg:font-condensed text-pastel-sage/50 max-lg:text-pressbox-sage/50 uppercase tracking-[0.15em]">LW</span>
                   </div>
                   <div className="text-center">
-                    <span className="text-[8px] font-varsity text-pastel-sage/50 uppercase tracking-[0.15em]">C</span>
+                    <span className="text-[8px] font-varsity max-lg:font-condensed text-pastel-sage/50 max-lg:text-pressbox-sage/50 uppercase tracking-[0.15em]">C</span>
                   </div>
                   <div className="text-center">
-                    <span className="text-[8px] font-varsity text-pastel-sage/50 uppercase tracking-[0.15em]">RW</span>
+                    <span className="text-[8px] font-varsity max-lg:font-condensed text-pastel-sage/50 max-lg:text-pressbox-sage/50 uppercase tracking-[0.15em]">RW</span>
                   </div>
                 </div>
 
@@ -227,14 +227,14 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
               <div className="flex items-center gap-2 mb-2">
                 <div className="flex items-center gap-1.5">
                   <div className="w-5 h-5 rounded-lg bg-gradient-to-br from-blue-200/50 to-blue-300/30 border border-blue-400/40 flex items-center justify-center">
-                    <span className="text-[9px] font-varsity font-black text-pastel-cream">{i + 1}</span>
+                    <span className="text-[9px] font-varsity max-lg:font-condensed font-black text-pastel-cream max-lg:text-pressbox-text">{i + 1}</span>
                   </div>
-                  <span className="text-[10px] font-varsity text-pastel-cream tracking-wider uppercase">
+                  <span className="text-[10px] font-varsity max-lg:font-condensed text-pastel-cream max-lg:text-pressbox-text tracking-wider uppercase">
                     {PAIR_LABELS[i]}
                   </span>
                 </div>
                 <div className="flex-1 h-px bg-gradient-to-r from-blue-300/30 to-transparent" />
-                <span className="text-[9px] font-varsity text-white/55">
+                <span className="text-[9px] font-varsity max-lg:font-condensed text-white/55">
                   {formatCap(pair.pairCap)}
                 </span>
               </div>
@@ -246,8 +246,8 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
                   <CompactPlayerRow player={pair.rd} maxCapHit={lineup.maxCapHit} />
                 ) : (
                   <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border border-dashed border-pastel-sage/20 bg-white/20">
-                    <span className="text-[10px] font-varsity text-pastel-sage/40 w-7 text-center">D</span>
-                    <span className="text-[10px] font-display text-white/25">Open Slot</span>
+                    <span className="text-[10px] font-varsity max-lg:font-condensed text-pastel-sage/40 max-lg:text-pressbox-sage/40 w-7 text-center">D</span>
+                    <span className="text-[10px] font-display max-lg:font-barlow text-white/25">Open Slot</span>
                   </div>
                 )}
               </div>
@@ -257,10 +257,10 @@ export default function RosterLineupView({ data }: RosterLineupViewProps) {
                 {/* Position labels */}
                 <div className="grid grid-cols-2 gap-2 md:gap-3 max-w-2xl mx-auto mb-1">
                   <div className="text-center">
-                    <span className="text-[8px] font-varsity text-pastel-sage uppercase tracking-[0.15em]">LD</span>
+                    <span className="text-[8px] font-varsity max-lg:font-condensed text-pastel-sage max-lg:text-pressbox-sage uppercase tracking-[0.15em]">LD</span>
                   </div>
                   <div className="text-center">
-                    <span className="text-[8px] font-varsity text-pastel-sage uppercase tracking-[0.15em]">RD</span>
+                    <span className="text-[8px] font-varsity max-lg:font-condensed text-pastel-sage max-lg:text-pressbox-sage uppercase tracking-[0.15em]">RD</span>
                   </div>
                 </div>
 
@@ -357,15 +357,15 @@ function LineupSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-pastel-sage/30 shadow-varsity overflow-hidden">
+    <div className="bg-pastel-surface-tile max-lg:bg-pressbox-tile backdrop-blur-sm rounded-2xl max-lg:rounded-[12px] border-2 border-pastel-sage/30 shadow-varsity overflow-hidden">
       {/* Section Header */}
       <div className="px-4 md:px-5 py-3 bg-gradient-to-r from-pastel-sage/25 via-pastel-sage/15 to-pastel-sage/25 border-b-2 border-pastel-sage/40 flex items-center gap-3">
         <span className="text-xl">{icon}</span>
         <div className="flex-1 min-w-0">
-          <h3 className="font-varsity text-base md:text-lg text-pastel-cream tracking-tight">
+          <h3 className="font-varsity max-lg:font-condensed text-base md:text-lg text-pastel-cream max-lg:text-pressbox-text tracking-tight">
             {title}
           </h3>
-          <span className="text-[10px] text-white/60 font-display">
+          <span className="text-[10px] text-white/60 font-display max-lg:font-barlow">
             {subtitle}
           </span>
         </div>
@@ -373,12 +373,12 @@ function LineupSection({
         {/* UFA/RFA badges */}
         <div className="hidden md:flex items-center gap-2">
           {ufaCount > 0 && (
-            <Badge className="bg-red-100 text-red-700 text-[8px] h-5 px-2 font-varsity border border-red-200">
+            <Badge className="bg-red-100 text-red-700 text-[8px] h-5 px-2 font-varsity max-lg:font-condensed border border-red-200">
               {ufaCount} UFA
             </Badge>
           )}
           {rfaCount > 0 && (
-            <Badge className="bg-amber-100 text-amber-700 text-[8px] h-5 px-2 font-varsity border border-amber-200">
+            <Badge className="bg-amber-100 text-amber-700 text-[8px] h-5 px-2 font-varsity max-lg:font-condensed border border-amber-200">
               {rfaCount} RFA
             </Badge>
           )}
@@ -386,10 +386,10 @@ function LineupSection({
 
         {/* Total cap */}
         <div className="text-right flex-shrink-0">
-          <div className="text-[8px] text-white/50 uppercase font-display font-bold tracking-wider">
+          <div className="text-[8px] text-white/50 uppercase font-display max-lg:font-barlow font-bold tracking-wider">
             Total Cap
           </div>
-          <div className="font-varsity text-sm text-pastel-cream">
+          <div className="font-varsity max-lg:font-condensed text-sm text-pastel-cream max-lg:text-pressbox-text">
             {formatCap(capTotal)}
           </div>
         </div>
@@ -423,25 +423,25 @@ function CollapsibleLineupSection({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-white/15 shadow-sm overflow-hidden">
+    <div className="bg-pastel-surface-tile max-lg:bg-pressbox-tile backdrop-blur-sm rounded-2xl max-lg:rounded-[12px] border-2 border-white/15 shadow-sm overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full px-4 md:px-5 py-3 bg-gradient-to-r from-white/5 via-transparent to-white/5 border-b border-white/10 flex items-center gap-3 hover:from-pastel-sage/10 hover:to-pastel-sage/10 transition-colors"
       >
         <span className="text-lg">{icon}</span>
         <div className="flex-1 min-w-0 text-left">
-          <h3 className="font-varsity text-base text-pastel-cream tracking-tight">
+          <h3 className="font-varsity max-lg:font-condensed text-base text-pastel-cream max-lg:text-pressbox-text tracking-tight">
             {title}
           </h3>
-          <span className="text-[10px] text-white/50 font-display">
+          <span className="text-[10px] text-white/50 font-display max-lg:font-barlow">
             {subtitle}
           </span>
         </div>
         <div className="text-right flex-shrink-0 mr-2">
-          <div className="text-[8px] text-white/55 uppercase font-display font-bold tracking-wider">
+          <div className="text-[8px] text-white/55 uppercase font-display max-lg:font-barlow font-bold tracking-wider">
             Total Cap
           </div>
-          <div className="font-varsity text-sm text-white/60">
+          <div className="font-varsity max-lg:font-condensed text-sm text-white/60">
             {formatCap(capTotal)}
           </div>
         </div>
@@ -479,11 +479,11 @@ function ExtraPlayersSection({
   return (
     <div className="mt-4 pt-4 border-t border-dashed border-pastel-sage/20">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-[10px] font-varsity text-white/55 uppercase tracking-wider">
+        <span className="text-[10px] font-varsity max-lg:font-condensed text-white/55 uppercase tracking-wider">
           {label}
         </span>
         <div className="flex-1 h-px bg-pastel-sage/15" />
-        <span className="text-[9px] font-varsity text-white/55">
+        <span className="text-[9px] font-varsity max-lg:font-condensed text-white/55">
           {formatCap(totalCap)}
         </span>
       </div>
@@ -509,11 +509,11 @@ function ExtraPlayersSection({
 
 function EmptySlot({ position }: { position: string }) {
   return (
-    <div className="rounded-2xl border-2 border-dashed border-pastel-sage/20 bg-white/20 flex flex-col items-center justify-center py-8 md:py-10">
+    <div className="rounded-2xl max-lg:rounded-[12px] border-2 border-dashed border-pastel-sage/20 bg-white/20 flex flex-col items-center justify-center py-8 md:py-10">
       <div className="w-8 h-8 rounded-full bg-pastel-sage/10 border border-dashed border-pastel-sage/30 flex items-center justify-center mb-1.5">
-        <span className="text-[10px] font-varsity text-pastel-sage/40">{position}</span>
+        <span className="text-[10px] font-varsity max-lg:font-condensed text-pastel-sage/40 max-lg:text-pressbox-sage/40">{position}</span>
       </div>
-      <span className="text-[9px] font-display text-white/25">Open Slot</span>
+      <span className="text-[9px] font-display max-lg:font-barlow text-white/25">Open Slot</span>
     </div>
   );
 }
@@ -527,7 +527,7 @@ const statusColorCompact: Record<string, string> = {
   UFA: 'text-red-600',
   RFA: 'text-amber-600',
   ELC: 'text-pastel-butter',
-  Signed: 'text-pastel-sage',
+  Signed: 'text-pastel-sage max-lg:text-pressbox-sage',
   '35+': 'text-purple-600',
 };
 
@@ -548,21 +548,21 @@ function CompactPlayerRow({ player, maxCapHit }: { player: PlayerContract; maxCa
       "flex items-center gap-2 px-2.5 py-2 rounded-xl border transition-all",
       isNonNHL
         ? "bg-white/5 border-white/10 opacity-80"
-        : "bg-pastel-surface-tile border-pastel-sage/30",
+        : "bg-pastel-surface-tile max-lg:bg-pressbox-tile border-pastel-sage/30",
     )}>
       {/* Position pill */}
-      <span className="text-[9px] font-varsity font-black text-pastel-cream bg-pastel-sage/20 border border-pastel-sage/30 rounded-md px-1.5 py-0.5 w-7 text-center flex-shrink-0">
+      <span className="text-[9px] font-varsity max-lg:font-condensed font-black text-pastel-cream max-lg:text-pressbox-text bg-pastel-sage/20 border border-pastel-sage/30 rounded-md px-1.5 py-0.5 w-7 text-center flex-shrink-0">
         {player.position}
       </span>
 
       {/* Name + contract info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className="font-display font-bold text-[11px] text-pastel-cream truncate">
+          <span className="font-display max-lg:font-barlow font-bold text-[11px] text-pastel-cream max-lg:text-pressbox-text truncate">
             {player.name}
           </span>
           {isNonNHL && (
-            <Badge className={cn("text-[6px] h-3 px-1 font-varsity font-bold border-0 flex-shrink-0", rosterStatusCompact[player.rosterStatus])}>
+            <Badge className={cn("text-[6px] h-3 px-1 font-varsity max-lg:font-condensed font-bold border-0 flex-shrink-0", rosterStatusCompact[player.rosterStatus])}>
               {player.rosterStatus}
             </Badge>
           )}
@@ -583,14 +583,14 @@ function CompactPlayerRow({ player, maxCapHit }: { player: PlayerContract; maxCa
 
       {/* Cap hit + status */}
       <div className="text-right flex-shrink-0">
-        <span className="font-varsity text-[11px] text-pastel-cream leading-none">
+        <span className="font-varsity max-lg:font-condensed text-[11px] text-pastel-cream max-lg:text-pressbox-text leading-none">
           {formatCap(player.capHit)}
         </span>
         <div className="flex items-center justify-end gap-1 mt-0.5">
-          <span className={cn("text-[8px] font-varsity font-bold", statusColorCompact[player.expiryStatus])}>
+          <span className={cn("text-[8px] font-varsity max-lg:font-condensed font-bold", statusColorCompact[player.expiryStatus])}>
             {player.expiryStatus}
           </span>
-          <span className="text-[8px] text-white/55 font-display">
+          <span className="text-[8px] text-white/55 font-display max-lg:font-barlow">
             {player.yearsRemaining}yr
           </span>
         </div>
