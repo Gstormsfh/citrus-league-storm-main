@@ -64,8 +64,13 @@ const Index = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  const hasLeagues = (league?.userLeagues?.length ?? 0) > 0;
-  if (auth?.user && hasLeagues && (native || isMobile)) {
+  // A SIGNED-IN PHONE NEVER SEES THE STOREFRONT (2026-09-05, from a phone
+  // screenshot: the Press Box nav and the Stormy bar under the Citrus 2.0
+  // pitch page). This branch was gated on having a league, so a manager
+  // whose leagues had not loaded, or who had none yet, got the sales pitch
+  // with the app's chrome around it. PressBoxHome has its own no-leagues
+  // state (`No leagues yet · + League`) and that is the screen.
+  if (auth?.user && (native || isMobile)) {
     // LEAGUE HQ IS HOME (2026-09-05). "I want to see LEAGUE HQ when I log
     // in; it adds a lot more value, like a main menu." With an active league
     // the app opens on its HQ; the league list is one tap away (`?all=1`,
@@ -73,7 +78,8 @@ const Index = () => {
     // go). A manager with leagues but no active one still gets the list.
     const wantsList = new URLSearchParams(location.search).get('all') === '1';
     const activeId = league?.activeLeagueId;
-    if (!wantsList && activeId && league?.userLeagues?.some((l) => l.id === activeId)) {
+    const hasLeagues = (league?.userLeagues?.length ?? 0) > 0;
+    if (!wantsList && hasLeagues && activeId && league?.userLeagues?.some((l) => l.id === activeId)) {
       return <Navigate to={`/league/${activeId}`} replace />;
     }
     return <PressBoxHome inOffseason={seasonStatus.isDormant && seasonStatus.phase === 'offseason'} />;

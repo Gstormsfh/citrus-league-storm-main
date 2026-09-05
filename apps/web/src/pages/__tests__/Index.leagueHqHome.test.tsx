@@ -52,6 +52,12 @@ describe('the phone home', () => {
     renderAt('/');
     expect(screen.getByTestId('league-list')).toBeInTheDocument();
   });
+  it('a signed-in manager with no leagues yet gets the app home, never the storefront', () => {
+    mockLeague.mockReturnValue({ loading: false, activeLeagueId: null, userLeagues: [] });
+    renderAt('/');
+    expect(screen.getByTestId('league-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('storefront')).toBeNull();
+  });
   it('keeps the storefront for a signed-out visitor', () => {
     mockAuth.mockReturnValue({ user: null, loading: false });
     renderAt('/');
