@@ -1,4 +1,5 @@
 import { waiverApi } from '@/api/waivers';
+import { rosterApi } from '@/api/rosters';
 import { accountApi } from '@/api/account';
 import { apiClient } from '@/api/client';
 import { PlayerService } from './PlayerService';
@@ -340,22 +341,27 @@ export class WaiverService {
     searchTerm?: string
   ): Promise<any[]> {
     try {
-      // Get rostered player IDs from the league waivers endpoint
-      // For now, still use PlayerService for the player list + local filtering
-      const { data: teamWaivers } = await waiverApi.getLeagueWaivers(leagueId);
-
-      // Use PlayerService as the source of truth (handles all player data correctly)
-      let players = await PlayerService.getAllPlayers();
-
-      // If the server returned rostered IDs, filter them out
-      // Otherwise fall back to showing all players (server will validate on add)
-      const waiverPayload = teamWaivers as { rosteredPlayerIds?: string[] } | undefined;
-      if (waiverPayload?.rosteredPlayerIds) {
-        const rosteredPlayerIds = new Set<string>(
-          waiverPayload.rosteredPlayerIds.map(String)
-        );
-        players = players.filter(p => !rosteredPlayerIds.has(String(p.id)));
-      }
+      /*
+       * DRAFTED PLAYERS ON THE WIRE (2026-09-05, the night after the first
+       * 12-team test draft). This read the league's waiver CLAIMS and looked
+       * for a `rosteredPlayerIds` field on them that no server route has ever
+       * sent, then "fell back to showing all players (server will validate on
+       * add)". So the wire listed every player in the league, McDavid
+       * included, and the add button was the first thing that said no.
+       *
+       * The rostered set is roster_assignments for the league, the same read
+       * FreeAgents makes, visible to every member under RLS. If that read
+       * fails the wire shows nothing rather than everyone: an empty wire is a
+       * network error, a full one is a lie.
+       */
+      const [rostersResponse, allPlayers] = await Promise.all([
+        rosterApi.getLeagueRosters(leagueId),
+        PlayerService.getAllPlayers(),
+      ]);
+      const rostered = new Set(
+        ((rostersResponse.data || []) as Array<{ player_id: string | number }>).map((r) => String(r.player_id)),
+      );
+      let players = allPlayers.filter((p) => !rostered.has(String(p.id)));
 
       // Apply position filter
       if (position) {
