@@ -782,6 +782,8 @@ const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
   auth: () => import('../src/pages/Auth'),
   profilesetup: () => import('../src/pages/ProfileSetup'),
   verifyemail: () => import('../src/pages/VerifyEmail'),
+  resetpassword: () => import('../src/pages/ResetPassword'),
+  authcallback: () => import('../src/pages/AuthCallback'),
 };
 
 const which = new URLSearchParams(location.search).get('p') || 'waivers';
@@ -822,6 +824,8 @@ const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   auth: { path: '/auth', at: `/auth${location.search.replace(/^\?p=[^&]*/, '?_')}` },
   profilesetup: { path: '/profile-setup', at: '/profile-setup' },
   verifyemail: { path: '/verify-email', at: '/verify-email' },
+  resetpassword: { path: '/reset-password', at: '/reset-password' },
+  authcallback: { path: '/auth/callback', at: '/auth/callback' },
   // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
   // the week into the URL as soon as it resolves one. Under the old
   // `/matchup/:leagueId?` the very first push ("/matchup/harness-league/1")

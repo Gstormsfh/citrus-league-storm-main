@@ -149,17 +149,17 @@ const ResetPassword = () => {
       // between password submit and /auth redirect. All other branches
       // of this file (and every auth page) use DarkLayout. Now unified.
       <DarkLayout>
-        <Navbar />
-        <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
-          <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-pastel-cream">
+        <div className="hidden lg:block"><Navbar /></div>
+        <main className="pb-type-phone relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)] max-lg:min-h-screen max-lg:bg-pressbox-surface max-lg:text-pressbox-text max-lg:px-5 max-lg:pt-[calc(2.5rem+env(safe-area-inset-top))]">
+          <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] max-lg:bg-transparent max-lg:border-0 max-lg:ring-0 max-lg:shadow-none max-lg:rounded-none">
+            <CardHeader className="max-lg:p-0 max-lg:pb-5">
+              <CardTitle className="flex items-center gap-2 text-pastel-cream max-lg:font-condensed max-lg:font-extrabold max-lg:text-[24px] max-lg:uppercase max-lg:tracking-[0.02em] max-lg:text-pressbox-text">
                 <CheckCircle2 className="h-5 w-5 text-pastel-sage" aria-hidden="true" />
                 Password Reset Successful
               </CardTitle>
-              <CardDescription className="text-white/60">Your password has been updated successfully.</CardDescription>
+              <CardDescription className="text-white/60 max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">Your password has been updated successfully.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="max-lg:p-0">
               <Alert className="bg-pastel-sage/15 ring-1 ring-pastel-sage/40 border-0 text-pastel-sage-soft">
                 <AlertDescription>Redirecting to sign in…</AlertDescription>
               </Alert>
@@ -175,12 +175,12 @@ const ResetPassword = () => {
     // still running is how a working link gets reported as broken.
     return (
       <DarkLayout>
-        <Navbar />
-        <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
-          <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
-            <CardContent className="flex items-center gap-3 py-8">
+        <div className="hidden lg:block"><Navbar /></div>
+        <main className="pb-type-phone relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)] max-lg:min-h-screen max-lg:bg-pressbox-surface max-lg:text-pressbox-text max-lg:px-5 max-lg:pt-[calc(2.5rem+env(safe-area-inset-top))]">
+          <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] max-lg:bg-transparent max-lg:border-0 max-lg:ring-0 max-lg:shadow-none max-lg:rounded-none">
+            <CardContent className="flex items-center gap-3 py-8 max-lg:px-0 max-lg:justify-center">
               <Loader2 className="h-5 w-5 animate-spin text-pastel-orange" aria-hidden="true" />
-              <span className="text-pastel-cream">Checking your reset link…</span>
+              <span className="text-pastel-cream max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">Checking your reset link…</span>
             </CardContent>
           </Card>
         </main>
@@ -191,18 +191,18 @@ const ResetPassword = () => {
   if (!hasToken) {
     return (
       <DarkLayout>
-        <Navbar />
-        <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
-          <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-pastel-cream">
+        <div className="hidden lg:block"><Navbar /></div>
+        <main className="pb-type-phone relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)] max-lg:min-h-screen max-lg:bg-pressbox-surface max-lg:text-pressbox-text max-lg:px-5 max-lg:pt-[calc(2.5rem+env(safe-area-inset-top))]">
+          <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] max-lg:bg-transparent max-lg:border-0 max-lg:ring-0 max-lg:shadow-none max-lg:rounded-none">
+            <CardHeader className="max-lg:p-0 max-lg:pb-5">
+              <CardTitle className="flex items-center gap-2 text-pastel-cream max-lg:font-condensed max-lg:font-extrabold max-lg:text-[24px] max-lg:uppercase max-lg:tracking-[0.02em] max-lg:text-pressbox-text">
                 <XCircle className="h-5 w-5 text-pastel-orange" aria-hidden="true" />
                 Invalid Reset Link
               </CardTitle>
-              <CardDescription className="text-white/60">{error || 'This password reset link is invalid or has expired.'}</CardDescription>
+              <CardDescription className="text-white/60 max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">{error || 'This password reset link is invalid or has expired.'}</CardDescription>
             </CardHeader>
-            <CardContent>
-              <Button onClick={() => navigate('/auth')} className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft">
+            <CardContent className="max-lg:p-0">
+              <Button onClick={() => navigate('/auth')} className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft max-lg:h-12 max-lg:rounded-[12px] max-lg:border-0 max-lg:outline-none max-lg:shadow-none max-lg:bg-pressbox-orange max-lg:text-pressbox-orange-ink max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.08em] max-lg:uppercase">
                 Return to Sign In
               </Button>
             </CardContent>
@@ -214,14 +214,14 @@ const ResetPassword = () => {
 
   return (
     <DarkLayout>
-      <Navbar />
-      <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
-        <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-pastel-cream">Reset Your Password</CardTitle>
-            <CardDescription className="text-white/60">Enter your new password below</CardDescription>
+      <div className="hidden lg:block"><Navbar /></div>
+      <main className="pb-type-phone relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)] max-lg:min-h-screen max-lg:bg-pressbox-surface max-lg:text-pressbox-text max-lg:px-5 max-lg:pt-[calc(2.5rem+env(safe-area-inset-top))]">
+        <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] max-lg:bg-transparent max-lg:border-0 max-lg:ring-0 max-lg:shadow-none max-lg:rounded-none">
+          <CardHeader className="max-lg:p-0 max-lg:pb-5">
+            <CardTitle className="text-2xl font-bold text-pastel-cream max-lg:font-condensed max-lg:font-extrabold max-lg:text-[24px] max-lg:uppercase max-lg:tracking-[0.02em] max-lg:text-pressbox-text max-lg:text-[28px]">Reset Your Password</CardTitle>
+            <CardDescription className="text-white/60 max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">Enter your new password below</CardDescription>
           </CardHeader>
-        <CardContent>
+        <CardContent className="max-lg:p-0">
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <Alert variant="destructive">
@@ -230,16 +230,16 @@ const ResetPassword = () => {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="password">New Password</Label>
+              <Label htmlFor="password" className="max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">New Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground max-lg:top-1/2 max-lg:-translate-y-1/2 max-lg:text-pressbox-text/45" aria-hidden="true" />
                 <Input
                   id="password"
                   type="password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-tile max-lg:border-white/[0.08] max-lg:font-barlow max-lg:text-[15px] max-lg:text-pressbox-text max-lg:placeholder:text-pressbox-text/40"
                   required
                   minLength={8}
                 />
@@ -248,22 +248,22 @@ const ResetPassword = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <Label htmlFor="confirm-password" className="max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">Confirm Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground max-lg:top-1/2 max-lg:-translate-y-1/2 max-lg:text-pressbox-text/45" aria-hidden="true" />
                 <Input
                   id="confirm-password"
                   type="password"
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-tile max-lg:border-white/[0.08] max-lg:font-barlow max-lg:text-[15px] max-lg:text-pressbox-text max-lg:placeholder:text-pressbox-text/40"
                   required
                 />
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full max-lg:h-12 max-lg:rounded-[12px] max-lg:border-0 max-lg:outline-none max-lg:shadow-none max-lg:bg-pressbox-orange max-lg:text-pressbox-orange-ink max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.08em] max-lg:uppercase" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
