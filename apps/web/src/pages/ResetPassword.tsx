@@ -11,7 +11,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Lock, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
-import { CitrusLogo, DarkLayout } from '@/components/citrus2';
+import { DarkLayout } from '@/components/citrus2';
+// Direct import, not the barrel (2026-09-05): ResetPassword.pkce.test mocks the
+// barrel down to DarkLayout, and a barrel-imported CitrusLogo rendered as
+// undefined under it -- seven render tests failed on a crest.
+import { CitrusLogo } from '@/components/citrus2/CitrusLogo';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
