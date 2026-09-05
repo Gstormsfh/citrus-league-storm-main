@@ -23,6 +23,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { SeasonStatus } from '@citrus/shared';
 
 vi.mock('@/components/Navbar', () => ({ default: () => <nav data-testid="navbar" /> }));
@@ -105,16 +106,35 @@ const MOCK_TARGET = '/armchair-gm?tab=mockdraft';
 const ENTRY = 'Run a mock draft';
 const DISCLAIMER = 'Practice your picks against the computer. Nothing there touches this league.';
 
+/**
+ * The page reads its HQ matchups and transactions through react-query
+ * (PR9b), so it renders under a QueryClientProvider the way App.tsx mounts
+ * it. Retries off: a mocked read that rejects should fail once, not hang the
+ * test on a backoff.
+ */
 const mount = () =>
   render(
-    <MemoryRouter initialEntries={['/league/league-1']}>
-      <Routes>
-        <Route path="/league/:leagueId" element={<LeagueDashboard />} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={['/league/league-1']}>
+        <Routes>
+          <Route path="/league/:leagueId" element={<LeagueDashboard />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 
 const loaded = () => screen.findByText('League quicklinks', undefined, { timeout: 4000 });
+
+/**
+ * The desktop draft card's entry. The Press Box HQ below lg (PR9b) carries the
+ * same "Run a mock draft" link under its own CTA, and jsdom applies no media
+ * queries, so a page-wide query finds two; this is the one beside the
+ * "Enter Draft Lobby" button, i.e. the desktop card.
+ */
+const desktopEntry = () => {
+  const entries = screen.getAllByRole('link', { name: ENTRY });
+  return entries.find((e) => e.className.includes('bg-transparent')) ?? entries[0];
+};
 
 beforeEach(() => {
   toastSpy.mockReset();
@@ -129,8 +149,11 @@ describe('LeagueDashboard practice entry, before the draft', () => {
     mount();
     await loaded();
 
-    const entry = screen.getByRole('link', { name: ENTRY });
-    expect(entry).toHaveAttribute('href', MOCK_TARGET);
+    // Both layers carry the entry (the desktop card and the Press Box HQ),
+    // pointed at the same simulator.
+    const entries = screen.getAllByRole('link', { name: ENTRY });
+    expect(entries.length).toBeGreaterThanOrEqual(1);
+    entries.forEach((entry) => expect(entry).toHaveAttribute('href', MOCK_TARGET));
     // The real action is still the card's first button, unchanged.
     expect(screen.getByRole('button', { name: /Enter Draft Lobby/ })).toBeInTheDocument();
   });
@@ -142,7 +165,7 @@ describe('LeagueDashboard practice entry, before the draft', () => {
     // Button's own base classes are merged onto the anchor by asChild, so the
     // rendered class list is checked for the fill that matters, not for the
     // authored string (leagueHqCompositionGuard pins that).
-    const entry = screen.getByRole('link', { name: ENTRY });
+    const entry = desktopEntry();
     expect(entry.className).toContain('bg-transparent');
     expect(entry.className).not.toContain('bg-pastel-orange');
   });

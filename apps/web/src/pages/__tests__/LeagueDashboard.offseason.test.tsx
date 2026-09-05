@@ -31,6 +31,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { SeasonStatus } from '@citrus/shared';
 
 vi.mock('@/components/Navbar', () => ({ default: () => <nav data-testid="navbar" /> }));
@@ -140,13 +141,21 @@ const CHRISTMAS: SeasonStatus = {
   isDormant: true,
 };
 
+/**
+ * The page reads its HQ matchups and transactions through react-query
+ * (PR9b), so it renders under a QueryClientProvider the way App.tsx mounts
+ * it. Retries off: a mocked read that rejects should fail once, not hang the
+ * test on a backoff.
+ */
 const mount = () =>
   render(
-    <MemoryRouter initialEntries={['/league/league-1']}>
-      <Routes>
-        <Route path="/league/:leagueId" element={<LeagueDashboard />} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={['/league/league-1']}>
+        <Routes>
+          <Route path="/league/:leagueId" element={<LeagueDashboard />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 
 const loaded = () => screen.findByText('League quicklinks', undefined, { timeout: 4000 });
