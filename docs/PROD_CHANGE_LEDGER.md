@@ -312,3 +312,19 @@ The proof also caught a defect in this migration before it reached prod: `pg_get
 **Follow-up (open).** `sync_roster_assignments_for_league`: add `IF NOT (service role OR auth.uid() is a member/commissioner of p_league_id) THEN RETURN error` inside the body, with a Rule 1 capture and a proof, after the 2026-09-08 test drafts.
 
 **Ledger note.** SQL Editor apply; no `schema_migrations` row; the repo file is the record.
+
+## Rule 1 recorded change: `get_player_ownership()` created (2026-09-05 ~05:10Z)
+
+**What.** `supabase/migrations/20260905050000_player_ownership.sql`: `CREATE OR REPLACE FUNCTION public.get_player_ownership()` — a `STABLE SECURITY DEFINER` SQL function, `search_path = public`, returning one row per rostered player: `rostered_teams`, `started_teams`, `total_teams`, `rostered_pct`, `started_pct`. Aggregate counts only; no team, league or manager identity leaves the function. `GRANT EXECUTE TO authenticated, service_role`. Additive; no capture required.
+
+**Why.** The Press Box roster and players rows print `100% · 99% |` — rostered% and started% across every Citrus team that holds a roster — and nothing read that league-wide before (design_handoff README §4/§5 named the gap). Read by `GET /api/players/ownership` (`server/src/services/PlayerService.getOwnership`, cached 10 minutes server-side; `[]` on error, and the client hides the two percentages until the API is redeployed with `cb2932b5`).
+
+**Measured before applying** (read-only, Claude): 51 teams with rosters across 11 leagues.
+
+**Executed by.** Garrett, SQL Editor, 2026-09-05 ~05:10Z, after `supabase db push` refused (project not linked on the laptop). Result pasted: McDavid (8478402) → 11 rostered, 9 started, 51 total, 22%, 82%.
+
+**After** (read-only, Claude, 06:34Z). Function present, `prosecdef = true`, ACL `{postgres=X, authenticated=X, service_role=X}`; 328 rows returned.
+
+**Reversal.** `DROP FUNCTION public.get_player_ownership();` — the route returns `[]` and the rows print no percentages; nothing else depends on it.
+
+**Ledger note.** SQL Editor apply; no `schema_migrations` row; the repo file is the record.

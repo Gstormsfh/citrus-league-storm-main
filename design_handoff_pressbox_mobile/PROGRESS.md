@@ -208,6 +208,33 @@ Harness knobs added: `page.html?p=auth&signedout=1`, `?p=profilesetup&fresh=1`,
 `?hold=1` (league context frozen loading), `draft.html?lobby=1`,
 `skeleton.html?route=/standings`.
 
+### 1:1 pass, 2026-09-05 (after midnight)
+
+Commits `8f0fc99f`..`f5e758f6`, all on `redesign/pressbox`, checked against
+the 1a artboards in the harness at 393×852:
+
+- Match: the CATEGORIES tab (`8f0fc99f`) from the starters' week totals;
+  goalies read `goalieMatchupStats` (the weekly shape), which would have
+  been four zeros on a real week.
+- Matchup load: ensure-rosters remembered ten minutes, not thirty seconds
+  (`ad6bdd67`). The rest of the chain is ~10 sequential round trips on a
+  remount; the real fix is a snapshot across remounts (stale-while-
+  revalidate) and is post-submission.
+- League HQ + Home: win chance, games left (`27 · 26 LEFT`), `· 2ND`, the
+  Standings/Transactions/Draft results lines (`34788e5a`). Server: the
+  scoreboard ships `team1_games_left` / `team2_games_left` — **API
+  redeploy needed** (with `cb2932b5` ownership, `c6c9c31c` stats mapper,
+  `2b9b1c8a` directory vitals).
+- Standings: `WEEK n OF N` (`b20088a4`).
+- League menu: the ten-tile shape with lines from real reads (`10993bc7`);
+  `/league/:id?settings=1` opens the commissioner's sheet.
+- Scores: NHL crests (dark variant, app-wide) and headshots (`8930bd7a`).
+- Home: Citrus Game Day (`f5e758f6`).
+
+Not drawn, still: Power/Playoff odds/Median on Standings (no simulation);
+Commish note, Scoring & legend, League history tiles (no route); the
+Players `FA ONLY` chip (every row is already a free agent).
+
 ### Still open
 
 - **Fantasy points above replacement (Garrett, 2026-09-05 00:30): a
