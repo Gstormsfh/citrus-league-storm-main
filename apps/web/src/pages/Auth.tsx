@@ -626,7 +626,7 @@ const Auth = () => {
           </CitrusCard>
 
           <p className="text-center text-[10px] font-jbmono uppercase tracking-[0.32em] text-white/55 mt-6 max-lg:font-plex max-lg:font-medium max-lg:text-[9px] max-lg:tracking-[0.2em] max-lg:text-pressbox-text/45">
-            Free during launch · Founders pricing locked in
+            Fantasy hockey · Built by hockey heads
           </p>
         </div>
       </main>

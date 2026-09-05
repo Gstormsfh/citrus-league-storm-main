@@ -87,7 +87,8 @@ describe('the header card collapses to one line below lg', () => {
     const cls = ROSTER.slice(cardOuter, ROSTER.indexOf('>', cardOuter));
     expect(cls).toContain('p-3 lg:p-5');
     expect(cls).toContain('mb-3 lg:mb-4');
-    expect(openingTag(ROSTER, '<TabsContent value="roster"')).toContain('px-3 py-4 lg:p-6');
+    // max-lg:pt-0 (2026-09-05): the team card sits directly over the list.
+    expect(openingTag(ROSTER, '<TabsContent value="roster"')).toContain('px-3 py-4 max-lg:pt-0 lg:p-6');
   });
 
   it('the phone card is the Press Box one, with exactly one orange action', () => {
@@ -121,13 +122,15 @@ describe('the header card collapses to one line below lg', () => {
 // week trigger + day chips) and the game-day strip are the desktop's now.
 
 describe('the phone has no week/day row; the day toggles ride on the list', () => {
-  const branchAt = ROSTER.indexOf("the day lives on the STARTERS header's");
+  // `code()` strips comments, so the anchor is the branch itself: the
+  // phone side of the week/day selector is `isMobile ? (` followed by `null`.
+  const branchAt = ROSTER.search(/isMobile \? \(\s*null\s*\) : \(/);
   const listAt = ROSTER.indexOf('<PressBoxRosterList');
   const stripAt = ROSTER.indexOf('<TodayStrip');
 
   it('the phone branch of the week/day selector renders nothing', () => {
     expect(branchAt).toBeGreaterThan(-1);
-    const branch = ROSTER.slice(ROSTER.lastIndexOf('isMobile ? (', branchAt), ROSTER.indexOf(') : (', branchAt));
+    const branch = ROSTER.slice(branchAt, ROSTER.indexOf(') : (', branchAt));
     expect(branch).toContain('null');
     expect(branch).not.toMatch(/<MatchupScheduleSelector/);
     expect(branch).not.toMatch(/<WeeklySchedule/);
@@ -150,7 +153,7 @@ describe('the phone has no week/day row; the day toggles ride on the list', () =
     const list = ROSTER.slice(listAt, ROSTER.indexOf('starters={rows.starters}', listAt));
     expect(list).toContain('days={[...pressBoxDays.map((d) => d.label)');
     expect(list).toContain("['WEEK']");
-    expect(list).toContain('showWeek={rosterWeek.ready}');
+    expect(list).toContain('showWeek={rosterWeek.ready && !weekView}');
     expect(list).toContain('showOwnership={ownership.size > 0}');
     expect(ROSTER).toContain('extras: rowExtras,');
   });

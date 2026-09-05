@@ -2454,52 +2454,9 @@ const Profile = () => {
                     </CardContent>
                   </Card>
 
-                  {/* Subscription Plan */}
-                  <Card className="animated-element lg:col-span-2 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.15)] relative overflow-hidden">
-                    <div aria-hidden="true" className="absolute top-0 right-0 w-64 h-64 bg-pastel-orange/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-                    <CardHeader className="relative z-10">
-                      <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
-                        <Crown className="h-5 w-5 text-pastel-orange" />
-                        Subscription Plan
-                      </CardTitle>
-                      <CardDescription className="text-white/55">Manage your membership</CardDescription>
-                    </CardHeader>
-                    <CardContent className="relative z-10">
-                      <div className="bg-pastel-orange/10 rounded-xl p-6 ring-1 ring-pastel-orange/30 flex flex-col md:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className="h-12 w-12 rounded-2xl bg-pastel-orange/20 ring-1 ring-pastel-orange/40 flex items-center justify-center text-pastel-orange shrink-0">
-                            <Crown className="h-6 w-6" />
-                          </div>
-                          <div>
-                            <h3 className="font-calistoga text-xl text-pastel-cream flex items-center gap-2 flex-wrap">
-                              Free Plan
-                              <span className="bg-white/10 ring-1 ring-white/20 text-white/70 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold px-2 py-0.5 rounded-full">Premium Coming Soon</span>
-                            </h3>
-                            <p className="text-sm text-white/55 mt-1">All features are free during the beta period</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-pastel-orange mt-0.5 shrink-0" />
-                          <span className="text-pastel-cream">Advanced Stats <span className="text-xs text-white/55">(Free during Beta)</span></span>
-                        </div>
-                        <div className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-pastel-orange mt-0.5 shrink-0" />
-                          <span className="text-pastel-cream">Ad-free Experience <span className="text-xs text-white/55">(Free during Beta)</span></span>
-                        </div>
-                        <div className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-pastel-orange mt-0.5 shrink-0" />
-                          <span className="text-pastel-cream">Priority Support <span className="text-xs text-white/55">(Free during Beta)</span></span>
-                        </div>
-                        <div className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-pastel-orange mt-0.5 shrink-0" />
-                          <span className="text-pastel-cream">Trade Analyzer <span className="text-xs text-white/55">(Free during Beta)</span></span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {/* THE PLAN CARD IS GONE (2026-09-05): no plan, no tier, no
+                      "free during beta" anywhere in the app until payments
+                      exist. The store review reads every word. */}
 
                   {/* Delete Account */}
                   <Card className="animated-element lg:col-span-2 bg-[#1A2A20] border-0 ring-1 ring-red-400/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(248,113,113,0.2)]">

@@ -57,6 +57,13 @@ const Index = () => {
     return <LoadingScreen />;
   }
 
+  // THE SHELL OPENS ON THE DOOR (2026-09-05). Signed out in the iOS app,
+  // the storefront and its pricing copy are the web's; the app opens on
+  // sign in, the way every fantasy app does.
+  if (native && !auth?.loading && !auth?.user) {
+    return <Navigate to="/auth" replace />;
+  }
+
   const hasLeagues = (league?.userLeagues?.length ?? 0) > 0;
   if (auth?.user && hasLeagues && (native || isMobile)) {
     // LEAGUE HQ IS HOME (2026-09-05). "I want to see LEAGUE HQ when I log

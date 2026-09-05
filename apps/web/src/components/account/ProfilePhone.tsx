@@ -18,8 +18,8 @@
  *  - the "Commissioner League Settings" card: a 340-line copy of League
  *    HQ's settings dialog. On a phone the commissioner's leagues are rows
  *    that open League HQ, where the Press Box settings screen already is.
- *  - the subscription card's four "(Free during Beta)" ticks: one fact row
- *    says the plan.
+ *  - the subscription card: no plan, no tier, nothing about pricing in the
+ *    app until payments exist (2026-09-05).
  */
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -537,8 +537,8 @@ export function ProfilePhone({ tab, onTabChange, hero, identity, stats, activity
                 label="Export your data"
                 help="A JSON file: profile, teams, leagues, transactions, drafts"
                 action={{ label: settings.exporting ? 'EXPORTING…' : 'EXPORT', onPress: settings.onExport, busy: settings.exporting }}
+                last
               />
-              <PressBoxSettingRow label="Plan" help="Everything is free during the beta" value="Free" last />
             </PressBoxSettingGroup>
 
             <PressBoxSettingGroup label="SESSION">
