@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { PB_LOADING_MIN_MS, useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { useSeasonStatus } from '@/hooks/useSeasonStatus';
+import { clampToSeasonStart, getCurrentWeekNumber, getDraftCompletionDate, getFirstWeekStartDate, getScheduleLength } from '@/utils/weekCalculator';
 import { shortDateLabel } from '@/components/scores/scoresFormat';
 
 import { PlayoffService, type PlayoffPictureTeam, type PlayoffBracket as BracketType } from '@/services/PlayoffService';
@@ -79,6 +80,21 @@ const Standings = () => {
 
   // Derived format flags
   const hasMatchups = FORMAT_HAS_MATCHUPS[leagueFormat.scoringFormat] ?? true;
+  /**
+   * `WEEK 5 OF 24` (2026-09-05, artboard 1a): the fantasy week by the
+   * Matchup page's arithmetic, and the regular season's length by the
+   * same. null before the draft, in the offseason (the week would be 0 or
+   * past the schedule), and for a format with no weeks.
+   */
+  const weekOfSeason = useMemo(() => {
+    if (!activeLeague || !hasMatchups) return null;
+    const done = getDraftCompletionDate(activeLeague);
+    if (!done || Number.isNaN(done.getTime())) return null;
+    const first = clampToSeasonStart(getFirstWeekStartDate(done));
+    const week = getCurrentWeekNumber(first);
+    const length = getScheduleLength(first);
+    return week >= 1 && week <= length ? { week, length } : null;
+  }, [activeLeague, hasMatchups]);
   const isRoto = leagueFormat.scoringFormat === 'roto';
   const isPPG = leagueFormat.scoringFormat === 'points-per-game';
   const isSeasonPoints = leagueFormat.scoringFormat === 'total-points' || isPPG;
@@ -582,10 +598,11 @@ const Standings = () => {
 
         {/* The artboard's meta line: the cut on the left, and on the right
             what the numbers are — `H2H POINTS`, `ROTO` — because a PF column
-            means something different under each. `WEEK n OF 24` lands with a
-            week state this page does not hold yet. */}
+            means something different under each; `WEEK n OF 24` on the
+            left once the season is on. */}
         <div className="flex items-center justify-between gap-3 mt-2 font-plex font-medium text-[10px] uppercase text-pressbox-text/45">
           <span className="truncate">
+            {weekOfSeason ? `Week ${weekOfSeason.week} of ${weekOfSeason.length} · ` : ''}
             {hasMatchups ? `Top ${leagueFormat.playoffTeams} make playoffs` : `Ranked by ${isRoto ? 'roto points' : isPPG ? 'points per game' : 'total points'}`}
           </span>
           <span className="shrink-0">{SCORING_FORMAT_LABELS[leagueFormat.scoringFormat]}</span>

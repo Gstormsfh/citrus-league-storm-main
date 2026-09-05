@@ -210,6 +210,14 @@ Harness knobs added: `page.html?p=auth&signedout=1`, `?p=profilesetup&fresh=1`,
 
 ### Still open
 
+- **Fantasy points above replacement (Garrett, 2026-09-05 00:30): a
+  position-dependent stat -- a player's projected/actual fantasy points over
+  the replacement level at his position (the best freely available C / LW /
+  RW / D / G in THIS league, under THIS league's scoring), the way VORP
+  reads in baseball. Belongs on the player card tiles, the Players rows'
+  sort menu and the trade analyzer. Needs: replacement level per position
+  per league (from ownership + projections), ScoringCalculator only, a
+  server column or a computed field on the dashboard index, tests.**
 - Measure first league page interactive on 4G (fonts are bundled now; `f9cdcded`+).
 - Store screenshots from the simulator; a VoiceOver hour on a device.
 - ArmchairGM (the league menu's Mock draft tile) is still Citrus 2.0 on a phone.
