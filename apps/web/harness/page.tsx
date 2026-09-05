@@ -690,6 +690,7 @@ const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
   news: () => import('../src/pages/News'),
   schedule: () => import('../src/pages/ScheduleManager'),
   team: () => import('../src/pages/OtherTeam'),
+  gmoffice: () => import('../src/pages/GMOffice'),
 };
 
 const which = new URLSearchParams(location.search).get('p') || 'waivers';
@@ -714,6 +715,7 @@ const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   news: { path: '/news', at: '/news' },
   schedule: { path: '/schedule-manager', at: '/schedule-manager?league=harness-league' },
   team: { path: '/team/:teamId', at: '/team/t2?league=harness-league' },
+  gmoffice: { path: '/gm-office', at: '/gm-office?league=harness-league' },
   trade: { path: '/trade-analyzer', at: '/trade-analyzer?league=harness-league' },
   waivers: { path: '/waiver-wire', at: '/waiver-wire?league=harness-league' },
   // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
