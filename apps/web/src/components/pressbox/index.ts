@@ -134,3 +134,7 @@ export {
   PB_POSITION_CHIP_BASE,
   PB_NEUTRAL_CHIP,
 } from './positionChip';
+
+/** The league switcher sheet (2026-09-05): the header's name and the menu's SWITCH ▾ open it. */
+export { PressBoxLeagueSwitcher, type PressBoxLeagueSwitcherProps } from './LeagueSwitcher';
+export { leagueSwitcherRows, switcherLine, type LeagueSwitcherRow, type SwitcherLeague } from './leagueSwitcherRows';

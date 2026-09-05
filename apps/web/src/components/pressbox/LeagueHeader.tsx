@@ -28,7 +28,7 @@
  * imported anywhere.
  */
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { HEADER_ROW1_H, HEADER_SUBTAB_H, SCANLINE } from './chromeMetrics';
 import { PB_TYPE } from './rowScale';
@@ -61,6 +61,17 @@ export interface LeagueHeaderProps {
    * else the icon takes the manager to League HQ, where the sheet lives.
    */
   onSettingsPress?: () => void;
+  /**
+   * THE LEAGUE NAME IS THE SWITCHER (2026-09-05). Reported from the phone:
+   * "the league drop down doesn't work any longer with the new visuals —
+   * click the dropdown and nothing happens, I can't create a new league."
+   * The old mobile navbar's league pill opened My Leagues with Create /
+   * Join at the top; here the name linked to the HQ you were already on.
+   * With an opener the crest-and-name is a button with a chevron and
+   * opens the switcher sheet; without one (a page that resolves no
+   * leagues) it stays a link to the league's HQ.
+   */
+  onLeaguePress?: () => void;
   /**
    * Draw the four-column sub-tab strip. OFF on a screen that already carries
    * its own strip: the Roster page has Roster / Stats / Analytics /
@@ -99,6 +110,7 @@ export function LeagueHeader({
   onWeekPrev,
   onWeekNext,
   onSettingsPress,
+  onLeaguePress,
   showSubTabs = true,
   leagueId: leagueIdProp,
   leagueName: leagueNameProp,
@@ -119,6 +131,24 @@ export function LeagueHeader({
 
   const activeKey = SUB_TABS.find((t) => t.match(location.pathname))?.key ?? 'league';
 
+  // The crest and the name, drawn once for both the button and the link.
+  const identity = (
+    <>
+      <span className="w-[30px] h-[30px] flex-shrink-0 rounded-[7px] bg-pressbox-tile-high ring-1 ring-white/[0.08] flex items-center justify-center overflow-hidden">
+        {crest ? (
+          <img src={crest} alt="" className="w-[22px] h-[22px] object-contain" />
+        ) : (
+          <span className="font-condensed font-extrabold text-[13px] text-pressbox-text">
+            {(leagueName || '?').slice(0, 1).toUpperCase()}
+          </span>
+        )}
+      </span>
+      <span className="font-condensed font-bold text-[22px] uppercase tracking-[0.02em] text-pressbox-text truncate">
+        {leagueName}
+      </span>
+    </>
+  );
+
   return (
     <header
       className={cn(PB_TYPE, 'sticky top-0 z-app-nav bg-pressbox-surface', className)}
@@ -129,24 +159,27 @@ export function LeagueHeader({
         className="flex items-center gap-2.5 px-3 border-b border-white/[0.08]"
         style={{ height: HEADER_ROW1_H }}
       >
-        <Link
-          to={leagueId ? `/league/${leagueId}` : '/'}
-          className="focus-citrus flex items-center gap-2.5 min-w-0 flex-1"
-          aria-label={leagueName ? `${leagueName} home` : 'League home'}
-        >
-          <span className="w-[30px] h-[30px] flex-shrink-0 rounded-[7px] bg-pressbox-tile-high ring-1 ring-white/[0.08] flex items-center justify-center overflow-hidden">
-            {crest ? (
-              <img src={crest} alt="" className="w-[22px] h-[22px] object-contain" />
-            ) : (
-              <span className="font-condensed font-extrabold text-[13px] text-pressbox-text">
-                {(leagueName || '?').slice(0, 1).toUpperCase()}
-              </span>
-            )}
-          </span>
-          <span className="font-condensed font-bold text-[22px] uppercase tracking-[0.02em] text-pressbox-text truncate">
-            {leagueName}
-          </span>
-        </Link>
+        {onLeaguePress ? (
+          <button
+            type="button"
+            onClick={onLeaguePress}
+            className="focus-citrus flex items-center gap-2.5 min-w-0 flex-1 min-h-[44px] text-left"
+            aria-label={leagueName ? `Switch league, currently ${leagueName}` : 'Switch league'}
+            aria-haspopup="dialog"
+            data-testid="league-switcher-trigger"
+          >
+            {identity}
+            <ChevronDown className="w-[14px] h-[14px] flex-none -ml-1 text-pressbox-text/45" strokeWidth={2.5} aria-hidden="true" />
+          </button>
+        ) : (
+          <Link
+            to={leagueId ? `/league/${leagueId}` : '/'}
+            className="focus-citrus flex items-center gap-2.5 min-w-0 flex-1"
+            aria-label={leagueName ? `${leagueName} home` : 'League home'}
+          >
+            {identity}
+          </Link>
+        )}
 
         {weekLabel && (
           <span className="flex items-center whitespace-nowrap">

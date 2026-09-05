@@ -88,9 +88,24 @@ describe('the chrome itself', () => {
     expect(chrome).toContain('<LeagueMenuWithReads');
   });
 
-  it('SWITCH goes to the league list (`/?all=1`; `/` itself is the active league\'s HQ)', () => {
-    expect(chrome).toContain("navigate('/?all=1')");
+  it('the league name and SWITCH ▾ open the switcher sheet; its foot is the league list (`/?all=1`)', () => {
+    // THE SWITCHER (2026-09-05). Reported from the phone: "the league drop
+    // down doesn't work any longer with the new visuals — click the dropdown
+    // and nothing happens, I can't create a new league." The header's name
+    // was a Link to the HQ you stood on. Now it opens the sheet, and so does
+    // the menu's SWITCH ▾; a pick routes like the desktop switcher's pick.
+    expect(chrome).toContain('onLeaguePress={() => setSwitcherOpen(true)}');
     expect(chrome).toContain('onSwitchLeague=');
+    expect(chrome).toMatch(/const onSwitchLeague = \(\) => \{\s*setMenuOpen\(false\);\s*setSwitcherOpen\(true\);/);
+    expect(chrome).toMatch(/\{switcherOpen && \(\s*<PressBoxLeagueSwitcher\s+open/);
+    expect(chrome).toContain('leagueSwitchDestination(l.id, lType, location.pathname)');
+    expect(chrome).toContain("navigate('/create-league')");
+    expect(chrome).toContain("navigate('/?all=1')");
+    // The header stays presentational: the opener arrives as a prop.
+    const header = read('../components/pressbox/LeagueHeader.tsx');
+    expect(header).toContain('onLeaguePress?: () => void;');
+    expect(header).toContain('data-testid="league-switcher-trigger"');
+    expect(header).not.toMatch(/useLeague\(\)/);
   });
 
   it('resolves the league once — URL, then the page, then the context — and hands it to both header and menu', () => {

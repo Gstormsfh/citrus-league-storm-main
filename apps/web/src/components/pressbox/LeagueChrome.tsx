@@ -20,14 +20,17 @@
  * of its own breakpoint.
  */
 import { useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useProfile } from '@/hooks/useProfile';
 import { teamCrestUrl } from '@/components/roster/headshot';
+import { getLeagueTypeFromSettings, leagueSwitchDestination } from '@/utils/leagueTypeHelpers';
 import { cn } from '@/lib/utils';
 import { PB_TYPE } from './rowScale';
 import { LeagueHeader, type LeagueHeaderProps } from './LeagueHeader';
 import { LeagueMenu, type LeagueMenuProps } from './LeagueMenu';
+import { PressBoxLeagueSwitcher } from './LeagueSwitcher';
+import type { SwitcherLeague } from './leagueSwitcherRows';
 import type { LeagueMenuTile } from './leagueMenuTiles';
 import { menuUserFromProfile } from './menuUser';
 import { useLeagueMenuTiles } from './useLeagueMenuTiles';
@@ -47,9 +50,11 @@ export interface PressBoxLeagueChromeProps extends Omit<LeagueHeaderProps, 'onSe
 
 export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, ...header }: PressBoxLeagueChromeProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
   const league = useLeague();
   const params = useParams<{ leagueId?: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: profile } = useProfile();
   // The header is presentational; this is where the league is resolved.
   // The URL's league wins, then the page's, then the context's -- and the
@@ -62,10 +67,32 @@ export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, .
     const abbr = (league?.activeLeague?.settings as { crestTeam?: string } | null)?.crestTeam;
     return abbr ? teamCrestUrl(abbr) : null;
   }, [resolvedId, league?.activeLeagueId, league?.activeLeague]);
+  // THE SWITCHER (2026-09-05). The league name in the header and the
+  // SWITCH ▾ pill in the menu both open one bottom sheet: Create / Join at
+  // the top, the manager's leagues under it, the active one marked. A pick
+  // goes where the desktop switcher's pick goes (`leagueSwitchDestination`:
+  // a pool to its pool route, a Match screen to the other league's Match,
+  // everything else to the league's HQ) and makes it the context's active
+  // league, so the next cold open lands there. The sheet's foot goes to
+  // the league list (`/?all=1`; `/` itself is the active league's HQ).
+  const userLeagues: SwitcherLeague[] = league?.userLeagues ?? [];
   const onSwitchLeague = () => {
-    // SWITCH ▾ goes to the league list (the artboard's home). `/` itself
-    // opens the active league's HQ since 2026-09-05; `?all=1` is the list.
     setMenuOpen(false);
+    setSwitcherOpen(true);
+  };
+  const onPickLeague = (l: SwitcherLeague) => {
+    setSwitcherOpen(false);
+    if (l.id === resolvedId) return;
+    league?.setActiveLeagueId?.(l.id);
+    const lType = getLeagueTypeFromSettings((l.settings as Record<string, unknown> | null | undefined) ?? null);
+    navigate(leagueSwitchDestination(l.id, lType, location.pathname));
+  };
+  const onCreateLeague = () => {
+    setSwitcherOpen(false);
+    navigate('/create-league');
+  };
+  const onAllLeagues = () => {
+    setSwitcherOpen(false);
     navigate('/?all=1');
   };
   return (
@@ -86,8 +113,20 @@ export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, .
           leagueName={resolvedName}
           crestSrc={crestSrc}
           onSettingsPress={() => setMenuOpen(true)}
+          onLeaguePress={() => setSwitcherOpen(true)}
         />
       </div>
+      {switcherOpen && (
+        <PressBoxLeagueSwitcher
+          open
+          onOpenChange={setSwitcherOpen}
+          leagues={userLeagues}
+          activeId={resolvedId || null}
+          onPick={onPickLeague}
+          onCreate={onCreateLeague}
+          onAllLeagues={onAllLeagues}
+        />
+      )}
       {/* The menu exists only while open (2026-09-05): its lines are
           react-query reads, and mounting the hook on every league page put
           `useQuery` under page tests that render no QueryClient. A page

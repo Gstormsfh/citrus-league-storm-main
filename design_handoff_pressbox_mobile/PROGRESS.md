@@ -269,6 +269,21 @@ Root cause was a real bug, not a styling miss -- `/` fell through to
   direct import), mobileHeaderMenuGuard, Standings.offseason (menu reads
   mount only while open).
 
+### The league switcher, 2026-09-05 (Garrett's first tap of the morning)
+
+"The league drop down doesn't work any longer with the new visuals. Click
+the dropdown and nothing happens; I can't create a new league." The old
+mobile navbar's league pill WAS the switcher -- My Leagues, Create / Join
+at the top since 09-01 -- and the Press Box header's name was a Link to
+the HQ you were already standing on. Now the name carries a 14px chevron
+and opens `PressBoxLeagueSwitcher` (bottom sheet: Create / Join on top,
+the leagues under it in context order, the active one marked and inert,
+ALL LEAGUES to `/?all=1`); the menu's SWITCH ▾ opens the same sheet. A
+pick routes through `leagueSwitchDestination` and sets the context's
+active league. Rows are pure (`leagueSwitcherRows.ts`, tested);
+`mobileHeaderMenuGuard` pins the wiring. The chevron is a deliberate
+deviation from artboard 4a's header, which draws no affordance there.
+
 ### Still open
 
 - **Fantasy points above replacement (Garrett, 2026-09-05 00:30): a
