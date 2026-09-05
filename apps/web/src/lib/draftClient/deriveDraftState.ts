@@ -66,6 +66,8 @@ export interface RosterEntry {
    * that must not count unconfirmed picks should filter on it.
    */
   isPending?: boolean;
+  /** AUCTION (2026-09-05): what the lot went for. Absent on a drafted pick. */
+  price?: number;
 }
 
 /**
@@ -204,7 +206,7 @@ export function foldEvents(
   // header count, the board, the pool's drafted filter, MY TEAM — reads
   // this state, which used to no-op every auction event. The lot's
   // player id is text on the wire; the pool's ids are numbers.
-  const awardLot = (teamId: string, playerIdText: string, seq: number) => {
+  const awardLot = (teamId: string, playerIdText: string, seq: number, price: number) => {
     const playerId = Number(playerIdText);
     const roster = teamRosters.get(teamId) ?? [];
     roster.push({
@@ -212,6 +214,7 @@ export function foldEvents(
       playerId: Number.isFinite(playerId) ? playerId : -1,
       pickNumber: picksMade + 1,
       roundNumber: matrix?.[picksMade]?.round ?? 1,
+      ...(Number.isFinite(price) ? { price } : {}),
     });
     teamRosters.set(teamId, roster);
     picksMade += 1;
@@ -430,7 +433,7 @@ export function foldEvents(
         auctionLotPlayerId = event.playerId;
         break;
       case 'auction_nomination_closed':
-        awardLot(event.winnerTeamId, event.playerId, event.seq);
+        awardLot(event.winnerTeamId, event.playerId, event.seq, event.finalAmount);
         auctionLotPlayerId = null;
         break;
       case 'auction_nomination_expired':
@@ -440,12 +443,12 @@ export function foldEvents(
         const ns = event.newState ?? {};
         if (event.overrideAction === 'force_close_nomination') {
           if (String(ns.outcome) === 'sold' && auctionLotPlayerId !== null) {
-            awardLot(String(ns.winnerTeamId), auctionLotPlayerId, event.seq);
+            awardLot(String(ns.winnerTeamId), auctionLotPlayerId, event.seq, Number(ns.finalAmount));
           }
           auctionLotPlayerId = null;
         } else if (event.overrideAction === 'award_to_team') {
           if (auctionLotPlayerId !== null) {
-            awardLot(String(ns.awardedTeamId), auctionLotPlayerId, event.seq);
+            awardLot(String(ns.awardedTeamId), auctionLotPlayerId, event.seq, Number(ns.awardedAmount));
           }
           auctionLotPlayerId = null;
         } else if (event.overrideAction === 'cancel_nomination') {

@@ -36,6 +36,9 @@ import {
 import { OnClockActionBar } from '@/components/draft/v2/OnClockActionBar';
 import { OffClockBar } from '@/components/draft/v2/OffClockBar';
 import { AuctionPanel } from '@/components/draft/v2/AuctionPanel';
+import { AuctionBoard } from '@/components/draft/v2/AuctionBoard';
+import { isMyNomination } from '@/lib/draftClient/auctionNominator';
+import { submitNomination } from '@/lib/draftClient/submitAuctionAction';
 import { OfflineDraftRoom } from '@/components/draft/v2/OfflineDraftRoom';
 import { ManagerPresencePanel } from '@/components/draft/v2/ManagerPresencePanel';
 import { DraftBoard } from '@/components/draft/DraftBoard';
@@ -78,6 +81,7 @@ import {
   usePendingActions,
   usePickTimeLimitSec,
   usePresence,
+  useAuctionDerived,
 } from '@/stores/draftClientStore';
 import { useMyTeamIdCrossCheck } from '@/hooks/useMyTeamIdCrossCheck';
 import {
@@ -1799,6 +1803,8 @@ function MainTabs({
 }: MainTabsProps) {
   const derived = useDerivedDraftState();
   const snapshot = useDraftSnapshot();
+  // AUCTION BOARD (2026-09-05): the lot's budgets for the column heads.
+  const auctionDerived = useAuctionDerived();
 
   // LEAGUE-SCORING WIRE (2026-08-23 final audit): the pool previously
   // ranked EVERY league with DEFAULT_SCORING — a custom league (e.g.
@@ -1929,6 +1935,30 @@ function MainTabs({
   const participatingTeamIds = useMemo(
     () => participatingTeamIdsFromMatrix(matrix ?? null),
     [matrix],
+  );
+  // AUCTION (2026-09-05): the pool's row verb is NOMINATE, live only on my
+  // nomination. One rule shared with the panel (auctionNominator.ts), so a
+  // "Draft" button that answers "it's not your turn" can never draw here.
+  const myNomination = isAuctionRoom && isMyNomination(auctionDerived, matrix ?? null, teams, myTeamId);
+  const [nominating, setNominating] = useState(false);
+  const handleNominateFromPool = useCallback(
+    async (player: Player) => {
+      if (!myTeamId || !myNomination || nominating) return;
+      setNominating(true);
+      try {
+        const result = await submitNomination({
+          leagueId,
+          teamId: myTeamId,
+          playerId: String(player.id),
+          playerName: player.full_name,
+          openingBid: 1,
+        });
+        if (result.ok === false) toast.error(result.message);
+      } finally {
+        setNominating(false);
+      }
+    },
+    [leagueId, myTeamId, myNomination, nominating],
   );
   // PICK-LATENCY (2026-08-12) — optimistic render.
   //
@@ -2528,15 +2558,16 @@ function MainTabs({
           ) : (
             <PlayerPool
               onPlayerSelect={setSelectedPlayer}
-              onPlayerDraft={handleDraftFromPool}
+              onPlayerDraft={isAuctionRoom ? handleNominateFromPool : handleDraftFromPool}
               selectedPlayer={selectedPlayer}
               draftedPlayers={draftedIds}
               isDraftActive={isDraftActive}
               availablePlayers={availablePlayers}
               loadError={playersError}
               onRetryLoad={onRetryPlayers}
-              isYourTurn={amIOnClock}
-              isSubmitPending={isSubmitPending}
+              isYourTurn={isAuctionRoom ? myNomination : amIOnClock}
+              actionVerb={isAuctionRoom ? 'Nominate' : 'Draft'}
+              isSubmitPending={isAuctionRoom ? nominating : isSubmitPending}
               /* LEAGUE-SCORING WIRE (2026-08-23) — rankings/FPTS follow
                  this league's categories instead of default scoring. */
               scoringSettings={leagueScoring}
@@ -2576,6 +2607,29 @@ function MainTabs({
         </TabsContent>
 
         <TabsContent value="board" className="mt-4">
+          {/* AUCTION BOARD (2026-09-05): a lot has no pick number a team was
+              owed, so the snake matrix ("1.01 ON THE CLOCK") is the wrong
+              picture. Each team's column fills from the top with what it
+              bought, price under the name, budget in the head. */}
+          {snapshot?.format === 'auction' && derived ? (
+            <AuctionBoard
+              teams={teams}
+              derived={derived}
+              auction={auctionDerived}
+              playersById={playersById}
+              myTeamId={myTeamId}
+              slotsPerTeam={
+                teams.length > 0 && derived.totalPicks > 0
+                  ? Math.round(derived.totalPicks / teams.length)
+                  : 0
+              }
+              onPlayerClick={(playerId) => {
+                const picked = playersById.get(playerId);
+                if (picked) setCardPlayer(picked);
+              }}
+            />
+          ) : (
+          <>
           {/* DR-4 (2026-07-30) — pre-draft board copy. */}
           {derived?.draftStatus === 'not_started' && (
             <div
@@ -2629,6 +2683,8 @@ function MainTabs({
               if (picked) setCardPlayer(picked);
             }}
           />
+          </>
+          )}
         </TabsContent>
 
         <TabsContent value="history" className="mt-2">

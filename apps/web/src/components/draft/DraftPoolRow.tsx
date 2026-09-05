@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Star, Info } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { Mug } from '@/components/roster/Mug';
 import { mugFromDirectory } from '@/components/roster/headshot';
 import { positionChipKey } from '@/components/roster/positionChip';
@@ -79,9 +79,23 @@ export interface DraftPoolRowProps {
   seasonLine?: string | null;
   /** `D1` -- rank at his position in the pool's projection order (artboard 4a's `TIER 2 · D1`, the half the data supports). */
   positionRank?: string | null;
-  /** Show the inline Draft button: on the clock, or this row is selected. */
+  /**
+   * The action is LIVE: it is the manager's turn (on the clock, or their
+   * nomination in an auction) and the draft is running. The button draws
+   * on every undrafted row regardless (2026-09-05: "that's where draft
+   * will come up for every player"); off the turn it is dimmed and inert.
+   */
   canDraft: boolean;
   submitting: boolean;
+  /**
+   * TWO TAPS (2026-09-05). The first tap ARMS the row (`onArm`); the button
+   * reads CONFIRM until the second tap fires `onDraft`. The pool owns which
+   * row is armed so only one is at a time, and stands it down on a timer.
+   */
+  armed?: boolean;
+  onArm?: () => void;
+  /** `Draft` for snake and linear; `Nominate` in an auction room. */
+  verb?: 'Draft' | 'Nominate';
   onSelect: () => void;
   onDraft: () => void;
   /** Undefined removes the queue star entirely (v1 call sites). */
@@ -108,6 +122,9 @@ export function DraftPoolRow({
   positionRank = null,
   canDraft,
   submitting,
+  armed = false,
+  onArm,
+  verb = 'Draft',
   onSelect,
   onDraft,
   onToggleQueue,
@@ -132,13 +149,20 @@ export function DraftPoolRow({
       data-testid="draft-pool-row"
       className={cn(
         PB_TYPE,
-        'grid grid-cols-[22px_1fr_54px_40px] gap-2.5 items-center min-h-[62px] px-3.5',
+        'grid grid-cols-[22px_1fr_54px_56px] gap-2.5 items-center min-h-[62px] px-3.5',
         'border-t border-white/[0.06] transition-colors active:bg-white/5',
         !drafted && 'cursor-pointer',
-        selected && 'bg-pressbox-orange/[0.06] shadow-[inset_3px_0_0_theme(colors.pressbox.orange)]',
+        (selected || armed) && 'bg-pressbox-orange/[0.06] shadow-[inset_3px_0_0_theme(colors.pressbox.orange)]',
         drafted && 'opacity-40',
       )}
-      onClick={() => !drafted && onSelect()}
+      // THE ROW IS THE CARD (2026-09-05): a tap on the face, the name or the
+      // figures opens the player card. Selecting is what the v1 desktop
+      // room does with a row; on the phone the verb lives on the row itself.
+      onClick={() => {
+        if (drafted) return;
+        if (onShowCard) onShowCard();
+        else onSelect();
+      }}
     >
       {/* 1 — the star over the rank. */}
       <span className="flex flex-col items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
@@ -273,51 +297,56 @@ export function DraftPoolRow({
         </span>
       </span>
 
-      {/* 4 — the action slot. The verb on the clock, the card off it, never
-          both. */}
+      {/* 4 — the action slot: the verb on every undrafted row. Live and
+          solid on the manager's turn once armed, outlined before that,
+          dimmed and inert off the turn. No (i): the row itself is the card. */}
       <span className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-        {canDraft ? (
+        {!drafted && (
           <button
             type="button"
             className={cn(
               SLOT,
-              'border-transparent bg-pressbox-orange text-pressbox-orange-ink',
-              'font-condensed font-bold text-[10px] uppercase tracking-[0.06em] disabled:opacity-50',
+              'w-auto min-w-[56px] px-1.5 font-condensed font-bold text-[10px] uppercase tracking-[0.06em] whitespace-nowrap',
+              armed && canDraft
+                ? 'border-transparent bg-pressbox-orange text-pressbox-orange-ink'
+                : canDraft
+                  ? 'border-pressbox-orange/60 bg-pressbox-orange/10 text-pressbox-orange-soft'
+                  : 'border-white/[0.1] bg-white/[0.04] text-pressbox-text/35 cursor-default active:scale-100',
+              submitting && 'opacity-50',
             )}
-            disabled={submitting}
+            disabled={submitting || !canDraft}
+            aria-disabled={!canDraft || undefined}
             aria-busy={submitting}
+            aria-label={
+              !canDraft
+                ? `${verb} ${player.full_name} (not your turn)`
+                : armed
+                  ? `Confirm: ${verb.toLowerCase()} ${player.full_name}`
+                  : `${verb} ${player.full_name}`
+            }
+            title={!canDraft ? 'Not your turn' : undefined}
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();
-              onDraft();
+              if (!canDraft || submitting) return;
+              if (armed || !onArm) onDraft();
+              else onArm();
             }}
             data-testid="pool-row-draft-button"
+            data-armed={armed && canDraft ? 'true' : undefined}
           >
             {submitting ? (
               <>
                 <span aria-hidden="true">&hellip;</span>
                 <span className="sr-only">Submitting…</span>
               </>
+            ) : armed && canDraft ? (
+              'Confirm'
             ) : (
-              'Draft'
+              verb
             )}
           </button>
-        ) : onShowCard ? (
-          <button
-            type="button"
-            className={cn(SLOT, 'border-white/[0.12] bg-white/[0.06] text-pressbox-text/70')}
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              onShowCard();
-            }}
-            title={`View ${player.full_name} card`}
-            aria-label={`View ${player.full_name} player card`}
-            data-testid="pool-row-card-button"
-          >
-            <Info className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
-          </button>
-        ) : null}
+        )}
       </span>
     </div>
   );

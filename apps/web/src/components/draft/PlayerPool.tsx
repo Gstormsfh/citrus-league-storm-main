@@ -89,7 +89,17 @@ interface PlayerPoolProps {
    * layer 2 DISAMBIGUATE that catches any race that slips this guard).
    */
   isSubmitPending?: boolean;
+  /**
+   * THE ROW'S VERB (2026-09-05). `Draft` for snake and linear; `Nominate`
+   * in an auction room, where a "Draft" button that answers "it's not your
+   * turn" was the wrong control on every row. `isYourTurn` is then "my
+   * nomination" and `onPlayerDraft` nominates.
+   */
+  actionVerb?: 'Draft' | 'Nominate';
 }
+
+/** How long an armed row waits for its second tap before standing down. */
+export const POOL_ARM_TTL_MS = 6000;
 
 /**
  * One shared empty map so a caller that passes no signals does not hand the
@@ -137,8 +147,27 @@ export const PlayerPool = memo(({
   isYourTurn = false,
   need = null,
   isSubmitPending = false,
+  actionVerb = 'Draft',
 }: PlayerPoolProps) => {
   const [searchTerm, setSearchTerm] = useState('');
+  // TWO TAPS (2026-09-05): the one row whose verb reads CONFIRM. Stands
+  // down on a timer, when the turn passes, and once the action fires.
+  const [armedId, setArmedId] = useState<string | null>(null);
+  const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const disarm = () => {
+    if (armTimer.current) clearTimeout(armTimer.current);
+    armTimer.current = null;
+    setArmedId(null);
+  };
+  const arm = (id: string) => {
+    if (armTimer.current) clearTimeout(armTimer.current);
+    setArmedId(id);
+    armTimer.current = setTimeout(() => setArmedId(null), POOL_ARM_TTL_MS);
+  };
+  useEffect(() => {
+    if (!isYourTurn || !isDraftActive) disarm();
+  }, [isYourTurn, isDraftActive]);
+  useEffect(() => () => { if (armTimer.current) clearTimeout(armTimer.current); }, []);
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedPosition, setSelectedPosition] = useState('All');
   // Default sort is the overall projected-fantasy-points ranking (#1 / #2 / #3...).
@@ -698,10 +727,16 @@ export const PlayerPool = memo(({
               drafted={isDrafted}
               queued={queueIndex >= 0}
               queuePosition={queueIndex >= 0 ? queueIndex + 1 : null}
-              canDraft={(isSelected || isYourTurn) && isDraftActive && !isDrafted}
+              canDraft={isYourTurn && isDraftActive && !isDrafted}
               submitting={isSubmitPending}
+              armed={armedId === player.id}
+              onArm={() => arm(player.id)}
+              verb={actionVerb}
               onSelect={() => onPlayerSelect(player)}
-              onDraft={() => onPlayerDraft(player)}
+              onDraft={() => {
+                disarm();
+                onPlayerDraft(player);
+              }}
               onToggleQueue={onAddToQueue ? () => onAddToQueue(player.id) : undefined}
               onShowCard={onShowCard ? () => onShowCard(player) : undefined}
             />

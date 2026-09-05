@@ -159,7 +159,10 @@ export function foldAuctionEvents(
       case 'auction_nomination_started':
       case 'auction_auto_nominated': {
         const s = ensure();
-        s.playerNames.set(event.playerId, event.playerName);
+        // An empty name is no name (2026-09-05): the engine sends '' for a
+        // player it could not name, and '' survived `??` into the results
+        // feed as a blank row. The panel falls back to the pool by id.
+        if (event.playerName) s.playerNames.set(event.playerId, event.playerName);
         s.currentNomination = {
           nominationId: event.nominationId,
           playerId: event.playerId,
@@ -206,9 +209,9 @@ export function foldAuctionEvents(
           nominationId: event.nominationId,
           playerId: event.playerId,
           playerName:
-            s.playerNames.get(event.playerId) ??
+            s.playerNames.get(event.playerId) ||
             (s.currentNomination?.playerId === event.playerId
-              ? s.currentNomination.playerName
+              ? s.currentNomination.playerName || null
               : null),
           teamId: event.winnerTeamId,
           amount: event.finalAmount,
@@ -225,7 +228,7 @@ export function foldAuctionEvents(
           kind: 'no_sale',
           nominationId: event.nominationId,
           playerId: s.currentNomination?.playerId ?? null,
-          playerName: s.currentNomination?.playerName ?? null,
+          playerName: s.currentNomination?.playerName || null,
           teamId: s.currentNomination?.nominatorTeamId ?? null,
           amount: null,
           reason: event.reason,

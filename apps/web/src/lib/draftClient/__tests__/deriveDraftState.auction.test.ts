@@ -63,7 +63,7 @@ describe('foldEvents — an auction lot won is a pick', () => {
     expect(gaps).toEqual([]);
     expect(state.picksMade).toBe(1);
     expect(state.draftStatus).toBe('in_progress');
-    expect(state.teamRosters.get('t2')).toEqual([{ seq: 3, playerId: 8478402, pickNumber: 1, roundNumber: 1 }]);
+    expect(state.teamRosters.get('t2')).toEqual([{ seq: 3, playerId: 8478402, pickNumber: 1, roundNumber: 1, price: 60 }]);
     expect(state.teamRosters.get('t1')).toBeUndefined();
     expect(state.auctionLotPlayerId).toBeNull();
     expect(state.foldedThroughSeq).toBe(3);
@@ -118,8 +118,8 @@ describe('foldEvents — an auction lot won is a pick', () => {
     ];
     const { state } = foldEvents(emptyDerivedState(SEED), events, MATRIX);
     expect(state.picksMade).toBe(2);
-    expect(state.teamRosters.get('t1')?.map((r) => r.playerId)).toEqual([8478402]);
-    expect(state.teamRosters.get('t2')?.map((r) => r.playerId)).toEqual([8477934]);
+    expect(state.teamRosters.get('t1')?.map((r) => [r.playerId, r.price])).toEqual([[8478402, 12]]);
+    expect(state.teamRosters.get('t2')?.map((r) => [r.playerId, r.price])).toEqual([[8477934, 5]]);
     expect(state.auctionLotPlayerId).toBeNull();
   });
 
