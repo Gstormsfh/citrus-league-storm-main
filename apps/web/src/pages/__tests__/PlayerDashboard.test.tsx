@@ -406,8 +406,11 @@ describe('PlayerDashboard — the shipped page', () => {
     expect(screen.getByText(/no update timestamp on this payload/i)).toBeInTheDocument();
   });
 
-  it('shows the freshness badge when the payload carried a real timestamp', async () => {
-    serve(payload());
+  it('shows the freshness badge when the payload carried a real timestamp that has gone stale', async () => {
+    // StaleDataBadge hides itself under 14 days (a fresh model needs no
+    // badge), so the fixture's timestamp is three weeks old.
+    const staleAsOf = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString();
+    serve(payload({ as_of: staleAsOf }));
     renderAt(MCDAVID);
     await screen.findByLabelText(/shot heatmap/i);
     expect(screen.queryByText(/no update timestamp/i)).toBeNull();

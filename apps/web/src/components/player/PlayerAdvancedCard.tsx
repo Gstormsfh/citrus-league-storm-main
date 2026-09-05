@@ -23,6 +23,7 @@ import {
   type CardEntry,
 } from './playerAdvancedMetrics';
 import { seasonLabel } from './playerDashboardData';
+import { projectionFraming } from './projectionFraming';
 import { usePlayerXgHistory } from './usePlayerXgHistory';
 
 /**
@@ -266,6 +267,7 @@ export function PlayerAdvancedCard({
   const projFp = player.proj_fantasy_points;
   const projPpg = player.proj_fantasy_ppg;
   const hasProjection = projFp != null || projPpg != null;
+  const framing = projectionFraming();
   const deployment = deploymentParts(player);
   const asOf = player.as_of ?? null;
   /**
@@ -463,12 +465,15 @@ export function PlayerAdvancedCard({
       {showAll && hasProjection && (
         <Band className="flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <Eyebrow>Rest of season</Eyebrow>
+            {/* Before the opener this is a SEASON projection and `proj_gp` is
+                the games the model expects him to play; after it, the rest
+                of the season (projectionFraming.ts, 2026-09-05). */}
+            <Eyebrow>{framing.eyebrow}</Eyebrow>
             <div className={cn(ROW_META, 'mt-1 text-white/70')}>
               {player.is_goalie
                 ? `${fmt1(player.proj_wins)} W · ${fmt1(player.proj_saves)} SV · ${fmt1(player.proj_shutouts)} SO`
                 : `${fmt1(player.proj_goals)} G · ${fmt1(player.proj_assists)} A · ${fmt1(player.proj_sog)} SOG`}
-              {player.proj_gp != null && ` over ${Math.round(player.proj_gp)} GP`}
+              {player.proj_gp != null && framing.gpPhrase(player.proj_gp)}
             </div>
           </div>
           <div className="flex-shrink-0 text-right">
