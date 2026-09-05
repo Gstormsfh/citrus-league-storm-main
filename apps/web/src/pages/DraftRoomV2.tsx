@@ -36,6 +36,7 @@ import {
 import { OnClockActionBar } from '@/components/draft/v2/OnClockActionBar';
 import { OffClockBar } from '@/components/draft/v2/OffClockBar';
 import { AuctionPanel } from '@/components/draft/v2/AuctionPanel';
+import { auctionRules, type AuctionRules } from '@/lib/draftClient/auctionRules';
 import { AuctionBoard } from '@/components/draft/v2/AuctionBoard';
 import { isMyNomination } from '@/lib/draftClient/auctionNominator';
 import { submitNomination } from '@/lib/draftClient/submitAuctionAction';
@@ -1645,6 +1646,28 @@ function DraftRoomBody({
    * while the pool becomes a read/write view of the same array.
    */
   const isMobile = useIsMobile();
+  // The auction's money rules, read from the league so the room offers only
+  // bids the engine accepts (auctionRules.ts, 2026-09-05): the minimum bid,
+  // the increment tiers, the budget. One fetch, shared by the panel and the
+  // pool's Nominate button. Defaults stand until it lands.
+  const [leagueSettings, setLeagueSettings] = useState<unknown>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { apiClient } = await import('@/api/client');
+        const response = await apiClient.get<{ settings?: unknown }>(`/api/leagues/${encodeURIComponent(leagueId)}`);
+        const payload = (response.data ?? response) as { settings?: unknown };
+        if (!cancelled) setLeagueSettings(payload?.settings ?? null);
+      } catch {
+        /* engine defaults remain */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueId]);
+  const money = useMemo(() => auctionRules(leagueSettings), [leagueSettings]);
   const [queue, setQueue] = useState<string[]>([]);
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
@@ -1720,6 +1743,8 @@ function DraftRoomBody({
             teams={teams}
             playersById={playersById}
             myTeamId={myTeamId}
+            minBid={money.minBid}
+            bidIncrementTiers={money.tiers}
           />
         )}
         <MainTabs
@@ -1734,6 +1759,7 @@ function DraftRoomBody({
           queue={queue}
           onQueueChange={setQueue}
           isMobile={isMobile}
+          auctionMoney={money}
         />
       </div>
       {/* QUEUE-REACH (2026-08-13) — was `hidden lg:block`.
@@ -1786,6 +1812,8 @@ interface MainTabsProps {
   onQueueChange: (next: string[]) => void;
   /** Below lg: the rail's halves become the QUEUE and MY TEAM tabs. */
   isMobile: boolean;
+  /** The league's auction money rules (auctionRules.ts): the pool nominates at the league's minimum. */
+  auctionMoney: AuctionRules;
 }
 
 function MainTabs({
@@ -1800,6 +1828,7 @@ function MainTabs({
   queue,
   onQueueChange,
   isMobile,
+  auctionMoney: money,
 }: MainTabsProps) {
   const derived = useDerivedDraftState();
   const snapshot = useDraftSnapshot();
@@ -1951,14 +1980,14 @@ function MainTabs({
           teamId: myTeamId,
           playerId: String(player.id),
           playerName: player.full_name,
-          openingBid: 1,
+          openingBid: money.minBid,
         });
         if (result.ok === false) toast.error(result.message);
       } finally {
         setNominating(false);
       }
     },
-    [leagueId, myTeamId, myNomination, nominating],
+    [leagueId, myTeamId, myNomination, nominating, money.minBid],
   );
   // PICK-LATENCY (2026-08-12) — optimistic render.
   //

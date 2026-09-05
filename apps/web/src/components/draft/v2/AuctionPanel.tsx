@@ -31,12 +31,20 @@ import { positionChipKey } from '@/components/roster/positionChip';
 import { pressBoxPositionChipClasses } from '@/components/pressbox/positionChip';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { getTeamColor } from '@/utils/teamColors';
+import { DEFAULT_TIERS, minimumNextBid, type BidIncrementTier } from '@/lib/draftClient/auctionRules';
 
 interface AuctionPanelProps {
   leagueId: string;
   teams: FetchedTeam[];
   playersById: ReadonlyMap<string, Player>;
   myTeamId: string | null;
+  /**
+   * The league's money rules (auctionRules.ts, 2026-09-05): the floor for an
+   * opening bid and the per-slot reserve, and the increment tiers the engine
+   * enforces. Defaults are the engine's own ($1, flat $1).
+   */
+  minBid?: number;
+  bidIncrementTiers?: ReadonlyArray<BidIncrementTier>;
 }
 
 const EYEBROW = 'font-plex font-semibold text-[9px] tracking-[0.14em] uppercase';
@@ -60,7 +68,14 @@ function useCountdownSeconds(deadlineIso: string | null): number | null {
   return Math.ceil(remaining);
 }
 
-export function AuctionPanel({ leagueId, teams, playersById, myTeamId }: AuctionPanelProps) {
+export function AuctionPanel({
+  leagueId,
+  teams,
+  playersById,
+  myTeamId,
+  minBid = 1,
+  bidIncrementTiers = DEFAULT_TIERS,
+}: AuctionPanelProps) {
   const auction = useAuctionDerived();
   const matrix = useDraftMatrix();
   const { toast } = useToast();
@@ -69,7 +84,7 @@ export function AuctionPanel({ leagueId, teams, playersById, myTeamId }: Auction
   const [submitting, setSubmitting] = useState(false);
   const [nomSearch, setNomSearch] = useState('');
   const [nomPlayer, setNomPlayer] = useState<Player | null>(null);
-  const [nomOpeningBid, setNomOpeningBid] = useState<string>('1');
+  const [nomOpeningBid, setNomOpeningBid] = useState<string>(String(minBid));
   const lastNominationId = useRef<string | null>(null);
 
   const teamNameById = useMemo(() => {
@@ -114,8 +129,7 @@ export function AuctionPanel({ leagueId, teams, playersById, myTeamId }: Auction
   const iAmNominating = nomination === null && myTeamId !== null && onClockNominatorId === myTeamId;
 
   const myBudget = myTeamId ? auction.budgets.get(myTeamId) : undefined;
-  const minBid = 1;
-  const minNextBid = nomination ? Math.floor(nomination.leadingBid) + minBid : minBid;
+  const minNextBid = nomination ? minimumNextBid(Math.floor(nomination.leadingBid), bidIncrementTiers) : minBid;
   const myMaxAffordable = myBudget
     ? myBudget.remaining - Math.max(0, myBudget.slotsRemaining - 1) * minBid
     : null;
@@ -169,7 +183,7 @@ export function AuctionPanel({ leagueId, teams, playersById, myTeamId }: Auction
       if (result.ok === true) {
         setNomPlayer(null);
         setNomSearch('');
-        setNomOpeningBid('1');
+        setNomOpeningBid(String(minBid));
       } else {
         toast({ title: 'Nomination Failed', description: result.message, variant: 'destructive' });
       }
@@ -392,7 +406,7 @@ export function AuctionPanel({ leagueId, teams, playersById, myTeamId }: Auction
                     <input
                       type="number"
                       inputMode="numeric"
-                      min={1}
+                      min={minBid}
                       step={1}
                       value={nomOpeningBid}
                       onChange={(e) => setNomOpeningBid(e.target.value)}

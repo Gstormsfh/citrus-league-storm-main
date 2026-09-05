@@ -156,6 +156,10 @@ const CreateLeague = () => {
   const [auctionBudget, setAuctionBudget] = useState("200");
   const [auctionMinBid, setAuctionMinBid] = useState("1");
   const [auctionNominationTime, setAuctionNominationTime] = useState("30");
+  // SETTINGS PASS-THROUGH (2026-09-05): the engine's bid window
+  // (`auctionBidWindowSeconds`, draft/index.ts) was never written by this
+  // form, so every auction ran a 30s clock whatever the commissioner meant.
+  const [auctionBidTime, setAuctionBidTime] = useState("30");
 
   // ---- Season Settings ----
   const [playoffTeams, setPlayoffTeams] = useState("6");
@@ -525,6 +529,7 @@ const CreateLeague = () => {
           // auctionNominationTime. Write both so the commissioner's
           // value actually reaches the auction clock.
           settings.auctionNominationWindowSeconds = parseInt(auctionNominationTime) || 30;
+          settings.auctionBidWindowSeconds = parseInt(auctionBidTime) || 30;
         }
 
         // Waiver/transaction settings (persisted in settings AND dedicated columns)
@@ -848,6 +853,7 @@ const CreateLeague = () => {
         auctionBudget, setAuctionBudget,
         auctionMinBid, setAuctionMinBid,
         auctionNominationTime, setAuctionNominationTime,
+        auctionBidTime, setAuctionBidTime,
         leagueStats,
         setStatEnabled: (id, enabled) => setLeagueStats((prev) => prev.map((s) => (s.id === id ? { ...s, enabled } : s))),
         setStatPoints: (id, points) => setLeagueStats((prev) => prev.map((s) => (s.id === id ? { ...s, points } : s))),
@@ -1495,7 +1501,7 @@ const CreateLeague = () => {
                             <DollarSign className="w-4 h-4 text-pastel-orange" />
                             Auction Settings
                           </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label className="text-sm">Salary Budget ($)</Label>
                               <Input
@@ -1532,6 +1538,20 @@ const CreateLeague = () => {
                                 </SelectContent>
                               </Select>
                               <p className="text-xs text-white/55">Time to nominate a player</p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Bid Timer</Label>
+                              <Select value={auctionBidTime} onValueChange={setAuctionBidTime}>
+                                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="10">10 seconds</SelectItem>
+                                  <SelectItem value="15">15 seconds</SelectItem>
+                                  <SelectItem value="20">20 seconds</SelectItem>
+                                  <SelectItem value="30">30 seconds</SelectItem>
+                                  <SelectItem value="45">45 seconds</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-white/55">Bidding stays open this long after each bid</p>
                             </div>
                           </div>
                         </div>

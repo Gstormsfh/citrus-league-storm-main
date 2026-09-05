@@ -38,7 +38,9 @@ const form = (over: Partial<CreateLeagueForm> = {}): CreateLeagueForm => ({
   auctionMinBid: '1',
   setAuctionMinBid: noop,
   auctionNominationTime: '30',
+  auctionBidTime: '30',
   setAuctionNominationTime: noop,
+  setAuctionBidTime: noop,
   leagueStats: defaultLeagueStats(),
   setStatEnabled: noop,
   setStatPoints: noop,
@@ -208,6 +210,15 @@ describe('the rows write through the page', () => {
     const auction = form({ draftType: 'auction' });
     expect(() => field(auction, 'draft', 'clock')).toThrow();
     expect(field(auction, 'draft', 'budget')).toMatchObject({ kind: 'number', unit: '$' });
+  });
+
+  it('an auction carries BOTH clocks: the nomination window and the bid window the engine reads', () => {
+    // SETTINGS PASS-THROUGH (2026-09-05): auctionBidWindowSeconds was never
+    // written, so every auction ran a 30s bid clock whatever was chosen.
+    const auction = form({ draftType: 'auction', auctionBidTime: '15' });
+    expect(field(auction, 'draft', 'nomination')).toMatchObject({ kind: 'select', value: '30' });
+    expect(field(auction, 'draft', 'bid')).toMatchObject({ kind: 'select', value: '15' });
+    expect(() => field(form(), 'draft', 'bid')).toThrow();
   });
 });
 

@@ -78,6 +78,8 @@ export interface CreateLeagueForm {
   setAuctionMinBid: (v: string) => void;
   auctionNominationTime: string;
   setAuctionNominationTime: (v: string) => void;
+  auctionBidTime: string;
+  setAuctionBidTime: (v: string) => void;
 
   leagueStats: LeagueStatSetting[];
   setStatEnabled: (id: string, enabled: boolean) => void;
@@ -181,6 +183,7 @@ export function statPointOptions(stat: LeagueStatSetting): SettingOption[] {
 const DRAFT_ROUNDS = opts([['14', '14 rounds'], ['16', '16 rounds'], ['18', '18 rounds'], ['21', '21 rounds'], ['24', '24 rounds'], ['30', '30 rounds']]);
 const PICK_CLOCKS = opts([['30', '30s'], ['60', '60s'], ['90', '90s'], ['120', '120s'], ['180', '3 min'], ['300', '5 min']]);
 const NOMINATION_CLOCKS = opts([['15', '15s'], ['30', '30s'], ['45', '45s'], ['60', '60s']]);
+const BID_CLOCKS = opts([['10', '10s'], ['15', '15s'], ['20', '20s'], ['30', '30s'], ['45', '45s']]);
 const PLAYOFF_WEEKS = opts([['1', '1 week'], ['2', '2 weeks'], ['3', '3 weeks'], ['4', '4 weeks']]);
 const TRADE_DEADLINES = opts([['0', 'None'], ['8', 'Week 8'], ['10', 'Week 10'], ['12', 'Week 12'], ['14', 'Week 14'], ['16', 'Week 16']]);
 const KEEPER_COUNTS = opts([['0', 'Unlimited', 'Dynasty: the whole roster is kept'], ['1', '1 keeper'], ['2', '2 keepers'], ['3', '3 keepers'], ['5', '5 keepers'], ['8', '8 keepers'], ['10', '10 keepers']]);
@@ -479,6 +482,15 @@ export function buildCreateLeagueSections(f: CreateLeagueForm): SettingSection[]
             value: f.auctionNominationTime,
             options: NOMINATION_CLOCKS,
             onChange: f.setAuctionNominationTime,
+          },
+          {
+            kind: 'select',
+            key: 'bid',
+            label: 'Bid clock',
+            help: 'Bidding stays open this long after each bid',
+            value: f.auctionBidTime,
+            options: BID_CLOCKS,
+            onChange: f.setAuctionBidTime,
           },
         ]
       : [];
