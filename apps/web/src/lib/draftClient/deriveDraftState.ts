@@ -96,6 +96,14 @@ export interface DerivedDraftState {
    * for repeat events uses `seq <= foldedThroughSeq`.
    */
   foldedThroughSeq: number;
+  /**
+   * AUCTION (2026-09-05): the player on the block right now, or null
+   * between lots. `auction_nomination_closed` names its player, but the
+   * two commissioner overrides that award a lot (`force_close_nomination`
+   * sold, `award_to_team`) name only the team, so the fold remembers the
+   * lot's player from `auction_nomination_started` / `auction_auto_nominated`.
+   */
+  auctionLotPlayerId?: string | null;
 }
 
 /**
@@ -157,6 +165,7 @@ export function emptyDerivedState(seed: DerivationSeed): DerivedDraftState {
     draftStatus: 'not_started',
     teamRosters: new Map(),
     foldedThroughSeq: 0,
+    auctionLotPlayerId: null,
   };
 }
 
@@ -183,10 +192,36 @@ export function foldEvents(
   let picksMade = state.picksMade;
   let draftStatus = state.draftStatus;
   let foldedThroughSeq = state.foldedThroughSeq;
+  let auctionLotPlayerId: string | null = state.auctionLotPlayerId ?? null;
   const teamRosters = new Map(
     Array.from(state.teamRosters.entries(), ([k, v]) => [k, [...v]]),
   );
   const gaps: number[] = [];
+
+  // AUCTION (2026-09-05, found live: four lots sold, `0 / 168 SOLD`, an
+  // empty board, McDavid still in the pool). A won lot IS a pick: the RPC
+  // writes the draft_picks row, and every surface that draws picks — the
+  // header count, the board, the pool's drafted filter, MY TEAM — reads
+  // this state, which used to no-op every auction event. The lot's
+  // player id is text on the wire; the pool's ids are numbers.
+  const awardLot = (teamId: string, playerIdText: string, seq: number) => {
+    const playerId = Number(playerIdText);
+    const roster = teamRosters.get(teamId) ?? [];
+    roster.push({
+      seq,
+      playerId: Number.isFinite(playerId) ? playerId : -1,
+      pickNumber: picksMade + 1,
+      roundNumber: matrix?.[picksMade]?.round ?? 1,
+    });
+    teamRosters.set(teamId, roster);
+    picksMade += 1;
+    if (draftStatus === 'not_started') {
+      draftStatus = 'in_progress';
+    }
+    if (picksMade >= state.totalPicks) {
+      draftStatus = 'completed';
+    }
+  };
 
   for (const event of events) {
     // Idempotency: skip already-folded seqs.
@@ -387,23 +422,44 @@ export function foldEvents(
       // etc. at LobbyManager.ts:3247+); those events do not affect
       // snake/linear derivation. When the auction UI lands, extend
       // this switch with a parallel auction-state derivation.
+      // AUCTION (2026-09-05): a lot on the block, a lot won. Budgets,
+      // the clock and the history feed stay in deriveAuctionState; this
+      // reducer takes only what a pick is — who got which player.
       case 'auction_nomination_started':
+      case 'auction_auto_nominated':
+        auctionLotPlayerId = event.playerId;
+        break;
+      case 'auction_nomination_closed':
+        awardLot(event.winnerTeamId, event.playerId, event.seq);
+        auctionLotPlayerId = null;
+        break;
+      case 'auction_nomination_expired':
+        auctionLotPlayerId = null;
+        break;
+      case 'auction_commissioner_override': {
+        const ns = event.newState ?? {};
+        if (event.overrideAction === 'force_close_nomination') {
+          if (String(ns.outcome) === 'sold' && auctionLotPlayerId !== null) {
+            awardLot(String(ns.winnerTeamId), auctionLotPlayerId, event.seq);
+          }
+          auctionLotPlayerId = null;
+        } else if (event.overrideAction === 'award_to_team') {
+          if (auctionLotPlayerId !== null) {
+            awardLot(String(ns.awardedTeamId), auctionLotPlayerId, event.seq);
+          }
+          auctionLotPlayerId = null;
+        } else if (event.overrideAction === 'cancel_nomination') {
+          auctionLotPlayerId = null;
+        }
+        break;
+      }
       case 'auction_bid_placed':
       case 'auction_bid_extends_timer':
-      case 'auction_nomination_expired':
-      case 'auction_nomination_closed':
-      case 'auction_auto_nominated':
       case 'auction_nomination_skipped':
       case 'auction_paused':
       case 'auction_resumed':
-      case 'auction_commissioner_override':
-        // No-op — snake/linear derivation ignores auction events.
-        // F28 (2026-08-08): added `auction_nomination_skipped` to
-        // this group (previously missing; had fallen through to
-        // implicit no-op with foldedThroughSeq advance — same
-        // effective behavior but now explicit for reviewer clarity
-        // and to keep the F28-added `default` clause below reserved
-        // for truly-unknown forward-compat kinds).
+        // No roster consequence. F28 (2026-08-08) kept these explicit so
+        // the `default` below stays reserved for unknown forward-compat kinds.
         break;
 
       default: {
@@ -463,6 +519,7 @@ export function foldEvents(
       draftStatus,
       teamRosters,
       foldedThroughSeq,
+      auctionLotPlayerId,
     },
     gaps,
   };
