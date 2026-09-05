@@ -79,6 +79,18 @@ export type SettingField =
       label: string;
       help?: string | null;
       value: string;
+    }
+  | {
+      /** A name or a date: typed in place, no picker. (Create League.) */
+      kind: 'text';
+      key: string;
+      label: string;
+      help?: string | null;
+      value: string;
+      placeholder?: string;
+      inputType?: 'text' | 'datetime-local';
+      maxLength?: number;
+      onChange: (value: string) => void;
     };
 
 export interface SettingGroup {

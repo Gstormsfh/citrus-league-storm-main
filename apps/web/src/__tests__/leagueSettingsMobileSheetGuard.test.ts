@@ -85,8 +85,14 @@ describe('the phone screen is the artboard', () => {
   });
 
   it('every value row opens a picker; nothing saves on tap', () => {
-    expect(PHONE).toContain("setPicker({ kind: 'select', key: f.key })");
-    expect(PHONE).toContain("setPicker({ kind: 'number', key: f.key })");
+    // The rows and their pickers moved to SettingFields.tsx on 2026-09-04
+    // so Create League could draw the same fields; the phone screen holds
+    // the picker state and hands it across.
+    const FIELDS = read('../components/league/SettingFields.tsx');
+    expect(FIELDS).toContain("onPick({ kind: 'select', key: f.key })");
+    expect(FIELDS).toContain("onPick({ kind: 'number', key: f.key })");
+    expect(PHONE).toContain('<SettingFieldRows fields={g.fields} onPick={setPicker} />');
+    expect(PHONE).toContain('<SettingPicker picker={picker} fields={fields} onClose={() => setPicker(null)} />');
     expect(PHONE).toContain("saveLabel={(section.saving ?? saving) ? 'SAVING…' : 'SAVE & NOTIFY LEAGUE'}");
   });
 });

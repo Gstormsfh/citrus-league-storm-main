@@ -27,6 +27,9 @@ import { LeagueService } from "@/services/LeagueService";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
+import { CreateLeaguePhone } from '@/components/league/CreateLeaguePhone';
+import { buildCreateLeagueSections } from '@/components/league/createLeagueSections';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -819,11 +822,77 @@ const CreateLeague = () => {
     }
   };
 
+  /**
+   * PRESS BOX (2026-09-04, PR10o): the phone states every setting above as
+   * data and draws it in the settings screen's rows. Each field reads and
+   * writes the same state the desktop form does, so the two cannot
+   * disagree, and the create path is `handleCreateLeague` above. The
+   * position-format change resets the slots here exactly as the desktop
+   * buttons do; the stat rows fold the switch and the points menu into one.
+   */
+  const isMobile = useIsMobile();
+  const phoneSections = isMobile
+    ? buildCreateLeagueSections({
+        leagueTypes: visibleLeagueTypes(searchParams.get('type')),
+        leagueType, setLeagueType,
+        leagueName, setLeagueName,
+        teamsCount, setTeamsCount,
+        scoringFormat, setScoringFormat,
+        draftType, setDraftType,
+        draftRounds, setDraftRounds,
+        pickTimeLimit, setPickTimeLimit,
+        auctionBudget, setAuctionBudget,
+        auctionMinBid, setAuctionMinBid,
+        auctionNominationTime, setAuctionNominationTime,
+        leagueStats,
+        setStatEnabled: (id, enabled) => setLeagueStats((prev) => prev.map((s) => (s.id === id ? { ...s, enabled } : s))),
+        setStatPoints: (id, points) => setLeagueStats((prev) => prev.map((s) => (s.id === id ? { ...s, points } : s))),
+        selectedCategories, toggleCategory: handleCategoryToggle,
+        minGoalieGames, setMinGoalieGames,
+        playoffTeams,
+        setPlayoffTeams: (v) => {
+          setPlayoffTeams(v);
+          const n = parseInt(v, 10);
+          if (n >= 2) setPlayoffWeeks(String(playoffRounds(n)));
+        },
+        playoffOptions,
+        playoffWeeks, setPlayoffWeeks,
+        tradeDeadlineWeek, setTradeDeadlineWeek,
+        keeperEnabled, setKeeperEnabled,
+        keeperCount, setKeeperCount,
+        keeperPenalty, setKeeperPenalty,
+        dynastyMode, setDynastyMode,
+        waivers: waiverSettings, setWaivers: setWaiverSettings,
+        weeklyAddLimit, setWeeklyAddLimit,
+        seasonAddLimit, setSeasonAddLimit,
+        positionType,
+        setPositionType: (v) => {
+          setPositionType(v);
+          const defaults: Record<string, number> = {};
+          (v === 'forward' ? DEFAULT_FDG_ROSTER_SLOTS : DEFAULT_ROSTER_SLOTS).forEach((s) => { defaults[s.slot] = s.count; });
+          setRosterSlots(defaults);
+        },
+        rosterSlots,
+        setRosterSlot: (slot, count) => setRosterSlots((prev) => ({ ...prev, [slot]: count })),
+        roundsVsRoster,
+        pickemFormat, setPickemFormat,
+        picksPerWeek, setPicksPerWeek,
+        survivorLives, setSurvivorLives,
+        confidenceMaxPoints,
+        pickDeadline, setPickDeadline,
+        tiebreaker, setTiebreaker,
+        allowRepeatTeams, setAllowRepeatTeams,
+        playoffLockDeadline, setPlayoffLockDeadline,
+        bracketPickMode, setBracketPickMode,
+        isFantasy, showPointValues, showCategories, showMatchupSettings, showDraftSettings, showWaiverSettings,
+      })
+    : [];
+
   // ============================================================================
   // RENDER
   // ============================================================================
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
+    <div className="min-h-screen bg-pressbox-surface text-pastel-cream relative">
       {/* Decorative Background — pastel-orange + sage halos in citrus2 voice */}
       <div aria-hidden="true" className="absolute top-0 right-0 w-96 h-96 bg-pastel-orange/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
       <div aria-hidden="true" className="absolute bottom-0 left-0 w-96 h-96 bg-pastel-sage/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
@@ -835,8 +904,26 @@ const CreateLeague = () => {
       <div className="lg:hidden pt-[env(safe-area-inset-top)]">
         <PressBoxAppHeader title="New league" logoSrc="/favicon.svg" />
       </div>
+      {isMobile && (
+        <CreateLeaguePhone
+          tab={defaultTab}
+          onTabChange={(t) => { setDefaultTab(t); setError(null); }}
+          sections={phoneSections}
+          error={error}
+          loading={loading}
+          canCreate={!!leagueName.trim()}
+          onCreate={handleCreateLeague}
+          joinCode={joinCode}
+          onJoinCode={setJoinCode}
+          teamName={teamNameForJoin}
+          onTeamName={setTeamNameForJoin}
+          canJoin={!!joinCode.trim()}
+          onJoin={() => handleJoinLeague()}
+          onCancelJoin={() => navigate('/gm-office')}
+        />
+      )}
 
-      <main className="lg:pt-32 lg:pb-20 pt-4 pb-app-chrome px-4">
+      {!isMobile && <main className="lg:pt-32 lg:pb-20 pt-4 pb-app-chrome px-4">
         <div className="container mx-auto max-w-4xl">
 
           <div className="mb-8 text-left">
@@ -2215,7 +2302,7 @@ const CreateLeague = () => {
           </Card>
 
         </div>
-      </main>
+      </main>}
       <HockeyFooter />
     </div>
   );

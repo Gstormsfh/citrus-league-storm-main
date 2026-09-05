@@ -231,6 +231,54 @@ export function PressBoxSettingRow({
   );
 }
 
+/**
+ * A row that is typed into rather than picked: the league's name, a lock
+ * deadline. Label and rule above, the field below, in the row's own shell so
+ * a group of rows reads as one list. (Create League, 2026-09-04.)
+ */
+export interface PressBoxTextRowProps {
+  label: string;
+  help?: string | null;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  inputType?: 'text' | 'datetime-local';
+  maxLength?: number;
+  last?: boolean;
+  className?: string;
+}
+
+export function PressBoxTextRow({
+  label,
+  help,
+  value,
+  onChange,
+  placeholder,
+  inputType = 'text',
+  maxLength,
+  last,
+  className,
+}: PressBoxTextRowProps) {
+  return (
+    <label className={cn('block px-3.5 py-3 w-full', !last && 'border-b border-white/[0.06]', className)}>
+      <span className="block font-barlow font-semibold text-[14px] text-pressbox-text">{label}</span>
+      {help && <span className="block mt-px font-barlow text-[11px] text-pressbox-text/50">{help}</span>}
+      <input
+        type={inputType}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        className={cn(
+          'focus-citrus mt-2 w-full h-10 rounded-[8px] bg-white/[0.04] border border-white/[0.1] px-3',
+          'font-barlow text-[15px] text-pressbox-text placeholder:text-pressbox-text/35',
+          inputType === 'datetime-local' && 'font-plex text-[13px] [color-scheme:dark]',
+        )}
+      />
+    </label>
+  );
+}
+
 /* ── pickers ───────────────────────────────────────────────────────── */
 
 export interface PressBoxPickerOption {
@@ -405,9 +453,19 @@ export function PressBoxNumberSheet({ open, onOpenChange, title, help, value, mi
 
 /* ── callout ───────────────────────────────────────────────────────── */
 
-export function PressBoxCallout({ children, className }: { children: React.ReactNode; className?: string }) {
+export function PressBoxCallout({
+  children,
+  className,
+  role,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  /** `alert` when the callout is the page's error line. */
+  role?: 'alert';
+}) {
   return (
     <div
+      role={role}
       className={cn(
         PB_TYPE,
         'flex items-center gap-2.5 px-3.5 py-2.5 rounded-[12px]',

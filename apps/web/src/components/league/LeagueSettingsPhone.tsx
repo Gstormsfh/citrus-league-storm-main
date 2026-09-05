@@ -27,13 +27,11 @@ import { PressBoxChips } from '@/components/pressbox/Chips';
 import {
   PressBoxSettingsHeader,
   PressBoxSettingGroup,
-  PressBoxSettingRow,
   PressBoxCallout,
   PressBoxSaveBar,
-  PressBoxOptionSheet,
-  PressBoxNumberSheet,
 } from '@/components/pressbox/Settings';
-import { optionLabel, type SettingField, type SettingSection } from './leagueSettingsSections';
+import type { SettingSection } from './leagueSettingsSections';
+import { SettingFieldRows, SettingPicker, type SettingPickerState } from './SettingFields';
 
 export interface LeagueSettingsPhoneProps {
   open: boolean;
@@ -49,8 +47,6 @@ export interface LeagueSettingsPhoneProps {
   status?: string | null;
 }
 
-type Picker = { kind: 'select' | 'number'; key: string } | null;
-
 export function LeagueSettingsPhone({
   open,
   onOpenChange,
@@ -63,7 +59,7 @@ export function LeagueSettingsPhone({
   onDiscard,
   status,
 }: LeagueSettingsPhoneProps) {
-  const [picker, setPicker] = useState<Picker>(null);
+  const [picker, setPicker] = useState<SettingPickerState>(null);
   const section = sections.find((s) => s.key === activeKey) ?? sections[0];
   // Eight chips do not fit a phone; the active one is always on screen.
   const chipsRef = useRef<HTMLDivElement | null>(null);
@@ -73,52 +69,6 @@ export function LeagueSettingsPhone({
     active?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' });
   }, [open, section?.key]);
   const fields = section ? section.groups.flatMap((g) => g.fields) : [];
-  const picked = picker ? fields.find((f) => f.key === picker.key) : undefined;
-
-  const renderField = (f: SettingField, last: boolean) => {
-    switch (f.kind) {
-      case 'select':
-        return (
-          <PressBoxSettingRow
-            key={f.key}
-            label={f.label}
-            help={f.help ?? f.options.find((o) => o.value === f.value)?.help ?? null}
-            value={optionLabel(f.options, f.value)}
-            onPress={() => setPicker({ kind: 'select', key: f.key })}
-            disabled={f.disabled}
-            last={last}
-          />
-        );
-      case 'number':
-        return (
-          <PressBoxSettingRow
-            key={f.key}
-            label={f.label}
-            help={f.help}
-            value={f.unit === '$' ? `$${f.value}` : f.unit ? `${f.value}${f.unit}` : String(f.value)}
-            onPress={() => setPicker({ kind: 'number', key: f.key })}
-            disabled={f.disabled}
-            last={last}
-          />
-        );
-      case 'toggle':
-        return (
-          <PressBoxSettingRow key={f.key} label={f.label} help={f.help} checked={f.checked} onToggle={f.onChange} last={last} />
-        );
-      case 'action':
-        return (
-          <PressBoxSettingRow
-            key={f.key}
-            label={f.label}
-            help={f.help}
-            action={{ label: f.actionLabel, onPress: f.onPress, busy: f.busy }}
-            last={last}
-          />
-        );
-      case 'info':
-        return <PressBoxSettingRow key={f.key} label={f.label} help={f.help} value={f.value} last={last} />;
-    }
-  };
 
   return (
     <PressBoxSheet open={open} onOpenChange={onOpenChange} title="League settings" shape="full">
@@ -145,7 +95,7 @@ export function LeagueSettingsPhone({
           {section?.groups.map((g) =>
             g.fields.length === 0 ? null : (
               <PressBoxSettingGroup key={g.key} label={g.label}>
-                {g.fields.map((f, i) => renderField(f, i === g.fields.length - 1))}
+                <SettingFieldRows fields={g.fields} onPick={setPicker} />
               </PressBoxSettingGroup>
             ),
           )}
@@ -163,37 +113,7 @@ export function LeagueSettingsPhone({
         )}
       </div>
 
-      {picked?.kind === 'select' && (
-        <PressBoxOptionSheet
-          open
-          onOpenChange={(o) => !o && setPicker(null)}
-          title={picked.label}
-          help={picked.help}
-          /* A value set elsewhere that the list does not offer stays
-             choosable as itself rather than vanishing. */
-          options={
-            picked.options.some((o) => o.value === picked.value)
-              ? picked.options
-              : [{ value: picked.value, label: picked.value }, ...picked.options]
-          }
-          value={picked.value}
-          onSelect={picked.onChange}
-        />
-      )}
-      {picked?.kind === 'number' && (
-        <PressBoxNumberSheet
-          open
-          onOpenChange={(o) => !o && setPicker(null)}
-          title={picked.label}
-          help={picked.help}
-          value={picked.value}
-          min={picked.min}
-          max={picked.max}
-          step={picked.step}
-          unit={picked.unit}
-          onCommit={picked.onChange}
-        />
-      )}
+      <SettingPicker picker={picker} fields={fields} onClose={() => setPicker(null)} />
     </PressBoxSheet>
   );
 }

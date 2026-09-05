@@ -753,6 +753,7 @@ const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
   gmoffice: () => import('../src/pages/GMOffice'),
   playoffs: () => import('../src/pages/PlayoffBracket'),
   stormy: () => import('../src/pages/StormyAssistant'),
+  createleague: () => import('../src/pages/CreateLeague'),
 };
 
 const which = new URLSearchParams(location.search).get('p') || 'waivers';
@@ -784,6 +785,8 @@ const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   teamanalytics: { path: '/team-analytics', at: '/team-analytics?league=harness-league' },
   // The Stormy bar stands down on this route; the page's own composer takes its slot.
   stormy: { path: '/gm-office/stormy', at: '/gm-office/stormy?league=harness-league' },
+  // `&type=playoff` for the playoff-pool funnel, `&tab=join` for the join pane.
+  createleague: { path: '/create-league', at: `/create-league${location.search.replace(/^\?p=[^&]*/, '?_')}` },
   // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
   // the week into the URL as soon as it resolves one. Under the old
   // `/matchup/:leagueId?` the very first push ("/matchup/harness-league/1")
