@@ -170,11 +170,52 @@ not touch it. Revoked. `sync_roster_assignments_for_league` has the same
 shape but the server calls it with the user's token after a draft — left
 alone until after Tuesday, with the fix written down.
 
+### PR18 — the App Store pass (2026-09-05, same night)
+
+`f90725dc` **launch screen, icon, status bar, fonts.** The launch image is
+the boot splash's static frame (ground, glow, the puck at the overlay's
+exact spot, the empty track — no wordmark: no Barlow in a launch image);
+the storyboard ground was WHITE under a dark app and is `#0C1811` with
+capacitor, `html`, `body`, `#root` and the native hold. Icon on `#0C1811`.
+**The status bar was unreadable on every light-appearance phone** —
+Capacitor defaults `UIStatusBarStyle` to dark text — fixed in Info.plist
+with `UIUserInterfaceStyle Dark`. The Google Fonts sheet was an `@import`
+at the top of `index.css` that held the first paint on a round trip; it
+is a non-blocking link now (self-hosting the Press Box faces needs an
+`npm i` on the Mac). `appStoreShellGuard` pins all of it.
+
+`939e0047` `a152a0a8` **the front door.** Auth, Profile setup, Verify
+email, Reset password (four states) and the OAuth return are Press Box
+below lg — one tree each, `max-lg:` classes, same ids and handlers,
+desktop untouched. `.pb-type-phone` is the `.pb-type` inheritance reset
+scoped below lg. `frontDoorGuard`.
+
+`df950ccf` **the draft lobby** in the room's own vocabulary (classes
+only; `commishLobby` and `lobbySeatControls` pass unchanged).
+`draft.html?lobby=1`.
+
+`84b79104` **44pt under the finger.** Harness audit across ten phone
+screens: zero controls without an accessible name. `pb-hit` / `pb-hit-y`
+grow every chip, segment, tab and roster slot chip to 44px without
+moving the visual; the sideways chip strips are padded so they stop
+clipping it.
+
+`f6e37979` a signed-in phone in a browser holds the home skeleton while
+leagues load instead of flashing the storefront.
+
+Harness knobs added: `page.html?p=auth&signedout=1`, `?p=profilesetup&fresh=1`,
+`?p=verifyemail&signedout=1`, `?p=resetpassword&signedout=1`, `?p=authcallback`,
+`?hold=1` (league context frozen loading), `draft.html?lobby=1`,
+`skeleton.html?route=/standings`.
+
 ### Still open
 
+- Self-host Barlow Condensed / Barlow / IBM Plex Mono (`@fontsource`, needs `npm i` on the Mac), then measure first league page on 4G.
+- Store screenshots from the simulator; a VoiceOver hour on a device.
+- ArmchairGM (the league menu's Mock draft tile) is still Citrus 2.0 on a phone.
 - `FreeAgentRow` + its tests, once Players is signed off.
 - `sync_roster_assignments_for_league`: membership check inside the body (after 2026-09-08).
-- PR12 aggregates, PR13 motion, PR14/15 moments, PR17, PR18.
+- PR12 aggregates, PR13 motion, PR14/15 moments, PR17.
 
 ---
 
