@@ -85,6 +85,10 @@ vi.mock('@/services/WaiverService', () => ({ WaiverService: { getLeagueWaiverSet
 vi.mock('@/services/TradeService', () => ({ TradeService: {} }));
 vi.mock('@/api/leagues', () => ({ leagueApi: {} }));
 vi.mock('@/api/waivers', () => ({ waiverApi: {} }));
+// The HQ matchup read (PR9b). Un-mocked, api/matchups drags api/client and
+// the Supabase client -- which throws at module scope in the hermetic env --
+// into the graph and the suite cannot load.
+vi.mock('@/api/matchups', () => ({ matchupApi: { getLeagueMatchups: vi.fn(async () => ({ data: [] as unknown[] })) } }));
 
 /**
  * The roster read decides which squad-card sentence renders. `[]` (a drafted

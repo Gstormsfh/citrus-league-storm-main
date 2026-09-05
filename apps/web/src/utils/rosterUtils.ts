@@ -1,5 +1,11 @@
-import { MatchupPlayer } from "@/components/matchup/types";
-import { NHLGame } from "@/services/ScheduleService";
+// `import type`, both of them (2026-09-05). Written as value imports these
+// kept ScheduleService -- and through it api/schedule, api/client and the
+// Supabase client, which THROWS at module scope without VITE_SUPABASE_*
+// -- in the graph of everything that reaches this file: the roster chip,
+// every pressbox component, every matchup row. Four suites could not
+// load in the hermetic test env for exactly that.
+import type { MatchupPlayer } from "@/components/matchup/types";
+import type { NHLGame } from "@/services/ScheduleService";
 import { getTodayMST } from "@/utils/timezoneUtils";
 
 // ============================================================================
