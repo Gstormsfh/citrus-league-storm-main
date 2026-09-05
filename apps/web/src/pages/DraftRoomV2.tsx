@@ -259,6 +259,16 @@ export default function DraftRoomV2() {
   // not_started/completed leagues at discovery without creating a
   // lobby (the format gate that bricked the autopick league only runs
   // at ignition, which draftV2Start now refuses for offline).
+  /**
+   * The league's settings document off the format probe below, for the
+   * auction money rules (auctionRules.ts). Read once, in the parent, and
+   * handed down: a second `import('@/api/client')` inside DraftRoomBody
+   * made the mocked client unreachable in every DraftRoomV2 page test
+   * (found by bisect, 2026-09-05), and the room was already fetching this
+   * row twice.
+   */
+  const [leagueSettingsForRules, setLeagueSettingsForRules] = useState<unknown>(null);
+  const auctionMoney = useMemo(() => auctionRules(leagueSettingsForRules), [leagueSettingsForRules]);
   const [offlineMeta, setOfflineMeta] = useState<
     | { kind: 'live' }
     | {
@@ -288,6 +298,10 @@ export default function DraftRoomV2() {
             draft_status?: string;
             settings?: Record<string, unknown> | null;
           });
+        // AUCTION MONEY (2026-09-05): the same row carries the league's
+        // auction rules; keep the settings so the body can derive them
+        // without a fetch of its own.
+        setLeagueSettingsForRules(payload?.settings ?? null);
         const draftType = (payload?.settings as { draftType?: string } | null)
           ?.draftType;
         if (draftType === 'offline') {
@@ -634,6 +648,7 @@ export default function DraftRoomV2() {
         playersError={playersError}
         onRetryPlayers={reloadPlayers}
         clockOffsetMs={clockOffsetMs}
+        auctionMoney={auctionMoney}
       />
     </div>
   );
@@ -1605,6 +1620,8 @@ interface DraftRoomBodyProps {
   teams: FetchedTeam[];
   playersById: ReadonlyMap<string, Player>;
   playersLoading: boolean;
+  /** The league's auction money rules, derived in the parent from the league row it already reads. */
+  auctionMoney: AuctionRules;
   playersError: Error | null;
   onRetryPlayers: () => void;
   /**
@@ -1624,6 +1641,7 @@ function DraftRoomBody({
   playersError,
   onRetryPlayers,
   clockOffsetMs,
+  auctionMoney: money,
 }: DraftRoomBodyProps) {
   /*
    * QUEUE-REACH (2026-08-13) — this state was declared inside
@@ -1652,28 +1670,6 @@ function DraftRoomBody({
    * while the pool becomes a read/write view of the same array.
    */
   const isMobile = useIsMobile();
-  // The auction's money rules, read from the league so the room offers only
-  // bids the engine accepts (auctionRules.ts, 2026-09-05): the minimum bid,
-  // the increment tiers, the budget. One fetch, shared by the panel and the
-  // pool's Nominate button. Defaults stand until it lands.
-  const [leagueSettings, setLeagueSettings] = useState<unknown>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { apiClient } = await import('@/api/client');
-        const response = await apiClient.get<{ settings?: unknown }>(`/api/leagues/${encodeURIComponent(leagueId)}`);
-        const payload = (response.data ?? response) as { settings?: unknown };
-        if (!cancelled) setLeagueSettings(payload?.settings ?? null);
-      } catch {
-        /* engine defaults remain */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [leagueId]);
-  const money = useMemo(() => auctionRules(leagueSettings), [leagueSettings]);
   const [queue, setQueue] = useState<string[]>([]);
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
