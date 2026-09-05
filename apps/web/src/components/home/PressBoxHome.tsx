@@ -55,7 +55,8 @@ export interface PressBoxHomeProps {
 export function PressBoxHome({ inOffseason, className }: PressBoxHomeProps) {
   const navigate = useNavigate();
   const league = useLeague();
-  const leagues = league?.userLeagues ?? [];
+  const userLeagues = league?.userLeagues;
+  const leagues = useMemo(() => userLeagues ?? [], [userLeagues]);
   const activeLeagueId = league?.activeLeagueId ?? null;
   const today = getTodayMST();
 
@@ -139,16 +140,35 @@ export function PressBoxHome({ inOffseason, className }: PressBoxHomeProps) {
         />
 
         {leagues.length === 0 ? (
-          <div className="rounded-[12px] bg-pressbox-tile border border-white/[0.08] p-4 text-center">
-            <p className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text/70">No leagues yet</p>
-            <p className="mt-1 font-plex font-medium text-[10px] text-pressbox-text/45">Create one, or join with a code</p>
-            <button
-              type="button"
-              onClick={() => navigate('/create-league')}
-              className="focus-citrus mt-3 px-[11px] py-[5px] rounded-full bg-pressbox-orange text-pressbox-orange-ink font-condensed font-bold text-[13px] uppercase tracking-[0.1em]"
-            >
-              + League
-            </button>
+          /* THE FIRST SCREEN AFTER SIGN-UP (2026-09-05). A manager with no
+             league lands here, so it is the welcome: what this is, and the
+             two ways in -- a league of your own, or a friend's code. The
+             free-to-play games follow below. Nothing here is a pitch; the
+             storefront's copy stays on the web. */
+          <div className="rounded-[14px] bg-pressbox-tile border border-white/[0.08] p-4" data-testid="home-welcome">
+            <p className="font-plex font-semibold text-[9px] uppercase tracking-[0.12em] text-pressbox-orange-soft">Welcome to Citrus</p>
+            <p className="mt-1 font-condensed font-bold text-[22px] leading-[1.05] uppercase tracking-[0.02em] text-pressbox-text">
+              Your first league starts here.
+            </p>
+            <p className="mt-2 font-barlow text-[13px] leading-snug text-pressbox-text/70">
+              Start a league and invite your group, or join one with the code a commissioner sent you. Drafts run live, scoring is nightly, Stormy reads every line.
+            </p>
+            <div className="mt-3.5 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/create-league')}
+                className="focus-citrus h-11 rounded-[10px] bg-pressbox-orange text-pressbox-orange-ink font-condensed font-bold text-[14px] uppercase tracking-[0.1em]"
+              >
+                Create a league
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/create-league?tab=join')}
+                className="focus-citrus h-11 rounded-[10px] bg-pressbox-tile-high border border-white/[0.1] text-pressbox-text font-condensed font-bold text-[14px] uppercase tracking-[0.1em]"
+              >
+                Join with a code
+              </button>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col gap-2">

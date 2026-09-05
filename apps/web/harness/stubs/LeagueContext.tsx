@@ -57,4 +57,12 @@ const LEAGUE = {
   refreshLeagues: async () => {},
 };
 
-export const useLeague = () => LEAGUE;
+/**
+ * `?noleagues=1` (2026-09-05): a signed-in manager with no league yet --
+ * the first screen after sign-up -- so the home's welcome state can be
+ * looked at.
+ */
+const NO_LEAGUES = new URLSearchParams(location.search).get('noleagues') === '1';
+const EMPTY = { ...LEAGUE, userLeagueState: 'logged-in-no-league' as const, activeLeagueId: null, activeLeague: null, userLeagues: [], leagues: [] };
+
+export const useLeague = () => (NO_LEAGUES ? EMPTY : LEAGUE);
