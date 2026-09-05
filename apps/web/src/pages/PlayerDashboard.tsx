@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
 import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
@@ -198,11 +198,19 @@ function StatCell({
  * the player card's DASHBOARD action), the Navbar from lg.
  */
 function Shell({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  // A WAY BACK (2026-09-05): the dashboard is a pushed screen, reached from
+  // a player card or the Players table. Back goes where the manager came
+  // from; with no history (a cold open on the URL) it goes to the table.
+  const goBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) navigate(-1);
+    else navigate('/players');
+  };
   return (
     <DarkLayout>
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden pt-[env(safe-area-inset-top)]">
-        <PressBoxAppHeader title="Player" logoSrc="/favicon.svg" />
+        <PressBoxAppHeader title="Player" logoSrc="/favicon.svg" onBack={goBack} backLabel="Back to players" />
       </div>
       <main className={cn(PB_TYPE, 'relative pt-20 max-lg:pt-3 pb-12 pb-app-chrome max-lg:font-barlow')}>{children}</main>
       <HockeyFooter variant="app" />
@@ -784,6 +792,7 @@ export default function PlayerDashboard() {
           <>
             <RinkHeatmap
               shots={rinkShots}
+              sampleSize={summary.plotted}
               mode={rinkMode}
               onModeChange={setRinkMode}
               playerName={heroIdentity.name}
@@ -812,17 +821,10 @@ export default function PlayerDashboard() {
                  the caption rather than overflowing it. */
               caption={`${rinkShots.length} attempts · ${modeLabel}${gameType === 'playoff' ? ' · playoffs' : ''}`}
             />
-            {isMobile && shotVerdict && (
-              <div className="mx-auto mt-4 max-w-[1100px]">
-                <VerdictTile
-                  variant="floating"
-                  size="sm"
-                  accent="orange"
-                  eyebrow="Stormy verdict"
-                  body={shotVerdict}
-                />
-              </div>
-            )}
+            {/* ONE VERDICT (2026-09-05): the phone printed this same sentence
+                twice - here under the rink and again in the bento as "Read
+                from N placed attempts". The bento tile stays; it names its
+                sample. */}
           </>
         ) : (
           <HeroFallback

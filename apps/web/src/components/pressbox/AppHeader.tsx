@@ -17,6 +17,14 @@ import { PB_TYPE } from './rowScale';
 
 export interface PressBoxAppHeaderProps {
   title?: string;
+  /**
+   * A WAY BACK (2026-09-05, from the phone: "need a way to back out of the
+   * player dashboards"). A pushed screen - the player dashboard reached
+   * from a card - draws the Press Box back chevron before the title; the
+   * tab roots (home, scores, news) pass nothing and draw the mark.
+   */
+  onBack?: () => void;
+  backLabel?: string;
   logoSrc?: string | null;
   onSearch?: () => void;
   onAddLeague?: () => void;
@@ -31,6 +39,8 @@ const SQUARE =
 
 export function PressBoxAppHeader({
   title = 'Fantasy',
+  onBack,
+  backLabel = 'Back',
   logoSrc,
   onSearch,
   onAddLeague,
@@ -41,7 +51,17 @@ export function PressBoxAppHeader({
   return (
     <header className={cn(PB_TYPE, 'flex items-center justify-between gap-2 pl-4 pr-4 pt-2 pb-1.5', className)}>
       <div className="flex items-center gap-2 min-w-0">
-        {logoSrc && <img src={logoSrc} alt="" className="w-[26px] h-[26px] flex-none" />}
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label={backLabel}
+            className="focus-citrus relative -ml-1 flex-none w-[26px] h-[34px] flex items-center justify-center font-plex text-[22px] leading-none text-pressbox-orange after:absolute after:-inset-[13px] after:content-['']"
+          >
+            &lsaquo;
+          </button>
+        )}
+        {logoSrc && !onBack && <img src={logoSrc} alt="" className="w-[26px] h-[26px] flex-none" />}
         <h1 className="font-condensed font-extrabold text-[24px] uppercase tracking-[0.02em] text-pressbox-text truncate">
           {title}
         </h1>

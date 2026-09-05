@@ -249,11 +249,15 @@ describe('PlayerDashboard — the shipped page', () => {
     const rink = await screen.findByLabelText(/shot heatmap for connor mcdavid/i);
     expect(rink).toBeInTheDocument();
 
-    // All four chapters of the zone contract are present.
+    // Three chapters of the zone contract are present. Chapter 4 (one xG
+    // number against the cohort median) was dropped on 2026-09-05: it read
+    // as a verdict on the player.
     expect(screen.getByText(/chapter 1 · overview/i)).toBeInTheDocument();
     expect(screen.getByText(/chapter 2 · career arc/i)).toBeInTheDocument();
     expect(screen.getByText(/chapter 3 · breakdown/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/chapter 4 · position vs league/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/position vs league/i)).toBeNull();
+    // A way back on the phone header (2026-09-05).
+    expect(screen.getByRole('button', { name: /back to players/i })).toBeInTheDocument();
 
     // The condensed card is inline at the top — PWS-2 Option 1.
     expect(screen.getByTestId('player-advanced-card')).toBeInTheDocument();

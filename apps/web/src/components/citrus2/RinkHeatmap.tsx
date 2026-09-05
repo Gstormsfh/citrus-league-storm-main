@@ -75,6 +75,13 @@ interface RinkHeatmapProps {
   isLoading?: boolean;
   /** Sample-size threshold below which the low-sample treatment renders. */
   lowSampleThreshold?: number;
+  /**
+   * THE SAMPLE THE THRESHOLD JUDGES (2026-09-05). The G-xG layer draws only
+   * the goals, and 39 goals on 306 placed attempts is not a limited sample
+   * - it is a 39-goal season. Pass the season's placed-attempt count; the
+   * drawn layer's length is the default for callers that draw everything.
+   */
+  sampleSize?: number;
 
   /** Caption rendered along the bottom edge of the rink (e.g. attempt count). */
   caption?: string;
@@ -383,11 +390,13 @@ export function RinkHeatmap({
   verdictEyebrow = 'Stormy verdict',
   isLoading = false,
   lowSampleThreshold = 50,
+  sampleSize,
   caption,
   className,
 }: RinkHeatmapProps) {
   const pulseId = useId();
-  const isLowSample = !isLoading && shots.length > 0 && shots.length < lowSampleThreshold;
+  const sample = sampleSize ?? shots.length;
+  const isLowSample = !isLoading && shots.length > 0 && sample < lowSampleThreshold;
   const isEmpty = !isLoading && shots.length === 0;
 
   const hottestIndex = useMemo(
@@ -431,7 +440,7 @@ export function RinkHeatmap({
               Limited sample
             </div>
             <div className="font-sans text-[12px] text-white/65 leading-snug">
-              {shots.length} shot{shots.length === 1 ? '' : 's'} · need{shots.length === 1 ? 's' : ''} more data for confident heatmap
+              {sample} attempt{sample === 1 ? '' : 's'} · need{sample === 1 ? 's' : ''} more data for a confident heatmap
             </div>
           </div>
         </div>
