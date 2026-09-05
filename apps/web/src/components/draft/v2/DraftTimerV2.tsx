@@ -219,8 +219,14 @@ export const DraftTimerV2 = memo(
         <div
           role="timer"
           aria-label={`Draft timer: ${minutes} minutes ${seconds} seconds remaining${wsOpen ? '' : ' (connection lost)'}`}
+          /* PRESS BOX (2026-09-04): the pill wears the Press Box tile —
+             8px radius, hairline, Plex Mono 600 at 12px — so it sits in the
+             draft header's corner beside `12/12 ●` as one piece of chrome.
+             Everything the palette test pins survives: the tones, the ring,
+             the dimming without a socket, and a textContent that is the
+             mm:ss label and nothing else. */
           className={cn(
-            'flex shrink-0 items-center gap-1.5 rounded-lg bg-pastel-surface-tile px-2 py-1 ring-1 ring-pastel-sage-soft/20',
+            'flex shrink-0 items-center gap-1.5 rounded-[8px] bg-pressbox-tile border border-white/[0.08] px-2 py-1',
             !wsOpen && 'opacity-60',
           )}
         >
@@ -244,7 +250,7 @@ export const DraftTimerV2 = memo(
           ) : (
             <WifiOff className="h-3.5 w-3.5 text-pastel-sage-soft/60" aria-hidden="true" />
           )}
-          <span className={cn('font-jbmono text-base font-bold tabular-nums leading-none', toneClass)}>
+          <span className={cn('font-plex text-[12px] font-semibold tabular-nums leading-none', toneClass)}>
             {label}
           </span>
         </div>

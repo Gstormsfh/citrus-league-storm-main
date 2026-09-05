@@ -20,12 +20,39 @@ export interface ConsentStatus {
 export class UserAccountService {
   /**
    * Change the current user's password.
+   *
+   * With `verify`, the current password is checked first (2026-09-05): a
+   * phone left unlocked on a table could otherwise set a new password in
+   * two taps and lock the owner out. Supabase has no "verify password"
+   * call, so the check is a sign-in with the current one -- same user, a
+   * fresh session, no side effect beyond that. Without `verify` (the reset
+   * link's recovery session, an account with no password yet) it sets the
+   * password directly, as before.
    */
-  static async changePassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
+  static async changePassword(
+    newPassword: string,
+    verify?: { email: string; currentPassword: string },
+  ): Promise<{ success: boolean; error?: string; needsReauth?: boolean }> {
     try {
+      if (verify) {
+        const { error: checkError } = await supabase.auth.signInWithPassword({
+          email: verify.email,
+          password: verify.currentPassword,
+        });
+        if (checkError) {
+          return { success: false, error: 'That current password is not right.' };
+        }
+      }
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) {
-        return { success: false, error: error.message };
+        // "Secure password change" is ON for the project (Auth > Providers >
+        // Email, checked 2026-09-05): a session older than 24h may not set a
+        // password without reauthentication. The sign-in above makes the
+        // session fresh, so this is the no-current-password path only (a
+        // Google or Apple account adding one). The caller sends the reset
+        // link instead, which is the same proof by email.
+        const needsReauth = /reauth|nonce/i.test(`${error.message} ${(error as { code?: string }).code ?? ''}`);
+        return { success: false, error: error.message, needsReauth };
       }
       return { success: true };
     } catch (error: unknown) {

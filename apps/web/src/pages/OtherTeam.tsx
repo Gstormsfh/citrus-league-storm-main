@@ -1,7 +1,11 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { HockeyFooter } from '@/components/citrus2';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
+import { PressBoxRosterList, PressBoxTeamCard, PB_TYPE } from '@/components/pressbox';
+import { buildRosterRows } from '@/components/pressbox/rosterRows';
+import { buildSlotConfig } from '@/components/roster/slotConfig';
+import { resolveIrSlotCount } from '@/components/roster/irSlots';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRightLeft, Star } from 'lucide-react';
 import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
@@ -40,7 +44,7 @@ const OtherTeam = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: profile } = useProfile();
-  const { userLeagueState, activeLeagueId: contextLeagueId } = useLeague();
+  const { userLeagueState, activeLeagueId: contextLeagueId, activeLeague, activeLeagueFormat } = useLeague();
   // DEEP-LINK FIX (2026-08-23, found live on prod during launch QA): this
   // page looked teams up ONLY through the global active-league context, so
   // any /team/<id>?league=<id> link — from League Activity, a share, or a
@@ -552,14 +556,78 @@ const OtherTeam = () => {
     <ErrorBoundary>
     <div className="min-h-screen bg-[#0F1F15]">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">Team View</h1>
-          <MobileMenuButton />
-        </div>
+      {/* PRESS BOX (2026-09-04): the league chrome — header, sub-tabs and
+          the league menu — replaces the 09-01 title bar and its hamburger,
+          which opened the old menu sheet. One menu in the app. */}
+      <PressBoxLeagueChrome />
+      {/* PRESS BOX (2026-09-04): below lg another manager's team is the
+          same list your own team is — the artboard's team card over
+          STARTERS / BENCH / IR rows, read-only, a name tap opening the
+          card — with PROPOSE TRADE as the card's one orange action. The
+          desktop main is unchanged from lg. */}
+      <div className={`${PB_TYPE} lg:hidden bg-pressbox-surface text-pressbox-text px-3 pt-3 pb-app-chrome`} data-testid="other-team-phone">
+        {loading ? (
+          <div className="flex flex-col gap-1.5">
+            <div className="h-[92px] rounded-[12px] bg-pressbox-tile border border-white/[0.08] animate-pulse" />
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-[56px] rounded-[10px] bg-pressbox-tile border border-white/[0.08] animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          (() => {
+            // The league's slot shape, from its settings as the roster page
+            // reads them; the defaults when a league has none.
+            const leagueSlots = ((activeLeague?.settings as { rosterSlots?: Record<string, number> } | null)?.rosterSlots) ?? undefined;
+            const rows = buildRosterRows({
+              starters: roster.starters,
+              bench: roster.bench,
+              ir: roster.ir,
+              irSlotCount: resolveIrSlotCount(leagueSlots),
+              slotConfig: buildSlotConfig(activeLeagueFormat?.positionType, leagueSlots),
+              slotAssignments: roster.slotAssignments,
+              // Read-only: every chip wears the lock rather than the swap
+              // glyph, because nothing on this page moves a player.
+              lockedPlayerIds: new Set([...roster.starters, ...roster.bench, ...roster.ir].map((x) => String(x.id))),
+            });
+            const findPlayer = (id: string | number | undefined) =>
+              [...roster.starters, ...roster.bench, ...roster.ir].find((x) => String(x.id) === String(id ?? ''));
+            return (
+              <PressBoxRosterList
+                teamCard={
+                  <PressBoxTeamCard
+                    teamName={team.team_name}
+                    rank={ownerName ? `@${ownerName}`.toUpperCase() : null}
+                    actions={
+                      userLeagueState === 'active-user'
+                        ? [{ glyph: '⇄', label: 'Propose trade', to: `/trade-analyzer?partner=${team.id}`, primary: true }]
+                        : isDemoTeam
+                          ? [{ glyph: '+', label: 'Create your league', to: '/auth', primary: true }]
+                          : []
+                    }
+                  />
+                }
+                starters={rows.starters}
+                bench={rows.bench}
+                ir={rows.ir}
+                irRequired={rows.irRequired}
+                startersFilled={rows.startersFilled}
+                startersRequired={rows.startersRequired}
+                benchPlayingCount={rows.benchPlayingCount}
+                onSlotPress={(slotId) => {
+                  const held = rows.starters.find((r) => r.slotId === slotId)?.player ?? rows.bench.find((r) => r.slotId === slotId)?.player;
+                  const p = findPlayer(held?.id);
+                  if (p) handlePlayerClick(p);
+                }}
+                onNamePress={(row) => {
+                  const p = findPlayer(row.player?.id);
+                  if (p) handlePlayerClick(p);
+                }}
+              />
+            );
+          })()
+        )}
       </div>
-      <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <main className="hidden lg:block w-full lg:pt-24 lg:pb-8">
         <div className="w-full m-0 p-0">
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-2 lg:px-6 order-1 lg:order-2">

@@ -18,6 +18,8 @@ export interface Profile {
   default_team_name: string | null;
   timezone: string | null;
   avatar_url: string | null;
+  /** The on-the-clock APNs opt-in (profiles.push_notifications). Defaults true. */
+  push_notifications?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -33,6 +35,7 @@ export type ProfileUpdateFields = {
   default_team_name?: string;
   timezone?: string;
   avatar_url?: string;
+  push_notifications?: boolean;
 };
 
 // ============================================================================

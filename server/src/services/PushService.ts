@@ -138,6 +138,9 @@ export class PushService {
       }
 
       const tokens = await this.tokensForTeamOwner(input.teamId);
+      if (tokens === 'opted_out') {
+        return { sent: 0, failed: 0, skipped: true, reason: 'opted_out' };
+      }
       if (tokens.length === 0) {
         return { sent: 0, failed: 0, skipped: true, reason: 'no_devices' };
       }
@@ -203,7 +206,8 @@ export class PushService {
     return Array.isArray(data) && data.length > 0;
   }
 
-  private async tokensForTeamOwner(teamId: string): Promise<string[]> {
+  /** The owner's device tokens, or `'opted_out'` when the owner turned the push off. */
+  private async tokensForTeamOwner(teamId: string): Promise<string[] | 'opted_out'> {
     const { data: team, error: teamError } = await this.supabase
       .from('teams')
       .select('owner_id')
@@ -213,6 +217,21 @@ export class PushService {
     if (teamError || !team?.owner_id) {
       // Unowned seat (AI team) — nobody to nudge. Not an error.
       return [];
+    }
+
+    // The manager's own switch (profiles.push_notifications, 2026-09-04).
+    // Read before the tokens: an opted-out owner with three registered
+    // devices gets nothing, and the log says why. A read error is treated
+    // as opted IN — the column defaults true and a nudge nobody asked to
+    // stop is the smaller failure during a draft.
+    const { data: profile, error: profileError } = await this.supabase
+      .from('profiles')
+      .select('push_notifications')
+      .eq('id', team.owner_id)
+      .maybeSingle();
+    if (!profileError && profile && profile.push_notifications === false) {
+      structuredLogger.info(`[push] owner opted out userId=${team.owner_id} teamId=${teamId}`);
+      return 'opted_out';
     }
 
     const { data, error } = await this.supabase

@@ -35,6 +35,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { DarkLayout, HockeyFooter } from '@/components/citrus2';
 import {
   BlurbSlot,
@@ -112,22 +113,22 @@ export default function DraftKit() {
 
   return (
     <DarkLayout>
-      <Navbar />
+      <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Draft kit" logoSrc="/favicon.svg" /></div>
 
-      <main className="mx-auto w-full max-w-[1180px] px-4 pb-24 pt-24 sm:px-6">
+      <main className="mx-auto w-full max-w-[1180px] px-4 pb-24 pt-24 sm:px-6 max-lg:pt-3 max-lg:px-3 pb-app-chrome">
         {/* Hero.
             ART PLACEHOLDER: the dashed panel below is where the founder's
             Draft Kit cover art goes. It is deliberately left as a labelled
             empty frame rather than filled with generated imagery. Drop a file
             into apps/web/public/ and swap the panel for an <img>. */}
         <header className="mb-8">
-          <p className="font-jbmono text-[10px] font-bold uppercase tracking-[0.32em] text-pastel-orange-soft">
+          <p className="font-jbmono max-lg:font-plex text-[10px] font-bold uppercase tracking-[0.32em] text-pastel-orange-soft max-lg:text-pressbox-orange-soft">
             Draft Kit {seasonLabel}
           </p>
-          <h1 className="mt-3 font-sans text-[2rem] font-black leading-[1.02] tracking-[-0.03em] text-pastel-cream sm:text-[3rem]">
+          <h1 className="mt-3 font-sans max-lg:font-barlow text-[2rem] font-black leading-[1.02] tracking-[-0.03em] text-pastel-cream max-lg:text-pressbox-text sm:text-[3rem]">
             The board, the cards,
             <br />
-            <span className="text-pastel-orange">and the reasoning.</span>
+            <span className="text-pastel-orange max-lg:text-pressbox-orange">and the reasoning.</span>
           </h1>
           <p className="mt-4 max-w-xl text-[14px] leading-relaxed text-white/60 sm:text-[15px]">
             Every skater and goalie, ranked and tiered, with percentiles taken inside position and
@@ -135,11 +136,11 @@ export default function DraftKit() {
           </p>
 
           <div
-            className="mt-6 flex aspect-[16/7] w-full items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.02]"
+            className="mt-6 flex aspect-[16/7] w-full items-center justify-center rounded-2xl max-lg:rounded-[12px] border border-dashed border-white/15 bg-white/[0.02]"
             role="img"
             aria-label="Draft Kit cover art placeholder"
           >
-            <span className="px-4 text-center font-jbmono text-[10px] uppercase tracking-[0.2em] text-white/25">
+            <span className="px-4 text-center font-jbmono max-lg:font-plex text-[10px] uppercase tracking-[0.2em] text-white/25">
               Cover art placeholder
               <br />
               founder-supplied
@@ -155,7 +156,7 @@ export default function DraftKit() {
         )}
 
         {!loading && error && (
-          <p className="rounded-2xl bg-pastel-surface-tile px-4 py-6 text-center text-[14px] text-white/60 ring-1 ring-white/10">
+          <p className="rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile px-4 py-6 text-center text-[14px] text-white/60 ring-1 ring-white/10">
             {error}
           </p>
         )}
@@ -165,9 +166,9 @@ export default function DraftKit() {
             {board.locked && (
               <div
                 data-testid="draft-kit-gate-banner"
-                className="mb-6 rounded-2xl bg-pastel-orange/10 px-4 py-4 ring-1 ring-pastel-orange/30"
+                className="mb-6 rounded-2xl max-lg:rounded-[12px] bg-pastel-orange/10 max-lg:bg-pressbox-orange/10 px-4 py-4 ring-1 ring-pastel-orange/30 max-lg:ring-pressbox-orange/30"
               >
-                <p className="text-[14px] font-bold text-pastel-cream">
+                <p className="text-[14px] font-bold text-pastel-cream max-lg:text-pressbox-text">
                   You are on the free tier
                 </p>
                 <p className="mt-1.5 text-[13px] leading-relaxed text-white/65">
@@ -186,9 +187,9 @@ export default function DraftKit() {
                     type="button"
                     onClick={() => setTab(t.id)}
                     aria-pressed={tab === t.id}
-                    className={`h-9 shrink-0 rounded-lg px-4 font-jbmono text-[11px] font-bold uppercase tracking-[0.14em] transition-colors ${
+                    className={`h-9 shrink-0 rounded-lg px-4 font-jbmono max-lg:font-plex text-[11px] font-bold uppercase tracking-[0.14em] transition-colors ${
                       tab === t.id
-                        ? 'bg-pastel-orange text-[#581E00]'
+                        ? 'bg-pastel-orange max-lg:bg-pressbox-orange text-[#581E00] max-lg:text-pressbox-orange-ink'
                         : 'bg-white/5 text-white/60 ring-1 ring-white/10 hover:bg-white/10'
                     }`}
                   >
@@ -208,9 +209,9 @@ export default function DraftKit() {
                         type="button"
                         onClick={() => setCohort(c)}
                         aria-pressed={cohort === c}
-                        className={`h-8 shrink-0 rounded-lg px-3 font-jbmono text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                        className={`h-8 shrink-0 rounded-lg px-3 font-jbmono max-lg:font-plex text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
                           cohort === c
-                            ? 'bg-white/15 text-pastel-cream ring-1 ring-white/25'
+                            ? 'bg-white/15 text-pastel-cream max-lg:text-pressbox-text ring-1 ring-white/25'
                             : 'bg-white/5 text-white/50 ring-1 ring-white/10 hover:bg-white/10'
                         }`}
                       >
@@ -240,7 +241,7 @@ export default function DraftKit() {
                         locked={board.locked}
                       />
                     ) : (
-                      <p className="rounded-2xl bg-pastel-surface-tile px-4 py-6 text-center text-[13px] text-white/50 ring-1 ring-white/10">
+                      <p className="rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile px-4 py-6 text-center text-[13px] text-white/50 ring-1 ring-white/10">
                         Pick a player to open their card.
                       </p>
                     )}
@@ -266,8 +267,8 @@ export default function DraftKit() {
                   onSelect={select}
                 />
                 <div className="space-y-4">
-                  <div className="rounded-2xl bg-pastel-surface-tile p-4 ring-1 ring-white/10">
-                    <h3 className="font-jbmono text-[11px] font-bold uppercase tracking-[0.2em] text-pastel-orange-soft">
+                  <div className="rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile p-4 ring-1 ring-white/10">
+                    <h3 className="font-jbmono max-lg:font-plex text-[11px] font-bold uppercase tracking-[0.2em] text-pastel-orange-soft max-lg:text-pressbox-orange-soft">
                       How a move is detected
                     </h3>
                     <p className="mt-2 text-[13px] leading-relaxed text-white/65">

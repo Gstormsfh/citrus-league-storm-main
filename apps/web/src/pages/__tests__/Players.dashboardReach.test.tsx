@@ -77,6 +77,7 @@ function entry(over: Partial<DashboardPlayer> = {}): DashboardPlayer {
     gp: 71, goals: 48, assists: 52, points: 100, sog: 244, hits: 20, blocks: 18,
     ppp: 30, plus_minus: 12, x_goals: 40.5,
     wins: 0, saves: 0, save_pct: 0, gaa: 0, shutouts: 0,
+    pim: 0, shp: 0, toi_seconds: 0, losses: 0, ot_losses: 0, goals_against: 0,
     xg_per_60: 1.42, xg_rating: 'Elite',
     gar_per_60: 0.5, gar_evo: 0.31, gar_evd: 0.04, gar_ppo: 0.11, gar_ppd: 0.01, gar_pen: 0.03,
     proj_gp: 58, proj_fantasy_points: 320, proj_fantasy_ppg: 5.5,

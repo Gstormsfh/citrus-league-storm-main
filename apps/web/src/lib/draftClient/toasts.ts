@@ -40,11 +40,11 @@ export type DraftActionRejectionReason =
 const REJECTION_MESSAGES: Record<DraftActionRejectionReason, string | null> = {
   not_on_clock: 'Someone else picked just before you. Your pick was reverted.',
   player_taken: 'That player was just taken. Try another.',
-  pick_out_of_order: 'Pick number didn’t match — try again.',
+  pick_out_of_order: 'Pick number didn’t match. Try again.',
   unauthorized: 'You’re not authorized to pick for this team.',
   invalid_state: 'The draft is paused or completed. Picks aren’t allowed right now.',
   idempotency_conflict:
-    'Duplicate action detected — your previous attempt may have succeeded.',
+    'Duplicate action detected. Your previous attempt may have succeeded.',
   internal_error: 'Something went wrong on our end. Please try again.',
   invalid_payload: 'That pick was invalid. Please try again.',
   // Developer / forward-compat reasons that should never reach the

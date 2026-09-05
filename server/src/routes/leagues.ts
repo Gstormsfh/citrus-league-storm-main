@@ -11,7 +11,8 @@ import { TeamAnalyticsService } from '../services/TeamAnalyticsService';
 import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
-import { getCurrentSeason } from '@citrus/shared';
+import { mirrorRulesIntoSettings, mirrorRulesIntoStatsList, settingsDiffer } from '../lib/scoringMirror';
+import { getCurrentSeason, logger, SCORING_DEFAULTS } from '@citrus/shared';
 
 const leagueRoutes = new Hono<Env>();
 
@@ -567,6 +568,48 @@ leagueRoutes.put('/:leagueId/scoring-rules', commissionerMiddleware, async (c) =
       { onConflict: 'league_id,stat_key' },
     );
     if (upsertErr) return handleError(c, upsertErr, 'Failed to update scoring rules');
+
+    // SETTINGS PASS-THROUGH (2026-09-05): fold the effective rules back into
+    // leagues.scoring_settings so ScoresService, TeamAnalytics and the client's
+    // ScoringCalculator score with the weights the commissioner just set. The
+    // trigger on that column re-upserts the same rules: idempotent. A failure
+    // here is logged, not returned; the rules (the scorer's truth) are saved.
+    try {
+      const [catalogRes, effectiveRes, leagueRes] = await Promise.all([
+        admin.from('stat_catalog').select('stat_key, applies_to'),
+        admin.rpc('get_effective_scoring_rules', { p_league_id: leagueId }),
+        admin.from('leagues').select('scoring_settings, settings').eq('id', leagueId).single(),
+      ]);
+      if (catalogRes.error) throw new Error(catalogRes.error.message);
+      if (effectiveRes.error) throw new Error(effectiveRes.error.message);
+      if (leagueRes.error) throw new Error(leagueRes.error.message);
+      const mirrored = mirrorRulesIntoSettings(
+        leagueRes.data?.scoring_settings ?? null,
+        (catalogRes.data ?? []) as Array<{ stat_key: string; applies_to: string }>,
+        (effectiveRes.data ?? []) as Array<{ stat_key: string; multiplier: number | string }>,
+      );
+      const update: Record<string, unknown> = {};
+      if (settingsDiffer(leagueRes.data?.scoring_settings ?? null, mirrored)) update.scoring_settings = mirrored;
+      // The form's own copy (settings.stats) too: the scoring-change audit
+      // trigger watches it, so leaving it stale left no trail of the edit.
+      const currentSettings = (leagueRes.data?.settings ?? null) as Record<string, unknown> | null;
+      const statsList = mirrorRulesIntoStatsList(
+        currentSettings?.stats,
+        (effectiveRes.data ?? []) as Array<{ stat_key: string; multiplier: number | string }>,
+        new Map(SCORING_DEFAULTS.stats.map((s) => [s.id, s.key])),
+      );
+      if (statsList && currentSettings && settingsDiffer(currentSettings.stats, statsList)) {
+        update.settings = { ...currentSettings, stats: statsList };
+      }
+      if (Object.keys(update).length > 0) {
+        const { error: mirrorErr } = await admin.from('leagues').update(update).eq('id', leagueId);
+        if (mirrorErr) throw new Error(mirrorErr.message);
+      }
+    } catch (mirrorFail) {
+      logger.error(
+        `[leagues] scoring rules saved for ${leagueId} but scoring_settings mirror failed: ${mirrorFail instanceof Error ? mirrorFail.message : String(mirrorFail)}`,
+      );
+    }
 
     // NOTE: not audit-logged. AuditService.log takes a closed SecurityEventType
     // union and there is no member for a scoring-rule change. Adding one (and

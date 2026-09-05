@@ -9,7 +9,7 @@
 // jsdom has no cascade, so what is checkable is the DOM contract: the chip
 // exists, says the SLOT, and wears the roster's own colour classes.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 
 import { CenterColumn } from '../CenterColumn';
@@ -22,6 +22,11 @@ import {
   positionChipKey,
 } from '@/components/roster/positionChip';
 import type { MatchupPlayer } from '../types';
+
+// MatchupComparisonRow -> pressbox/matchupRows -> ScheduleService -> api/schedule
+// -> api/client -> the Supabase client, which throws at module scope in the
+// hermetic env. Mock the api leaf so the pure functions above it load for real.
+vi.mock('@/api/client', () => ({ apiClient: {}, API_BASE_URL: '', ApiError: class ApiError extends Error {} }));
 
 const chipOf = (container: HTMLElement) =>
   container.querySelector('.matchup-slot-chip') as HTMLElement | null;

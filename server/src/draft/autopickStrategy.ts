@@ -86,6 +86,12 @@ export interface AutopickInput {
    * a "Public can view" RLS policy.
    */
   supabase: SupabaseClient;
+  /**
+   * KEEPERS (2026-09-05): players no strategy may return. Kept players are
+   * not in draft_picks_v2 until their own slot comes up, so the drafted-set
+   * read alone would hand one to another team.
+   */
+  excludePlayerIds?: ReadonlySet<number>;
 }
 
 /**
@@ -164,6 +170,7 @@ export const projectionsStrategy: AutopickStrategy = async ({
   leagueId,
   teamId,
   supabase,
+  excludePlayerIds,
 }) => {
   // Step 1: load already-drafted player_ids for this league.
   const { data: draftedRows, error: draftedErr } = await supabase
@@ -186,7 +193,7 @@ export const projectionsStrategy: AutopickStrategy = async ({
   // projections join). Uses shared coerceToNumericPlayerId
   // (packages/shared/src/utils/playerIdDomain.ts) — returns null
   // for uuid/invalid, real number for numeric.
-  const draftedSet = new Set<number>();
+  const draftedSet = new Set<number>(excludePlayerIds ?? []);
   for (const r of (draftedRows ?? []) as Array<{ player_id: number | string }>) {
     const coerced = coerceToNumericPlayerId(r.player_id);
     if (coerced !== null) draftedSet.add(coerced);
@@ -668,6 +675,7 @@ export const queueStrategy: AutopickStrategy = async ({
   leagueId,
   teamId,
   supabase,
+  excludePlayerIds,
 }) => {
   const defer = (): AutopickResult => ({
     ok: false,
@@ -723,7 +731,7 @@ export const queueStrategy: AutopickStrategy = async ({
       return defer();
     }
 
-    const drafted = new Set<number>();
+    const drafted = new Set<number>(excludePlayerIds ?? []);
     for (const row of (draftedRows ?? []) as Array<{ player_id: number }>) {
       const id = coerceToNumericPlayerId(row.player_id);
       if (id !== null) drafted.add(id);

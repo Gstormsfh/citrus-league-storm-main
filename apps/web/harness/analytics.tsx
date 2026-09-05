@@ -2,6 +2,7 @@
  *  the honest cases: a category the model under-projects (hits), one it
  *  over-projects (goals), and a ranking where ratio and delta disagree. */
 import { createRoot } from 'react-dom/client';
+import '../src/pressboxFonts';
 import '../src/index.css';
 import { ProjectedVsActual } from '../src/components/analytics/ProjectedVsActual';
 import { harnessPlayer } from './players';

@@ -59,18 +59,20 @@ const VerifyEmail = () => {
 
   return (
     <DarkLayout>
-      <Navbar />
-      <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
-        <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
-          <CardHeader className="text-center">
+      {/* PRESS BOX BELOW lg (PR18 paint sweep, 2026-09-05): the same one-tree
+          re-skin as Auth and ProfileSetup. The desktop keeps the card. */}
+      <div className="hidden lg:block"><Navbar /></div>
+      <main className="pb-type-phone relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)] max-lg:min-h-screen max-lg:bg-pressbox-surface max-lg:text-pressbox-text max-lg:px-5 max-lg:pt-[calc(2.5rem+env(safe-area-inset-top))]">
+        <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] max-lg:bg-transparent max-lg:border-0 max-lg:ring-0 max-lg:shadow-none max-lg:rounded-none">
+          <CardHeader className="text-center max-lg:p-0 max-lg:pb-5">
             <div className="flex justify-center mb-2">
               <MascotAvatar id="stormy" size="lg" />
             </div>
             <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
               <Mail className="h-6 w-6 text-primary" aria-hidden="true" />
             </div>
-            <CardTitle className="text-2xl font-bold">Check Your Email</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-2xl font-bold max-lg:font-condensed max-lg:font-extrabold max-lg:text-[28px] max-lg:uppercase max-lg:tracking-[0.02em] max-lg:text-pressbox-text">Check Your Email</CardTitle>
+            <CardDescription className="max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">
               {email ? (
                 <>We've sent a verification link to <strong className="text-foreground">{email}</strong></>
               ) : (
@@ -78,7 +80,7 @@ const VerifyEmail = () => {
               )}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 max-lg:p-0">
             {/* S-1 Entry 21 P-a fix (2026-08-09): inline warning when we
                 have NO email context. Pre-fix the user only saw this
                 message AFTER clicking Resend (error state). Surface it
@@ -86,7 +88,7 @@ const VerifyEmail = () => {
                 help them — signup flow got interrupted; they need to
                 start over. */}
             {!email && (
-              <Alert className="bg-pastel-orange/15 ring-1 ring-pastel-orange/40 border-0 text-pastel-orange-soft">
+              <Alert className="bg-pastel-orange/15 ring-1 ring-pastel-orange/40 border-0 text-pastel-orange-soft max-lg:rounded-[12px] max-lg:bg-pressbox-orange/10 max-lg:ring-pressbox-orange/30 max-lg:text-pressbox-orange-soft max-lg:font-barlow max-lg:text-[13px]">
                 <AlertDescription>
                   We don't have your email on file. Please <a href="/auth" className="underline font-semibold">sign up again</a> to receive a fresh verification link.
                 </AlertDescription>
@@ -97,7 +99,7 @@ const VerifyEmail = () => {
               <Alert>
                 <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                 <AlertDescription>
-                  Verification email sent! Check your inbox and click the link to verify your account.
+                  Verification email sent. Check your inbox and open the link to verify your account.
                 </AlertDescription>
               </Alert>
             )}
@@ -109,11 +111,11 @@ const VerifyEmail = () => {
             )}
 
             <div className="space-y-2 text-center">
-              <p className="text-sm text-muted-foreground">
-                Click the verification link in the email to activate your Citrus Fantasy Sports account. The link expires after 24 hours.
+              <p className="text-sm text-muted-foreground max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">
+                Open the link in that email to activate your Citrus account. It expires after 24 hours.
               </p>
-              <p className="text-sm text-muted-foreground">
-                Didn't receive it? Check your spam folder or click below to resend.
+              <p className="text-sm text-muted-foreground max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">
+                Nothing there? Check spam, or send it again.
               </p>
             </div>
 
@@ -122,7 +124,7 @@ const VerifyEmail = () => {
                 onClick={handleResend}
                 disabled={loading || success}
                 variant="outline"
-                className="w-full"
+                className="w-full max-lg:h-12 max-lg:rounded-[12px] max-lg:border-0 max-lg:outline-none max-lg:shadow-none max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.08em] max-lg:uppercase max-lg:bg-pressbox-orange max-lg:text-pressbox-orange-ink"
               >
                 {loading ? (
                   <>
@@ -145,7 +147,7 @@ const VerifyEmail = () => {
               <Button
                 variant="ghost"
                 onClick={() => navigate('/auth')}
-                className="w-full"
+                className="w-full max-lg:h-12 max-lg:rounded-[12px] max-lg:border-0 max-lg:outline-none max-lg:shadow-none max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.08em] max-lg:uppercase max-lg:text-pressbox-text/70"
               >
                 Back to Sign In
               </Button>

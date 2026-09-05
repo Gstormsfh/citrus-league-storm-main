@@ -24,6 +24,8 @@ const CACHE_TTL = {
   MEDIUM: 30_000,  // 30s — weekly scores, roster snapshots
   LONG: 120_000,   // 2min — matchup metadata, standings
 } as const;
+/** ensure-rosters only: what it creates stays created. See the method. */
+const ENSURE_ROSTERS_TTL = 10 * 60_000;
 
 /**
  * Dedup + cache wrapper.  Identical concurrent calls share one network request;
@@ -225,13 +227,20 @@ export const matchupApi = {
     // both fire on an ordinary load. A network capture of one Matchup render
     // showed it twice, 1.11s and 985ms — a full second of duplicated work.
     //
-    // A 30s window collapses that without weakening the invariant: the first
-    // call still completes before any roster read, and a genuine revisit later
-    // re-runs it.
+    // A 30s window collapsed the duplicate without weakening the invariant:
+    // the first call still completes before any roster read.
+    //
+    // Ten minutes (2026-09-05). On the phone every tap of MATCH remounts the
+    // page and re-runs its load, and with a 30s window the tab paid the
+    // second-long ensure again on nearly every visit. What the call creates
+    // -- an AI team's lineup, the week's fantasy_daily_rosters -- stays
+    // created, and the daily-scores read behind getMatchupData backfills the
+    // rosters on its own each time. A matchup ensured once this session is
+    // ensured; ten minutes is a bound, not a need.
     return cached(
       `matchups:ensure-rosters:${matchupId}`,
       () => apiClient.post(`/api/matchups/${matchupId}/ensure-rosters`),
-      CACHE_TTL.MEDIUM,
+      ENSURE_ROSTERS_TTL,
     );
   },
 

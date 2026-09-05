@@ -420,7 +420,7 @@ export function deriveShotVerdict(
   const zonePhrase = `He takes ${Math.round(busiest.share)}% of his attempts from the ${busiest.zone.toLowerCase()}`;
   const qualityPhrase =
     busiest.xgPerShot != null
-      ? `, worth ${busiest.xgPerShot.toFixed(3)} expected goals apiece on Citrus xG v3`
+      ? `, worth ${busiest.xgPerShot.toFixed(3)} expected goals apiece`
       : '';
 
   if (finishing == null) return `${zonePhrase}${qualityPhrase}.`;
@@ -454,5 +454,5 @@ export function deriveGoalieVerdict(gsax: {
     gsax.raw_gsax >= 0
       ? `${magnitude} goals better than expectation`
       : `${magnitude} goals worse than expectation`;
-  return `On ${gsax.shots_faced.toLocaleString()} primary shots Citrus GSAx expected ${gsax.xga.toFixed(1)} goals against; he allowed ${gsax.ga}. That is ${verdict}, ${signed(gsax.regressed_gsax, 1)} once regressed for workload.`;
+  return `On ${gsax.shots_faced.toLocaleString()} primary shots the expected goals against were ${gsax.xga.toFixed(1)}; he allowed ${gsax.ga}. That is ${verdict}, ${signed(gsax.regressed_gsax, 1)} once regressed for workload.`;
 }

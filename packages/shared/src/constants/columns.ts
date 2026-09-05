@@ -34,7 +34,7 @@ export const MATCHUP_COLUMNS_SLIM = 'id, league_id, week_number, team1_id, team2
 // league read as defaults ('rolling', 2:00 AM, 48h) in that dialog, and a
 // commissioner pressing Save then silently REVERTED the league's real
 // waiver configuration to those defaults.
-export const LEAGUE_COLUMNS = 'id, name, commissioner_id, draft_status, join_code, roster_size, draft_rounds, league_size, settings, scoring_settings, scheduled_draft_time, waiver_type, waiver_process_time, waiver_period_hours, waiver_game_lock, allow_trades_during_games, trade_review_type, created_at, updated_at';
+export const LEAGUE_COLUMNS = 'id, name, commissioner_id, draft_status, join_code, roster_size, draft_rounds, league_size, settings, scoring_settings, scheduled_draft_time, waiver_type, waiver_process_time, waiver_period_hours, waiver_game_lock, allow_trades_during_games, trade_review_type, trade_review_period_hours, trade_veto_threshold, created_at, updated_at';
 
 // Slim version for list views
 export const LEAGUE_COLUMNS_SLIM = 'id, name, commissioner_id, draft_status, roster_size, league_size, settings, scoring_settings, scheduled_draft_time';
@@ -114,7 +114,12 @@ export const MATCHUP_LINES_COLUMNS_SLIM = 'id, matchup_id, player_id, team_id, t
 // ============================================================================
 // PROFILE COLUMNS
 // ============================================================================
-export const PROFILE_COLUMNS = 'id, username, display_name, first_name, last_name, phone, location, bio, default_team_name, timezone, created_at, updated_at';
+// `avatar_url` was missing until 2026-09-04: the account page uploaded one,
+// PUT /api/account/profile stored it, and GET /api/account/profile never
+// returned it, so the avatar vanished on the next load while the league
+// rows (which fetch it themselves) still showed it. `push_notifications` is
+// the on-the-clock opt-in (migration 20260905001000).
+export const PROFILE_COLUMNS = 'id, username, display_name, first_name, last_name, phone, location, bio, default_team_name, timezone, avatar_url, push_notifications, created_at, updated_at';
 
 // ============================================================================
 // DRAFT ORDER COLUMNS

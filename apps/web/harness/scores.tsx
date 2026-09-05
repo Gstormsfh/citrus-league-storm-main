@@ -27,6 +27,7 @@ import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Suspense, lazy } from 'react';
+import '../src/pressboxFonts';
 import '../src/index.css';
 import { scoresApi } from '../src/api/scores';
 import type {

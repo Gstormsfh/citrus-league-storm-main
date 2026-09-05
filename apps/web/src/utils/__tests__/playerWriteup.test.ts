@@ -12,6 +12,8 @@ import {
   generatePlayerWriteup,
   parseToiToMinutes,
   normalizeSavePct,
+  careerSentences,
+  shortTrophy,
 } from '../playerWriteup';
 import type { PlayerWriteup } from '../playerWriteup';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
@@ -188,9 +190,9 @@ describe('generatePlayerWriteup — goalies', () => {
 
   it('reports goals saved above expected in both directions', () => {
     const good = generatePlayerWriteup(goalie({ goalsSavedAboveExpected: 12.4 }));
-    expect(good.summary).toMatch(/Citrus GSAx has him stopping 12\.4 goals more/);
+    expect(good.summary).toMatch(/He has stopped 12\.4 goals more/);
     const bad = generatePlayerWriteup(goalie({ goalsSavedAboveExpected: -8.2 }));
-    expect(bad.summary).toMatch(/Citrus GSAx has him conceding 8\.2 goals more/);
+    expect(bad.summary).toMatch(/He has conceded 8\.2 goals more/);
     expect(bad.tags.map((t) => t.label)).toContain('Underperforming xG');
   });
 
@@ -295,7 +297,7 @@ describe('analysis paragraph — the "what should I do" half', () => {
     const w = generatePlayerWriteup(
       skater({}, { gamesPlayed: 70, goals: 30, assists: 20, points: 50, xGoals: 15 }),
     );
-    expect(w.analysis).toMatch(/Citrus xG has him at 30 goals on 15 expected/);
+    expect(w.analysis).toMatch(/30 goals on 15 expected/);
     expect(w.analysis).toMatch(/sell high/i);
   });
 
@@ -303,7 +305,7 @@ describe('analysis paragraph — the "what should I do" half', () => {
     const w = generatePlayerWriteup(
       skater({}, { gamesPlayed: 70, goals: 8, assists: 30, points: 38, xGoals: 18 }),
     );
-    expect(w.analysis).toMatch(/Citrus xG has him at 8 goals on 18 expected/);
+    expect(w.analysis).toMatch(/8 goals on 18 expected/);
     expect(w.analysis).toMatch(/buy low/i);
   });
 
@@ -482,21 +484,24 @@ describe('player writeups: voice conformance', () => {
     }
   });
 
-  // The attribution rule, stated twice: once as a property of any sentence
-  // that reaches for expected goals, and once as a fixture-driven check on
-  // the four branches that actually quote one.
+  // THE BRAND RULE, REVERSED (2026-09-05, Garrett: "don't mention Citrus
+  // at all; just mention stats if relevant"). The old brief had every
+  // expected-goals sentence name the model behind it; the card now reads
+  // as a scout's note, not a product's. Stated twice: as a property of any
+  // sentence that reaches for expected goals, and on the four branches that
+  // used to name it.
   it.each(CASES.map((c) => [c.label] as const))(
-    '%s: any sentence quoting expected goals names the Citrus model behind it',
+    '%s: no sentence names the brand',
     (label) => {
       const w = CASES.find((c) => c.label === label)!.w;
       for (const text of [w.summary, w.analysis]) {
-        if (!QUOTES_EXPECTED_GOALS.test(text)) continue;
-        expect(CITRUS_SOURCE.test(text), `no source named in: ${text}`).toBe(true);
+        expect(CITRUS_SOURCE.test(text), `brand named in: ${text}`).toBe(false);
+        expect(text).not.toMatch(/\bCitrus\b/);
       }
     },
   );
 
-  it('the four branches built on a Citrus number all name it', () => {
+  it('the four branches built on an expected-goals number quote the number and not the brand', () => {
     const named = [
       'finishing above his chances',
       'finishing below his chances',
@@ -506,7 +511,8 @@ describe('player writeups: voice conformance', () => {
     for (const label of named) {
       const w = CASES.find((c) => c.label === label)!.w;
       const text = `${w.summary} ${w.analysis}`;
-      expect(CITRUS_SOURCE.test(text), `${label} quotes a Citrus number without naming it: ${text}`).toBe(true);
+      expect(QUOTES_EXPECTED_GOALS.test(text), `${label} should quote the number: ${text}`).toBe(true);
+      expect(CITRUS_SOURCE.test(text), `${label} names the brand: ${text}`).toBe(false);
     }
   });
 
@@ -525,5 +531,163 @@ describe('player writeups: voice conformance', () => {
     expect(ACCURACY_CLAIMS.find((p) => p.re.test('the most accurate model'))?.name).toBe(
       'most/wildly accurate',
     );
+  });
+});
+
+describe('the voice (2026-09-05)', () => {
+  const goalie = (overrides: Partial<HockeyPlayer> = {}): HockeyPlayer =>
+    ({
+      id: 30, name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
+      stats: { gamesPlayed: 50, savePct: 0.925, gaa: 2.35, wins: 30, losses: 15, shutouts: 4 },
+      ...overrides,
+    }) as HockeyPlayer;
+
+  it('opens with the full name, not the first name', () => {
+    const w = generatePlayerWriteup(skater({ name: 'Connor McDavid' }));
+    expect(w.summary).toMatch(/Connor McDavid/);
+    expect(w.summary.indexOf('Connor McDavid')).toBeLessThan(20);
+    const g = generatePlayerWriteup(goalie({ name: 'Igor Shesterkin' }));
+    expect(g.summary.indexOf('Igor Shesterkin')).toBeLessThan(20);
+  });
+
+  it('gives two players with the same line different prose, and the same player the same prose twice', () => {
+    const a = generatePlayerWriteup(skater({ id: 8478402, name: 'Connor McDavid' }));
+    const b = generatePlayerWriteup(skater({ id: 8477492, name: 'Nathan MacKinnon' }));
+    const c = generatePlayerWriteup(skater({ id: 8476453, name: 'Nikita Kucherov' }));
+    const shapes = new Set([a, b, c].map((w) => w.summary.replace(/Connor McDavid|Nathan MacKinnon|Nikita Kucherov/g, 'X')));
+    expect(shapes.size).toBeGreaterThan(1);
+    expect(generatePlayerWriteup(skater({ id: 8478402, name: 'Connor McDavid' })).summary).toBe(a.summary);
+  });
+
+  it('never prints an em dash', () => {
+    for (const w of [generatePlayerWriteup(skater()), generatePlayerWriteup(goalie()), generatePlayerWriteup(skater({}, { gamesPlayed: 3 }))]) {
+      expect(`${w.headline} ${w.summary} ${w.analysis} ${w.cardNote}`).not.toContain('—');
+    }
+  });
+
+  it('says more than points when the box score does: the power play, the plus-minus, the shooting', () => {
+    const w = generatePlayerWriteup(skater({}, { gamesPlayed: 70, points: 100, goals: 40, assists: 60, shots: 250, powerPlayPoints: 30, plusMinus: 22 }));
+    expect(w.summary).toMatch(/power play/i);
+    expect(w.summary).toMatch(/plus-22/);
+    expect(w.summary).toMatch(/16%/);
+  });
+});
+
+describe('ice time that is not there says nothing (2026-09-05)', () => {
+  it("a '0:00' TOI is a missing number: no minutes clause, no Limited ice time tag", () => {
+    const player = {
+      id: '8471214',
+      name: 'Alex Ovechkin',
+      position: 'LW',
+      team: 'WSH',
+      stats: { gamesPlayed: 82, points: 64, goals: 32, assists: 32, shots: 244, powerPlayPoints: 19, toi: '0:00' },
+    } as unknown as Parameters<typeof generatePlayerWriteup>[0];
+    const w = generatePlayerWriteup(player);
+    expect(w.summary).not.toMatch(/minutes a night/);
+    expect(w.analysis).not.toMatch(/0 a night|minutes a night/);
+    expect(w.tags.some((t) => t.label === 'Limited ice time')).toBe(false);
+  });
+});
+
+describe('writeup extras (2026-09-05): what the stat line cannot say', () => {
+  const ovi = {
+    id: '8471214',
+    name: 'Alex Ovechkin',
+    position: 'LW',
+    team: 'WSH',
+    stats: { gamesPlayed: 82, points: 64, goals: 32, assists: 32, shots: 244, powerPlayPoints: 19, toi: '17:24' },
+  } as unknown as Parameters<typeof generatePlayerWriteup>[0];
+  const nine = [2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025].map((season, i) => ({ season, goals: [49, 51, 48, 24, 50, 42, 31, 44, 32][i] }));
+
+  it('says the streak as a stat, with his age, and earns the tag a legend earns', () => {
+    const w = generatePlayerWriteup(ovi, { age: 40, goalsBySeason: nine.map((r) => ({ ...r, goals: Math.max(r.goals, 30) })) });
+    expect(w.summary).toContain('At 40, he has nine straight seasons of 30 goals or more on record.');
+    expect(w.tags.some((t) => t.label === '9 straight 30-goal seasons')).toBe(true);
+    expect(w.tags.some((t) => t.label === 'Veteran')).toBe(true);
+  });
+
+  it('a dip in one season drops the 30-goal claim to the one the numbers support', () => {
+    const w = generatePlayerWriteup(ovi, { age: 40, goalsBySeason: nine });
+    expect(w.summary).toContain('nine straight seasons of 20 goals or more on record');
+    expect(w.tags.some((t) => t.label.includes('30-goal'))).toBe(false);
+  });
+
+  it('cohort reads only when notable, the projection as a number, and never the brand', () => {
+    const w = generatePlayerWriteup(ovi, {
+      xgPercentile: 92,
+      garPercentile: 98,
+      cohortNoun: 'forwards',
+      cohortSize: 515,
+      projFp: 611.4,
+      projGp: 74,
+      posRank: 'LW8',
+      projectionLabel: 'for 2026-27',
+    });
+    expect(w.analysis).toContain('XG/60 in the 92nd percentile, GAR/60 in the 98th of forwards.');
+    expect(w.analysis).toContain('Projects to 611 fantasy points over 74 games for 2026-27 (LW8).');
+    expect(w.tags.some((t) => t.label === 'Elite GAR')).toBe(true);
+    expect(`${w.summary} ${w.analysis}`).not.toMatch(/Citrus/);
+  });
+
+  it('a middling percentile says nothing', () => {
+    const w = generatePlayerWriteup(ovi, { xgPercentile: 55, garPercentile: 48, cohortNoun: 'forwards', cohortSize: 515 });
+    expect(w.analysis).not.toMatch(/percentile/);
+  });
+
+  it('adds nothing when there is nothing to add', () => {
+    const base = generatePlayerWriteup(ovi);
+    const w = generatePlayerWriteup(ovi, {});
+    expect(w.summary).toBe(base.summary);
+    expect(w.analysis).toBe(base.analysis);
+    expect(w.tags).toEqual(base.tags);
+  });
+
+  it('the career is a sentence of plain numbers, the trophies with counts, and the tags a legend earns', () => {
+    const career = {
+      gp: 1491,
+      goals: 897,
+      assists: 726,
+      points: 1623,
+      seasons: 21,
+      first_season: 20052006,
+      draft: { year: 2004, round: 1, overall: 1, team: 'WSH' },
+      awards: [
+        { name: 'Maurice "Rocket" Richard Trophy', count: 9 },
+        { name: 'Hart Memorial Trophy', count: 3 },
+        { name: 'Art Ross Trophy', count: 1 },
+        { name: 'Calder Memorial Trophy', count: 1 },
+      ],
+    };
+    const w = generatePlayerWriteup(ovi, { age: 40, career });
+    expect(w.summary).toContain('Career: 897 goals and 1,623 points in 1,491 games over 21 NHL seasons.');
+    expect(w.summary).toContain('Trophies: Rocket Richard x9, Hart x3, Art Ross.');
+    expect(w.summary).toContain('Drafted 1st overall in 2004 by WSH.');
+    for (const label of ['500-goal club', '1,000-point club', '1,000 games', 'Veteran']) {
+      expect(w.tags.some((t) => t.label === label), label).toBe(true);
+    }
+    expect(`${w.summary} ${w.analysis}`).not.toMatch(/—|Citrus/);
+  });
+
+  it('a goalie career counts wins and shutouts; a late pick is not mentioned; undrafted is', () => {
+    const g = careerSentences({ gp: 620, wins: 312, shutouts: 45, seasons: 12, draft: { year: 2010, round: 5, overall: 140, team: 'BOS' }, awards: [] }, true);
+    expect(g.summary).toEqual(['Career: 312 wins and 45 shutouts in 620 games over 12 NHL seasons.']);
+    expect(g.tags.map((t) => t.label)).toEqual(['300 wins']);
+    const u = careerSentences({ gp: 200, goals: 40, points: 90, seasons: 3, draft: null, awards: [] }, false);
+    expect(u.summary).toEqual(['Career: 40 goals and 90 points in 200 games over 3 NHL seasons.', 'Undrafted.']);
+    expect(u.tags).toEqual([]);
+    expect(careerSentences(null, false)).toEqual({ summary: [], tags: [] });
+    expect(careerSentences({ gp: 0 }, false).summary).toEqual([]);
+  });
+
+  it('shortTrophy keeps the name a fan uses', () => {
+    expect(shortTrophy('Maurice "Rocket" Richard Trophy')).toBe('Rocket Richard');
+    expect(shortTrophy('Hart Memorial Trophy')).toBe('Hart');
+    expect(shortTrophy('Vezina Trophy')).toBe('Vezina');
+    expect(shortTrophy('Ted Lindsay Award')).toBe('Ted Lindsay');
+  });
+
+  it('never writes an em dash or the brand', () => {
+    const w = generatePlayerWriteup(ovi, { age: 40, goalsBySeason: nine, xgPercentile: 92, garPercentile: 98, cohortNoun: 'forwards', cohortSize: 515, projFp: 611, projGp: 74, posRank: 'LW8', projectionLabel: 'for 2026-27' });
+    expect(`${w.summary} ${w.analysis}`).not.toMatch(/—|Citrus/);
   });
 });

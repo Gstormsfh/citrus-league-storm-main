@@ -52,12 +52,27 @@ export interface DashboardIndexEntry {
   ppp: number;
   plus_minus: number;
   x_goals: number;
+  /**
+   * PIM, SHP and ice time (2026-09-05). The service SELECTed nhl_pim and
+   * nhl_toi_seconds from the day the index shipped and dropped both in the
+   * mapper; nhl_shp was never read. The player card's Detailed grid printed
+   * PIM 0, SHP 0 and TOI/G "-" for every skater in the league while
+   * player_season_stats held all three for 877, 229 and 1,038 of the 1,063
+   * rows of season 2025. `toi_seconds` is the season total; per game is
+   * toi_seconds / gp, which the card formats.
+   */
+  pim: number;
+  shp: number;
+  toi_seconds: number;
   // goalie actuals
   wins: number;
+  losses: number;
+  ot_losses: number;
   saves: number;
   save_pct: number;
   gaa: number;
   shutouts: number;
+  goals_against: number;
   // advanced
   xg_per_60: number | null;
   xg_rating: string | null;

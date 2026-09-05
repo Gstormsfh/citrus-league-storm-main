@@ -1,6 +1,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { isPastTradeDeadline } from '../lib/leagueRules';
-import { COLUMNS, getCurrentSeason } from '@citrus/shared';
+import { isPastTradeDeadline, lockedTeamForTrade } from '../lib/leagueRules';
+import { getSupabaseAdmin } from '../lib/supabase';
+import { COLUMNS, getCurrentSeason, logger } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
 /**
@@ -320,7 +321,7 @@ export class TradeService {
     // Check roster size limits for both teams
     const { data: league } = await this.supabase
       .from('leagues')
-      .select('roster_size, trade_review_type, trade_review_period_hours')
+      .select('roster_size, trade_review_type, trade_review_period_hours, allow_trades_during_games')
       .eq('id', trade.league_id)
       .single();
 
@@ -346,6 +347,49 @@ export class TradeService {
 
     if (newFromSize > maxRoster || newToSize > maxRoster) {
       return { success: false, error: 'Trade would exceed roster size limit' };
+    }
+
+    // SETTINGS PASS-THROUGH (2026-09-05): allow_trades_during_games was a
+    // stored toggle nothing read. OFF means a trade that moves a player
+    // whose team is on the ice waits until the games are over (Yahoo's
+    // behaviour). Same shape as the waiver game lock, and the same rule:
+    // any data problem fails OPEN. Pure logic: lib/leagueRules.lockedTeamForTrade.
+    if (league?.allow_trades_during_games === false) {
+      try {
+        const playerIds = [...(trade.offered_player_ids || []), ...(trade.requested_player_ids || [])]
+          .map((p: unknown) => Number(p))
+          .filter((n: number) => Number.isFinite(n) && n > 0);
+        if (playerIds.length) {
+          const admin = getSupabaseAdmin();
+          const { data: dir } = await admin
+            .from('player_directory')
+            .select('player_id, team_abbrev, season')
+            .in('player_id', playerIds)
+            .order('season', { ascending: false });
+          const teamOf = new Map<number, string>();
+          for (const r of (dir ?? []) as Array<{ player_id: number; team_abbrev: string | null }>) {
+            if (r.team_abbrev && !teamOf.has(r.player_id)) teamOf.set(r.player_id, r.team_abbrev);
+          }
+          const abbrevs = Array.from(new Set(teamOf.values()));
+          if (abbrevs.length) {
+            const today = new Date().toISOString().slice(0, 10);
+            const { data: games } = await admin
+              .from('nhl_games')
+              .select('status, game_date, game_time, home_team, away_team')
+              .eq('game_date', today)
+              .or(abbrevs.map((a) => `home_team.eq.${a},away_team.eq.${a}`).join(','));
+            const locked = lockedTeamForTrade(abbrevs, games ?? [], Date.now());
+            if (locked) {
+              return {
+                success: false,
+                error: `${locked}'s game has started. This league holds trades with a player on the ice until the games are over; accept it after tonight's games.`,
+              };
+            }
+          }
+        }
+      } catch (lockErr) {
+        logger.warn('[acceptTradeOffer] game-lock check failed open:', lockErr);
+      }
     }
 
     // Check if review is required
@@ -668,19 +712,28 @@ export class TradeService {
       trade_review_type: 'none' | 'commissioner' | 'league_vote';
       trade_review_period_hours: number;
       trade_veto_threshold: number;
+      /** Matchup week after which trades close; 0 = none. Merged into settings JSONB. */
+      tradeDeadlineWeek?: number;
     },
   ) {
     await this.membership.requireCommissioner(leagueId, commissionerId);
 
-    const { error } = await this.supabase
-      .from('leagues')
-      .update({
-        trade_review_type: settings.trade_review_type,
-        trade_review_period_hours: settings.trade_review_period_hours,
-        trade_veto_threshold: settings.trade_veto_threshold,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', leagueId);
+    const update: Record<string, unknown> = {
+      trade_review_type: settings.trade_review_type,
+      trade_review_period_hours: settings.trade_review_period_hours,
+      trade_veto_threshold: settings.trade_veto_threshold,
+      updated_at: new Date().toISOString(),
+    };
+    if (typeof settings.tradeDeadlineWeek === 'number') {
+      // The deadline lives in settings JSONB (isPastTradeDeadline reads
+      // settings.tradeDeadlineWeek). Merge, never replace, the document.
+      const { data: row, error: readErr } = await this.supabase.from('leagues').select('settings').eq('id', leagueId).single();
+      if (readErr) return { success: false, error: readErr };
+      const current = (row?.settings && typeof row.settings === 'object' ? row.settings : {}) as Record<string, unknown>;
+      update.settings = { ...current, tradeDeadlineWeek: settings.tradeDeadlineWeek };
+    }
+
+    const { error } = await this.supabase.from('leagues').update(update).eq('id', leagueId);
 
     if (!error) {
       await this.supabase.rpc('notify_league_members', {

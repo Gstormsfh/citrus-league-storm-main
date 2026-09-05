@@ -13,6 +13,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// The Press Box row (matchupRows.ts) reads game info through ScheduleService,
+// whose api module reaches the Supabase client -- which throws at module
+// scope in the hermetic env. Mock the api leaf; ScheduleService's pure
+// functions load and run for real.
+vi.mock('@/api/client', () => ({ apiClient: {}, API_BASE_URL: '', ApiError: class ApiError extends Error {} }));
+
 const cardProps: Array<{ player: unknown; isUserTeam: boolean }> = [];
 vi.mock('../PlayerCard', () => ({
   PlayerCard: (props: { player: unknown; isUserTeam: boolean }) => {

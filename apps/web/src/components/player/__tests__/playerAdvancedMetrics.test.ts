@@ -30,6 +30,7 @@ import {
   ordinal,
   playerDashboardHref,
   xgTrend,
+  finishingTrend,
   VERDICT_MAX_CHARS,
   type CardEntry,
 } from '../playerAdvancedMetrics';
@@ -62,6 +63,12 @@ function entry(over: Partial<CardEntry> = {}): CardEntry {
     save_pct: 0,
     gaa: 0,
     shutouts: 0,
+    pim: 0,
+    shp: 0,
+    toi_seconds: 0,
+    losses: 0,
+    ot_losses: 0,
+    goals_against: 0,
     xg_per_60: 1.0,
     xg_rating: null,
     gar_per_60: 0.5,
@@ -395,9 +402,9 @@ describe('deriveVerdict — derived, or nothing', () => {
     expect(v).toContain('Elite looks, cold stick');
     expect(v).toContain('88th-percentile');
     expect(v).toContain('3.1 goals under expected');
-    // The source is named and the fantasy call is stated, per the
-    // 2026-09-02 voice brief. Both are the point of the sentence.
-    expect(v).toContain('Citrus xG');
+    // No brand in the prose (2026-09-05, Garrett: "don't mention Citrus at
+    // all; just mention stats"); the fantasy call is stated.
+    expect(v).not.toContain('Citrus');
     expect(v).toContain('Buy low');
     expect(v.length).toBeLessThanOrEqual(VERDICT_MAX_CHARS);
   });
@@ -433,7 +440,7 @@ describe('deriveVerdict — derived, or nothing', () => {
       gar_evo: { value: 0.05, percentile: 40 },
     });
     const v = deriveVerdict(entry({ gp: 40 }), 'D', m, null, null)!;
-    expect(v).toBe('Value is mostly even-strength defence. Citrus GAR has him at 0.42 there, 91st among defencemen.');
+    expect(v).toBe('Value is mostly even-strength defence: 0.42 GAR/60 there, 91st among defencemen.');
   });
 
   it('names the biggest negative component as the drag', () => {
@@ -442,7 +449,7 @@ describe('deriveVerdict — derived, or nothing', () => {
       gar_evo: { value: 0.05, percentile: 40 },
     });
     const v = deriveVerdict(entry({ gp: 40 }), 'F', m, null, null)!;
-    expect(v).toBe('Penalties drawn is the drag. Citrus GAR has him at -0.31, 6th among forwards.');
+    expect(v).toBe('Penalties drawn is the drag: -0.31 GAR/60, 6th among forwards.');
   });
 
   it('falls back to total impact when no component stands out', () => {
@@ -451,7 +458,7 @@ describe('deriveVerdict — derived, or nothing', () => {
       gar_evo: { value: 0.2, percentile: 50 },
     });
     const v = deriveVerdict(entry({ gp: 41 }), 'F', m, null, null)!;
-    expect(v).toBe('Citrus GAR puts him 72nd-percentile for total impact among forwards over 41 games.');
+    expect(v).toBe('72nd-percentile GAR/60 for total impact among forwards over 41 games.');
   });
 
   it('returns null when nothing at all is known', () => {
@@ -492,19 +499,19 @@ describe('deriveVerdict — derived, or nothing', () => {
 
     const hi = deriveVerdict(tendy, 'G', g(8.2, 88), null, null)!;
     expect(hi).toBe(
-      'Stopping more than his share. Citrus GSAx has him stopping 8.2 goals more than expected on 1,204 primary shots, 88th among goalies.',
+      'Stopping more than his share. Stopping 8.2 goals more than expected on 1,204 primary shots, 88th among goalies.',
     );
 
     const lo = deriveVerdict(goalie({ gp: 40, gsax_shots_faced: 640 }), 'G', g(-4.2, 12), null, null)!;
     expect(lo).toBe(
-      'Leaking more than he should. Citrus GSAx has him conceding 4.2 goals more than expected on 640 primary shots, 12th among goalies.',
+      'Leaking more than he should. Conceding 4.2 goals more than expected on 640 primary shots, 12th among goalies.',
     );
 
     const mid = deriveVerdict(goalie({ gp: 40, gsax_shots_faced: 900 }), 'G', g(1.2, 54), null, null)!;
-    expect(mid).toBe('Citrus GSAx has him stopping 1.2 goals more than expected on 900 primary shots, 54th among goalies.');
+    expect(mid).toBe('Stopping 1.2 goals more than expected on 900 primary shots, 54th among goalies.');
 
     const level = deriveVerdict(goalie({ gp: 40, gsax_shots_faced: 900 }), 'G', g(0.02, 50), null, null)!;
-    expect(level).toContain('level with expected');
+    expect(level).toMatch(/level with expected/i);
 
     // GSAx outranks the save rate, so none of these are the save-rate line.
     for (const v of [hi, lo, mid, level]) expect(v).not.toContain('save rate');
@@ -679,5 +686,30 @@ describe('playerDashboardHref', () => {
     // `/players/:playerId` OUTSIDE the import.meta.env.DEV gate, so the
     // card's "Full dashboard →" finally goes to the dashboard.
     expect(playerDashboardHref(8478402)).toBe('/players/8478402');
+  });
+});
+
+describe('finishingTrend (2026-09-05)', () => {
+  const pt = (season: number, goals: number, xg: number, game_type: 'regular' | 'playoff' = 'regular') =>
+    ({ season, game_type, shots: 0, sog: 0, goals, xg, finishing: goals - xg, teams: 1 });
+
+  it('plots goals over expected per regular season and reads the newest season both ways', () => {
+    const t = finishingTrend([pt(2024, 20, 24), pt(2025, 39, 31), pt(2025, 3, 2, 'playoff')]);
+    expect(t).not.toBeNull();
+    expect(t!.points.map((p) => p.y)).toEqual([-4, 8]);
+    expect(t!.endpoint).toBe('+8.0');
+    expect(t!.pctOfExpected).toBe('126%');
+    expect(t!.seasons).toBe(2);
+  });
+
+  it('merges a traded season into one point', () => {
+    const t = finishingTrend([pt(2024, 10, 12), pt(2025, 10, 8), pt(2025, 5, 4)]);
+    expect(t!.points.map((p) => p.y)).toEqual([-2, 3]);
+    expect(t!.pctOfExpected).toBe('125%');
+  });
+
+  it('refuses one season', () => {
+    expect(finishingTrend([pt(2025, 39, 31)])).toBeNull();
+    expect(finishingTrend(null)).toBeNull();
   });
 });

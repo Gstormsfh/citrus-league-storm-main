@@ -119,6 +119,16 @@ describe('the reader can pick the season, and lands on the right one', () => {
     expect(MODAL).toContain('const nextStart = getSeasonStartDate(season + 1);');
   });
 
+  it('keeps the regular season only: the playoff run inside the window is dropped (2026-09-05)', () => {
+    // The window runs to the eve of the next opener, so a full playoff run
+    // sat in the log (Quinn Hughes: "93 Games", May dates). Fantasy is the
+    // regular season; the schedule rows carry game_type and the stats map is
+    // keyed by those rows' dates, so the playoff stats fall away with them.
+    const body = gameLogEffect();
+    expect(body).toMatch(/game_type === 'regular'/);
+    expect(body).toMatch(/const games = \(scheduled \?\? \[\]\)\.filter\(/);
+  });
+
   it('the picker survives the loading state', () => {
     // A reader who lands on the wrong season must be able to leave it without
     // waiting for it to arrive.

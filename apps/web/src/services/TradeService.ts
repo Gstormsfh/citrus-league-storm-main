@@ -433,6 +433,8 @@ export class TradeService {
       trade_review_type: 'none' | 'commissioner' | 'league_vote';
       trade_review_period_hours: number;
       trade_veto_threshold: number;
+      /** Matchup week after which trades close; 0 = none. Editable since 2026-09-05. */
+      tradeDeadlineWeek?: number;
     }
   ): Promise<{ success: boolean; error?: string }> {
     try {

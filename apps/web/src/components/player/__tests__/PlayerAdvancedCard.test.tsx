@@ -16,6 +16,7 @@ vi.mock('@/api/client', () => ({ apiClient: { get: getMock } }));
 import type { XgHistoryPoint } from '@citrus/shared';
 import { PlayerAdvancedCard } from '../PlayerAdvancedCard';
 import { type CardEntry } from '../playerAdvancedMetrics';
+import { projectionFraming } from '../projectionFraming';
 import { resetPlayerDashboardIndex } from '@/hooks/usePlayerDashboardIndex';
 
 let seq = 900;
@@ -44,6 +45,12 @@ function entry(over: Partial<CardEntry> = {}): CardEntry {
     save_pct: 0,
     gaa: 0,
     shutouts: 0,
+    pim: 0,
+    shp: 0,
+    toi_seconds: 0,
+    losses: 0,
+    ot_losses: 0,
+    goals_against: 0,
     xg_per_60: 1.18,
     xg_rating: 'Elite',
     gar_per_60: 0.62,
@@ -267,13 +274,16 @@ describe('PlayerAdvancedCard — skater', () => {
     }
   });
 
-  it('shows the rest-of-season projection only on the expanded variant', () => {
+  it('shows the projection only on the expanded variant, framed for the date', () => {
+    // Before the opener the eyebrow is `2026-27 projection`; once the season
+    // is under way it is `Rest of season` (projectionFraming.ts).
+    const eyebrow = projectionFraming().eyebrow;
     const { unmount } = renderCard({ playerId: 8478402, indexOverride: index });
-    expect(screen.queryByText(/Rest of season/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(eyebrow)).not.toBeInTheDocument();
     unmount();
 
     renderCard({ playerId: 8478402, indexOverride: index, variant: 'expanded' });
-    expect(screen.getByText(/Rest of season/i)).toBeInTheDocument();
+    expect(screen.getByText(eyebrow)).toBeInTheDocument();
     expect(screen.getByText(/7.58/)).toBeInTheDocument();
     expect(screen.getByText(/318.4 total/)).toBeInTheDocument();
   });
@@ -374,7 +384,7 @@ describe('PlayerAdvancedCard — goalie', () => {
     const vasy = goalieEntry({ id: 8476883, gsax_regressed: 8.2, gsax_shots_faced: 1204 });
     renderCard({ playerId: 8476883, indexOverride: [...league(), vasy] });
     const verdict = screen.getByTestId('advanced-card-verdict');
-    expect(verdict).toHaveTextContent('Citrus GSAx');
+    expect(verdict).toHaveTextContent('goals more than expected');
     expect(verdict).toHaveTextContent('1,204 primary shots');
     expect(verdict).toHaveTextContent('among goalies');
   });

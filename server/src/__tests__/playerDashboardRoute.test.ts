@@ -38,7 +38,7 @@ vi.mock('../lib/supabase', () => ({
   supabaseAdmin: { from: vi.fn() },
   createUserClient: vi.fn(),
   getSupabaseAdmin: () => {
-    if (adminThrows) throw new Error('SUPABASE_SERVICE_ROLE_KEY not set — admin client unavailable');
+    if (adminThrows) throw new Error('SUPABASE_SERVICE_ROLE_KEY not set: admin client unavailable');
     return adminClient;
   },
 }));

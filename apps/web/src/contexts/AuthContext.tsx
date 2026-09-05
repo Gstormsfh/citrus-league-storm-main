@@ -13,6 +13,7 @@ import {
   authRedirectUrl,
 } from '@/lib/nativeAuth';
 import { registerForPush, unregisterDeviceToken } from '@/lib/pushNotifications';
+import { reportBootStage } from '@/lib/bootStages';
 
 /** Returns true if JWT is expired or within 30s of expiry. */
 function isTokenExpired(token: string | undefined): boolean {
@@ -93,6 +94,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const queryClient = useQueryClient();
+
+  // The boot splash's first stage (PR3): auth has answered, signed in or not.
+  useEffect(() => {
+    if (!loading) reportBootStage('auth');
+  }, [loading]);
 
   useEffect(() => {
     let mounted = true;

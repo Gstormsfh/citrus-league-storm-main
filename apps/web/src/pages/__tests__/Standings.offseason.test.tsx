@@ -44,7 +44,6 @@ vi.mock('react-router-dom', async (importOriginal) => {
 // Chrome. Each of these drags the auth/league/supabase shell in behind it, so
 // a failure here would be a failure of the shell and not of the standings.
 vi.mock('@/components/Navbar', () => ({ default: () => <nav data-testid="navbar" /> }));
-vi.mock('@/components/MobileMenuButton', () => ({ default: () => <button type="button" /> }));
 vi.mock('@/components/LeagueCreationCTA', () => ({ LeagueCreationCTA: () => null }));
 vi.mock('@/components/matchup/LeagueNotifications', () => ({ default: () => null }));
 // A STABLE `toast`, not a fresh spy per render. Standings' load effect lists
@@ -58,6 +57,10 @@ vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastSpy }) }));
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1' } }),
 }));
+// The Press Box league chrome (PR10f) reads the profile for the menu's
+// avatar; the real hook reaches api/account -> api/client -> the Supabase
+// client, which throws at module scope under the hermetic env.
+vi.mock('@/hooks/useProfile', () => ({ useProfile: () => ({ data: null }) }));
 
 const LEAGUE = {
   id: 'league-1',
@@ -187,13 +190,15 @@ const mount = () =>
     </MemoryRouter>,
   );
 
-/** The loading screen holds for a minimum 800ms (useMinimumLoadingTime). */
+/** The loading state holds for PB_LOADING_MIN_MS (useMinimumLoadingTime). */
 const settled = (text: string | RegExp) => screen.findByText(text, undefined, { timeout: 4000 });
 /**
- * A team name appears in three places once the page is populated — the table
- * row, the Playoff Picture card and the Points Leaders card — which is exactly
- * why all three are gated together. Assertions about "the table is here" use
- * the plural query and let the count speak.
+ * A team name appears in four places once the page is populated — the desktop
+ * table row, the Playoff Picture card, the Points Leaders card, and (since
+ * PR10, 2026-09-04) the Press Box table below lg, which jsdom renders too
+ * because it applies no media queries — which is exactly why all of them
+ * are gated together. Assertions about "the table is here" use the plural
+ * query and let the count speak.
  */
 const settledAll = (text: string | RegExp) => screen.findAllByText(text, undefined, { timeout: 4000 });
 
@@ -224,11 +229,16 @@ describe('Standings — the offseason zero table', () => {
     seasonStatus.mockReturnValue(OFFSEASON);
     mount();
 
-    expect(await settled(/Records, PF and PA fill in once the season opens Sep 29\./)).toBeInTheDocument();
+    // Both layers say it -- the desktop card and the Press Box preseason
+    // state below lg -- so the plural query, and the count is the assertion.
+    expect(await settledAll(/Records, PF and PA fill in once the season opens Sep 29\./)).toHaveLength(2);
 
     // A dormant screen that only says "nothing here" is not finished. This is
-    // a real deep link: Scores.tsx reads the `date` query param.
-    fireEvent.click(screen.getByRole('button', { name: /Opening night Sep 29/ }));
+    // a real deep link: Scores.tsx reads the `date` query param. Both layers
+    // carry the button; either tap is the same navigate.
+    const openers = screen.getAllByRole('button', { name: /Opening night Sep 29/ });
+    expect(openers).toHaveLength(2);
+    fireEvent.click(openers[0]);
     expect(navigateSpy).toHaveBeenCalledWith('/scores?date=2026-09-29');
   });
 
@@ -251,10 +261,11 @@ describe('Standings — the states that must NOT change', () => {
     seasonStatus.mockReturnValue(UNKNOWN);
     mount();
 
-    // Three appearances each: the table row, the Playoff Picture and the
-    // Points Leaders card — every surface this change could have emptied.
-    expect(await settledAll('Frost Giants')).toHaveLength(3);
-    expect(screen.getAllByText('Slot Machines')).toHaveLength(3);
+    // Four appearances each: the desktop table row, the Playoff Picture, the
+    // Points Leaders card, and the Press Box table below lg — every surface
+    // this change could have emptied.
+    expect(await settledAll('Frost Giants')).toHaveLength(4);
+    expect(screen.getAllByText('Slot Machines')).toHaveLength(4);
     expect(screen.getAllByText('0.0%')).toHaveLength(2);
     expect(screen.queryByText('No games played yet.')).toBeNull();
     expect(screen.queryByRole('button', { name: /Opening night/ })).toBeNull();

@@ -4,7 +4,8 @@ import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
+import { TradesPhone } from '@/components/trades/TradesPhone';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -527,14 +528,77 @@ const TradeAnalyzer = () => {
   return (
     <div className="min-h-screen bg-[#0F1F15] flex flex-col">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">Trade Center</h1>
-          <MobileMenuButton />
-        </div>
+      {/* PRESS BOX (2026-09-04): the league chrome — header, sub-tabs and
+          the league menu — replaces the 09-01 title bar and its hamburger,
+          which opened the old menu sheet. One menu in the app. */}
+      <PressBoxLeagueChrome />
+      {/* PRESS BOX (2026-09-04): below lg the trade center is TradesPhone,
+          drawn from this page's own state and handlers. The desktop main
+          is unchanged from lg. The player card is the ONE PlayerStatsModal
+          at the page's root, shared by both layers. */}
+      <div className="lg:hidden bg-pressbox-surface text-pressbox-text pb-app-chrome">
+        <TradesPhone
+          tab={activeTab === 'offers' ? 'offers' : 'propose'}
+          onTab={setActiveTab}
+          loading={loading}
+          draftNotCompleted={draftNotCompleted}
+          partners={opponentTeams}
+          partnerId={String(selectedTeamId)}
+          onPartner={(id) => {
+            setSelectedTeamId(id);
+            setTheirSelectedPlayers([]);
+          }}
+          myRoster={myTeamRoster}
+          mySelected={mySelectedPlayers}
+          onToggleMine={toggleMyPlayer}
+          theirSelected={theirSelectedPlayers}
+          onToggleTheirs={toggleTheirPlayer}
+          searchMine={searchMyTeam}
+          onSearchMine={setSearchMyTeam}
+          searchTheirs={searchTheirTeam}
+          onSearchTheirs={setSearchTheirTeam}
+          myValue={myTotalValue}
+          theirValue={theirTotalValue}
+          opinion={getTradeOpinion()}
+          message={tradeMessage}
+          onMessage={setTradeMessage}
+          onPropose={handleProposeTrade}
+          onClear={() => {
+            setMySelectedPlayers([]);
+            setTheirSelectedPlayers([]);
+            setTradeMessage('');
+          }}
+          onOpenPlayer={(player) => {
+            setSelectedPlayerForStats(toHockeyPlayer(player));
+            setIsPlayerDialogOpen(true);
+          }}
+          offers={tradeOffers}
+          myTeamId={myTeamId}
+          offersError={tradeOffersError}
+          onAccept={handleAcceptTrade}
+          onReject={handleRejectTrade}
+          onCancel={handleCancelTrade}
+          review={
+            <TradeReviewSection
+              tradeOffers={tradeOffers}
+              myTeamId={myTeamId}
+              onVoted={() => (myTeamId ? loadTradeOffers(myTeamId) : Promise.resolve())}
+            />
+          }
+          banner={
+            isGuestMode(userLeagueState) ? (
+              <div className="mb-3">
+                <LeagueCreationCTA
+                  title="You're viewing demo trade analyzer"
+                  description="Sign up to analyze trades against your actual roster."
+                  variant="compact"
+                />
+              </div>
+            ) : null
+          }
+        />
       </div>
-      <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <main className="hidden lg:block w-full lg:pt-24 lg:pb-8">
         <div className="w-full m-0 p-0">
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">
@@ -1056,12 +1120,6 @@ const TradeAnalyzer = () => {
         />
         )}
 
-        {/* Player Stats Modal */}
-        <PlayerStatsModal
-          player={selectedPlayerForStats}
-          isOpen={isPlayerDialogOpen}
-          onClose={() => setIsPlayerDialogOpen(false)}
-        />
           </TabsContent>
 
           {/* Trade Offers Tab */}
@@ -1298,6 +1356,14 @@ const TradeAnalyzer = () => {
           </div>
         </div>
       </main>
+      {/* The ONE player card, at the root (2026-09-04): both the phone
+          lists and the desktop columns open it, and it portals to the body
+          regardless of which layer is hidden. */}
+      <PlayerStatsModal
+        player={selectedPlayerForStats}
+        isOpen={isPlayerDialogOpen}
+        onClose={() => setIsPlayerDialogOpen(false)}
+      />
       <HockeyFooter variant="app" />
     </div>
   );

@@ -190,7 +190,7 @@ describe('submitPick — error taxonomy → reason + human copy', () => {
       label: 'pick_out_of_order (409) → clock_expired translation',
       thrown: new MockApiError('pick_out_of_order: pick_number=3 stale, current=4', 409),
       reason: 'clock_expired',
-      messageContains: 'autopick made your choice',
+      messageContains: 'Autopick made your choice',
       statusCode: 409,
     },
     {
@@ -249,13 +249,13 @@ describe('submitPick — network / timeout', () => {
     // Matches api/client.ts:212 — apiClient throws ApiError with
     // status=0 after retries are exhausted for timeout/network paths.
     apiClientPostMock.mockRejectedValueOnce(
-      new MockApiError('Request timed out — retrying', 0),
+      new MockApiError('Request timed out. Retrying', 0),
     );
     const r = await submitPick(BASE);
     expect(r.ok).toBe(false);
     if (isSubmitPickFailure(r)) {
       expect(r.reason).toBe('network_or_timeout');
-      expect(r.message).toContain('check the board');
+      expect(r.message).toContain('Check the board');
     }
   });
 

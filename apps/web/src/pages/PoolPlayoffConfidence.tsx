@@ -12,6 +12,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Trophy, Lock, Save, AlertTriangle, ChevronDown, ChevronUp, Check, ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { NHL_TEAMS } from '@/types/captracker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -211,8 +212,8 @@ export default function PoolPlayoffConfidence() {
   // Navbar in their loading branch; these two were the odd ones out.
   if (loading) {
     return (
-      <div className="min-h-screen bg-pastel-surface">
-        <Navbar />
+      <div className="min-h-screen bg-pastel-surface max-lg:bg-pressbox-surface">
+        <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div>
         <div className="flex items-center justify-center pt-32 text-white/55">Loading...</div>
       </div>
     );
@@ -220,10 +221,10 @@ export default function PoolPlayoffConfidence() {
 
   return (
     <>
-    <Navbar />
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream py-6 px-4 pt-24">
+    <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div>
+    <div className="min-h-screen bg-[#0F1F15] max-lg:bg-pressbox-surface text-pastel-cream max-lg:text-pressbox-text py-6 px-4 pt-24">
       <div className="max-w-5xl mx-auto mb-3">
-        <Link to={`/pool/playoff-hub?league=${leagueId}`} className="text-sm text-pastel-sage-soft hover:text-pastel-cream inline-flex items-center gap-1">
+        <Link to={`/pool/playoff-hub?league=${leagueId}`} className="text-sm text-pastel-sage-soft hover:text-pastel-cream hover:max-lg:text-pressbox-text inline-flex items-center gap-1">
           <ArrowLeft className="h-4 w-4" />Back to Pool Home
         </Link>
       </div>
@@ -231,8 +232,8 @@ export default function PoolPlayoffConfidence() {
         {/* Header */}
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <div>
-            <h1 className="text-xl sm:text-2xl font-calistoga text-pastel-cream flex items-center gap-2">
-              <Trophy className="h-6 w-6 text-pastel-orange" aria-hidden="true" />
+            <h1 className="text-xl sm:text-2xl font-calistoga max-lg:font-condensed text-pastel-cream max-lg:text-pressbox-text flex items-center gap-2">
+              <Trophy className="h-6 w-6 text-pastel-orange max-lg:text-pressbox-orange" aria-hidden="true" />
               Confidence Pool
             </h1>
             <p className="text-xs text-white/70 mt-1">
@@ -241,11 +242,11 @@ export default function PoolPlayoffConfidence() {
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <div className="text-[10px] text-white/55 uppercase font-display">Total confidence</div>
-              <div className="text-lg font-bold text-pastel-orange">{totalConfidence}</div>
+              <div className="text-[10px] text-white/55 uppercase font-display max-lg:font-barlow">Total confidence</div>
+              <div className="text-lg font-bold text-pastel-orange max-lg:text-pressbox-orange">{totalConfidence}</div>
             </div>
             {dirty && (
-              <Button onClick={savePicks} disabled={saving} className="bg-pastel-sage text-[#0F1F15] hover:bg-pastel-sage-soft font-bold shadow-[0_4px_12px_-4px_rgba(166,211,160,0.4)]">
+              <Button onClick={savePicks} disabled={saving} className="bg-pastel-sage max-lg:bg-pressbox-sage text-[#0F1F15] hover:bg-pastel-sage-soft font-bold shadow-[0_4px_12px_-4px_rgba(166,211,160,0.4)]">
                 <Save className="h-4 w-4 mr-1" />{saving ? 'Saving...' : 'Save'}
               </Button>
             )}
@@ -254,11 +255,11 @@ export default function PoolPlayoffConfidence() {
 
         {/* Available confidence bank */}
         {availableValues.length > 0 && (
-          <Card className="mb-4 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl p-3 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.2)]">
-            <div className="text-[10px] font-display font-bold uppercase text-white/50 mb-2">Available Confidence Points</div>
+          <Card className="mb-4 bg-[#1A2A20] max-lg:bg-pressbox-tile border-0 ring-1 ring-pastel-orange/30 max-lg:ring-pressbox-orange/30 rounded-2xl max-lg:rounded-[12px] p-3 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.2)]">
+            <div className="text-[10px] font-display max-lg:font-barlow font-bold uppercase text-white/50 mb-2">Available Confidence Points</div>
             <div className="flex flex-wrap gap-1.5">
               {availableValues.map(v => (
-                <div key={v} className="w-8 h-8 rounded-full bg-pastel-orange/15 ring-1 ring-pastel-orange/40 flex items-center justify-center text-xs font-bold text-pastel-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.3)]">
+                <div key={v} className="w-8 h-8 rounded-full bg-pastel-orange/15 max-lg:bg-pressbox-orange/15 ring-1 ring-pastel-orange/40 max-lg:ring-pressbox-orange/40 flex items-center justify-center text-xs font-bold text-pastel-orange-soft max-lg:text-pressbox-orange-soft shadow-[0_4px_12px_-4px_rgba(255,168,87,0.3)]">
                   {v}
                 </div>
               ))}
@@ -274,7 +275,7 @@ export default function PoolPlayoffConfidence() {
             return (
               <Card key={round}>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-display">{ROUND_NAMES[round]}</CardTitle>
+                  <CardTitle className="text-base font-display max-lg:font-barlow">{ROUND_NAMES[round]}</CardTitle>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {roundSeries.map(s => {
@@ -302,7 +303,7 @@ export default function PoolPlayoffConfidence() {
                         locked && !isCorrect && !isWrong && !gameIsLive && 'opacity-70 bg-white/5 ring-1 ring-white/10',
                       )}>
                         {gameIsLive && (
-                          <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-calistoga px-2 py-0.5 rounded-full shadow-md">
+                          <div className="absolute -top-2 right-3 flex items-center gap-1 bg-red-600 text-white text-[9px] font-calistoga max-lg:font-condensed px-2 py-0.5 rounded-full shadow-md">
                             <span className="relative flex h-1.5 w-1.5">
                               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
                               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white" />
@@ -311,8 +312,8 @@ export default function PoolPlayoffConfidence() {
                           </div>
                         )}
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] uppercase font-display text-white/55">Series {s.bracket_slot}</span>
-                          {locked && <Badge className="bg-white/5 ring-1 ring-white/10 text-white/55 border-0 text-[9px] font-jbmono uppercase tracking-[0.18em] font-bold"><Lock className="h-3 w-3 mr-1" />Locked</Badge>}
+                          <span className="text-[10px] uppercase font-display max-lg:font-barlow text-white/55">Series {s.bracket_slot}</span>
+                          {locked && <Badge className="bg-white/5 ring-1 ring-white/10 text-white/55 border-0 text-[9px] font-jbmono max-lg:font-plex uppercase tracking-[0.18em] font-bold"><Lock className="h-3 w-3 mr-1" />Locked</Badge>}
                           {isCorrect && <Badge className="bg-green-500 text-white text-[9px]"><Check className="h-3 w-3 mr-1" />+{pick.confidence_value}</Badge>}
                         </div>
 
@@ -320,7 +321,7 @@ export default function PoolPlayoffConfidence() {
                         {seriesGame && (gameIsLive || gameIsFinal) && (
                           <div className={cn(
                             'flex items-center justify-between px-2 py-1 rounded text-xs',
-                            gameIsLive ? 'bg-red-400/20 ring-1 ring-red-400/40' : 'bg-pastel-sage/10 ring-1 ring-pastel-sage/30'
+                            gameIsLive ? 'bg-red-400/20 ring-1 ring-red-400/40' : 'bg-pastel-sage/10 max-lg:bg-pressbox-sage/10 ring-1 ring-pastel-sage/30'
                           )}>
                             <span className="font-mono font-bold">{seriesGame.away_team} {seriesGame.away_score}</span>
                             <span className={cn('text-[10px]', gameIsLive && 'text-red-400 font-bold animate-pulse')}>
@@ -342,7 +343,7 @@ export default function PoolPlayoffConfidence() {
                                 disabled={!id || locked}
                                 className={cn(
                                   'relative overflow-hidden rounded-lg border-2 p-2.5 text-left transition-all',
-                                  picked ? 'ring-2 ring-pastel-sage/60 bg-pastel-sage/10 shadow-[0_4px_12px_-4px_rgba(166,211,160,0.3)]' : 'ring-1 ring-white/10 bg-white/5 hover:ring-pastel-sage/40',
+                                  picked ? 'ring-2 ring-pastel-sage/60 bg-pastel-sage/10 max-lg:bg-pressbox-sage/10 shadow-[0_4px_12px_-4px_rgba(166,211,160,0.3)]' : 'ring-1 ring-white/10 bg-white/5 hover:ring-pastel-sage/40',
                                   !id && 'opacity-40',
                                 )}
                                 style={picked && info ? { background: `linear-gradient(135deg, ${info.primaryColor}12, ${info.secondaryColor}08)` } : undefined}
@@ -350,7 +351,7 @@ export default function PoolPlayoffConfidence() {
                                 {info && <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: info.primaryColor }} />}
                                 <div className="flex items-center gap-2.5 pl-1.5">
                                   <div
-                                    className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-calistoga font-black text-white flex-shrink-0 shadow-sm"
+                                    className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-calistoga max-lg:font-condensed font-black text-white flex-shrink-0 shadow-sm"
                                     style={info ? { background: info.primaryColor } : { background: '#6b7280' }}
                                   >
                                     {team?.team_abbrev || '?'}
@@ -358,7 +359,7 @@ export default function PoolPlayoffConfidence() {
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1">
                                       <span className="text-[10px] font-mono text-white/55">#{team?.seed || '-'}</span>
-                                      <span className="text-sm font-display font-bold truncate" style={info ? { color: info.primaryColor } : undefined}>
+                                      <span className="text-sm font-display max-lg:font-barlow font-bold truncate" style={info ? { color: info.primaryColor } : undefined}>
                                         {info?.name || team?.team_abbrev || 'TBD'}
                                       </span>
                                     </div>
@@ -401,7 +402,7 @@ export default function PoolPlayoffConfidence() {
                         {/* Confidence selector */}
                         {pick?.picked_team_id && !locked && (
                           <div>
-                            <div className="text-[10px] font-display text-white/50 mb-1">Confidence:</div>
+                            <div className="text-[10px] font-display max-lg:font-barlow text-white/50 mb-1">Confidence:</div>
                             <div className="flex flex-wrap gap-1">
                               {Array.from({ length: totalSeries }, (_, i) => i + 1).map(v => {
                                 const isUsedElsewhere = usedValues.has(v) && pick.confidence_value !== v;
@@ -414,10 +415,10 @@ export default function PoolPlayoffConfidence() {
                                     className={cn(
                                       'w-7 h-7 rounded-full text-[11px] font-bold transition-all border',
                                       isSelected
-                                        ? 'bg-pastel-orange text-[#581E00] ring-2 ring-pastel-orange/60 scale-110 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.5)]'
+                                        ? 'bg-pastel-orange max-lg:bg-pressbox-orange text-[#581E00] max-lg:text-pressbox-orange-ink ring-2 ring-pastel-orange/60 max-lg:ring-pressbox-orange/60 scale-110 shadow-[0_4px_12px_-4px_rgba(255,168,87,0.5)]'
                                         : isUsedElsewhere
                                           ? 'bg-white/5 ring-1 ring-white/10 text-white/55 cursor-not-allowed'
-                                          : 'bg-white/5 ring-1 ring-white/10 text-white/55 hover:ring-pastel-orange/40 hover:text-pastel-cream'
+                                          : 'bg-white/5 ring-1 ring-white/10 text-white/55 hover:ring-pastel-orange/40 hover:max-lg:ring-pressbox-orange/40 hover:text-pastel-cream hover:max-lg:text-pressbox-text'
                                     )}
                                   >
                                     {v}
@@ -449,8 +450,8 @@ export default function PoolPlayoffConfidence() {
         )}
 
         {/* How it works */}
-        <Card className="mt-6 bg-[#1A2A20] border-0 ring-1 ring-pastel-sage/30 rounded-2xl px-4 py-3 shadow-[0_8px_24px_-12px_rgba(166,211,160,0.15)]">
-          <div className="text-[10px] font-display font-bold uppercase text-white/50 mb-1">How Confidence Pools Work</div>
+        <Card className="mt-6 bg-[#1A2A20] max-lg:bg-pressbox-tile border-0 ring-1 ring-pastel-sage/30 rounded-2xl max-lg:rounded-[12px] px-4 py-3 shadow-[0_8px_24px_-12px_rgba(166,211,160,0.15)]">
+          <div className="text-[10px] font-display max-lg:font-barlow font-bold uppercase text-white/50 mb-1">How Confidence Pools Work</div>
           <ul className="text-[11px] text-white/70 space-y-0.5 list-disc pl-3">
             <li>Pick the winner of each playoff series</li>
             <li>Assign a confidence value (1-{totalSeries}) to each pick. Each value used exactly once</li>

@@ -420,8 +420,8 @@ describe('foldEvents — isAutopick badge propagation', () => {
 
 // ── Auction variants no-op ─────────────────────────────────────────
 
-describe('foldEvents — auction variants no-op (chunk 11g.6 territory)', () => {
-  it('does not change picksMade or status for auction events', () => {
+describe('foldEvents — a nomination alone is not a pick', () => {
+  it('does not change picksMade or status until a lot is won', () => {
     const nomination: BufferedDraftEvent = {
       kind: 'auction_nomination_started',
       seq: 1,

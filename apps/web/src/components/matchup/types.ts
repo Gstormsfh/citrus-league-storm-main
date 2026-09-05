@@ -1,4 +1,8 @@
-import { NHLGame } from "@/services/ScheduleService";
+// `import type` (2026-09-05): as a value import this pulled ScheduleService,
+// api/schedule, api/client and the Supabase client -- which throws at
+// module scope without VITE_SUPABASE_* -- into every matchup component's
+// graph, and two of their suites could not load in the hermetic test env.
+import type { NHLGame } from "@/services/ScheduleService";
 
 export type MatchupPlayerStatus = "In Game" | "Final" | null;
 

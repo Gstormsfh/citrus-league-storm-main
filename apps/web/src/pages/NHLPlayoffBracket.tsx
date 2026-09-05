@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { Link } from 'react-router-dom';
 import { Trophy, Clock, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -143,7 +144,7 @@ export default function NHLPlayoffBracket() {
   if (loading) {
     return (
       <DarkLayout>
-        <Navbar />
+        <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff bracket" logoSrc="/favicon.svg" /></div>
         <StormyLoading message="Loading the playoff bracket..." />
       </DarkLayout>
     );
@@ -153,10 +154,10 @@ export default function NHLPlayoffBracket() {
     <DarkLayout>
 
 
-      <Navbar />
-      <main className="relative max-w-[1280px] mx-auto px-6 pt-24 pb-16">
+      <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff bracket" logoSrc="/favicon.svg" /></div>
+      <main className="relative max-w-[1280px] mx-auto px-6 pt-24 pb-16 max-lg:pt-3 max-lg:px-3 pb-app-chrome">
         {/* Hero — Pineapple lifting the Cup scene banner */}
-        <div className="relative mb-8 w-full aspect-[21/9] sm:aspect-[24/9] rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
+        <div className="relative mb-8 w-full aspect-[21/9] sm:aspect-[24/9] rounded-2xl max-lg:rounded-[12px] overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
           <img
             src="/mascots/scene-cup.webp"
             alt="Pineapple lifting the Stanley Cup with arena spotlight"
@@ -169,40 +170,40 @@ export default function NHLPlayoffBracket() {
             style={{ background: 'linear-gradient(to top, rgba(15,31,21,0.85) 0%, transparent 45%)' }}
           />
           <div className="absolute bottom-4 left-5 sm:bottom-6 sm:left-8 z-10 max-w-[80%]">
-            <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-1.5 font-bold flex items-center gap-2">
+            <div className="font-jbmono max-lg:font-plex text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft max-lg:text-pressbox-orange-soft mb-1.5 font-bold flex items-center gap-2">
               <LivePulse size="xs" /> Stanley Cup Playoffs
             </div>
-            <h1 className="font-sans font-black text-[1.5rem] sm:text-[2rem] md:text-[2.5rem] tracking-[-0.025em] text-pastel-cream leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
-              Lift the <span className="text-pastel-orange">Cup</span>.
+            <h1 className="font-sans max-lg:font-barlow font-black text-[1.5rem] sm:text-[2rem] md:text-[2.5rem] tracking-[-0.025em] text-pastel-cream max-lg:text-pressbox-text leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+              Lift the <span className="text-pastel-orange max-lg:text-pressbox-orange">Cup</span>.
             </h1>
           </div>
         </div>
 
         {/* Hero text — refresh status under the banner */}
         <div className="text-center mb-10">
-          <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold flex items-center justify-center gap-2">
+          <div className="font-jbmono max-lg:font-plex text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft max-lg:text-pressbox-orange-soft mb-3 font-bold flex items-center justify-center gap-2">
             {bracketIsLive && <LivePulse size="xs" />}
             {bracketIsLive ? `Live · Updated ${refreshAgo} ago` : `Final · 2025-26 season · Updated ${refreshAgo} ago`}
           </div>
           <div className="flex items-center justify-center gap-3 mb-3">
-            <Trophy className="w-9 h-9 text-pastel-orange" strokeWidth={2} />
-            <h1 className="font-sans font-black text-[2.5rem] md:text-[3.5rem] tracking-[-0.03em] text-pastel-cream leading-none">
+            <Trophy className="w-9 h-9 text-pastel-orange max-lg:text-pressbox-orange" strokeWidth={2} />
+            <h1 className="font-sans max-lg:font-barlow font-black text-[2.5rem] md:text-[3.5rem] tracking-[-0.03em] text-pastel-cream max-lg:text-pressbox-text leading-none">
               Stanley Cup Playoffs
             </h1>
           </div>
-          <p className="font-jbmono text-[11px] tracking-[0.22em] uppercase text-white/55">
+          <p className="font-jbmono max-lg:font-plex text-[11px] tracking-[0.22em] uppercase text-white/55">
             {season}–{(season + 1).toString().slice(2)} · Best of 7 · 4 Rounds
           </p>
         </div>
 
         {/* Inline pool CTA — with Pineapple peeking (he presides over the playoffs) */}
-        <div className="group relative mb-10 bg-pastel-surface-tile border border-pastel-orange/30 rounded-2xl p-5 flex items-center justify-between gap-4 flex-wrap overflow-hidden hover:border-pastel-orange/60 transition-colors duration-300">
+        <div className="group relative mb-10 bg-pastel-surface-tile max-lg:bg-pressbox-tile border border-pastel-orange/30 max-lg:border-pressbox-orange/30 rounded-2xl max-lg:rounded-[12px] p-5 flex items-center justify-between gap-4 flex-wrap overflow-hidden hover:border-pastel-orange/60 hover:max-lg:border-pressbox-orange/60 transition-colors duration-300">
           <MascotPeek id="pineapple" position="top-right" size="sm" />
           <div className="relative z-10">
-            <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft mb-1 font-bold">
+            <div className="font-jbmono max-lg:font-plex text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft max-lg:text-pressbox-orange-soft mb-1 font-bold">
               Build your pool
             </div>
-            <h2 className="font-sans font-bold text-[18px] text-pastel-cream">
+            <h2 className="font-sans max-lg:font-barlow font-bold text-[18px] text-pastel-cream max-lg:text-pressbox-text">
               Pick your bracket. Win bragging rights.
             </h2>
             <p className="text-[13px] text-white/55 mt-1">
@@ -212,13 +213,13 @@ export default function NHLPlayoffBracket() {
           <div className="relative z-10 flex items-center gap-2">
             <Link
               to="/create-league?type=playoff"
-              className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] font-bold px-5 h-11 rounded-md hover:bg-pastel-orange-soft hover:-translate-y-0.5 active:scale-95 transition-all duration-200 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.4)]"
+              className="inline-flex items-center gap-2 bg-pastel-orange max-lg:bg-pressbox-orange text-[#581E00] max-lg:text-pressbox-orange-ink text-[14px] font-bold px-5 h-11 rounded-md hover:bg-pastel-orange-soft hover:max-lg:bg-pressbox-orange-soft hover:-translate-y-0.5 active:scale-95 transition-all duration-200 shadow-[0_4px_16px_-4px_rgba(255,107,26,0.4)]"
             >
               Create Pool <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
             </Link>
             <Link
               to="/create-league?tab=join"
-              className="inline-flex items-center text-[13px] font-bold text-pastel-cream hover:text-pastel-orange-soft transition-colors px-4 h-11 rounded-md ring-1 ring-white/15 hover:ring-white/30"
+              className="inline-flex items-center text-[13px] font-bold text-pastel-cream max-lg:text-pressbox-text hover:text-pastel-orange-soft hover:max-lg:text-pressbox-orange-soft transition-colors px-4 h-11 rounded-md ring-1 ring-white/15 hover:ring-white/30"
             >
               Join Pool
             </Link>
@@ -232,7 +233,7 @@ export default function NHLPlayoffBracket() {
             if (roundSeries.length === 0) return null;
             return (
               <section key={round}>
-                <h3 className="font-jbmono text-[11px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 px-1 font-bold">
+                <h3 className="font-jbmono max-lg:font-plex text-[11px] tracking-[0.32em] uppercase text-pastel-orange-soft max-lg:text-pressbox-orange-soft mb-3 px-1 font-bold">
                   ✦ {ROUND_NAMES[round]}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -252,14 +253,14 @@ export default function NHLPlayoffBracket() {
                       <article
                         key={s.series_id}
                         className={cn(
-                          'bg-pastel-surface-tile border rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5',
+                          'bg-pastel-surface-tile max-lg:bg-pressbox-tile border rounded-2xl max-lg:rounded-[12px] p-4 transition-all duration-300 hover:-translate-y-0.5',
                           gameIsLive
                             ? 'hover:shadow-[0_16px_40px_-12px_rgba(255,107,26,0.4)]'
                             : isFinal
                             ? 'hover:shadow-[0_16px_40px_-12px_rgba(132,165,125,0.3)]'
                             : 'hover:shadow-[0_16px_40px_-12px_rgba(255,255,255,0.1)]',
                           gameIsLive
-                            ? 'border-pastel-orange/40'
+                            ? 'border-pastel-orange/40 max-lg:border-pressbox-orange/40'
                             : isFinal
                             ? 'border-pastel-sage/30'
                             : 'border-white/10',
@@ -268,16 +269,16 @@ export default function NHLPlayoffBracket() {
                         {/* Header */}
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-1.5">
-                            <span className="font-jbmono text-[9px] uppercase text-white/55 tracking-wider font-bold">
+                            <span className="font-jbmono max-lg:font-plex text-[9px] uppercase text-white/55 tracking-wider font-bold">
                               Series {String.fromCharCode(64 + s.bracket_slot)}
                             </span>
                             {s.conference && (
                               <span
                                 className={cn(
-                                  'font-jbmono text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded',
+                                  'font-jbmono max-lg:font-plex text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded',
                                   s.conference === 'Eastern'
-                                    ? 'bg-pastel-sage/15 text-pastel-sage-soft'
-                                    : 'bg-pastel-orange/15 text-pastel-orange-soft',
+                                    ? 'bg-pastel-sage/15 max-lg:bg-pressbox-sage/15 text-pastel-sage-soft'
+                                    : 'bg-pastel-orange/15 max-lg:bg-pressbox-orange/15 text-pastel-orange-soft max-lg:text-pressbox-orange-soft',
                                 )}
                               >
                                 {s.conference === 'Eastern' ? 'EAST' : 'WEST'}
@@ -285,15 +286,15 @@ export default function NHLPlayoffBracket() {
                             )}
                           </div>
                           {gameIsLive && (
-                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-pastel-orange/15 ring-1 ring-pastel-orange/30">
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-pastel-orange/15 max-lg:bg-pressbox-orange/15 ring-1 ring-pastel-orange/30 max-lg:ring-pressbox-orange/30">
                               <LivePulse size="xs" />
-                              <span className="font-jbmono text-[9px] uppercase tracking-wider text-pastel-orange-soft font-bold leading-none">
+                              <span className="font-jbmono max-lg:font-plex text-[9px] uppercase tracking-wider text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-bold leading-none">
                                 Live
                               </span>
                             </span>
                           )}
                           {isFinal && (
-                            <span className="font-jbmono text-[9px] uppercase tracking-wider text-pastel-sage-soft font-bold px-1.5 py-0.5 rounded bg-pastel-sage/15">
+                            <span className="font-jbmono max-lg:font-plex text-[9px] uppercase tracking-wider text-pastel-sage-soft font-bold px-1.5 py-0.5 rounded bg-pastel-sage/15 max-lg:bg-pressbox-sage/15">
                               Final
                             </span>
                           )}
@@ -306,13 +307,13 @@ export default function NHLPlayoffBracket() {
 
                         {/* Season H2H */}
                         {h2h && h2h.games > 0 && high && low && (
-                          <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-center gap-2 font-jbmono text-[10px] text-white/55">
+                          <div className="mt-3 pt-2 border-t border-white/10 flex items-center justify-center gap-2 font-jbmono max-lg:font-plex text-[10px] text-white/55">
                             <span className="uppercase tracking-wider font-bold">Season H2H</span>
-                            <span className="font-bold text-pastel-cream">
+                            <span className="font-bold text-pastel-cream max-lg:text-pressbox-text">
                               {high.team_abbrev} {h2h.high_wins}
                             </span>
                             <span className="text-white/55">-</span>
-                            <span className="font-bold text-pastel-cream">
+                            <span className="font-bold text-pastel-cream max-lg:text-pressbox-text">
                               {h2h.low_wins} {low.team_abbrev}
                             </span>
                           </div>
@@ -320,7 +321,7 @@ export default function NHLPlayoffBracket() {
 
                         {/* Game count */}
                         {s.games_played > 0 && (
-                          <div className="font-jbmono text-[10px] text-white/55 mt-2 text-center flex items-center justify-center gap-1">
+                          <div className="font-jbmono max-lg:font-plex text-[10px] text-white/55 mt-2 text-center flex items-center justify-center gap-1">
                             <Clock className="w-3 h-3" aria-hidden="true" />
                             {s.games_played} of 7 games played
                           </div>
@@ -337,7 +338,7 @@ export default function NHLPlayoffBracket() {
         {series.length === 0 && (
           <div className="text-center py-16">
             <Trophy className="w-12 h-12 text-white/20 mx-auto mb-3" aria-hidden="true" />
-            <p className="font-jbmono text-[12px] uppercase tracking-wider text-white/55">
+            <p className="font-jbmono max-lg:font-plex text-[12px] uppercase tracking-wider text-white/55">
               Bracket not yet finalized. Check back when seeds are set.
             </p>
           </div>
@@ -349,7 +350,7 @@ export default function NHLPlayoffBracket() {
         eyebrowPulse
         title={
           <>
-            Lift the <span className="text-pastel-orange">Cup</span>.
+            Lift the <span className="text-pastel-orange max-lg:text-pressbox-orange">Cup</span>.
           </>
         }
         sub="Free during launch · Confidence-weighted scoring · Bragging rights for life"
@@ -357,7 +358,7 @@ export default function NHLPlayoffBracket() {
         ctaHref="/create-league?type=playoff"
       />
 
-      <HockeyFooter />
+      <HockeyFooter variant="app" />
     </DarkLayout>
   );
 }
@@ -377,7 +378,7 @@ function BracketTeamRow({
   if (!team) {
     return (
       <div className="flex items-center gap-2 py-2 px-2 rounded">
-        <span className="text-white/55 italic text-xs font-jbmono">TBD</span>
+        <span className="text-white/55 italic text-xs font-jbmono max-lg:font-plex">TBD</span>
       </div>
     );
   }
@@ -390,28 +391,28 @@ function BracketTeamRow({
     >
       {info && <TeamColorBar abbrev={info.abbrev} className="!h-full !w-1" />}
       <div
-        className="w-8 h-8 rounded ring-1 ring-white/20 flex items-center justify-center text-[9px] font-jbmono font-black text-white flex-shrink-0"
+        className="w-8 h-8 rounded ring-1 ring-white/20 flex items-center justify-center text-[9px] font-jbmono max-lg:font-plex font-black text-white flex-shrink-0"
         style={{ background: info?.primaryColor || '#6b7280', color: onTeamColor(info?.primaryColor || '#6b7280') }}
       >
         {team.team_abbrev}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1">
-          <span className="font-jbmono text-[10px] text-white/55 tabular-nums">#{team.seed}</span>
-          <span className="text-xs font-sans font-bold truncate text-pastel-cream">
+          <span className="font-jbmono max-lg:font-plex text-[10px] text-white/55 tabular-nums">#{team.seed}</span>
+          <span className="text-xs font-sans max-lg:font-barlow font-bold truncate text-pastel-cream max-lg:text-pressbox-text">
             {info?.name || team.team_abbrev}
           </span>
         </div>
         {team.wins != null && (
-          <div className="font-jbmono text-[9px] text-white/55 truncate tabular-nums">
+          <div className="font-jbmono max-lg:font-plex text-[9px] text-white/55 truncate tabular-nums">
             {team.wins}-{team.losses}-{team.ot_losses} · {team.points}pts
           </div>
         )}
       </div>
       <span
         className={cn(
-          'font-sans font-black text-lg flex-shrink-0 tabular-nums',
-          wins >= 4 ? 'text-pastel-orange' : 'text-white/55',
+          'font-sans max-lg:font-barlow font-black text-lg flex-shrink-0 tabular-nums',
+          wins >= 4 ? 'text-pastel-orange max-lg:text-pressbox-orange' : 'text-white/55',
         )}
       >
         {wins}

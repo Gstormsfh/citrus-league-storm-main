@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { leagueApi } from '@/api/leagues';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 import { Narwhal } from '@/components/icons/Narwhal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import { ScheduleService } from '@/services/ScheduleService';
 import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { ProjectedVsActual } from '@/components/analytics/ProjectedVsActual';
+import { TeamAnalyticsPhone } from '@/components/analytics/TeamAnalyticsPhone';
 import type { CategoryKey, CategoryPair } from '@/utils/teamAnalytics';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { logger } from '@/utils/logger';
@@ -223,16 +224,27 @@ const TeamAnalytics = () => {
 
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
+    <div className="min-h-screen bg-pressbox-surface text-pressbox-text flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">Analytics</h1>
-          <MobileMenuButton />
-        </div>
-      </div>
-      <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      {/* PRESS BOX (2026-09-04): the league chrome — header, sub-tabs and
+          the league menu — replaces the 09-01 title bar and its hamburger,
+          which opened the old menu sheet. One menu in the app. */}
+      <PressBoxLeagueChrome />
+      {/* PRESS BOX (2026-09-04, PR10m): the phone layer. Same data, the
+          Press Box shapes; the desktop grid below is untouched. */}
+      <TeamAnalyticsPhone
+        analytics={analytics}
+        targets={freeAgentTargets}
+        loading={loading}
+        banner={isGuestMode(userLeagueState) ? (
+          <LeagueCreationCTA
+            title="You're viewing demo analytics"
+            description="Sign up to see analytics for your own team."
+            variant="compact"
+          />
+        ) : null}
+      />
+      <main className="hidden lg:block w-full lg:pt-24 lg:pb-8 pb-app-chrome">
         <div className="w-full m-0 p-0">
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">

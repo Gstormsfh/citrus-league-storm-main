@@ -252,3 +252,109 @@ The proof also caught a defect in this migration before it reached prod: `pg_get
 **After** (read-only, Claude, immediately post-apply). Live body md5 `cfd64c3da6ef5405e89f0ea47a743edb`. Comment-stripping predicate present; the old bare `p.prosrc ~` predicate absent; all three message strings (`opening night`, `no regular-season rows`, `silently falls back`) intact; still `prosecdef = true` and `provolatile = 's'`. `SELECT * FROM public.check_season_boundary(180)` returns **zero rows** — no ERROR, no WARN. The false positive is gone and nothing took its place.
 
 **Ledger note.** SQL Editor apply, so no `supabase_migrations.schema_migrations` row; the repo file is the record.
+
+## Rule 1 recorded change: manager_week_metrics — table, policies, indexes (2026-09-05 ~02:30Z)
+
+**What.** `supabase/migrations/20260904100000_manager_week_metrics.sql`. New table `public.manager_week_metrics` (one row per manager per league per week: `points_for`, `league_week_median`, `z_score`, and three columns that ship NULL on purpose — `lineup_efficiency`, `waiver_hit_rate`, `xg_luck`), RLS enabled, two policies (`manager_week_metrics_self_read` SELECT for the row's own user; `manager_week_metrics_service_write` ALL to `service_role`), indexes `manager_week_metrics_leaderboard_idx` and `manager_week_metrics_user_idx` beside the pkey and the unique. Every object is new; MIGRATION_SAFETY_GUIDE Rule 1 capture not required.
+
+**Why.** The aggregate behind "You vs the World" (design handoff 3f): z-score against the manager's own league's weekly median (median and MAD, not mean and SD — a 12-team league is a small sample), ranked globally by a function that returns positions rather than rows. Full rationale (a)–(f) is in the migration file's header, including what it cannot do yet: only the WORLDWIDE cut is buildable (`profiles` has no country, city or fan-base column), and with 72 users the leaderboard shows nothing until the population crosses the spec's 100-manager floor.
+
+**Blast radius.** Additive. Nothing reads the table yet on a user-facing path.
+
+**Executed by.** Garrett, Supabase SQL Editor (prod `iezwazccqqrhrjupxzvf`), from the file via `pbcopy`, 2026-09-05 ~02:30Z.
+
+**After** (read-only, Claude, ~02:45Z). `to_regclass('public.manager_week_metrics')` present; `relrowsecurity = true`; both policies present with the stated commands and roles; four indexes (pkey, unique, leaderboard, user).
+
+**Reversal.** `DROP TABLE public.manager_week_metrics;` — it holds nothing yet.
+
+**Ledger note.** SQL Editor apply, so no `supabase_migrations.schema_migrations` row; the repo file is the record.
+
+## Rule 1 recorded change: refresh_manager_week_metrics(), leaderboard_week(), leaderboard_min_managers() (2026-09-05 ~02:30Z)
+
+**What.** `supabase/migrations/20260904101000_manager_week_metrics_functions.sql`. Three NEW functions: `refresh_manager_week_metrics(integer, integer)` (SECURITY DEFINER, `search_path=public`, returns the row count it wrote — the count IS the health signal; a nightly aggregate that silently stops is the failure mode this repo lost seven months to), `leaderboard_week(integer, integer, integer)` (SECURITY DEFINER read that returns ranks, not rows, and zero rows under 100 managers), `leaderboard_min_managers()` (the floor, 100). Scoring is not recomputed: `points_for` is read from `matchups.team1_score` / `team2_score`.
+
+**Executed by.** Garrett, SQL Editor, `pbcopy`, 2026-09-05 ~02:30Z.
+
+**After** (read-only, Claude, ~02:45Z). All three present with the stated signatures; `refresh_manager_week_metrics` and `leaderboard_week` `prosecdef = true`. **Finding:** `refresh_manager_week_metrics` ACL read `{postgres, authenticated, service_role}` — Supabase's default privileges for functions in `public` (`pg_default_acl` for role `postgres`: `{postgres=X, authenticated=X, service_role=X}`) grant `authenticated` at CREATE, and the file's `REVOKE ALL ... FROM PUBLIC` removes only the PUBLIC entry. Corrected by the next entry.
+
+**Reversal.** `DROP FUNCTION` ×3.
+
+**Ledger note.** SQL Editor apply; no `schema_migrations` row; the repo file is the record.
+
+## Rule 1 recorded change: profiles.push_notifications (2026-09-05 ~02:30Z)
+
+**What.** `supabase/migrations/20260905001000_profiles_push_notifications.sql`: `ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS push_notifications boolean NOT NULL DEFAULT true;` plus a column comment. Additive; no capture required.
+
+**Why.** The Account screen's one real preference. The only push the app sends today is APNs "You're on the clock" (`server/src/services/PushService.ts`, called from `LobbyManager`); it now reads this column and returns `{ skipped: true, reason: 'opted_out' }` for a manager who switched it off. `PUT /api/account/profile` accepts the boolean and rejects anything else. The column is generic on purpose: every future push (league activity, matchups) honours the same switch.
+
+**Executed by.** Garrett, SQL Editor, `pbcopy`, 2026-09-05 ~02:30Z.
+
+**After** (read-only, Claude, ~02:45Z). Column present: `boolean`, NOT NULL, default `true`; 72 of 72 profiles `true`.
+
+**Reversal.** `ALTER TABLE public.profiles DROP COLUMN push_notifications;` — the server tolerates its absence only in the sense that the read returns null and `PushService` treats an unreadable profile as opted in; `PROFILE_COLUMNS` in `packages/shared` names the column, so reversal means reverting `12c32a13` too.
+
+**Ledger note.** SQL Editor apply; no `schema_migrations` row; the repo file is the record.
+
+## Rule 1 recorded change: two SECURITY DEFINER writers revoked from authenticated (2026-09-05 ~02:55Z)
+
+**What.** `supabase/migrations/20260905003000_writer_functions_service_only.sql`: `REVOKE EXECUTE ON FUNCTION public.refresh_manager_week_metrics(integer, integer) FROM authenticated, anon;` and the same for `public.populate_player_weekly_stats(integer, date, date)`. Grants only; no body changes; no capture required.
+
+**Why.** Found while verifying the entry above. PostgREST exposes every function in `public` as an RPC to whichever roles hold EXECUTE, and Supabase's default privileges hand `authenticated` EXECUTE on every new function. `refresh_manager_week_metrics` is a full-table rewrite on demand (cannot write false data, but it is load nobody asked for on draft night). `populate_player_weekly_stats` takes the week's dates as arguments and does not check them against the schedule, so a signed-in caller could write a "week 3" row that sums the whole season, and scoring reads `player_weekly_stats`.
+
+**Measured before applying** (read-only, Claude). Every SECURITY DEFINER volatile function in `public` with `authenticated=X` and a writer-shaped name: eight. Five check `auth.uid()` or the commissioner inside (`run_full_autopick_draft`, `reset_playoff_bracket`, `advance_playoff_round`, `process_roster_move`, `delete_user_account`). One — `sync_roster_assignments_for_league(uuid)` — has no check inside but is called WITH THE USER'S TOKEN by `POST /api/rosters/league/:leagueId/sync` and by `DraftService` after a completed draft; revoking it would break the post-draft roster sync three days before the test drafts, so it is deliberately untouched here. Its fix is a membership check inside the body, after Tuesday, with a proof. The remaining two are this change. Neither is called with a user token anywhere in `server/`, `apps/` or `supabase/functions`; the pipeline calls `populate_player_weekly_stats` with `SUPABASE_SERVICE_ROLE_KEY` (`scripts/utilities/populate_weekly_stats.py`); pg_cron runs as `postgres` and is unaffected.
+
+**Executed by.** Garrett, SQL Editor, `pbcopy`, 2026-09-05 ~02:55Z. "perfect, just ran."
+
+**After** (read-only, Claude, ~02:57Z). Both ACLs read `{postgres=X/postgres, service_role=X/postgres}`. `leaderboard_week` keeps `authenticated` (the gated read, intended). `sync_roster_assignments_for_league` unchanged.
+
+**Reversal.** `GRANT EXECUTE ON FUNCTION ... TO authenticated;` for either.
+
+**Follow-up (open).** `sync_roster_assignments_for_league`: add `IF NOT (service role OR auth.uid() is a member/commissioner of p_league_id) THEN RETURN error` inside the body, with a Rule 1 capture and a proof, after the 2026-09-08 test drafts.
+
+**Ledger note.** SQL Editor apply; no `schema_migrations` row; the repo file is the record.
+
+## Rule 1 recorded change: `get_player_ownership()` created (2026-09-05 ~05:10Z)
+
+**What.** `supabase/migrations/20260905050000_player_ownership.sql`: `CREATE OR REPLACE FUNCTION public.get_player_ownership()` — a `STABLE SECURITY DEFINER` SQL function, `search_path = public`, returning one row per rostered player: `rostered_teams`, `started_teams`, `total_teams`, `rostered_pct`, `started_pct`. Aggregate counts only; no team, league or manager identity leaves the function. `GRANT EXECUTE TO authenticated, service_role`. Additive; no capture required.
+
+**Why.** The Press Box roster and players rows print `100% · 99% |` — rostered% and started% across every Citrus team that holds a roster — and nothing read that league-wide before (design_handoff README §4/§5 named the gap). Read by `GET /api/players/ownership` (`server/src/services/PlayerService.getOwnership`, cached 10 minutes server-side; `[]` on error, and the client hides the two percentages until the API is redeployed with `cb2932b5`).
+
+**Measured before applying** (read-only, Claude): 51 teams with rosters across 11 leagues.
+
+**Executed by.** Garrett, SQL Editor, 2026-09-05 ~05:10Z, after `supabase db push` refused (project not linked on the laptop). Result pasted: McDavid (8478402) → 11 rostered, 9 started, 51 total, 22%, 82%.
+
+**After** (read-only, Claude, 06:34Z). Function present, `prosecdef = true`, ACL `{postgres=X, authenticated=X, service_role=X}`; 328 rows returned.
+
+**Reversal.** `DROP FUNCTION public.get_player_ownership();` — the route returns `[]` and the rows print no percentages; nothing else depends on it.
+
+**Ledger note.** SQL Editor apply; no `schema_migrations` row; the repo file is the record.
+
+## Ops change: prod draft engine redeployed to `599b1f69` (2026-09-05 ~11:10Z)
+
+**What.** `citrus-draft-engine-prod` (project `citrus-fantasy-prod`, zone `northamerica-northeast1-a`) moved from image `sha256:624c63bd505f3cf898574e6ba2fbd7f0ba6e0a5e3bb96ade2e594bad344399dd` (commit `60f81e45`, booted 2026-09-01 20:31Z) to `northamerica-northeast1-docker.pkg.dev/citrus-fantasy-prod/citrus-draft-engine/draft-engine:engine-599b1f69`, digest `sha256:9745fc3fb78cbbe151418f3cf0a70050cabffc2dfe842ff306774c1beb265bc5`, commit `599b1f69a96e74cd202f055132d7501b1af133e8` (branch `redesign/pressbox`, a superset of `origin/master` at `8a4a596d`). Built with Cloud Build `578f2ec7-3f2e-49e4-860b-11ec9c40698a` from `infra/gce/cloudbuild-draft-engine.yaml` (3m57s, SUCCESS); digest confirmed with `gcloud artifacts docker images describe` before the metadata write; VM metadata set in one `add-metadata` call (`image-tag`, `image-sha`, `commit-sha`); `reset`.
+
+**Why.** The running build predated `aced0e6f` (2026-09-03), the auction foreign-pick guard in `server/src/draft/LobbyManager.ts` -- the fix for the 2026-09-01 incident in which the format-blind pgmq safety net wrote 53 snake picks into auction league a1a125c8. The Sep 3 brief's order: redeploy the engine, apply 11g.9 steps 1-3, then test an auction.
+
+**Executed by.** Garrett, from his Mac (`gcloud` installed via Homebrew tonight), 2026-09-05 10:48Z-11:10Z. The daylight rule (DEPLOY_PROTOCOL_F26_F27 §4d, no engine deploy after midnight MT) was knowingly set aside: 0 drafts in progress, the operator awake and testing immediately.
+
+**After** (Garrett's paste, 11:10:08Z). `uws.listening 3002`; `deployment.fingerprint` imageSha `sha256:9745fc…265bc5`, commitSha `599b1f69a96e…33e8`, all seven env vars present, startup 41ms; `registry.boot_scan_complete scanned 0, resumed 0, failed 0`. `https://draft.citrusfantasysports.com/` answers the uWebSockets 404, which is the deploy workflow's own healthy-endpoint check.
+
+**Rollback.** One call, then a reset:
+`gcloud compute instances add-metadata citrus-draft-engine-prod --project citrus-fantasy-prod --zone northamerica-northeast1-a --metadata="image-tag=engine-60f81e45,image-sha=sha256:624c63bd505f3cf898574e6ba2fbd7f0ba6e0a5e3bb96ade2e594bad344399dd,commit-sha=60f81e45"` ·
+`gcloud compute instances reset citrus-draft-engine-prod --project citrus-fantasy-prod --zone northamerica-northeast1-a --quiet`.
+
+## Rule 1 recorded change: chunk 11g.9 steps 1-3 applied -- the pgmq autopick path retired (2026-09-05 ~11:15Z)
+
+**What.** `supabase/migrations/20260824230000_chunk_11g9_decommission_pgmq_autopick.sql`, steps 1-3 (steps 4-5 remain commented out in the file and were NOT run): `cron.unschedule('draft-autopick-keepalive')`; `CREATE OR REPLACE FUNCTION public.draft_deadline_sweep()` without the `pgmq.send`; `DROP FUNCTION IF EXISTS` for `draft_autopick_read(integer, integer)`, `draft_autopick_read(integer)`, `draft_autopick_archive(bigint)`, `draft_autopick_dlq(uuid, integer, integer, text, bigint)`. Capture: `captures/2026-09-03_pre_chunk_11g9_decommission_pgmq_autopick.sql`.
+
+**Why.** The header of that file, and the two incidents it cites (2026-08-21 f548834a, 2026-09-01 a1a125c8): the Edge worker had no notion of draft format and finished two auctions as snake drafts. The prod engine's own `OrphanedDraftScanner` is the safety net now; it required a prod engine, which exists since 2026-08-18 and was redeployed to the current build minutes before this (entry above).
+
+**Measured before applying** (read-only, Claude, ~10:40Z): 0 drafts in progress; `draft_deadline_sweep` body md5 `edcd02ced675ff61d5b685e8ccbd6022` = the captured body; queue depth 0; both safety-net cron jobs active.
+
+**Executed by.** Garrett, SQL Editor, `pbcopy` of the whole file, 2026-09-05 ~11:15Z. "Success. No rows returned."
+
+**After** (read-only, Claude, ~11:20Z). `draft-autopick-keepalive` cron rows: 0. `draft-deadline-sweep` cron still scheduled and active (by design: the sweep keeps running, now without a queue write); its body md5 `a5cd5454e93d91ef0121429a1d26446a`, `pgmq.send` absent. Wrapper RPCs in `public`: 0. `pgmq.q_draft_deadlines` depth 0. Drafts in progress 0.
+
+**Reversal.** Restore the captured body of `draft_deadline_sweep` from the capture file; `SELECT cron.schedule('draft-autopick-keepalive', '*/2 * * * *', <the captured command>)`; the wrapper RPC bodies are in the same capture. Reversal re-arms the format-blind path and should not be done while any auction league is in progress.
+
+**Ledger note.** SQL Editor apply; no `schema_migrations` row; the repo file is the record.

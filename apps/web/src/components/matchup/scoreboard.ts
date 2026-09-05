@@ -23,6 +23,8 @@
  * projection batch not in hand); the strip draws nothing for null.
  */
 
+import { winProbabilityFromTotals } from '@/utils/winProbability';
+
 export type ScoreboardSide = 'team1' | 'team2';
 
 export interface WeekMatchupTeam {
@@ -60,6 +62,9 @@ export interface WeekMatchupRow {
    */
   team1_projected_total?: number | string | null;
   team2_projected_total?: number | string | null;
+  /** Starter-games still to be played per side (2026-09-05); same terms as the totals. */
+  team1_games_left?: number | string | null;
+  team2_games_left?: number | string | null;
 }
 
 /** Points as a number; the API hands back numerics as strings on some paths. */
@@ -146,6 +151,43 @@ export function projectionOf(row: WeekMatchupRow, side: ScoreboardSide, today: s
   if (raw === null || raw === undefined || raw === '') return null;
   const n = typeof raw === 'number' ? raw : parseFloat(String(raw));
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Starter-games left for one side, or null on the terms of `projectionOf`.
+ * The League HQ card's `27 · 26 LEFT`.
+ */
+export function gamesLeftOf(row: WeekMatchupRow, side: ScoreboardSide, today: string): number | null {
+  if (isFinal(row, today)) return null;
+  if (side === 'team2' && isBye(row)) return null;
+  const raw = side === 'team1' ? row.team1_games_left : row.team2_games_left;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = typeof raw === 'number' ? raw : parseInt(String(raw), 10);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/**
+ * Win chance for one side, 0-100, from the row's projected finals and
+ * games left through the same rule the Match screen and the Team card use
+ * (`winProbabilityFromTotals`, DEFAULT_GAME_SD per unplayed game). null when
+ * either side's projection or games-left is not in hand: the artboard's
+ * `64% · 118.4` is a real number or nothing, never a coin flip drawn as one.
+ * A settled week (nothing left on either side) is 100 / 0 / 50 on the score.
+ */
+export function winChanceOf(row: WeekMatchupRow, side: ScoreboardSide, today: string): number | null {
+  const other: ScoreboardSide = side === 'team1' ? 'team2' : 'team1';
+  const mine = projectionOf(row, side, today);
+  const theirs = projectionOf(row, other, today);
+  const myLeft = gamesLeftOf(row, side, today);
+  const theirLeft = gamesLeftOf(row, other, today);
+  if (mine === null || theirs === null || myLeft === null || theirLeft === null) return null;
+  const { probability } = winProbabilityFromTotals({
+    myExpectedFinal: mine,
+    oppExpectedFinal: theirs,
+    myGamesLeft: myLeft,
+    oppGamesLeft: theirLeft,
+  });
+  return Math.round(probability * 100);
 }
 
 export type ScoreboardState = 'final' | 'live' | 'open';

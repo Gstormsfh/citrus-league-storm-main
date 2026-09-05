@@ -13,19 +13,14 @@
  * than stored as a rule that could never score anything.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
-import {
-  LeagueSettingsService,
-  type ScoringCatalogEntry,
-} from '@/services/LeagueSettingsService';
-import { logger } from '@/utils/logger';
+import { type ScoringCatalogEntry } from '@/services/LeagueSettingsService';
+import { useScoringRules } from './useScoringRules';
 
 interface ScoringRulesEditorProps {
   leagueId: string;
@@ -34,91 +29,14 @@ interface ScoringRulesEditorProps {
 }
 
 export function ScoringRulesEditor({ leagueId, canEdit }: ScoringRulesEditorProps) {
-  const { toast } = useToast();
-  const [catalog, setCatalog] = useState<ScoringCatalogEntry[]>([]);
-  const [edits, setEdits] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      setLoading(true);
-      const { stats, error } = await LeagueSettingsService.getScoringRules(leagueId);
-      if (cancelled) return;
-      if (error) {
-        toast({
-          title: "Scoring Rules Didn't Load",
-          description: "Refresh and we'll pull them again.",
-          variant: 'destructive',
-        });
-      }
-      setCatalog(stats);
-      setEdits({});
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [leagueId, toast]);
-
-  const skaters = useMemo(() => catalog.filter((s) => s.applies_to === 'skater'), [catalog]);
-  const goalies = useMemo(() => catalog.filter((s) => s.applies_to === 'goalie'), [catalog]);
-
-  /** Rows whose value differs from what the server returned. */
-  const changed = useMemo(() => {
-    const out: Array<{ stat_key: string; multiplier: number }> = [];
-    for (const stat of catalog) {
-      const raw = edits[stat.stat_key];
-      if (raw === undefined) continue;
-      const next = Number(raw);
-      if (!Number.isFinite(next)) continue;
-      if (next !== Number(stat.multiplier)) out.push({ stat_key: stat.stat_key, multiplier: next });
-    }
-    return out;
-  }, [catalog, edits]);
-
-  /** Any edit that is not a finite number — blocks save rather than sending NaN. */
-  const invalid = useMemo(
-    () => Object.values(edits).some((v) => v.trim() !== '' && !Number.isFinite(Number(v))),
-    [edits],
-  );
-
-  const handleSave = useCallback(async () => {
-    if (changed.length === 0 || invalid) return;
-    setSaving(true);
-    const { success, error } = await LeagueSettingsService.updateScoringRules(leagueId, changed);
-    setSaving(false);
-
-    if (!success) {
-      logger.error('Failed to save scoring rules', error);
-      toast({
-        title: 'Scoring rules not saved',
-        description: 'Nothing was changed. Please try again.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setCatalog((prev) =>
-      prev.map((s) => {
-        const hit = changed.find((c) => c.stat_key === s.stat_key);
-        return hit ? { ...s, multiplier: hit.multiplier } : s;
-      }),
-    );
-    setEdits({});
-    toast({
-      title: 'Scoring updated',
-      description:
-        changed.length === 1
-          ? '1 category saved. New scores apply from the next scoring run.'
-          : changed.length + ' categories saved. New scores apply from the next scoring run.',
-    });
-  }, [changed, invalid, leagueId, toast]);
+  // The fetch, the diff and the save live in useScoringRules (2026-09-04),
+  // shared with the Press Box settings screen; this file is the table.
+  const { catalog, skaters, goalies, setEdit, reset, valueOf, changed, invalid, loading, saving, save } =
+    useScoringRules(leagueId);
 
   const renderRows = (rows: ScoringCatalogEntry[]) =>
     rows.map((stat) => {
-      const value = edits[stat.stat_key] ?? String(stat.multiplier);
+      const value = valueOf(stat);
       const isOff = Number(value) === 0;
       return (
         <TableRow key={stat.stat_key} className={isOff ? 'opacity-60' : undefined}>
@@ -142,7 +60,7 @@ export function ScoringRulesEditor({ leagueId, canEdit }: ScoringRulesEditorProp
               className="text-right"
               disabled={!canEdit || saving}
               value={value}
-              onChange={(e) => setEdits((prev) => ({ ...prev, [stat.stat_key]: e.target.value }))}
+              onChange={(e) => setEdit(stat.stat_key, e.target.value)}
             />
           </TableCell>
         </TableRow>
@@ -216,12 +134,12 @@ export function ScoringRulesEditor({ leagueId, canEdit }: ScoringRulesEditorProp
                 <div className="flex gap-2">
                   <Button
                     variant="ghost"
-                    onClick={() => setEdits({})}
+                    onClick={reset}
                     disabled={changed.length === 0 || saving}
                   >
                     Reset
                   </Button>
-                  <Button onClick={handleSave} disabled={changed.length === 0 || invalid || saving}>
+                  <Button onClick={() => void save()} disabled={changed.length === 0 || invalid || saving}>
                     {saving ? 'Saving…' : 'Save scoring'}
                   </Button>
                 </div>

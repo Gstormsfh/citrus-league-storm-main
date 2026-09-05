@@ -4,17 +4,20 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { supabase } from '@/integrations/supabase/client';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { HockeyFooter } from '@/components/citrus2';
 import { accountApi } from '@/api/account';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import { UserAccountService, type ConsentStatus } from '@/services/UserAccountService';
+import { CONSENT_CHANGED_EVENT } from '@/lib/consent';
 import { LeagueService } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { WaiverService } from '@/services/WaiverService';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
+import { ProfilePhone, type ProfileTab } from '@/components/account/ProfilePhone';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -104,12 +107,13 @@ const CONSENT_PRESENTATION: Record<
 };
 
 const Profile = () => {
-  const { user, signOut } = useAuth();
-  const { userLeagueState } = useLeague();
+  const { user, signOut, resetPassword } = useAuth();
+  const { userLeagueState, activeLeagueId, activeLeague } = useLeague();
   const { data: profile } = useProfile();
   const updateProfile = useUpdateProfile();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
 
   // Active Tab State Management — support ?tab= URL param
@@ -221,9 +225,22 @@ const Profile = () => {
   const [consentError, setConsentError] = useState<string | null>(null);
   const [consentBusy, setConsentBusy] = useState<string | null>(null);
   const [settingsMessage, setSettingsMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [sendingReset, setSendingReset] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
+
+  // HOW THIS ACCOUNT SIGNS IN (2026-09-05). Supabase lists every linked
+  // identity; `email` means a password exists. A Google- or Apple-only
+  // account has none, so the change-password form would only ever fail for
+  // it -- that account gets the reset link instead, which is also how it
+  // adds a password if it wants one.
+  const signInProviders: string[] = Array.from(new Set(
+    (user?.identities?.map((i) => i.provider) ?? user?.app_metadata?.providers ?? [])
+      .filter((p): p is string => typeof p === 'string'),
+  ));
+  const hasPassword = signInProviders.includes('email');
   // 2026-08-24 click-sweep: the Light/Dark/System appearance toggle is gone.
   // The shipped design system is single-theme — the forest-dark palette lives
   // on the :root tokens. Adding `.dark` flipped every token to an unmaintained
@@ -333,13 +350,16 @@ const Profile = () => {
     confirm: ''
   });
 
-  // Preferences
-  const [preferences, setPreferences] = useState({
-    emailNotifications: true,
-    pushNotifications: true,
-    darkMode: false,
-    publicProfile: true
-  });
+  /**
+   * THE ONE NOTIFICATION SWITCH THAT IS REAL (2026-09-04). This was a
+   * `preferences` state object with four keys (email, push, dark mode,
+   * public profile) that `handlePreferenceChange` wrote to and then toasted
+   * "saved automatically". Nothing was saved anywhere. The app sends exactly
+   * one push -- "You're on the clock", from the draft engine -- and no email
+   * at all (no mailer in the repo), so the switch that exists is the push
+   * opt-in, stored on the profile and honoured by PushService.
+   */
+  const pushEnabled = profile?.push_notifications ?? true;
 
   // Commissioner leagues for reset
   const [commissionerLeagues, setCommissionerLeagues] = useState<Array<{ id: string; name: string; draft_status: string }>>([]);
@@ -665,6 +685,28 @@ const Profile = () => {
     return () => { cancelled = true; };
   }, [user]);
 
+  /**
+   * CURRENT RANK (2026-09-05): the place in the active league's ranked
+   * standings -- the same read League HQ's Standings tile and the Home
+   * card make -- once the draft is done. `–` before that, and when the
+   * manager's team is not in the table.
+   */
+  useEffect(() => {
+    if (!user || !activeLeagueId || activeLeague?.draft_status !== 'completed') return;
+    let cancelled = false;
+    Promise.all([leagueApi.getStandings(activeLeagueId), leagueApi.getMyTeam(activeLeagueId)])
+      .then(([standingsRes, teamRes]) => {
+        if (cancelled) return;
+        const rows = ((standingsRes as { data?: unknown }).data ?? standingsRes) as unknown;
+        const myId = ((teamRes as { data?: { id?: string } | null }).data ?? null)?.id ?? null;
+        if (!Array.isArray(rows) || !myId) return;
+        const index = (rows as Array<{ team_id: string }>).findIndex((r) => r.team_id === myId);
+        if (index >= 0) setUserStats((prev) => ({ ...prev, currentRank: index + 1 }));
+      })
+      .catch((err) => logger.error('Failed to fetch the current rank', err));
+    return () => { cancelled = true; };
+  }, [user, activeLeagueId, activeLeague?.draft_status]);
+
   // Achievements - empty for new users
   const achievements: Array<{ title: string; year?: string; description?: string; icon: any; color: string }> = [];
 
@@ -720,12 +762,20 @@ const Profile = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handlePreferenceChange = (field: string, value: boolean) => {
-    setPreferences(prev => ({ ...prev, [field]: value }));
-    toast({
-      title: "Preference updated",
-      description: "Your settings have been saved automatically.",
-    });
+  const handlePushToggle = async (value: boolean) => {
+    try {
+      await updateProfile.mutateAsync({ push_notifications: value });
+      toast({
+        title: value ? 'On-the-clock alerts on' : 'On-the-clock alerts off',
+        description: value ? "We'll push when a pick is yours." : 'No push when a pick is yours.',
+      });
+    } catch (error: unknown) {
+      toast({
+        title: 'Could not save that',
+        description: userMessage(error, 'Try the switch again in a moment.'),
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleSave = async () => {
@@ -838,11 +888,16 @@ const Profile = () => {
     }
   };
 
-  // Real password change handler (from old Settings page)
+  // Real password change handler (from old Settings page). The current
+  // password is checked first for an account that has one (2026-09-05).
   const handleChangePasswordReal = async (e: React.FormEvent) => {
     e.preventDefault();
     setSettingsMessage(null);
 
+    if (hasPassword && !currentPassword) {
+      setSettingsMessage({ type: 'error', text: 'Enter your current password first' });
+      return;
+    }
     if (newPassword.length < 8) {
       setSettingsMessage({ type: 'error', text: 'Password must be at least 8 characters' });
       return;
@@ -851,12 +906,30 @@ const Profile = () => {
       setSettingsMessage({ type: 'error', text: 'Passwords do not match' });
       return;
     }
+    if (hasPassword && newPassword === currentPassword) {
+      setSettingsMessage({ type: 'error', text: 'The new password is the same as the current one' });
+      return;
+    }
 
     setChangePasswordLoading(true);
     try {
-      const result = await UserAccountService.changePassword(newPassword);
+      const result = await UserAccountService.changePassword(
+        newPassword,
+        hasPassword && user?.email ? { email: user.email, currentPassword } : undefined,
+      );
+      if (!result.success && result.needsReauth && user?.email) {
+        // Supabase wants a recent sign-in for this and the account has no
+        // password to sign in with: the reset link is the same proof, by email.
+        const { error: linkError } = await resetPassword(user.email);
+        if (linkError) throw linkError;
+        setSettingsMessage({ type: 'success', text: `For safety we emailed a link to ${user.email} to set it. It expires in an hour.` });
+        setNewPassword('');
+        setConfirmPassword('');
+        return;
+      }
       if (!result.success) throw new Error(result.error);
       setSettingsMessage({ type: 'success', text: 'Password updated successfully!' });
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: unknown) {
@@ -868,6 +941,32 @@ const Profile = () => {
     } finally {
       setChangePasswordLoading(false);
     }
+  };
+
+  // FORGOT IT (2026-09-05): the same recovery email the sign-in screen
+  // sends. It is the only path for a Google or Apple account that wants a
+  // password, and the honest one for anyone who cannot type the current one.
+  const handleSendResetLink = async () => {
+    if (!user?.email || sendingReset) return;
+    setSendingReset(true);
+    setSettingsMessage(null);
+    try {
+      const { error } = await resetPassword(user.email);
+      if (error) throw error;
+      setSettingsMessage({ type: 'success', text: `Reset link sent to ${user.email}. It expires in an hour.` });
+    } catch (error: unknown) {
+      logger.error('Reset link error:', error);
+      setSettingsMessage({ type: 'error', text: userMessage(error, 'Could not send the reset link. Try again.') });
+    } finally {
+      setSendingReset(false);
+    }
+  };
+
+  // SIGN OUT (2026-09-05). The phone had no way out of an account: the
+  // desktop's is in the Navbar the phone does not draw.
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth', { replace: true });
   };
 
   // ── GDPR consent ──────────────────────────────────────────────────
@@ -892,6 +991,10 @@ const Profile = () => {
   useEffect(() => {
     if (!user) return;
     void loadConsent();
+    // The terms gate records over this screen; its rows re-read on the event.
+    const onChanged = () => void loadConsent();
+    window.addEventListener(CONSENT_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(CONSENT_CHANGED_EVENT, onChanged);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
@@ -962,6 +1065,7 @@ const Profile = () => {
       const result = await UserAccountService.deleteAccount();
       if (!result.success) throw new Error(result.error || 'Deletion failed');
       await signOut();
+      navigate('/auth', { replace: true });
     } catch (error: unknown) {
       logger.error('Account deletion error:', error);
       setSettingsMessage({
@@ -1013,10 +1117,18 @@ const Profile = () => {
     }
   };
 
+  /**
+   * PRESS BOX (2026-09-04, PR10p): the phone draws the account as the
+   * settings screen's rows. The layers are gated on the viewport rather than
+   * stacked, so one form owns each input and the page's tests see one set
+   * of strings. Every handler is the page's own.
+   */
+  const isMobile = useIsMobile();
+
   // If user is not logged in, show signup prompt
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
+      <div className="min-h-screen bg-pressbox-surface text-pastel-cream">
         {/* MOBILE CHROME (2026-09-01): Profile was the last core page on the
             old shell — global fixed Navbar + a hard pt-16. The fixed bar
             grows by env(safe-area-inset-top) on notched phones while pt-16
@@ -1026,14 +1138,26 @@ const Profile = () => {
             lg and renders its own sticky safe-area header (see
             LeagueDashboard); Profile now matches. */}
         <div className="hidden lg:block"><Navbar /></div>
-        <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-          <div className="flex items-center justify-between h-12 px-4">
-            <div className="w-10" />
-            <h1 className="text-lg font-bold text-pastel-cream">Profile</h1>
-            <MobileMenuButton />
-          </div>
+        {/* PRESS BOX (2026-09-04): the app header in place of the 09-01 title
+            bar and its hamburger, which opened the old menu sheet. The app
+            nav is the way around; the header names the screen. */}
+        <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+          <PressBoxAppHeader title="Account" logoSrc="/favicon.svg" />
         </div>
-        <main className="w-full pt-6 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
+        {isMobile && (
+          <div className="pb-type px-3.5 pt-6 pb-app-chrome text-center" data-testid="profile-phone-signed-out">
+            <p className="font-plex font-semibold text-[9px] tracking-[0.14em] text-pressbox-orange-soft">SIGN IN REQUIRED</p>
+            <h2 className="mt-2 font-condensed font-extrabold text-[24px] uppercase tracking-[0.02em] leading-none text-pressbox-text">Your account</h2>
+            <p className="mt-2 font-barlow text-[13px] leading-[1.45] text-pressbox-text/60">Sign in or create an account to see your profile.</p>
+            <Link to="/auth" className="mt-5 inline-flex w-full h-11 items-center justify-center rounded-[10px] bg-pressbox-orange text-pressbox-orange-ink font-condensed font-bold text-[15px] uppercase tracking-[0.06em]">
+              Sign in or sign up
+            </Link>
+            <Link to="/" className="mt-2 inline-flex w-full h-11 items-center justify-center rounded-[10px] border border-white/[0.12] bg-white/[0.03] text-pressbox-text/80 font-condensed font-bold text-[15px] uppercase tracking-[0.06em]">
+              Home
+            </Link>
+          </div>
+        )}
+        {!isMobile && <main className="w-full pt-6 lg:pt-24 pb-app-chrome lg:pb-16">
           <div className="container mx-auto px-3 sm:px-4">
             <div className="max-w-2xl mx-auto">
               <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_24px_60px_-16px_rgba(255,168,87,0.25)] relative overflow-hidden">
@@ -1058,26 +1182,108 @@ const Profile = () => {
               </Card>
             </div>
           </div>
-        </main>
+        </main>}
         <HockeyFooter variant="app" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
+    <div className="min-h-screen bg-pressbox-surface text-pastel-cream">
       {/* MOBILE CHROME (2026-09-01) — same pattern as the signed-out branch
           above and every other core page: Navbar is desktop-only, phones get
           the sticky safe-area header + bottom nav. */}
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">Profile</h1>
-          <MobileMenuButton />
-        </div>
+      {/* PRESS BOX (2026-09-04): the app header in place of the 09-01 title
+          bar and its hamburger, which opened the old menu sheet. The app
+          nav is the way around; the header names the screen. */}
+      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+        <PressBoxAppHeader title="Account" logoSrc="/favicon.svg" />
       </div>
-      <main className="w-full pt-6 lg:pt-24 pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-16">
+      {isMobile && (
+        <ProfilePhone
+          tab={activeTab as ProfileTab}
+          onTabChange={handleTabChange}
+          hero={{
+            avatarUrl: profile?.avatar_url,
+            initials: getInitials(),
+            displayName: getDisplayName(),
+            teamName: formData.teamName,
+            since: getMemberSince(),
+            championships: userStats.championships,
+            uploading: uploadingAvatar,
+            onAvatarInput: handleAvatarUpload,
+          }}
+          identity={{
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            phone: formData.phone,
+            location: formData.location,
+            bio: formData.bio,
+            editing: isEditing,
+            onEditing: setIsEditing,
+            onChange: handleInputChange,
+            onSave: handleSave,
+          }}
+          stats={userStats}
+          activity={recentActivity}
+          achievements={achievements}
+          hasLeague={userLeagueState === 'active-user'}
+          settings={{
+            message: settingsMessage,
+            displayName: displayNameInput,
+            onDisplayName: setDisplayNameInput,
+            canSaveDisplayName: displayNameInput.trim() !== (profile?.display_name || ''),
+            savingDisplayName,
+            onSaveDisplayName: handleSaveDisplayName,
+            email: user.email ?? '',
+            signInProviders,
+            hasPassword,
+            currentPassword,
+            newPassword,
+            confirmPassword,
+            onCurrentPassword: setCurrentPassword,
+            onNewPassword: setNewPassword,
+            onConfirmPassword: setConfirmPassword,
+            changingPassword: changePasswordLoading,
+            onChangePassword: handleChangePasswordReal,
+            sendingReset,
+            onSendResetLink: () => void handleSendResetLink(),
+            onSignOut: () => void handleSignOut(),
+            team: {
+              name: formData.teamName,
+              abbr: formData.teamAbbr,
+              slogan: formData.teamDescription,
+              onChange: handleInputChange,
+              onSave: handleSaveTeamName,
+            },
+            commissionerLeagues,
+            loadingLeagues,
+            onResetDraft: handleResetLeagueDraft,
+            onOpenLeague: (id) => navigate(`/league/${id}?league=${id}`),
+            consent: {
+              rows: consentRows,
+              loading: consentLoading,
+              error: consentError,
+              busy: consentBusy,
+              onGrant: handleGrantConsent,
+              onWithdraw: handleWithdrawConsent,
+              onRetry: loadConsent,
+            },
+            pushEnabled,
+            pushSaving: updateProfile.isPending,
+            onPushToggle: (on) => void handlePushToggle(on),
+            exporting: exportLoading,
+            onExport: handleExportData,
+            deleteConfirmation,
+            onDeleteConfirmation: setDeleteConfirmation,
+            deleting: deleteAccountLoading,
+            onDelete: handleDeleteAccount,
+          }}
+        />
+      )}
+      {!isMobile && <main className="w-full pt-6 lg:pt-24 pb-app-chrome lg:pb-16">
         <div className="container mx-auto px-3 sm:px-4">
           <div className="max-w-6xl mx-auto">
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6 lg:space-y-8">
@@ -1602,6 +1808,25 @@ const Profile = () => {
                     </CardHeader>
                     <CardContent>
                       <form onSubmit={handleChangePasswordReal} className="space-y-4">
+                        {hasPassword ? (
+                          <div className="space-y-2">
+                            <Label htmlFor="settings-currentPassword" className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">Current Password</Label>
+                            <Input
+                              id="settings-currentPassword"
+                              type="password"
+                              autoComplete="current-password"
+                              placeholder="Your current password"
+                              value={currentPassword}
+                              onChange={(e) => setCurrentPassword(e.target.value)}
+                              disabled={changePasswordLoading}
+                              className="bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 disabled:opacity-50"
+                            />
+                          </div>
+                        ) : (
+                          <p className="text-sm text-white/65">
+                            You sign in with {signInProviders.map((p) => p === 'google' ? 'Google' : p === 'apple' ? 'Apple' : p).join(' and ') || 'a linked account'}. Setting a password here adds email sign-in to this account.
+                          </p>
+                        )}
                         <div className="space-y-2">
                           <Label htmlFor="settings-newPassword" className="text-[10px] font-jbmono uppercase tracking-[0.22em] text-pastel-orange-soft font-bold">New Password</Label>
                           <Input
@@ -1628,7 +1853,7 @@ const Profile = () => {
                         </div>
                         <Button
                           type="submit"
-                          disabled={changePasswordLoading || !newPassword || !confirmPassword}
+                          disabled={changePasswordLoading || !newPassword || !confirmPassword || (hasPassword && !currentPassword)}
                           className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:opacity-50"
                         >
                           {changePasswordLoading ? (
@@ -1637,6 +1862,14 @@ const Profile = () => {
                             'Update Password'
                           )}
                         </Button>
+                        <button
+                          type="button"
+                          onClick={() => void handleSendResetLink()}
+                          disabled={sendingReset}
+                          className="w-full text-center text-sm text-pastel-orange-soft hover:text-pastel-orange underline-offset-4 hover:underline disabled:opacity-50"
+                        >
+                          {sendingReset ? 'Sending…' : 'Forgot it? Email me a reset link'}
+                        </button>
                       </form>
                     </CardContent>
                   </Card>
@@ -2088,31 +2321,23 @@ const Profile = () => {
                         <Settings className="h-5 w-5 text-pastel-orange" />
                         Game Preferences
                       </CardTitle>
-                      <CardDescription className="text-white/55">Manage automation and gameplay</CardDescription>
+                      <CardDescription className="text-white/55">The alerts the app sends</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
+                      {/* One switch, because the app sends one push: the draft
+                          engine's "You're on the clock". The email switch that
+                          stood beside it had no sender behind it. */}
                       <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
                         <div className="space-y-0.5">
-                          <Label className="text-sm font-bold text-pastel-cream">Email Notifications</Label>
+                          <Label className="text-sm font-bold text-pastel-cream">On-the-clock push</Label>
                           <p className="text-xs text-white/55">
-                            Receive weekly summaries and alerts
+                            A push the moment a draft pick is yours. iOS app only.
                           </p>
                         </div>
                         <Switch
-                          checked={preferences.emailNotifications}
-                          onCheckedChange={(c) => handlePreferenceChange('emailNotifications', c)}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
-                        <div className="space-y-0.5">
-                          <Label className="text-sm font-bold text-pastel-cream">Push Notifications</Label>
-                          <p className="text-xs text-white/55">
-                            Live scoring and injury alerts
-                          </p>
-                        </div>
-                        <Switch
-                          checked={preferences.pushNotifications}
-                          onCheckedChange={(c) => handlePreferenceChange('pushNotifications', c)}
+                          checked={pushEnabled}
+                          disabled={updateProfile.isPending}
+                          onCheckedChange={(c) => void handlePushToggle(c)}
                         />
                       </div>
                     </CardContent>
@@ -2251,52 +2476,9 @@ const Profile = () => {
                     </CardContent>
                   </Card>
 
-                  {/* Subscription Plan */}
-                  <Card className="animated-element lg:col-span-2 bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(255,168,87,0.15)] relative overflow-hidden">
-                    <div aria-hidden="true" className="absolute top-0 right-0 w-64 h-64 bg-pastel-orange/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
-                    <CardHeader className="relative z-10">
-                      <CardTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
-                        <Crown className="h-5 w-5 text-pastel-orange" />
-                        Subscription Plan
-                      </CardTitle>
-                      <CardDescription className="text-white/55">Manage your membership</CardDescription>
-                    </CardHeader>
-                    <CardContent className="relative z-10">
-                      <div className="bg-pastel-orange/10 rounded-xl p-6 ring-1 ring-pastel-orange/30 flex flex-col md:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className="h-12 w-12 rounded-2xl bg-pastel-orange/20 ring-1 ring-pastel-orange/40 flex items-center justify-center text-pastel-orange shrink-0">
-                            <Crown className="h-6 w-6" />
-                          </div>
-                          <div>
-                            <h3 className="font-calistoga text-xl text-pastel-cream flex items-center gap-2 flex-wrap">
-                              Free Plan
-                              <span className="bg-white/10 ring-1 ring-white/20 text-white/70 text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold px-2 py-0.5 rounded-full">Premium Coming Soon</span>
-                            </h3>
-                            <p className="text-sm text-white/55 mt-1">All features are free during the beta period</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-pastel-orange mt-0.5 shrink-0" />
-                          <span className="text-pastel-cream">Advanced Stats <span className="text-xs text-white/55">(Free during Beta)</span></span>
-                        </div>
-                        <div className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-pastel-orange mt-0.5 shrink-0" />
-                          <span className="text-pastel-cream">Ad-free Experience <span className="text-xs text-white/55">(Free during Beta)</span></span>
-                        </div>
-                        <div className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-pastel-orange mt-0.5 shrink-0" />
-                          <span className="text-pastel-cream">Priority Support <span className="text-xs text-white/55">(Free during Beta)</span></span>
-                        </div>
-                        <div className="flex items-start gap-2 text-sm">
-                          <Check className="h-4 w-4 text-pastel-orange mt-0.5 shrink-0" />
-                          <span className="text-pastel-cream">Trade Analyzer <span className="text-xs text-white/55">(Free during Beta)</span></span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {/* THE PLAN CARD IS GONE (2026-09-05): no plan, no tier, no
+                      "free during beta" anywhere in the app until payments
+                      exist. The store review reads every word. */}
 
                   {/* Delete Account */}
                   <Card className="animated-element lg:col-span-2 bg-[#1A2A20] border-0 ring-1 ring-red-400/40 rounded-2xl shadow-[0_16px_40px_-12px_rgba(248,113,113,0.2)]">
@@ -2385,7 +2567,7 @@ const Profile = () => {
             </Tabs>
           </div>
         </div>
-      </main>
+      </main>}
       <HockeyFooter variant="app" />
     </div>
   );

@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
+import { WaiversPhone } from '@/components/waivers/WaiversPhone';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -504,14 +505,72 @@ const WaiverWire = () => {
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">Waiver Wire</h1>
-          <MobileMenuButton />
-        </div>
+      {/* PRESS BOX (2026-09-04): the league chrome — header, sub-tabs and
+          the league menu — replaces the 09-01 title bar and its hamburger,
+          which opened the old menu sheet. One menu in the app. */}
+      <PressBoxLeagueChrome />
+      {/* PRESS BOX (2026-09-04): below lg the wire is WaiversPhone, drawn
+          from this page's own state and handlers — the two facts, the
+          rules, the wire, your claims, the claim sheet. The desktop main
+          is unchanged from lg. */}
+      <div className="lg:hidden bg-pressbox-surface text-pressbox-text pb-app-chrome">
+        <WaiversPhone
+          loading={loading}
+          myPriority={myPriority}
+          teamCount={teamCount || waiverPriority.length}
+          isFAAB={isFAAB}
+          faabBudget={faabBudget}
+          processTime={formatWaiverProcessTime(waiverSettings?.waiver_process_time)}
+          periodHours={waiverSettings?.waiver_period_hours || 48}
+          gameLock={!!waiverSettings?.waiver_game_lock}
+          searchQuery={searchTerm}
+          onSearchQuery={setSearchTerm}
+          positions={
+            activeLeagueFormat?.positionType === 'forward'
+              ? [{ key: 'all', label: 'ALL' }, { key: 'F', label: 'F' }, { key: 'D', label: 'D' }, { key: 'G', label: 'G' }]
+              : [{ key: 'all', label: 'ALL' }, { key: 'C', label: 'C' }, { key: 'LW', label: 'LW' }, { key: 'RW', label: 'RW' }, { key: 'D', label: 'D' }, { key: 'G', label: 'G' }]
+          }
+          position={positionFilter}
+          onPosition={setPositionFilter}
+          players={availablePlayers}
+          playersLoading={searchLoading}
+          lockedTeams={lockedTeams}
+          clearsAt={onWaiversClearsAt}
+          formatMoment={formatMoment}
+          selected={selectedPlayer}
+          onSelect={(pl) => {
+            setSelectedPlayer(pl);
+            if (!pl) {
+              setDropPlayer(null);
+              setFaabBidAmount(0);
+            }
+          }}
+          roster={myRoster}
+          dropPlayerId={dropPlayer}
+          onDropPlayer={setDropPlayer}
+          bidAmount={faabBidAmount}
+          onBidAmount={setFaabBidAmount}
+          onSubmit={handleSubmitClaim}
+          claims={waiverClaims}
+          claimPlayers={claimPlayers}
+          onCancelClaim={handleCancelClaim}
+          nextRunFor={(c) =>
+            computeNextWaiverProcessMoment(c.waiver_clears_at, c.league_waiver_process_time || waiverSettings?.waiver_process_time)
+          }
+          banner={
+            isGuestMode(userLeagueState) ? (
+              <div className="mb-3">
+                <LeagueCreationCTA
+                  title="You're viewing demo waiver wire"
+                  description="Sign up to manage waiver claims and priorities for your team."
+                  variant="compact"
+                />
+              </div>
+            ) : null
+          }
+        />
       </div>
-      <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <main className="hidden lg:block w-full lg:pt-24 lg:pb-8">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile, left on desktop; Notifications on right on desktop */}
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">

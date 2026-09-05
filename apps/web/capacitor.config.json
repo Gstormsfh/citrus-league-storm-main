@@ -2,7 +2,7 @@
   "appId": "com.citrussports.app",
   "appName": "Citrus",
   "webDir": "dist",
-  "backgroundColor": "#0F1F15",
+  "backgroundColor": "#0C1811",
   "ios": {
     "contentInset": "never"
   }

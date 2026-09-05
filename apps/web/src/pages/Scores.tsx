@@ -24,11 +24,14 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { RefreshCw } from 'lucide-react';
 import Navbar from '@/components/Navbar';
-import { DarkLayout } from '@/components/citrus2/DarkLayout';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
+import { PB_TYPE } from '@/components/pressbox/rowScale';
+import { PressBoxSkeletonCard } from '@/components/pressbox/Skeleton';
+import { cn } from '@/lib/utils';
 import { useLeague } from '@/contexts/LeagueContext';
 import { scoresApi } from '@/api/scores';
 import { getTodayMST } from '@/utils/timezoneUtils';
@@ -46,6 +49,7 @@ const LIVE_POLL_MS = 20_000;
 
 export default function Scores() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { activeLeagueId } = useLeague();
 
   const dateParam = searchParams.get('date');
@@ -90,51 +94,64 @@ export default function Scores() {
   }, [refetch]);
 
   return (
-    <DarkLayout>
-      <Navbar />
+    /*
+     * PRESS BOX (2026-09-04). The SCORES tab of the app nav. No artboard
+     * draws this screen, so it is built from the vocabulary the artboards
+     * do: the Home screen's app header with the tab's name in it, the
+     * Match screen's `‹ day ›` strip, and game tiles in the ticker's
+     * colours — sage while a game is on, orange-soft for what is projected,
+     * 45% for what is over. The desktop keeps the Navbar.
+     */
+    <div className={cn(PB_TYPE, 'min-h-screen bg-pressbox-surface text-pressbox-text')}>
+      <div className="hidden lg:block"><Navbar /></div>
+      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+        <PressBoxAppHeader
+          title="Scores"
+          logoSrc="/favicon.svg"
+          onSearch={() => navigate('/players')}
+          onNotifications={() => navigate('/profile')}
+        />
+      </div>
 
-      <div className="relative z-10 max-w-2xl mx-auto pb-16">
-        <header className="px-4 pt-4 pb-1 flex items-end justify-between">
-          <div>
-            <h1 className="font-varsity text-2xl text-pastel-cream leading-none">Scores</h1>
-            <p className="font-display text-[11px] text-pastel-sage/70 mt-1">
-              {liveCount > 0
-                ? `${liveCount} live now`
-                : `${friendlyDateLabel(selectedDate)} around the league`}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={manualRefresh}
-            aria-label="Refresh scores"
-            className="p-2 -mr-2 rounded-full text-pastel-sage/70 active:bg-pastel-surface-high touch-manipulation"
-          >
-            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-          </button>
-        </header>
-
+      <div className="relative z-10 max-w-2xl mx-auto pb-app-chrome lg:pt-24 lg:pb-8">
         <div className="sticky top-0 z-sticky-raised">
           <ScoresDateStrip selected={selectedDate} onSelect={selectDate} />
         </div>
 
+        <div className="px-3.5 pt-3 flex items-center justify-between">
+          <p className="font-plex font-medium text-[10px] tracking-[0.06em] uppercase text-pressbox-text/45">
+            {liveCount > 0
+              ? `${liveCount} live now`
+              : `${friendlyDateLabel(selectedDate)} around the league`}
+          </p>
+          <button
+            type="button"
+            onClick={manualRefresh}
+            aria-label="Refresh scores"
+            className="focus-citrus relative p-1 -mr-1 rounded-full text-pressbox-text/45 after:absolute after:-inset-2 after:content-['']"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
         {isLoading ? (
-          <div className="px-3 py-3 flex flex-col gap-2" data-testid="scores-loading">
+          <div className="px-3.5 py-3 flex flex-col gap-2" data-testid="scores-loading" role="status" aria-label="Loading">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-[92px] rounded-2xl bg-pastel-surface-tile animate-pulse" />
+              <PressBoxSkeletonCard key={i} height={92} index={i} />
             ))}
           </div>
         ) : isError ? (
           <div className="px-6 py-12 text-center" data-testid="scores-error">
-            <p className="font-varsity text-base text-pastel-cream">Scores did not load</p>
-            <p className="font-display text-xs text-pastel-forest-dim mt-1.5">
+            <p className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text/70">Scores did not load</p>
+            <p className="font-barlow text-[12px] text-pressbox-text/45 mt-1.5">
               {(error as Error | undefined)?.message ?? 'Something went wrong on the way here.'}
             </p>
             <button
               type="button"
               onClick={manualRefresh}
-              className="mt-4 px-4 py-2 rounded-full bg-pastel-orange text-pastel-surface font-display text-xs font-semibold touch-manipulation"
+              className="focus-citrus mt-4 px-4 py-2 rounded-full bg-pressbox-text text-pressbox-surface font-plex font-semibold text-[10px] tracking-[0.06em] touch-manipulation"
             >
-              Try again
+              TRY AGAIN
             </button>
           </div>
         ) : games.length === 0 ? (
@@ -151,18 +168,18 @@ export default function Scores() {
               onToggle={toggle}
             />
             {data?.truncated ? (
-              <p className="px-4 pb-4 font-display text-[10px] text-pastel-orange-soft">
+              <p className="px-3.5 pb-4 font-barlow text-[11px] text-pressbox-orange-soft">
                 This day is incomplete: the read hit its row cap.
               </p>
             ) : null}
             {activeLeagueId && data && !data.league.rostersResolved ? (
-              <p className="px-4 pb-4 font-display text-[10px] text-pastel-forest-dim">
+              <p className="px-3.5 pb-4 font-barlow text-[11px] text-pressbox-text/45">
                 Your league has no rostered players yet, so nothing is marked as yours.
               </p>
             ) : null}
           </>
         )}
       </div>
-    </DarkLayout>
+    </div>
   );
 }

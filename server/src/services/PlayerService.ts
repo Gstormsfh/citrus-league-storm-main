@@ -470,6 +470,28 @@ export class PlayerService {
     return { trending, error: null };
   }
 
+  /**
+   * PLAYER OWNERSHIP (2026-09-05): rostered% / started% per player across
+   * every Citrus team with a roster. `get_player_ownership()` is aggregate
+   * counts only (migration 20260905050000). Until the migration runs the
+   * RPC does not exist and this returns an empty map with the error, which
+   * the route turns into `[]`; the client hides the two percentages.
+   */
+  async getOwnership() {
+    const { data, error } = await this.supabase.rpc('get_player_ownership');
+    const ownership = new Map<string, { rostered_pct: number; started_pct: number; rostered_teams: number; total_teams: number }>();
+    if (error) return { ownership, error };
+    for (const row of (data || []) as Array<{ player_id: string; rostered_pct: number | null; started_pct: number | null; rostered_teams: number; total_teams: number }>) {
+      ownership.set(String(row.player_id), {
+        rostered_pct: row.rostered_pct ?? 0,
+        started_pct: row.started_pct ?? 0,
+        rostered_teams: row.rostered_teams ?? 0,
+        total_teams: row.total_teams ?? 0,
+      });
+    }
+    return { ownership, error: null };
+  }
+
   /** Get roster assignment count for a team */
   async getRosterAssignmentCount(teamId: string, leagueId: string) {
     const { count, error } = await this.supabase

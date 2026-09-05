@@ -158,22 +158,55 @@ describe('getWeekDateLabel', () => {
  * live: matchups table had 0 rows platform-wide.
  */
 import { describe as describe2, it as it2, expect as expect2 } from 'vitest';
-import { clampToSeasonStart, getAvailableWeeks as gaw } from '../weekCalculator';
+import { clampToSeasonStart, getAvailableWeeks as gaw, FANTASY_WEEK_START_DOW, weekEndDow } from '../weekCalculator';
 
 describe2('clampToSeasonStart — offseason drafts land on the season opener', () => {
-  it2('THE regression: an August draft clamps to the Monday of Oct-1 week', () => {
+  // ANCHOR DAY CHANGED 2026-09-04, from Monday to Sunday.
+  //
+  // This clamp used to hardcode "Monday of the week containing Oct 1" while
+  // getFirstWeekStartDate snapped to Sunday, so the app held two definitions
+  // of a fantasy week and every league built for this season came out
+  // Monday-anchored against a UI that expected Sunday. Garrett's call was
+  // Sunday to Saturday, configurable per league later. The clamp now walks
+  // back to FANTASY_WEEK_START_DOW instead of to a literal 1.
+  //
+  // Nothing was migrated: the nine Monday-anchored leagues on production are
+  // all rehearsals with nothing played.
+
+  it2('THE regression: an August draft clamps into the season, on the start day', () => {
     const clamped = clampToSeasonStart(new Date(2026, 7, 16)); // Aug 16 2026
-    expect2(clamped.getMonth()).toBe(8); // Sep 28 - September is month index 8
-    // Oct 1 2026 is a Thursday → Monday of that week is Sep 28.
     expect2(clamped.getFullYear()).toBe(2026);
-    expect2([8, 9]).toContain(clamped.getMonth()); // Sep 28 = month 8
-    expect2(clamped.getDay()).toBe(1); // Monday
-    expect2(clamped.getDate()).toBe(28);
+    expect2([8, 9]).toContain(clamped.getMonth());
+    expect2(clamped.getDay()).toBe(FANTASY_WEEK_START_DOW);
+    // Oct 1 2026 is a Thursday, so the Sunday on or before it is Sep 27.
+    expect2(clamped.getMonth()).toBe(8);
+    expect2(clamped.getDate()).toBe(27);
+  });
+
+  it2('week one contains opening night', () => {
+    // The whole point of the clamp. 2026-27 opens Tue Sep 29; a week
+    // starting Sun Sep 27 runs through Sat Oct 3 and contains it.
+    const clamped = clampToSeasonStart(new Date(2026, 7, 16));
+    const end = new Date(clamped);
+    end.setDate(clamped.getDate() + 6);
+    const opener = new Date(2026, 8, 29);
+    expect2(clamped.getTime()).toBeLessThanOrEqual(opener.getTime());
+    expect2(end.getTime()).toBeGreaterThanOrEqual(opener.getTime());
+    expect2(end.getDay()).toBe(weekEndDow());
+  });
+
+  it2('honours an explicit start day, so the per-league setting can drive it', () => {
+    // The picker is not built yet; the seam it will use is.
+    for (const dow of [0, 1, 2, 3, 4, 5, 6]) {
+      const clamped = clampToSeasonStart(new Date(2026, 7, 16), dow);
+      expect2(clamped.getDay(), `startDow ${dow}`).toBe(dow);
+    }
+    expect2(clampToSeasonStart(new Date(2026, 7, 16), 1).getDate()).toBe(28); // Monday
   });
 
   it2('a September draft (Yahoo prime time) also clamps forward', () => {
     const clamped = clampToSeasonStart(new Date(2026, 8, 10)); // Sep 10
-    expect2(clamped.getDate()).toBe(28);
+    expect2(clamped.getDate()).toBe(27);
     expect2(clamped.getMonth()).toBe(8);
   });
 
@@ -190,7 +223,7 @@ describe2('clampToSeasonStart — offseason drafts land on the season opener', (
   it2('END TO END: august anchor now yields a real season of weeks', () => {
     // Before the fix this returned ZERO weeks (season end in the past).
     const weeks = gaw(clampToSeasonStart(new Date(2026, 7, 16)));
-    expect2(weeks.length).toBeGreaterThanOrEqual(25); // Sep 28→Apr 15 = 29 weeks
+    expect2(weeks.length).toBeGreaterThanOrEqual(25); // Sep 27→Apr 15 = 29 weeks
     expect2(weeks.length).toBeLessThanOrEqual(31);
     expect2(weeks[0]).toBe(1);
   });

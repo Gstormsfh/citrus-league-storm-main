@@ -73,4 +73,13 @@ export interface LeagueScoreboardMatchup {
   team1_projected_total: number | null;
   /** Projected final for team2, or null on the same terms. */
   team2_projected_total: number | null;
+  /**
+   * Starter-games still to be played on each side (2026-09-05): every
+   * remaining-day starter whose game has an unplayed share, a game in
+   * progress included. The League HQ card's `27 · 26 LEFT`; with the
+   * projected totals, the inputs of the shared win-probability rule. null
+   * on the same terms as the totals; absent on the week-less form.
+   */
+  team1_games_left?: number | null;
+  team2_games_left?: number | null;
 }

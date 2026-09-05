@@ -96,6 +96,29 @@ playerRoutes.get('/trending', authMiddleware, async (c) => {
   return ok(c, data);
 });
 
+// GET /api/players/ownership — rostered% / started% per player, every Citrus
+// team with a roster (2026-09-05). Aggregate counts, cached ten minutes: the
+// numbers move on a waiver run, not a tap. `[]` until the RPC exists.
+let ownershipCache: { at: number; data: Array<Record<string, unknown>> } | null = null;
+const OWNERSHIP_TTL_MS = 10 * 60 * 1000;
+playerRoutes.get('/ownership', authMiddleware, async (c) => {
+  if (ownershipCache && Date.now() - ownershipCache.at < OWNERSHIP_TTL_MS) {
+    return ok(c, ownershipCache.data);
+  }
+  const supabase = createUserClient(c.get('userToken'));
+  const service = new PlayerService(supabase);
+  const { ownership, error } = await service.getOwnership();
+  if (error) {
+    // The function is not there yet, or the read failed: an empty list is
+    // "no percentages", which the client draws as no percentages.
+    logger.warn('[players/ownership] unavailable:', error.message ?? error);
+    return ok(c, []);
+  }
+  const data = Array.from(ownership.entries()).map(([player_id, o]) => ({ player_id, ...o }));
+  ownershipCache = { at: Date.now(), data };
+  return ok(c, data);
+});
+
 // GET /api/players/by-ids — Get players by IDs (batch)
 playerRoutes.get('/by-ids', authMiddleware, async (c) => {
   const ids = c.req.query('ids');
@@ -209,16 +232,24 @@ playerRoutes.get('/directory', authMiddleware, async (c) => {
   const supabase = createUserClient(c.get('userToken'));
 
   try {
-    let query = supabase
-      .from('player_directory')
-      .select('player_id, position_code')
-      .in('player_id', playerIds);
-
-    if (season) {
-      query = query.eq('season', parseInt(season, 10));
+    // THE VITALS (2026-09-05): the artboard's player card prints AGE · HT ·
+    // WT · SHOOTS under the name, and player_directory holds all four for
+    // every 2026 row (1,277 of 1,277 checked on prod). This route had no
+    // caller and selected two columns; it now carries the bio strip.
+    // CAREER (2026-09-05): `career` is the directory refresh's career
+    // document (migration 20260905230000). Asked for first; if this database
+    // has not taken that migration yet the read is repeated without it, so
+    // the vitals strip never goes dark over an optional column.
+    const BASE = 'player_id, season, position_code, full_name, team_abbrev, jersey_number, shoots_catches, height_in, weight_lb, birthdate';
+    const read = async (columns: string) => {
+      let query = supabase.from('player_directory').select(columns).in('player_id', playerIds).order('season', { ascending: false });
+      if (season) query = query.eq('season', parseInt(season, 10));
+      return query;
+    };
+    let { data, error } = await read(`${BASE}, career`);
+    if (error && /career/i.test(error.message ?? '')) {
+      ({ data, error } = await read(BASE));
     }
-
-    const { data, error } = await query;
 
     if (error) {
       return handleError(c, error, 'Failed to fetch player directory');

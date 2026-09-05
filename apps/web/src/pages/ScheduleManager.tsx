@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
+import { SchedulePhone } from '@/components/schedule/SchedulePhone';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -153,14 +154,34 @@ const ScheduleManager = () => {
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">Schedule</h1>
-          <MobileMenuButton />
-        </div>
+      {/* PRESS BOX (2026-09-04): the league chrome — header, sub-tabs and
+          the league menu — replaces the 09-01 title bar and its hamburger,
+          which opened the old menu sheet. One menu in the app. */}
+      <PressBoxLeagueChrome />
+      {/* PRESS BOX (2026-09-04): below lg the slate is SchedulePhone, a pure
+          view of the games and the three derived reads above. The upcoming
+          matchups and recent results the desktop draws are empty arrays
+          here, so the phone does not draw them. The desktop main is
+          unchanged from lg. */}
+      <div className="lg:hidden bg-pressbox-surface text-pressbox-text pb-app-chrome">
+        <SchedulePhone
+          loading={loading}
+          games={nhlGames}
+          days={DAY_KEYS.map((key) => ({ key, count: dayCounts[key] || 0 }))}
+          teams={teamGameCounts}
+          backToBacks={backToBacks}
+          dayLabel={(iso) => format(new Date(iso + 'T00:00:00'), 'EEE M/d').toUpperCase()}
+          timeLabel={(iso) => {
+            if (!iso) return null;
+            try {
+              return format(new Date(iso), 'h:mm a');
+            } catch {
+              return null;
+            }
+          }}
+        />
       </div>
-      <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))] relative z-10">
+      <main className="hidden lg:block w-full lg:pt-24 lg:pb-8 relative z-10">
         <div className="w-full m-0 p-0">
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2">

@@ -1,8 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   DndContext, 
   closestCenter, 
@@ -20,9 +16,15 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, X, Play, Trash2, AlertCircle, Info, Zap } from 'lucide-react';
+import { GripVertical, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Player } from '@/services/PlayerService';
+import { Mug } from '@/components/roster/Mug';
+import { mugFromDirectory } from '@/components/roster/headshot';
+import { positionChipKey } from '@/components/roster/positionChip';
+// By file, never the `@/components/pressbox` barrel — it reaches LeagueContext
+// and the Supabase client at module scope, and this panel has its own client.
+import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/utils/logger';
 import { supabase } from '@/integrations/supabase/client';
@@ -101,13 +103,17 @@ interface DraftQueueProps {
   totalPicks?: number;
 }
 
-const positionColors = {
-  'C': 'bg-fantasy-primary/20 text-fantasy-primary border-fantasy-primary/30',
-  'LW': 'bg-fantasy-secondary/20 text-fantasy-secondary border-fantasy-secondary/30',
-  'RW': 'bg-fantasy-tertiary/20 text-fantasy-tertiary border-fantasy-tertiary/30',
-  'D': 'bg-white/10 text-pastel-cream border-white/20',
-  'G': 'bg-pastel-orange/20 text-pastel-orange-soft border-pastel-orange/30',
-};
+/*
+ * PRESS BOX (2026-09-04). The queue is a Press Box list now — artboard 4a's
+ * QUEUE tab, which the artboard names but does not draw, so it borrows the
+ * pool row's grammar one column over: the grip and the order where the pool
+ * keeps the star and the rank, the same 36px face, the same 15px name over a
+ * 10px meta line, and the 40px action slots at the right. `DRAFT NOW` on the
+ * top row when it is your turn is orange, the way every draft verb in the
+ * room is; remove is the neutral slot. Every behaviour — drag to reorder,
+ * remove, clear, the drafted tail, server-first restore and debounced
+ * persistence — is exactly what it was.
+ */
 
 interface SortableQueueItemProps {
   player: Player;
@@ -143,75 +149,80 @@ function SortableQueueItem({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const posColor = positionColors[player.position as keyof typeof positionColors] || 'bg-citrus-sage/20 text-pastel-cream border-citrus-sage/40';
+  const onDeck = index === 0 && isYourTurn && !isDrafted;
+  const posKey = positionChipKey(player.position);
 
   return (
     <div
       ref={setNodeRef}
       style={style}
+      data-testid="draft-queue-row"
       className={cn(
-        'flex items-center gap-3 p-2 rounded-lg border bg-pastel-surface-tile backdrop-blur-sm transition-all',
-        isDrafted && 'opacity-50 bg-muted/50',
-        isDragging && 'shadow-lg scale-105 z-50',
-        index === 0 && isYourTurn && !isDrafted && 'ring-2 ring-fantasy-primary bg-fantasy-primary/5'
+        PB_TYPE,
+        'grid grid-cols-[22px_1fr_auto] gap-2.5 items-center min-h-[56px] px-3.5 border-t border-white/[0.06] transition-colors',
+        isDrafted && 'opacity-40',
+        isDragging && 'bg-pressbox-tile shadow-lg z-50',
+        onDeck && 'bg-pressbox-orange/[0.06] shadow-[inset_3px_0_0_theme(colors.pressbox.orange)]',
       )}
     >
-      <div
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors"
-        title="Drag to reorder"
-      >
-        <GripVertical className="h-4 w-4" />
-      </div>
-      
-      <div className="flex items-center gap-2 min-w-0 flex-1">
-        <div className={cn(
-          "text-sm font-medium w-6 text-center",
-          index === 0 && isYourTurn && !isDrafted ? "text-citrus-orange font-bold" : "text-muted-foreground"
-        )}>
-          #{index + 1}
-        </div>
-        {/* REMOVED AVATAR */}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-sm truncate">{player.full_name}</span>
-            <Badge className={cn('text-xs border', posColor)}>
-              {player.position}
-            </Badge>
-          </div>
-          <div className="text-xs text-muted-foreground">
-            <span>{player.team} • {player.points} PTS</span>
-            {/* REMOVED "picks away" text */}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-1">
-        {isDrafted ? (
-          <Badge variant="outline" className="text-xs bg-muted">
-            Drafted
-          </Badge>
-        ) : isYourTurn && index === 0 ? (
-          <Button
-            size="sm"
-            onClick={onDraft}
-            className="h-7 text-xs font-bold bg-fantasy-primary text-[#0F1F15] hover:bg-fantasy-primary/90 shadow-sm"
-          >
-            <Play className="h-3 w-3 mr-1" />
-            Draft Now
-          </Button>
-        ) : null}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onRemove}
-          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive transition-colors"
-          title="Remove from queue"
+      <span className="flex flex-col items-center gap-0.5">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="focus-citrus relative flex h-[18px] w-[18px] cursor-grab items-center justify-center text-pressbox-text/45 active:cursor-grabbing after:absolute after:-inset-[13px] after:content-['']"
+          title="Drag to reorder"
+          aria-label={`Reorder ${player.full_name}`}
         >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
+          <GripVertical className="h-3.5 w-3.5" strokeWidth={2} aria-hidden="true" />
+        </button>
+        <span
+          className={cn(
+            'font-plex font-semibold text-[12px] tabular-nums',
+            onDeck ? 'text-pressbox-orange-soft' : 'text-pressbox-text/60',
+          )}
+        >
+          {index + 1}
+        </span>
+      </span>
+
+      <span className="flex items-center gap-2.5 min-w-0">
+        <Mug p={mugFromDirectory(player)} size="sm" crest />
+        <span className="min-w-0">
+          <span className="block font-barlow font-bold text-[15px] truncate text-pressbox-text">
+            {player.full_name}
+          </span>
+          <span className="block mt-[3px] font-plex font-medium text-[10px] text-pressbox-text/55 truncate">
+            {posKey && <b className="font-bold text-pressbox-text">{posKey}</b>}
+            {posKey && player.team ? ' · ' : ''}
+            {player.team}
+            {player.points != null ? ` · ${player.points} PTS` : ''}
+          </span>
+        </span>
+      </span>
+
+      <span className="flex items-center gap-1.5">
+        {isDrafted ? (
+          <span className="font-plex font-semibold text-[10px] tracking-[0.06em] text-pressbox-text/45">DRAFTED</span>
+        ) : onDeck ? (
+          <button
+            type="button"
+            onClick={onDraft}
+            className="focus-citrus h-10 px-3 rounded-[10px] bg-pressbox-orange text-pressbox-orange-ink font-condensed font-bold text-[10px] uppercase tracking-[0.06em] whitespace-nowrap active:scale-95 transition-transform"
+          >
+            Draft now
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={onRemove}
+          className="focus-citrus h-10 w-10 flex items-center justify-center rounded-[10px] border border-white/[0.12] bg-white/[0.06] text-pressbox-text/70 active:scale-95 transition-transform"
+          title="Remove from queue"
+          aria-label={`Remove ${player.full_name} from your queue`}
+        >
+          <X className="h-4 w-4" strokeWidth={2} aria-hidden="true" />
+        </button>
+      </span>
     </div>
   );
 }
@@ -434,110 +445,100 @@ export const DraftQueue = ({
   }, [isDraftActive, isYourTurn, availableQueuePlayers.length]);
 
   return (
-    <Card className="border-white/10">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CardTitle className="text-lg font-semibold text-pastel-cream">
-              Draft Queue
-            </CardTitle>
-            {isYourTurn && availableQueuePlayers.length > 0 && (
-              <Badge className="bg-fantasy-primary text-[#0F1F15] font-bold animate-pulse">
-                <Zap className="h-3 w-3 mr-1" />
-                Your Turn
-              </Badge>
+    <section className={cn(PB_TYPE)} data-testid="draft-queue">
+      <div className="flex items-center justify-between gap-2 px-3.5 pt-3 pb-1.5">
+        <h2 className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text truncate">
+          Queue
+          {availableQueuePlayers.length > 0 && (
+            <span className="text-pressbox-text/45"> &middot; {availableQueuePlayers.length}</span>
+          )}
+        </h2>
+        <span className="flex items-center gap-2 flex-none">
+          {isYourTurn && availableQueuePlayers.length > 0 && (
+            <span className="px-[7px] py-[3px] rounded-[4px] bg-pressbox-orange/15 font-plex font-semibold text-[10px] tracking-[0.08em] text-pressbox-orange-soft">
+              YOUR TURN
+            </span>
+          )}
+          {availableQueuePlayers.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="focus-citrus font-plex font-medium text-[11px] text-pressbox-orange-soft"
+            >
+              CLEAR
+            </button>
+          )}
+        </span>
+      </div>
+
+      {availableQueuePlayers.length === 0 ? (
+        <div className="px-3.5 py-8 text-center">
+          <p className="font-barlow font-semibold text-[14px] text-pressbox-text">Your queue is empty</p>
+          <p className="mt-1 font-barlow text-[12px] text-pressbox-text/55">
+            Tap the star on any player to add him. Drag to reorder. The top player is your autopick.
+          </p>
+        </div>
+      ) : (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={availableQueuePlayers.map(p => p.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div>
+              {availableQueuePlayers.map((player, index) => (
+                <SortableQueueItem
+                  key={player.id}
+                  player={player}
+                  index={index}
+                  isDrafted={false}
+                  onRemove={() => handleRemove(player.id)}
+                  onDraft={() => onDraftFromQueue(player.id)}
+                  isYourTurn={isYourTurn}
+                  estimatedPick={currentPick}
+                  totalPicks={totalPicks}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
+
+      {draftedInQueue.length > 0 && (
+        <div className="mt-2 px-3.5 pt-3 border-t border-white/[0.08]">
+          <div className="flex items-center justify-between font-plex font-medium text-[10px] tracking-[0.06em] text-pressbox-text/45">
+            <span>
+              {draftedInQueue.length} ALREADY DRAFTED
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                const newQueue = queue.filter(id => !draftedPlayers.includes(id));
+                onQueueChange(newQueue);
+              }}
+              className="focus-citrus text-pressbox-orange-soft"
+            >
+              REMOVE ALL
+            </button>
+          </div>
+          <div className="mt-1.5 pb-3">
+            {draftedInQueue.slice(0, 3).map(player => (
+              <div key={player.id} className="font-plex font-medium text-[10px] text-pressbox-text/45 line-through">
+                {player.full_name} ({player.position})
+              </div>
+            ))}
+            {draftedInQueue.length > 3 && (
+              <div className="font-plex font-medium text-[10px] text-pressbox-text/45">
+                +{draftedInQueue.length - 3} more
+              </div>
             )}
           </div>
-          {availableQueuePlayers.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleClearAll}
-              className="h-7 text-xs"
-            >
-              <Trash2 className="h-3 w-3 mr-1" />
-              Clear
-            </Button>
-          )}
         </div>
-        {/* REMOVED drafted count display */}
-      </CardHeader>
-      <CardContent className="pt-0">
-        {availableQueuePlayers.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <div className="flex flex-col items-center gap-2">
-              <AlertCircle className="h-8 w-8 text-muted-foreground/50" />
-              <p className="text-sm font-medium">Your queue is empty</p>
-              <p className="text-xs">Click the star icon on players to add them to your queue</p>
-              <div className="mt-2 p-2 bg-white/5 rounded text-xs flex items-center gap-2">
-                <Info className="h-3 w-3" />
-                <span>Drag to reorder • Top player auto-drafts when it's your turn</span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={availableQueuePlayers.map(p => p.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-2">
-                {availableQueuePlayers.map((player, index) => (
-                  <SortableQueueItem
-                    key={player.id}
-                    player={player}
-                    index={index}
-                    isDrafted={false}
-                    onRemove={() => handleRemove(player.id)}
-                    onDraft={() => onDraftFromQueue(player.id)}
-                    isYourTurn={isYourTurn}
-                    estimatedPick={currentPick}
-                    totalPicks={totalPicks}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        )}
-
-        {draftedInQueue.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-white/10">
-            <div className="text-xs text-muted-foreground mb-2 flex items-center justify-between">
-              <span>
-                {draftedInQueue.length} player{draftedInQueue.length !== 1 ? 's' : ''} already drafted
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  const newQueue = queue.filter(id => !draftedPlayers.includes(id));
-                  onQueueChange(newQueue);
-                }}
-                className="h-6 text-xs"
-              >
-                Remove All
-              </Button>
-            </div>
-            <div className="space-y-1">
-              {draftedInQueue.slice(0, 3).map(player => (
-                <div key={player.id} className="text-xs text-muted-foreground line-through opacity-60">
-                  {player.full_name} ({player.position})
-                </div>
-              ))}
-              {draftedInQueue.length > 3 && (
-                <div className="text-xs text-muted-foreground">
-                  +{draftedInQueue.length - 3} more...
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      )}
+    </section>
   );
 };
 

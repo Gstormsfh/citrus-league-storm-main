@@ -130,6 +130,14 @@ export const playerApi = {
     );
   },
 
+  /**
+   * Rostered% / started% per player across every Citrus team with a roster
+   * (2026-09-05). Cached long: the numbers move on a waiver run.
+   */
+  getOwnership() {
+    return c.cached('players:ownership', () => apiClient.get('/api/players/ownership'), CACHE_TTL.LONG);
+  },
+
   /** Get player directory entries */
   getDirectory(ids: string[], season?: number) {
     const params = new URLSearchParams();

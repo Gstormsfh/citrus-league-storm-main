@@ -116,28 +116,80 @@ describe('DraftPoolRow — the quality signal', () => {
 });
 
 describe('DraftPoolRow — the controls', () => {
-  it('shows the card button off the clock and stands it down on the clock', () => {
-    // Under the clock the row itself carries the projection and the
-    // percentile, which is what the card was being opened for, and the name
-    // needs the 32px back.
-    const { rerender } = render(<DraftPoolRow {...base} onShowCard={vi.fn()} canDraft={false} />);
-    expect(screen.getByTestId('pool-row-card-button')).toBeInTheDocument();
-    rerender(<DraftPoolRow {...base} onShowCard={vi.fn()} canDraft={true} />);
+  // TWO TAPS, NO (i) (2026-09-05). The verb draws on every undrafted row;
+  // the first tap arms it, the second fires; the row itself opens the card.
+  it('draws the verb on every undrafted row, live only on the turn', () => {
+    const { rerender } = render(<DraftPoolRow {...base} canDraft={false} />);
+    const off = screen.getByTestId('pool-row-draft-button') as HTMLButtonElement;
+    expect(off.textContent).toBe('Draft');
+    expect(off.disabled).toBe(true);
+    expect(off.getAttribute('title')).toBe('Not your turn');
+    rerender(<DraftPoolRow {...base} canDraft />);
+    const on = screen.getByTestId('pool-row-draft-button') as HTMLButtonElement;
+    expect(on.disabled).toBe(false);
     expect(screen.queryByTestId('pool-row-card-button')).toBeNull();
   });
 
-  it('omits the card button entirely when the caller passes no handler', () => {
-    render(<DraftPoolRow {...base} />);
-    expect(screen.queryByTestId('pool-row-card-button')).toBeNull();
+  it('no verb on a drafted row', () => {
+    render(<DraftPoolRow {...base} drafted />);
+    expect(screen.queryByTestId('pool-row-draft-button')).toBeNull();
   });
 
-  it('opens the card without selecting the row (stopPropagation contract)', () => {
+  it('says Nominate in an auction room', () => {
+    render(<DraftPoolRow {...base} canDraft verb="Nominate" />);
+    expect(screen.getByTestId('pool-row-draft-button').textContent).toBe('Nominate');
+  });
+
+  it('the first tap arms, the second fires', () => {
+    const onDraft = vi.fn();
+    const onArm = vi.fn();
+    const { rerender } = render(<DraftPoolRow {...base} canDraft onArm={onArm} onDraft={onDraft} />);
+    fireEvent.click(screen.getByTestId('pool-row-draft-button'));
+    expect(onArm).toHaveBeenCalledTimes(1);
+    expect(onDraft).not.toHaveBeenCalled();
+    rerender(<DraftPoolRow {...base} canDraft armed onArm={onArm} onDraft={onDraft} />);
+    const btn = screen.getByTestId('pool-row-draft-button');
+    expect(btn.textContent).toBe('Confirm');
+    expect(btn.getAttribute('data-armed')).toBe('true');
+    fireEvent.click(btn);
+    expect(onDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires in one tap when the caller keeps no armed state (v1 call sites)', () => {
+    const onDraft = vi.fn();
+    render(<DraftPoolRow {...base} canDraft onDraft={onDraft} />);
+    fireEvent.click(screen.getByTestId('pool-row-draft-button'));
+    expect(onDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('off the turn a tap does nothing, armed or not', () => {
+    const onDraft = vi.fn();
+    const onArm = vi.fn();
+    render(<DraftPoolRow {...base} canDraft={false} armed onArm={onArm} onDraft={onDraft} />);
+    const btn = screen.getByTestId('pool-row-draft-button');
+    expect(btn.textContent).toBe('Draft');
+    fireEvent.click(btn);
+    expect(onArm).not.toHaveBeenCalled();
+    expect(onDraft).not.toHaveBeenCalled();
+  });
+
+  it('the row opens the card, and selects only when there is no card', () => {
     const onShowCard = vi.fn();
     const onSelect = vi.fn();
-    render(<DraftPoolRow {...base} onShowCard={onShowCard} onSelect={onSelect} />);
-    fireEvent.click(screen.getByTestId('pool-row-card-button'));
+    const { rerender } = render(<DraftPoolRow {...base} onShowCard={onShowCard} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText('Connor McDavid'));
     expect(onShowCard).toHaveBeenCalledTimes(1);
     expect(onSelect).not.toHaveBeenCalled();
+    rerender(<DraftPoolRow {...base} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText('Connor McDavid'));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('the verb does not open the card (stopPropagation contract)', () => {
+    const onShowCard = vi.fn();
+    render(<DraftPoolRow {...base} canDraft onShowCard={onShowCard} onArm={vi.fn()} />);
+    fireEvent.click(screen.getByTestId('pool-row-draft-button'));
+    expect(onShowCard).not.toHaveBeenCalled();
   });
 
   it('queues without selecting, and reports its pressed state', () => {
@@ -153,14 +205,7 @@ describe('DraftPoolRow — the controls', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it('drafts in ONE tap when the Draft button is showing', () => {
-    const onDraft = vi.fn();
-    render(<DraftPoolRow {...base} canDraft onDraft={onDraft} />);
-    fireEvent.click(screen.getByTestId('pool-row-draft-button'));
-    expect(onDraft).toHaveBeenCalledTimes(1);
-  });
-
-  it('disables the Draft button while a pick is in flight (F11 double-submit guard)', () => {
+  it('disables the verb while a pick is in flight (F11 double-submit guard)', () => {
     const onDraft = vi.fn();
     render(<DraftPoolRow {...base} canDraft submitting onDraft={onDraft} />);
     const btn = screen.getByTestId('pool-row-draft-button') as HTMLButtonElement;
@@ -170,11 +215,13 @@ describe('DraftPoolRow — the controls', () => {
     expect(onDraft).not.toHaveBeenCalled();
   });
 
-  it('a drafted row does not select', () => {
+  it('a drafted row does not select or open', () => {
     const onSelect = vi.fn();
-    render(<DraftPoolRow {...base} drafted onSelect={onSelect} />);
+    const onShowCard = vi.fn();
+    render(<DraftPoolRow {...base} drafted onSelect={onSelect} onShowCard={onShowCard} />);
     fireEvent.click(screen.getByTestId('draft-pool-row'));
     expect(onSelect).not.toHaveBeenCalled();
+    expect(onShowCard).not.toHaveBeenCalled();
   });
 });
 
@@ -211,5 +258,21 @@ describe('DraftPoolRow — identity', () => {
   it('shows no chip for an active player', () => {
     render(<DraftPoolRow {...base} player={mkPlayer({ status: 'ACT' })} />);
     expect(screen.queryByTestId('draft-pool-status-chip')).toBeNull();
+  });
+});
+
+describe('DraftPoolRow — the Players-row cut (2026-09-05, artboard 4a)', () => {
+  it('prints the season line after the team, and the position rank after the read', () => {
+    render(<DraftPoolRow {...base} signal={SIGNAL} seasonLine="90 PTS · 26:10" positionRank="D1" />);
+    expect(screen.getByTestId('draft-pool-season').textContent).toBe('90 PTS · 26:10');
+    const meta = screen.getByTestId('draft-pool-signal').parentElement!;
+    expect(meta.textContent).toContain('xG 88th');
+    expect(meta.textContent).toContain('D1');
+  });
+
+  it('draws neither when the caller has neither', () => {
+    render(<DraftPoolRow {...base} signal={null} />);
+    expect(screen.queryByTestId('draft-pool-season')).toBeNull();
+    expect(screen.queryByText(/D1/)).toBeNull();
   });
 });

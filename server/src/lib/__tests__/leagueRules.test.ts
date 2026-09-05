@@ -13,6 +13,7 @@ import {
   resolveAddLimits,
   isPastTradeDeadline,
   evaluateGameLock,
+  lockedTeamForTrade,
 } from '../leagueRules';
 
 describe('resolveSlotConfig — the league shape, not a literal', () => {
@@ -339,5 +340,26 @@ describe('validateIrPlacements: only the injured go on IR (2026-09-03, WORLD_CLA
       cfg,
     );
     expect(v.error).toMatch(/^Bo Horvat isn't listed IR or LTIR/);
+  });
+});
+
+describe('lockedTeamForTrade — allow_trades_during_games OFF holds a trade with a player on the ice', () => {
+  const NOON = Date.parse('2026-10-10T19:00:00Z');
+  const games = [
+    { home_team: 'EDM', away_team: 'CGY', status: 'live' },
+    { home_team: 'TOR', away_team: 'MTL', status: 'scheduled', game_date: '2026-10-10', game_time: '23:00:00Z' },
+  ];
+
+  it('names the first team in the trade whose game has started', () => {
+    expect(lockedTeamForTrade(['TOR', 'CGY', 'EDM'], games, NOON)).toBe('CGY');
+  });
+
+  it('is null when every team in the trade is still waiting for puck drop or idle', () => {
+    expect(lockedTeamForTrade(['TOR', 'MTL', 'BOS'], games, NOON)).toBeNull();
+  });
+
+  it('fails open on unknown teams and an empty schedule', () => {
+    expect(lockedTeamForTrade([null, undefined, ''], games, NOON)).toBeNull();
+    expect(lockedTeamForTrade(['EDM'], [], NOON)).toBeNull();
   });
 });

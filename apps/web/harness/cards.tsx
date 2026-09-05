@@ -1,5 +1,6 @@
 /** Roster-card gallery at a phone viewport. Real HockeyPlayerCard, real Tailwind. */
 import { createRoot } from 'react-dom/client';
+import '../src/pressboxFonts';
 import '../src/index.css';
 import HockeyPlayerCard, { HockeyPlayer } from '../src/components/roster/HockeyPlayerCard';
 import MobileRosterList from '../src/components/roster/MobileRosterList';

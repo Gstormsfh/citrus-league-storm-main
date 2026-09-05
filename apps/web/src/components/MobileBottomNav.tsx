@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
+import { PressBoxBottomNav } from '@/components/pressbox/PressBoxBottomNav';
 
 const MobileBottomNav = () => {
   const location = useLocation();
@@ -162,6 +163,23 @@ const MobileBottomNav = () => {
   ];
   if (hideOnRoutes.some(route => location.pathname.startsWith(route))) {
     return null;
+  }
+
+  /**
+   * PRESS BOX (2026-09-04). The five-tab APP nav — Leagues / Scores /
+   * Players / News / Account — replaces the league tabs below. The split is
+   * the point: this bar moves you around the app; `LeagueHeader`'s strip,
+   * now on every league screen (Match / Team / Players / League), moves you
+   * around a league. A bar that did both is how a manager ended up with
+   * five tabs that all led back into one league and no way out.
+   *
+   * Pool leagues keep their own tab sets for now: their pages carry no
+   * LeagueHeader yet, so taking their tabs away would leave a pick'em
+   * manager with the app bar and no way between Picks and Standings. That
+   * branch, and the hide-route contract above it, are unchanged.
+   */
+  if (!isPool) {
+    return <PressBoxBottomNav />;
   }
 
   return (

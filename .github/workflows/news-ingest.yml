@@ -1,0 +1,65 @@
+name: News Room Ingest (news_items from the wires)
+
+# Reads every enabled row of news_sources (NHL.com, ESPN, the beat feeds),
+# matches each story to the players it names, summarises the new ones, and
+# stores them in news_items for the Citrus News Room and the player card's
+# NEWS tab. One news_ingest_runs row per source per run: that table, read by
+# GET /api/news/health, is the affirmative signal the phone prints ("Read
+# 12m ago · 7 sources"). A silent hour is visible, not assumed fine.
+#
+# Same shape as citrus-news-generate.yml: the endpoint is gated by the
+# shared secret in X-Scheduled-Secret, held as a repo secret and a Cloud Run
+# env var, so nobody pastes it into a terminal.
+#
+# Why every 30 minutes: a beat writer's injury note is worth having before
+# lineups lock, and the ingest is idempotent (news_items.url is UNIQUE and
+# inserts ignore duplicates), so a run that finds nothing new writes
+# nothing. The feeds are small; a run is a few seconds plus the summaries.
+#
+# Manual run:  gh workflow run news-ingest.yml
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: POST /api/scheduled/news-ingest
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          SCHEDULED_TRIGGER_SECRET: ${{ secrets.SCHEDULED_TRIGGER_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${API_BASE_URL:-}" ]; then
+            echo "API_BASE_URL secret not set" >&2
+            exit 1
+          fi
+          if [ -z "${SCHEDULED_TRIGGER_SECRET:-}" ]; then
+            echo "SCHEDULED_TRIGGER_SECRET secret not set" >&2
+            exit 1
+          fi
+
+          RESP=$(mktemp)
+          STATUS=$(curl -sS -o "$RESP" -w "%{http_code}" \
+            -X POST "${API_BASE_URL%/}/api/scheduled/news-ingest" \
+            -H "X-Scheduled-Secret: ${SCHEDULED_TRIGGER_SECRET}" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            --max-time 300)
+          echo "HTTP $STATUS"
+          cat "$RESP"
+          echo
+          if [ "$STATUS" != "200" ]; then
+            echo "news-ingest failed (status $STATUS)" >&2
+            exit 1
+          fi
+
+          # A source failing is reported inside the payload (its run row
+          # carries the error) rather than by a non-200, so one dead feed
+          # cannot discard the others' stories. Surface it as a warning.
+          if grep -q '"errors":1' "$RESP"; then
+            echo "::warning::One or more sources failed this run — see the payload above."
+          fi

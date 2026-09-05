@@ -71,7 +71,7 @@ interface ScoreCardProps {
    * from `useSeasonStatus()`, which the PAGE reads and passes down.
    *
    * A prop, not a hook read, in all three matchup header components
-   * (ScoreCard, WinProbabilityBar, StickyScoreBar). They are handed
+   * (ScoreCard, WinProbabilityBar, and the phone's PressBoxScoreBlock). They are handed
    * pre-formatted strings and told what to draw; none of them fetches
    * anything, and putting a React Query call inside one would make a
    * presentational component fail to render outside a QueryClientProvider —
@@ -229,7 +229,7 @@ export const ScoreCard = ({
       <CitrusBurst className="hidden md:block absolute bottom-3 left-3 w-10 h-10 text-pastel-sage/10" aria-hidden="true" />
 
       {/* Mobile: Compact single-row layout — the AT-REST header (audit M8).
-          On a phone the page's sticky StickyScoreBar is the compressed
+          On a phone the page's PressBoxScoreBlock is the compressed
           version of this card (disc · name · score · proj · win chance,
           both sides) and never leaves the screen; this card adds what the
           band has no room for — records, the YOU pill, "N left", the full

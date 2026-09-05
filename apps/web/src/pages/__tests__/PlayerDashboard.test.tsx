@@ -102,6 +102,7 @@ function indexEntry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntr
     gp: 71, goals: 48, assists: 52, points: 100, sog: 244, hits: 20, blocks: 18,
     ppp: 30, plus_minus: 12, x_goals: 40.5,
     wins: 0, saves: 0, save_pct: 0, gaa: 0, shutouts: 0,
+    pim: 0, shp: 0, toi_seconds: 0, losses: 0, ot_losses: 0, goals_against: 0,
     xg_per_60: 1.42, xg_rating: 'Elite',
     gar_per_60: 0.5, gar_evo: 0.31, gar_evd: 0.04, gar_ppo: 0.11, gar_ppd: 0.01, gar_pen: 0.03,
     proj_gp: 58, proj_fantasy_points: 320, proj_fantasy_ppg: 5.5,
@@ -248,11 +249,15 @@ describe('PlayerDashboard — the shipped page', () => {
     const rink = await screen.findByLabelText(/shot heatmap for connor mcdavid/i);
     expect(rink).toBeInTheDocument();
 
-    // All four chapters of the zone contract are present.
+    // Three chapters of the zone contract are present. Chapter 4 (one xG
+    // number against the cohort median) was dropped on 2026-09-05: it read
+    // as a verdict on the player.
     expect(screen.getByText(/chapter 1 · overview/i)).toBeInTheDocument();
     expect(screen.getByText(/chapter 2 · career arc/i)).toBeInTheDocument();
     expect(screen.getByText(/chapter 3 · breakdown/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/chapter 4 · position vs league/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/position vs league/i)).toBeNull();
+    // A way back on the phone header (2026-09-05).
+    expect(screen.getByRole('button', { name: /back to players/i })).toBeInTheDocument();
 
     // The condensed card is inline at the top — PWS-2 Option 1.
     expect(screen.getByTestId('player-advanced-card')).toBeInTheDocument();
@@ -401,12 +406,18 @@ describe('PlayerDashboard — the shipped page', () => {
     expect(screen.getByText(/no update timestamp on this payload/i)).toBeInTheDocument();
   });
 
-  it('shows the freshness badge when the payload carried a real timestamp', async () => {
-    serve(payload());
+  it('shows the freshness badge when the payload carried a real timestamp that has gone stale', async () => {
+    // StaleDataBadge hides itself under 14 days (a fresh model needs no
+    // badge), so the fixture's timestamp is three weeks old.
+    const staleAsOf = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString();
+    serve(payload({ as_of: staleAsOf }));
     renderAt(MCDAVID);
     await screen.findByLabelText(/shot heatmap/i);
     expect(screen.queryByText(/no update timestamp/i)).toBeNull();
-    expect(screen.getByText(/xg model/i)).toBeInTheDocument();
+    // The badge names itself for assistive tech (`xG model. <date>, <age>.`);
+    // the old text match had been passing against the marketing footer's
+    // "31-feature xG model" line, which the app footer no longer carries.
+    expect(screen.getByRole('note', { name: /xg model/i })).toBeInTheDocument();
   });
 
   // The league index is a SEPARATE endpoint behind the same gate. Losing it

@@ -20,7 +20,7 @@ import { Search, Shield, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-reac
    labels 1.58:1 against it. There is no text colour that fixes a
    mid-grey surface; the surface itself is the bug. Swapped to the dark
    tile family the rest of the app uses (ui/card.tsx is
-   bg-pastel-surface-tile + ring-white/10), so cream text lands at 13:1. */
+   bg-pastel-surface-tile max-lg:bg-pressbox-tile + ring-white/10), so cream text lands at 13:1. */
 
 
 interface TeamSelectorProps {
@@ -95,13 +95,13 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
       {/* Search + View Toggle */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-pastel-cream/60" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-pastel-cream/60 max-lg:text-pressbox-text/60" />
           <input
             type="text"
             placeholder="Search teams..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border-2 border-citrus-sage/30 bg-pastel-surface-tile backdrop-blur-sm text-sm font-display text-pastel-cream placeholder:text-pastel-cream/60 focus:outline-none focus:border-citrus-sage focus:ring-2 focus:ring-citrus-sage/20 transition-all"
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border-2 border-citrus-sage/30 bg-pastel-surface-tile max-lg:bg-pressbox-tile backdrop-blur-sm text-sm font-display max-lg:font-barlow text-pastel-cream max-lg:text-pressbox-text placeholder:text-pastel-cream/60 placeholder:max-lg:text-pressbox-text/60 focus:outline-none focus:border-citrus-sage focus:ring-2 focus:ring-citrus-sage/20 transition-all"
           />
         </div>
         <div className="flex rounded-xl border-2 border-citrus-sage/30 overflow-hidden">
@@ -110,10 +110,10 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
               key={mode}
               onClick={() => setViewMode(mode)}
               className={cn(
-                "px-3 py-2 text-[10px] font-display font-bold uppercase tracking-wider transition-colors",
+                "px-3 py-2 text-[10px] font-display max-lg:font-barlow font-bold uppercase tracking-wider transition-colors",
                 viewMode === mode
                   ? "bg-citrus-sage text-pastel-forest"
-                  : "bg-pastel-surface-tile text-pastel-cream/70 hover:bg-citrus-sage/10"
+                  : "bg-pastel-surface-tile max-lg:bg-pressbox-tile text-pastel-cream/70 max-lg:text-pressbox-text/70 hover:bg-citrus-sage/10"
               )}
             >
               {mode === 'division' ? 'Division' : mode === 'grid' ? 'All' : 'Rankings'}
@@ -128,14 +128,14 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
           {teamsByDivision.map((div) => (
             <div
               key={div.name}
-              className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 overflow-hidden"
+              className="bg-pastel-surface-tile max-lg:bg-pressbox-tile backdrop-blur-sm rounded-2xl max-lg:rounded-[12px] border-2 border-citrus-sage/30 overflow-hidden"
             >
               <div className="px-4 py-2.5 bg-gradient-to-r from-citrus-sage/20 to-citrus-sage/10 border-b border-citrus-sage/30">
                 <div className="flex items-center gap-2">
-                  <span className="font-varsity text-sm text-pastel-cream tracking-tight">
+                  <span className="font-varsity max-lg:font-condensed text-sm text-pastel-cream max-lg:text-pressbox-text tracking-tight">
                     {div.name}
                   </span>
-                  <span className="text-[9px] text-pastel-cream/65 font-display">
+                  <span className="text-[9px] text-pastel-cream/65 max-lg:text-pressbox-text/65 font-display max-lg:font-barlow">
                     {div.conference}
                   </span>
                 </div>
@@ -172,17 +172,17 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
 
       {/* Rankings Table View */}
       {viewMode === 'rankings' && (
-        <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
+        <div className="bg-pastel-surface-tile max-lg:bg-pressbox-tile backdrop-blur-sm rounded-2xl max-lg:rounded-[12px] border-2 border-citrus-sage/30 shadow-varsity overflow-hidden">
           <div className="px-4 py-2.5 bg-gradient-to-r from-citrus-sage/20 to-citrus-sage/10 border-b-2 border-citrus-sage/30 flex items-center justify-between">
-            <span className="font-varsity text-sm text-pastel-cream">League Cap Rankings</span>
-            <span className="text-[9px] text-pastel-cream/65 font-display">
+            <span className="font-varsity max-lg:font-condensed text-sm text-pastel-cream max-lg:text-pressbox-text">League Cap Rankings</span>
+            <span className="text-[9px] text-pastel-cream/65 max-lg:text-pressbox-text/65 font-display max-lg:font-barlow">
               Click any team to view full roster
             </span>
           </div>
 
           {/* Table Header */}
           <div className="grid grid-cols-[1.5rem_2rem_1fr_4.5rem_4.5rem] sm:grid-cols-[2rem_2.5rem_1fr_6rem_6rem_4rem] md:grid-cols-[2rem_2.5rem_1fr_7rem_7rem_5rem] items-center gap-1 md:gap-2 px-2 sm:px-3 py-2 bg-citrus-sage/10 border-b border-citrus-sage/20">
-            <span className="text-[7px] sm:text-[8px] text-pastel-cream/60 uppercase font-display font-bold text-center">#</span>
+            <span className="text-[7px] sm:text-[8px] text-pastel-cream/60 max-lg:text-pressbox-text/60 uppercase font-display max-lg:font-barlow font-bold text-center">#</span>
             <span></span>
             <SortHeader label="Team" sortKey="name" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} />
             <SortHeader label="Cap Hit" sortKey="capHit" currentKey={sortKey} dir={sortDir} onToggle={toggleSort} align="right" />
@@ -208,10 +208,10 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
                     i % 2 === 0 ? "bg-white/5" : "bg-citrus-cream/20"
                   )}
                 >
-                  <span className="text-[9px] sm:text-[10px] text-pastel-cream/65 font-display font-semibold text-center">{i + 1}</span>
+                  <span className="text-[9px] sm:text-[10px] text-pastel-cream/65 max-lg:text-pressbox-text/65 font-display max-lg:font-barlow font-semibold text-center">{i + 1}</span>
                   <img loading="lazy" decoding="async" src={info?.logoUrl || ''} alt={team.teamAbbrev} className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
                   <div className="min-w-0">
-                    <span className="font-display font-bold text-[10px] sm:text-xs text-pastel-cream truncate block">{team.teamName}</span>
+                    <span className="font-display max-lg:font-barlow font-bold text-[10px] sm:text-xs text-pastel-cream max-lg:text-pressbox-text truncate block">{team.teamName}</span>
                     <div className="h-1 mt-0.5 sm:mt-1 bg-citrus-cream rounded-full overflow-hidden">
                       <div
                         className={cn(
@@ -222,14 +222,14 @@ export default function TeamSelector({ selectedTeam, onSelectTeam }: TeamSelecto
                       />
                     </div>
                   </div>
-                  <span className="font-varsity text-[10px] sm:text-xs text-pastel-cream text-right">{formatCap(team.projectedCapHit)}</span>
+                  <span className="font-varsity max-lg:font-condensed text-[10px] sm:text-xs text-pastel-cream max-lg:text-pressbox-text text-right">{formatCap(team.projectedCapHit)}</span>
                   <span className={cn(
-                    "font-varsity text-[10px] sm:text-xs text-right",
+                    "font-varsity max-lg:font-condensed text-[10px] sm:text-xs text-right",
                     isOverCap ? "text-red-600" : isNearCap ? "text-amber-600" : "text-green-600"
                   )}>
                     {isOverCap ? '-' : ''}{formatCap(Math.abs(team.capSpace))}
                   </span>
-                  <span className="hidden sm:block font-varsity text-xs text-pastel-cream/75 text-center">{team.activeRosterSize}</span>
+                  <span className="hidden sm:block font-varsity max-lg:font-condensed text-xs text-pastel-cream/75 max-lg:text-pressbox-text/75 text-center">{team.activeRosterSize}</span>
                 </button>
               );
             })}
@@ -256,8 +256,8 @@ function SortHeader({
     <button
       onClick={() => onToggle(key)}
       className={cn(
-        "flex items-center gap-0.5 text-[7px] sm:text-[8px] uppercase font-display font-bold tracking-wider transition-colors",
-        isActive ? "text-pastel-cream" : "text-pastel-cream/60 hover:text-pastel-cream/70",
+        "flex items-center gap-0.5 text-[7px] sm:text-[8px] uppercase font-display max-lg:font-barlow font-bold tracking-wider transition-colors",
+        isActive ? "text-pastel-cream max-lg:text-pressbox-text" : "text-pastel-cream/60 max-lg:text-pressbox-text/60 hover:text-pastel-cream/70 hover:max-lg:text-pressbox-text/70",
         align === 'right' && "justify-end",
         align === 'center' && "justify-center",
         className,
@@ -303,7 +303,7 @@ function TeamCard({
         ) : (
           <Shield className="w-8 h-8 text-citrus-sage/50" />
         )}
-        <span className="text-[9px] font-varsity text-pastel-cream">{team.abbrev}</span>
+        <span className="text-[9px] font-varsity max-lg:font-condensed text-pastel-cream max-lg:text-pressbox-text">{team.abbrev}</span>
       </button>
     );
   }
@@ -329,10 +329,10 @@ function TeamCard({
         <Shield className="w-8 h-8 text-citrus-sage/50 flex-shrink-0" />
       )}
       <div className="min-w-0">
-        <div className="font-display font-bold text-xs text-pastel-cream truncate">
+        <div className="font-display max-lg:font-barlow font-bold text-xs text-pastel-cream max-lg:text-pressbox-text truncate">
           {team.name}
         </div>
-        <div className="text-[9px] text-pastel-cream/65 font-display">{team.abbrev}</div>
+        <div className="text-[9px] text-pastel-cream/65 max-lg:text-pressbox-text/65 font-display max-lg:font-barlow">{team.abbrev}</div>
       </div>
     </button>
   );

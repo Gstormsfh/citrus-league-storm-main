@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import Navbar from '@/components/Navbar';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
+import { PressBoxChips } from '@/components/pressbox/Chips';
 import { HockeyFooter } from '@/components/citrus2';
 import TeamSelector from '@/components/armchair-gm/TeamSelector';
 import CapSummaryBar from '@/components/armchair-gm/CapSummaryBar';
@@ -71,12 +73,32 @@ const ArmchairGM = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F1F15] text-pastel-cream">
-      <Navbar />
+    <div className="pb-type-phone min-h-screen flex flex-col bg-[#0F1F15] max-lg:bg-pressbox-surface text-pastel-cream max-lg:text-pressbox-text max-lg:font-barlow">
+      <div className="hidden lg:block"><Navbar /></div>
+      {/* PRESS BOX (2026-09-05): "Armchair GM is still stuck in the past."
+          Below lg the page wears the app header and the chip strip the
+          other app tabs wear; the hero band and the tab bar are the
+          desktop's. The six tools take Press Box tokens through max-lg
+          twins on every surface class, so the desktop is untouched. */}
+      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+        <PressBoxAppHeader title="Armchair GM" logoSrc="/favicon.svg" />
+        <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-2.5 -my-2.5">
+          <PressBoxChips
+            className="w-max px-4"
+            label="Armchair GM tool"
+            activeKey={activeTab}
+            onSelect={(k) => setActiveTab(k as GMTab)}
+            chips={TABS.map((t) => ({ key: t.id, label: t.label.toUpperCase() }))}
+          />
+        </div>
+        <p className="px-4 pt-3 font-plex font-medium text-[10px] tracking-[0.06em] uppercase text-pressbox-text/45">
+          NHL salary cap toolkit · {formatCap(SALARY_CAP_2025_26)} cap · {SEASON_LABEL}
+        </p>
+      </div>
 
-      <main className="flex-1 w-full pt-[var(--header-height)] pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-12">
+      <main className="flex-1 w-full lg:pt-[var(--header-height)] pb-app-chrome lg:pb-12">
         {/* Hero Header — deeper #0F1F15 band with orange glow + diagonal stripes for depth */}
-        <div className="w-full bg-[#0F1F15] border-b border-white/10 relative isolate overflow-hidden">
+        <div className="hidden lg:block w-full bg-[#0F1F15] max-lg:bg-pressbox-surface border-b border-white/10 relative isolate overflow-hidden">
           <div aria-hidden="true" className="absolute -top-32 -right-20 w-[480px] h-[480px] bg-pastel-orange/15 rounded-full blur-3xl pointer-events-none" />
           <div aria-hidden="true" className="absolute -bottom-24 -left-20 w-[360px] h-[360px] bg-pastel-sage/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute inset-0 opacity-[0.04] pointer-events-none z-0" aria-hidden="true"
@@ -87,14 +109,14 @@ const ArmchairGM = () => {
 
           <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 relative z-10">
             <div className="flex items-center gap-3 sm:gap-4">
-              <div className="p-2 sm:p-3 rounded-2xl bg-pastel-orange/15 ring-1 ring-pastel-orange/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
-                <DollarSign className="w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 text-pastel-orange" />
+              <div className="p-2 sm:p-3 rounded-2xl max-lg:rounded-[12px] bg-pastel-orange/15 ring-1 ring-pastel-orange/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                <DollarSign className="w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8 text-pastel-orange max-lg:text-pressbox-orange-soft" />
               </div>
               <div>
-                <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
+                <div className="font-jbmono max-lg:font-plex text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-bold mb-1">
                   ✦ NHL Salary Cap Toolkit
                 </div>
-                <h1 className="font-calistoga text-xl sm:text-2xl md:text-3xl text-pastel-cream leading-none">
+                <h1 className="font-calistoga max-lg:font-condensed max-lg:font-extrabold max-lg:uppercase max-lg:tracking-[0.02em] text-xl sm:text-2xl md:text-3xl text-pastel-cream max-lg:text-pressbox-text leading-none">
                   Armchair GM
                 </h1>
                 <p className="text-xs sm:text-sm text-white/55 mt-1.5">
@@ -138,8 +160,8 @@ const ArmchairGM = () => {
                   className={cn(
                     "flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2.5 min-h-[44px] rounded-t-xl text-xs sm:text-sm font-bold transition-all border-2 border-b-0 flex-shrink-0 whitespace-nowrap cursor-pointer",
                     activeTab === tab.id
-                      ? "bg-pastel-orange text-[#581E00] border-pastel-orange shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
-                      : "bg-white/5 text-white/55 border-white/10 hover:bg-white/[0.08] hover:border-pastel-orange/30 hover:text-pastel-cream"
+                      ? "bg-pastel-orange max-lg:bg-pressbox-orange text-[#581E00] max-lg:text-pressbox-orange-ink border-pastel-orange shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                      : "bg-white/5 text-white/55 border-white/10 hover:bg-white/[0.08] hover:border-pastel-orange/30 hover:text-pastel-cream max-lg:text-pressbox-text"
                   )}
                 >
                   {tab.icon}
@@ -159,8 +181,8 @@ const ArmchairGM = () => {
               {showTeamSelector || !selectedTeam ? (
                 <>
                   <div className="flex items-center gap-3 mb-2">
-                    <TrendingUp className="w-5 h-5 text-pastel-orange" />
-                    <h2 className="font-calistoga text-lg text-pastel-cream">Select a Team</h2>
+                    <TrendingUp className="w-5 h-5 text-pastel-orange max-lg:text-pressbox-orange-soft" />
+                    <h2 className="font-calistoga max-lg:font-condensed max-lg:font-extrabold max-lg:uppercase max-lg:tracking-[0.02em] text-lg text-pastel-cream max-lg:text-pressbox-text">Select a Team</h2>
                   </div>
                   <TeamSelector
                     selectedTeam={selectedTeam}
@@ -171,7 +193,7 @@ const ArmchairGM = () => {
                 <>
                   <button
                     onClick={handleBackToTeams}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl ring-1 ring-pastel-cream/30 bg-transparent hover:bg-white/5 hover:ring-pastel-cream/50 transition-colors text-sm text-pastel-cream font-bold"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl ring-1 ring-pastel-cream/30 bg-transparent hover:bg-white/5 hover:ring-pastel-cream/50 transition-colors text-sm text-pastel-cream max-lg:text-pressbox-text font-bold"
                   >
                     <ChevronLeft className="w-4 h-4" />
                     All Teams
@@ -179,7 +201,7 @@ const ArmchairGM = () => {
 
                   {isLoading && (
                     <div className="flex flex-col items-center justify-center py-20 gap-4">
-                      <Loader2 className="w-8 h-8 text-pastel-orange animate-spin" />
+                      <Loader2 className="w-8 h-8 text-pastel-orange max-lg:text-pressbox-orange-soft animate-spin" />
                       <span className="text-sm text-white/55">
                         Loading roster data…
                       </span>
@@ -187,14 +209,14 @@ const ArmchairGM = () => {
                   )}
 
                   {error && (
-                    <div className="flex flex-col items-center justify-center py-12 gap-3 bg-[#1A2A20] ring-1 ring-red-400/40 rounded-2xl shadow-[0_8px_24px_-12px_rgba(248,113,113,0.2)]">
+                    <div className="flex flex-col items-center justify-center py-12 gap-3 bg-[#1A2A20] max-lg:bg-pressbox-tile ring-1 ring-red-400/40 rounded-2xl max-lg:rounded-[12px] shadow-[0_8px_24px_-12px_rgba(248,113,113,0.2)]">
                       <AlertCircle className="w-8 h-8 text-red-300" />
                       <span className="text-sm text-white/70">
                         Unable to load team data. Please try again.
                       </span>
                       <button
                         onClick={() => setSelectedTeam(selectedTeam)}
-                        className="px-4 py-2 rounded-lg bg-pastel-orange text-[#581E00] text-sm font-bold hover:bg-pastel-orange-soft transition-colors shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
+                        className="px-4 py-2 rounded-lg bg-pastel-orange max-lg:bg-pressbox-orange text-[#581E00] max-lg:text-pressbox-orange-ink text-sm font-bold hover:bg-pastel-orange-soft transition-colors shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)]"
                       >
                         Retry
                       </button>
@@ -246,8 +268,8 @@ const ArmchairGM = () => {
 function HeroBadge({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-white/5 ring-1 ring-white/10 flex-shrink-0">
-      <span className="text-[10px] sm:text-xs text-white/55 font-jbmono uppercase tracking-[0.18em] font-bold">{label}</span>
-      <span className="text-xs sm:text-sm font-bold text-pastel-cream tabular-nums">{value}</span>
+      <span className="text-[10px] sm:text-xs text-white/55 font-jbmono max-lg:font-plex uppercase tracking-[0.18em] font-bold">{label}</span>
+      <span className="text-xs sm:text-sm font-bold text-pastel-cream max-lg:text-pressbox-text tabular-nums">{value}</span>
     </div>
   );
 }

@@ -8,6 +8,7 @@
  */
 import { createRoot } from 'react-dom/client';
 import { useState } from 'react';
+import '../src/pressboxFonts';
 import '../src/index.css';
 import { PlayerService, type Player } from '../src/services/PlayerService';
 import { rosterApi } from '../src/api/rosters';

@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart, Lock, Clock, AlertCircle } from 'lucide-react';
-import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
+import { PB_LOADING_MIN_MS, useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from 'recharts';
@@ -29,7 +29,13 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
-import MobileRosterList from '@/components/roster/MobileRosterList';
+import { PressBoxRosterList, PressBoxSkeletonRoster, PressBoxTeamCard } from '@/components/pressbox';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
+import { buildRosterRows, type RosterRowExtras } from '@/components/pressbox/rosterRows';
+import { sideOutlook } from '@/components/pressbox/rosterWeek';
+import { useOwnership, useRosterWeek } from '@/hooks/useRosterWeek';
+import { winProbabilityFromTotals } from '@/utils/winProbability';
+import { buildSlotConfig } from '@/components/roster/slotConfig';
 import { FillSlotSheet } from '@/components/roster/FillSlotSheet';
 import { TodayStrip } from '@/components/roster/TodayStrip';
 import { computeTodaySummary } from '@/components/roster/todaySummary';
@@ -38,7 +44,6 @@ import { planAutoLineup, type AutoLineupPlan } from '@/components/roster/autoLin
 import { irSlotIds, resolveIrSlotCount } from '@/components/roster/irSlots';
 import { gameOnDate, rowGameFor } from '@/components/roster/gameDay';
 import { ApiError } from '@/api/client';
-import MobileMenuButton from '@/components/MobileMenuButton';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useToast } from '@/hooks/use-toast';
 import { PlayerService, Player } from '@/services/PlayerService';
@@ -268,6 +273,19 @@ const dayLabelFor = (dateStr: string): string => {
     .replace(',', '');
 };
 
+/**
+ * The roster's four views, one class for the four triggers. Below lg a pill
+ * in the Press Box well — Plex 10px, cream when active; from lg the
+ * condensed underline strip the desktop card has had. The tracking pair is
+ * the one mobileSweepGuard pins: tight where the column is 98px wide.
+ */
+const ROSTER_VIEW_TAB =
+  'flex-1 min-w-0 px-1 whitespace-nowrap uppercase transition-colors focus-citrus ' +
+  'h-[30px] rounded-[6px] font-plex font-semibold text-[9px] sm:text-[10px] tracking-[0.04em] sm:tracking-[0.14em] text-pressbox-text/60 ' +
+  'data-[state=active]:bg-pressbox-text data-[state=active]:text-pressbox-surface data-[state=active]:shadow-none ' +
+  'lg:h-[34px] lg:rounded-none lg:font-condensed lg:font-bold lg:text-[13px] lg:text-pressbox-text/45 ' +
+  'lg:data-[state=active]:bg-transparent lg:data-[state=active]:text-pressbox-text lg:data-[state=active]:border-b-2 lg:data-[state=active]:border-pressbox-sage lg:hover:text-pressbox-text';
+
 const Roster = () => {
   const { user } = useAuth();
   const { data: profile } = useProfile();
@@ -393,7 +411,7 @@ const Roster = () => {
     };
   }, []);
 
-  const rosterDisplayLoading = useMinimumLoadingTime(loading || leagueLoading, 800);
+  const rosterDisplayLoading = useMinimumLoadingTime(loading || leagueLoading, PB_LOADING_MIN_MS);
 
   // Calculate positional stats
   const posStats = useMemo(() => calculateTeamCategoryStats(roster.starters), [roster.starters]);
@@ -2140,6 +2158,25 @@ const Roster = () => {
 
   const stripDayLabel = useMemo(() => dayLabelFor(selectedDate || getTodayMST()), [selectedDate]);
 
+  /**
+   * `WK 3` for the Press Box header. Null until the week resolves — the
+   * header renders no week label at all rather than `WK 0`, which is what the
+   * page's own `selectedWeek === 0` sentinel would otherwise print.
+   */
+  /**
+   * The league menu now comes with the header, in `PressBoxLeagueChrome`
+   * (2026-09-04): the page no longer keeps its open state. The history is
+   * the reason the guard exists — for one commit the roster had NO menu on
+   * a phone and `mobileHeaderMenuGuard` did not notice, because it scanned
+   * for the legacy header string and this page had dropped out of its
+   * list. The guard now pins the chrome on every league page by name.
+   */
+
+  const weekLabelForHeader = useMemo(
+    () => (selectedWeek > 0 ? `WK ${selectedWeek}` : null),
+    [selectedWeek],
+  );
+
   // OFFSEASON (2026-09-02). The gate below is roster-shaped, so a drafted
   // roster in September rendered the strip and it read "0/13 starters play ·
   // 0 on bench with games · proj 0.0" — with 27 days to the season opener and
@@ -2153,6 +2190,124 @@ const Roster = () => {
     !rosterDisplayLoading &&
     userLeagueState !== 'logged-in-no-league' &&
     (displayRoster.starters.length > 0 || displayRoster.bench.length > 0);
+
+  // ===========================================================================
+  // PRESS BOX · THE TEAM SCREEN'S NUMBERS (2026-09-05, artboard 1a).
+  //
+  // The artboard's rows carry `100% · 99% | vs TOR 3RD` and a WK column with
+  // a trend; the team card carries `64% WIN` over the live score pair. The
+  // components drew all of it since PR4 and the page fed none of it. Two
+  // hooks now do: the week read (matchup-stats + batch projections, scored
+  // with the league's settings) and the ownership aggregate. The opponent's
+  // side of the win bar is their frozen starters for today, read through the
+  // same week hook; no starters on file means no bar, not a 50% one.
+  // See components/pressbox/rosterWeek.ts.
+  // ===========================================================================
+  const pressBoxOn = isMobile && userLeagueState === 'active-user';
+  const weekPlayers = useMemo(
+    () =>
+      [...roster.starters, ...roster.bench, ...roster.ir].map((p) => ({
+        id: p.id,
+        isGoalie: p.position === 'Goalie' || p.position === 'G',
+      })),
+    [roster.starters, roster.bench, roster.ir],
+  );
+  const leagueScoring = (activeLeague as { scoring_settings?: unknown } | null)?.scoring_settings;
+  const rosterWeek = useRosterWeek({
+    enabled: pressBoxOn,
+    players: weekPlayers,
+    weekStart: currentMatchup?.week_start_date,
+    weekEnd: currentMatchup?.week_end_date,
+    scoring: leagueScoring,
+  });
+  const ownership = useOwnership(pressBoxOn);
+
+  const rowExtras = useMemo(() => {
+    const m = new Map<string, RosterRowExtras>();
+    for (const p of weekPlayers) {
+      const id = String(p.id);
+      const w = rosterWeek.entries.get(id);
+      const o = ownership.get(id);
+      m.set(id, {
+        weekPoints: w ? w.weekPoints : null,
+        weekTrendPct: w ? w.weekTrendPct : null,
+        rosteredPct: o ? o.rosteredPct : null,
+        startedPct: o ? o.startedPct : null,
+      });
+    }
+    return m;
+  }, [weekPlayers, rosterWeek.entries, ownership]);
+
+  // The opponent's starters for today, from the frozen daily roster.
+  const opponentTeamId = useMemo(() => {
+    if (!currentMatchup || !userTeamId) return null;
+    const mine = String(userTeamId);
+    if (String(currentMatchup.team1_id) === mine) return currentMatchup.team2_id;
+    if (String(currentMatchup.team2_id ?? '') === mine) return currentMatchup.team1_id;
+    return null;
+  }, [currentMatchup, userTeamId]);
+  const [opponentStarters, setOpponentStarters] = useState<Array<{ id: string; isGoalie: boolean }>>([]);
+  useEffect(() => {
+    if (!pressBoxOn || !currentMatchup || !opponentTeamId) {
+      setOpponentStarters([]);
+      return;
+    }
+    let cancelled = false;
+    matchupApi
+      .getFrozenRoster(currentMatchup.id, opponentTeamId, getTodayMST())
+      .then((res) => {
+        if (cancelled) return;
+        const rows = ((res as { data?: unknown }).data ?? []) as Array<{ player_id: string | number; slot_type?: string; slot_id?: string }>;
+        setOpponentStarters(
+          rows
+            .filter((r) => (r.slot_type ?? 'starter') === 'starter')
+            .map((r) => ({ id: String(r.player_id), isGoalie: /^g/i.test(String(r.slot_id ?? '')) })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setOpponentStarters([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pressBoxOn, currentMatchup, opponentTeamId]);
+  const opponentWeek = useRosterWeek({
+    enabled: pressBoxOn && opponentStarters.length > 0,
+    players: opponentStarters,
+    weekStart: currentMatchup?.week_start_date,
+    weekEnd: currentMatchup?.week_end_date,
+    scoring: leagueScoring,
+  });
+
+  const teamCardNumbers = useMemo(() => {
+    if (!currentMatchup || !userTeamId) return { winPct: null, yourScore: null, theirScore: null };
+    const mine = String(currentMatchup.team1_id) === String(userTeamId);
+    const yourScore = mine ? currentMatchup.team1_score : currentMatchup.team2_score;
+    const theirScore = mine ? currentMatchup.team2_score : currentMatchup.team1_score;
+    if (!rosterWeek.ready || !opponentWeek.ready || opponentStarters.length === 0) {
+      return { winPct: null, yourScore: yourScore ?? null, theirScore: theirScore ?? null };
+    }
+    const my = sideOutlook(roster.starters.map((p) => p.id), rosterWeek.entries);
+    const opp = sideOutlook(opponentStarters.map((p) => p.id), opponentWeek.entries);
+    const { probability } = winProbabilityFromTotals({
+      myExpectedFinal: (yourScore ?? 0) + (my.expectedFinal - my.banked),
+      oppExpectedFinal: (theirScore ?? 0) + (opp.expectedFinal - opp.banked),
+      myGamesLeft: my.gamesLeft,
+      oppGamesLeft: opp.gamesLeft,
+    });
+    return { winPct: Math.round(probability * 100), yourScore: yourScore ?? null, theirScore: theirScore ?? null };
+  }, [currentMatchup, userTeamId, rosterWeek.ready, rosterWeek.entries, opponentWeek.ready, opponentWeek.entries, opponentStarters, roster.starters]);
+
+  // The day toggles: today and the next two days of the week, then WEEK.
+  const pressBoxDays = useMemo(() => {
+    const today = getTodayMST();
+    const upcoming = matchupWeekDates.filter((d) => d >= today).slice(0, 3);
+    return upcoming.map((date) => ({ date, label: dayLabelFor(date).slice(0, 3).toUpperCase() }));
+  }, [matchupWeekDates]);
+  const [weekView, setWeekView] = useState(false);
+  const activePressBoxDay = weekView
+    ? 'WEEK'
+    : (pressBoxDays.find((d) => d.date === (selectedDate || getTodayMST()))?.label ?? pressBoxDays[0]?.label);
 
   // Load CitrusPuck Analytics
   useEffect(() => {
@@ -2385,7 +2540,10 @@ const Roster = () => {
             }
             
             setAnalyticsLoaded(true);
-            toast({ title: "CitrusPuck Loaded", description: "Advanced stats and projections ready." });
+            // No toast (2026-09-05). "CitrusPuck Loaded -- Advanced stats and
+            // projections ready" fired over the header on every Team visit;
+            // a background enrichment that worked is not news. Its failure
+            // still logs below.
         } catch (e) {
             logger.error("Failed to load analytics", e);
         }
@@ -3409,10 +3567,13 @@ const Roster = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
-      {/* Loading overlay during league switch - non-blocking */}
+    <div className="min-h-screen bg-[#0F1F15] max-lg:bg-pressbox-surface text-pastel-cream relative">
+      {/* Loading overlay during league switch - non-blocking. DESKTOP ONLY
+          since PR3 (2026-09-05): below lg the roster skeleton is already on
+          screen for the same state, and a blurred spinner sheet over a
+          skeleton is two loaders for one wait. */}
       {showLoadingOverlay && (
-        <div className="fixed inset-0 bg-[#0F1F15]/90 backdrop-blur-lg z-overlay flex items-center justify-center">
+        <div className="fixed inset-0 bg-[#0F1F15]/90 backdrop-blur-lg z-overlay hidden lg:flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pastel-orange mx-auto mb-4"></div>
             <p className="text-lg font-medium text-pastel-cream">Switching leagues…</p>
@@ -3426,29 +3587,30 @@ const Roster = () => {
       </div>
       
       {/* MOBILE: Compact sticky header with roster context + hamburger menu */}
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-sm font-calistoga font-bold text-pastel-cream truncate">
-              {userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Roster')}
-            </h1>
-            {activeLeague?.name && (
-              <div className="text-xs font-jbmono text-white/55 truncate -mt-0.5">
-                {activeLeague.name}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-            <span className="text-xs font-calistoga font-bold text-pastel-orange-soft">
-              {teamStats.record}
-            </span>
-            <MobileMenuButton />
-          </div>
-        </div>
-      </div>
+      {/* PRESS BOX HEADER (2026-09-04). This was a 48px bar carrying the team
+          name, the league name and the record — all three of which the team
+          card below it repeats, which is why the first player row started
+          343px down a 852px screen. The Press Box header carries the LEAGUE:
+          crest, name, the week, and the settings control.
+
+          THE SUB-TABS ARE BACK ON (PR2b, 2026-09-04). This header hid its
+          Match / Team / Players / League strip because the page had a strip
+          of its own and "the bottom nav is what moves you between league
+          screens" — which stopped being true the moment the bottom nav
+          became the APP nav (Leagues / Scores / Players / News / Account).
+          Without the strip a manager on their roster had no way to the
+          matchup or the pool except through the menu, which has neither.
+          The page's own four views (Roster / Stats / Analytics /
+          Transactions) are now a segmented control under the team card —
+          pills in a well, the vocabulary for "one team, four views" — so
+          the two are told apart on sight rather than stacked as twin
+          underline strips. */}
+      <PressBoxLeagueChrome
+        weekLabel={weekLabelForHeader}
+      />
       
       {/* MOBILE: Full-screen scrollable content / DESKTOP: Grid layout */}
-      <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <main className="w-full lg:pt-24 lg:pb-8 pb-app-chrome">
         <div className="w-full m-0 p-0">
           {/* Desktop: 3-column grid / Mobile: Single column */}
           <div className={cn(
@@ -3470,7 +3632,40 @@ const Roster = () => {
                   Pts live on the Team Stats tab; the manager eyebrow is a
                   desktop nicety. Every desktop element is untouched — the
                   compaction is responsive classes only. */}
-              <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-3 lg:p-5 mb-3 lg:mb-4 relative overflow-hidden">
+              {/* PRESS BOX TEAM CARD — phones only (2026-09-04). The card
+                  below it is the desktop one, unchanged: it carries Rank,
+                  Total Pts and a 48px Auto Lineup button that a 393px row
+                  cannot hold. The phone version is the artboard's: disc,
+                  record and rank on one line, then the four actions, exactly
+                  one of them orange.
+
+                  No win-probability bar. That figure lives on the matchup
+                  payload and this page does not fetch it — the component
+                  draws no bar rather than a 50% one, and the bar returns when
+                  the roster starts asking for the number. */}
+              <div className="lg:hidden">
+                <PressBoxTeamCard
+                  teamName={userLeagueState === 'guest' ? 'Citrus Crushers' : (userTeam?.team_name || 'My Team')}
+                  /* teamStats.rank is the literal string "-" until standings
+                     resolve. Passing it through printed "0-0-0 · -", which
+                     reads as a broken field rather than a pending one. */
+                  rank={teamStats.rank && teamStats.rank !== '-' ? String(teamStats.rank) : null}
+                  record={teamStats.record && teamStats.record !== '-' ? teamStats.record : null}
+                  winPct={teamCardNumbers.winPct}
+                  yourScore={teamCardNumbers.yourScore}
+                  theirScore={teamCardNumbers.theirScore}
+                  actions={[
+                    ...(userLeagueState === 'active-user'
+                      ? [{ glyph: '⚡', label: 'Optimize', primary: true, onPress: handleAutoLineup }]
+                      : []),
+                    { glyph: '⇄', label: 'Trade', to: `/trade-analyzer${userTeam?.league_id ? `?league=${userTeam.league_id}` : ''}` },
+                    { glyph: '+', label: 'Add', to: `/free-agents${userTeam?.league_id ? `?league=${userTeam.league_id}` : ''}` },
+                    { glyph: '☰', label: 'Log', onPress: () => setActiveTab('transactions') },
+                  ]}
+                />
+              </div>
+
+              <div className="hidden lg:block bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] p-3 lg:p-5 mb-3 lg:mb-4 relative overflow-hidden">
                 <div data-testid="roster-header-card" className="flex items-center gap-3 lg:gap-4 lg:justify-between relative z-10">
               <div className="flex items-center gap-2.5 lg:gap-3 min-w-0 flex-1 lg:flex-none">
                 <div className="w-8 h-8 lg:w-12 lg:h-12 flex-shrink-0 rounded-lg lg:rounded-xl bg-gradient-to-br from-pastel-orange to-pastel-orange-soft ring-1 ring-pastel-orange/40 flex items-center justify-center text-[#0F1F15] text-sm lg:text-2xl font-calistoga relative overflow-hidden shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
@@ -3557,7 +3752,15 @@ const Roster = () => {
 
             {/* Main Tabs — Citrus 2.0 dark */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <div className="bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+              {/* FULL-BLEED ON PHONES (2026-09-04, Press Box). The card is a
+                  desktop affordance: on a 393px screen it inset the roster by
+                  24px a side and rounded off the hairlines the row grid
+                  depends on, so the list read as a narrow panel floating in a
+                  box. The Press Box list carries its own 12px gutter and its
+                  rules run edge to edge, which is what makes a dense list
+                  scannable. The card returns at lg, where there is width to
+                  spend on it. */}
+              <div className="bg-transparent ring-0 rounded-none shadow-none lg:bg-[#1A2A20] lg:ring-1 lg:ring-white/10 lg:rounded-2xl lg:shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
                 {/*
                   * The four labels do not fit a phone. "TRENDS & ANALYTICS" alone
                   * needs ~150px at this letter-spacing. The first fix made the
@@ -3572,36 +3775,48 @@ const Roster = () => {
                   * at sm alongside the equal-width bar. The scroller stays only
                   * as a net for sub-360px devices.
                   */}
-                <TabsList className="w-full p-0 bg-transparent border-b border-white/10 rounded-none gap-0 h-auto justify-start overflow-x-auto sm:overflow-x-visible">
+                {/* PRESS BOX (2026-09-04): a segmented control below lg — the
+                    #16241B well, 2px of padding, cream on the active pill —
+                    and the underline strip from lg, where the header's
+                    sub-tabs are not drawn. Still four equal columns. */}
+                {/* PHONE (2026-09-05): the artboard has no view switcher
+                    under the team card; LOG opens Transactions and the
+                    other two views are the desktop's. Hidden below lg. */}
+                <TabsList className="max-lg:hidden w-full grid grid-cols-4 gap-0.5 p-0.5 h-auto rounded-[8px] bg-pressbox-tile mx-3 max-lg:w-[calc(100%-24px)] mt-2 lg:mx-0 lg:mt-0 lg:w-full lg:p-0 lg:gap-0 lg:h-[34px] lg:rounded-none lg:bg-transparent lg:border-b lg:border-white/[0.08]">
                 <TabsTrigger
                   value="roster"
-                  className="flex-none shrink-0 px-3 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.12em] sm:tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className={ROSTER_VIEW_TAB}
                 >
                   Roster
                 </TabsTrigger>
                 <TabsTrigger
                   value="stats"
-                  className="flex-none shrink-0 px-3 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.12em] sm:tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className={ROSTER_VIEW_TAB}
                 >
                   <span className="sm:hidden">Stats</span>
                   <span className="hidden sm:inline">Team Stats</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="trends"
-                  className="flex-none shrink-0 px-3 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.12em] sm:tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className={ROSTER_VIEW_TAB}
                 >
-                  <span className="sm:hidden">Trends</span>
+                  {/* "TRENDS & ANALYTICS" is ~131px in Barlow Condensed at
+                      13/.14em and the column is 98px at 393. The phone label
+                      is ANALYTICS rather than TRENDS on purpose: this tab is
+                      the insight surface other fantasy apps do not have, and
+                      "Trends" reads as a generic mover list. */}
+                  <span className="sm:hidden">Analytics</span>
                   <span className="hidden sm:inline">Trends &amp; Analytics</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="transactions"
-                  className="flex-none shrink-0 px-3 sm:flex-1 sm:px-0 py-4 rounded-none font-jbmono text-[11px] tracking-[0.12em] sm:tracking-[0.22em] uppercase font-bold text-white/55 data-[state=active]:bg-pastel-orange/10 data-[state=active]:border-b-2 data-[state=active]:border-pastel-orange data-[state=active]:text-pastel-orange-soft hover:text-pastel-cream transition-colors"
+                  className={ROSTER_VIEW_TAB}
                 >
                   Transactions
                 </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="roster" className="m-0 px-3 py-4 lg:p-6">
+                <TabsContent value="roster" className="m-0 px-3 py-4 max-lg:pt-0 lg:p-6">
                 {/* Read-only banner for demo/guest users */}
                 {(userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league' || (userTeam && isDemoLeague(userTeam.league_id))) && (
                   <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
@@ -3625,49 +3840,10 @@ const Roster = () => {
                     week bar, the day card and the Viewing line as they were. */}
                 {userTeam?.league_id && availableWeeks.length > 0 && firstWeekStart && selectedWeek > 0 && (
                   isMobile ? (
-                  <div className="mb-3">
-                    {currentMatchup && matchupWeekDates.length > 0 ? (
-                      <div
-                        data-testid="roster-week-day-row"
-                        className="flex items-center gap-2 bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl p-2"
-                      >
-                        <MatchupScheduleSelector
-                          compact
-                          currentWeek={selectedWeek}
-                          scheduleLength={availableWeeks.length}
-                          availableWeeks={availableWeeks}
-                          onWeekChange={handleWeekChange}
-                          firstWeekStart={firstWeekStart}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <WeeklySchedule
-                            chips
-                            weekStart={currentMatchup.week_start_date}
-                            weekEnd={currentMatchup.week_end_date}
-                            // loadRoster follows selectedDate through its own
-                            // effect — never call it here (stale closure race).
-                            onDayClick={(date) => setSelectedDate(date)}
-                            selectedDate={selectedDate}
-                            hideScores={true}
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        <MatchupScheduleSelector
-                          compact
-                          currentWeek={selectedWeek}
-                          scheduleLength={availableWeeks.length}
-                          availableWeeks={availableWeeks}
-                          onWeekChange={handleWeekChange}
-                          firstWeekStart={firstWeekStart}
-                        />
-                        {!currentMatchup && selectedWeek && (
-                          <span className="text-sm text-white/55">Week {selectedWeek} has no matchup yet.</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  /* PHONE (2026-09-05): the day lives on the STARTERS header's
+                     THU · FRI · SAT · WEEK toggles now (artboard 1a); this
+                     row and the strip under it are the desktop's. */
+                  null
                   ) : (
                   <div className="mb-6 space-y-4">
                     {/* Week Selector */}
@@ -3732,7 +3908,19 @@ const Roster = () => {
                     wear the badge is desktop-only now. */}
                 {showTodayStrip && (
                   <TodayStrip
-                    className="mb-3 lg:mb-4"
+                    /* PRESS BOX (2026-09-04). The strip keeps every word and
+                       every number — it is the first thing a manager reads on
+                       a game day — but stops being a floating pill. On phones
+                       it is flush with the list below it: no rounding, no
+                       fill, a hairline top and bottom, and it spans the full
+                       column like the rows do. `TodayStrip` merges `className`
+                       last through `cn`, so this overrides its container
+                       without touching the component or the two test files
+                       that pin its content. The card returns at lg. */
+                    className={cn(
+                      'max-lg:hidden mb-0 -mx-3 rounded-none bg-transparent ring-0 border-y border-white/[0.08] px-3 py-2.5',
+                      'lg:mx-0 lg:mb-4 lg:rounded-xl lg:bg-pastel-surface-high lg:ring-1 lg:ring-white/10 lg:border-y-0',
+                    )}
                     summary={todaySummary}
                     dayLabel={stripDayLabel}
                     tense={isPastDate ? 'past' : 'present'}
@@ -3775,7 +3963,18 @@ const Roster = () => {
                 {(() => {
                   // Apply minimum display time to prevent flash
                   if (rosterDisplayLoading) {
-                    return <StormyLoading message="Loading your roster…" />;
+                    // PR3: below lg the list arrives as itself with the words
+                    // missing -- the team card, the segmented control and the
+                    // day strip above are already on screen, so only the rows
+                    // settle. Stormy stays on the desktop. `-mx-3` is the same
+                    // gutter cancel the real list gets below.
+                    return isMobile ? (
+                      <div className="-mx-3">
+                        <PressBoxSkeletonRoster />
+                      </div>
+                    ) : (
+                      <StormyLoading message="Loading your roster…" />
+                    );
                   }
                   
                   if (userLeagueState === 'logged-in-no-league') {
@@ -3861,24 +4060,93 @@ const Roster = () => {
                           </button>
                         </div>
                       )}
-                      <MobileRosterList
-                        starters={displayRoster.starters}
-                        bench={displayRoster.bench}
-                        ir={displayRoster.ir}
-                        slotAssignments={displayRoster.slotAssignments}
-                        lockedPlayerIds={lockedPlayerIds}
-                        tapSelectedPlayerId={tapSelectedPlayerId}
-                        tapEligibleSlots={tapEligibleSlots}
-                        onPlayerTap={handleMobileTapPlayer}
-                        onPlayerNameTap={handlePlayerClick}
-                        onSlotTap={handleMobileTapSlot}
-                        onBenchTap={handleMobileTapBench}
-                        onCancelSelection={() => setTapSelectedPlayerId(null)}
-                        onFillSlot={handleFillSlot}
-                        swapHint={canEdit}
-                        positionType={leaguePositionType}
-                        irSlotCount={irSlotCount}
-                      />
+                      {/* PRESS BOX (2026-09-04, direction 1a). The rows the
+                          list draws are built by `buildRosterRows`, a pure
+                          function this page hands its own state to — the page
+                          keeps every fetch, the row keeps every pixel, and
+                          the mapping between them is the part with tests.
+
+                          The day toggles are NOT passed. `TodayStrip` above
+                          already owns which day is on screen, and two day
+                          controls on one screen can disagree; the Press Box
+                          toggles come back when the strip is retired.
+
+                          `showWeek` and `showOwnership` stay off: there is no
+                          per-player week total on this payload and no
+                          cross-league ownership aggregate. The columns and
+                          the grid that carries them return the day those
+                          numbers exist, not before. */}
+                      {/* -mx-3 cancels the page column's phone padding for the
+                          LIST ONLY. Two nested gutters put the rows 24px in
+                          from each edge and made a dense list read as a panel
+                          floating in a box; the list's own px-3 is the gutter
+                          that stays. Scoped here rather than on the whole tab
+                          because the summary card above it still wants the
+                          page's padding. */}
+                      <div className="-mx-3 lg:mx-0">
+                      {(() => {
+                        const rows = buildRosterRows({
+                          starters: displayRoster.starters,
+                          bench: displayRoster.bench,
+                          ir: displayRoster.ir,
+                          irSlotCount,
+                          slotConfig: buildSlotConfig(leaguePositionType, leagueRosterSlots),
+                          slotAssignments: displayRoster.slotAssignments,
+                          lockedPlayerIds,
+                          tapSelectedPlayerId,
+                          tapEligibleSlots,
+                          extras: rowExtras,
+                          // WEEK (2026-09-05): the day column carries the week
+                          // number (banked + remaining projection) as a
+                          // projection, and the WK column steps aside.
+                          weekView,
+                        });
+                        return (
+                          <PressBoxRosterList
+                            days={[...pressBoxDays.map((d) => d.label), ...(pressBoxDays.length > 0 ? ['WEEK'] : [])]}
+                            activeDay={activePressBoxDay}
+                            onDayChange={(label) => {
+                              if (label === 'WEEK') { setWeekView(true); return; }
+                              const day = pressBoxDays.find((d) => d.label === label);
+                              if (day) { setWeekView(false); setSelectedDate(day.date); }
+                            }}
+                            dayHeading={weekView ? 'Week' : pressBoxDays[0]?.date === getTodayMST() && activePressBoxDay === pressBoxDays[0]?.label ? 'Today' : (activePressBoxDay ?? 'Today')}
+                            showWeek={rosterWeek.ready && !weekView}
+                            showOwnership={ownership.size > 0}
+                            starters={rows.starters}
+                            bench={rows.bench}
+                            ir={rows.ir}
+                            irRequired={rows.irRequired}
+                            startersFilled={rows.startersFilled}
+                            startersRequired={rows.startersRequired}
+                            benchPlayingCount={rows.benchPlayingCount}
+                            onSlotPress={(slotId) => {
+                              // A held slot selects its player; an empty one
+                              // is a move target with a player already picked
+                              // and the Fill trigger otherwise. One gesture,
+                              // read against the page's state — the rule the
+                              // list this replaces established (audit R2).
+                              const held = rows.starters.find((r) => r.slotId === slotId)?.player;
+                              const bench = rows.bench.find((r) => r.slotId === slotId)?.player;
+                              const p = [...displayRoster.starters, ...displayRoster.bench, ...displayRoster.ir]
+                                .find((x) => String(x.id) === String(held?.id ?? bench?.id ?? ''));
+                              if (p) handleMobileTapPlayer(p);
+                              else if (tapSelectedPlayerId != null) handleMobileTapSlot(slotId);
+                              else handleFillSlot(slotId);
+                            }}
+                            onNamePress={(row) => {
+                              const p = [...displayRoster.starters, ...displayRoster.bench, ...displayRoster.ir]
+                                .find((x) => String(x.id) === String(row.player?.id ?? ''));
+                              if (p) handlePlayerClick(p);
+                            }}
+                            onEmptyPress={(slotId) => {
+                              if (tapSelectedPlayerId != null) handleMobileTapSlot(slotId);
+                              else handleFillSlot(slotId);
+                            }}
+                          />
+                        );
+                      })()}
+                      </div>
                       {/* Fill sheet — slot-first counterpart of the Line
                           Change sheet; opens from an empty row (audit R2). */}
                       <FillSlotSheet

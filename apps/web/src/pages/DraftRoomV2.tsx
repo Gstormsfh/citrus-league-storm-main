@@ -34,7 +34,12 @@ import {
   useClockOffsetEstimator,
 } from '@/components/draft/v2/DraftTimerV2';
 import { OnClockActionBar } from '@/components/draft/v2/OnClockActionBar';
+import { OffClockBar } from '@/components/draft/v2/OffClockBar';
 import { AuctionPanel } from '@/components/draft/v2/AuctionPanel';
+import { auctionRules, type AuctionRules } from '@/lib/draftClient/auctionRules';
+import { AuctionBoard } from '@/components/draft/v2/AuctionBoard';
+import { isMyNomination } from '@/lib/draftClient/auctionNominator';
+import { submitNomination } from '@/lib/draftClient/submitAuctionAction';
 import { OfflineDraftRoom } from '@/components/draft/v2/OfflineDraftRoom';
 import { ManagerPresencePanel } from '@/components/draft/v2/ManagerPresencePanel';
 import { DraftBoard } from '@/components/draft/DraftBoard';
@@ -48,9 +53,19 @@ import { servicePlayerToHockeyPlayer } from '@/utils/playerStatsHelper';
 import { buildInviteLink, canSystemShare, shareInvite } from '@/utils/inviteShare';
 import { ScoringCalculator, type ScoringSettings } from '@citrus/shared';
 import { DraftHistory } from '@/components/draft/DraftHistory';
+import { mugFromDirectory } from '@/components/roster/headshot';
 import { TeamRosters } from '@/components/draft/TeamRosters';
 import { DraftQueue } from '@/components/draft/DraftQueue';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
+// Direct file imports, not the `@/components/pressbox` barrel: the barrel
+// re-exports LeagueHeader, which reaches LeagueContext and the Supabase
+// client at module scope. The room reads its league from the PATH and must
+// not pull the league shell in behind it.
+import { PressBoxDraftHeader } from '@/components/pressbox/DraftHeader';
+import { PressBoxTabs } from '@/components/pressbox/Tabs';
+import { PB_TYPE } from '@/components/pressbox/rowScale';
+import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { Card } from '@/components/ui/card';
 import { DraftClientRunner } from '@/lib/draftClient/runner';
 import { fetchDraftOrderMatrix } from '@/lib/draftClient/fetchDraftOrderMatrix';
@@ -66,6 +81,8 @@ import {
   useIdentityFailure,
   usePendingActions,
   usePickTimeLimitSec,
+  usePresence,
+  useAuctionDerived,
 } from '@/stores/draftClientStore';
 import { useMyTeamIdCrossCheck } from '@/hooks/useMyTeamIdCrossCheck';
 import {
@@ -90,6 +107,7 @@ import {
   toAvailablePlayers,
   toDraftHistory,
   toDraftedPlayerIds,
+  toKeeperSlots,
   toV1Teams,
   participatingTeamIdsFromMatrix,
   type FetchedTeam,
@@ -99,6 +117,7 @@ import type { Player } from '@/services/PlayerService';
 import { Button } from '@/components/ui/button';
 import type { Team } from '@/services/LeagueService';
 import { userMessage } from '@/lib/userMessage';
+import { logger } from '@/utils/logger';
 
 export default function DraftRoomV2() {
   const params = useParams<{ leagueId: string; draftId?: string }>();
@@ -147,15 +166,19 @@ export default function DraftRoomV2() {
               useDraftClientStore.getState().setIdentityFailure(null);
             }
             return;
-          } catch {
+          } catch (attemptErr) {
+            // Named, not swallowed: the banner below says "couldn't verify";
+            // this says why, in the console and in a test's stderr.
+            logger.warn(`[draft-room] my-team fetch attempt ${attempt + 1} failed:`, attemptErr);
             if (attempt < 2) {
               await new Promise((resolve) => setTimeout(resolve, 400 * 2 ** attempt));
             }
           }
         }
-      } catch {
+      } catch (importErr) {
         // Fall through to the loud failure below (covers a dynamic
         // import failure as well as an exhausted retry loop).
+        logger.warn('[draft-room] my-team resolution failed:', importErr);
       }
       if (cancelled) return;
       useDraftClientStore.getState().setIdentityFailure({ reason: 'my_team_unverifiable' });
@@ -236,6 +259,16 @@ export default function DraftRoomV2() {
   // not_started/completed leagues at discovery without creating a
   // lobby (the format gate that bricked the autopick league only runs
   // at ignition, which draftV2Start now refuses for offline).
+  /**
+   * The league's settings document off the format probe below, for the
+   * auction money rules (auctionRules.ts). Read once, in the parent, and
+   * handed down: a second `import('@/api/client')` inside DraftRoomBody
+   * made the mocked client unreachable in every DraftRoomV2 page test
+   * (found by bisect, 2026-09-05), and the room was already fetching this
+   * row twice.
+   */
+  const [leagueSettingsForRules, setLeagueSettingsForRules] = useState<unknown>(null);
+  const auctionMoney = useMemo(() => auctionRules(leagueSettingsForRules), [leagueSettingsForRules]);
   const [offlineMeta, setOfflineMeta] = useState<
     | { kind: 'live' }
     | {
@@ -265,6 +298,10 @@ export default function DraftRoomV2() {
             draft_status?: string;
             settings?: Record<string, unknown> | null;
           });
+        // AUCTION MONEY (2026-09-05): the same row carries the league's
+        // auction rules; keep the settings so the body can derive them
+        // without a fetch of its own.
+        setLeagueSettingsForRules(payload?.settings ?? null);
         const draftType = (payload?.settings as { draftType?: string } | null)
           ?.draftType;
         if (draftType === 'offline') {
@@ -487,6 +524,29 @@ export default function DraftRoomV2() {
   // (the F14 incident's user-visible surface).
   useMyTeamIdCrossCheck({ leagueId });
 
+  /**
+   * `FINALSZ DRAFT` (artboard 4a, 2026-09-05): the league's name for the
+   * header, off the league row. One small GET at room open, the same row
+   * MainTabs reads for the roster shape; never LeagueContext, which may
+   * point at another league for the whole draft (ARCHITECT 2026-08-12).
+   * Null until it lands, and on any failure: the header says DRAFT ROOM.
+   */
+  const [leagueName, setLeagueName] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { apiClient } = await import('@/api/client');
+        const res = await apiClient.get<{ name?: string }>(`/api/leagues/${leagueId}`);
+        const name = (res?.data as { name?: string } | undefined)?.name;
+        if (!cancelled && typeof name === 'string' && name.trim()) setLeagueName(name.trim());
+      } catch {
+        // The header keeps its generic title.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [leagueId]);
+
   const handleRetryNow = useMemo(
     () => () => {
       const runner = runnerRef.current;
@@ -542,10 +602,19 @@ export default function DraftRoomV2() {
   }
 
   return (
-    /* pb-28: clearance for the on-clock action bar, which is FIXED to the
-       bottom edge on phones (see MainTabs). lg+ restores the normal pad —
-       the bar is sticky-in-flow there. */
-    <div className="container mx-auto p-4 pb-28 lg:pb-4" data-testid="draft-room-v2">
+    /* pb-40: clearance for the pick bar, which is FIXED to the bottom edge
+       on phones (see MainTabs). lg+ restores the normal pad — the bar is
+       sticky-in-flow there. PRESS BOX (2026-09-04): was pb-28 (112px), set
+       for the old bar. The artboard's bar with the decision line and the
+       scarcity strip under it measured 141px at 393, and the pool's
+       `+ N MORE` button sat 30px under it. 160 clears the tallest bar with
+       room for the safe-area inset. */
+    /* PRESS BOX (2026-09-04): px-0 below md. The Press Box screens run
+       full-bleed with each block owning its own 14px gutter — the pool's
+       selected row needs its rail to reach the screen edge — so the room
+       stops padding the phone and lets its children do it. The desktop pool
+       card takes over at md, and the gutter comes back with it. */
+    <div className={`${PB_TYPE} container mx-auto px-0 py-4 md:px-4 pb-40 lg:pb-4`} data-testid="draft-room-v2">
       {/*
         * NATIVE ESCAPE HATCH (2026-08-31, moved into the sticky header
         * 2026-09-01) — reported from the iOS simulator as "I'm stuck, the
@@ -559,8 +628,10 @@ export default function DraftRoomV2() {
         */}
       <StickyHeader
         leagueId={leagueId}
+        leagueName={leagueName}
         onRetryNow={handleRetryNow}
         clockOffsetMs={clockOffsetMs}
+        teams={teams}
       />
       <IdentityFailureBanner />
       <DraftLobbyV2
@@ -577,6 +648,7 @@ export default function DraftRoomV2() {
         playersError={playersError}
         onRetryPlayers={reloadPlayers}
         clockOffsetMs={clockOffsetMs}
+        auctionMoney={auctionMoney}
       />
     </div>
   );
@@ -655,8 +727,20 @@ function IdentityFailureBanner() {
 interface StickyHeaderProps {
   /** Exit-link target — the header owns the room's way back to League HQ. */
   leagueId: string;
+  /**
+   * `FINALSZ DRAFT` (artboard 4a, 2026-09-05). The name off the league row
+   * MainTabs already reads for the roster shape -- one fetch, not two, and
+   * never LeagueContext (which may point at another league for the whole
+   * draft; see the title note below). Null until it lands: `DRAFT ROOM`.
+   */
+  leagueName: string | null;
   onRetryNow: () => void;
   clockOffsetMs: number;
+  /**
+   * PRESS BOX (2026-09-04). Who is actually in the room, `11/12 ●`, in the
+   * artboard's corner. Owned teams only — an AI seat is never "present".
+   */
+  teams: FetchedTeam[];
 }
 
 // DR-4 (2026-07-30) — honest status label. Pre-DR-4 the header showed
@@ -1060,7 +1144,14 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
 
   return (
     <Card
-      className="mb-4 overflow-hidden border-0 bg-pastel-surface-tile p-0 ring-1 ring-white/10 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.6)]"
+      /* PRESS BOX (PR18 paint sweep, 2026-09-05). The lobby is the screen
+         twelve managers sit on for minutes before a draft, under a Press
+         Box header, and it was the last Citrus 2.0 card in the room: Inter
+         and Montserrat, JetBrains Mono eyebrows, the varsity button. Now
+         the room's own vocabulary -- Barlow Condensed for the one line
+         that matters, Plex for every label, the orange pill. Classes only;
+         every handler, id and test hook is the same element. */
+      className="mb-4 overflow-hidden border-0 bg-pressbox-tile p-0 ring-1 ring-white/[0.08] rounded-[12px] shadow-none"
       data-testid="draft-lobby-v2"
     >
       {/* Hero — this is the last screen before a live draft, so it should
@@ -1073,22 +1164,22 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
         />
         <div className="relative flex items-start justify-between gap-5 flex-wrap">
           <div className="min-w-0">
-            <div className="font-jbmono text-[10px] font-bold uppercase tracking-[0.32em] text-pastel-orange-soft">
+            <div className="font-plex font-semibold text-[9px] uppercase tracking-[0.12em] text-pressbox-orange-soft">
               {isCommissioner ? "You're the commissioner" : 'Draft lobby'}
             </div>
-            <h2 className="mt-1.5 font-sans text-[1.75rem] sm:text-[2.25rem] font-black leading-none tracking-[-0.03em] text-pastel-cream">
+            <h2 className="mt-1.5 font-condensed font-extrabold text-[28px] sm:text-[32px] uppercase leading-none tracking-[0.02em] text-pressbox-text">
               {roomFull ? (
                 <>Everyone&apos;s here.</>
               ) : (
-                <>Waiting on the <span className="text-pastel-orange">room</span>.</>
+                <>Waiting on the <span className="text-pressbox-orange-soft">room</span>.</>
               )}
             </h2>
-            <p className="mt-2 text-sm text-white/55">
+            <p className="mt-2 font-barlow text-[13px] text-pressbox-text/60">
               {teamsError ? (
                 'Team list unavailable. See the list below.'
               ) : (
                 <>
-                  <span className="font-semibold text-pastel-cream">
+                  <span className="font-plex font-semibold text-pressbox-text">
                     {teams.length} of {leagueSize ?? teams.length}
                   </span>{' '}
                   seats filled
@@ -1104,18 +1195,18 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
           </div>
 
           {isCommissioner && (
-            <div className="flex flex-col items-end gap-1.5">
+            <div className="flex flex-col items-stretch gap-1.5 w-full lg:w-auto lg:items-end">
               <Button
                 onClick={handleStart}
                 disabled={isStarting || !roomFull}
                 data-testid="draft-lobby-v2-start"
                 size="lg"
-                className="bg-pastel-orange text-[#2A0F00] hover:bg-pastel-orange-soft border-0 rounded-full px-8 font-black tracking-tight shadow-[0_8px_24px_-6px_rgba(255,107,26,0.55)] disabled:shadow-none"
+                className="h-12 rounded-[12px] px-8 border-0 outline-none shadow-none bg-pressbox-orange text-pressbox-orange-ink hover:bg-pressbox-orange-soft font-plex font-semibold text-[12px] tracking-[0.08em] uppercase"
               >
                 {isStarting ? 'Starting…' : 'Start Draft'}
               </Button>
               {roomFull && !isStarting && (
-                <span className="font-jbmono text-[10px] uppercase tracking-[0.18em] text-white/55">
+                <span className="font-plex font-medium text-[9px] uppercase tracking-[0.12em] text-pressbox-text/55 text-center lg:text-right">
                   This goes live immediately
                 </span>
               )}
@@ -1132,7 +1223,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                   disabled={isFilling}
                   data-testid="draft-lobby-v2-fill-ai"
                   variant="outline"
-                  className="rounded-full border-white/20 bg-white/5 text-pastel-cream hover:bg-white/10"
+                  className="h-11 rounded-[12px] border-white/[0.08] bg-pressbox-tile-high text-pressbox-text hover:bg-pressbox-tile-high font-plex font-semibold text-[12px] tracking-[0.06em] uppercase"
                 >
                   {isFilling
                     ? 'Adding AI teams…'
@@ -1171,12 +1262,12 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
               return (
                 <div
                   key={c.label}
-                  className="rounded-lg bg-white/5 px-3 py-1.5 ring-1 ring-white/10"
+                  className="rounded-[10px] bg-pressbox-tile-high px-3 py-1.5 ring-1 ring-white/[0.08]"
                 >
-                  <span className="font-jbmono text-[9px] uppercase tracking-[0.18em] text-white/55">
+                  <span className="font-plex font-medium text-[9px] uppercase tracking-[0.06em] text-pressbox-text/55">
                     {c.label}
                   </span>
-                  <span className="ml-2 text-sm font-bold text-pastel-cream">{c.value}</span>
+                  <span className="ml-2 font-plex font-semibold text-[13px] text-pressbox-text">{c.value}</span>
                 </div>
               );
             })}
@@ -1189,17 +1280,17 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
             first, link copy beside it. Mechanics live in inviteShare. */}
         {league?.join_code && !roomFull && (
           <div
-            className="relative mt-5 rounded-xl bg-pastel-orange/[0.07] ring-1 ring-pastel-orange/35 p-4"
+            className="relative mt-5 rounded-[12px] bg-pressbox-orange/[0.08] ring-1 ring-pressbox-orange/30 p-4"
             data-testid="draft-lobby-v2-invite"
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="font-jbmono text-[10px] font-bold uppercase tracking-[0.32em] text-pastel-orange-soft">
+                <div className="font-plex font-semibold text-[9px] uppercase tracking-[0.12em] text-pressbox-orange-soft">
                   Invite managers
                 </div>
                 <button
                   type="button"
-                  className="focus-citrus mt-1 font-mono text-2xl font-bold tracking-[0.2em] text-pastel-cream active:opacity-70"
+                  className="focus-citrus mt-1 font-plex text-2xl font-semibold tracking-[0.2em] text-pressbox-text active:opacity-70"
                   onClick={() => {
                     void navigator.clipboard.writeText(league.join_code as string);
                     toast.success('Join code copied');
@@ -1207,7 +1298,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                 >
                   {league.join_code}
                 </button>
-                <div className="text-xs text-white/55">Tap the code to copy it</div>
+                <div className="font-barlow text-[12px] text-pressbox-text/55">Tap the code to copy it</div>
               </div>
               <div className="flex flex-col gap-1.5 w-full sm:w-auto">
                 {canSystemShare() && (
@@ -1217,7 +1308,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                       if (result === 'copied') toast.success('Invite copied. Paste it anywhere');
                       if (result === 'failed') toast.error('Could not share. Use Copy Link');
                     }}
-                    className="rounded-full bg-pastel-orange text-[#2A0F00] hover:bg-pastel-orange-soft font-black px-6"
+                    className="h-11 rounded-[12px] px-6 border-0 outline-none shadow-none bg-pressbox-orange text-pressbox-orange-ink hover:bg-pressbox-orange-soft font-plex font-semibold text-[12px] tracking-[0.08em] uppercase"
                   >
                     Share Invite
                   </Button>
@@ -1228,7 +1319,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                     void navigator.clipboard.writeText(buildInviteLink(league.join_code as string));
                     toast.success('Invite link copied');
                   }}
-                  className="rounded-full border-white/20 bg-white/5 text-pastel-cream hover:bg-white/10"
+                  className="h-11 rounded-[12px] border-white/[0.08] bg-pressbox-tile-high text-pressbox-text hover:bg-pressbox-tile-high font-plex font-semibold text-[12px] tracking-[0.06em] uppercase"
                 >
                   Copy Link
                 </Button>
@@ -1287,11 +1378,11 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
           confident lie — you would read "3rd" in the lobby and pick ninth.
           So the seats say who is here, the badge is an initial rather than
           a rank, and the line below says when the order is decided. */}
-      <div className="border-t border-white/5 bg-black/15 px-5 py-4 sm:px-7">
-        <div className="mb-1 font-jbmono text-[10px] font-bold uppercase tracking-[0.28em] text-white/55">
+      <div className="border-t border-white/[0.08] bg-black/15 px-5 py-4 sm:px-7">
+        <div className="mb-1 font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text">
           The room
         </div>
-        <div className="mb-3 text-xs text-white/55">
+        <div className="mb-3 font-barlow text-[12px] text-pressbox-text/55">
           Draft order is randomized when the draft starts.
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -1300,18 +1391,18 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
             return (
               <div
                 key={t.id}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ring-1 transition-colors ${
+                className={`flex items-center gap-3 rounded-[12px] px-3 min-h-[52px] py-2 ring-1 transition-colors ${
                   isMine
-                    ? 'bg-pastel-orange/10 ring-pastel-orange/40'
-                    : 'bg-white/5 ring-white/10'
+                    ? 'bg-pressbox-orange/10 ring-pressbox-orange/40'
+                    : 'bg-pressbox-tile-high ring-white/[0.08]'
                 }`}
               >
                 <span
                   aria-hidden="true"
-                  className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg font-jbmono text-[11px] font-bold ${
+                  className={`grid h-8 w-8 flex-shrink-0 place-items-center rounded-full font-condensed text-[12px] font-extrabold ${
                     isMine
-                      ? 'bg-pastel-orange text-[#2A0F00]'
-                      : 'bg-white/10 text-white/55'
+                      ? 'bg-pressbox-orange text-pressbox-orange-ink'
+                      : 'bg-white/10 text-pressbox-text/70'
                   }`}
                 >
                   {(t.team_name ?? '').trim().charAt(0).toUpperCase() || '\u00b7'}
@@ -1330,21 +1421,21 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                       }}
                       aria-label="Your team name"
                       data-testid="lobby-rename-input"
-                      className="min-w-0 flex-1 rounded-md bg-black/30 px-2 py-1 text-sm font-bold text-pastel-cream ring-1 ring-pastel-orange/40 outline-none"
+                      className="min-w-0 flex-1 rounded-[8px] bg-black/30 px-2 py-1.5 font-barlow text-[15px] font-semibold text-pressbox-text ring-1 ring-pressbox-orange/40 outline-none"
                     />
                     <button
                       type="button"
                       onClick={() => void saveTeamName()}
                       disabled={renameSaving}
                       data-testid="lobby-rename-save"
-                      className="shrink-0 rounded-md bg-pastel-orange px-2 py-1 font-jbmono text-[10px] font-bold uppercase tracking-[0.12em] text-[#2A0F00] active:scale-95"
+                      className="shrink-0 rounded-[8px] bg-pressbox-orange px-2.5 py-1.5 font-plex text-[10px] font-semibold uppercase tracking-[0.08em] text-pressbox-orange-ink active:scale-95"
                     >
                       {renameSaving ? '…' : 'Save'}
                     </button>
                   </>
                 ) : (
                   <>
-                    <span className="min-w-0 flex-1 truncate text-sm font-bold text-pastel-cream">
+                    <span className="min-w-0 flex-1 truncate font-barlow text-[15px] font-semibold text-pressbox-text">
                       {t.team_name}
                     </span>
                     {isMine && (
@@ -1356,7 +1447,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                         }}
                         data-testid="lobby-rename-open"
                         aria-label="Rename your team"
-                        className="shrink-0 rounded-md px-2 py-1 font-jbmono text-[9px] font-bold uppercase tracking-[0.16em] text-pastel-orange-soft ring-1 ring-pastel-orange/40 active:scale-95"
+                        className="shrink-0 rounded-full px-2.5 py-1.5 font-plex text-[9px] font-semibold uppercase tracking-[0.1em] text-pressbox-orange-soft ring-1 ring-pressbox-orange/40 active:scale-95"
                       >
                         Rename
                       </button>
@@ -1369,7 +1460,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                         data-testid="lobby-remove-ai"
                         aria-label={`Remove ${t.team_name} and open the seat`}
                         title="Open this seat for a manager"
-                        className="shrink-0 rounded-md px-2 py-1 font-jbmono text-[11px] font-bold leading-none text-white/55 ring-1 ring-white/15 active:scale-95"
+                        className="shrink-0 rounded-full px-2.5 py-1.5 font-plex text-[11px] font-semibold leading-none text-pressbox-text/55 ring-1 ring-white/15 active:scale-95"
                       >
                         {removingTeamId === t.id ? '…' : '\u00d7'}
                       </button>
@@ -1378,7 +1469,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                 )}
                 <span
                   className={`h-2 w-2 flex-shrink-0 rounded-full ${
-                    t.owner_id ? 'bg-pastel-sage' : 'bg-white/20'
+                    t.owner_id ? 'bg-pressbox-sage' : 'bg-white/20'
                   }`}
                   title={t.owner_id ? 'Manager ready' : 'Seat open'}
                 />
@@ -1414,11 +1505,12 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
 // round/pick/status, and the countdown as a compact pill. The h1 stays
 // for screen readers and the page-heading test; sighted users don't
 // need a sign saying "Draft Room" — they need the clock and the way out.
-function StickyHeader({ leagueId, onRetryNow, clockOffsetMs }: StickyHeaderProps) {
+function StickyHeader({ leagueId, leagueName, onRetryNow, clockOffsetMs, teams }: StickyHeaderProps) {
   const connectionState = useDraftConnectionState();
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
   const pickTimeLimitSec = usePickTimeLimitSec();
+  const presentUserIds = usePresence();
   const wsOpen = connectionState.kind === 'connected';
 
   // Status stays in the DOM in every state (the DR-4 honest-status
@@ -1431,64 +1523,91 @@ function StickyHeader({ leagueId, onRetryNow, clockOffsetMs }: StickyHeaderProps
       ? 'hidden sm:inline'
       : '';
 
-  return (
-    <div className="sticky top-0 z-section-header bg-background/95 backdrop-blur border-b border-border pb-2 mb-3 pt-safe">
-      <h1 className="sr-only">Draft Room</h1>
-      <div className="flex min-h-[44px] items-center justify-between gap-2">
-        <Link
-          to={`/league/${leagueId}`}
-          data-testid="draft-room-exit"
-          className="-ml-1.5 inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-sm font-semibold text-pastel-orange transition-colors hover:text-pastel-orange/80 active:bg-white/5"
-        >
-          &larr; League HQ
-        </Link>
-        {snapshot !== null && derived !== null ? (
-          <div
-            className="min-w-0 flex-1 truncate text-right text-xs sm:text-sm text-muted-foreground tabular-nums"
-            data-testid="draft-header-label"
-          >
-            {/* AUCTION CHROME (2026-09-01): an auction has lots sold,
-                not a round/pick position — and its clock lives on the
-                nomination card, so the snake pick timer stays hidden. */}
-            {snapshot.format === 'auction' ? (
-              <>
-                Auction · {derived.picksMade} / {derived.totalPicks} sold
-                <span className={statusVisibility}>
-                  {' '}· {describeStatus(derived.draftStatus, derived.picksMade)}
-                </span>
-              </>
-            ) : derived.currentPickNumber !== null &&
-            derived.currentRoundNumber !== null ? (
-              <>
-                Round {derived.currentRoundNumber} · Pick{' '}
-                {derived.currentPickNumber} / {derived.totalPicks}
-                <span className={statusVisibility}>
-                  {' '}· {describeStatus(derived.draftStatus, derived.picksMade)}
-                </span>
-              </>
-            ) : (
-              <>
-                {derived.picksMade} / {derived.totalPicks} picks ·{' '}
-                {describeStatus(derived.draftStatus, derived.picksMade)}
-              </>
-            )}
-          </div>
+  // Same count ManagerPresencePanel draws its dots from: owned seats only.
+  const ownedTeams = teams.filter((t) => typeof t.owner_id === 'string' && t.owner_id.length > 0);
+  const connectedCount = ownedTeams.filter((t) => presentUserIds.has(t.owner_id as string)).length;
+
+  /*
+   * PRESS BOX (2026-09-04) — artboard 4a's header. The exit, the title, the
+   * `Round · Pick / total` line and presence in one block, with the compact
+   * clock beside presence so the room still tells the time OFF the clock
+   * (the pick bar below only exists on it).
+   *
+   * The title says `<league> DRAFT` once the league row MainTabs fetches
+   * for the roster shape has landed, and DRAFT ROOM until then. Never from
+   * LeagueContext, which may point at a different league for the whole
+   * draft (ARCHITECT 2026-08-12, below), and never a second fetch.
+   *
+   * The progress line keeps the exact text it had — `Round 1 · Pick 6 / 36
+   * · in progress` — uppercased by CSS. Its textContent is a DR-1b/DR-4
+   * contract (DraftRoomV2.test.tsx reads /Round 1/, /Pick 6 \/ 36/ and
+   * /in progress/ off it) and the honest-status words stay in the DOM in
+   * every state.
+   */
+  const progress =
+    snapshot !== null && derived !== null ? (
+      <span data-testid="draft-header-label" className="tabular-nums">
+        {snapshot.format === 'auction' ? (
+          <>
+            Auction · {derived.picksMade} / {derived.totalPicks} sold
+            <span className={statusVisibility}>
+              {' '}· {describeStatus(derived.draftStatus, derived.picksMade)}
+            </span>
+          </>
+        ) : derived.currentPickNumber !== null && derived.currentRoundNumber !== null ? (
+          <>
+            Round {derived.currentRoundNumber} · Pick{' '}
+            {derived.currentPickNumber} / {derived.totalPicks}
+            <span className={statusVisibility}>
+              {' '}· {describeStatus(derived.draftStatus, derived.picksMade)}
+            </span>
+          </>
         ) : (
-          <div className="min-w-0 flex-1 truncate text-right text-sm font-semibold">
-            Draft Room
-          </div>
+          <>
+            {derived.picksMade} / {derived.totalPicks} picks ·{' '}
+            {describeStatus(derived.draftStatus, derived.picksMade)}
+          </>
         )}
-        {snapshot !== null && derived !== null && snapshot.format !== 'auction' && (
-          <DraftTimerV2
-            variant="compact"
-            currentPickDeadline={snapshot.stateSnapshot.currentPickDeadline}
-            draftStatus={derived.draftStatus}
-            wsOpen={wsOpen}
-            clockOffsetMs={clockOffsetMs}
-            pickTimeLimitSec={pickTimeLimitSec}
-          />
-        )}
-      </div>
+      </span>
+    ) : null;
+
+  return (
+    <div className="sticky top-0 z-section-header bg-pressbox-surface/95 backdrop-blur border-b border-white/[0.08] pb-2 mb-3 pt-safe">
+      <PressBoxDraftHeader
+        exit={
+          <Link
+            to={`/league/${leagueId}`}
+            data-testid="draft-room-exit"
+            /* Spelled out rather than `PB_DRAFT_EXIT`, on purpose: the guard
+               that keeps this exit brand orange reads the class off the
+               room's own source, at the call site, and it should. */
+            className="focus-citrus relative flex-none text-[18px] leading-none text-pastel-orange after:absolute after:-inset-y-[13px] after:-inset-x-5 after:content-['']"
+            aria-label="Back to League HQ"
+          >
+            &lsaquo;
+          </Link>
+        }
+        /* `FINALSZ DRAFT` (artboard 4a), once the league row is in hand. */
+        leagueName={leagueName}
+        progress={progress}
+        connected={ownedTeams.length > 0 ? connectedCount : null}
+        total={ownedTeams.length > 0 ? ownedTeams.length : null}
+        aside={
+          /* AUCTION CHROME (2026-09-01): an auction has lots sold, not a
+             round/pick position — and its clock lives on the nomination
+             card, so the snake pick timer stays hidden. */
+          snapshot !== null && derived !== null && snapshot.format !== 'auction' && (
+            <DraftTimerV2
+              variant="compact"
+              currentPickDeadline={snapshot.stateSnapshot.currentPickDeadline}
+              draftStatus={derived.draftStatus}
+              wsOpen={wsOpen}
+              clockOffsetMs={clockOffsetMs}
+              pickTimeLimitSec={pickTimeLimitSec}
+            />
+          )
+        }
+      />
       <ConnectionBanner onRetryNow={onRetryNow} />
     </div>
   );
@@ -1501,6 +1620,8 @@ interface DraftRoomBodyProps {
   teams: FetchedTeam[];
   playersById: ReadonlyMap<string, Player>;
   playersLoading: boolean;
+  /** The league's auction money rules, derived in the parent from the league row it already reads. */
+  auctionMoney: AuctionRules;
   playersError: Error | null;
   onRetryPlayers: () => void;
   /**
@@ -1520,6 +1641,7 @@ function DraftRoomBody({
   playersError,
   onRetryPlayers,
   clockOffsetMs,
+  auctionMoney: money,
 }: DraftRoomBodyProps) {
   /*
    * QUEUE-REACH (2026-08-13) — this state was declared inside
@@ -1547,6 +1669,7 @@ function DraftRoomBody({
    * the very queue it restored — see DraftQueue.persistence.test.tsx),
    * while the pool becomes a read/write view of the same array.
    */
+  const isMobile = useIsMobile();
   const [queue, setQueue] = useState<string[]>([]);
   const snapshot = useDraftSnapshot();
   const derived = useDerivedDraftState();
@@ -1622,6 +1745,8 @@ function DraftRoomBody({
             teams={teams}
             playersById={playersById}
             myTeamId={myTeamId}
+            minBid={money.minBid}
+            bidIncrementTiers={money.tiers}
           />
         )}
         <MainTabs
@@ -1635,6 +1760,8 @@ function DraftRoomBody({
           clockOffsetMs={clockOffsetMs}
           queue={queue}
           onQueueChange={setQueue}
+          isMobile={isMobile}
+          auctionMoney={money}
         />
       </div>
       {/* QUEUE-REACH (2026-08-13) — was `hidden lg:block`.
@@ -1651,16 +1778,22 @@ function DraftRoomBody({
           stacks underneath the pool, which is what v1 has always
           done. At lg and up nothing changes — it is still the right
           hand column. */}
-      <div className="space-y-4">
-        <SidebarPanel
-          leagueId={leagueId}
-          teams={teams}
-          playersById={playersById}
-          myTeamId={myTeamId}
-          queue={queue}
-          onQueueChange={setQueue}
-        />
-      </div>
+      {/* PRESS BOX (2026-09-04): below lg the rail's halves live in the
+          QUEUE and MY TEAM tabs (MainTabs), so the rail is not rendered
+          there at all — not hidden, not rendered — which is what keeps
+          DraftQueue at exactly one instance either way. */}
+      {!isMobile && (
+        <div className="space-y-4">
+          <SidebarPanel
+            leagueId={leagueId}
+            teams={teams}
+            playersById={playersById}
+            myTeamId={myTeamId}
+            queue={queue}
+            onQueueChange={setQueue}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -1679,6 +1812,10 @@ interface MainTabsProps {
   /** QUEUE-REACH (2026-08-13) — owned by DraftRoomBody, shared with the sidebar. */
   queue: string[];
   onQueueChange: (next: string[]) => void;
+  /** Below lg: the rail's halves become the QUEUE and MY TEAM tabs. */
+  isMobile: boolean;
+  /** The league's auction money rules (auctionRules.ts): the pool nominates at the league's minimum. */
+  auctionMoney: AuctionRules;
 }
 
 function MainTabs({
@@ -1692,9 +1829,13 @@ function MainTabs({
   clockOffsetMs,
   queue,
   onQueueChange,
+  isMobile,
+  auctionMoney: money,
 }: MainTabsProps) {
   const derived = useDerivedDraftState();
   const snapshot = useDraftSnapshot();
+  // AUCTION BOARD (2026-09-05): the lot's budgets for the column heads.
+  const auctionDerived = useAuctionDerived();
 
   // LEAGUE-SCORING WIRE (2026-08-23 final audit): the pool previously
   // ranked EVERY league with DEFAULT_SCORING — a custom league (e.g.
@@ -1728,7 +1869,7 @@ function MainTabs({
   // sticky bar and the header timer agree frame-for-frame.
   const pickTimeLimitSec = usePickTimeLimitSec();
   const pendingActions = usePendingActions();
-  const [tab, setTab] = useState<'players' | 'board' | 'history'>('players');
+  const [tab, setTab] = useState<'players' | 'queue' | 'board' | 'myteam' | 'history'>('players');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   // V2-PARITY (2026-08-17) — tap-for-player-card. Garrett's #1 feedback
   // from Citrus Draft Night: rows only highlighted; no card ever opened.
@@ -1826,6 +1967,30 @@ function MainTabs({
     () => participatingTeamIdsFromMatrix(matrix ?? null),
     [matrix],
   );
+  // AUCTION (2026-09-05): the pool's row verb is NOMINATE, live only on my
+  // nomination. One rule shared with the panel (auctionNominator.ts), so a
+  // "Draft" button that answers "it's not your turn" can never draw here.
+  const myNomination = isAuctionRoom && isMyNomination(auctionDerived, matrix ?? null, teams, myTeamId);
+  const [nominating, setNominating] = useState(false);
+  const handleNominateFromPool = useCallback(
+    async (player: Player) => {
+      if (!myTeamId || !myNomination || nominating) return;
+      setNominating(true);
+      try {
+        const result = await submitNomination({
+          leagueId,
+          teamId: myTeamId,
+          playerId: String(player.id),
+          playerName: player.full_name,
+          openingBid: money.minBid,
+        });
+        if (result.ok === false) toast.error(result.message);
+      } finally {
+        setNominating(false);
+      }
+    },
+    [leagueId, myTeamId, myNomination, nominating, money.minBid],
+  );
   // PICK-LATENCY (2026-08-12) — optimistic render.
   //
   // `renderDerived` is `derived` plus any pick the user has submitted
@@ -1855,6 +2020,21 @@ function MainTabs({
   const draftedIds = useMemo(
     () => (renderDerived ? toDraftedPlayerIds(renderDerived) : []),
     [renderDerived],
+  );
+  // KEEPERS (2026-09-05): the slots spoken for before their picks land,
+  // named for the board. Empty for a league without keepers.
+  const keeperSlotNames = useMemo(() => {
+    const m = new Map<string, string>();
+    if (!renderDerived) return m;
+    toKeeperSlots(renderDerived).forEach((playerId, key) => {
+      m.set(key, playersById.get(playerId)?.full_name ?? `#${playerId}`);
+    });
+    return m;
+  }, [renderDerived, playersById]);
+  /** Queued players still on the board — the number the QUEUE tab carries. */
+  const liveQueueCount = useMemo(
+    () => queue.filter((id) => !draftedIds.includes(id)).length,
+    [queue, draftedIds],
   );
   const availablePlayers = useMemo(
     () => (renderDerived ? toAvailablePlayers(playersById, renderDerived) : []),
@@ -1953,6 +2133,19 @@ function MainTabs({
     matrix,
     derived?.currentPickNumber,
   ]);
+
+  /**
+   * PRESS BOX (2026-09-04): the off-clock bar's `NEXT PICK 4.06 · 11 PICKS
+   * AWAY`. `picksUntilNextTurn` already answers the second half for the
+   * scarcity strip; the first half is the same walk of the matrix.
+   */
+  const offClockNextPick = useMemo<{ number: number; picksAway: number } | 'none' | 'unknown'>(() => {
+    const current = derived?.currentPickNumber ?? null;
+    if (!matrix || myTeamId === null || current === null) return 'unknown';
+    const away = picksUntilNextTurn(matrix, myTeamId, current);
+    if (away === null) return 'none';
+    return { number: current + away, picksAway: away };
+  }, [matrix, myTeamId, derived?.currentPickNumber]);
 
   const selectedProjection = selectedPlayer
     ? (projectedFptsMap.get(selectedPlayer.id) ?? null)
@@ -2117,8 +2310,18 @@ function MainTabs({
     });
   }, [leagueId]);
 
+  // KEEPERS (2026-09-05): a keeper slot is the engine's pick, not ours.
+  // `derived.keepers` is carried through every fold by reference, so this
+  // recomputes only when the round changes.
+  const keeperRound = derived?.currentRoundNumber ?? null;
+  const keepersRef = derived?.keepers;
+  const isMyKeeperSlot = useMemo(
+    () => !!(myTeamId && keeperRound != null && (keepersRef ?? []).some((k) => k.teamId === myTeamId && k.round === keeperRound)),
+    [myTeamId, keeperRound, keepersRef],
+  );
+
   useEffect(() => {
-    if (!autodraftOn || !amIOnClock || isSubmitPending) return;
+    if (!autodraftOn || !amIOnClock || isSubmitPending || isMyKeeperSlot) return;
     const pickNo = derived?.currentPickNumber ?? null;
     // One attempt per pick slot: if the submit fails (e.g. the engine
     // refuses the player), we deliberately do NOT retry this slot — the
@@ -2177,7 +2380,7 @@ function MainTabs({
       }
     }, 1500);
     return () => clearTimeout(timer);
-  }, [autodraftOn, amIOnClock, isSubmitPending, derived?.currentPickNumber, availablePlayers, queue, handleDraftFromPool, rosterCaps, myTeamId, playersById, leagueScoring]);
+  }, [autodraftOn, amIOnClock, isSubmitPending, isMyKeeperSlot, derived?.currentPickNumber, availablePlayers, queue, handleDraftFromPool, rosterCaps, myTeamId, playersById, leagueScoring]);
 
   return (
     <div className="space-y-3">
@@ -2229,11 +2432,11 @@ function MainTabs({
           sticky header can never overlap. (Its old `sticky top-24` sat
           UNDERNEATH the taller pre-compaction header, z-20 vs z-30.)
           The draft routes already hide MobileBottomNav, so the bottom
-          edge belongs to the draft; the room container carries pb-28 so
+          edge belongs to the draft; the room container carries pb-40 so
           the list's last rows scroll clear of it. lg+ keeps it in-flow,
           sticky just below the compact header. */}
       {!isAuctionRoom && (
-        <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-page-header lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-16 lg:z-sticky-raised">
+        <div className="fixed inset-x-0 bottom-0 z-page-header lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-16 lg:z-sticky-raised">
           <OnClockActionBar
             amIOnClock={amIOnClock}
             currentPickDeadline={snapshot?.stateSnapshot.currentPickDeadline ?? null}
@@ -2249,23 +2452,67 @@ function MainTabs({
             projection={selectedProjection}
             signal={selectedSignal}
             scarcity={scarcity}
+            /* PRESS BOX (2026-09-04): the rule across the bar's top, and the
+               queue position the artboard prints inside the verb. */
+            picksMade={derived?.picksMade ?? null}
+            totalPicks={derived?.totalPicks ?? null}
+            selectedQueuePosition={
+              selectedPlayer !== null && queue.indexOf(selectedPlayer.id) >= 0
+                ? queue.indexOf(selectedPlayer.id) + 1
+                : null
+            }
           />
+          {/* PRESS BOX (2026-09-04): the bar between turns. The handoff's
+              `NEXT PICK 4.06 · 11 PICKS AWAY · ~8 MIN` with QUEUE as the
+              verb on a phone; the desktop rail already shows the queue, so
+              there the bar is the line and the room's clock alone. Only
+              while the draft is running — a lobby has no next pick. */}
+          {!amIOnClock && derived !== null && derived.draftStatus === 'in_progress' && (
+            <OffClockBar
+              currentPickDeadline={snapshot?.stateSnapshot.currentPickDeadline ?? null}
+              clockOffsetMs={clockOffsetMs}
+              pickTimeLimitSec={pickTimeLimitSec}
+              pickNumber={derived.currentPickNumber}
+              roundNumber={derived.currentRoundNumber}
+              onClockTeamName={
+                derived.onClockTeamId !== null
+                  ? (teams.find((t) => t.id === derived.onClockTeamId)?.team_name ?? null)
+                  : null
+              }
+              nextPick={offClockNextPick}
+              teamCount={participatingTeamIds.size}
+              picksMade={derived.picksMade}
+              totalPicks={derived.totalPicks}
+              queueCount={liveQueueCount}
+              onOpenQueue={isMobile ? () => setTab('queue') : undefined}
+            />
+          )}
         </div>
       )}
       {/* Toggles live in normal flow — set-and-forget controls don't earn
-          a permanent slice of a phone screen the way the pick action does. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          a permanent slice of a phone screen the way the pick action does.
+          PRESS BOX (2026-09-04): they wear the filter chip — a pill that is
+          cream when armed and tile when not — because that is what a
+          set-and-forget switch IS on artboard 4a, and an underlined sentence
+          with an emoji in it was the one piece of the room still speaking
+          the old language. `aria-pressed` says the state to a screen reader;
+          the word says it to everyone else. */}
+      <div className="flex flex-wrap items-center gap-1.5 px-3.5 font-plex font-semibold text-[10px] tracking-[0.06em]">
         {/* DR-4 (2026-07-30) — alarm mute toggle. Beeping at a user who's
             already looking is obnoxious; muting is one click. */}
         {amIOnClock && (
           <button
             type="button"
             onClick={() => alarm.setMuted(!alarm.muted)}
-            className="text-xs text-muted-foreground hover:text-foreground underline"
+            className={cn(
+              'px-[11px] py-[5px] rounded-full whitespace-nowrap',
+              alarm.muted ? 'bg-pressbox-tile text-pressbox-text/70' : 'bg-pressbox-text text-pressbox-surface',
+            )}
             data-testid="alarm-mute-toggle"
             aria-pressed={alarm.muted}
+            title={alarm.muted ? 'Alarm muted. Tap to unmute' : 'Alarm on. Tap to mute'}
           >
-            {alarm.muted ? '🔇 Alarm muted. Click to unmute' : '🔊 Alarm on. Click to mute'}
+            {alarm.muted ? 'ALARM MUTED' : 'ALARM ON'}
           </button>
         )}
         {/* V2-PARITY (2026-08-17) — autodraft toggle, always visible so a
@@ -2275,26 +2522,84 @@ function MainTabs({
           <button
             type="button"
             onClick={toggleAutodraft}
-            className={
-              autodraftOn
-                ? 'text-xs underline text-fantasy-primary font-semibold'
-                : 'text-xs underline text-muted-foreground hover:text-foreground'
-            }
+            className={cn(
+              'px-[11px] py-[5px] rounded-full whitespace-nowrap',
+              autodraftOn ? 'bg-pressbox-text text-pressbox-surface' : 'bg-pressbox-tile text-pressbox-text/70',
+            )}
             data-testid="autodraft-toggle"
             aria-pressed={autodraftOn}
             title="When on, your picks submit automatically. Top of your queue first, best available otherwise. One attempt per pick; the draft clock is still the backstop."
           >
-            {autodraftOn ? '🤖 Autodraft ON. Click to turn off' : '🤖 Autodraft off. Click to turn on'}
+            {autodraftOn ? 'AUTODRAFT ON' : 'AUTODRAFT OFF'}
           </button>
         )}
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="players">Players</TabsTrigger>
-          <TabsTrigger value="board">Board</TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-        </TabsList>
+        {/* PRESS BOX (2026-09-04): artboard 4a's strip — four centred
+            columns in Barlow Condensed at .14em, an orange rule under the
+            one you are on. Radix still owns the panes below; this is only
+            the trigger row, which is why it is not a TabsList. */}
+        <PressBoxTabs
+          fill
+          label="Draft room view"
+          activeKey={tab}
+          onSelect={(v) => setTab(v as typeof tab)}
+          tabs={
+            isMobile
+              ? [
+                  { key: 'players', label: 'Players' },
+                  { key: 'queue', label: liveQueueCount > 0 ? `Queue · ${liveQueueCount}` : 'Queue' },
+                  { key: 'board', label: 'Board' },
+                  { key: 'myteam', label: 'My team' },
+                  { key: 'history', label: 'History' },
+                ]
+              : [
+                  { key: 'players', label: 'Players' },
+                  { key: 'board', label: 'Board' },
+                  { key: 'history', label: 'History' },
+                ]
+          }
+        />
+
+        {/* PRESS BOX (2026-09-04) — artboard 4a's QUEUE and MY TEAM tabs,
+            phones only. `forceMount` + `data-[state=inactive]:hidden` keeps
+            both panes MOUNTED while another tab is showing: DraftQueue's
+            restore effect overwrites the queue and toasts on every mount,
+            so a queue that unmounted on each tab switch would re-restore —
+            and could clobber a reorder still inside its 600ms save
+            debounce — every time you looked at the pool. Radix would
+            otherwise unmount an inactive pane. */}
+        {isMobile && (
+          <>
+            <TabsContent value="queue" forceMount className="mt-2 data-[state=inactive]:hidden">
+              <SidebarPanel
+                section="queue"
+                leagueId={leagueId}
+                teams={teams}
+                playersById={playersById}
+                myTeamId={myTeamId}
+                queue={queue}
+                onQueueChange={onQueueChange}
+                onDraftFromQueue={(playerId) => {
+                  const picked = playersById.get(playerId);
+                  if (picked) void handleDraftFromPool(picked);
+                }}
+              />
+            </TabsContent>
+            <TabsContent value="myteam" forceMount className="mt-3 px-3.5 space-y-3 data-[state=inactive]:hidden">
+              <SidebarPanel
+                section="rosters"
+                leagueId={leagueId}
+                teams={teams}
+                playersById={playersById}
+                myTeamId={myTeamId}
+                queue={queue}
+                onQueueChange={onQueueChange}
+              />
+            </TabsContent>
+          </>
+        )}
 
         <TabsContent value="players" className="mt-4">
           {playersLoading ? (
@@ -2304,15 +2609,16 @@ function MainTabs({
           ) : (
             <PlayerPool
               onPlayerSelect={setSelectedPlayer}
-              onPlayerDraft={handleDraftFromPool}
+              onPlayerDraft={isAuctionRoom ? handleNominateFromPool : handleDraftFromPool}
               selectedPlayer={selectedPlayer}
               draftedPlayers={draftedIds}
               isDraftActive={isDraftActive}
               availablePlayers={availablePlayers}
               loadError={playersError}
               onRetryLoad={onRetryPlayers}
-              isYourTurn={amIOnClock}
-              isSubmitPending={isSubmitPending}
+              isYourTurn={isAuctionRoom ? myNomination : amIOnClock}
+              actionVerb={isAuctionRoom ? 'Nominate' : 'Draft'}
+              isSubmitPending={isAuctionRoom ? nominating : isSubmitPending}
               /* LEAGUE-SCORING WIRE (2026-08-23) — rankings/FPTS follow
                  this league's categories instead of default scoring. */
               scoringSettings={leagueScoring}
@@ -2333,11 +2639,48 @@ function MainTabs({
                  season fantasy points exactly as before. */
               projectedFptsMap={projectedFptsMap}
               qualitySignals={qualitySignals}
+              /* STORMY'S NEED LINE (2026-09-05, artboard 4a): the league's
+                 slots, the positions already drafted, the picks before the
+                 next turn -- all held here already. Not in an auction. */
+              need={
+                !isAuctionRoom && myTeamId !== null
+                  ? {
+                      caps: rosterCaps,
+                      myPositions: (derived?.teamRosters.get(myTeamId) ?? [])
+                        .map((r) => playersById.get(String(r.playerId))?.position ?? null)
+                        .filter((p): p is string => p !== null),
+                      picksAway: typeof offClockNextPick === 'object' ? offClockNextPick.picksAway : null,
+                    }
+                  : null
+              }
             />
           )}
         </TabsContent>
 
         <TabsContent value="board" className="mt-4">
+          {/* AUCTION BOARD (2026-09-05): a lot has no pick number a team was
+              owed, so the snake matrix ("1.01 ON THE CLOCK") is the wrong
+              picture. Each team's column fills from the top with what it
+              bought, price under the name, budget in the head. */}
+          {snapshot?.format === 'auction' && derived ? (
+            <AuctionBoard
+              teams={teams}
+              derived={derived}
+              auction={auctionDerived}
+              playersById={playersById}
+              myTeamId={myTeamId}
+              slotsPerTeam={
+                teams.length > 0 && derived.totalPicks > 0
+                  ? Math.round(derived.totalPicks / teams.length)
+                  : 0
+              }
+              onPlayerClick={(playerId) => {
+                const picked = playersById.get(playerId);
+                if (picked) setCardPlayer(picked);
+              }}
+            />
+          ) : (
+          <>
           {/* DR-4 (2026-07-30) — pre-draft board copy. */}
           {derived?.draftStatus === 'not_started' && (
             <div
@@ -2384,11 +2727,35 @@ function MainTabs({
                 : undefined
             }
             draftType="snake"
+            keeperSlots={keeperSlotNames}
+            /* PRESS BOX (2026-09-04): the outlined column and the card on tap. */
+            userTeamId={myTeamId}
+            onPlayerClick={(playerId) => {
+              const picked = playersById.get(playerId);
+              if (picked) setCardPlayer(picked);
+            }}
           />
+          </>
+          )}
         </TabsContent>
 
-        <TabsContent value="history" className="mt-4">
-          <DraftHistory draftHistory={draftHistory} />
+        <TabsContent value="history" className="mt-2">
+          {/* PRESS BOX (2026-09-04): `round.pick` labels, the face, your
+              picks outlined, and the card on tap — the same card the board
+              opens. */}
+          <DraftHistory
+            draftHistory={draftHistory}
+            teamCount={teams.length}
+            userTeamId={myTeamId}
+            mugFor={(playerId) => {
+              const p = playersById.get(playerId);
+              return p ? mugFromDirectory(p) : null;
+            }}
+            onPlayerClick={(playerId) => {
+              const picked = playersById.get(playerId);
+              if (picked) setCardPlayer(picked);
+            }}
+          />
         </TabsContent>
       </Tabs>
 
@@ -2429,6 +2796,23 @@ interface SidebarPanelProps {
   /** QUEUE-REACH (2026-08-13) — lifted to DraftRoomBody; see the note there. */
   queue: string[];
   onQueueChange: (next: string[]) => void;
+  /**
+   * PRESS BOX (2026-09-04) — artboard 4a gives the phone QUEUE and MY TEAM
+   * tabs. Below lg the rail's two halves render in those panes instead of
+   * stacked under 75 rows of pool; at lg the rail is still the rail. Both
+   * paths render ONE DraftQueue: `all` on the rail, `queue` in the tab, never
+   * together — "exactly one DraftQueue is mounted" is a tested invariant
+   * because its restore effect overwrites the queue on every mount.
+   */
+  section?: 'all' | 'queue' | 'rosters';
+  /**
+   * PRESS BOX (2026-09-04). On the phone the queue is a TAB, so its
+   * `DRAFT NOW` has to do something: MainTabs hands it the same guarded
+   * DR-2 submit the pool's Draft button uses. Absent (the desktop rail),
+   * the button keeps its "Draft from the Players tab" toast — architect
+   * ruling 1c's status quo, unchanged.
+   */
+  onDraftFromQueue?: (playerId: string) => void;
 }
 
 function SidebarPanel({
@@ -2438,7 +2822,11 @@ function SidebarPanel({
   myTeamId,
   queue,
   onQueueChange,
+  section = 'all',
+  onDraftFromQueue,
 }: SidebarPanelProps) {
+  const showRosters = section !== 'queue';
+  const showQueue = section !== 'rosters';
   const derived = useDerivedDraftState();
   const matrix = useDraftMatrix();
 
@@ -2483,49 +2871,61 @@ function SidebarPanel({
 
   return (
     <>
-      <ManagerPresencePanel teams={participatingTeams} />
-      {!anyPicksMade && derived !== null && (
-        <div
-          className="rounded border border-dashed border-muted-foreground/30 bg-muted/20 p-3 text-xs text-muted-foreground"
-          data-testid="rosters-empty-copy"
-        >
-          No picks yet. Rosters will fill in as the draft progresses.
+      {/* The queue leads the rail: during a draft it is the thing a manager
+          reaches for, and a rail that buries it under twelve rosters is a
+          rail that scrolls. */}
+      {showQueue && (
+        <div>
+          <DraftQueue
+            queue={queue}
+            players={allPlayers}
+            draftedPlayers={draftedIds}
+            onQueueChange={onQueueChange}
+            onDraftFromQueue={
+              onDraftFromQueue ??
+              (() => {
+                // Queue-drive submit is post-DR-3. For now, users draft
+                // via the pool's Draft button. Queue is display-only per
+                // architect ruling 1c.
+                toast.info('Draft from the Players tab');
+              })
+            }
+            isDraftActive={derived?.draftStatus === 'in_progress'}
+            isYourTurn={amIOnClock}
+            leagueId={leagueId}
+            // QUEUE (2026-08-12) — enables server persistence. Null for a
+            // spectator or an unresolved identity, in which case DraftQueue
+            // stays on its previous localStorage-only path.
+            teamId={myTeamId}
+            currentPick={derived?.currentPickNumber ?? undefined}
+            totalPicks={derived?.totalPicks ?? undefined}
+          />
+          <div
+            className="px-3.5 pb-3 font-plex font-medium text-[10px] text-pressbox-text/45"
+            data-testid="queue-persistence-note"
+          >
+            Saved to your team. Used for autopick if your clock expires
+          </div>
         </div>
       )}
-      <TeamRosters
-        teams={v1Teams}
-        draftHistory={draftHistory}
-        userTeamId={myTeamId}
-      />
-      <div>
-        <DraftQueue
-          queue={queue}
-          players={allPlayers}
-          draftedPlayers={draftedIds}
-          onQueueChange={onQueueChange}
-          onDraftFromQueue={() => {
-            // Queue-drive submit is post-DR-3. For now, users draft
-            // via the pool's Draft button. Queue is display-only per
-            // architect ruling 1c.
-            toast.info('Draft from the Players tab');
-          }}
-          isDraftActive={derived?.draftStatus === 'in_progress'}
-          isYourTurn={amIOnClock}
-          leagueId={leagueId}
-          // QUEUE (2026-08-12) — enables server persistence. Null for a
-          // spectator or an unresolved identity, in which case DraftQueue
-          // stays on its previous localStorage-only path.
-          teamId={myTeamId}
-          currentPick={derived?.currentPickNumber ?? undefined}
-          totalPicks={derived?.totalPicks ?? undefined}
-        />
-        <div
-          className="text-xs text-muted-foreground mt-1"
-          data-testid="queue-persistence-note"
-        >
-          Saved to your team. Used for autopick if your clock expires
-        </div>
-      </div>
+      {showRosters && (
+        <>
+          {!anyPicksMade && derived !== null && (
+            <div
+              className="rounded-[12px] border border-dashed border-white/15 px-3 py-2.5 font-barlow text-[12px] text-pressbox-text/55"
+              data-testid="rosters-empty-copy"
+            >
+              No picks yet. Rosters will fill in as the draft progresses.
+            </div>
+          )}
+          <TeamRosters
+            teams={v1Teams}
+            draftHistory={draftHistory}
+            userTeamId={myTeamId}
+          />
+          <ManagerPresencePanel teams={participatingTeams} />
+        </>
+      )}
       {/* DR-3 (2026-07-29) — DraftControls HIDDEN per architect ruling:
           v2 HTTP routes for /pause and /resume don't exist yet (only
           /undo is exposed at server/src/routes/draft.ts:273). Wiring

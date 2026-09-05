@@ -118,21 +118,25 @@ const ProfileSetup = () => {
 
   return (
     <DarkLayout>
-      <Navbar />
-      <main className="relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)]">
-        <Card className="w-full max-w-2xl bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]">
-          <CardHeader className="space-y-3 text-center">
+      {/* PRESS BOX BELOW lg (PR18 paint sweep, 2026-09-05). The first screen
+          a new email signup sees after Auth, re-skinned the same way Auth
+          is: one tree, `max-lg:` classes, every id and handler the same
+          element on both layers. The desktop keeps the card from lg. */}
+      <div className="hidden lg:block"><Navbar /></div>
+      <main className="pb-type-phone relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)] max-lg:min-h-screen max-lg:bg-pressbox-surface max-lg:text-pressbox-text max-lg:px-5 max-lg:pt-[calc(2.5rem+env(safe-area-inset-top))] max-lg:pb-app-chrome">
+        <Card className="w-full max-w-2xl bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] max-lg:bg-transparent max-lg:border-0 max-lg:ring-0 max-lg:shadow-none max-lg:rounded-none">
+          <CardHeader className="space-y-3 text-center max-lg:p-0 max-lg:pb-6">
             <div className="flex justify-center mb-2">
               <MascotAvatar id="stormy" size="lg" />
             </div>
-            <CardTitle className="text-2xl font-black text-pastel-cream tracking-[-0.02em]">
-              Set up your <span className="text-pastel-orange">profile</span>
+            <CardTitle className="text-2xl font-black text-pastel-cream tracking-[-0.02em] max-lg:font-condensed max-lg:font-extrabold max-lg:text-[28px] max-lg:uppercase max-lg:tracking-[0.02em] max-lg:text-pressbox-text">
+              Set up your <span className="text-pastel-orange max-lg:text-pressbox-orange-soft">profile</span>
             </CardTitle>
-            <CardDescription className="text-white/60">
+            <CardDescription className="text-white/60 max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">
               One last step before puck drop. Name your manager profile
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-lg:p-0">
             <form onSubmit={handleSubmit} className="space-y-6">
               {error && (
                 <Alert variant="destructive">
@@ -142,98 +146,105 @@ const ProfileSetup = () => {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="username">Username *</Label>
+                  <Label htmlFor="username" className="max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">Username *</Label>
                   <div className="relative">
-                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground max-lg:top-1/2 max-lg:-translate-y-1/2 max-lg:text-pressbox-text/45" aria-hidden="true" />
                     <Input
                       id="username"
                       type="text"
                       placeholder="your_username"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-tile max-lg:border-white/[0.08] max-lg:font-barlow max-lg:text-[15px] max-lg:text-pressbox-text max-lg:placeholder:text-pressbox-text/40"
                       required
                       minLength={3}
                       pattern="[a-zA-Z0-9_]+"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground max-lg:font-barlow max-lg:text-[12px] max-lg:text-pressbox-text/50">
                     Letters, numbers, and underscores only. 3+ characters.
                   </p>
                 </div>
 
+                {/* PHONE (2026-09-05): username and a name are the setup. The
+                    email is read-only, and phone and location are optional
+                    facts the Account screen still takes; six fields on a
+                    first-run screen is a form, not a welcome. Desktop keeps
+                    them. The ids stay in the tree for the tests. */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
+                    <Label htmlFor="firstName" className="max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">First Name</Label>
                     <Input
                       id="firstName"
                       type="text"
                       placeholder="John"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
+                      className="max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-tile max-lg:border-white/[0.08] max-lg:font-barlow max-lg:text-[15px] max-lg:text-pressbox-text max-lg:placeholder:text-pressbox-text/40"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
+                    <Label htmlFor="lastName" className="max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">Last Name</Label>
                     <Input
                       id="lastName"
                       type="text"
                       placeholder="Smith"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
+                      className="max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-tile max-lg:border-white/[0.08] max-lg:font-barlow max-lg:text-[15px] max-lg:text-pressbox-text max-lg:placeholder:text-pressbox-text/40"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                <div className="space-y-2 max-lg:hidden">
+                  <Label htmlFor="email" className="max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">Email</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground max-lg:top-1/2 max-lg:-translate-y-1/2 max-lg:text-pressbox-text/45" aria-hidden="true" />
                     <Input
                       id="email"
                       type="email"
                       value={user?.email || ''}
                       disabled
-                      className="pl-10 bg-muted"
+                      className="pl-10 bg-muted max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-tile max-lg:border-white/[0.08] max-lg:font-barlow max-lg:text-[15px] max-lg:text-pressbox-text max-lg:placeholder:text-pressbox-text/40 max-lg:opacity-60"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground max-lg:font-barlow max-lg:text-[12px] max-lg:text-pressbox-text/50">
                     Email is set from your account
                   </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
+                <div className="space-y-2 max-lg:hidden">
+                  <Label htmlFor="phone" className="max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">Phone</Label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground max-lg:top-1/2 max-lg:-translate-y-1/2 max-lg:text-pressbox-text/45" aria-hidden="true" />
                     <Input
                       id="phone"
                       type="tel"
                       placeholder="+1 (555) 123-4567"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-tile max-lg:border-white/[0.08] max-lg:font-barlow max-lg:text-[15px] max-lg:text-pressbox-text max-lg:placeholder:text-pressbox-text/40"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location</Label>
+                <div className="space-y-2 max-lg:hidden">
+                  <Label htmlFor="location" className="max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">Location</Label>
                   <div className="relative">
-                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground max-lg:top-1/2 max-lg:-translate-y-1/2 max-lg:text-pressbox-text/45" aria-hidden="true" />
                     <Input
                       id="location"
                       type="text"
                       placeholder="New York, NY"
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-tile max-lg:border-white/[0.08] max-lg:font-barlow max-lg:text-[15px] max-lg:text-pressbox-text max-lg:placeholder:text-pressbox-text/40"
                     />
                   </div>
                 </div>
               </div>
 
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full max-lg:h-12 max-lg:rounded-[12px] max-lg:border-0 max-lg:outline-none max-lg:shadow-none max-lg:bg-pressbox-orange max-lg:text-pressbox-orange-ink max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.08em] max-lg:uppercase" disabled={loading}>
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />

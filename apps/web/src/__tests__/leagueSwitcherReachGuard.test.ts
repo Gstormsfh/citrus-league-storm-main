@@ -6,16 +6,19 @@
  * creation affordance off the bottom of the screen with no way to
  * scroll to it.
  *
- * Three variants exist and ALL must hold the contract: the desktop rail
- * and mobile-menu dropdowns in Navbar.tsx, plus the plain-button
- * switcher inside the full-screen menu in MobileMenuButton.tsx (core
- * pages hide the Navbar below lg, so the hamburger menu on iOS is
- * MobileMenuButton — the variant the first fix missed).
- *
- * The contract, for EVERY variant:
+ * Two dropdown variants exist in Navbar.tsx — the desktop rail and the
+ * mobile-menu overlay — and both must hold the contract:
  *   1. Create / Join League sits ABOVE the league list — reachable at
  *      any league count.
  *   2. The league list itself is height-capped and scrolls on its own.
+ *
+ * PRESS BOX (2026-09-04): the phone's switcher is no longer a dropdown.
+ * The old hamburger menu (MobileMenuButton, the variant the first fix
+ * missed) is gone; below lg the LEAGUES tab is the home screen, whose
+ * league list IS the switcher and whose header carries `+ LEAGUE`. The
+ * creation affordance is in the header above the list, so it is reachable
+ * at any league count by construction; the list scrolls with the page.
+ * Pinned below as its own case.
  *
  * jsdom has no layout engine; these are source contracts.
  */
@@ -34,14 +37,9 @@ const SOURCES = [
     endMarker: '</DropdownMenuContent>',
     minBlocks: 2, // desktop rail + mobile-menu overlay
   },
-  {
-    file: 'MobileMenuButton.tsx',
-    text: readFileSync(resolve(here, '../components/MobileMenuButton.tsx'), 'utf-8'),
-    // Plain-button switcher ends where the nav-link section begins.
-    endMarker: 'Nav links',
-    minBlocks: 1, // full-screen menu switcher
-  },
 ] as const;
+
+const HOME = readFileSync(resolve(here, '../components/home/PressBoxHome.tsx'), 'utf-8');
 
 // Each switcher block runs from its "My Leagues" label to the variant's
 // end marker (or EOF — the reach assertions still bind on the slice).
@@ -85,5 +83,19 @@ describe('the league switcher never buries Create / Join League', () => {
 
   it.each(flat)('%s caps and scrolls the league list', (_label, block) => {
     expect(block).toMatch(/max-h-\[min\(50vh,320px\)\] overflow-y-auto/);
+  });
+});
+
+describe('the phone switcher is the home league list', () => {
+  it('puts the creation affordance in the header, above the list', () => {
+    const header = HOME.indexOf("onAddLeague={() => navigate('/create-league')}");
+    const list = HOME.indexOf('<PressBoxLeagueCard');
+    expect(header, '+ LEAGUE missing from the home header').toBeGreaterThan(-1);
+    expect(list, 'league cards missing from home').toBeGreaterThan(-1);
+    expect(header).toBeLessThan(list);
+  });
+
+  it('every card switches through the shared helper', () => {
+    expect(HOME).toContain("leagueSwitchDestination(l.id, fmt.leagueType, '/')");
   });
 });

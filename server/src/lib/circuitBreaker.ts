@@ -141,7 +141,7 @@ export class CircuitBreaker {
 
 export class CircuitOpenError extends Error {
   constructor(breakerName: string) {
-    super(`Circuit breaker "${breakerName}" is OPEN — service unavailable`);
+    super(`Circuit breaker "${breakerName}" is OPEN: service unavailable`);
     this.name = 'CircuitOpenError';
   }
 }

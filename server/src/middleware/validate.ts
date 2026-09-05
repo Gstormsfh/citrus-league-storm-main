@@ -133,6 +133,10 @@ export const schemas = {
     trade_review_type: z.enum(['none', 'commissioner', 'league_vote']),
     trade_review_period_hours: z.number().int().min(1).max(168),
     trade_veto_threshold: z.number().min(0.01).max(1),
+    // SETTINGS PASS-THROUGH (2026-09-05): the deadline week was set at
+    // creation and never editable. 0 = no deadline. Lives in settings JSONB
+    // (settings.tradeDeadlineWeek), where isPastTradeDeadline reads it.
+    tradeDeadlineWeek: z.number().int().min(0).max(30).optional(),
   }),
 
   // Auction schemas

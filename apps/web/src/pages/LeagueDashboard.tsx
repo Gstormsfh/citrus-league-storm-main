@@ -1,6 +1,7 @@
 import { userMessage } from '@/lib/userMessage';
-import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   HockeyFooter,
   CupIcon,
@@ -16,26 +17,35 @@ import {
   MascotAvatar,
   MascotPortrait,
 } from '@/components/citrus2';
-import { StormyLoading } from '@/components/citrus2/StormyLoading';
 import { getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
-import { useProfile } from '@/hooks/useProfile';
 import { useSeasonStatus } from '@/hooks/useSeasonStatus';
 import { shortDateLabel } from '@/components/scores/scoresFormat';
 import { LeagueService, League, Team } from '@/services/LeagueService';
+import { getTodayMST } from '@/utils/timezoneUtils';
 import { WaiverService } from '@/services/WaiverService';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import { waiverApi } from '@/api/waivers';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
+import { PressBoxPageLoading } from '@/components/pressbox/PageLoading';
+import { LeagueHQPhone, type LeagueHQMatchup } from '@/components/league/LeagueHQPhone';
+import { LeagueSettingsPhone } from '@/components/league/LeagueSettingsPhone';
+import { buildLeagueSettingsSections } from '@/components/league/leagueSettingsSections';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { useScoringRules } from '@/components/league/useScoringRules';
+import { matchupApi } from '@/api/matchups';
+import { gamesLeftOf, isBye, scoreOf, teamNameOf, winChanceOf, type WeekMatchupRow } from '@/components/matchup/scoreboard';
+import { standingsLine, type StandingsLineRow } from '@/components/league/hqLines';
+import { clampToSeasonStart, getCurrentWeekNumber, getDraftCompletionDate, getFirstWeekStartDate } from '@/utils/weekCalculator';
 import { LeagueTimelineCard } from '@/components/dashboard/LeagueTimelineCard';
 import { FEATURE_PRACTICE_DRAFT } from '@/lib/featureFlags';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Trophy, Users, Calendar, Settings, Play, Copy, CheckCircle, Clock, Shield, RefreshCw, UserPlus, Crown, Mail, ArrowLeftRight, Layers, Share2 } from 'lucide-react';
+import { Loader2, Trophy, Users, Calendar, Settings, Play, Copy, CheckCircle, Clock, Shield, RefreshCw, UserPlus, Crown, Mail, ArrowLeftRight, Layers, Share2, BarChart3, ArrowUpDown, CalendarDays, Briefcase, ClipboardList } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { buildInviteLink, canSystemShare, emailInvite, shareInvite } from '@/utils/inviteShare';
 import { InvitePlayersButton } from '@/components/InvitePlayersButton';
@@ -56,7 +66,6 @@ const LeagueDashboard = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: profile } = useProfile();
   const { status: seasonStatus } = useSeasonStatus();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -72,6 +81,7 @@ const LeagueDashboard = () => {
   
   // Commissioner Settings State
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** PRESS BOX (2026-09-04): the league menu behind the header's sliders. */
   const [savingSettings, setSavingSettings] = useState(false);
   const [processingWaivers, setProcessingWaivers] = useState(false);
   const [waiverSettings, setWaiverSettings] = useState({
@@ -100,6 +110,8 @@ const LeagueDashboard = () => {
     trade_review_type: 'none' as 'none' | 'commissioner' | 'league_vote',
     trade_review_period_hours: 48,
     trade_veto_threshold: 0.5,
+    // SETTINGS PASS-THROUGH (2026-09-05): the deadline was create-time only.
+    tradeDeadlineWeek: 0,
   });
 
   // Keeper/Dynasty settings state
@@ -124,6 +136,18 @@ const LeagueDashboard = () => {
 
   // Active settings tab
   const [activeSettingsTab, setActiveSettingsTab] = useState('waivers');
+  /**
+   * PRESS BOX (2026-09-04): which settings surface opens. The desktop
+   * dialog and the phone screen (`LeagueSettingsPhone`) share every piece
+   * of state above and the save handler below; only one of them mounts,
+   * because both portal to the body and a responsive class cannot hide a
+   * portal. `useIsMobile` is the one viewport answer (see the hook).
+   */
+  const isMobile = useIsMobile();
+  /* The phone screen's SCORING section reads the same catalog the desktop
+     editor does, through the same hook; it fetches only while the phone
+     screen is open, so a visit to HQ costs nothing. */
+  const scoringRules = useScoringRules(settingsOpen && isMobile && leagueId ? leagueId : null);
 
   const loadLeagueData = useCallback(async () => {
     if (!leagueId || !user) return;
@@ -212,12 +236,23 @@ const LeagueDashboard = () => {
         pickTimeLimit: (leagueData.settings as LeagueSettings)?.pickTimeLimit as number || 90,
       });
 
-      // Update trade review settings
+      // Update trade review settings.
+      // SETTINGS PASS-THROUGH (2026-09-05): the review settings are saved to
+      // the leagues.trade_review_* COLUMNS (TradeService.updateTradeReviewSettings)
+      // and enforced from there; this screen read settings.tradeReviewType, a
+      // key nothing writes, so it showed "Instant" after "Commissioner" had
+      // been saved. Read the columns; the JSONB key is the legacy fallback.
       const fmt = extractFormatSettings((leagueData.settings as LeagueSettings) || {});
+      const cols = leagueData as unknown as {
+        trade_review_type?: string | null;
+        trade_review_period_hours?: number | null;
+        trade_veto_threshold?: number | null;
+      };
       setTradeSettings({
-        trade_review_type: (fmt.tradeReviewType || 'none') as 'none' | 'commissioner' | 'league_vote',
-        trade_review_period_hours: fmt.tradeReviewPeriodHours || 48,
-        trade_veto_threshold: fmt.tradeVetoThreshold || 0.5,
+        trade_review_type: (cols.trade_review_type || fmt.tradeReviewType || 'none') as 'none' | 'commissioner' | 'league_vote',
+        trade_review_period_hours: cols.trade_review_period_hours || fmt.tradeReviewPeriodHours || 48,
+        trade_veto_threshold: cols.trade_veto_threshold || fmt.tradeVetoThreshold || 0.5,
+        tradeDeadlineWeek: Number(fmt.tradeDeadlineWeek) || 0,
       });
 
       // Update keeper/dynasty settings
@@ -551,8 +586,14 @@ const LeagueDashboard = () => {
         description: `League ${activeSettingsTab} settings have been updated. All league members have been notified.`,
       });
       setSettingsOpen(false);
-      
-      // Reload league data to reflect changes
+
+      // Reload league data to reflect changes. Both league caches first
+      // (SETTINGS PASS-THROUGH, 2026-09-05): the trade, keeper and draft
+      // saves go through their own endpoints and invalidated nothing, so
+      // this reload handed back the 30s-cached league and the dialog
+      // reopened on the values from BEFORE the save.
+      LeagueService.clearLeagueCache();
+      leagueApi.invalidate(`leagues:${leagueId}`);
       loadLeagueData();
     } catch (err: unknown) {
       toast({
@@ -567,6 +608,21 @@ const LeagueDashboard = () => {
 
   // Determine if user is commissioner (needs to be before handler functions that use it)
   const isCommissioner = league?.commissioner_id === user?.id;
+
+  /**
+   * `/league/:id?settings=1` opens the commissioner's settings sheet
+   * (2026-09-05): the league menu's League settings tile routes here, since
+   * a tile must route and the sheet is this page's. The param is consumed
+   * once -- cleared as the sheet opens -- so back does not reopen it.
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (!league || !isCommissioner || searchParams.get('settings') !== '1') return;
+    setSettingsOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('settings');
+    setSearchParams(next, { replace: true });
+  }, [league, isCommissioner, searchParams, setSearchParams]);
 
   /**
    * THERE IS NO WEEK (2026-09-02 offseason audit).
@@ -597,9 +653,9 @@ const LeagueDashboard = () => {
     : null;
   const isCategoryLeague =
     leagueScoringFormat === 'h2h-categories' || leagueScoringFormat === 'roto';
-  // SETTINGS SECTIONS (2026-09-01): one list drives BOTH the desktop tab
-  // strip and the mobile section dropdown — "hard to use and navigate on
-  // mobile... utilize drop down menus."
+  // SETTINGS SECTIONS (2026-09-01): one list drives the desktop tab strip;
+  // the phone screen's chips come from leagueSettingsSections.ts, in the
+  // same order, with the same keys (2026-09-04).
   const settingsSections = isCategoryLeague
     ? (['waivers', 'categories', 'draft', 'trades', 'keeper', 'rosterslots', 'playoffs', 'rosters'] as const)
     : (['waivers', 'scoring', 'draft', 'trades', 'keeper', 'rosterslots', 'playoffs', 'rosters'] as const);
@@ -716,12 +772,176 @@ const LeagueDashboard = () => {
     }
   };
 
+  // ─────────────────────────────────────────────────────────────────────
+  // PRESS BOX (2026-09-04): what the phone's HQ draws, from what this page
+  // already holds plus one read — the week's scoreboard, which the old HQ
+  // never showed at all.
+  // ─────────────────────────────────────────────────────────────────────
+
+  /**
+   * The fantasy week, by the same arithmetic the Matchup page uses, and
+   * null when there is none: before the draft, or in the offseason (the
+   * `THERE IS NO WEEK` gate above). `phase === 'unknown'` on a failed season
+   * read leaves the week in, so a dead status API cannot hide the list.
+   */
+  const currentWeek = useMemo(() => {
+    if (!league || inOffseason) return null;
+    const done = getDraftCompletionDate(league);
+    if (!done || Number.isNaN(done.getTime())) return null;
+    return getCurrentWeekNumber(clampToSeasonStart(getFirstWeekStartDate(done)));
+  }, [league, inOffseason]);
+
+  const weekMatchupsQuery = useQuery({
+    queryKey: ['league-hq-matchups', leagueId, currentWeek],
+    enabled: !!leagueId && currentWeek !== null,
+    queryFn: async () => {
+      const res = await matchupApi.getLeagueMatchups(leagueId!, currentWeek!);
+      const rows = ((res as { data?: unknown }).data ?? res) as unknown;
+      return Array.isArray(rows) ? (rows as WeekMatchupRow[]) : [];
+    },
+    staleTime: 60_000,
+  });
+
+  /** The same key LeagueTimelineCard uses, so the two reads share one cache entry. */
+  const transactionsQuery = useQuery({
+    queryKey: ['league-timeline-transactions', leagueId],
+    enabled: !!leagueId,
+    queryFn: async () => {
+      const res = await leagueApi.getTransactions(leagueId!);
+      const raw = (res as { data?: unknown; transactions?: unknown }).data
+        ?? (res as { transactions?: unknown }).transactions
+        ?? res;
+      return Array.isArray(raw) ? (raw as Array<{ created_at?: string }>) : [];
+    },
+    staleTime: 60_000,
+  });
+  const transactionsThisWeek = useMemo(() => {
+    const rows = transactionsQuery.data;
+    if (!rows) return null;
+    const since = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return rows.filter((r) => r.created_at && new Date(r.created_at).getTime() >= since).length;
+  }, [transactionsQuery.data]);
+
+  /**
+   * THE TILES' ONE LIVE NUMBER (2026-09-05, artboard 1a): `You're 2nd · 1.5
+   * GB · 588.9 PF` under Standings and `2 trades pending` after the week's
+   * transaction count. Standings is the same ranked read the Standings
+   * page makes; the pending trades are the league's open offers. Neither
+   * blocks the screen: a tile with no number is a tile with a title.
+   */
+  const standingsQuery = useQuery({
+    queryKey: ['league-standings', leagueId],
+    enabled: !!leagueId && league?.draft_status === 'completed',
+    queryFn: async () => {
+      const res = await leagueApi.getStandings(leagueId!);
+      const rows = ((res as { data?: unknown }).data ?? res) as unknown;
+      return Array.isArray(rows) ? (rows as StandingsLineRow[]) : [];
+    },
+    staleTime: 60_000,
+  });
+  const pendingTradesQuery = useQuery({
+    queryKey: ['league-pending-trades', leagueId],
+    enabled: !!leagueId && league?.draft_status === 'completed',
+    queryFn: async () => {
+      // Imported when the read runs: `@/api/client` builds the Supabase
+      // client at module scope, and this page's tests mock the services,
+      // not the API modules.
+      const { tradeApi } = await import('@/api/trades');
+      const res = await tradeApi.getLeagueTrades(leagueId!, 'pending');
+      const rows = ((res as { data?: unknown }).data ?? res) as unknown;
+      return Array.isArray(rows) ? (rows as Array<{ to_team_id?: string | null }>) : [];
+    },
+    staleTime: 60_000,
+  });
+  const standingsStat = useMemo(
+    () => (standingsQuery.data && userTeam ? standingsLine(standingsQuery.data, userTeam.id) : null),
+    [standingsQuery.data, userTeam],
+  );
+  const transactionsStat = useMemo(() => {
+    const parts: string[] = [];
+    if (transactionsThisWeek !== null) parts.push(`${transactionsThisWeek} this week`);
+    const pending = pendingTradesQuery.data?.length ?? 0;
+    if (pending) parts.push(`${pending} trade${pending === 1 ? '' : 's'} pending`);
+    return parts.length ? parts.join(' · ') : null;
+  }, [transactionsThisWeek, pendingTradesQuery.data]);
+  const draftStat = useMemo(() => {
+    if (!league) return null;
+    // Through extractFormatSettings, which this page already uses for the
+    // scoring format: the page tests mock LeagueService to its class alone.
+    const type = extractFormatSettings((league.settings as LeagueSettings) || {}).draftType ?? 'snake';
+    const label = type === 'auction' ? 'Auction' : type === 'linear' ? 'Linear' : type === 'offline' ? 'Offline' : 'Snake';
+    return `${draftSettings.draft_rounds} rds · ${label}`;
+  }, [league, draftSettings.draft_rounds]);
+
+  const hqMatchups = useMemo<LeagueHQMatchup[] | undefined>(() => {
+    if (currentWeek === null || !leagueId) return [];
+    const rows = weekMatchupsQuery.data;
+    if (!rows) return weekMatchupsQuery.isError ? [] : undefined;
+    const mine = userTeam?.id ?? null;
+    const to = `/matchup/${leagueId}/${currentWeek}`;
+    const today = getTodayMST();
+    // LeagueHQPhone puts yours first; this is the week's order. Win chance
+    // and games left come off the scoreboard row (2026-09-05) through the
+    // same rule as the Match screen's header; null draws nothing.
+    return rows.map((row) => ({
+      id: row.id,
+      home: {
+        name: teamNameOf(row, 'team1'),
+        points: scoreOf(row.team1_score),
+        winPct: winChanceOf(row, 'team1', today),
+        gamesLeft: gamesLeftOf(row, 'team1', today),
+        isYou: mine !== null && row.team1_id === mine,
+      },
+      away: isBye(row)
+        ? { name: 'Bye week' }
+        : {
+            name: teamNameOf(row, 'team2'),
+            points: scoreOf(row.team2_score),
+            winPct: winChanceOf(row, 'team2', today),
+            gamesLeft: gamesLeftOf(row, 'team2', today),
+            isYou: mine !== null && row.team2_id === mine,
+          },
+      to,
+    }));
+  }, [currentWeek, leagueId, weekMatchupsQuery.data, weekMatchupsQuery.isError, userTeam?.id]);
+
+  /** The draft card, in the states the desktop card has (see it below). */
+  const hqDraft = useMemo(() => {
+    if (!league || !leagueId || league.draft_status === 'completed') return null;
+    const maxTeams = league.settings?.teamsCount || 12;
+    let description: string;
+    if (league.draft_status === 'in_progress') {
+      description = 'The draft is live. Join the room to make your picks.';
+    } else if (league.scheduled_draft_time && new Date(league.scheduled_draft_time) > new Date()) {
+      const at = new Date(league.scheduled_draft_time);
+      description = `Draft scheduled for ${at.toLocaleDateString()} at ${at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else if (isCommissioner) {
+      description = teams.length >= maxTeams
+        ? 'All teams are ready. Set up and start the draft.'
+        : `Need ${maxTeams - teams.length} more team${maxTeams - teams.length === 1 ? '' : 's'} to start the draft.`;
+    } else {
+      description = 'The commissioner starts the draft when every team is in. Join the lobby to wait.';
+    }
+    return {
+      label: league.draft_status === 'in_progress' ? 'Join draft room' : isCommissioner ? 'Go to draft room' : 'Enter draft lobby',
+      hot: league.draft_status === 'in_progress' || (isCommissioner && league.draft_status === 'not_started' && teams.length >= maxTeams),
+      description,
+      // DRAFT CUTOVER (2026-08-31): the live-engine room is /draft-v2/:leagueId.
+      to: `/draft-v2/${leagueId}`,
+      note: !isCommissioner && league.draft_status === 'not_started'
+        ? "You'll be able to participate once the commissioner starts the draft"
+        : null,
+      mock: FEATURE_PRACTICE_DRAFT && league.draft_status === 'not_started'
+        ? { label: 'Run a mock draft', to: '/armchair-gm?tab=mockdraft', note: 'Practice against the computer. Nothing there touches this league.' }
+        : null,
+    };
+  }, [league, leagueId, isCommissioner, teams.length]);
+
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0F1F15]">
-        <StormyLoading message="Loading your league…" />
-      </div>
-    );
+    // PR3: the league chrome over HQ's skeleton below lg; Stormy from lg.
+    // The name comes from the URL's league once it loads; until then the
+    // chrome shows the id's league only if it is the context's active one.
+    return <PressBoxPageLoading kind="hq" message="Loading your league…" chrome={{ leagueId: leagueId ?? '' }} />;
   }
 
   if (error || !league) {
@@ -755,18 +975,116 @@ const LeagueDashboard = () => {
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col">
       <div className="hidden lg:block"><Navbar /></div>
-      {/* HQ MOBILE COMPOSITION (2026-09-01, Sleeper pattern): the chrome
-          bar carries the league's identity on phones — not a generic
-          "League" label — so the page below can skip the duplicate mega
-          header and put the draft CTA above the fold. */}
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream truncate px-1">{league.name}</h1>
-          <MobileMenuButton />
-        </div>
+      {/*
+        * PRESS BOX (2026-09-04): League HQ, artboard 1a's LEAGUE tab.
+        *
+        * Below `lg`: the shared LeagueHeader over `LeagueHQPhone` — this
+        * week's matchups (a read the old HQ never made), the tile grid, the
+        * teams. `<main>` — the status badges, the squad card, the timeline,
+        * the settings dialog's trigger and the sidebar — is the desktop's
+        * from `lg` and is not rendered below it. The settings SHEET itself
+        * still opens on a phone: the Dialog is controlled (`settingsOpen`)
+        * and portals to the body, so a hidden trigger costs it nothing.
+        */}
+      <PressBoxLeagueChrome
+        weekLabel={currentWeek !== null ? `WK ${currentWeek}` : null}
+        leagueId={leagueId ?? ''}
+        leagueName={league.name}
+      />
+      <div className="lg:hidden pb-app-chrome">
+        <LeagueHQPhone
+          week={currentWeek !== null && leagueId ? { number: currentWeek, to: `/matchup/${leagueId}/${currentWeek}` } : null}
+          seasonOpensOn={seasonOpensOn}
+          matchups={hqMatchups}
+          draft={hqDraft}
+          tiles={[
+            { title: 'Standings', to: `/standings?league=${leagueId}`, Icon: BarChart3, stat: standingsStat },
+            {
+              title: 'Transactions',
+              to: `/waiver-wire?league=${leagueId}`,
+              Icon: ArrowUpDown,
+              stat: transactionsStat,
+            },
+            { title: 'Trades', to: `/trade-analyzer?league=${leagueId}`, Icon: ArrowLeftRight },
+            { title: 'Schedule', to: `/schedule-manager?league=${leagueId}`, Icon: CalendarDays },
+            {
+              title: 'My team',
+              to: `/roster?league=${leagueId}`,
+              Icon: Users,
+              stat: userTeam ? (myRosterCount !== null && myRosterCount > 0 ? `${myRosterCount} players` : userTeam.team_name) : null,
+            },
+            { title: 'GM office', to: '/gm-office', Icon: Briefcase },
+            ...(league.draft_status === 'completed'
+              ? [{
+                  title: 'Draft results',
+                  to: `/draft-v2/${leagueId}`,
+                  Icon: ClipboardList,
+                  stat: draftStat,
+                }]
+              : []),
+            ...(isCommissioner
+              ? [{ title: 'League settings', onPress: () => setSettingsOpen(true), Icon: Settings }]
+              : []),
+          ]}
+          teams={teams.map((t) => ({
+            id: t.id,
+            name: t.team_name,
+            owner: t.owner_id ? (t.owner_id === user?.id ? 'You' : 'Manager') : 'AI team',
+            rosterCount: rosterCounts[t.id] ?? null,
+            isYou: t.owner_id === user?.id,
+            to: `/team/${t.id}`,
+          }))}
+          /* Every member can invite — the guard is the join code existing,
+             not the commissioner's role (leagueHqCompositionGuard). */
+          invite={league.join_code && <InvitePlayersButton joinCode={league.join_code} leagueName={league.name} />}
+        />
       </div>
-      <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      {/* PRESS BOX (2026-09-04): the commissioner's settings as artboard
+          1a's screen. Same state, same save; the fields are stated once in
+          leagueSettingsSections.ts and this screen draws them. */}
+      {isCommissioner && (
+        <LeagueSettingsPhone
+          open={settingsOpen && isMobile}
+          onOpenChange={setSettingsOpen}
+          leagueName={league.name}
+          sections={buildLeagueSettingsSections({
+            draftCompleted: league.draft_status === 'completed',
+            teamCount: teams.length,
+            isCategoryLeague,
+            waiver: waiverSettings,
+            setWaiver: setWaiverSettings,
+            draft: draftSettings,
+            setDraft: setDraftSettings,
+            trade: tradeSettings,
+            setTrade: setTradeSettings,
+            keeper: keeperSettings,
+            setKeeper: setKeeperSettings,
+            categories: categorySettings,
+            setCategories: setCategorySettings,
+            rosterSlots: rosterSlotSettings,
+            setRosterSlots: setRosterSlotSettings,
+            playoff: playoffSettings,
+            setPlayoff: setPlayoffSettings,
+            processWaivers: { onPress: handleProcessWaivers, busy: processingWaivers },
+            syncRosters: { onPress: handleSyncRosters, busy: syncingRosters },
+            rosters: teams.map((t) => ({ name: t.team_name, count: rosterCounts[t.id] ?? null })),
+            rostersLoading: loadingRosterCounts,
+            scoring: scoringRules,
+          })}
+          activeKey={activeSettingsTab}
+          onSectionChange={setActiveSettingsTab}
+          onSave={handleSaveSettings}
+          saving={savingSettings}
+          onDiscard={() => {
+            // The dashboard's own reload puts every setting back to what
+            // the server has; the sheet closes on the same beat.
+            scoringRules.reset();
+            loadLeagueData();
+            setSettingsOpen(false);
+          }}
+        />
+      )}
+      <main className="hidden lg:block w-full lg:pt-24 lg:pb-8">
         <div className="w-full m-0 p-0">
           <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2 pt-3 sm:pt-0">
@@ -821,7 +1139,7 @@ const LeagueDashboard = () => {
                   <InvitePlayersButton joinCode={league.join_code} leagueName={league.name} />
                 )}
                 {isCommissioner && (
-                  <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+                  <Dialog open={settingsOpen && !isMobile} onOpenChange={setSettingsOpen}>
                     <DialogTrigger asChild>
                       <Button
                         variant="outline"
@@ -832,15 +1150,13 @@ const LeagueDashboard = () => {
                         <span className="sr-only sm:hidden">League Settings</span>
                       </Button>
                     </DialogTrigger>
-                    {/* MOBILE SHEET (2026-09-01): below sm the centered 700px
-                        desktop modal crammed eight settings tabs onto a phone.
-                        Pin it as a full-height bottom sheet instead — top edge
-                        under the status bar, safe-area padding at the foot —
-                        while sm+ keeps the desktop modal unchanged. */}
-                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 text-pastel-cream max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-[max(env(safe-area-inset-top),1rem)] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:left-0 max-sm:max-w-none max-sm:w-full max-sm:max-h-none max-sm:rounded-t-2xl max-sm:rounded-b-none max-sm:p-4 max-sm:pb-[max(env(safe-area-inset-bottom),1.25rem)] max-sm:overflow-x-hidden">
-                      {/* text-left + pr-8: the sheet header wraps inside the
-                          viewport and clears the close button — the sim showed
-                          header text running past the right screen edge. */}
+                    {/* DESKTOP ONLY (2026-09-04). This dialog opens at `lg`
+                        and up; below it `LeagueSettingsPhone` is the screen
+                        (artboard 1a). The 09-01 phone sheet classes and the
+                        section dropdown that lived here were for viewports
+                        this dialog no longer opens on, so they are gone
+                        rather than left as dead code. */}
+                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 text-pastel-cream">
                       <DialogHeader className="text-left pr-8 max-w-full">
                         <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
                           ✦ Commissioner
@@ -855,26 +1171,7 @@ const LeagueDashboard = () => {
                       </DialogHeader>
                       
                       <Tabs value={activeSettingsTab} onValueChange={setActiveSettingsTab} className="w-full">
-                        {/* MOBILE SECTION PICKER (2026-09-01): eight tabs in a
-                            horizontal scroll strip were unnavigable on a phone
-                            — half the sections hidden past the edge. One
-                            full-width dropdown replaces the strip below sm;
-                            the desktop tab strip returns at sm+. */}
-                        <div className="sm:hidden">
-                          <Select value={activeSettingsTab} onValueChange={setActiveSettingsTab}>
-                            <SelectTrigger className="w-full h-11 bg-[#0F1F15] ring-1 ring-white/10 border-0 rounded-xl font-bold text-pastel-cream">
-                              <SelectValue>{settingsSectionLabel(activeSettingsTab)} Settings</SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {settingsSections.map((tab) => (
-                                <SelectItem key={tab} value={tab}>
-                                  {settingsSectionLabel(tab)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="hidden sm:block overflow-x-auto -mx-2 px-2">
+                        <div className="overflow-x-auto -mx-2 px-2">
                           <TabsList className="inline-flex w-auto min-w-full bg-[#0F1F15] ring-1 ring-white/10 p-1 rounded-xl">
                             {settingsSections.map((tab) => (
                               <TabsTrigger
@@ -1285,6 +1582,31 @@ const LeagueDashboard = () => {
                                 {tradeSettings.trade_review_type === 'none' && 'Trades are executed immediately when accepted.'}
                                 {tradeSettings.trade_review_type === 'commissioner' && 'Trades require commissioner approval before being processed.'}
                                 {tradeSettings.trade_review_type === 'league_vote' && 'League members vote on trades during the review window.'}
+                              </p>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Trade Deadline</Label>
+                              <Select
+                                value={String(tradeSettings.tradeDeadlineWeek)}
+                                onValueChange={(value) =>
+                                  setTradeSettings(prev => ({ ...prev, tradeDeadlineWeek: parseInt(value, 10) || 0 }))
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="0">None</SelectItem>
+                                  {[8, 10, 12, 14, 16, 18, 20].map((w) => (
+                                    <SelectItem key={w} value={String(w)}>Week {w}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-white/55">
+                                {tradeSettings.tradeDeadlineWeek > 0
+                                  ? `No trades after week ${tradeSettings.tradeDeadlineWeek}.`
+                                  : 'Trades stay open all season.'}
                               </p>
                             </div>
 
@@ -2047,6 +2369,7 @@ const LeagueDashboard = () => {
               isCommissioner={isCommissioner}
               keeperCount={Number((league.settings as { keeperCount?: number } | null)?.keeperCount ?? 0)}
               dynastyMode={Boolean((league.settings as { dynastyMode?: boolean } | null)?.dynastyMode)}
+              draftCompleted={league.draft_status === 'completed'}
             />
           )}
             </div>

@@ -31,10 +31,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { SeasonStatus } from '@citrus/shared';
 
 vi.mock('@/components/Navbar', () => ({ default: () => <nav data-testid="navbar" /> }));
-vi.mock('@/components/MobileMenuButton', () => ({ default: () => <button type="button" /> }));
 vi.mock('@/components/matchup/LeagueNotifications', () => ({ default: () => null }));
 vi.mock('@/components/dashboard/LeagueTimelineCard', () => ({ LeagueTimelineCard: () => null }));
 vi.mock('@/components/InvitePlayersButton', () => ({ InvitePlayersButton: () => null }));
@@ -56,6 +56,12 @@ const USER = { id: 'user-1' };
 const PROFILE = { data: { username: 'alex' } };
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: USER }) }));
 vi.mock('@/hooks/useProfile', () => ({ useProfile: () => PROFILE }));
+// The Press Box league chrome (PR10f) reads the active league from the
+// context; the real module imports DemoLeagueService, which builds the
+// Supabase client at module scope and throws under the hermetic env.
+vi.mock('@/contexts/LeagueContext', () => ({
+  useLeague: () => ({ activeLeagueId: null, activeLeague: null, userLeagueState: 'active-user' }),
+}));
 
 const LEAGUE = {
   id: 'league-1',
@@ -80,6 +86,10 @@ vi.mock('@/services/WaiverService', () => ({ WaiverService: { getLeagueWaiverSet
 vi.mock('@/services/TradeService', () => ({ TradeService: {} }));
 vi.mock('@/api/leagues', () => ({ leagueApi: {} }));
 vi.mock('@/api/waivers', () => ({ waiverApi: {} }));
+// The HQ matchup read (PR9b). Un-mocked, api/matchups drags api/client and
+// the Supabase client -- which throws at module scope in the hermetic env --
+// into the graph and the suite cannot load.
+vi.mock('@/api/matchups', () => ({ matchupApi: { getLeagueMatchups: vi.fn(async () => ({ data: [] as unknown[] })) } }));
 
 /**
  * The roster read decides which squad-card sentence renders. `[]` (a drafted
@@ -131,13 +141,21 @@ const CHRISTMAS: SeasonStatus = {
   isDormant: true,
 };
 
+/**
+ * The page reads its HQ matchups and transactions through react-query
+ * (PR9b), so it renders under a QueryClientProvider the way App.tsx mounts
+ * it. Retries off: a mocked read that rejects should fail once, not hang the
+ * test on a backoff.
+ */
 const mount = () =>
   render(
-    <MemoryRouter initialEntries={['/league/league-1']}>
-      <Routes>
-        <Route path="/league/:leagueId" element={<LeagueDashboard />} />
-      </Routes>
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter initialEntries={['/league/league-1']}>
+        <Routes>
+          <Route path="/league/:leagueId" element={<LeagueDashboard />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 
 const loaded = () => screen.findByText('League quicklinks', undefined, { timeout: 4000 });

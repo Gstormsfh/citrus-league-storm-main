@@ -155,6 +155,11 @@ export class LeagueService {
       settings: settings || {},
       scoring_settings: effectiveScoringSettings,
     };
+    // SETTINGS PASS-THROUGH (2026-09-05): mirror the commissioner's slot
+    // shape into the dedicated column (see updateRosterSlotSettings).
+    if (settings?.rosterSlots && typeof settings.rosterSlots === 'object') {
+      insertRow.roster_slots = settings.rosterSlots;
+    }
 
     // Write waiver settings to dedicated columns (fantasy leagues)
     // These come merged into settings from the client, or via waiverSettings param
@@ -399,9 +404,35 @@ export class LeagueService {
 
     const { data: league } = await this.supabase
       .from('leagues')
-      .select('settings')
+      .select('settings, draft_status')
       .eq('id', leagueId)
       .single();
+
+    // SETTINGS PASS-THROUGH (2026-09-05): the league's size and the number
+    // of rounds are the draft's geometry. submit_pick_v2 derives every
+    // pick's round and on-clock team from league_size and draft_order, so
+    // changing either once the draft has started corrupts every pick that
+    // follows; and a size below the teams already in the league orphans
+    // managers. Both are refused with the reason, not silently clamped.
+    const geometryChange = draftSettings.teams_count !== undefined || draftSettings.draft_rounds !== undefined;
+    if (geometryChange && league?.draft_status && league.draft_status !== 'not_started') {
+      return {
+        success: false,
+        error: 'League size and draft rounds are locked once the draft has started.',
+      };
+    }
+    if (draftSettings.teams_count !== undefined) {
+      const { count } = await this.supabase
+        .from('teams')
+        .select('id', { count: 'exact', head: true })
+        .eq('league_id', leagueId);
+      if (typeof count === 'number' && draftSettings.teams_count < count) {
+        return {
+          success: false,
+          error: `This league already has ${count} teams; the size cannot be set below that.`,
+        };
+      }
+    }
 
     const currentSettings = league?.settings || {};
     const updatedSettings = { ...currentSettings };
@@ -470,6 +501,10 @@ export class LeagueService {
       .update({
         settings: updatedSettings,
         roster_size: newRosterSize,
+        // SETTINGS PASS-THROUGH (2026-09-05): the dedicated column carried
+        // its default forever; settings.rosterSlots is what the app reads
+        // (resolveSlotConfig), so the column mirrors it and never disagrees.
+        roster_slots: rosterSlots,
         updated_at: new Date().toISOString(),
       })
       .eq('id', leagueId);

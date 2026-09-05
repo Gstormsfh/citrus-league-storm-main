@@ -1,5 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
+import { NewsPhone } from '@/components/news/NewsPhone';
+import { NewsRoomPhone } from '@/components/news/NewsRoomPhone';
+import type { NewsSegment } from '@/components/news/newsRoomRows';
+import { getWireHealth, getWireItems, type WireHealth, type WirePage } from '@/services/NewsRoomService';
+import { useAuth } from '@/contexts/AuthContext';
+import { useLeague } from '@/contexts/LeagueContext';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { logger } from '@/utils/logger';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -29,11 +39,132 @@ const categoryColors: Record<string, string> = {
   olympics: 'bg-amber-500/15 text-amber-200 border-amber-400/30',
 };
 
+/**
+ * THE NEWS ROOM (2026-09-05). Below lg the tab is the Citrus News Room:
+ * wire stories the API has read, matched to players and summarised, in two
+ * views (MY PLAYERS / ALL). It fetches per view: ALL always, so the screen
+ * knows whether the wires have anything at all; MY PLAYERS once the roster
+ * of the league in the header is known. Until the migration and the first
+ * ingest have run the wires are empty, and the tab falls back to the
+ * headline feed it showed before (NewsPhone), so nothing regresses on a
+ * phone built ahead of the deploy.
+ */
+function useWireRoom(enabled: boolean) {
+  const { user } = useAuth();
+  const { activeLeagueId } = useLeague();
+  const [health, setHealth] = useState<WireHealth | null>(null);
+  /** null = not fetched yet; [] = fetched, nothing there. */
+  const [rosterIds, setRosterIds] = useState<number[] | null>(null);
+  const [pages, setPages] = useState<Record<NewsSegment, WirePage | null>>({ mine: null, all: null });
+  const [segment, setSegmentState] = useState<NewsSegment>('all');
+  const segmentTouched = useRef(false);
+  const setSegment = useCallback((s: NewsSegment) => {
+    segmentTouched.current = true;
+    setSegmentState(s);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    void getWireItems({ limit: 80 }).then((page) => {
+      if (!cancelled) setPages((p) => ({ ...p, all: page }));
+    });
+    void getWireHealth().then((h) => {
+      if (!cancelled) setHealth(h);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+
+  // The roster behind MY PLAYERS: the viewer's team in the active league.
+  useEffect(() => {
+    if (!enabled) return;
+    if (!user || !activeLeagueId) {
+      setRosterIds([]);
+      return;
+    }
+    let cancelled = false;
+    setRosterIds(null);
+    (async () => {
+      try {
+        // Lazy for the same reason NewsService is: `@/api` loads the Supabase
+        // client, which throws at module scope without the VITE_* env.
+        const { leagueApi, rosterApi } = await import('@/api');
+        const my = await leagueApi.getMyTeam(activeLeagueId);
+        const team = (my.data ?? null) as { id: string; league_id: string } | null;
+        if (!team) {
+          if (!cancelled) setRosterIds([]);
+          return;
+        }
+        const ids = await rosterApi.getPlayerIds(team.league_id, team.id);
+        const nums = ((ids.data ?? []) as string[]).map((s) => Number.parseInt(s, 10)).filter((n) => Number.isFinite(n) && n > 0);
+        if (!cancelled) setRosterIds(nums);
+      } catch (error) {
+        logger.debug('[news-room] roster unavailable:', error);
+        if (!cancelled) setRosterIds([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, user, activeLeagueId]);
+
+  // MY PLAYERS is the default the moment a roster exists, unless the thumb
+  // has already chosen.
+  useEffect(() => {
+    if (rosterIds && rosterIds.length > 0 && !segmentTouched.current) setSegmentState('mine');
+  }, [rosterIds]);
+
+  useEffect(() => {
+    if (!enabled || !rosterIds) return;
+    if (rosterIds.length === 0) {
+      setPages((p) => ({ ...p, mine: { items: [], players: [] } }));
+      return;
+    }
+    let cancelled = false;
+    setPages((p) => ({ ...p, mine: null }));
+    void getWireItems({ playerIds: rosterIds, limit: 60 }).then((page) => {
+      if (!cancelled) setPages((p) => ({ ...p, mine: page }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, rosterIds]);
+
+  const names = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const page of [pages.all, pages.mine]) for (const p of page?.players ?? []) m.set(p.id, p.name);
+    return m;
+  }, [pages.all, pages.mine]);
+  const nameOf = useCallback((id: number) => names.get(id), [names]);
+
+  const current = pages[segment];
+  return {
+    /** The wires have stories: the News Room is the screen. `null` while unknown. */
+    live: pages.all === null ? null : pages.all.items.length > 0,
+    items: current?.items ?? [],
+    loading: current === null || (segment === 'mine' && rosterIds === null),
+    health,
+    segment,
+    setSegment,
+    hasRoster: (rosterIds?.length ?? 0) > 0,
+    nameOf,
+  };
+}
+
 const News = () => {
   const [articles, setArticles] = useState<NewsArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  /** PRESS BOX (2026-09-04): the phone's search row, behind the header's glass. */
+  const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
+  const [team, setTeam] = useState('all');
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const room = useWireRoom(isMobile);
+  const roomOn = room.live !== false;
 
   useEffect(() => {
     let mounted = true;
@@ -60,10 +191,47 @@ const News = () => {
 
   return (
     <DarkLayout>
-
-
-      <Navbar />
-      <main className="relative max-w-[1280px] mx-auto px-6 pt-24 pb-16">
+      {/* PRESS BOX (2026-09-04): the NEWS tab of the app nav. Below lg the
+          app header and NewsPhone; the desktop page from lg, untouched. */}
+      <div className="hidden lg:block"><Navbar /></div>
+      <div className="lg:hidden relative min-h-screen bg-pressbox-surface pt-[env(safe-area-inset-top)] pb-app-chrome">
+        <PressBoxAppHeader
+          title={roomOn ? 'News Room' : 'News'}
+          logoSrc="/favicon.svg"
+          onSearch={() => setPhoneSearchOpen((o) => !o)}
+          onNotifications={() => navigate('/profile')}
+        />
+        {roomOn ? (
+          <NewsRoomPhone
+            className="mt-1"
+            items={room.items}
+            loading={room.loading}
+            health={room.health}
+            segment={room.segment}
+            onSegment={room.setSegment}
+            hasRoster={room.hasRoster}
+            team={team}
+            onTeam={setTeam}
+            searchOpen={phoneSearchOpen}
+            searchQuery={searchTerm}
+            onSearchQuery={setSearchTerm}
+            nameOf={room.nameOf}
+          />
+        ) : (
+          <NewsPhone
+            className="mt-1"
+            articles={filtered}
+            loading={loading}
+            categories={NEWS_CATEGORIES}
+            category={activeCategory}
+            onCategory={setActiveCategory}
+            searchOpen={phoneSearchOpen}
+            searchQuery={searchTerm}
+            onSearchQuery={setSearchTerm}
+          />
+        )}
+      </div>
+      <main className="hidden lg:block relative max-w-[1280px] mx-auto px-6 pt-24 pb-16">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
@@ -251,7 +419,7 @@ const News = () => {
         )}
       </main>
 
-      <HockeyFooter />
+      <div className="hidden lg:block"><HockeyFooter /></div>
     </DarkLayout>
   );
 };

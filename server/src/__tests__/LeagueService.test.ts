@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LeagueService } from '../services/LeagueService';
+import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { createChain, createMockSupabase } from './helpers';
 
 // Mock the admin client used by fetchTransactions to enrich pending waivers.
@@ -477,6 +478,63 @@ describe('LeagueService', () => {
       const result = await service.addAITeams('league-1', 'user-1', []);
       expect(result.teams).toEqual([]);
       expect(result.error).toBeNull();
+    });
+  });
+
+  describe('updateDraftSettings — the draft’s geometry is locked once it starts (2026-09-05)', () => {
+    beforeEach(() => {
+      // Membership is cached per (league, user) across the file; a stale
+      // hit would skip the first two reads and shift every table below.
+      LeagueMembershipService.clearCache();
+    });
+
+    // Reads, by table: leagues → commissioner check, then settings +
+    // draft_status, then the update; teams → the membership row, then the
+    // count. Dispatch by table so the order of the two never matters.
+    const drive = (draftStatus: string, teamCount: number) => {
+      let leagues = 0;
+      let teams = 0;
+      const update = createChain({ data: null, error: null });
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'leagues') {
+          leagues++;
+          if (leagues === 1) return createChain({ data: { commissioner_id: 'user-1' }, error: null });
+          if (leagues === 2) return createChain({ data: { settings: { teamsCount: 12 }, draft_status: draftStatus }, error: null });
+          return update;
+        }
+        if (table === 'teams') {
+          teams++;
+          if (teams === 1) return createChain({ data: { id: 'team-1' }, error: null });
+          return createChain({ data: null, error: null, count: teamCount });
+        }
+        return createChain({ data: null, error: null });
+      });
+      return update;
+    };
+
+    it('refuses a size or rounds change once the draft is in progress', async () => {
+      const update = drive('in_progress', 4);
+      const result = await service.updateDraftSettings('league-1', 'user-1', { teams_count: 10 });
+      expect(result.success).toBe(false);
+      expect(String(result.error)).toContain('locked once the draft has started');
+      expect(update.update).not.toHaveBeenCalled();
+    });
+
+    it('refuses a size below the teams already in the league', async () => {
+      const update = drive('not_started', 8);
+      const result = await service.updateDraftSettings('league-1', 'user-1', { teams_count: 6 });
+      expect(result.success).toBe(false);
+      expect(String(result.error)).toContain('already has 8 teams');
+      expect(update.update).not.toHaveBeenCalled();
+    });
+
+    it('writes league_size and settings.teamsCount together before the draft', async () => {
+      const update = drive('not_started', 4);
+      const result = await service.updateDraftSettings('league-1', 'user-1', { teams_count: 10 });
+      expect(result.success).toBe(true);
+      expect(update.update).toHaveBeenCalledWith(
+        expect.objectContaining({ league_size: 10, settings: expect.objectContaining({ teamsCount: 10 }) }),
+      );
     });
   });
 });

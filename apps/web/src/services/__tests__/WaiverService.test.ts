@@ -26,6 +26,13 @@ vi.mock('@/api/account', () => ({
   },
 }));
 
+// The wire's rostered set is roster_assignments for the league (15be6999);
+// the old `rosteredPlayerIds` field on the waivers read is gone.
+const getLeagueRosters = vi.fn();
+vi.mock('@/api/rosters', () => ({
+  rosterApi: { getLeagueRosters: (id: string) => getLeagueRosters(id) },
+}));
+
 vi.mock('@/api/client', () => ({
   apiClient: {
     get: vi.fn(),
@@ -502,9 +509,7 @@ describe('WaiverService.getAvailablePlayers', () => {
   });
 
   it('returns filtered players', async () => {
-    (waiverApi.getLeagueWaivers as any).mockResolvedValue({
-      data: { rosteredPlayerIds: ['101'] },
-    });
+    getLeagueRosters.mockResolvedValue({ data: [{ team_id: 't1', player_id: 101 }] });
 
     (PlayerService.getAllPlayers as any).mockResolvedValue([
       { id: 101, full_name: 'Player A', position: 'C', team: 'TOR', jersey_number: '97' },
@@ -518,7 +523,7 @@ describe('WaiverService.getAvailablePlayers', () => {
   });
 
   it('filters by position', async () => {
-    (waiverApi.getLeagueWaivers as any).mockResolvedValue({ data: {} });
+    getLeagueRosters.mockResolvedValue({ data: [] });
     (PlayerService.getAllPlayers as any).mockResolvedValue([
       { id: 101, full_name: 'Player A', position: 'C', team: 'TOR', jersey_number: '' },
       { id: 102, full_name: 'Player B', position: 'G', team: 'EDM', jersey_number: '' },
@@ -530,7 +535,7 @@ describe('WaiverService.getAvailablePlayers', () => {
   });
 
   it('filters by search term', async () => {
-    (waiverApi.getLeagueWaivers as any).mockResolvedValue({ data: {} });
+    getLeagueRosters.mockResolvedValue({ data: [] });
     (PlayerService.getAllPlayers as any).mockResolvedValue([
       { id: 101, full_name: 'Connor McDavid', position: 'C', team: 'EDM', jersey_number: '97' },
       { id: 102, full_name: 'Leon Draisaitl', position: 'C', team: 'EDM', jersey_number: '29' },
@@ -542,7 +547,7 @@ describe('WaiverService.getAvailablePlayers', () => {
   });
 
   it('returns empty array on error', async () => {
-    (waiverApi.getLeagueWaivers as any).mockRejectedValue(new Error('Error'));
+    getLeagueRosters.mockRejectedValue(new Error('Error'));
 
     const result = await WaiverService.getAvailablePlayers('league-1');
     expect(result).toEqual([]);

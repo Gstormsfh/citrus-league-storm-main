@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getSeasonYearForDate, getProjectionsSeason, getUpcomingSeasonStartDate, getPlayoffSeasonForDate } from '../season';
+import { getSeasonYearForDate, getProjectionsSeason, getUpcomingSeasonStartDate, getPlayoffSeasonForDate, keeperSeasonYear } from '../season';
 
 // Local-time constructor: month is 1-based here for readability.
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day, 12, 0, 0);
@@ -100,5 +100,16 @@ describe('getPlayoffSeasonForDate (playoff pool season key, 2026-09-03)', () => 
   it('January-March belongs to the run two calendar years back', () => {
     // Jan 2026: the last playoffs played were April-June 2025, season 2024.
     expect(getPlayoffSeasonForDate(d(2026, 2, 10))).toBe(2024);
+  });
+});
+
+describe('keeperSeasonYear (keepers are for the next draft, 2026-09-05)', () => {
+  it('before this season’s draft, keepers are for this season; after it, next season’s', () => {
+    // September 2026, draft still ahead: the 2026-27 draft.
+    expect(keeperSeasonYear(false, d(2026, 9, 5))).toBe(2026);
+    // Same day, league already drafted: kept into the 2027-28 draft.
+    expect(keeperSeasonYear(true, d(2026, 9, 5))).toBe(2027);
+    // Mid-season January, drafted: next season.
+    expect(keeperSeasonYear(true, d(2027, 1, 15))).toBe(2027);
   });
 });

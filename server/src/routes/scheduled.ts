@@ -3,8 +3,9 @@ import type { Env } from '../app';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { readAllPaged } from '../lib/pagedRead';
 import { MatchupService } from '../services/MatchupService';
+import { NewsRoomService } from '../services/NewsRoomService';
 import { AppError } from '../lib/errors';
-import { ok, fail } from '../lib/responses';
+import { ok, fail, handleError } from '../lib/responses';
 import { logger } from '@citrus/shared';
 import { generateCitrusNews } from '../services/CitrusNewsService';
 
@@ -249,7 +250,7 @@ scheduledRoutes.post('/waiver-process', async (c) => {
             title: won ? 'Waiver Claim Successful' : 'Waiver Claim Missed',
             message: won
               ? `${player} is now on your roster.`
-              : `Your claim for ${player} did not go through${cl.failure_reason ? ` — ${cl.failure_reason}` : '.'}`,
+              : `Your claim for ${player} did not go through${cl.failure_reason ? `: ${cl.failure_reason}` : '.'}`,
             metadata: { claim_id: cl.id, player_id: cl.player_id, status: cl.status },
           }];
         });
@@ -467,6 +468,29 @@ scheduledRoutes.post('/generate-news', async (c) => {
   } catch (e) {
     logger.error('[scheduled.generate-news] failed:', e);
     return fail(c, AppError.internal(e instanceof Error ? e.message : String(e)));
+  }
+});
+
+
+/**
+ * POST /api/scheduled/news-ingest (2026-09-05)
+ *
+ * The News Room's hourly read of the wires: every enabled source in
+ * news_sources, one run row each in news_ingest_runs. A source that fails
+ * is a row with an error, not a failed request; the response carries every
+ * run so the trigger's log shows the shape of the hour.
+ */
+scheduledRoutes.post('/news-ingest', async (c) => {
+  try {
+    const runs = await new NewsRoomService(getSupabaseAdmin()).ingest();
+    const totals = runs.reduce(
+      (t, r) => ({ seen: t.seen + r.seen, inserted: t.inserted + r.inserted, matched: t.matched + r.matched, errors: t.errors + r.errors }),
+      { seen: 0, inserted: 0, matched: 0, errors: 0 },
+    );
+    logger.info(`[scheduled] news-ingest: ${runs.length} sources, ${totals.inserted} new of ${totals.seen} seen, ${totals.matched} matched, ${totals.errors} errors`);
+    return ok(c, { runs, totals });
+  } catch (err) {
+    return handleError(c, err, 'news-ingest failed');
   }
 });
 

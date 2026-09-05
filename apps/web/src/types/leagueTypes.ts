@@ -29,7 +29,7 @@ export const LEAGUE_TYPE_LABELS: Record<LeagueType, string> = {
 
 export const LEAGUE_TYPE_DESCRIPTIONS: Record<LeagueType, string> = {
   'fantasy': 'Draft players, manage your roster, and compete head-to-head or season-long. The classic fantasy experience.',
-  'pickem': 'Pick the winners of NHL games each week. No roster management needed — just predict outcomes.',
+  'pickem': 'Pick the winners of NHL games each week. No roster management needed, just predict outcomes.',
   'survivor': 'Pick one NHL team to win each week. Get it wrong and you\'re eliminated. Can\'t pick the same team twice.',
   'confidence-pool': 'Pick NHL game winners and rank them by confidence. Higher confidence = more points if correct.',
   'playoff-bracket-pickem': 'Pick the winner of every Stanley Cup Playoff series. Bonus for predicting games. Points double each round.',
@@ -63,7 +63,7 @@ export const SCORING_FORMAT_DESCRIPTIONS: Record<ScoringFormat, string> = {
   'h2h-categories': 'Teams face off weekly. Each stat category (goals, assists, etc.) is a separate win/loss/tie.',
   'roto': 'No weekly matchups. Teams are ranked in each stat category all season. Rankings are summed for final standings.',
   'total-points': 'No weekly matchups. The team with the most cumulative fantasy points over the season wins.',
-  'best-ball': 'Your best possible lineup is automatically set each week. No roster management needed — just draft well.',
+  'best-ball': 'Your best possible lineup is automatically set each week. No roster management needed, just draft well.',
   'points-per-game': 'Like Total Points, but standings are ranked by average points per game played. Rewards efficiency.',
 };
 

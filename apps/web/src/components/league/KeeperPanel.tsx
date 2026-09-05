@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { Crown, Lock, Loader2, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { KeeperService, type KeeperDesignation } from '@/services/KeeperService';
+import { keeperSeasonYear } from '@citrus/shared';
 import { PlayerService, type Player } from '@/services/PlayerService';
 import { rosterApi } from '@/api/rosters';
 import { logger } from '@/utils/logger';
@@ -40,6 +41,8 @@ interface KeeperPanelProps {
   /** 0 with dynasty off means "not configured"; dynasty = unlimited. */
   keeperCount: number;
   dynastyMode: boolean;
+  /** Whether this season's draft has run: decides which draft the keepers are for. */
+  draftCompleted: boolean;
 }
 
 interface RosterRow {
@@ -50,15 +53,11 @@ interface RosterRow {
 }
 
 /**
- * Keepers designated now apply to the NEXT season's draft. NHL season
- * label runs July→June: in Aug 2026 the current season is 2026–27, so
- * keeper designations target the 2027 draft.
+ * KEEPERS (2026-09-05): designations are for the league's NEXT draft. While
+ * this season's draft has not happened, that is this season's; once it has,
+ * next season's. Shared keeperSeasonYear is the one rule the engine loads
+ * by too, so a keeper locked here is the keeper the lobby seats.
  */
-function upcomingKeeperSeasonYear(now = new Date()): number {
-  const currentSeasonStart =
-    now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
-  return currentSeasonStart + 1;
-}
 
 export function KeeperPanel({
   leagueId,
@@ -67,9 +66,10 @@ export function KeeperPanel({
   isCommissioner,
   keeperCount,
   dynastyMode,
+  draftCompleted,
 }: KeeperPanelProps) {
   const { toast } = useToast();
-  const seasonYear = useMemo(() => upcomingKeeperSeasonYear(), []);
+  const seasonYear = useMemo(() => keeperSeasonYear(draftCompleted), [draftCompleted]);
   const maxKeepers = dynastyMode ? Infinity : keeperCount > 0 ? keeperCount : 0;
 
   const [loading, setLoading] = useState(true);

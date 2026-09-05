@@ -26,7 +26,10 @@ import { useLeague } from "@/contexts/LeagueContext";
 import { LeagueService } from "@/services/LeagueService";
 import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
-import MobileMenuButton from "@/components/MobileMenuButton";
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
+import { CreateLeaguePhone } from '@/components/league/CreateLeaguePhone';
+import { buildCreateLeagueSections } from '@/components/league/createLeagueSections';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -153,6 +156,10 @@ const CreateLeague = () => {
   const [auctionBudget, setAuctionBudget] = useState("200");
   const [auctionMinBid, setAuctionMinBid] = useState("1");
   const [auctionNominationTime, setAuctionNominationTime] = useState("30");
+  // SETTINGS PASS-THROUGH (2026-09-05): the engine's bid window
+  // (`auctionBidWindowSeconds`, draft/index.ts) was never written by this
+  // form, so every auction ran a 30s clock whatever the commissioner meant.
+  const [auctionBidTime, setAuctionBidTime] = useState("30");
 
   // ---- Season Settings ----
   const [playoffTeams, setPlayoffTeams] = useState("6");
@@ -234,6 +241,10 @@ const CreateLeague = () => {
     // ?type=playoff → default to bracket pickem (most common playoff format)
     if (type === 'playoff') {
       setLeagueType('playoff-bracket-pickem');
+    } else if (type === 'pickem' || type === 'survivor' || type === 'confidence-pool') {
+      // Citrus Game Day (2026-09-05): the home screen's tiles arrive with
+      // the game already chosen.
+      setLeagueType(type);
     }
   }, [searchParams]);
 
@@ -518,6 +529,7 @@ const CreateLeague = () => {
           // auctionNominationTime. Write both so the commissioner's
           // value actually reaches the auction clock.
           settings.auctionNominationWindowSeconds = parseInt(auctionNominationTime) || 30;
+          settings.auctionBidWindowSeconds = parseInt(auctionBidTime) || 30;
         }
 
         // Waiver/transaction settings (persisted in settings AND dedicated columns)
@@ -819,25 +831,109 @@ const CreateLeague = () => {
     }
   };
 
+  /**
+   * PRESS BOX (2026-09-04, PR10o): the phone states every setting above as
+   * data and draws it in the settings screen's rows. Each field reads and
+   * writes the same state the desktop form does, so the two cannot
+   * disagree, and the create path is `handleCreateLeague` above. The
+   * position-format change resets the slots here exactly as the desktop
+   * buttons do; the stat rows fold the switch and the points menu into one.
+   */
+  const isMobile = useIsMobile();
+  const phoneSections = isMobile
+    ? buildCreateLeagueSections({
+        leagueTypes: visibleLeagueTypes(searchParams.get('type')),
+        leagueType, setLeagueType,
+        leagueName, setLeagueName,
+        teamsCount, setTeamsCount,
+        scoringFormat, setScoringFormat,
+        draftType, setDraftType,
+        draftRounds, setDraftRounds,
+        pickTimeLimit, setPickTimeLimit,
+        auctionBudget, setAuctionBudget,
+        auctionMinBid, setAuctionMinBid,
+        auctionNominationTime, setAuctionNominationTime,
+        auctionBidTime, setAuctionBidTime,
+        leagueStats,
+        setStatEnabled: (id, enabled) => setLeagueStats((prev) => prev.map((s) => (s.id === id ? { ...s, enabled } : s))),
+        setStatPoints: (id, points) => setLeagueStats((prev) => prev.map((s) => (s.id === id ? { ...s, points } : s))),
+        selectedCategories, toggleCategory: handleCategoryToggle,
+        minGoalieGames, setMinGoalieGames,
+        playoffTeams,
+        setPlayoffTeams: (v) => {
+          setPlayoffTeams(v);
+          const n = parseInt(v, 10);
+          if (n >= 2) setPlayoffWeeks(String(playoffRounds(n)));
+        },
+        playoffOptions,
+        playoffWeeks, setPlayoffWeeks,
+        tradeDeadlineWeek, setTradeDeadlineWeek,
+        keeperEnabled, setKeeperEnabled,
+        keeperCount, setKeeperCount,
+        keeperPenalty, setKeeperPenalty,
+        dynastyMode, setDynastyMode,
+        waivers: waiverSettings, setWaivers: setWaiverSettings,
+        weeklyAddLimit, setWeeklyAddLimit,
+        seasonAddLimit, setSeasonAddLimit,
+        positionType,
+        setPositionType: (v) => {
+          setPositionType(v);
+          const defaults: Record<string, number> = {};
+          (v === 'forward' ? DEFAULT_FDG_ROSTER_SLOTS : DEFAULT_ROSTER_SLOTS).forEach((s) => { defaults[s.slot] = s.count; });
+          setRosterSlots(defaults);
+        },
+        rosterSlots,
+        setRosterSlot: (slot, count) => setRosterSlots((prev) => ({ ...prev, [slot]: count })),
+        roundsVsRoster,
+        pickemFormat, setPickemFormat,
+        picksPerWeek, setPicksPerWeek,
+        survivorLives, setSurvivorLives,
+        confidenceMaxPoints,
+        pickDeadline, setPickDeadline,
+        tiebreaker, setTiebreaker,
+        allowRepeatTeams, setAllowRepeatTeams,
+        playoffLockDeadline, setPlayoffLockDeadline,
+        bracketPickMode, setBracketPickMode,
+        isFantasy, showPointValues, showCategories, showMatchupSettings, showDraftSettings, showWaiverSettings,
+      })
+    : [];
+
   // ============================================================================
   // RENDER
   // ============================================================================
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
+    <div className="min-h-screen bg-pressbox-surface text-pastel-cream relative">
       {/* Decorative Background — pastel-orange + sage halos in citrus2 voice */}
       <div aria-hidden="true" className="absolute top-0 right-0 w-96 h-96 bg-pastel-orange/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
       <div aria-hidden="true" className="absolute bottom-0 left-0 w-96 h-96 bg-pastel-sage/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
 
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">Create League</h1>
-          <MobileMenuButton />
-        </div>
+      {/* PRESS BOX (2026-09-04): the app header in place of the 09-01 title
+          bar and its hamburger, which opened the old menu sheet. The app
+          nav is the way around; the header names the screen. */}
+      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+        <PressBoxAppHeader title="New league" logoSrc="/favicon.svg" />
       </div>
+      {isMobile && (
+        <CreateLeaguePhone
+          tab={defaultTab}
+          onTabChange={(t) => { setDefaultTab(t); setError(null); }}
+          sections={phoneSections}
+          error={error}
+          loading={loading}
+          canCreate={!!leagueName.trim()}
+          onCreate={handleCreateLeague}
+          joinCode={joinCode}
+          onJoinCode={setJoinCode}
+          teamName={teamNameForJoin}
+          onTeamName={setTeamNameForJoin}
+          canJoin={!!joinCode.trim()}
+          onJoin={() => handleJoinLeague()}
+          onCancelJoin={() => navigate('/gm-office')}
+        />
+      )}
 
-      <main className="lg:pt-32 lg:pb-20 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))] px-4">
+      {!isMobile && <main className="lg:pt-32 lg:pb-20 pt-4 pb-app-chrome px-4">
         <div className="container mx-auto max-w-4xl">
 
           <div className="mb-8 text-left">
@@ -1405,7 +1501,7 @@ const CreateLeague = () => {
                             <DollarSign className="w-4 h-4 text-pastel-orange" />
                             Auction Settings
                           </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label className="text-sm">Salary Budget ($)</Label>
                               <Input
@@ -1442,6 +1538,20 @@ const CreateLeague = () => {
                                 </SelectContent>
                               </Select>
                               <p className="text-xs text-white/55">Time to nominate a player</p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm">Bid Timer</Label>
+                              <Select value={auctionBidTime} onValueChange={setAuctionBidTime}>
+                                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="10">10 seconds</SelectItem>
+                                  <SelectItem value="15">15 seconds</SelectItem>
+                                  <SelectItem value="20">20 seconds</SelectItem>
+                                  <SelectItem value="30">30 seconds</SelectItem>
+                                  <SelectItem value="45">45 seconds</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-white/55">Bidding stays open this long after each bid</p>
                             </div>
                           </div>
                         </div>
@@ -1794,7 +1904,7 @@ const CreateLeague = () => {
                                     </SelectContent>
                                   </Select>
                                   <p className="text-xs text-white/55">
-                                    {keeperPenalty === 'none' && 'Keepers have no draft pick cost.'}
+                                    {keeperPenalty === 'none' && 'No round cost: a keeper takes the team’s last-round pick so the roster still fills.'}
                                     {keeperPenalty === 'round-cost' && 'Keeping a player costs the round they were originally drafted in.'}
                                     {keeperPenalty === 'round-escalation' && 'Keeper cost increases by one round each season.'}
                                   </p>
@@ -2216,8 +2326,8 @@ const CreateLeague = () => {
           </Card>
 
         </div>
-      </main>
-      <HockeyFooter />
+      </main>}
+      <HockeyFooter variant="app" />
     </div>
   );
 };

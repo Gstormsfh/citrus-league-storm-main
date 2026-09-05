@@ -241,3 +241,16 @@ const SEASON_GAME_COUNTS: Record<number, number> = {
 export function getSeasonGameCount(season: number): number {
   return SEASON_GAME_COUNTS[season] ?? 82;
 }
+
+/**
+ * The season_year a keeper designation is FOR (2026-09-05). Keepers are
+ * kept into the next draft: while the league has not drafted for the
+ * season projections describe, that is the draft they are kept for; once
+ * it has, they are kept for the one after. The engine loads locked
+ * designations by this key when the lobby opens, and the keeper panel
+ * designates by it, so the two can never disagree by a year.
+ */
+export function keeperSeasonYear(draftCompleted: boolean, d: Date = new Date()): number {
+  const season = getProjectionsSeason(d);
+  return draftCompleted ? season + 1 : season;
+}

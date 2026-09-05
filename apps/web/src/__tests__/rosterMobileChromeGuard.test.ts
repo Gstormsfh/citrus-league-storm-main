@@ -74,49 +74,100 @@ describe('the header card collapses to one line below lg', () => {
     expect(btn).toContain('lg:min-h-[48px]');
   });
 
-  it('the card and the tab body lose their desktop padding on phones', () => {
-    const cardOuter = ROSTER.lastIndexOf('<div className="bg-[#1A2A20]', cardStart);
+  it('the legacy card is DESKTOP ONLY — the phone gets the Press Box card', () => {
+    // The shape changed with the Press Box conversion (2026-09-04). This card
+    // still exists and still carries Rank, Total Pts and a 48px Auto Lineup
+    // button, none of which fit a 393px row; below lg it is not rendered at
+    // all and `PressBoxTeamCard` takes its place. The contract this case has
+    // always protected — a phone never sees the desktop card's padding — is
+    // now satisfied by not drawing the card, which is stronger than shrinking
+    // it, so the assertion moved rather than being dropped.
+    const cardOuter = ROSTER.lastIndexOf('<div className="hidden lg:block bg-[#1A2A20]', cardStart);
+    expect(cardOuter, 'the legacy header card must be hidden below lg').toBeGreaterThan(-1);
     const cls = ROSTER.slice(cardOuter, ROSTER.indexOf('>', cardOuter));
     expect(cls).toContain('p-3 lg:p-5');
     expect(cls).toContain('mb-3 lg:mb-4');
-    expect(openingTag(ROSTER, '<TabsContent value="roster"')).toContain('px-3 py-4 lg:p-6');
+    // max-lg:pt-0 (2026-09-05): the team card sits directly over the list.
+    expect(openingTag(ROSTER, '<TabsContent value="roster"')).toContain('px-3 py-4 max-lg:pt-0 lg:p-6');
+  });
+
+  it('the phone card is the Press Box one, with exactly one orange action', () => {
+    const at = ROSTER.indexOf('<PressBoxTeamCard');
+    expect(at, 'the phone team card must be mounted').toBeGreaterThan(-1);
+    const wrapper = openingTag(ROSTER, ROSTER.slice(ROSTER.lastIndexOf('<div', at), ROSTER.lastIndexOf('<div', at) + 20));
+    expect(wrapper, 'and only below lg').toContain('lg:hidden');
+    const card = ROSTER.slice(at, ROSTER.indexOf('/>', ROSTER.indexOf('actions=', at)));
+    for (const label of ['Optimize', 'Trade', 'Add', 'Log']) {
+      expect(card, `${label} action missing`).toContain(`label: '${label}'`);
+    }
+    expect(card.match(/primary: true/g) ?? [], 'exactly one primary action').toHaveLength(1);
+  });
+
+  it('the list escapes the tab body\'s gutter so its rules reach both edges', () => {
+    // The tab body keeps px-3 for the summary card above the list; the list
+    // cancels it with -mx-3 and supplies the only gutter the rows see. Two
+    // nested gutters put the rows 24px in from each edge, which is what made
+    // a dense list read as a panel floating in a box.
+    const at = ROSTER.indexOf('<PressBoxRosterList');
+    const wrapper = ROSTER.lastIndexOf('<div className="-mx-3 lg:mx-0">', at);
+    expect(wrapper, 'the list must cancel the page gutter below lg').toBeGreaterThan(-1);
   });
 });
 
-// ── R4: week + day are one row on phones; the Viewing line is desktop's ──
+// ── PRESS BOX (2026-09-05): the day lives on the STARTERS header ─────────
+//
+// Artboard 1a's Team screen has no week/day row under the team card: the
+// day is THU · FRI · SAT · WEEK on the STARTERS header, and the WK column
+// and the ownership segment ride on the rows. The R4 phone row (compact
+// week trigger + day chips) and the game-day strip are the desktop's now.
 
-describe('week and day selectors share one row on phones', () => {
-  const rowAt = ROSTER.indexOf('data-testid="roster-week-day-row"');
-  const branchStart = ROSTER.lastIndexOf('isMobile ? (', rowAt);
-  const stripAt = ROSTER.indexOf('<TodayStrip', rowAt);
-  // The desktop branch opens with the block the page always had.
-  const split = ROSTER.indexOf('<div className="mb-6 space-y-4">', rowAt);
-  const mobile = ROSTER.slice(branchStart, split);
-  const desktop = ROSTER.slice(split, stripAt);
+describe('the phone has no week/day row; the day toggles ride on the list', () => {
+  // `code()` strips comments, so the anchor is the branch itself: the
+  // phone side of the week/day selector is `isMobile ? (` followed by `null`.
+  const branchAt = ROSTER.search(/isMobile \? \(\s*null\s*\) : \(/);
+  const listAt = ROSTER.indexOf('<PressBoxRosterList');
+  const stripAt = ROSTER.indexOf('<TodayStrip');
 
-  it('the phone branch mounts the compact week trigger beside the day chips', () => {
-    expect(rowAt).toBeGreaterThan(-1);
-    expect(branchStart).toBeGreaterThan(-1);
-    expect(mobile).toMatch(/<MatchupScheduleSelector\s+compact/);
-    expect(mobile).toMatch(/<WeeklySchedule\s+chips/);
-  });
-
-  it('the phone branch carries no "Viewing:" line, no Read Only badge, no Lineup heading', () => {
-    expect(mobile).not.toContain('Viewing:');
-    expect(mobile).not.toContain('Read Only');
-    expect(mobile).not.toContain('>Lineup<');
+  it('the phone branch of the week/day selector renders nothing', () => {
+    expect(branchAt).toBeGreaterThan(-1);
+    const branch = ROSTER.slice(branchAt, ROSTER.indexOf(') : (', branchAt));
+    expect(branch).toContain('null');
+    expect(branch).not.toMatch(/<MatchupScheduleSelector/);
+    expect(branch).not.toMatch(/<WeeklySchedule/);
+    expect(ROSTER).not.toContain('data-testid="roster-week-day-row"');
   });
 
   it('the desktop branch is the one that was there: varsity week bar, day card, Viewing line', () => {
+    const desktop = ROSTER.slice(ROSTER.indexOf('<div className="mb-6 space-y-4">', branchAt), stripAt);
     expect(desktop).not.toMatch(/<MatchupScheduleSelector\s+compact/);
-    expect(desktop).not.toMatch(/<WeeklySchedule\s+chips/);
     expect(desktop).toContain('Viewing:');
     expect(desktop).toContain('Read Only');
   });
 
-  it('a past day\'s read-only mark moves into the strip on phones', () => {
+  it('the game-day strip is hidden below lg', () => {
     const strip = ROSTER.slice(stripAt, ROSTER.indexOf('/>', stripAt));
-    expect(strip).toContain('readOnly={isMobile && isPastDate}');
+    expect(strip).toContain("'max-lg:hidden");
+  });
+
+  it('the list gets the day toggles, the WK column and the ownership segment', () => {
+    const list = ROSTER.slice(listAt, ROSTER.indexOf('starters={rows.starters}', listAt));
+    expect(list).toContain('days={[...pressBoxDays.map((d) => d.label)');
+    expect(list).toContain("['WEEK']");
+    expect(list).toContain('showWeek={rosterWeek.ready && !weekView}');
+    expect(list).toContain('showOwnership={ownership.size > 0}');
+    expect(ROSTER).toContain('extras: rowExtras,');
+  });
+
+  it('the team card gets the win bar and the score pair', () => {
+    const card = ROSTER.slice(ROSTER.indexOf('<PressBoxTeamCard'), ROSTER.indexOf('actions=[', ROSTER.indexOf('<PressBoxTeamCard')));
+    expect(card).toContain('winPct={teamCardNumbers.winPct}');
+    expect(card).toContain('yourScore={teamCardNumbers.yourScore}');
+    expect(card).toContain('theirScore={teamCardNumbers.theirScore}');
+  });
+
+  it('the view switcher under the team card is desktop-only', () => {
+    const tabs = ROSTER.slice(ROSTER.indexOf('<TabsList'), ROSTER.indexOf('>', ROSTER.indexOf('<TabsList')));
+    expect(tabs).toContain('max-lg:hidden');
   });
 });
 
@@ -143,9 +194,18 @@ describe('the Lineup heading and the stat-view toggle are desktop-only', () => {
 
 describe('the phone list is told the league\'s real IR slot count', () => {
   it('resolves it with the server rule and passes it down', () => {
+    // The SHAPE changed with the Press Box conversion (2026-09-04): the page
+    // no longer hands a component `irSlotCount` as a prop, it hands it to
+    // `buildRosterRows`, which turns the count into one row per IR SLOT --
+    // held or empty -- for the list to draw. The intent this guard exists to
+    // protect is unchanged and is what is asserted: the count is resolved by
+    // the SERVER's rule, never defaulted locally, and it reaches the rows.
     expect(ROSTER).toContain('resolveIrSlotCount(leagueRosterSlots)');
-    const list = ROSTER.slice(ROSTER.indexOf('<MobileRosterList'), ROSTER.indexOf('<FillSlotSheet'));
-    expect(list).toContain('irSlotCount={irSlotCount}');
+    const call = ROSTER.slice(ROSTER.indexOf('buildRosterRows({'), ROSTER.indexOf('<PressBoxRosterList'));
+    expect(call, 'the IR count reaches the row builder').toContain('irSlotCount,');
+    const list = ROSTER.slice(ROSTER.indexOf('<PressBoxRosterList'), ROSTER.indexOf('<FillSlotSheet'));
+    expect(list, 'and the built IR rows reach the list').toContain('ir={rows.ir}');
+    expect(list).toContain('irRequired={rows.irRequired}');
   });
 });
 

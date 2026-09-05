@@ -41,6 +41,34 @@ async function get<T>(path: string): Promise<{ data: T }> {
   if (/\/api\/players\/dashboard-index/.test(path)) {
     return { data: [...DASHBOARD_INDEX, ...DASHBOARD_PLAYER_INDEX] as unknown as T };
   }
+  // The News tab (2026-09-04): a wire of generated stories across the
+  // categories, so the phone's lead tile and rows can be looked at. No
+  // real outlet is named; the sources are the app's own words.
+  if (/\/api\/news$/.test(path)) {
+    const ago = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
+    const story = (id: number, category: string, title: string, description: string, hours: number, image: boolean) => ({
+      id: `harness-${id}`,
+      title,
+      description,
+      url: `https://example.com/wire/${id}`,
+      imageUrl: image ? `https://picsum.photos/seed/citrus-${id}/640/360` : '',
+      source: ['The Wire', 'Rink Report', 'Puck Desk'][id % 3],
+      category,
+      publishedAt: ago(hours),
+    });
+    return {
+      data: {
+        articles: [
+          story(1, 'top', 'Kaprizov on PP1 as Wild shuffle lines ahead of the opener', 'A three-day camp scrimmage moved the top unit around; the second unit lost its net-front presence.', 2, true),
+          story(2, 'injury', 'Forsberg out of warmups, listed day-to-day with an upper-body injury', 'Coach called it precautionary after the morning skate.', 4, true),
+          story(3, 'fantasy', 'Five late-round centers with a real path to 60 points', 'Usage, linemates and power-play time, ranked.', 7, false),
+          story(4, 'trade', 'Senators listening on a top-four defenceman as the deadline sets up', 'Two contenders have called; the ask is a first and a prospect.', 12, true),
+          story(5, 'recap', 'Oilers 4, Kings 2: McDavid opens the preseason with three points', 'The first line was on the ice for every goal.', 20, true),
+          story(6, 'top', 'League confirms the 82-game schedule opens September 29', 'Opening night is a four-game slate.', 30, false),
+        ],
+      } as unknown as T,
+    };
+  }
   if (/\/my-team$/.test(path)) return { data: { id: MY_TEAM_ID } as T };
   if (/\/teams$/.test(path)) return { data: TEAMS as unknown as T };
   if (/\/api\/leagues\/[^/]+$/.test(path)) return { data: LEAGUE as unknown as T };

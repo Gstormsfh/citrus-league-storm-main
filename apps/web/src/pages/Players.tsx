@@ -29,9 +29,14 @@
 // which made a substantial, ungated, shareable page effectively unreachable.
 // Row CLICK is unchanged and still opens the inline panel.
 
-import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Suspense, lazy, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
+import { PlayersBrowsePhone } from '@/components/players/PlayersBrowsePhone';
+import { dashboardEntryToHockeyPlayer, type GoalieSortKey, type SkaterSortKey } from '@/components/players/playersBrowse';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import type { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -57,8 +62,16 @@ export type DashboardPlayer = DashboardIndexEntry;
 
 const POSITIONS = ['C', 'LW', 'RW', 'D', 'G'] as const;
 
-type SkaterSortKey = 'points' | 'goals' | 'assists' | 'sog' | 'xg_per_60' | 'gar_per_60' | 'proj_fantasy_points';
-type GoalieSortKey = 'wins' | 'save_pct' | 'saves' | 'shutouts' | 'proj_wins';
+// SkaterSortKey / GoalieSortKey live in components/players/playersBrowse.ts
+// (2026-09-04), shared with the phone screen.
+
+/**
+ * The shared player card, loaded when a phone row is first tapped. Lazy
+ * and mounted only while open: the card pulls the auth and league
+ * services in behind it, none of which this page needs to draw its list,
+ * and the page's own tests import this module without them.
+ */
+const PlayerStatsModal = lazy(() => import('@/components/PlayerStatsModal'));
 
 const f1 = (v: number | null | undefined) => (v == null ? '-' : (Math.round(v * 10) / 10).toFixed(1));
 const f2 = (v: number | null | undefined) => (v == null ? '-' : (Math.round(v * 100) / 100).toFixed(2));
@@ -367,10 +380,18 @@ const Players = () => {
     const p = searchParams.get('player');
     return p ? parseInt(p, 10) || null : null;
   });
-  // Mobile-only overlay for the dashboard panel (opened by a row tap,
-  // never on load — `selected` defaults to the top scorer, which must
-  // not auto-open a sheet).
-  const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+  /*
+   * PRESS BOX (2026-09-04). Below lg the page is PlayersBrowsePhone and a
+   * row tap opens the SHARED player card (`cardPlayer`), whose Detailed
+   * tab draws the same GAR / xG breakdown the side panel draws from lg.
+   * The old phone overlay of that panel is gone with it. `useIsMobile` is
+   * the one viewport answer; the card is a portal, so a class cannot gate
+   * it.
+   */
+  const isMobile = useIsMobile();
+  const navigate = useNavigate();
+  const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
+  const [cardPlayer, setCardPlayer] = useState<HockeyPlayer | null>(null);
 
   const teams = useMemo(
     () => Array.from(new Set(players.map((p) => p.team).filter(Boolean))).sort(),
@@ -411,9 +432,7 @@ const Players = () => {
 
   const selectPlayer = (p: DashboardPlayer) => {
     setSelectedId(p.id);
-    // Below lg the dashboard panel sits under the 400-row table where a
-    // tap looks like a no-op — surface it as an overlay instead.
-    setMobilePanelOpen(true);
+    if (isMobile) setCardPlayer(dashboardEntryToHockeyPlayer(p));
     const next = new URLSearchParams(searchParams);
     next.set('player', String(p.id));
     setSearchParams(next, { replace: true });
@@ -438,8 +457,44 @@ const Players = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar />
-      <main className="container mx-auto px-4 pb-16 pt-6">
+      <div className="hidden lg:block"><Navbar /></div>
+      <div className="lg:hidden relative min-h-screen bg-pressbox-surface pt-[env(safe-area-inset-top)] pb-app-chrome">
+        <PressBoxAppHeader
+          title="Players"
+          logoSrc="/favicon.svg"
+          onSearch={() => setPhoneSearchOpen((o) => !o)}
+          onNotifications={() => navigate('/profile')}
+        />
+        <PlayersBrowsePhone
+          className="mt-1"
+          rows={sorted}
+          total={sorted.length}
+          loading={loading}
+          error={loadError}
+          onRetry={() => void reload()}
+          group={group}
+          onGroup={setGroup}
+          position={position}
+          onPosition={setPosition}
+          teams={teams}
+          team={team}
+          onTeam={setTeam}
+          skaterSort={skaterSort}
+          onSkaterSort={setSkaterSort}
+          goalieSort={goalieSort}
+          onGoalieSort={setGoalieSort}
+          searchOpen={phoneSearchOpen}
+          searchQuery={search}
+          onSearchQuery={setSearch}
+          onOpen={selectPlayer}
+        />
+        {cardPlayer && (
+          <Suspense fallback={null}>
+            <PlayerStatsModal player={cardPlayer} isOpen onClose={() => setCardPlayer(null)} />
+          </Suspense>
+        )}
+      </div>
+      <main className="hidden lg:block container mx-auto px-4 pb-16 pt-6">
         <div className="mb-5">
           <h1 className="text-2xl font-bold">Players</h1>
           <p className="text-sm text-muted-foreground">
@@ -643,25 +698,6 @@ const Players = () => {
           </div>
         )}
 
-        {/* Below lg: the side panel above is hidden, so a row tap opens the
-            same dashboard as a dismissible overlay sheet. */}
-        {mobilePanelOpen && selected && (
-          <div
-            className="lg:hidden fixed inset-0 z-app-nav overflow-y-auto bg-black/70 backdrop-blur-sm p-3"
-            role="dialog"
-            aria-modal="true"
-            onClick={() => setMobilePanelOpen(false)}
-          >
-            <div className="mx-auto mb-10 mt-4 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-              <div className="mb-2 flex justify-end">
-                <Button variant="outline" size="sm" onClick={() => setMobilePanelOpen(false)}>
-                  Close
-                </Button>
-              </div>
-              <PlayerDashboardPanel player={selected} skaters={skaters} goalies={goalies} />
-            </div>
-          </div>
-        )}
       </main>
     </div>
   );

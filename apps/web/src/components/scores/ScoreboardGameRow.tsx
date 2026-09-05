@@ -30,8 +30,9 @@
 
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PB_TYPE } from '@/components/pressbox/rowScale';
 import type { ScoreboardGame, ScoreboardTeam } from '@citrus/shared';
-import { TeamChip } from '@/components/citrus2/TeamChip';
+import { PressBoxTeamMark } from '@/components/pressbox/TeamMark';
 import { LivePulse } from '@/components/citrus2/LivePulse';
 import {
   citrusSummaryText,
@@ -44,12 +45,14 @@ import {
 } from './scoresFormat';
 import { CitrusRowStrip } from './CitrusRowStrip';
 
+// PRESS BOX (2026-09-04): the Home ticker's vocabulary — sage for a game
+// being played, orange-soft for one about to end, 45% for one that is over.
 const TONE_CLASS: Record<ReturnType<typeof statusTone>, string> = {
-  live: 'text-pastel-sage',
-  urgent: 'text-pastel-orange',
-  final: 'text-pastel-cream/60',
-  scheduled: 'text-pastel-cream/80',
-  muted: 'text-pastel-forest-dim',
+  live: 'text-pressbox-sage',
+  urgent: 'text-pressbox-orange-soft',
+  final: 'text-pressbox-text/45',
+  scheduled: 'text-pressbox-text/70',
+  muted: 'text-pressbox-text/45',
 };
 
 function TeamLine({
@@ -65,11 +68,11 @@ function TeamLine({
 }) {
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <TeamChip abbrev={team.abbrev} size="sm" />
+      <PressBoxTeamMark abbrev={team.abbrev} size="sm" label={teamFullName(team)} />
       <span
         className={cn(
-          'font-display text-sm truncate flex-1 min-w-0',
-          emphasised ? 'text-pastel-cream font-semibold' : dimmed ? 'text-pastel-cream/55' : 'text-pastel-cream/85',
+          'font-barlow text-[14px] truncate flex-1 min-w-0',
+          emphasised ? 'text-pressbox-text font-bold' : dimmed ? 'text-pressbox-text/50' : 'text-pressbox-text/85 font-semibold',
         )}
         title={teamFullName(team)}
       >
@@ -78,8 +81,8 @@ function TeamLine({
       {score !== null ? (
         <span
           className={cn(
-            'font-varsity text-xl tabular-nums leading-none w-8 text-right',
-            emphasised ? 'text-pastel-cream' : dimmed ? 'text-pastel-cream/55' : 'text-pastel-cream/85',
+            'font-plex font-semibold text-[20px] tabular-nums leading-none w-8 text-right',
+            emphasised ? 'text-pressbox-text' : dimmed ? 'text-pressbox-text/50' : 'text-pressbox-text/85',
           )}
         >
           {score}
@@ -110,8 +113,9 @@ export function ScoreboardGameRow({ game, expanded, onToggle, detail }: Scoreboa
       data-game-id={game.gameId}
       data-state={game.state}
       className={cn(
-        'rounded-2xl bg-pastel-surface-tile overflow-hidden',
-        game.state === 'live' && 'ring-1 ring-pastel-sage/30',
+        PB_TYPE,
+        'rounded-[12px] bg-pressbox-tile border overflow-hidden',
+        game.state === 'live' ? 'border-pressbox-sage/40' : 'border-white/[0.08]',
       )}
     >
       <button
@@ -119,7 +123,7 @@ export function ScoreboardGameRow({ game, expanded, onToggle, detail }: Scoreboa
         onClick={() => onToggle(game.gameId)}
         aria-expanded={expanded}
         aria-label={`${teamFullName(game.away)} at ${teamFullName(game.home)}, ${status}`}
-        className="w-full text-left px-3 py-2.5 touch-manipulation active:bg-pastel-surface-high transition-colors"
+        className="focus-citrus w-full text-left px-3 py-2.5 touch-manipulation transition-colors"
       >
         <div className="flex items-stretch gap-2">
           <div className="flex-1 min-w-0 flex flex-col gap-1.5">
@@ -137,12 +141,12 @@ export function ScoreboardGameRow({ game, expanded, onToggle, detail }: Scoreboa
             />
           </div>
 
-          <div className="w-[74px] flex-shrink-0 flex flex-col items-end justify-center gap-1 border-l border-pastel-sage/10 pl-2">
+          <div className="w-[74px] flex-shrink-0 flex flex-col items-end justify-center gap-1 border-l border-white/[0.06] pl-2">
             <div className="flex items-center gap-1">
               {showsLivePulse(game) ? <LivePulse tone="sage" size="xs" /> : null}
               <span
                 className={cn(
-                  'font-jbmono text-[10px] tabular-nums text-right leading-tight',
+                  'font-plex font-medium text-[10px] tabular-nums text-right leading-tight',
                   TONE_CLASS[tone],
                 )}
               >
@@ -150,13 +154,13 @@ export function ScoreboardGameRow({ game, expanded, onToggle, detail }: Scoreboa
               </span>
             </div>
             {game.state === 'unknown' && game.statusRaw ? (
-              <span className="font-jbmono text-[8px] text-pastel-forest-dim">
+              <span className="font-plex text-[8px] text-pressbox-text/45">
                 {game.statusRaw}
               </span>
             ) : null}
             <ChevronDown
               className={cn(
-                'h-3.5 w-3.5 text-pastel-sage/50 transition-transform',
+                'h-3.5 w-3.5 text-pressbox-text/40 transition-transform',
                 expanded && 'rotate-180',
               )}
               aria-hidden="true"
@@ -165,7 +169,7 @@ export function ScoreboardGameRow({ game, expanded, onToggle, detail }: Scoreboa
         </div>
 
         {summary ? (
-          <p className="font-display text-[10px] text-pastel-sage/70 mt-1.5 leading-tight">
+          <p className="font-plex font-medium text-[10px] text-pressbox-sage mt-1.5 leading-tight">
             {summary}
           </p>
         ) : null}
@@ -173,7 +177,7 @@ export function ScoreboardGameRow({ game, expanded, onToggle, detail }: Scoreboa
         {!expanded ? <CitrusRowStrip citrus={game.citrus} /> : null}
       </button>
 
-      {expanded ? <div className="border-t border-pastel-sage/10">{detail}</div> : null}
+      {expanded ? <div className="border-t border-white/[0.06]">{detail}</div> : null}
     </div>
   );
 }

@@ -72,8 +72,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const form = () => screen.queryByText('Reset Your Password');
-const invalid = () => screen.queryByText('Invalid Reset Link');
+const form = () => screen.queryByText('Choose a new password');
+const invalid = () => screen.queryByText('That link is done');
 
 describe('a PKCE recovery link', () => {
   it('shows the form when the session arrives by event, with NOTHING in the URL', async () => {

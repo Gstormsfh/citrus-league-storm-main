@@ -351,7 +351,8 @@ describe('verdicts — assembled from measured values, never generated', () => {
     expect(v).toContain('He takes 100% of his attempts from the low slot');
     // The model is NAMED (2026-09-02 voice brief): "our model" was
     // unattributable and the copy rules require the source in the sentence.
-    expect(v).toContain('0.250 expected goals apiece on Citrus xG v3');
+    expect(v).toContain('0.250 expected goals apiece');
+    expect(v).not.toContain('Citrus');
     expect(v).toContain('7.5 goals ahead');
   });
 
@@ -375,7 +376,7 @@ describe('verdicts — assembled from measured values, never generated', () => {
       regressed_gsax: 4.9,
     })!;
     expect(v).toContain('1,204 primary shots');
-    expect(v).toContain('96.4 goals against');
+    expect(v).toContain('expected goals against were 96.4');
     expect(v).toContain('he allowed 89');
     expect(v).toContain('7.4 goals better than expectation');
     expect(v).toContain('+4.9 once regressed');

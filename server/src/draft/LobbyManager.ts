@@ -142,9 +142,11 @@ function md5UuidFromSeed(seed: string): string {
 import { RingBuffer } from './RingBuffer';
 import {
   selectAutopickPlayer,
+  type AutopickResult,
   type AutopickStrategy,
 } from './autopickStrategy';
 import { computeMinimumNextBid } from './auctionBidIncrement';
+import { keeperSlotKey, type KeeperSlot } from './keeperSlots';
 import {
   ENGINE_SNAPSHOT_VERSION,
   deserializeEngineState,
@@ -257,6 +259,14 @@ export interface LobbyManagerOptions {
    * and RPC validate against an identical view by construction.
    */
   draftOrder: ReadonlyArray<DraftOrderSlot>;
+
+  /**
+   * KEEPERS (2026-09-05): locked keepers and the slot each one costs
+   * (keeperSlots.ts). The lobby submits the keeper itself when his slot
+   * comes on the clock and refuses him to everyone else before that.
+   * Empty for a league without keepers and for auction lobbies.
+   */
+  keepers?: ReadonlyArray<KeeperSlot>;
 
   /**
    * Engine-side team-authorization callback per ADR-004 §5.3.
@@ -551,6 +561,13 @@ export class LobbyManager {
    * for the current pick. Length is `totalPicks` for the lobby.
    */
   private readonly draftOrder: ReadonlyArray<DraftOrderSlot>;
+  /** KEEPERS: `${teamId}:${round}` → the kept player who takes that slot. */
+  private readonly keeperBySlot: ReadonlyMap<string, number>;
+  /** KEEPERS: every kept player, off the board for everyone but his team at his slot. */
+  private readonly keptPlayerIds: ReadonlySet<number>;
+  private readonly keeperSlots: ReadonlyArray<KeeperSlot>;
+  /** The pickNumber a keeper pick has been enqueued for, so one slot never gets two. */
+  private keeperPickEnqueuedFor: number | null = null;
 
   /**
    * Number of successful, non-duplicate picks recorded so far.
@@ -928,6 +945,9 @@ export class LobbyManager {
     this.initialPickDeadline = opts.initialPickDeadline;
     this.initialDraftState = opts.initialDraftState;
     this.draftOrder = opts.draftOrder;
+    this.keeperSlots = opts.keepers ?? [];
+    this.keeperBySlot = new Map(this.keeperSlots.map((k) => [keeperSlotKey(k.teamId, k.round), k.playerId]));
+    this.keptPlayerIds = new Set(this.keeperSlots.map((k) => k.playerId));
 
     // RECONNECT (2026-08-12) — size the resume buffer to THIS draft.
     // Must come after `this.draftOrder` is set and before `init()`,
@@ -1499,7 +1519,7 @@ export class LobbyManager {
     // (visible to `await enqueueAction`) rather than getting masked
     // by the queue's catch-and-convert-to-internal_error pattern.
     if (!this.initialized) {
-      const msg = `[lobby] enqueueAction called before init() — caller MUST await LobbyManager.init() lobbyId=${this.lobbyId} actionKind=${action.kind}`;
+      const msg = `[lobby] enqueueAction called before init(): caller MUST await LobbyManager.init() lobbyId=${this.lobbyId} actionKind=${action.kind}`;
       structuredLogger.error(msg);
       throw new Error(msg);
     }
@@ -1560,6 +1580,12 @@ export class LobbyManager {
       // users on render-1. See addConnection() for the ordering
       // guarantee (join added to Set BEFORE this snapshot is built).
       presentUserIds: [...this.presentUserIds],
+      // KEEPERS (2026-09-05): every kept player and the slot he takes, so
+      // the client keeps him out of the pool before his pick lands and can
+      // mark the slot on the board. Absent for a league without keepers.
+      ...(this.keeperSlots.length > 0
+        ? { keepers: this.keeperSlots.map((k) => ({ teamId: k.teamId, playerId: String(k.playerId), round: k.round })) }
+        : {}),
     };
   }
 
@@ -1867,6 +1893,21 @@ export class LobbyManager {
     // Step 5: compute round + pickNumber from the loaded draft order.
     const roundNumber = expectedSlot.round;
     const pickNumber = expectedSlot.pickNumber;
+
+    // KEEPERS (2026-09-05): a kept player belongs to his team at his slot
+    // and to nobody anywhere else; and a keeper slot takes its keeper, not
+    // a pick of the manager's choosing. Either way the answer is the same
+    // reason the RPC would give once the keeper pick had landed.
+    {
+      const numericPlayerId = parseInt(action.playerId, 10);
+      const keeperHere = this.keeperBySlot.get(keeperSlotKey(expectedSlot.teamId, roundNumber));
+      if (keeperHere !== undefined && keeperHere !== numericPlayerId) {
+        return { ok: false, reason: 'player_taken' };
+      }
+      if (keeperHere === undefined && this.keptPlayerIds.has(numericPlayerId)) {
+        return { ok: false, reason: 'player_taken' };
+      }
+    }
 
     const actor: DraftV2Actor = {
       kind: isAutopick ? 'autopick' : 'user',
@@ -4571,6 +4612,63 @@ export class LobbyManager {
       'pick',
     );
     this.notifyOnClockDevice(rpcDeadline);
+    this.maybeSubmitKeeperPick();
+  }
+
+  /**
+   * KEEPERS (2026-09-05): when the slot on the clock is one a keeper
+   * costs, the lobby makes that pick itself, now. It goes through
+   * `enqueueAction` like an autopick so the RPC, the event log, the board
+   * and the roster sync all see an ordinary pick in the round he cost. The
+   * pick clock stays armed underneath: if this submission fails for any
+   * reason, the timer's autopick fills the slot with the same keeper (see
+   * handleAutopickTimeout), so a keeper slot can never stall the draft.
+   */
+  private maybeSubmitKeeperPick(): void {
+    if (this.format === 'auction' || this.keeperBySlot.size === 0) return;
+    // Bootstrap replays historical arms slot by slot; only the live slot
+    // after init (or init's own catch-up arm) may make a keeper pick.
+    if (!this.initialized) return;
+    if (this.draftStatus !== 'in_progress' || this.pauseState !== null) return;
+    const slot = this.draftOrder[this.picksMade];
+    if (!slot) return;
+    const keeper = this.keeperBySlot.get(keeperSlotKey(slot.teamId, slot.round));
+    if (keeper === undefined) return;
+    if (this.keeperPickEnqueuedFor === slot.pickNumber) return;
+    this.keeperPickEnqueuedFor = slot.pickNumber;
+    const action: DraftAction = {
+      kind: 'submit_pick',
+      teamId: slot.teamId,
+      playerId: String(keeper),
+      userId: 'keeper-engine',
+      sessionId: randomUUID(),
+      idempotencyKey: randomUUID(),
+      actorKind: 'autopick',
+    };
+    structuredLogger.info('keeper.pick_submitted', {
+      lobbyId: this.lobbyId,
+      teamId: slot.teamId,
+      playerId: keeper,
+      round: slot.round,
+      pickNumber: slot.pickNumber,
+    });
+    setTimeout(() => {
+      void this.enqueueAction(action).then(
+        (result) => {
+          if (result.ok === false) {
+            structuredLogger.warn('keeper.pick_rejected', {
+              lobbyId: this.lobbyId,
+              teamId: slot.teamId,
+              playerId: keeper,
+              reason: result.reason,
+            });
+          }
+        },
+        (err) => {
+          structuredLogger.error(`[lobby] keeper pick threw lobbyId=${this.lobbyId}`, {}, err);
+        },
+      );
+    }, 0);
   }
 
   /**
@@ -5051,16 +5149,23 @@ export class LobbyManager {
       return;
     }
 
-    let result;
+    // KEEPERS (2026-09-05): a keeper slot's autopick IS the keeper. This is
+    // the fallback for maybeSubmitKeeperPick; the strategies never see it.
+    const keeperHere = this.keeperBySlot.get(keeperSlotKey(slot.teamId, slot.round));
+    let result: AutopickResult;
     try {
-      result = await selectAutopickPlayer(
-        {
-          leagueId: this.leagueId,
-          teamId: slot.teamId,
-          supabase: this.supabase,
-        },
-        this.autopickStrategies,
-      );
+      result =
+        keeperHere !== undefined
+          ? { ok: true, playerId: keeperHere, source: 'keeper' }
+          : await selectAutopickPlayer(
+              {
+                leagueId: this.leagueId,
+                teamId: slot.teamId,
+                supabase: this.supabase,
+                excludePlayerIds: this.keptPlayerIds,
+              },
+              this.autopickStrategies,
+            );
     } catch (err) {
       structuredLogger.error(
         `[lobby] autopick strategy threw lobbyId=${this.lobbyId} teamId=${slot.teamId}`,

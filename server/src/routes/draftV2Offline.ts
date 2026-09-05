@@ -122,7 +122,7 @@ draftV2OfflineRoutes.post(
       return fail(
         c,
         AppError.badRequest(
-          `offline_only: this league drafts ${draftType ?? 'live'} — import is only for offline drafts`,
+          `offline_only: this league drafts ${draftType ?? 'live'}. Import is only for offline drafts`,
         ),
       );
     }

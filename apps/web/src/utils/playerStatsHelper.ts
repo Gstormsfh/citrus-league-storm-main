@@ -65,9 +65,13 @@ export function servicePlayerToHockeyPlayer(player: Player): HockeyPlayer {
         powerPlayPoints: powerPlayPoints,
         shortHandedPoints: shortHandedPoints,
         pim: player.pim || 0,
-        toi: player.icetime_seconds 
+        // MISSING IS NOT ZERO (2026-09-05): a directory row without ice time
+        // used to read '0:00', and the writeup took it as a real zero ("0
+        // minutes a night", LIMITED ICE TIME on Ovechkin). Undefined renders
+        // as '-' and says nothing.
+        toi: player.icetime_seconds
           ? formatTOIPerGame(player.icetime_seconds, player.games_played || 1)
-          : '0:00',
+          : undefined,
         // Goalie stats
         wins: player.wins || 0,
         losses: player.losses || 0,

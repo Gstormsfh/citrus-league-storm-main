@@ -57,11 +57,14 @@ interface StatsRow {
   nhl_blocks: number;
   nhl_pim: number;
   nhl_ppp: number;
+  nhl_shp: number;
   nhl_plus_minus: number;
   nhl_toi_seconds: number;
   x_goals: number;
   goalie_gp: number;
   nhl_wins: number;
+  nhl_losses: number;
+  nhl_ot_losses: number;
   nhl_saves: number;
   nhl_save_pct: number;
   nhl_gaa: number;
@@ -132,7 +135,7 @@ interface IndexGsaxRow {
 // `updated_at` rides along on every season-scoped table so the index can
 // carry a real `as_of` per player (see the field's note in the shared type).
 const INDEX_STATS_COLS =
-  'player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_plus_minus, nhl_toi_seconds, x_goals, goalie_gp, nhl_wins, nhl_saves, nhl_save_pct, nhl_gaa, nhl_shutouts, nhl_goals_against, updated_at';
+  'player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_toi_seconds, x_goals, goalie_gp, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_save_pct, nhl_gaa, nhl_shutouts, nhl_goals_against, updated_at';
 const GAR_COLS =
   'player_id, evo_gar_per_60, evd_gar_per_60, ppo_gar_per_60, ppd_gar_per_60, penalty_gar_per_60, total_gar_per_60, toi_total_minutes, updated_at';
 const TALENT_COLS = 'player_id, xg_per_60, xg_rating, roster_status, vopa_score, avg_toi_per_game, updated_at';
@@ -838,11 +841,18 @@ export class PlayerDashboardService {
         ppp: s?.nhl_ppp ?? 0,
         plus_minus: s?.nhl_plus_minus ?? 0,
         x_goals: s?.x_goals ?? 0,
+        // Selected since the index shipped, dropped here until 2026-09-05.
+        pim: s?.nhl_pim ?? 0,
+        shp: s?.nhl_shp ?? 0,
+        toi_seconds: s?.nhl_toi_seconds ?? 0,
         wins: s?.nhl_wins ?? 0,
+        losses: s?.nhl_losses ?? 0,
+        ot_losses: s?.nhl_ot_losses ?? 0,
         saves: s?.nhl_saves ?? 0,
         save_pct: s?.nhl_save_pct ?? 0,
         gaa: s?.nhl_gaa ?? 0,
         shutouts: s?.nhl_shutouts ?? 0,
+        goals_against: s?.nhl_goals_against ?? 0,
         xg_per_60: t?.xg_per_60 ?? null,
         xg_rating: t?.xg_rating ?? null,
         gar_per_60: g?.total_gar_per_60 ?? null,

@@ -85,12 +85,19 @@ describe('FEATURE_PRACTICE_DRAFT', () => {
 
   it('gates the HQ entry to the public simulator, and nothing renders that target un-gated', () => {
     const hq = read(`${SRC}/pages/LeagueDashboard.tsx`);
-    const gateAt = hq.indexOf('FEATURE_PRACTICE_DRAFT &&');
-    const linkAt = hq.indexOf(`<Link to="${MOCK_TARGET}">`);
-    expect(gateAt).toBeGreaterThan(-1);
-    expect(linkAt).toBeGreaterThan(gateAt);
-    expect(linkAt - gateAt, 'the link sits inside the gated block').toBeLessThan(1500);
-    expect(hq.split(MOCK_TARGET).length - 1).toBe(1);
+    // PRESS BOX (2026-09-04): the target appears twice in the SOURCE — the
+    // desktop card's <Link> and the phone layer's `mock:` entry
+    // (LeagueHQPhone) — and a viewer only ever sees one. Each must sit
+    // inside its own gate: the nearest `FEATURE_PRACTICE_DRAFT &&` before
+    // it, within the same block.
+    const targets = [...hq.matchAll(new RegExp(MOCK_TARGET.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))].map((m) => m.index!);
+    expect(targets.length, 'one practice entry per screen').toBe(2);
+    for (const at of targets) {
+      const gateAt = hq.lastIndexOf('FEATURE_PRACTICE_DRAFT &&', at);
+      expect(gateAt, 'every practice entry is gated').toBeGreaterThan(-1);
+      expect(at - gateAt, 'the entry sits inside the gated block').toBeLessThan(1500);
+    }
+    expect(hq).toContain(`<Link to="${MOCK_TARGET}">`);
   });
 
   it('points at a surface that cannot write: React state and one player read', () => {

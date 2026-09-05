@@ -162,6 +162,39 @@ function firstName(fullName: string): string {
   return trimmed.split(/\s+/)[0];
 }
 
+function fullName(player: HockeyPlayer): string {
+  const trimmed = (player.name || '').trim();
+  return trimmed || 'This player';
+}
+
+/**
+ * THE VOICE ROTATES (2026-09-05). "All of the top players ALL SOUND THE
+ * SAME": one template, one sentence order, one set of stock phrases, so
+ * McDavid, MacKinnon and Kucherov read as the same card with the numbers
+ * swapped. Each fact below now has several honest ways of being said, and
+ * the player's own id and name pick which one he gets, so two cards side
+ * by side differ in shape and not only in figures. Deterministic: the same
+ * player reads the same way every time he is opened, which is what makes
+ * it prose rather than a slot machine.
+ */
+function seedOf(player: HockeyPlayer): number {
+  const key = `${player.id ?? ''}|${player.name ?? ''}`;
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i += 1) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h;
+}
+
+function pickerFor(seed: number) {
+  let n = seed;
+  return <T,>(options: readonly T[]): T => {
+    n = (Math.imul(n, 1103515245) + 12345) >>> 0;
+    return options[(n >>> 8) % options.length];
+  };
+}
+
 function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
   const s = player.stats || {};
   const gp = s.gamesPlayed ?? 0;
@@ -206,29 +239,43 @@ function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
     tags.push({ label: 'Below league average', tone: 'caution' });
   }
 
+  const pick = pickerFor(seedOf(player));
+  const full = fullName(player);
+  const gaaClause = gaa !== null ? ` and a ${fmt(gaa, 2)} goals-against average` : '';
+  const apps = `${gp} appearance${gp === 1 ? '' : 's'}`;
   const parts: string[] = [];
   parts.push(
-    `${name} is carrying a ${fmtSavePct(savePct)} save percentage${
-      gaa !== null ? ` and a ${fmt(gaa, 2)} goals-against average` : ''
-    } across ${gp} appearance${gp === 1 ? '' : 's'}.`,
+    pick([
+      `${full} is carrying a ${fmtSavePct(savePct)} save percentage${gaaClause} across ${apps}.`,
+      `${full} has a ${fmtSavePct(savePct)} save percentage${gaaClause} through ${apps}.`,
+      `${full} sits at a ${fmtSavePct(savePct)} save percentage${gaaClause} through ${apps}.`,
+      `${full}: ${fmtSavePct(savePct)} save percentage${gaaClause}, ${apps} in.`,
+    ]),
   );
 
   const wins = s.wins ?? 0;
   const losses = s.losses ?? 0;
   if (wins + losses > 0) {
-    parts.push(`He's ${wins}-${losses} in decisions${s.shutouts ? ` with ${s.shutouts} shutout${s.shutouts === 1 ? '' : 's'}` : ''}.`);
+    const so = s.shutouts ? ` with ${s.shutouts} shutout${s.shutouts === 1 ? '' : 's'}` : '';
+    parts.push(
+      pick([
+        `He's ${wins}-${losses} in decisions${so}.`,
+        `The record is ${wins}-${losses}${so}.`,
+        `${wins} wins against ${losses} losses${so ? `,${so.replace(' with', '')}` : ''}.`,
+      ]),
+    );
   }
 
   const gsax = s.goalsSavedAboveExpected;
   if (Number.isFinite(gsax as number) && Math.abs(gsax as number) >= 1) {
     if ((gsax as number) > 0) {
       parts.push(
-        `Citrus GSAx has him stopping ${fmt(gsax as number)} goals more than an average goalie would have on the same shots.`,
+        `He has stopped ${fmt(gsax as number)} goals more than expected on the shots he has faced.`,
       );
       tags.push({ label: 'Beating expected', tone: 'positive' });
     } else {
       parts.push(
-        `Citrus GSAx has him conceding ${fmt(Math.abs(gsax as number))} goals more than the shot quality says he should have.`,
+        `He has conceded ${fmt(Math.abs(gsax as number))} goals more than expected on the shots he has faced.`,
       );
       tags.push({ label: 'Underperforming xG', tone: 'caution' });
     }
@@ -302,7 +349,10 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
   const hitsPerGame = (s.hits ?? 0) / gp;
   const blocksPerGame = (s.blockedShots ?? 0) / gp;
   const ppPoints = s.powerPlayPoints ?? 0;
-  const toiMinutes = parseToiToMinutes(s.toi);
+  // A zero is a missing number, not a benched player (2026-09-05): nobody
+  // dresses for a game and skates 0:00. Unknown ice time says nothing.
+  const toiParsed = parseToiToMinutes(s.toi);
+  const toiMinutes = toiParsed !== null && toiParsed > 0 ? toiParsed : null;
   const defenceman = isDefence(player.position);
 
   // Headline band. Defencemen are judged on a lower points curve — a 0.65 PPG
@@ -347,9 +397,22 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
     }
   }
 
+  const pick = pickerFor(seedOf(player));
+  const full = fullName(player);
+  const pts = `${points} point${points === 1 ? '' : 's'}`;
+  const rate = `${fmt(ppg, 2)} per game`;
+  const plusMinus = s.plusMinus;
+  const shots = s.shots ?? 0;
+  const shootingPct = shots > 0 ? (goals / shots) * 100 : null;
+
   const parts: string[] = [];
   parts.push(
-    `${name} has ${points} point${points === 1 ? '' : 's'} (${goals}G, ${assists}A) in ${gp} games, ${fmt(ppg, 2)} per game.`,
+    pick([
+      `${full} has ${pts} (${goals}G, ${assists}A) in ${gp} games, ${rate}.`,
+      `${full} is at ${pts} through ${gp} games, ${goals} goals and ${assists} assists, ${rate}.`,
+      `${full}, ${gp} games in: ${pts}, ${goals} goals and ${assists} assists, ${rate}.`,
+      `${full} has put up ${goals} goals and ${assists} assists in ${gp} games, ${pts} at ${rate}.`,
+    ]),
   );
 
   // Usage. Ice time is the single best predictor of opportunity, which is what
@@ -357,21 +420,65 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
   if (toiMinutes !== null) {
     const heavy = defenceman ? toiMinutes >= 22 : toiMinutes >= 19;
     const light = defenceman ? toiMinutes < 17 : toiMinutes < 13;
+    const mins = fmt(toiMinutes);
     if (heavy) {
-      parts.push(`He's playing ${fmt(toiMinutes)} minutes a night, genuine top-of-the-lineup usage.`);
+      parts.push(
+        pick([
+          `He's playing ${mins} minutes a night, top-of-the-lineup usage.`,
+          `${mins} minutes a night is a first-unit workload, and the coach keeps handing it to him.`,
+          `The ${mins} minutes a night say the coaching staff trusts him in every situation.`,
+        ]),
+      );
       tags.push({ label: 'Heavy minutes', tone: 'positive' });
     } else if (light) {
-      parts.push(`At ${fmt(toiMinutes)} minutes a night, the opportunity just isn't there yet.`);
+      parts.push(
+        pick([
+          `At ${mins} minutes a night, the opportunity just isn't there yet.`,
+          `${mins} minutes a night caps what he can produce, however well he plays them.`,
+        ]),
+      );
       tags.push({ label: 'Limited ice time', tone: 'caution' });
     } else {
-      parts.push(`He's seeing ${fmt(toiMinutes)} minutes a night.`);
+      parts.push(pick([`He's seeing ${mins} minutes a night.`, `Ice time sits at ${mins} minutes a night.`]));
     }
   }
 
-  // Shot volume — the floor under a scorer's production.
+  // Shot volume, the floor under a scorer's production.
   if (shotsPerGame >= 3.0) {
-    parts.push(`The ${fmt(shotsPerGame)} shots a game give him a high floor even in a cold stretch.`);
+    const spg = fmt(shotsPerGame);
+    parts.push(
+      pick([
+        `The ${spg} shots a game give him a high floor even in a cold stretch.`,
+        `He fires ${spg} shots a game, which keeps the floor high when the puck stops going in.`,
+        `${spg} shots a night is volume that scores through a slump.`,
+      ]),
+    );
     tags.push({ label: 'Shot volume', tone: 'positive' });
+  }
+
+  // The rest of the box score, when it says something: the power play,
+  // the plus-minus, the shooting percentage.
+  if (ppPoints >= 10) {
+    parts.push(
+      pick([
+        `${ppPoints} of the points came on the power play.`,
+        `The power play is a real share of it: ${ppPoints} points with the man advantage.`,
+      ]),
+    );
+  }
+  if (typeof plusMinus === 'number' && Math.abs(plusMinus) >= 10) {
+    parts.push(
+      plusMinus > 0
+        ? pick([`He's a plus-${plusMinus}.`, `The plus-minus is a plus-${plusMinus}, which the coaches notice.`])
+        : pick([`He's a minus-${Math.abs(plusMinus)}, though that says as much about the team as the player.`, `The minus-${Math.abs(plusMinus)} is the one blemish on the line.`]),
+    );
+  }
+  if (shootingPct !== null && shots >= 60 && (shootingPct >= 15 || shootingPct <= 7)) {
+    parts.push(
+      shootingPct >= 15
+        ? pick([`He's shooting ${fmt(shootingPct)}%, hot by any standard.`, `A ${fmt(shootingPct)}% shooting percentage is well above the league line.`])
+        : pick([`He's shooting ${fmt(shootingPct)}%, which is cold for the looks he gets.`, `The ${fmt(shootingPct)}% shooting is the number most likely to move.`]),
+    );
   }
 
   const bangers = hitsPerGame + blocksPerGame;
@@ -398,11 +505,18 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
     const light = defenceman ? toiMinutes < 17 : toiMinutes < 13;
     if (heavy) {
       analysis.push(
-        `The ice time is the part that matters most: coaches don't hand ${fmt(toiMinutes)} minutes a night to players they intend to scratch, so the role is about as secure as it gets.`,
+        pick([
+          `The ice time is the part that matters most: coaches don't hand ${fmt(toiMinutes)} minutes a night to players they intend to scratch, so the role is about as secure as it gets.`,
+          `Start him and forget him. ${fmt(toiMinutes)} minutes a night is a role that survives a cold week.`,
+          `Nobody loses ${fmt(toiMinutes)} minutes a night over a slump. The deployment is the floor.`,
+        ]),
       );
     } else if (light) {
       analysis.push(
-        `There's a hard ceiling here until the deployment changes. Production can't outrun opportunity, and ${fmt(toiMinutes)} minutes a night isn't enough of it.`,
+        pick([
+          `There's a hard ceiling here until the deployment changes. Production can't outrun opportunity, and ${fmt(toiMinutes)} minutes a night isn't enough of it.`,
+          `Until the minutes move, treat the ceiling as fixed: ${fmt(toiMinutes)} a night only produces so much.`,
+        ]),
       );
     }
   }
@@ -423,11 +537,11 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
     const expected = xg as number;
     if (goals >= expected * 1.3) {
       analysis.push(
-        `Citrus xG has him at ${goals} goals on ${fmt(expected)} expected, finishing well clear of the quality of his chances. That gap rarely holds across a full season. Sell high if someone in your league is paying for the goal total.`,
+        `${goals} goals on ${fmt(expected)} expected, finishing well clear of the quality of his chances. That gap rarely holds across a full season. Sell high if someone in your league is paying for the goal total.`,
       );
     } else if (goals <= expected * 0.7) {
       analysis.push(
-        `Citrus xG has him at ${goals} goals on ${fmt(expected)} expected. The chances are there and the finishing hasn't been, and that gap usually closes. Buy low rather than drop him.`,
+        `${goals} goals on ${fmt(expected)} expected. The chances are there and the finishing hasn't been, and that gap usually closes. Buy low rather than drop him.`,
       );
     }
   }
@@ -441,8 +555,15 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
   if (analysis.length === 0) {
     analysis.push(
       ppg >= 0.5
-        ? `Nothing in the profile suggests a role change coming. He's a steady weekly starter in most formats.`
-        : `Better as a matchup-based streamer or depth piece than a set-and-forget starter.`,
+        ? pick([
+            `Nothing in the profile suggests a role change coming. He's a steady weekly starter in most formats.`,
+            `A weekly starter in most formats, and the profile has no red flag in it.`,
+            `Set the lineup and leave him in it. The production is steady and the role is settled.`,
+          ])
+        : pick([
+            `Better as a matchup-based streamer or depth piece than a set-and-forget starter.`,
+            `A depth piece for the right week, not a set-and-forget starter.`,
+          ]),
     );
   }
 
@@ -462,7 +583,186 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
  * a card that renders a blank space where a scouting note should be looks more
  * broken than one that admits the sample is thin.
  */
-export function generatePlayerWriteup(player: HockeyPlayer | null | undefined): PlayerWriteup {
+/**
+ * WHAT THE STAT LINE CANNOT SAY (2026-09-05). Garrett, from the card: "Our
+ * qualitative information is ass. Ovechkin going into another season as an
+ * NHL legend and we have no mention of it." The base writeup reads one
+ * season's box score. These are the other things the card already has in
+ * memory, handed in by the host so this stays pure: his age, the seasons
+ * on Citrus's books with the goals in each, the cohort-relative reads the
+ * XG tab draws, and the season projection. Every sentence below is a fact
+ * from a table; nothing is a claim about the league we cannot back.
+ */
+export interface WriteupExtras {
+  /** From player_directory.birthdate. */
+  age?: number | null;
+  /** Regular-season goals per season on record, oldest first. From player_xg_season. */
+  goalsBySeason?: ReadonlyArray<{ season: number; goals: number }> | null;
+  /** Cohort-relative percentiles from the dashboard index, 0-100. */
+  xgPercentile?: number | null;
+  garPercentile?: number | null;
+  cohortNoun?: string | null;
+  cohortSize?: number | null;
+  /** The projection, and how to frame it ("for 2026-27" before the opener). */
+  projFp?: number | null;
+  projGp?: number | null;
+  posRank?: string | null;
+  projectionLabel?: string | null;
+  /** From player_directory.career (NHL landing endpoint, regular season only). */
+  career?: CareerSummary | null;
+}
+
+/** The career document the directory refresh writes (populate_career_totals.py). */
+export interface CareerSummary {
+  gp?: number | null;
+  goals?: number | null;
+  assists?: number | null;
+  points?: number | null;
+  wins?: number | null;
+  shutouts?: number | null;
+  seasons?: number | null;
+  first_season?: number | null;
+  draft?: { year?: number | null; round?: number | null; overall?: number | null; team?: string | null } | null;
+  awards?: ReadonlyArray<{ name: string; count: number }> | null;
+}
+
+const fmtN = (n: number) => n.toLocaleString('en-US');
+
+/**
+ * The career, as one sentence and the tags a legend has earned. Regular
+ * season only, plain numbers, no adjectives: "897 goals" says legend on
+ * its own. Awards are the trophies with a count, the three most won.
+ */
+export function careerSentences(career: CareerSummary | null | undefined, goalie: boolean): { summary: string[]; tags: WriteupTag[] } {
+  const summary: string[] = [];
+  const tags: WriteupTag[] = [];
+  if (!career) return { summary, tags };
+  const gp = career.gp ?? 0;
+  const seasons = career.seasons ?? 0;
+  if (gp > 0) {
+    const over = seasons > 1 ? ` over ${seasons} NHL seasons` : '';
+    if (goalie) {
+      const wins = career.wins ?? 0;
+      const so = career.shutouts ?? 0;
+      summary.push(`Career: ${fmtN(wins)} wins and ${fmtN(so)} shutouts in ${fmtN(gp)} games${over}.`);
+      if (wins >= 300) tags.push({ label: '300 wins', tone: 'positive' });
+    } else {
+      const g = career.goals ?? 0;
+      const p = career.points ?? 0;
+      summary.push(`Career: ${fmtN(g)} goals and ${fmtN(p)} points in ${fmtN(gp)} games${over}.`);
+      if (g >= 500) tags.push({ label: '500-goal club', tone: 'positive' });
+      if (p >= 1000) tags.push({ label: '1,000-point club', tone: 'positive' });
+    }
+    if (gp >= 1000) tags.push({ label: '1,000 games', tone: 'neutral' });
+  }
+  const awards = [...(career.awards ?? [])].filter((a) => a.count > 0).sort((a, b) => b.count - a.count).slice(0, 3);
+  if (awards.length) {
+    summary.push(`Trophies: ${awards.map((a) => (a.count > 1 ? `${shortTrophy(a.name)} x${a.count}` : shortTrophy(a.name))).join(', ')}.`);
+  }
+  const d = career.draft;
+  if (d && d.overall != null && d.year != null && d.overall <= 10) {
+    summary.push(`Drafted ${ordinalWord(d.overall)} overall in ${d.year}${d.team ? ` by ${d.team}` : ''}.`);
+  } else if (career.gp && career.gp > 0 && d === null) {
+    summary.push('Undrafted.');
+  }
+  return { summary, tags };
+}
+
+/** "Maurice \"Rocket\" Richard Trophy" -> "Rocket Richard"; "Hart Memorial Trophy" -> "Hart". */
+export function shortTrophy(name: string): string {
+  const quoted = name.match(/"([^"]+)"\s+(\w+)/);
+  if (quoted) return `${quoted[1]} ${quoted[2]}`;
+  return name
+    .replace(/\bMemorial\b/g, '')
+    .replace(/\bTrophy\b|\bAward\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** 2025 -> "2025-26". */
+function seasonWord(season: number): string {
+  return `${season}-${String((season + 1) % 100).padStart(2, '0')}`;
+}
+
+function ordinalWord(n: number): string {
+  const r = n % 100;
+  if (r >= 11 && r <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1: return `${n}st`;
+    case 2: return `${n}nd`;
+    case 3: return `${n}rd`;
+    default: return `${n}th`;
+  }
+}
+
+const COUNT_WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+const countWord = (n: number) => COUNT_WORDS[n] ?? String(n);
+
+export function applyWriteupExtras(writeup: PlayerWriteup, player: HockeyPlayer, extras: WriteupExtras | undefined): PlayerWriteup {
+  if (!extras || !writeup.hasEnoughData) return writeup;
+  const goalie = isGoalie(player.position);
+  const summary: string[] = [];
+  const analysis: string[] = [];
+  const tags = [...writeup.tags];
+
+  // The career on record. "Nine straight 30-goal seasons" is a stat; it is
+  // the one sentence a legend's card owes him. Plain numbers, no brand.
+  const seasons = (extras.goalsBySeason ?? []).filter((r) => Number.isFinite(r.goals));
+  if (!goalie && seasons.length >= 2) {
+    const n = seasons.length;
+    const minGoals = Math.min(...seasons.map((r) => r.goals));
+    const best = seasons.reduce((a, b) => (b.goals > a.goals ? b : a));
+    const age = extras.age != null ? `At ${extras.age}, ` : '';
+    if (minGoals >= 30) {
+      summary.push(`${age}${age ? 'he' : 'He'} has ${countWord(n)} straight seasons of 30 goals or more on record.`);
+      if (n >= 5) tags.push({ label: `${n} straight 30-goal seasons`, tone: 'positive' });
+    } else if (minGoals >= 20) {
+      summary.push(`${age}${age ? 'he' : 'He'} has ${countWord(n)} straight seasons of 20 goals or more on record.`);
+    } else if (best.goals >= 30) {
+      summary.push(`${age}${age ? 'his' : 'His'} best season on record is ${best.goals} goals in ${seasonWord(best.season)}.`);
+    } else if (age) {
+      summary.push(`He is ${extras.age}.`);
+    }
+  } else if (extras.age != null && !goalie) {
+    summary.push(`He is ${extras.age}.`);
+  }
+  if (extras.age != null && extras.age >= 36) tags.push({ label: 'Veteran', tone: 'neutral' });
+
+  // The career on record, from the directory: what a legend's card owes him.
+  const career = careerSentences(extras.career, goalie);
+  summary.push(...career.summary);
+  for (const t of career.tags) if (!tags.some((x) => x.label === t.label)) tags.push(t);
+
+  // The cohort reads, only when they say something: the top or bottom fifth.
+  const noun = extras.cohortNoun ?? null;
+  const notable = (p: number | null | undefined) => p != null && (p >= 80 || p <= 20);
+  if (!goalie && noun && (notable(extras.xgPercentile) || notable(extras.garPercentile))) {
+    const bits: string[] = [];
+    if (notable(extras.xgPercentile)) bits.push(`xG/60 in the ${ordinalWord(extras.xgPercentile as number)} percentile`);
+    if (notable(extras.garPercentile)) bits.push(`GAR/60 in the ${ordinalWord(extras.garPercentile as number)}`);
+    analysis.push(`${bits.join(', ')} of ${noun}.`.replace(/^x/, 'X'));
+    if ((extras.garPercentile ?? 0) >= 90) tags.push({ label: 'Elite GAR', tone: 'positive' });
+  }
+
+  // The projection, framed by the host: a season before the opener, the
+  // rest of it after. Numbers only.
+  if (extras.projFp != null && Number.isFinite(extras.projFp)) {
+    const fp = Math.round(extras.projFp);
+    const gp = extras.projGp != null ? ` over ${Math.round(extras.projGp)} games` : '';
+    const rank = extras.posRank ? ` (${extras.posRank})` : '';
+    const when = extras.projectionLabel ? ` ${extras.projectionLabel}` : '';
+    analysis.push(`Projects to ${fp} fantasy points${gp}${when}${rank}.`);
+  }
+
+  return {
+    ...writeup,
+    summary: [writeup.summary, ...summary].filter(Boolean).join(' '),
+    analysis: [writeup.analysis, ...analysis].filter(Boolean).join(' '),
+    tags,
+  };
+}
+
+export function generatePlayerWriteup(player: HockeyPlayer | null | undefined, extras?: WriteupExtras): PlayerWriteup {
   if (!player) {
     return {
       headline: 'No player selected',
@@ -475,7 +775,8 @@ export function generatePlayerWriteup(player: HockeyPlayer | null | undefined): 
     };
   }
 
-  const writeup = isGoalie(player.position) ? buildGoalieWriteup(player) : buildSkaterWriteup(player);
+  const base = isGoalie(player.position) ? buildGoalieWriteup(player) : buildSkaterWriteup(player);
+  const writeup = applyWriteupExtras(base, player, extras);
 
   // Injury status outranks anything the stat line says: a 1.2 PPG winger on IR
   // is a bench decision tonight regardless of how good the season has been.

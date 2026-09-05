@@ -4,7 +4,8 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
+import { PressBoxPageLoading } from '@/components/pressbox/PageLoading';
 import {
   HockeyFooter,
   CupIcon,
@@ -13,7 +14,6 @@ import {
   MaskIcon,
   RangeIcon,
   MascotPortrait,
-  StormyLoading,
 } from '@/components/citrus2';
 import { LeagueService } from '@/services/LeagueService';
 import {
@@ -28,16 +28,23 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+import { PressBoxSettingGroup, PressBoxSettingRow } from '@/components/pressbox/Settings';
+import { PressBoxNoteCard } from '@/components/pressbox/PlayerCard';
 import { DestructiveConsequence } from '@/components/confirm/DestructiveConsequence';
-import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
+import { PB_LOADING_MIN_MS, useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { LeagueMembershipService } from '@/services/LeagueMembershipService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { logger } from '@/utils/logger';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
+
+/** PRESS BOX (2026-09-04): the two buttons this page needs. The orange
+ *  primary is the save bar's; the secondary is its quiet outline. */
+const PB_PRIMARY =
+  'pb-type focus-citrus w-full h-11 inline-flex items-center justify-center gap-2 rounded-[10px] bg-pressbox-orange text-pressbox-orange-ink font-condensed font-bold text-[15px] uppercase tracking-[0.06em] disabled:opacity-40';
+const PB_SECONDARY =
+  'pb-type focus-citrus w-full h-11 inline-flex items-center justify-center gap-2 rounded-[10px] border border-white/[0.12] bg-white/[0.03] text-pressbox-text/80 font-condensed font-bold text-[15px] uppercase tracking-[0.06em]';
 
 // ============================================================================
 // BRACKET MATCHUP CARD - Individual series matchup in the bracket
@@ -61,12 +68,9 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
   const getTeamDisplay = (teamId: string | null, seed: number | null, isWinner: boolean, score: number) => {
     if (!teamId) {
       return (
-        <div className={cn(
-          'flex items-center justify-between px-3 py-2 rounded-md',
-          'bg-white/5 ring-1 ring-white/10 text-white/55 italic'
-        )}>
-          <span className="text-xs">TBD</span>
-          <span className="text-xs">-</span>
+        <div className="flex items-center justify-between px-3 py-2 rounded-[8px] bg-white/[0.03] border border-white/[0.06] text-pressbox-text/45">
+          <span className="font-plex font-medium text-[10px] tracking-[0.08em]">TBD</span>
+          <span className="font-plex text-[12px]">–</span>
         </div>
       );
     }
@@ -75,43 +79,51 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
     const seedNum = seed || teamSeed?.seed_number;
     const name = teamNames[teamId] || 'Unknown Team';
     const isCompleted = series.status === 'completed';
+    // While a series is on, the side in front carries the figure in sage —
+    // the Match screen's rule. Nothing is decided; nothing goes to half strength.
+    const isLeading =
+      series.status === 'active' &&
+      series.home_score !== series.away_score &&
+      score === Math.max(series.home_score, series.away_score);
 
     return (
+      /* PRESS BOX (2026-09-04): the two-sided row the artboards use for
+         a matchup — seed chip, name in Barlow, the figure in Plex. A winner
+         takes sage, a loser goes to half strength, the champion's row wears
+         the orange border; nothing glows. */
       <div className={cn(
-        'flex items-center justify-between px-3 py-2 rounded-md transition-all',
-        isCompleted && isWinner && 'bg-green-950/30 border border-green-800/60',
-        isCompleted && !isWinner && 'bg-white/5 ring-1 ring-white/10 text-white/55 line-through opacity-60',
-        !isCompleted && 'bg-white/5 ring-1 ring-white/10 hover:ring-pastel-orange/30',
-        isChampionship && isCompleted && isWinner && 'bg-amber-400/15 ring-1 ring-amber-400/40 shadow-[0_8px_24px_-12px_rgba(251,191,36,0.4)]',
+        'flex items-center justify-between px-3 py-2 rounded-[8px] border transition-colors',
+        isCompleted && isWinner && 'bg-pressbox-sage/[0.08] border-pressbox-sage/40',
+        isCompleted && !isWinner && 'bg-white/[0.03] border-white/[0.06] opacity-50',
+        !isCompleted && 'bg-white/[0.03] border-white/[0.08]',
+        isChampionship && isCompleted && isWinner && 'border-pressbox-orange/60',
       )}>
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {seedNum && (
             <span className={cn(
-              'w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-              isCompleted && isWinner
-                ? 'bg-green-500 text-white'
-                : 'bg-white/5 ring-1 ring-white/10 text-white/55'
+              'w-5 h-5 rounded-[5px] flex items-center justify-center font-condensed font-extrabold text-[11px] shrink-0',
+              isCompleted && isWinner ? 'bg-pressbox-sage text-pressbox-surface' : 'bg-white/[0.08] text-pressbox-text/70'
             )}>
               {seedNum}
             </span>
           )}
           <span className={cn(
-            'text-sm font-medium truncate',
+            'font-barlow font-semibold truncate text-pressbox-text',
             isCompleted && isWinner && 'font-bold',
-            compact && 'text-xs',
+            compact ? 'text-[13px]' : 'text-[14px]',
           )}>
             {name}
           </span>
           {isCompleted && isWinner && isChampionship && (
-            <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <Crown className="w-3.5 h-3.5 text-pressbox-orange-soft shrink-0" />
           )}
         </div>
         <span className={cn(
-          'font-bold tabular-nums ml-2 shrink-0',
-          isCompleted && isWinner ? 'text-pastel-sage-soft' : 'text-pastel-cream',
-          compact ? 'text-sm' : 'text-base',
+          'font-plex font-semibold tabular-nums ml-2 shrink-0',
+          (isCompleted && isWinner) || isLeading ? 'text-pressbox-sage' : 'text-pressbox-text',
+          compact ? 'text-[14px]' : 'text-[16px]',
         )}>
-          {series.status === 'pending' ? '-' : score.toFixed(1)}
+          {series.status === 'pending' || series.status === 'bye' ? '–' : score.toFixed(1)}
         </span>
       </div>
     );
@@ -122,39 +134,37 @@ const MatchupCard: React.FC<MatchupCardProps> = ({
 
   return (
     <div className={cn(
-      'rounded-lg overflow-hidden border shadow-sm',
-      isChampionship && 'ring-2 ring-amber-400/50 shadow-[0_16px_40px_-12px_rgba(251,191,36,0.3)]',
-      series.status === 'active' && 'ring-2 ring-pastel-orange/40 shadow-[0_8px_24px_-12px_rgba(255,168,87,0.4)]',
-      series.status === 'completed' && !isChampionship && 'border-white/10',
-      series.status === 'pending' && 'border-white/10 opacity-70',
+      'pb-type rounded-[12px] overflow-hidden bg-pressbox-tile border',
+      isChampionship ? 'border-pressbox-orange/50' : series.status === 'active' ? 'border-pressbox-sage/40' : 'border-white/[0.08]',
+      series.status === 'pending' && 'opacity-70',
     )}>
-      {/* Status badge */}
+      {/* Status line: the ticker's vocabulary — sage while it is on, orange-soft for the final, 45% for what has not started. */}
       <div className={cn(
-        'px-3 py-1 text-xs font-bold uppercase tracking-wider text-center',
-        series.status === 'active' && 'bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft',
-        series.status === 'completed' && 'bg-green-900/30 text-green-400',
-        series.status === 'pending' && 'bg-white/5 ring-1 ring-white/10 text-white/55',
-        series.status === 'bye' && 'bg-pastel-sage/10 text-pastel-sage-soft',
+        'px-3 py-1.5 font-plex font-semibold text-[9px] uppercase tracking-[0.14em] text-center border-b border-white/[0.06]',
+        series.status === 'active' && 'text-pressbox-sage',
+        series.status === 'completed' && 'text-pressbox-orange-soft',
+        series.status === 'pending' && 'text-pressbox-text/45',
+        series.status === 'bye' && 'text-pressbox-sage-soft',
       )}>
         {series.status === 'active' && 'Live'}
         {series.status === 'completed' && 'Final'}
         {series.status === 'pending' && 'Upcoming'}
         {series.status === 'bye' && 'Bye'}
         {series.matchup_week_1 && (
-          <span className="ml-1 opacity-70">
+          <span className="ml-1.5 text-pressbox-text/45">
             {series.matchup_week_2
-              ? `Wk ${series.matchup_week_1}-${series.matchup_week_2}`
-              : `Wk ${series.matchup_week_1}`}
+              ? `WK ${series.matchup_week_1}–${series.matchup_week_2}`
+              : `WK ${series.matchup_week_1}`}
           </span>
         )}
       </div>
 
-      <div className="p-2 space-y-1 bg-[#1A2A20]">
+      <div className="p-2 space-y-1">
         {getTeamDisplay(series.home_team_id, series.home_seed, homeIsWinner, series.home_score)}
         <div className="flex items-center gap-1 px-3">
-          <div className="flex-1 border-t border-white/10"></div>
-          <span className="text-[9px] text-white/55 font-medium uppercase">vs</span>
-          <div className="flex-1 border-t border-white/10"></div>
+          <div className="flex-1 border-t border-white/[0.06]"></div>
+          <span className="font-plex text-[8px] text-pressbox-text/40 uppercase tracking-[0.1em]">vs</span>
+          <div className="flex-1 border-t border-white/[0.06]"></div>
         </div>
         {getTeamDisplay(series.away_team_id, series.away_seed, awayIsWinner, series.away_score)}
       </div>
@@ -190,13 +200,10 @@ const RoundColumn: React.FC<RoundColumnProps> = ({
   return (
     <div className="flex flex-col min-w-[140px] sm:min-w-[200px] lg:min-w-[240px]">
       {/* Round header */}
-      <div className={cn(
-        'text-center mb-4 pb-2 border-b-2',
-        isChampionship ? 'ring-2 ring-amber-400/50' : 'ring-1 ring-pastel-orange/20',
-      )}>
+      <div className="text-center mb-4 pb-2 border-b border-white/[0.08]">
         <h3 className={cn(
-          'text-sm font-bold uppercase tracking-wider',
-          isChampionship ? 'text-amber-300' : 'text-pastel-orange',
+          'font-condensed font-bold text-[15px] uppercase tracking-[0.08em]',
+          isChampionship ? 'text-pressbox-orange-soft' : 'text-pressbox-text',
         )}>
           {isChampionship && <Trophy className="w-4 h-4 inline-block mr-1 -mt-0.5" aria-hidden="true" />}
           {roundName}
@@ -258,37 +265,19 @@ const ChampionBanner: React.FC<{
   const thirdPlaceName = bracket.third_place_team_id ? teamNames[bracket.third_place_team_id] : null;
 
   return (
-    <Card className="bg-[#1A2A20] border-0 ring-2 ring-amber-400/50 rounded-2xl shadow-[0_24px_60px_-16px_rgba(251,191,36,0.35)] overflow-hidden relative">
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iMSIgZmlsbD0iI2Y1OWUwYiIgb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] pointer-events-none"></div>
-      <CardContent className="relative p-6 text-center">
-        <div className="flex items-center justify-center gap-2 mb-3">
-          <Crown className="w-8 h-8 text-amber-500" />
-          <Trophy className="w-10 h-10 text-amber-300" aria-hidden="true" />
-          <Crown className="w-8 h-8 text-amber-500" />
-        </div>
-        <h2 className="font-calistoga text-2xl lg:text-3xl text-amber-300 mb-1">
-          {bracket.season} Champion
-        </h2>
-        <p className="font-calistoga text-3xl lg:text-4xl text-pastel-cream mb-4">
-          {champName}
+    <div className="pb-type rounded-[12px] bg-pressbox-tile border border-pressbox-orange/50 px-4 py-5 text-center">
+      <p className="font-plex font-semibold text-[9px] tracking-[0.14em] text-pressbox-orange-soft">{bracket.season} CHAMPION</p>
+      <p className="mt-1 font-condensed font-extrabold text-[30px] uppercase tracking-[0.02em] leading-none text-pressbox-text">
+        {champName}
+      </p>
+      {(runnerUpName || thirdPlaceName) && (
+        <p className="mt-3 font-plex font-medium text-[10px] tracking-[0.06em] text-pressbox-text/55 uppercase">
+          {runnerUpName && <span>2ND · {runnerUpName}</span>}
+          {runnerUpName && thirdPlaceName && <span className="text-pressbox-text/30"> · </span>}
+          {thirdPlaceName && <span>3RD · {thirdPlaceName}</span>}
         </p>
-
-        <div className="flex items-center justify-center gap-6 text-sm text-white/55">
-          {runnerUpName && (
-            <div className="flex items-center gap-1.5">
-              <Medal className="w-4 h-4 text-white/55" />
-              <span>2nd: {runnerUpName}</span>
-            </div>
-          )}
-          {thirdPlaceName && (
-            <div className="flex items-center gap-1.5">
-              <Medal className="w-4 h-4 text-amber-300" />
-              <span>3rd: {thirdPlaceName}</span>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 };
 
@@ -322,63 +311,61 @@ const CommissionerControls: React.FC<CommissionerControlsProps> = ({
   if (!isCommissioner) return null;
 
   return (
-    <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/20 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-bold flex items-center gap-2">
-          <MaskIcon className="w-4 h-4 text-pastel-orange" strokeWidth={2} />
-          Commissioner Controls
+    /* PRESS BOX (2026-09-04): the commissioner's panel in the settings
+       vocabulary — a labelled group, switch rows, the orange primary. */
+    <Card className="pb-type rounded-[12px] bg-pressbox-tile border border-white/[0.08] shadow-none">
+      <CardHeader className="pb-3 border-b border-white/[0.06]">
+        <CardTitle className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text flex items-center gap-2">
+          <MaskIcon className="w-4 h-4 text-pressbox-orange-soft" strokeWidth={2} />
+          Commissioner
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 pt-4">
         {!bracket && (
           <>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="consolation" className="text-xs">Consolation Bracket</Label>
-                <Switch id="consolation" checked={consolation} onCheckedChange={setConsolation} />
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="twoWeek" className="text-xs">Two-Week Matchups</Label>
-                <Switch id="twoWeek" checked={twoWeek} onCheckedChange={setTwoWeek} />
-              </div>
-            </div>
-            <Button
-              className="w-full"
+            <PressBoxSettingGroup label="FORMAT">
+              <PressBoxSettingRow label="Consolation bracket" checked={consolation} onToggle={setConsolation} />
+              <PressBoxSettingRow label="Two-week matchups" checked={twoWeek} onToggle={setTwoWeek} last />
+            </PressBoxSettingGroup>
+            <button
+              type="button"
+              className={PB_PRIMARY}
               onClick={() => onGenerate({ consolation, twoWeek })}
               disabled={generating}
             >
               {generating ? (
-                'Generating...'
+                'Generating…'
               ) : (
                 <>
-                  <Swords className="w-4 h-4 mr-2" />
-                  Generate Playoff Bracket
+                  <Swords className="w-4 h-4" />
+                  Generate bracket
                 </>
               )}
-            </Button>
+            </button>
           </>
         )}
 
         {bracket && bracket.status === 'active' && (
           <>
-            <Button
-              className="w-full"
+            <button
+              type="button"
+              className={PB_PRIMARY}
               onClick={onAdvance}
               disabled={generating}
             >
-              <Play className="w-4 h-4 mr-2" />
-              Advance Round {bracket.current_round}
-            </Button>
+              <Play className="w-4 h-4" />
+              Advance round {bracket.current_round}
+            </button>
 
             {!confirmReset ? (
-              <Button
-                variant="outline"
-                className="w-full text-destructive border-destructive/20 hover:bg-destructive/5"
+              <button
+                type="button"
+                className={PB_SECONDARY}
                 onClick={() => setConfirmReset(true)}
               >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Reset Bracket
-              </Button>
+                <RotateCcw className="w-4 h-4" />
+                Reset bracket
+              </button>
             ) : (
               <div className="space-y-2">
                 {/* A question, not a failure — see components/confirm. The
@@ -410,8 +397,8 @@ const CommissionerControls: React.FC<CommissionerControlsProps> = ({
         )}
 
         {bracket && bracket.status === 'completed' && (
-          <div className="text-center text-xs text-white/55 py-2">
-            Bracket complete. Season is over.
+          <div className="text-center font-plex font-medium text-[10px] tracking-[0.06em] uppercase text-pressbox-text/45 py-2">
+            Bracket complete · season over
           </div>
         )}
       </CardContent>
@@ -431,34 +418,37 @@ const SeedList: React.FC<{
   if (seeds.length === 0) return null;
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-bold flex items-center gap-2">
-          <Trophy className="w-4 h-4 text-amber-500" aria-hidden="true" />
-          Playoff Seeds ({bracketSize} Teams)
+    /* PRESS BOX (2026-09-04): the seed list as a standings slice — seed
+       chip, Barlow name, the record in Plex, BYE as a sage tag. */
+    <Card className="pb-type rounded-[12px] bg-pressbox-tile border border-white/[0.08] shadow-none">
+      <CardHeader className="pb-3 border-b border-white/[0.06]">
+        <CardTitle className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text flex items-center gap-2">
+          <Trophy className="w-4 h-4 text-pressbox-orange-soft" aria-hidden="true" />
+          Seeds
+          <span className="font-plex font-medium text-[10px] tracking-[0.08em] text-pressbox-text/45">· {bracketSize} TEAMS</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="divide-y divide-border/40">
+        <div className="divide-y divide-white/[0.06]">
           {seeds.map((seed) => {
             const hasBye = bracketSize === 6 && seed.seed_number <= 2;
             return (
-              <div key={seed.id} className="flex items-center gap-2 px-4 py-2 text-sm">
+              <div key={seed.id} className="flex items-center gap-2.5 px-4 py-2">
                 <span className={cn(
-                  'w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-                  seed.seed_number <= 2 ? 'bg-pastel-orange text-[#581E00]' : 'bg-white/5 ring-1 ring-white/10 text-white/55',
+                  'w-5 h-5 rounded-[5px] flex items-center justify-center font-condensed font-extrabold text-[11px] shrink-0',
+                  seed.seed_number <= 2 ? 'bg-pressbox-orange text-pressbox-orange-ink' : 'bg-white/[0.08] text-pressbox-text/70',
                 )}>
                   {seed.seed_number}
                 </span>
-                <span className="font-medium truncate flex-1">
+                <span className="font-barlow font-semibold text-[14px] text-pressbox-text truncate flex-1">
                   {teamNames[seed.team_id] || 'Unknown'}
                 </span>
-                <span className="text-xs text-white/55 tabular-nums">
+                <span className="font-plex text-[11px] text-pressbox-text/55 tabular-nums">
                   {seed.regular_season_wins}-{seed.regular_season_losses}
                   {seed.regular_season_ties > 0 ? `-${seed.regular_season_ties}` : ''}
                 </span>
                 {hasBye && (
-                  <span className="text-[9px] font-bold text-pastel-sage-soft bg-pastel-sage/20 px-1.5 py-0.5 rounded">
+                  <span className="px-1.5 py-0.5 rounded-[4px] bg-pressbox-sage/15 font-plex font-semibold text-[9px] tracking-[0.12em] text-pressbox-sage">
                     BYE
                   </span>
                 )}
@@ -644,7 +634,7 @@ const PlayoffBracket = () => {
   winnersByRound.forEach(roundSeries => roundSeries.sort((a, b) => a.match_number - b.match_number));
   consolationByRound.forEach(roundSeries => roundSeries.sort((a, b) => a.match_number - b.match_number));
 
-  const displayLoading = useMinimumLoadingTime(loading, 800);
+  const displayLoading = useMinimumLoadingTime(loading, PB_LOADING_MIN_MS);
 
   // Redirect pool leagues to their pool page
   const _poolType = activeLeagueFormat?.leagueType;
@@ -653,25 +643,19 @@ const PlayoffBracket = () => {
   }
 
   if (displayLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0F1F15]">
-        <StormyLoading message="Loading the playoff bracket…" />
-      </div>
-    );
+    // PR3: the league chrome over the bracket's skeleton below lg; Stormy from lg.
+    return <PressBoxPageLoading kind="bracket" message="Loading the playoff bracket…" />;
   }
 
   // Layout wrapper used throughout
   const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
+    <div className="min-h-screen bg-pressbox-surface text-pressbox-text">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">Playoffs</h1>
-          <MobileMenuButton />
-        </div>
-      </div>
-      <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      {/* PRESS BOX (2026-09-04): the league chrome — header, sub-tabs and
+          the league menu — replaces the 09-01 title bar and its hamburger,
+          which opened the old menu sheet. One menu in the app. */}
+      <PressBoxLeagueChrome />
+      <main className="w-full lg:pt-24 lg:pb-8 pb-app-chrome">
         <div className="w-full m-0 p-0">
           <div className={cn(
             "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
@@ -680,12 +664,12 @@ const PlayoffBracket = () => {
               : "lg:grid-cols-[220px_1fr]"
           )}>
             {/* Main content */}
-            <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overflow-x-auto px-2 lg:px-6 order-1 lg:order-2">
+            <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:overflow-x-auto px-2 pt-3 lg:px-6 lg:pt-0 order-1 lg:order-2">
               {children}
             </div>
 
             {/* Left sidebar — AdSpace replaced with on-brand Stormy commentary */}
-            <aside className="w-full lg:w-auto order-2 lg:order-1">
+            <aside className="w-full lg:w-auto order-2 lg:order-1 px-2 pb-4 lg:px-0 lg:pb-0">
               <div className="lg:sticky lg:top-24 space-y-4">
                 <CommissionerControls
                   leagueId={effectiveLeagueId}
@@ -699,25 +683,29 @@ const PlayoffBracket = () => {
                 {seeds.length > 0 && bracket && (
                   <SeedList seeds={seeds} teamNames={teamNames} bracketSize={bracket.bracket_size} />
                 )}
-                <div className="bg-[#1A2A20] ring-1 ring-amber-400/30 rounded-2xl shadow-[0_16px_40px_-12px_rgba(251,191,36,0.15)] overflow-hidden">
+                {/* The Stormy read, in the note card the player card and
+                    the trade screen use. The portrait stays on desktop. */}
+                <div className="hidden lg:block rounded-[12px] overflow-hidden border border-white/[0.08]">
                   <MascotPortrait id="stormy" />
-                  <div className="p-5">
-                    <div className="font-jbmono text-[9px] tracking-[0.32em] uppercase text-amber-300 font-bold mb-1">
-                      ✦ Stormy says
-                    </div>
-                    <div className="font-calistoga text-xl text-pastel-cream mb-2">Cup chase</div>
-                    <p className="text-[11px] text-white/70 leading-relaxed">
-                      Single-elimination. Higher seed picks home ice. Click any series to see the matchup detail. Champions are immortalized.
-                    </p>
-                  </div>
                 </div>
+                <PressBoxNoteCard
+                  eyebrow="STORMY · CUP CHASE"
+                  body="Single elimination. The higher seed gets home ice. Tap any series for the matchup detail. Champions are immortalized."
+                  avatarSrc="/mascots/mascot-stormy.webp"
+                  className="lg:hidden"
+                />
+                <PressBoxNoteCard
+                  eyebrow="STORMY · CUP CHASE"
+                  body="Single elimination. The higher seed gets home ice. Click any series for the matchup detail. Champions are immortalized."
+                  className="hidden lg:flex"
+                />
               </div>
             </aside>
 
             {/* Right sidebar - notifications */}
             {userLeagueState === 'active-user' && (activeLeagueId || leagueId) && (
               <aside className="hidden lg:block order-3">
-                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-[#1A2A20] ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)] overflow-hidden">
+                <div className="lg:sticky lg:top-24 h-[calc(100vh-7rem)] bg-pressbox-tile border border-white/[0.08] rounded-[12px] overflow-hidden">
                   <LeagueNotifications leagueId={activeLeagueId || leagueId || ''} />
                 </div>
               </aside>
@@ -734,10 +722,10 @@ const PlayoffBracket = () => {
     return (
       <PageLayout>
         <div className="text-center py-20">
-          <p className="text-white/55 text-lg mb-4">{error}</p>
-          <Button onClick={() => effectiveLeagueId && navigate(`/standings`)}>
-            Back to Standings
-          </Button>
+          <p className="pb-type font-barlow text-[15px] text-pressbox-text/70 mb-4">{error}</p>
+          <button type="button" className={cn(PB_SECONDARY, 'w-auto px-5')} onClick={() => effectiveLeagueId && navigate(`/standings`)}>
+            Back to standings
+          </button>
         </div>
       </PageLayout>
     );
@@ -747,22 +735,23 @@ const PlayoffBracket = () => {
   if (!bracket) {
     return (
       <PageLayout>
-        <div className="text-center py-16">
+        <div className="text-center py-10 lg:py-16">
           <div className="mb-6">
-            <CupIcon className="w-16 h-16 mx-auto text-pastel-orange/30 mb-4" strokeWidth={2} />
-            <h1 className="text-2xl font-bold mb-2">Playoff Bracket</h1>
-            <p className="text-white/55 max-w-md mx-auto">
+            <CupIcon className="w-16 h-16 mx-auto text-pressbox-orange-soft/30 mb-4" strokeWidth={2} />
+            <h1 className="pb-type font-condensed font-extrabold text-[24px] uppercase tracking-[0.02em] text-pressbox-text mb-2">Playoffs</h1>
+            <p className="pb-type font-barlow text-[13px] leading-[1.45] text-pressbox-text/60 max-w-md mx-auto">
               {isCommissioner
-                ? 'Generate the playoff bracket from the sidebar when the regular season ends. Teams will be seeded based on standings.'
-                : 'The playoff bracket has not been generated yet. Ask your commissioner to set it up when the regular season ends.'}
+                ? 'Generate the bracket from the commissioner panel when the regular season ends. Teams are seeded from the standings.'
+                : 'The bracket has not been generated yet. Ask your commissioner to set it up when the regular season ends.'}
             </p>
           </div>
-          <Button
-            variant="outline"
+          <button
+            type="button"
+            className={cn(PB_SECONDARY, 'w-auto px-5')}
             onClick={() => navigate('/standings')}
           >
-            View Standings
-          </Button>
+            View standings
+          </button>
         </div>
       </PageLayout>
     );
@@ -783,16 +772,21 @@ const PlayoffBracket = () => {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-primary to-[hsl(var(--vibrant-orange))] bg-clip-text text-transparent">
-            Playoff Bracket
+          <h1 className="pb-type font-condensed font-extrabold text-[24px] lg:text-[30px] uppercase tracking-[0.02em] text-pressbox-text">
+            Playoffs
           </h1>
           {bracket.status === 'active' && (
-            <span className="text-[10px] font-jbmono uppercase tracking-[0.18em] font-bold bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft px-2 py-0.5 rounded-full">
+            <span className="pb-type px-1.5 py-0.5 rounded-[4px] bg-pressbox-sage/15 font-plex font-semibold text-[9px] tracking-[0.12em] text-pressbox-sage">
               LIVE
             </span>
           )}
+          {bracket.status === 'completed' && (
+            <span className="pb-type px-1.5 py-0.5 rounded-[4px] bg-pressbox-orange-soft/15 font-plex font-semibold text-[9px] tracking-[0.12em] text-pressbox-orange-soft">
+              FINAL
+            </span>
+          )}
         </div>
-        <p className="text-sm text-white/55">
+        <p className="pb-type font-plex font-medium text-[10px] tracking-[0.06em] uppercase text-pressbox-text/45">
           {bracket.bracket_size}-team single elimination
           {bracket.two_week_matchups && ' (two-week matchups)'}
           {bracket.consolation_enabled && ' with consolation bracket'}
@@ -800,10 +794,10 @@ const PlayoffBracket = () => {
       </div>
 
       {/* ====== WINNERS BRACKET ====== */}
-      <Card className="mb-6 overflow-hidden border-none shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-pastel-orange/10 to-transparent pb-3 border-b border-white/10">
-          <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-pastel-orange-soft font-bold flex items-center gap-2">
-            <Swords className="w-4 h-4" />
+      <Card className="pb-type mb-6 overflow-hidden rounded-[12px] bg-pressbox-tile border border-white/[0.08] shadow-none">
+        <CardHeader className="pb-3 border-b border-white/[0.06]">
+          <CardTitle className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text flex items-center gap-2">
+            <Swords className="w-4 h-4 text-pressbox-orange-soft" />
             {bracket.consolation_enabled ? 'Winners Bracket' : 'Bracket'}
           </CardTitle>
         </CardHeader>
@@ -823,7 +817,7 @@ const PlayoffBracket = () => {
                 />
                 {idx < roundNumbers.length - 1 && (
                   <div className="flex items-center justify-center shrink-0 pt-12">
-                    <ChevronRight className="w-5 h-5 text-border" />
+                    <ChevronRight className="w-5 h-5 text-pressbox-text/30" />
                   </div>
                 )}
               </React.Fragment>
@@ -838,8 +832,8 @@ const PlayoffBracket = () => {
               return (
                 <div key={roundNum}>
                   <h3 className={cn(
-                    'text-sm font-bold uppercase tracking-wider mb-3 pb-1 border-b',
-                    isChampionship ? 'text-amber-300 ring-1 ring-amber-400/40 bg-amber-400/10' : 'text-pastel-orange ring-1 ring-pastel-orange/30 bg-pastel-orange/10',
+                    'font-condensed font-bold text-[15px] uppercase tracking-[0.08em] mb-2 pb-1 border-b border-white/[0.08]',
+                    isChampionship ? 'text-pressbox-orange-soft' : 'text-pressbox-text',
                   )}>
                     {isChampionship && <Trophy className="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" aria-hidden="true" />}
                     {roundName}
@@ -865,15 +859,15 @@ const PlayoffBracket = () => {
 
       {/* ====== THIRD-PLACE GAME ====== */}
       {thirdPlaceSeries && (
-        <Card className="mb-6 overflow-hidden border-none shadow-md">
-          <CardHeader className="bg-amber-400/10 pb-3 border-b border-white/10">
-            <CardTitle className="text-[10px] font-jbmono uppercase tracking-[0.32em] text-amber-300 font-bold flex items-center gap-2">
-              <Medal className="w-4 h-4" />
+        <Card className="pb-type mb-6 overflow-hidden rounded-[12px] bg-pressbox-tile border border-white/[0.08] shadow-none">
+          <CardHeader className="pb-3 border-b border-white/[0.06]">
+            <CardTitle className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text flex items-center gap-2">
+              <Medal className="w-4 h-4 text-pressbox-orange-soft" />
               Third-Place Game
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4">
-            <div className="max-w-xs">
+            <div className="lg:max-w-xs">
               <MatchupCard
                 series={thirdPlaceSeries}
                 teamNames={teamNames}
@@ -886,9 +880,9 @@ const PlayoffBracket = () => {
 
       {/* ====== CONSOLATION BRACKET ====== */}
       {consolationByRound.size > 0 && (
-        <Card className="mb-6 overflow-hidden border-none shadow-md">
-          <CardHeader className="bg-white/[0.03] pb-3 border-b border-white/10">
-            <CardTitle className="text-sm font-bold uppercase tracking-wider text-white/55 flex items-center gap-2">
+        <Card className="pb-type mb-6 overflow-hidden rounded-[12px] bg-pressbox-tile border border-white/[0.08] shadow-none">
+          <CardHeader className="pb-3 border-b border-white/[0.06]">
+            <CardTitle className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text/60 flex items-center gap-2">
               <Shield className="w-4 h-4" />
               Consolation Bracket
             </CardTitle>
@@ -907,7 +901,7 @@ const PlayoffBracket = () => {
                   />
                   {idx < arr.length - 1 && (
                     <div className="flex items-center justify-center shrink-0 pt-12">
-                      <ChevronRight className="w-5 h-5 text-border" />
+                      <ChevronRight className="w-5 h-5 text-pressbox-text/30" />
                     </div>
                   )}
                 </React.Fragment>
@@ -917,7 +911,7 @@ const PlayoffBracket = () => {
             <div className="md:hidden space-y-6">
               {Array.from(consolationByRound.keys()).sort((a, b) => a - b).map((roundNum, idx) => (
                 <div key={roundNum}>
-                  <h3 className="text-sm font-bold uppercase tracking-wider mb-3 pb-1 border-b text-white/55 border-white/10">
+                  <h3 className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] mb-2 pb-1 border-b border-white/[0.08] text-pressbox-text/60">
                     Consolation R{idx + 1}
                   </h3>
                   <div className="space-y-3">
@@ -940,18 +934,20 @@ const PlayoffBracket = () => {
 
       {/* Back button */}
       <div className="mt-6 pb-4 flex gap-3">
-        <Button
-          variant="outline"
+        <button
+          type="button"
+          className={PB_SECONDARY}
           onClick={() => navigate('/standings')}
         >
-          View Standings
-        </Button>
-        <Button
-          variant="outline"
+          View standings
+        </button>
+        <button
+          type="button"
+          className={PB_SECONDARY}
           onClick={() => effectiveLeagueId && navigate(`/matchup/${effectiveLeagueId}/1`)}
         >
-          Regular Season
-        </Button>
+          Regular season
+        </button>
       </div>
     </PageLayout>
   );

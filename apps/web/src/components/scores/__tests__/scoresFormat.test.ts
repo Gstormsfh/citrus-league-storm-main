@@ -157,7 +157,7 @@ describe('citrus summary', () => {
 
   it('leads with your own players when you have any', () => {
     expect(citrusSummaryText(GAME({ citrus: CITRUS({ myCount: 1, rosteredCount: 4 }) })))
-      .toBe('1 of your player in this one');
+      .toBe('1 of your players in this one');
     expect(citrusSummaryText(GAME({ citrus: CITRUS({ myCount: 3, rosteredCount: 6 }) })))
       .toBe('3 of your players in this one');
   });

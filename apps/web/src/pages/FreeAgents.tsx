@@ -20,14 +20,13 @@ import { leagueApi } from '@/api/leagues';
 import { matchupApi } from '@/api/matchups';
 import { rosterApi } from '@/api/rosters';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar, TrendingUp, Filter, List, Grid, Star, Info, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Loader2 } from 'lucide-react';
-import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
+import { PB_LOADING_MIN_MS, useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService, League } from '@/services/LeagueService';
 import { ScheduleService, NHLGame } from '@/services/ScheduleService';
@@ -53,7 +52,14 @@ import { notifyRosterChanged } from '@/utils/rosterRefresh';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { DropPlayerForAddDialog } from '@/components/freeagents/DropPlayerForAddDialog';
-import { FreeAgentRow } from '@/components/freeagents/FreeAgentRow';
+import { FreeAgentRowPressBox } from '@/components/freeagents/FreeAgentRowPressBox';
+import {
+  PlayersPhone,
+  type PlayersAvailableMode,
+  type PlayersPhoneView,
+  type PlayersTrendMode,
+} from '@/components/freeagents/PlayersPhone';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 import {
   FA_CHIP,
   FA_CHIP_ROW,
@@ -69,6 +75,7 @@ import {
   waiverClearsLabel,
 } from '@/components/freeagents/freeAgentRowKit';
 import { cn } from '@/lib/utils';
+import { useOwnership } from '@/hooks/useRosterWeek';
 import { ArrowLeftRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -97,10 +104,12 @@ const formatPositionForDisplay = (position: string): string => {
 const FreeAgents = () => {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { userLeagueState, activeLeagueId, activeLeagueFormat, isChangingLeague } = useLeague();
+  const { userLeagueState, activeLeague, activeLeagueId, activeLeagueFormat, isChangingLeague } = useLeague();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
+  // Rostered% / started% across Citrus, for the phone rows (2026-09-05).
+  const ownership = useOwnership(true);
   const [positionFilter, setPositionFilter] = useState('ALL');
   const [activeTab, setActiveTab] = useState('available');
   const [viewMode, setViewMode] = useState<'summary' | 'all'>('summary');
@@ -166,6 +175,16 @@ const FreeAgents = () => {
    */
   const [rosterFull, setRosterFull] = useState(false);
 
+  /**
+   * PRESS BOX (2026-09-04): the phone's own controls. The three VIEWS map
+   * onto the state the desktop already keeps (`activeTab` / `viewMode`) so a
+   * rotation keeps its place; the two toggles and the search field are
+   * phone-only and live here.
+   */
+  const [trendMode, setTrendMode] = useState<PlayersTrendMode>('adds');
+  const [availableMode, setAvailableMode] = useState<PlayersAvailableMode>('proj');
+  const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
+
   // SETTINGS-ENFORCEMENT (2026-08-16) — league scoring for FPTS
   // display. Undefined → DEFAULT_SCORING inside ScoringCalculator, so
   // default leagues render identical numbers (pinned by scoringUtils
@@ -193,7 +212,7 @@ const FreeAgents = () => {
     observerRef.current.observe(node);
   }, []);
 
-  const displayLoading = useMinimumLoadingTime(loading, 800);
+  const displayLoading = useMinimumLoadingTime(loading, PB_LOADING_MIN_MS);
 
   useEffect(() => {
     // Skip if league is changing
@@ -1415,6 +1434,194 @@ const FreeAgents = () => {
     ? ['ALL', 'F', 'D', 'G']
     : ['ALL', 'C', 'LW', 'RW', 'W', 'D', 'G'];
 
+  // ─────────────────────────────────────────────────────────────────────
+  // PRESS BOX (2026-09-04): the phone's three views over the lists above.
+  //
+  // TREND is the artboard's screen — the 24-hour movers, adds or drops.
+  // AVAILABLE is the whole pool by the week's projection, or under GAMES by
+  // how many games are left this week (the Schedule tab's maximizers, which
+  // were a sideways-scrolling table on a phone). WATCH is the starred set,
+  // which had no phone rendering at all — a `min-w-[600px]` table inside
+  // `overflow-x-auto`. Every list is one the page already computes; this
+  // block only chooses which one the phone shows and how each row is
+  // labelled. The desktop keeps `activeTab` / `viewMode`, and the views map
+  // onto them so a rotation lands where it left off.
+  // ─────────────────────────────────────────────────────────────────────
+  const phoneView: PlayersPhoneView =
+    activeTab === 'watch'
+      ? 'watch'
+      : activeTab === 'schedule' || viewMode === 'all'
+        ? 'available'
+        : 'trend';
+  const setPhoneView = (v: PlayersPhoneView) => {
+    if (v === 'trend') {
+      setActiveTab('available');
+      setViewMode('summary');
+    } else if (v === 'available') {
+      setActiveTab(availableMode === 'games' ? 'schedule' : 'available');
+      setViewMode('all');
+    } else {
+      setActiveTab('watch');
+    }
+  };
+  const setPhoneAvailableMode = (m: PlayersAvailableMode) => {
+    setAvailableMode(m);
+    setActiveTab(m === 'games' ? 'schedule' : 'available');
+    setViewMode('all');
+  };
+
+  /** The 24-hour drops, derived from the same platform read as the adds. */
+  const topDropping = useMemo(
+    () =>
+      [...filteredPlayers]
+        .map((p) => {
+          const real = trendingData.get(toNumericId(p.id));
+          const drops = real ? Math.max(0, real.addCount - real.netAdds) : 0;
+          return { ...p, adds: real?.addCount ?? 0, drops, hasRealData: !!real };
+        })
+        .filter((p) => p.drops > 0)
+        .sort((a, b) => b.drops - a.drops)
+        .slice(0, 10)
+        .map(withProjection),
+    [filteredPlayers, trendingData, withProjection],
+  );
+
+  /** The Schedule tab's list, position- and search-filtered, most games first. */
+  const scheduleRows = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return scheduleMaximizers
+      .filter((p) => {
+        const pos = formatPositionForDisplay(p.position);
+        const okPos =
+          positionFilter === 'ALL' ||
+          (positionFilter === 'W'
+            ? pos === 'LW' || pos === 'RW'
+            : positionFilter === 'F'
+              ? pos === 'C' || pos === 'LW' || pos === 'RW'
+              : pos === positionFilter);
+        const okSearch = !q || p.full_name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q);
+        return okPos && okSearch;
+      })
+      .map(withProjection)
+      .sort((a, b) => b.gamesThisWeek - a.gamesThisWeek || b.weeklyProjection - a.weeklyProjection);
+  }, [scheduleMaximizers, positionFilter, searchQuery, withProjection]);
+
+  const watchRows = useMemo(
+    () => sortByProjection(filteredPlayers.filter((p) => watchlist.has(p.id)).map(withProjection)),
+    [filteredPlayers, watchlist, withProjection],
+  );
+
+  /**
+   * The row's second line when the projection has moved up into the column:
+   * the directory's season counts, as they are. `0 GP` when it has none
+   * rather than three zeros that look like a bad night.
+   */
+  const seasonLineFor = (p: Player): string => {
+    if (p.position === 'G') {
+      const gp = p.goalie_gp ?? p.games_played ?? 0;
+      if (!gp) return '0 GP';
+      const sv = p.save_percentage != null ? p.save_percentage.toFixed(3).replace(/^0/, '') : null;
+      return [`${p.wins ?? 0} W`, sv ? `${sv} SV%` : null, `${gp} GP`].filter(Boolean).join(' · ');
+    }
+    if (!p.games_played) return '0 GP';
+    return `${p.goals} G · ${p.assists} A · ${p.points} P · ${p.games_played} GP`;
+  };
+
+  type PhoneRow = ReturnType<typeof withProjection> & { adds?: number; drops?: number; hasRealData?: boolean };
+  const phoneList: { rows: PhoneRow[]; total: number; onMore?: () => void } = searchQuery
+    ? { rows: phoneRows, total: filteredPlayers.length, onMore: () => setVisibleCount((n) => n + PAGE_SIZE) }
+    : phoneView === 'trend'
+      ? trendMode === 'adds'
+        ? { rows: topTrending, total: topTrending.length }
+        : { rows: topDropping, total: topDropping.length }
+      : phoneView === 'available'
+        ? availableMode === 'games'
+          ? {
+              rows: scheduleRows.slice(0, visibleCount),
+              total: scheduleRows.length,
+              onMore: () => setVisibleCount((n) => n + PAGE_SIZE),
+            }
+          : { rows: phoneRows, total: filteredPlayers.length, onMore: () => setVisibleCount((n) => n + PAGE_SIZE) }
+        : { rows: watchRows, total: watchRows.length };
+
+  const renderPhoneRow = (player: PhoneRow, i: number) => {
+    const own = ownership.get(String(player.id));
+    const common = {
+      rank: i + 1,
+      player,
+      projection: player.weeklyProjection,
+      games: player.games,
+      todayStr,
+      // `ROS 38% · START 31%` (artboard 1a · Players), from the ownership
+      // aggregate; absent until it exists.
+      rosteredPct: own?.rosteredPct ?? null,
+      startedPct: own?.startedPct ?? null,
+      action: freeAgentAction(player, rosterFull),
+      pending: addingPlayerId === toNumericId(player.id),
+      disabled: addingPlayerId !== null,
+      onOpen: () => handlePlayerClick(player),
+      onAction: () => handleRowAction(player),
+      starred: watchlist.has(player.id),
+      onStar: () => toggleWatchlist(player),
+    };
+    if (!searchQuery && phoneView === 'trend') {
+      // The artboard's row: the movement in the column, and where the
+      // player IS under it. No platform read for him → no movement drawn.
+      const movement = player.hasRealData
+        ? trendMode === 'adds'
+          ? (player.adds ?? 0)
+          : -(player.drops ?? 0)
+        : null;
+      return (
+        <FreeAgentRowPressBox
+          key={player.id}
+          {...common}
+          movement={movement}
+          subLabel={player.is_on_waivers ? 'ON WAIVERS' : 'FREE AGENT'}
+        />
+      );
+    }
+    if (!searchQuery && phoneView === 'available' && availableMode === 'games') {
+      return (
+        <FreeAgentRowPressBox
+          key={player.id}
+          {...common}
+          movement={null}
+          figure={String(player.gamesThisWeek)}
+          subLabel={player.gamesThisWeek === 1 ? 'GAME' : 'GAMES'}
+          seasonLine={player.gameDays.length ? player.gameDays.map((d) => d.toUpperCase()).join(' · ') : 'NO GAMES LEFT'}
+        />
+      );
+    }
+    return (
+      <FreeAgentRowPressBox
+        key={player.id}
+        {...common}
+        movement={null}
+        figure={player.weeklyProjection.toFixed(1)}
+        subLabel={`${player.gamesThisWeek} GP`}
+        seasonLine={seasonLineFor(player)}
+      />
+    );
+  };
+
+  const phoneEmpty =
+    searchQuery
+      ? { title: 'No players match', body: 'Try another name or team' }
+      : phoneView === 'trend'
+        ? trendMode === 'adds'
+          ? { title: 'No adds yet', body: 'The 24-hour movers show here once managers make moves' }
+          : { title: 'No drops yet', body: 'The 24-hour movers show here once managers make moves' }
+        : phoneView === 'available'
+          ? players.length === 0
+            ? { title: 'No free agents', body: 'Every player in the pool is rostered' }
+            : { title: 'No players match', body: 'Try widening the position filter' }
+          : {
+              title: 'Your watch list is empty',
+              body: 'Star players to keep track of them',
+              action: { label: 'Browse available', onSelect: () => setPhoneView('available') },
+            };
+
   // Redirect pool leagues to their pool page
   const _leagueType = activeLeagueFormat?.leagueType;
   if (isPoolLeague(_leagueType) && activeLeagueId) {
@@ -1429,39 +1636,76 @@ const FreeAgents = () => {
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream relative">
       <div className="hidden lg:block"><Navbar /></div>
       {/*
-        * COMPACT PHONE CHROME (2026-09-02).
+        * PRESS BOX (2026-09-04): the Players screen, artboard 1a.
         *
-        * Everything above the first player used to be marketing: a
-        * "✦ Scouting Room" eyebrow, a "Scout the pool." headline, a
-        * subtitle and then the search box — ~250px measured at 393x852,
-        * so the first free agent appeared at y≈900. On the one screen
-        * whose entire job is showing available players, the first screen
-        * showed none.
-        *
-        * Below `lg` the hero is gone and this bar is the page: title,
-        * menu, and the search field the manager actually came for, in
-        * 96px total. The hero survives at `lg`, where a desktop has the
-        * room for it. Both branches are Tailwind responsive classes, not
-        * a `useIsMobile()` read — a CSS branch has no hydration flash and
-        * no `window.innerWidth` on the render path.
+        * The compact bar of 2026-09-02 (title, menu, search — 96px) is gone
+        * with the marketing hero it replaced. Below `lg` the page is the
+        * shared LeagueHeader (identity + Match / Team / PLAYERS / League)
+        * over `PlayersPhone`, which draws the action tile, the section head,
+        * the chips, the column head and the rows from the lists this page
+        * already computes. `<main>` — the tabs, the cards, the tables, the
+        * sidebar — is the desktop's from `lg` and is not rendered below it.
+        * Both are Tailwind branches, not a `useIsMobile()` read: no hydration
+        * flash, no `window.innerWidth` on the render path.
         */}
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">Free Agents</h1>
-          <MobileMenuButton />
-        </div>
-        <div className="px-4 pb-2.5">
-          <Input
-            placeholder="Search players…"
-            aria-label="Search free agents"
-            className="h-9 bg-white/5 border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
+      <PressBoxLeagueChrome />
+      <div className="lg:hidden pb-app-chrome">
+        <PlayersPhone
+          view={phoneView}
+          onView={setPhoneView}
+          ownership={ownership.size > 0}
+          leadersTo="/players"
+          tradeTo={activeLeagueId ? `/trade-analyzer?league=${activeLeagueId}` : '/trade-analyzer'}
+          trendMode={trendMode}
+          onTrendMode={setTrendMode}
+          availableMode={availableMode}
+          onAvailableMode={setPhoneAvailableMode}
+          searchOpen={phoneSearchOpen || searchQuery.length > 0}
+          onSearchOpen={(open) => {
+            setPhoneSearchOpen(open);
+            if (!open) setSearchQuery('');
+          }}
+          searchQuery={searchQuery}
+          onSearchQuery={setSearchQuery}
+          positions={positions}
+          positionFilter={positionFilter}
+          onPosition={setPositionFilter}
+          total={phoneList.total}
+          rows={phoneList.rows}
+          renderRow={renderPhoneRow}
+          onMore={phoneList.onMore}
+          loading={
+            displayLoading ||
+            (phoneView === 'available' && availableMode === 'games' && (loadingMaximizers || loadingProjections))
+          }
+          watchCount={watchRows.length}
+          empty={phoneEmpty}
+          banner={
+            <>
+              {userLeagueState === 'logged-in-no-league' && (
+                <LeagueCreationCTA
+                  title="Your Free Agent Pool Awaits"
+                  description="Create your league to start adding players to your roster and building your team."
+                />
+              )}
+              {userLeagueState === 'guest' && (
+                <LeagueCreationCTA
+                  title="You're viewing demo data"
+                  description="Sign up to add players to your roster and start managing your team."
+                  variant="compact"
+                />
+              )}
+              {rosterLookupFailed && (
+                <div className="flex items-center gap-2 rounded-[10px] border border-yellow-500/30 bg-yellow-500/10 px-3 py-2.5 font-barlow text-[12px] text-yellow-200">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-yellow-400" />
+                  <span>Roster data did not load. Some players shown may already be rostered.</span>
+                </div>
+              )}
+            </>
+          }
+        />
       </div>
-      <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <main className="hidden lg:block w-full lg:pt-24 lg:pb-8">
         <div className="w-full m-0 p-0">
           {/* Sidebar, Content, and Notifications Grid - Sidebar at bottom on mobile,
               left on desktop; Notifications on the right from 1400px, where the
@@ -1594,7 +1838,7 @@ const FreeAgents = () => {
                             nothing you could pick a player WITH. */}
                         <div className={FA_ROWS_ONLY}>
                           {topTrending.map((player, i) => (
-                            <FreeAgentRow
+                            <FreeAgentRowPressBox
                               key={player.id}
                               rank={i + 1}
                               player={player}
@@ -1719,7 +1963,7 @@ const FreeAgents = () => {
                         {/* Phone list — the shared FreeAgentRow. */}
                         <div className={FA_ROWS_ONLY}>
                           {topProjected.map((player, i) => (
-                            <FreeAgentRow
+                            <FreeAgentRowPressBox
                               key={player.id}
                               rank={i + 1}
                               player={player}
@@ -1853,7 +2097,7 @@ const FreeAgents = () => {
                         */}
                       <div className={FA_ROWS_ONLY} data-testid="free-agents-phone-list">
                         {phoneRows.map((player, i) => (
-                          <FreeAgentRow
+                          <FreeAgentRowPressBox
                             key={player.id}
                             rank={i + 1}
                             player={player}

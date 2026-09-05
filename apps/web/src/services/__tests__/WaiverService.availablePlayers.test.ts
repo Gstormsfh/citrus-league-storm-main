@@ -11,13 +11,22 @@
 // 2. IT WAS SORTED ALPHABETICALLY AND CUT AT 50. The wire opened on whoever was
 //    early in the alphabet and hid everyone past the fiftieth. Nobody scans a
 //    waiver wire by surname.
+//
+// 3. (2026-09-05) IT LISTED EVERY DRAFTED PLAYER. The rostered set was read
+//    off a `rosteredPlayerIds` field on the waiver-claims response that no
+//    server route ever sent, with "show everyone" as the fallback. The night
+//    after the first 12-team test draft, the wire offered the whole draft
+//    back. The rostered set is roster_assignments for the league, and a
+//    failed read shows nothing rather than everyone.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const getAllPlayers = vi.fn();
 const getLeagueWaivers = vi.fn();
+const getLeagueRosters = vi.fn();
 
 vi.mock('../PlayerService', () => ({ PlayerService: { getAllPlayers: () => getAllPlayers() } }));
 vi.mock('@/api/waivers', () => ({ waiverApi: { getLeagueWaivers: () => getLeagueWaivers() } }));
+vi.mock('@/api/rosters', () => ({ rosterApi: { getLeagueRosters: (id: string) => getLeagueRosters(id) } }));
 vi.mock('@/api/account', () => ({ accountApi: {} }));
 vi.mock('@/api/client', () => ({ apiClient: {} }));
 vi.mock('@/utils/logger', () => ({ logger: { log: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
@@ -43,6 +52,7 @@ const goalie = (name: string, wins: number) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   getLeagueWaivers.mockResolvedValue({ data: null });
+  getLeagueRosters.mockResolvedValue({ data: [] });
 });
 
 describe('WaiverService.getAvailablePlayers', () => {
@@ -95,21 +105,38 @@ describe('WaiverService.getAvailablePlayers', () => {
     expect(rows.map((r: { full_name: string }) => r.full_name)).toEqual(['Alpha Player', 'Bravo Player']);
   });
 
-  it('still filters out rostered players and honours the position filter', async () => {
+  it('filters out every player on any roster in the league, and honours the position filter', async () => {
     getAllPlayers.mockResolvedValue([
       skater('Rostered Guy', 80),
       skater('Available Guy', 70),
       goalie('Available Goalie', 20),
     ]);
     const rostered = String(Math.abs(80) + 'Rostered Guy'.length * 1000);
-    getLeagueWaivers.mockResolvedValue({ data: { rosteredPlayerIds: [rostered] } });
+    // roster_assignments rows carry player_id as a number; the filter compares as strings.
+    getLeagueRosters.mockResolvedValue({ data: [{ player_id: Number(rostered), team_id: 't-other' }] });
 
     const all = await WaiverService.getAvailablePlayers('league-1');
+    expect(getLeagueRosters).toHaveBeenCalledWith('league-1');
     expect(all.map((r: { full_name: string }) => r.full_name)).not.toContain('Rostered Guy');
+    expect(all.map((r: { full_name: string }) => r.full_name)).toContain('Available Guy');
 
     const goalies = await WaiverService.getAvailablePlayers('league-1', 'G');
     expect(goalies).toHaveLength(1);
     expect(goalies[0].full_name).toBe('Available Goalie');
+  });
+
+  it('does not read the rostered set off the waiver claims (no route ever sent it)', async () => {
+    getAllPlayers.mockResolvedValue([skater('Drafted Guy', 80)]);
+    const drafted = String(Math.abs(80) + 'Drafted Guy'.length * 1000);
+    getLeagueWaivers.mockResolvedValue({ data: { rosteredPlayerIds: [] } });
+    getLeagueRosters.mockResolvedValue({ data: [{ player_id: drafted }] });
+    expect(await WaiverService.getAvailablePlayers('league-1')).toEqual([]);
+  });
+
+  it('shows nothing, not everyone, when the roster read fails', async () => {
+    getAllPlayers.mockResolvedValue([skater('Drafted Guy', 80), skater('Free Guy', 10)]);
+    getLeagueRosters.mockRejectedValue(new Error('503'));
+    expect(await WaiverService.getAvailablePlayers('league-1')).toEqual([]);
   });
 
   it('filters by search term', async () => {

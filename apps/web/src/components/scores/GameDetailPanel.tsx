@@ -23,8 +23,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
+import { PressBoxSkeletonBar } from '@/components/pressbox/Skeleton';
 import type { ScoresGameDetailResponse, ScoresPlayerLine } from '@citrus/shared';
-import { TeamChip } from '@/components/citrus2/TeamChip';
 import { scoresApi } from '@/api/scores';
 import { formatPoints, formatToi, hasUnconfirmedGoalieDuel } from './scoresFormat';
 
@@ -32,16 +32,16 @@ function ConfidenceDot({ label }: { label: string | null }) {
   const key = (label ?? '').trim().toLowerCase();
   const tone =
     key === 'high'
-      ? 'bg-pastel-sage'
+      ? 'bg-pressbox-sage'
       : key === 'medium'
-        ? 'bg-pastel-butter'
+        ? 'bg-pressbox-text/70'
         : key === 'low'
-          ? 'bg-pastel-orange-soft'
-          : 'bg-pastel-forest-dim';
+          ? 'bg-pressbox-orange-soft'
+          : 'bg-pressbox-text/45';
   return (
     <span className="inline-flex items-center gap-1">
       <span className={cn('w-1.5 h-1.5 rounded-full', tone)} aria-hidden="true" />
-      <span className="font-jbmono text-[9px] text-pastel-sage/70">{label ?? 'no grade'}</span>
+      <span className="font-plex text-[9px] text-pressbox-text/45">{label ?? 'no grade'}</span>
     </span>
   );
 }
@@ -52,33 +52,33 @@ function PlayerRow({ player }: { player: ScoresPlayerLine }) {
     <div
       data-testid="scores-detail-player"
       className={cn(
-        'flex items-center gap-2 px-2.5 py-1.5 rounded-lg',
-        player.roster?.isMine ? 'bg-pastel-orange/12' : 'odd:bg-white/[0.02]',
+        'flex items-center gap-2 px-2.5 py-1.5 rounded-[8px]',
+        player.roster?.isMine ? 'bg-pressbox-orange/[0.08]' : 'odd:bg-white/[0.02]',
       )}
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-1.5 min-w-0">
-          <span className="font-display text-[11px] text-pastel-cream truncate">{player.name}</span>
+          <span className="font-barlow font-semibold text-[12px] text-pressbox-text truncate">{player.name}</span>
           {player.position ? (
-            <span className="font-jbmono text-[8px] text-pastel-sage/60 flex-shrink-0">
+            <span className="font-plex text-[8px] text-pressbox-text/45 flex-shrink-0">
               {player.position}
             </span>
           ) : null}
           {player.roster ? (
             <span
               className={cn(
-                'font-jbmono text-[8px] px-1 py-px rounded flex-shrink-0 truncate max-w-[86px]',
+                'font-plex font-semibold text-[8px] tracking-[0.06em] px-1 py-px rounded-[4px] flex-shrink-0 truncate max-w-[86px]',
                 player.roster.isMine
-                  ? 'bg-pastel-orange/25 text-pastel-orange-soft'
-                  : 'bg-white/5 text-pastel-sage/70',
+                  ? 'bg-pressbox-orange/15 text-pressbox-orange-soft'
+                  : 'bg-white/[0.06] text-pressbox-text/60',
               )}
             >
-              {player.roster.isMine ? 'Your team' : (player.roster.teamName ?? 'Rostered')}
+              {player.roster.isMine ? 'YOU' : (player.roster.teamName ?? 'Rostered')}
             </span>
           ) : null}
         </div>
         {a ? (
-          <div className="font-jbmono text-[9px] text-pastel-sage/70 mt-0.5 tabular-nums">
+          <div className="font-plex text-[9px] text-pressbox-sage mt-0.5 tabular-nums">
             {player.isGoalie
               ? `${a.saves ?? 0} SV, ${a.goalsAgainst ?? 0} GA, ${formatToi(a.toiSeconds)} TOI`
               : `${a.goals}G ${a.assists}A ${a.shotsOnGoal}SOG ${a.blocks}BLK, ${formatToi(a.toiSeconds)} TOI`}
@@ -93,19 +93,19 @@ function PlayerRow({ player }: { player: ScoresPlayerLine }) {
       <div className="text-right flex-shrink-0">
         {player.actualPoints !== null ? (
           <>
-            <div className="font-jbmono text-sm font-bold text-pastel-cream tabular-nums leading-none">
+            <div className="font-plex font-semibold text-[14px] text-pressbox-text tabular-nums leading-none">
               {formatPoints(player.actualPoints)}
             </div>
-            <div className="font-jbmono text-[8px] text-pastel-sage/60 tabular-nums mt-0.5">
-              proj {formatPoints(player.projectedPoints)}
+            <div className="font-plex text-[8px] text-pressbox-text/45 tabular-nums mt-0.5">
+              P {formatPoints(player.projectedPoints)}
             </div>
           </>
         ) : (
           <>
-            <div className="font-jbmono text-sm font-bold text-pastel-cream tabular-nums leading-none">
+            <div className="font-plex font-semibold text-[14px] text-pressbox-orange-soft tabular-nums leading-none">
               {formatPoints(player.projectedPoints)}
             </div>
-            <div className="font-jbmono text-[8px] text-pastel-sage/50 mt-0.5">proj</div>
+            <div className="font-plex text-[8px] text-pressbox-text/45 mt-0.5">PROJ</div>
           </>
         )}
       </div>
@@ -137,16 +137,16 @@ export function GameDetailPanel({
   if (isLoading) {
     return (
       <div className="px-3 py-4" data-testid="scores-detail-loading">
-        <div className="h-3 w-24 rounded bg-pastel-surface-high animate-pulse mb-2" />
-        <div className="h-3 w-full rounded bg-pastel-surface-high animate-pulse mb-1.5" />
-        <div className="h-3 w-5/6 rounded bg-pastel-surface-high animate-pulse" />
+        <PressBoxSkeletonBar className="h-3 w-24 mb-2" />
+        <PressBoxSkeletonBar className="h-3 w-full mb-1.5" style={{ animationDelay: '120ms' }} />
+        <PressBoxSkeletonBar className="h-3 w-5/6" style={{ animationDelay: '240ms' }} />
       </div>
     );
   }
 
   if (isError || !data) {
     return (
-      <p className="px-3 py-4 font-display text-[11px] text-pastel-orange-soft">
+      <p className="px-3 py-4 font-barlow text-[12px] text-pressbox-orange-soft">
         This game's detail did not load. {(error as Error | undefined)?.message ?? 'Try again.'}
       </p>
     );
@@ -160,21 +160,21 @@ export function GameDetailPanel({
   return (
     <div className="px-2 py-2.5" data-testid="scores-detail">
       <div className="flex items-center justify-between px-1 mb-1.5">
-        <span className="font-jbmono text-[8px] tracking-[0.2em] uppercase text-pastel-orange-soft">
-          {anyActuals ? 'Actual vs projected' : 'Citrus projected field'}
+        <span className="font-plex font-semibold text-[8px] tracking-[0.14em] uppercase text-pressbox-text/45">
+          {anyActuals ? 'Actual · projected' : 'Projected field'}
         </span>
-        <span className="font-jbmono text-[9px] text-pastel-sage/60">
+        <span className="font-plex text-[9px] text-pressbox-text/45 tabular-nums">
           {players.length} projected
         </span>
       </div>
 
       {/* Venue only when it exists. NULL on every 2026 row, so normally absent. */}
       {venue ? (
-        <p className="px-1 font-display text-[10px] text-pastel-forest-dim mb-1.5">{venue}</p>
+        <p className="px-1 font-barlow text-[11px] text-pressbox-text/45 mb-1.5">{venue}</p>
       ) : null}
 
       {players.length === 0 ? (
-        <p className="px-1 py-2 font-display text-[11px] text-pastel-cream/70">
+        <p className="px-1 py-2 font-barlow text-[12px] text-pressbox-text/70">
           No Citrus projections exist for this game.
         </p>
       ) : (
@@ -185,7 +185,7 @@ export function GameDetailPanel({
             ))}
           </div>
           {remaining > 0 ? (
-            <p className="px-1 pt-1.5 font-jbmono text-[9px] text-pastel-sage/50">
+            <p className="px-1 pt-1.5 font-plex text-[9px] text-pressbox-text/45">
               and {remaining} more projected in this game
             </p>
           ) : null}
@@ -193,25 +193,25 @@ export function GameDetailPanel({
       )}
 
       {!anyActuals && players.length > 0 ? (
-        <p className="px-1 pt-2 font-display text-[10px] text-pastel-forest-dim leading-snug">
+        <p className="px-1 pt-2 font-barlow text-[11px] text-pressbox-text/45 leading-snug">
           Actual stat lines appear here once the game is played.
         </p>
       ) : null}
 
       {hasUnconfirmedGoalieDuel(players) ? (
-        <p className="px-1 pt-1 font-display text-[10px] text-pastel-forest-dim leading-snug">
+        <p className="px-1 pt-1 font-barlow text-[11px] text-pressbox-text/45 leading-snug">
           Both goalies for a club are projected. Citrus does not have a confirmed starter.
         </p>
       ) : null}
 
       {leagueId && !data.league.rostersResolved ? (
-        <p className="px-1 pt-1 font-display text-[10px] text-pastel-forest-dim leading-snug">
+        <p className="px-1 pt-1 font-barlow text-[11px] text-pressbox-text/45 leading-snug">
           Nobody from your league is in this game, so nothing is marked as yours.
         </p>
       ) : null}
 
       {data.truncated ? (
-        <p className="px-1 pt-1 font-display text-[10px] text-pastel-orange-soft leading-snug">
+        <p className="px-1 pt-1 font-barlow text-[11px] text-pressbox-orange-soft leading-snug">
           This list is incomplete: the projection read hit its row cap.
         </p>
       ) : null}

@@ -276,8 +276,8 @@ async function request<T = unknown>(
           ? err
           : new ApiError(
               err.name === 'TimeoutError' || err.name === 'AbortError'
-                ? 'Request timed out — retrying'
-                : 'Network error — retrying',
+                ? 'Request timed out. Retrying'
+                : 'Network error. Retrying',
               0,
             );
         continue;

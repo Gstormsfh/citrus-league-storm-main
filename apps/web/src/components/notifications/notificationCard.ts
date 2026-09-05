@@ -65,7 +65,7 @@ export interface NotificationCard {
  * Labels are STATES, not verdicts (COPY_VOICE: "a STATE, not a verdict"),
  * two words at most, rendered uppercase by STATUS_PILL_BASE. Tones follow
  * the identity-vs-standing rule the matchup header states
- * (StickyScoreBar.tsx: orange is YOU / act, sage is good / ahead): a state
+ * (pressbox/ScoreBlock.tsx: orange is YOU / act, sage is good / ahead): a state
  * that went the reader's way is `good`, one that needs the reader's hand is
  * `attention`, a loss is `bad`, and a plain fact is `neutral`.
  *

@@ -118,13 +118,13 @@ export function isSubmitPickFailure(
 const HUMAN_COPY: Record<SubmitPickFailureReason, string> = {
   not_on_clock: "It's not your turn anymore",
   player_taken: 'Someone already took that player',
-  clock_expired: 'Your clock ran out — autopick made your choice',
+  clock_expired: 'Your clock ran out. Autopick made your choice',
   unauthorized: "You don't own this team",
-  idempotency_conflict: 'Duplicate submit — please refresh',
+  idempotency_conflict: 'Duplicate submit. Please refresh',
   illegal_state: "Draft isn't open",
-  invalid_payload: 'Invalid pick — please refresh',
-  server_error: 'Server error — please try again',
-  network_or_timeout: "We couldn't confirm your pick — check the board",
+  invalid_payload: 'Invalid pick. Please refresh',
+  server_error: 'Server error. Please try again',
+  network_or_timeout: "We couldn't confirm your pick. Check the board",
 };
 
 /**

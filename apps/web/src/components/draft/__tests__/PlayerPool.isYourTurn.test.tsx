@@ -80,7 +80,16 @@ describe('PlayerPool — isYourTurn inline Draft button gate (DR-3.1 F8 fix)', (
     expect(buttons.length).toBe(POOL.length * LAYOUTS);
   });
 
-  it('renders ZERO inline Draft buttons when isYourTurn=false AND nothing selected (original v1 behavior)', () => {
+  // THE VERB ON EVERY ROW (2026-09-05): the phone row draws Draft on every
+  // undrafted row and is LIVE only on the turn — off it the button is
+  // disabled and titled "Not your turn". The desktop table keeps the
+  // original gate (buttons only on the turn or the selected row).
+  const phoneButtons = () =>
+    screen.getAllByTestId('pool-row-draft-button').filter((b) => b.closest('[data-testid="draft-pool-row"]'));
+  const desktopButtons = () =>
+    screen.queryAllByTestId('pool-row-draft-button').filter((b) => !b.closest('[data-testid="draft-pool-row"]'));
+
+  it('off the turn with nothing selected: every phone row shows a dimmed, inert Draft; the desktop table shows none', () => {
     render(
       <PlayerPool
         onPlayerSelect={vi.fn()}
@@ -92,10 +101,16 @@ describe('PlayerPool — isYourTurn inline Draft button gate (DR-3.1 F8 fix)', (
         isYourTurn={false}
       />,
     );
-    expect(screen.queryAllByTestId('pool-row-draft-button').length).toBe(0);
+    const phone = phoneButtons();
+    expect(phone.length).toBe(POOL.length);
+    for (const b of phone) {
+      expect((b as HTMLButtonElement).disabled).toBe(true);
+      expect(b.getAttribute('title')).toBe('Not your turn');
+    }
+    expect(desktopButtons().length).toBe(0);
   });
 
-  it('renders inline Draft button on the SELECTED row when isYourTurn=false (v1 select-first behavior preserved)', () => {
+  it('off the turn a selected row is not a live button on the phone (the turn is the only gate)', () => {
     const selected = POOL[1];
     render(
       <PlayerPool
@@ -108,11 +123,12 @@ describe('PlayerPool — isYourTurn inline Draft button gate (DR-3.1 F8 fix)', (
         isYourTurn={false}
       />,
     );
-    // Exactly one selected row * both layouts = 2 buttons.
-    expect(screen.getAllByTestId('pool-row-draft-button').length).toBe(1 * LAYOUTS);
+    expect(phoneButtons().every((b) => (b as HTMLButtonElement).disabled)).toBe(true);
+    // The desktop table keeps v1's select-first affordance: one row.
+    expect(desktopButtons().length).toBe(1);
   });
 
-  it('renders ZERO inline Draft buttons when isDraftActive=false (paused/complete overrides on-clock)', () => {
+  it('with the draft not active nothing is live, on either layout', () => {
     render(
       <PlayerPool
         onPlayerSelect={vi.fn()}
@@ -124,7 +140,8 @@ describe('PlayerPool — isYourTurn inline Draft button gate (DR-3.1 F8 fix)', (
         isYourTurn={true}
       />,
     );
-    expect(screen.queryAllByTestId('pool-row-draft-button').length).toBe(0);
+    expect(phoneButtons().every((b) => (b as HTMLButtonElement).disabled)).toBe(true);
+    expect(desktopButtons().length).toBe(0);
   });
 
   // DR-4 F11 fix (2026-07-30) — isSubmitPending guard.

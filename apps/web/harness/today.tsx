@@ -15,6 +15,7 @@
  */
 import { createRoot } from 'react-dom/client';
 import { useMemo, useState } from 'react';
+import '../src/pressboxFonts';
 import '../src/index.css';
 import MobileRosterList from '../src/components/roster/MobileRosterList';
 import { FillSlotSheet } from '../src/components/roster/FillSlotSheet';

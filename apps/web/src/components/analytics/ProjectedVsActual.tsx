@@ -54,34 +54,37 @@ function DeltaRow({ p, rank }: { p: PlayerDelta; rank: 'up' | 'down' }) {
   const pct = Math.round((p.ratio - 1) * 100);
   const up = rank === 'up';
   return (
-    <div className="flex items-center gap-3 py-2 border-b border-white/5 last:border-0">
+    /* PRESS BOX (2026-09-04): the row ladder -- Barlow name, Plex meta,
+       Plex figure. Up keeps the chart's orange so the list and the shape
+       agree; down is the 55% cream every quiet figure wears. */
+    <div className="flex items-center gap-3 py-2 border-b border-white/[0.06] last:border-0">
       <span
         className={cn(
-          'flex h-7 w-7 shrink-0 items-center justify-center rounded-md ring-1',
-          up ? 'bg-pastel-orange/15 ring-pastel-orange/30' : 'bg-white/5 ring-white/10',
+          'flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border',
+          up ? 'bg-pressbox-orange/[0.12] border-pressbox-orange/30' : 'bg-white/[0.04] border-white/[0.08]',
         )}
       >
         {up ? <TrendingUp className="h-3.5 w-3.5" style={{ color: ACTUAL }} />
-            : <TrendingDown className="h-3.5 w-3.5 text-white/55" />}
+            : <TrendingDown className="h-3.5 w-3.5 text-pressbox-text/55" />}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-display text-[13px] font-bold text-pastel-cream">
+        <span className="block truncate font-barlow text-[14px] font-semibold text-pressbox-text">
           {p.name}
         </span>
-        <span className="block text-[10px] font-display text-white/55">
-          {p.position} · {p.games} GP · {p.actual.toFixed(1)} vs {p.projected.toFixed(1)} proj
+        <span className="block mt-0.5 font-plex font-medium text-[10px] tracking-[0.04em] text-pressbox-text/55">
+          {p.position} · {p.games} GP · {p.actual.toFixed(1)} VS {p.projected.toFixed(1)} PROJ
         </span>
       </span>
       <span className="shrink-0 text-right">
         <span
-          className="block font-varsity text-[14px] font-black leading-none"
+          className="block font-plex font-semibold text-[15px] leading-none tabular-nums"
           style={{ color: up ? ACTUAL : undefined }}
         >
-          <span className={up ? undefined : 'text-white/55'}>
+          <span className={up ? undefined : 'text-pressbox-text/55'}>
             {pct > 0 ? '+' : ''}{pct}%
           </span>
         </span>
-        <span className="block text-[9px] font-display uppercase text-white/55">
+        <span className="block mt-1 font-plex font-medium text-[9px] tracking-[0.06em] uppercase text-pressbox-text/45 tabular-nums">
           {p.delta > 0 ? '+' : ''}{p.delta.toFixed(1)} pts
         </span>
       </span>
@@ -104,24 +107,29 @@ export function ProjectedVsActual({ totals, players, className }: ProjectedVsAct
     :                       { text: 'On expectation', tone: EXPECTED, Icon: Minus };
 
   return (
-    <div className={cn('bg-pastel-surface-tile ring-1 ring-white/10 rounded-2xl overflow-hidden', className)}>
-      <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3">
+    /* PRESS BOX (2026-09-04): the tile, the eyebrow, the condensed head and
+       the Plex figure -- the player card's vocabulary. The radar keeps its
+       two validated colours; they were chosen for this surface. */
+    <div className={cn('pb-type bg-pressbox-tile border border-white/[0.08] rounded-[12px] overflow-hidden', className)}>
+      <div className="flex items-start justify-between gap-4 px-4 pt-4 pb-3">
         <div className="min-w-0">
-          <p className="font-jbmono text-[9px] font-bold uppercase tracking-[0.28em] text-pastel-orange-soft">
-            ✦ Projected vs Actual
+          <p className="font-plex font-semibold text-[9px] tracking-[0.14em] uppercase text-pressbox-orange-soft">
+            Projected vs actual
           </p>
-          <h3 className="font-calistoga text-xl text-pastel-cream mt-0.5">Are you beating the model?</h3>
-          <p className="text-[11px] text-white/55 mt-1 max-w-sm leading-relaxed">
+          <h3 className="mt-1 font-condensed font-bold text-[20px] uppercase tracking-[0.02em] leading-none text-pressbox-text">
+            Are you beating the model?
+          </h3>
+          <p className="mt-1.5 max-w-sm font-barlow text-[12px] leading-[1.45] text-pressbox-text/60">
             The ring is what a roster projected like yours <em>typically</em> returns, not the raw
-            projection, which runs hot. Outside the ring is genuine outperformance.
+            projection, which runs hot. Outside the ring is real outperformance.
           </p>
         </div>
         {headline && tracking.pct !== null && (
           <div className="shrink-0 text-right">
-            <p className="font-varsity text-[30px] font-black leading-none" style={{ color: headline.tone }}>
+            <p className="font-plex font-semibold text-[30px] leading-none tabular-nums" style={{ color: headline.tone }}>
               {tracking.pct}%
             </p>
-            <p className="mt-1 font-display text-[9px] font-semibold uppercase tracking-wide text-white/55">
+            <p className="mt-1 font-plex font-medium text-[9px] tracking-[0.1em] uppercase text-pressbox-text/55">
               {headline.text}
             </p>
           </div>
@@ -129,14 +137,14 @@ export function ProjectedVsActual({ totals, players, className }: ProjectedVsAct
       </div>
 
       {/* Legend — always present for two series, never colour alone. */}
-      <div className="flex items-center gap-4 px-5 pb-2">
+      <div className="flex items-center gap-4 px-4 pb-2">
         {[
-          { c: ACTUAL, l: 'Actual' },
-          { c: EXPECTED, l: 'Expected (100%)' },
+          { c: ACTUAL, l: 'ACTUAL' },
+          { c: EXPECTED, l: 'EXPECTED · 100%' },
         ].map((s) => (
           <span key={s.l} className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full" style={{ background: s.c }} aria-hidden="true" />
-            <span className="font-display text-[11px] text-white/55">{s.l}</span>
+            <span className="font-plex font-medium text-[9px] tracking-[0.08em] text-pressbox-text/55">{s.l}</span>
           </span>
         ))}
       </div>
@@ -149,7 +157,7 @@ export function ProjectedVsActual({ totals, players, className }: ProjectedVsAct
             <PolarGrid stroke="#FFFFFF1F" />
             <PolarAngleAxis
               dataKey="subject"
-              tick={{ fill: '#FFFFFF8C', fontSize: 11, fontWeight: 600 }}
+              tick={{ fill: '#F3EFE68C', fontSize: 10, fontWeight: 600, fontFamily: '"IBM Plex Mono", ui-monospace, monospace' }}
             />
             {/* Domain tops out at 160, not 200. The clamp in
                 categoryPerformance still admits 200, but a 200 ceiling puts
@@ -180,20 +188,20 @@ export function ProjectedVsActual({ totals, players, className }: ProjectedVsAct
       </div>
 
       {ranked.length > 0 && (
-        <div className="border-t border-white/10 px-5 py-4">
-          <p className="font-jbmono text-[9px] font-bold uppercase tracking-[0.2em] text-white/55 mb-2">
+        <div className="border-t border-white/[0.06] px-4 py-4">
+          <p className="mb-1 font-plex font-semibold text-[9px] tracking-[0.14em] uppercase text-pressbox-text/45">
             Carrying the team
           </p>
           {carrying.map((p) => <DeltaRow key={p.id} p={p} rank="up" />)}
           {dragging.length > 0 && (
             <>
-              <p className="font-jbmono text-[9px] font-bold uppercase tracking-[0.2em] text-white/55 mt-4 mb-2">
+              <p className="mt-4 mb-1 font-plex font-semibold text-[9px] tracking-[0.14em] uppercase text-pressbox-text/45">
                 Falling short
               </p>
               {dragging.map((p) => <DeltaRow key={p.id} p={p} rank="down" />)}
             </>
           )}
-          <p className="mt-3 text-[10px] leading-relaxed text-white/55">
+          <p className="mt-3 font-barlow text-[11px] leading-[1.45] text-pressbox-text/50">
             Ranked by ratio to expectation, not by raw points. The model's error grows with the
             size of a projection, and a ratio is the only comparison that survives it.
           </p>

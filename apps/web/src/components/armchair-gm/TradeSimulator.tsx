@@ -29,7 +29,7 @@ import PlayerAvatar from './PlayerAvatar';
    labels 1.58:1 against it. There is no text colour that fixes a
    mid-grey surface; the surface itself is the bug. Swapped to the dark
    tile family the rest of the app uses (ui/card.tsx is
-   bg-pastel-surface-tile + ring-white/10), so cream text lands at 13:1. */
+   bg-pastel-surface-tile max-lg:bg-pressbox-tile + ring-white/10), so cream text lands at 13:1. */
 
 
 interface SavedTrade {
@@ -243,7 +243,7 @@ export default function TradeSimulator() {
         {hasTrade && (
           <button
             onClick={handleSaveTrade}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-citrus-sage/30 bg-pastel-surface-tile hover:bg-citrus-sage/10 transition-colors text-xs font-display font-bold text-pastel-cream"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-citrus-sage/30 bg-pastel-surface-tile max-lg:bg-pressbox-tile hover:bg-citrus-sage/10 transition-colors text-xs font-display max-lg:font-barlow font-bold text-pastel-cream max-lg:text-pressbox-text"
           >
             <Save className="w-3.5 h-3.5 text-citrus-sage" />
             Save Scenario
@@ -253,10 +253,10 @@ export default function TradeSimulator() {
           <button
             onClick={() => setShowSaved(!showSaved)}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 transition-colors text-xs font-display font-bold",
+              "flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 transition-colors text-xs font-display max-lg:font-barlow font-bold",
               showSaved
-                ? "border-citrus-sage bg-citrus-sage/20 text-pastel-cream"
-                : "border-citrus-sage/30 bg-pastel-surface-tile hover:bg-citrus-sage/10 text-pastel-cream"
+                ? "border-citrus-sage bg-citrus-sage/20 text-pastel-cream max-lg:text-pressbox-text"
+                : "border-citrus-sage/30 bg-pastel-surface-tile max-lg:bg-pressbox-tile hover:bg-citrus-sage/10 text-pastel-cream max-lg:text-pressbox-text"
             )}
           >
             <FolderOpen className="w-3.5 h-3.5 text-citrus-sage" />
@@ -267,16 +267,16 @@ export default function TradeSimulator() {
 
       {/* Saved Trades Panel */}
       {showSaved && savedTrades.length > 0 && (
-        <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="bg-pastel-surface-tile max-lg:bg-pressbox-tile backdrop-blur-sm rounded-2xl max-lg:rounded-[12px] border-2 border-citrus-sage/30 shadow-varsity overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="px-4 py-2.5 bg-gradient-to-r from-citrus-sage/15 to-citrus-sage/5 border-b border-citrus-sage/20">
-            <span className="text-[10px] text-pastel-cream/70 uppercase font-display font-bold tracking-wider">Saved Trade Scenarios</span>
+            <span className="text-[10px] text-pastel-cream/70 max-lg:text-pressbox-text/70 uppercase font-display max-lg:font-barlow font-bold tracking-wider">Saved Trade Scenarios</span>
           </div>
           {savedTrades.map(trade => (
             <div key={trade.id} className="flex items-center gap-2 px-4 py-2.5 border-b border-citrus-sage/10 hover:bg-citrus-sage/5 transition-colors">
-              <Clock className="w-3.5 h-3.5 text-pastel-cream/60 flex-shrink-0" />
+              <Clock className="w-3.5 h-3.5 text-pastel-cream/60 max-lg:text-pressbox-text/60 flex-shrink-0" />
               <button onClick={() => handleLoadTrade(trade)} className="flex-1 text-left min-w-0">
-                <div className="font-display font-bold text-[11px] text-pastel-cream truncate">{trade.name}</div>
-                <div className="text-[9px] text-pastel-cream/60 font-display">
+                <div className="font-display max-lg:font-barlow font-bold text-[11px] text-pastel-cream max-lg:text-pressbox-text truncate">{trade.name}</div>
+                <div className="text-[9px] text-pastel-cream/60 max-lg:text-pressbox-text/60 font-display max-lg:font-barlow">
                   {new Date(trade.timestamp).toLocaleDateString()} {new Date(trade.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </button>
@@ -290,10 +290,10 @@ export default function TradeSimulator() {
 
       {/* Instructions */}
       {!teamA && !teamB && !showSaved && (
-        <div className="text-center py-8 bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-dashed border-citrus-sage/40">
+        <div className="text-center py-8 bg-pastel-surface-tile max-lg:bg-pressbox-tile backdrop-blur-sm rounded-2xl max-lg:rounded-[12px] border-2 border-dashed border-citrus-sage/40">
           <ArrowLeftRight className="w-10 h-10 text-citrus-sage/50 mx-auto mb-3" />
-          <h3 className="font-varsity text-lg text-pastel-cream mb-1">Trade Simulator</h3>
-          <p className="text-sm text-pastel-cream/70 font-display max-w-md mx-auto">
+          <h3 className="font-varsity max-lg:font-condensed text-lg text-pastel-cream max-lg:text-pressbox-text mb-1">Trade Simulator</h3>
+          <p className="text-sm text-pastel-cream/70 max-lg:text-pressbox-text/70 font-display max-lg:font-barlow max-w-md mx-auto">
             Select two teams below to start building a trade. See real-time cap impact, trade clause warnings, and salary retention options.
           </p>
         </div>
@@ -351,15 +351,15 @@ export default function TradeSimulator() {
 
       {/* Trade Summary */}
       {hasTrade && impact && dataA && dataB && (
-        <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="bg-pastel-surface-tile max-lg:bg-pressbox-tile backdrop-blur-sm rounded-2xl max-lg:rounded-[12px] border-2 border-citrus-sage/30 shadow-varsity overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="px-4 md:px-6 py-3 bg-gradient-to-r from-citrus-forest via-citrus-forest/95 to-citrus-forest border-b-2 border-citrus-sage/30 flex items-center justify-between">
-            <h3 className="font-varsity text-lg text-citrus-cream flex items-center gap-2">
+            <h3 className="font-varsity max-lg:font-condensed text-lg text-citrus-cream flex items-center gap-2">
               <ArrowLeftRight className="w-5 h-5" />
               Trade Summary
             </h3>
             <button
               onClick={handleReset}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-citrus-sage/20 hover:bg-citrus-sage/30 text-citrus-cream text-xs font-display font-bold transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-citrus-sage/20 hover:bg-citrus-sage/30 text-citrus-cream text-xs font-display max-lg:font-barlow font-bold transition-colors"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Reset
@@ -400,14 +400,14 @@ export default function TradeSimulator() {
               {impact.teamA.spaceAfter >= 0 && impact.teamB.spaceAfter >= 0 ? (
                 <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-50 border-2 border-green-200">
                   <Check className="w-5 h-5 text-green-600" />
-                  <span className="text-sm font-display font-bold text-green-700">
+                  <span className="text-sm font-display max-lg:font-barlow font-bold text-green-700">
                     Trade is cap compliant for both teams
                   </span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 border-2 border-red-200">
                   <X className="w-5 h-5 text-red-600" />
-                  <span className="text-sm font-display font-bold text-red-700">
+                  <span className="text-sm font-display max-lg:font-barlow font-bold text-red-700">
                     Trade puts {impact.teamA.spaceAfter < 0 ? dataA.teamName : dataB.teamName} over the cap
                   </span>
                 </div>
@@ -417,7 +417,7 @@ export default function TradeSimulator() {
               {clauseWarnings.map((w, i) => (
                 <div key={i} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-50 border border-amber-200">
                   <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                  <span className="text-xs font-display text-amber-700">{w}</span>
+                  <span className="text-xs font-display max-lg:font-barlow text-amber-700">{w}</span>
                 </div>
               ))}
             </div>
@@ -455,7 +455,7 @@ function TradePanel({
   const [imgErr, setImgErr] = useState(false);
 
   return (
-    <div className="bg-pastel-surface-tile backdrop-blur-sm rounded-2xl border-2 border-citrus-sage/30 shadow-varsity overflow-hidden flex flex-col">
+    <div className="bg-pastel-surface-tile max-lg:bg-pressbox-tile backdrop-blur-sm rounded-2xl max-lg:rounded-[12px] border-2 border-citrus-sage/30 shadow-varsity overflow-hidden flex flex-col">
       {/* Team Header */}
       <button
         onClick={onTogglePicker}
@@ -469,12 +469,12 @@ function TradePanel({
           </div>
         )}
         <div className="flex-1 text-left">
-          <div className="text-[10px] text-pastel-cream/65 uppercase font-display font-bold tracking-wider">{label}</div>
-          <div className="font-varsity text-base text-pastel-cream">
+          <div className="text-[10px] text-pastel-cream/65 max-lg:text-pressbox-text/65 uppercase font-display max-lg:font-barlow font-bold tracking-wider">{label}</div>
+          <div className="font-varsity max-lg:font-condensed text-base text-pastel-cream max-lg:text-pressbox-text">
             {teamInfo ? teamInfo.fullName : 'Select a team'}
           </div>
         </div>
-        <ChevronDown className={cn("w-4 h-4 text-pastel-cream/60 transition-transform", showPicker && "rotate-180")} />
+        <ChevronDown className={cn("w-4 h-4 text-pastel-cream/60 max-lg:text-pressbox-text/60 transition-transform", showPicker && "rotate-180")} />
       </button>
 
       {/* Team Picker Dropdown */}
@@ -493,7 +493,7 @@ function TradePanel({
                 )}
               >
                 <img loading="lazy" decoding="async" src={t.logoUrl} alt={t.abbrev} className="w-6 h-6 object-contain" />
-                <span className="text-[8px] font-varsity text-pastel-cream">{t.abbrev}</span>
+                <span className="text-[8px] font-varsity max-lg:font-condensed text-pastel-cream max-lg:text-pressbox-text">{t.abbrev}</span>
               </button>
             ))}
           </div>
@@ -512,13 +512,13 @@ function TradePanel({
               {/* Search */}
               <div className="px-3 py-2 border-b border-citrus-sage/20">
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-pastel-cream/60" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-pastel-cream/60 max-lg:text-pressbox-text/60" />
                   <input
                     type="text"
                     placeholder="Search players..."
                     value={search}
                     onChange={e => onSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-citrus-sage/30 bg-pastel-surface-tile text-xs font-display text-pastel-cream placeholder:text-pastel-cream/60 focus:outline-none focus:border-citrus-sage transition-all"
+                    className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-citrus-sage/30 bg-pastel-surface-tile max-lg:bg-pressbox-tile text-xs font-display max-lg:font-barlow text-pastel-cream max-lg:text-pressbox-text placeholder:text-pastel-cream/60 placeholder:max-lg:text-pressbox-text/60 focus:outline-none focus:border-citrus-sage transition-all"
                   />
                 </div>
               </div>
@@ -526,8 +526,8 @@ function TradePanel({
               {/* Retention slider */}
               <div className="px-3 py-2 border-b border-citrus-sage/20 bg-citrus-cream/20">
                 <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-pastel-cream/65 flex-shrink-0" />
-                  <span className="text-[9px] text-pastel-cream/70 font-display font-bold uppercase tracking-wider flex-shrink-0">Retain</span>
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-pastel-cream/65 max-lg:text-pressbox-text/65 flex-shrink-0" />
+                  <span className="text-[9px] text-pastel-cream/70 max-lg:text-pressbox-text/70 font-display max-lg:font-barlow font-bold uppercase tracking-wider flex-shrink-0">Retain</span>
                   <input
                     type="range"
                     min={0}
@@ -537,14 +537,14 @@ function TradePanel({
                     onChange={e => onRetention(Number(e.target.value))}
                     className="flex-1 h-1.5 accent-citrus-sage"
                   />
-                  <span className="text-xs font-varsity text-pastel-cream w-8 text-right">{retention}%</span>
+                  <span className="text-xs font-varsity max-lg:font-condensed text-pastel-cream max-lg:text-pressbox-text w-8 text-right">{retention}%</span>
                 </div>
               </div>
 
               {/* Player list */}
               <div className="flex-1 max-h-80 overflow-y-auto">
                 {players.length === 0 ? (
-                  <div className="text-center py-8 text-xs text-pastel-cream/65 font-display">
+                  <div className="text-center py-8 text-xs text-pastel-cream/65 max-lg:text-pressbox-text/65 font-display max-lg:font-barlow">
                     {search ? 'Nobody matches that search.' : 'No contracts on file for this team.'}
                   </div>
                 ) : (
@@ -563,10 +563,10 @@ function TradePanel({
               {/* Selected count */}
               {selected.size > 0 && (
                 <div className="px-3 py-2 bg-citrus-sage/15 border-t-2 border-citrus-sage/30 flex items-center justify-between">
-                  <span className="text-[10px] font-display font-bold text-pastel-cream uppercase tracking-wider">
+                  <span className="text-[10px] font-display max-lg:font-barlow font-bold text-pastel-cream max-lg:text-pressbox-text uppercase tracking-wider">
                     {selected.size} player{selected.size !== 1 ? 's' : ''} selected
                   </span>
-                  <span className="font-varsity text-sm text-pastel-cream">
+                  <span className="font-varsity max-lg:font-condensed text-sm text-pastel-cream max-lg:text-pressbox-text">
                     {formatCap(players.filter(p => selected.has(p.playerId)).reduce((s, p) => s + p.capHit, 0))}
                   </span>
                 </div>
@@ -614,9 +614,9 @@ function TradePlayerRow({
 
       {/* Name + Position */}
       <div className="flex-1 min-w-0">
-        <div className="font-display font-bold text-[11px] text-pastel-cream truncate">{player.name}</div>
+        <div className="font-display max-lg:font-barlow font-bold text-[11px] text-pastel-cream max-lg:text-pressbox-text truncate">{player.name}</div>
         <div className="flex items-center gap-1">
-          <Badge className="bg-citrus-sage/20 text-pastel-cream text-[7px] h-3.5 px-1 font-varsity border border-citrus-sage/40">
+          <Badge className="bg-citrus-sage/20 text-pastel-cream max-lg:text-pressbox-text text-[7px] h-3.5 px-1 font-varsity max-lg:font-condensed border border-citrus-sage/40">
             {player.position}
           </Badge>
           {player.clause && (
@@ -637,13 +637,13 @@ function TradePlayerRow({
 
       {/* Cap Hit */}
       <div className="text-right flex-shrink-0">
-        <div className="font-varsity text-xs text-pastel-cream">{formatCap(player.capHit)}</div>
+        <div className="font-varsity max-lg:font-condensed text-xs text-pastel-cream max-lg:text-pressbox-text">{formatCap(player.capHit)}</div>
         {retentionPct > 0 && (
-          <div className="text-[8px] text-pastel-cream/65 font-display">
+          <div className="text-[8px] text-pastel-cream/65 max-lg:text-pressbox-text/65 font-display max-lg:font-barlow">
             net {formatCap(effectiveCap)}
           </div>
         )}
-        <div className="text-[8px] text-pastel-cream/65 font-display">
+        <div className="text-[8px] text-pastel-cream/65 max-lg:text-pressbox-text/65 font-display max-lg:font-barlow">
           {player.yearsRemaining}yr &middot; {player.expiryStatus}
         </div>
       </div>
@@ -681,17 +681,17 @@ function TradeSummaryCard({
         ) : (
           <Shield className="w-8 h-8 text-citrus-sage/50" />
         )}
-        <span className="font-varsity text-base text-pastel-cream">{teamName}</span>
+        <span className="font-varsity max-lg:font-condensed text-base text-pastel-cream max-lg:text-pressbox-text">{teamName}</span>
       </div>
 
       {/* Receives */}
       {receives.length > 0 && (
         <div className="mb-2">
-          <div className="text-[9px] text-green-700 uppercase font-display font-bold tracking-wider mb-1">Acquires</div>
+          <div className="text-[9px] text-green-700 uppercase font-display max-lg:font-barlow font-bold tracking-wider mb-1">Acquires</div>
           {receives.map(p => (
             <div key={p.playerId} className="flex items-center justify-between py-0.5">
-              <span className="text-xs font-display text-pastel-cream">{p.name} <span className="text-pastel-cream/65">({p.position})</span></span>
-              <span className="text-xs font-varsity text-green-700">+{formatCap(p.capHit)}</span>
+              <span className="text-xs font-display max-lg:font-barlow text-pastel-cream max-lg:text-pressbox-text">{p.name} <span className="text-pastel-cream/65 max-lg:text-pressbox-text/65">({p.position})</span></span>
+              <span className="text-xs font-varsity max-lg:font-condensed text-green-700">+{formatCap(p.capHit)}</span>
             </div>
           ))}
         </div>
@@ -700,11 +700,11 @@ function TradeSummaryCard({
       {/* Sends */}
       {sends.length > 0 && (
         <div className="mb-3">
-          <div className="text-[9px] text-red-700 uppercase font-display font-bold tracking-wider mb-1">Sends</div>
+          <div className="text-[9px] text-red-700 uppercase font-display max-lg:font-barlow font-bold tracking-wider mb-1">Sends</div>
           {sends.map(p => (
             <div key={p.playerId} className="flex items-center justify-between py-0.5">
-              <span className="text-xs font-display text-pastel-cream">{p.name} <span className="text-pastel-cream/65">({p.position})</span></span>
-              <span className="text-xs font-varsity text-red-600">-{formatCap(p.capHit)}</span>
+              <span className="text-xs font-display max-lg:font-barlow text-pastel-cream max-lg:text-pressbox-text">{p.name} <span className="text-pastel-cream/65 max-lg:text-pressbox-text/65">({p.position})</span></span>
+              <span className="text-xs font-varsity max-lg:font-condensed text-red-600">-{formatCap(p.capHit)}</span>
             </div>
           ))}
         </div>
@@ -712,7 +712,7 @@ function TradeSummaryCard({
 
       {/* Retention */}
       {retainLabel && retained > 0 && (
-        <div className="px-2 py-1 mb-3 rounded-lg bg-amber-50 border border-amber-200 text-[9px] font-display text-amber-700">
+        <div className="px-2 py-1 mb-3 rounded-lg bg-amber-50 border border-amber-200 text-[9px] font-display max-lg:font-barlow text-amber-700">
           {retainLabel} salary ({formatCap(retained)} dead cap)
         </div>
       )}
@@ -720,22 +720,22 @@ function TradeSummaryCard({
       {/* Cap Impact */}
       <div className="border-t border-citrus-sage/20 pt-3 space-y-1.5">
         <div className="flex justify-between text-xs">
-          <span className="font-display text-pastel-cream/70">Cap Before</span>
-          <span className="font-varsity text-pastel-cream/85">{formatCapFull(capBefore)}</span>
+          <span className="font-display max-lg:font-barlow text-pastel-cream/70 max-lg:text-pressbox-text/70">Cap Before</span>
+          <span className="font-varsity max-lg:font-condensed text-pastel-cream/85 max-lg:text-pressbox-text/85">{formatCapFull(capBefore)}</span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="font-display text-pastel-cream/70">Cap After</span>
-          <span className="font-varsity text-pastel-cream/85">{formatCapFull(capAfter)}</span>
+          <span className="font-display max-lg:font-barlow text-pastel-cream/70 max-lg:text-pressbox-text/70">Cap After</span>
+          <span className="font-varsity max-lg:font-condensed text-pastel-cream/85 max-lg:text-pressbox-text/85">{formatCapFull(capAfter)}</span>
         </div>
         <div className="flex justify-between text-xs font-bold">
-          <span className="font-display text-pastel-cream/70">Net Change</span>
-          <span className={cn("font-varsity", capDelta > 0 ? "text-red-600" : "text-green-600")}>
+          <span className="font-display max-lg:font-barlow text-pastel-cream/70 max-lg:text-pressbox-text/70">Net Change</span>
+          <span className={cn("font-varsity max-lg:font-condensed", capDelta > 0 ? "text-red-600" : "text-green-600")}>
             {capDelta > 0 ? '+' : ''}{formatCap(capDelta)}
           </span>
         </div>
         <div className="flex justify-between text-xs">
-          <span className="font-display font-bold text-pastel-cream">Cap Space</span>
-          <span className={cn("font-varsity font-bold", spaceAfter < 0 ? "text-red-600" : "text-green-600")}>
+          <span className="font-display max-lg:font-barlow font-bold text-pastel-cream max-lg:text-pressbox-text">Cap Space</span>
+          <span className={cn("font-varsity max-lg:font-condensed font-bold", spaceAfter < 0 ? "text-red-600" : "text-green-600")}>
             {formatCap(spaceAfter)}
           </span>
         </div>

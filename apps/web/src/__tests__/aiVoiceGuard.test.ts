@@ -735,46 +735,10 @@ interface Quarantined {
 }
 
 const QUARANTINE: Quarantined[] = [
-  {
-    file: 'server/src/routes/stormy.ts',
-    text: 'Stormy is resting — daily capacity reached. Try again tomorrow!',
-    why: 'User-facing. The daily-cap message Stormy answers with. Two sentences, no dash.',
-  },
-  {
-    file: 'server/src/routes/stormy.ts',
-    text: 'Stormy is busy right now — try again shortly.',
-    why: 'User-facing. The 429 AppError message; the client toasts it verbatim.',
-  },
-  {
-    file: 'server/src/routes/draftV2Offline.ts',
-    text: '— import is only for offline drafts',
-    why: 'User-facing. Tail of the offline_only AppError a commissioner sees on a bad import.',
-  },
-  {
-    file: 'server/src/routes/scheduled.ts',
-    text: '—',
-    why: 'User-facing. Joins the waiver-claim failure reason onto a notification body sent to the manager. A colon reads better than a dash there.',
-  },
-  {
-    file: 'server/src/lib/circuitBreaker.ts',
-    text: '" is OPEN — service unavailable',
-    why: 'CircuitOpenError message. resilientSupabase swaps it for its own copy, but nothing stops another caller surfacing it.',
-  },
-  {
-    file: 'server/src/lib/supabase.ts',
-    text: 'SUPABASE_SERVICE_ROLE_KEY not set — admin client unavailable',
-    why: 'Startup misconfiguration throw. Operator-facing in practice, but it is a thrown Error and not a log call, so the range exclusion cannot see it.',
-  },
-  {
-    file: 'server/src/draft/LobbyManager.ts',
-    text: '[lobby] enqueueAction called before init() — caller MUST await LobbyManager.init() lobbyId=',
-    why: 'Developer-facing. Bound to a const, then both logged and thrown, so it sits outside the logger-call range the exclusion covers.',
-  },
-  {
-    file: 'pages/DraftRoom.tsx',
-    text: '🟢 Your Turn — Citrus Draft',
-    why: 'User-facing browser-tab title, written as "\\u2014" and therefore invisible to this guard until decodeEscapes landed. The sibling title in hooks/useOnClockAlarm.ts now reads "⏰ YOUR PICK · Citrus"; this one wants the same dot.',
-  },
+  // Emptied 2026-09-05: the eight strings recorded here were rewritten in
+  // their files (two sentences, a colon, or the dot the sibling title uses).
+  // Add to this list only with a `why` a reviewer would accept, and remove
+  // the entry in the same PR that fixes the string.
 ];
 
 const QUARANTINED = new Set(QUARANTINE.map((q) => `${q.file}|${q.text}`));

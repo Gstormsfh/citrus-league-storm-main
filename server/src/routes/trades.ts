@@ -56,6 +56,7 @@ tradeRoutes.put(
       trade_review_type: 'none' | 'commissioner' | 'league_vote';
       trade_review_period_hours: number;
       trade_veto_threshold: number;
+      tradeDeadlineWeek?: number;
     }>(c);
     const supabase = createUserClient(c.get('userToken'));
     const service = new TradeService(supabase);

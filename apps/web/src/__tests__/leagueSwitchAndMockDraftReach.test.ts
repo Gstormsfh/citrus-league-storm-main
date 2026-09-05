@@ -58,8 +58,14 @@ const here = dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => readFileSync(resolve(here, rel), 'utf-8');
 
 const NAVBAR = read('../components/Navbar.tsx');
-const MENU = read('../components/MobileMenuButton.tsx');
-const SWITCHERS: Array<[string, string]> = [['Navbar', NAVBAR], ['MobileMenuButton', MENU]];
+// PRESS BOX (2026-09-04): MobileMenuButton is gone. Below lg the switcher is
+// the home screen's league list, the pool tab sets live in MobileBottomNav,
+// and the simulator is a tile in the league menu.
+const HOME = read('../components/home/PressBoxHome.tsx');
+const BOTTOM_NAV = read('../components/MobileBottomNav.tsx');
+const MENU_TILES = read('../components/pressbox/leagueMenuTiles.ts');
+const SWITCHERS: Array<[string, string]> = [['Navbar', NAVBAR]];
+const TAB_SETS: Array<[string, string]> = [['Navbar', NAVBAR], ['MobileBottomNav', BOTTOM_NAV]];
 
 const FANTASY = 'lg-fantasy';
 const POOL = 'lg-pool';
@@ -102,6 +108,10 @@ describe('switching leagues out of the playoff section', () => {
     expect(src).toContain('leagueSwitchDestination(l.id, lType, location.pathname)');
   });
 
+  it('the home league cards route through the same helper', () => {
+    expect(HOME).toContain("leagueSwitchDestination(l.id, fmt.leagueType, '/')");
+  });
+
   it.each(SWITCHERS)('%s no longer carries the self-pin branch', (_name, src) => {
     // The exact shape that made the section inescapable.
     expect(src).not.toMatch(/navigate\(`\/league\/\$\{l\.id\}\/playoffs`\)/);
@@ -115,13 +125,16 @@ describe('the playoff pool navigation has a way out of the pool', () => {
     const at = src.indexOf(`case '${leagueType}':`);
     expect(at, `${leagueType} tab set is missing`).toBeGreaterThan(-1);
     const block = src.slice(at, src.indexOf('];', at));
-    return [...block.matchAll(/path:\s*(?:'([^']+)'|`([^`]+)`)/g)].map((m) => m[1] ?? m[2]);
+    const paths = [...block.matchAll(/path:\s*(?:'([^']+)'|`([^`]+)`)/g)].map((m) => m[1] ?? m[2]);
+    // MobileBottomNav spells its Profile tab as a shared constant.
+    if (/\bprofileTab\b/.test(block)) paths.push('/profile');
+    return paths;
   };
 
   const POOL_TYPES = ['playoff-bracket-pickem', 'playoff-confidence-pool', 'playoff-roster-pool'];
 
   it.each(
-    SWITCHERS.flatMap(([name, src]) => POOL_TYPES.map((t) => [name, t, src] as const)),
+    TAB_SETS.flatMap(([name, src]) => POOL_TYPES.map((t) => [name, t, src] as const)),
   )('%s / %s offers a destination outside the pool', (_name, type, src) => {
     const paths = tabPaths(src, type);
     expect(paths.length).toBeGreaterThan(0);
@@ -141,6 +154,10 @@ describe('a manager inside a league can still reach a mock draft', () => {
 
   it.each(SWITCHERS)('%s links the simulator from inside a fantasy league', (_name, src) => {
     expect(fantasyTabs(src)).toContain(MOCK_DRAFT);
+  });
+
+  it('the league menu carries the simulator tile on a phone', () => {
+    expect(MENU_TILES).toContain(`to: '${MOCK_DRAFT}'`);
   });
 
   it('the simulator route is still public and still ungated', () => {

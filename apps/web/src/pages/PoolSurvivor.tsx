@@ -3,6 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
+import { PressBoxPageLoading } from '@/components/pressbox/PageLoading';
+import { PressBoxTabs } from '@/components/pressbox/Tabs';
+import { PB_TYPE } from '@/components/pressbox/rowScale';
+import { PressBoxTeamMark } from '@/components/pressbox/TeamMark';
+import { cn } from '@/lib/utils';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -109,16 +115,26 @@ const PoolSurvivor = () => {
 
   if (loading) return (
     <DarkLayout>
-      <Navbar />
-      <StormyLoading message="Loading Survivor Pool..." />
+      <div className="hidden lg:block"><Navbar /></div>
+      <PressBoxPageLoading kind="list" message="Loading Survivor Pool..." />
     </DarkLayout>
   );
 
   return (
     <DarkLayout>
-      <Navbar />
+      {/* PRESS BOX (2026-09-05): the league chrome on the phone -- crest,
+          name, the week from the header's own chevrons -- and the desktop's
+          Navbar from `lg`. No Match/Team/Players/League axis in a pool, so
+          the sub-tab strip is off and the page's own strip follows the hero. */}
+      <div className="hidden lg:block"><Navbar /></div>
+      <PressBoxLeagueChrome
+        showSubTabs={false}
+        weekLabel={`WK ${currentWeek}`}
+        onWeekPrev={currentWeek > 1 ? () => setCurrentWeek((w) => Math.max(1, w - 1)) : null}
+        onWeekNext={() => setCurrentWeek((w) => w + 1)}
+      />
 
-      <main className="w-full pt-20 lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))]">
+      <main className={cn(PB_TYPE, 'w-full max-lg:pt-0 pt-20 lg:pt-24 lg:pb-8 pb-app-chrome max-lg:font-barlow')}>
         <div className="flex lg:gap-0">
         <div className="flex-1 min-w-0 px-3 sm:px-4 lg:px-8 xl:px-12">
           {userLeagueState === 'logged-in-no-league' && (
@@ -128,7 +144,7 @@ const PoolSurvivor = () => {
           )}
 
           {/* Hero banner — mascot acting in domain */}
-          <div className="relative mb-6 mt-4 w-full aspect-[21/9] sm:aspect-[24/9] rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
+          <div className="relative mb-6 max-lg:mb-3 mt-4 max-lg:mt-3 w-full aspect-[21/9] sm:aspect-[24/9] rounded-2xl max-lg:rounded-[12px] overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
             <img
               src="/mascots/scene-survivor.webp"
               alt="Kiwi alone in the spotlight, last one standing"
@@ -141,32 +157,40 @@ const PoolSurvivor = () => {
               style={{ background: 'linear-gradient(to top, rgba(15,31,21,0.85) 0%, transparent 45%)' }}
             />
             <div className="absolute bottom-4 left-5 sm:bottom-6 sm:left-8 z-10 max-w-[80%]">
-              <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-1.5 font-bold flex items-center gap-2">
+              <div className="font-jbmono max-lg:font-plex text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft max-lg:text-pressbox-orange-soft mb-1.5 font-bold flex items-center gap-2">
                 <SurvivorIcon className="w-3 h-3" /> Survivor Pool
               </div>
-              <h1 className="font-sans font-black text-[1.5rem] sm:text-[2rem] md:text-[2.5rem] tracking-[-0.025em] text-pastel-cream leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
-                One pick a week. <span className="text-pastel-orange">Don't lose.</span>
+              <h1 className="font-sans max-lg:font-condensed font-black max-lg:font-bold max-lg:uppercase max-lg:tracking-[0.02em] text-[1.5rem] max-lg:text-[22px] sm:text-[2rem] md:text-[2.5rem] tracking-[-0.025em] text-pastel-cream max-lg:text-pressbox-text leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+                One pick a week. <span className="text-pastel-orange max-lg:text-pressbox-orange">Don't lose.</span>
               </h1>
             </div>
           </div>
 
           {/* Header */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 sticky top-[92px] z-section-header bg-[#0F1F15]/95 backdrop-blur-md py-2 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
+          <PressBoxTabs
+            className="lg:hidden mb-3"
+            label="Pool view"
+            fill
+            activeKey={activeTab}
+            onSelect={setActiveTab}
+            tabs={[{ key: 'pick', label: 'My pick' }, { key: 'standings', label: 'Standings' }, { key: 'history', label: 'History' }, { key: 'league', label: 'League' }]}
+          />
+          <div className="max-lg:hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 sticky top-[92px] z-section-header bg-[#0F1F15]/95 max-lg:bg-pressbox-surface/95 backdrop-blur-md py-2 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
             <div className="flex items-center gap-2">
-              <div className="flex items-center bg-[#1A2A20] rounded-md ring-1 ring-white/10 overflow-hidden">
-                <Button variant="ghost" size="icon" aria-label="Previous week" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
+              <div className="flex items-center bg-[#1A2A20] max-lg:bg-pressbox-tile rounded-md ring-1 ring-white/10 overflow-hidden">
+                <Button variant="ghost" size="icon" aria-label="Previous week" className="h-8 w-8 rounded-none text-pastel-cream max-lg:text-pressbox-text hover:text-pastel-orange hover:max-lg:text-pressbox-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
                   <ChevronLeft className="w-4 h-4" aria-hidden="true" />
                 </Button>
                 <div className="px-3 text-center border-x border-white/10">
-                  <div className="text-[9px] font-jbmono text-white/55 uppercase tracking-widest leading-none">Week</div>
-                  <div className="text-base font-bold text-pastel-cream leading-none tabular-nums">{currentWeek}</div>
+                  <div className="text-[9px] font-jbmono max-lg:font-plex text-white/55 uppercase tracking-widest leading-none">Week</div>
+                  <div className="text-base font-bold text-pastel-cream max-lg:text-pressbox-text leading-none tabular-nums">{currentWeek}</div>
                 </div>
-                <Button variant="ghost" size="icon" aria-label="Next week" className="h-8 w-8 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
+                <Button variant="ghost" size="icon" aria-label="Next week" className="h-8 w-8 rounded-none text-pastel-cream max-lg:text-pressbox-text hover:text-pastel-orange hover:max-lg:text-pressbox-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
                   <ChevronRight className="w-4 h-4" aria-hidden="true" />
                 </Button>
               </div>
               {isEliminated && (
-                <Badge className="ml-2 bg-red-500/20 text-red-300 border border-red-500/40 font-jbmono text-[10px] uppercase tracking-wider">
+                <Badge className="ml-2 bg-red-500/20 text-red-300 border border-red-500/40 font-jbmono max-lg:font-plex text-[10px] uppercase tracking-wider">
                   <Skull className="w-3 h-3 mr-1" aria-hidden="true" /> Eliminated
                 </Badge>
               )}
@@ -176,11 +200,11 @@ const PoolSurvivor = () => {
                 <InvitePlayersButton joinCode={activeLeague.join_code} leagueName={activeLeague.name} />
               )}
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-                <TabsList className="bg-[#1A2A20] h-9 ring-1 ring-white/10">
-                  <TabsTrigger value="pick" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] text-white/70">My Pick</TabsTrigger>
-                  <TabsTrigger value="standings" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] text-white/70">Standings</TabsTrigger>
-                  <TabsTrigger value="history" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] text-white/70">History</TabsTrigger>
-                  <TabsTrigger value="league" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] text-white/70">League</TabsTrigger>
+                <TabsList className="bg-[#1A2A20] max-lg:bg-pressbox-tile h-9 ring-1 ring-white/10">
+                  <TabsTrigger value="pick" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:max-lg:bg-pressbox-orange data-[state=active]:text-[#581E00] data-[state=active]:max-lg:text-pressbox-orange-ink text-white/70">My Pick</TabsTrigger>
+                  <TabsTrigger value="standings" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:max-lg:bg-pressbox-orange data-[state=active]:text-[#581E00] data-[state=active]:max-lg:text-pressbox-orange-ink text-white/70">Standings</TabsTrigger>
+                  <TabsTrigger value="history" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:max-lg:bg-pressbox-orange data-[state=active]:text-[#581E00] data-[state=active]:max-lg:text-pressbox-orange-ink text-white/70">History</TabsTrigger>
+                  <TabsTrigger value="league" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:max-lg:bg-pressbox-orange data-[state=active]:text-[#581E00] data-[state=active]:max-lg:text-pressbox-orange-ink text-white/70">League</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -193,8 +217,8 @@ const PoolSurvivor = () => {
                 <GlowCard accent="orange" className="max-w-xl mx-auto">
                   <div className="py-16 text-center">
                     <Skull className="w-16 h-16 mx-auto mb-4 text-red-400/60" aria-hidden="true" />
-                    <h3 className="font-sans font-black text-[1.75rem] tracking-[-0.025em] text-pastel-cream mb-2">
-                      You've been <span className="text-pastel-orange">eliminated</span>.
+                    <h3 className="font-sans max-lg:font-barlow font-black text-[1.75rem] tracking-[-0.025em] text-pastel-cream max-lg:text-pressbox-text mb-2">
+                      You've been <span className="text-pastel-orange max-lg:text-pressbox-orange">eliminated</span>.
                     </h3>
                     <p className="text-[14px] text-white/55">Better luck next season. The Squad's still on the bench.</p>
                   </div>
@@ -213,11 +237,11 @@ const PoolSurvivor = () => {
                       return (
                         <button
                           key={team}
-                          className={`relative rounded-xl flex flex-col items-center justify-center py-3 gap-1 transition-all duration-200 ring-1 ${
-                            isSelected ? 'scale-105 text-white ring-2 ring-white/40 shadow-[0_8px_24px_-12px_rgba(255,107,26,0.5)]'
+                          className={`relative rounded-xl max-lg:rounded-[12px] flex flex-col items-center justify-center py-3 gap-1 transition-all duration-200 ring-1 ${
+                            isSelected ? 'scale-105 max-lg:scale-100 text-white ring-2 ring-white/40 max-lg:ring-pressbox-orange shadow-[0_8px_24px_-12px_rgba(255,107,26,0.5)]'
                             : isUsed ? 'opacity-25 cursor-not-allowed grayscale ring-white/10 bg-white/5'
                             : isLocked ? 'opacity-40 cursor-not-allowed ring-white/10 bg-white/5'
-                            : 'bg-[#1A2A20] ring-white/10 hover:ring-pastel-orange/50 hover:scale-[1.02] hover:shadow-[0_8px_24px_-12px_rgba(255,107,26,0.3)]'
+                            : 'bg-[#1A2A20] max-lg:bg-pressbox-tile ring-white/10 hover:ring-pastel-orange/50 hover:max-lg:ring-pressbox-orange/50 hover:scale-[1.02] hover:shadow-[0_8px_24px_-12px_rgba(255,107,26,0.3)]'
                           }`}
                           style={isSelected ? {
                             background: info.primaryColor,
@@ -226,9 +250,10 @@ const PoolSurvivor = () => {
                           disabled={isDisabled}
                           onClick={() => setSelectedTeam(isSelected ? null : team)}
                         >
-                          {/* Monogram */}
+                          {/* The crest on the phone; the monogram from lg. A used team's crest fades with the tile. */}
+                          <PressBoxTeamMark abbrev={team} size="md" label={info.fullName} className="lg:hidden" />
                           <div
-                            className={`w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs tracking-wide shadow-sm ${
+                            className={`max-lg:hidden w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs tracking-wide shadow-sm ${
                               isSelected ? 'bg-white/20 text-white' : isUsed ? 'bg-white/10 text-white/55' : 'text-white'
                             }`}
                             style={!isSelected && !isUsed ? { background: info.primaryColor, color: onTeamColor(info.primaryColor) } : {}}
@@ -237,12 +262,12 @@ const PoolSurvivor = () => {
                           </div>
                           {/* Team name + record */}
                           <span className={`text-[10px] font-bold leading-tight ${
-                            isSelected ? 'text-white/95' : isUsed ? 'text-white/55 line-through' : 'text-pastel-cream'
+                            isSelected ? 'text-white/95' : isUsed ? 'text-white/55 line-through' : 'text-pastel-cream max-lg:text-pressbox-text'
                           }`}>
                             {info.name}
                           </span>
                           {records[team] && !isUsed && (
-                            <span className={`text-[8px] font-jbmono leading-none tabular-nums ${
+                            <span className={`text-[8px] font-jbmono max-lg:font-plex leading-none tabular-nums ${
                               isSelected ? 'text-white/65' : 'text-white/55'
                             }`}>
                               {records[team].w}-{records[team].l}-{records[team].otl}
@@ -258,7 +283,7 @@ const PoolSurvivor = () => {
                   {/* Used teams chips */}
                   {usedTeams.length > 0 && (
                     <div className="mb-4 flex flex-wrap items-center gap-1.5">
-                      <span className="font-jbmono text-[10px] uppercase tracking-wider text-white/55 mr-1">Previously used:</span>
+                      <span className="font-jbmono max-lg:font-plex text-[10px] uppercase tracking-wider text-white/55 mr-1">Previously used:</span>
                       {usedTeams.map(t => {
                         const info = getInfo(t);
                         return (
@@ -272,11 +297,11 @@ const PoolSurvivor = () => {
                   )}
 
                   {/* Submit bar */}
-                  <div className="sticky bottom-20 lg:bottom-4 bg-[#1A2A20]/95 backdrop-blur-md ring-1 ring-pastel-orange/30 rounded-2xl py-3 px-4 flex items-center justify-between shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)]">
-                    <span className="text-[13px] text-pastel-cream">
+                  <div className="sticky bottom-20 lg:bottom-4 bg-[#1A2A20]/95 max-lg:bg-pressbox-tile/95 backdrop-blur-md ring-1 ring-pastel-orange/30 max-lg:ring-pressbox-orange/30 rounded-2xl max-lg:rounded-[12px] py-3 px-4 flex items-center justify-between shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)]">
+                    <span className="text-[13px] text-pastel-cream max-lg:text-pressbox-text">
                       {selectedTeam ? (
                         <span className="flex items-center gap-2">
-                          <span className="font-jbmono text-[10px] uppercase tracking-wider text-white/55">Selected:</span>
+                          <span className="font-jbmono max-lg:font-plex text-[10px] uppercase tracking-wider text-white/55">Selected:</span>
                           <span className="inline-flex items-center gap-1.5 font-bold text-white px-2.5 py-0.5 rounded-md text-xs"
                             style={{ background: getInfo(selectedTeam).primaryColor, color: onTeamColor(getInfo(selectedTeam).primaryColor) }}>
                             {selectedTeam} {getInfo(selectedTeam).name}
@@ -284,7 +309,7 @@ const PoolSurvivor = () => {
                         </span>
                       ) : <span className="text-white/55">Tap a team to make your pick</span>}
                     </span>
-                    <Button onClick={handleSubmitPick} disabled={!selectedTeam || submitting} className="font-bold uppercase tracking-wider bg-pastel-orange hover:bg-pastel-orange-soft text-white border-0 active:scale-95 transition-all">
+                    <Button onClick={handleSubmitPick} disabled={!selectedTeam || submitting} className="font-bold uppercase tracking-wider bg-pastel-orange max-lg:bg-pressbox-orange hover:bg-pastel-orange-soft hover:max-lg:bg-pressbox-orange-soft text-white border-0 active:scale-95 transition-all">
                       {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
                       Lock In Pick
                     </Button>
@@ -300,11 +325,11 @@ const PoolSurvivor = () => {
               <div>
                 {standings.length === 0 ? (
                   <div className="text-center py-16">
-                    <SurvivorIcon className="w-12 h-12 mx-auto mb-4 text-pastel-orange-soft/60" />
-                    <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-2">
+                    <SurvivorIcon className="w-12 h-12 mx-auto mb-4 text-pastel-orange-soft/60 max-lg:text-pressbox-orange-soft/60" />
+                    <div className="font-jbmono max-lg:font-plex text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-bold mb-2">
                       ✦ Everyone's still alive
                     </div>
-                    <p className="font-bold text-pastel-cream text-base">Standings light up after the first slate wraps.</p>
+                    <p className="font-bold text-pastel-cream max-lg:text-pressbox-text text-base">Standings light up after the first slate wraps.</p>
                     <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Lock in your team before puck drops. One wrong pick and you're out.</p>
                   </div>
                 ) : (
@@ -312,37 +337,37 @@ const PoolSurvivor = () => {
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-black/20 border-white/10 hover:bg-black/20">
-                          <TableHead className="w-12 text-center text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">#</TableHead>
-                          <TableHead className="text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">Player</TableHead>
-                          <TableHead className="text-center text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">Status</TableHead>
-                          <TableHead className="text-center hidden sm:table-cell text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">Lives</TableHead>
-                          <TableHead className="text-center text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">Survived</TableHead>
-                          <TableHead className="text-right hidden sm:table-cell text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">Pick</TableHead>
+                          <TableHead className="w-12 text-center text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-jbmono max-lg:font-plex uppercase text-[10px] tracking-wider">#</TableHead>
+                          <TableHead className="text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-jbmono max-lg:font-plex uppercase text-[10px] tracking-wider">Player</TableHead>
+                          <TableHead className="text-center text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-jbmono max-lg:font-plex uppercase text-[10px] tracking-wider">Status</TableHead>
+                          <TableHead className="text-center hidden sm:table-cell text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-jbmono max-lg:font-plex uppercase text-[10px] tracking-wider">Lives</TableHead>
+                          <TableHead className="text-center text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-jbmono max-lg:font-plex uppercase text-[10px] tracking-wider">Survived</TableHead>
+                          <TableHead className="text-right hidden sm:table-cell text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-jbmono max-lg:font-plex uppercase text-[10px] tracking-wider">Pick</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {standings.map((s, i) => (
-                          <TableRow key={s.user_id} className={`border-white/5 hover:bg-white/5 transition-colors ${s.user_id === user?.id ? 'bg-pastel-orange/10' : ''}`}>
+                          <TableRow key={s.user_id} className={`border-white/5 hover:bg-white/5 transition-colors ${s.user_id === user?.id ? 'bg-pastel-orange/10 max-lg:bg-pressbox-orange/10' : ''}`}>
                             <TableCell className="text-center">
                               <span className={`inline-flex w-7 h-7 rounded-full items-center justify-center text-xs font-bold ${
-                                !s.is_eliminated ? 'bg-pastel-sage text-[#0F1F15]' : 'bg-red-500/30 text-red-300'
+                                !s.is_eliminated ? 'bg-pastel-sage max-lg:bg-pressbox-sage text-[#0F1F15]' : 'bg-red-500/30 text-red-300'
                               }`}>{i + 1}</span>
                             </TableCell>
-                            <TableCell className="font-bold text-pastel-cream">
+                            <TableCell className="font-bold text-pastel-cream max-lg:text-pressbox-text">
                               {s.display_name}
-                              {s.user_id === user?.id && <Badge variant="outline" className="ml-2 text-[9px] font-jbmono uppercase tracking-wider border-pastel-orange text-pastel-orange-soft">YOU</Badge>}
+                              {s.user_id === user?.id && <Badge variant="outline" className="ml-2 text-[9px] font-jbmono max-lg:font-plex uppercase tracking-wider border-pastel-orange max-lg:border-pressbox-orange text-pastel-orange-soft max-lg:text-pressbox-orange-soft">YOU</Badge>}
                             </TableCell>
                             <TableCell className="text-center">
                               {s.is_eliminated
-                                ? <Badge className="text-[10px] bg-red-500/20 text-red-300 border border-red-500/40 font-jbmono uppercase tracking-wider"><Skull className="w-3 h-3 mr-0.5" aria-hidden="true" /> Out</Badge>
-                                : <Badge className="text-[10px] bg-pastel-sage/20 text-pastel-sage-soft border border-pastel-sage/40 font-jbmono uppercase tracking-wider"><Heart className="w-3 h-3 mr-0.5" aria-hidden="true" /> Alive</Badge>}
+                                ? <Badge className="text-[10px] bg-red-500/20 text-red-300 border border-red-500/40 font-jbmono max-lg:font-plex uppercase tracking-wider"><Skull className="w-3 h-3 mr-0.5" aria-hidden="true" /> Out</Badge>
+                                : <Badge className="text-[10px] bg-pastel-sage/20 max-lg:bg-pressbox-sage/20 text-pastel-sage-soft border border-pastel-sage/40 font-jbmono max-lg:font-plex uppercase tracking-wider"><Heart className="w-3 h-3 mr-0.5" aria-hidden="true" /> Alive</Badge>}
                             </TableCell>
                             <TableCell className="text-center hidden sm:table-cell">
                               {Array.from({ length: s.lives_remaining }).map((_, j) => (
-                                <Heart key={j} className="w-3.5 h-3.5 inline text-pastel-orange fill-pastel-orange" />
+                                <Heart key={j} className="w-3.5 h-3.5 inline text-pastel-orange max-lg:text-pressbox-orange fill-pastel-orange" />
                               ))}
                             </TableCell>
-                            <TableCell className="text-center font-bold text-pastel-cream tabular-nums">{s.teams_used.length} wks</TableCell>
+                            <TableCell className="text-center font-bold text-pastel-cream max-lg:text-pressbox-text tabular-nums">{s.teams_used.length} wks</TableCell>
                             <TableCell className="text-right hidden sm:table-cell">
                               {s.current_pick ? (
                                 <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-md text-white"
@@ -367,11 +392,11 @@ const PoolSurvivor = () => {
               {pickHistory.length === 0 ? (
                 <GlowCard accent="orange">
                   <div className="py-16 text-center">
-                    <SurvivorIcon className="w-12 h-12 mx-auto mb-4 text-pastel-orange-soft/60" />
-                    <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-2">
+                    <SurvivorIcon className="w-12 h-12 mx-auto mb-4 text-pastel-orange-soft/60 max-lg:text-pressbox-orange-soft/60" />
+                    <div className="font-jbmono max-lg:font-plex text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-bold mb-2">
                       ✦ Ready when you are
                     </div>
-                    <p className="font-bold text-pastel-cream text-base">Your pick history is empty.</p>
+                    <p className="font-bold text-pastel-cream max-lg:text-pressbox-text text-base">Your pick history is empty.</p>
                     <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Head to the Picks tab and lock in this week's team. Every choice you make lands here.</p>
                     <button
                       type="button"
@@ -380,7 +405,7 @@ const PoolSurvivor = () => {
                       // this CTA used to blank the content pane and
                       // de-highlight every tab. (2026-08-18 audit)
                       onClick={() => setActiveTab('pick')}
-                      className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-pastel-orange text-[#581E00] text-sm font-bold hover:bg-pastel-orange-soft transition-colors"
+                      className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-pastel-orange max-lg:bg-pressbox-orange text-[#581E00] max-lg:text-pressbox-orange-ink text-sm font-bold hover:bg-pastel-orange-soft hover:max-lg:bg-pressbox-orange-soft transition-colors"
                     >
                       Make your pick →
                     </button>
@@ -392,16 +417,16 @@ const PoolSurvivor = () => {
                     const info = getInfo(pick.team);
                     const ringClass = pick.is_correct === true ? 'ring-pastel-sage/40' : pick.is_correct === false ? 'ring-red-500/40' : 'ring-white/10';
                     return (
-                      <div key={pick.week} className={`flex items-center gap-3 p-3 rounded-xl bg-[#1A2A20] ring-1 ${ringClass} hover:ring-pastel-orange/40 transition-all`}>
-                        <Badge variant="outline" className="text-[10px] font-jbmono shrink-0 w-14 justify-center border-white/15 text-white/55 uppercase tracking-wider">Wk {pick.week}</Badge>
+                      <div key={pick.week} className={`flex items-center gap-3 p-3 rounded-xl bg-[#1A2A20] max-lg:bg-pressbox-tile ring-1 ${ringClass} hover:ring-pastel-orange/40 hover:max-lg:ring-pressbox-orange/40 transition-all`}>
+                        <Badge variant="outline" className="text-[10px] font-jbmono max-lg:font-plex shrink-0 w-14 justify-center border-white/15 text-white/55 uppercase tracking-wider">Wk {pick.week}</Badge>
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs text-white shadow-sm shrink-0"
                           style={{ background: info.primaryColor }}>
                           {pick.team}
                         </div>
-                        <span className="font-bold text-sm text-pastel-cream flex-1">{info.fullName}</span>
-                        {pick.is_correct === true && <CheckCircle2 className="w-5 h-5 text-pastel-sage shrink-0" aria-hidden="true" />}
+                        <span className="font-bold text-sm text-pastel-cream max-lg:text-pressbox-text flex-1">{info.fullName}</span>
+                        {pick.is_correct === true && <CheckCircle2 className="w-5 h-5 text-pastel-sage max-lg:text-pressbox-sage shrink-0" aria-hidden="true" />}
                         {pick.is_correct === false && <XCircle className="w-5 h-5 text-red-400 shrink-0" aria-hidden="true" />}
-                        {pick.is_correct === null && <span className="font-jbmono text-[10px] uppercase tracking-wider text-white/55 shrink-0">Pending</span>}
+                        {pick.is_correct === null && <span className="font-jbmono max-lg:font-plex text-[10px] uppercase tracking-wider text-white/55 shrink-0">Pending</span>}
                       </div>
                     );
                   })}

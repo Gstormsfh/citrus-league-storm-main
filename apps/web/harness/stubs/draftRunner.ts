@@ -9,6 +9,8 @@
 import { snakeMatrix, TEAMS, ROUNDS, PLAYERS } from './draftFixtures';
 
 const MATRIX = snakeMatrix(ROUNDS);
+/** The auction knob's nominated player: the next name in the pool after the picks in the book. */
+const PLAYERS_FOR_AUCTION = [Number(PLAYERS[Number(new URLSearchParams(location.search).get('picks') ?? 5)].id)];
 
 /** How many picks are already in the book when the room opens. */
 const PRE_PICKS = Number(new URLSearchParams(location.search).get('picks') ?? 5);
@@ -40,13 +42,63 @@ export class DraftClientRunner {
 
   connect(_params: unknown, callbacks: Record<string, unknown> = {}) {
     this.cbs = callbacks as never;
+    // `?lobby=1`: the draft has not been started -- discovery answered
+    // DRAFT_NOT_CONNECTABLE / not_started -- so the room shows the lobby.
+    if (new URLSearchParams(location.search).get('lobby') === '1') {
+      queueMicrotask(() => {
+        this.set({ kind: 'reconnecting', nextAttemptAt: Date.now() + 3000, attempt: 0, lastError: null, waitingForStart: true });
+      });
+      return;
+    }
     const deadline = new Date(Date.now() + CLOCK_SECONDS * 1000).toISOString();
-    const recentEvents = Array.from({ length: PRE_PICKS }, (_, i) => pickEvent(i + 1));
+    const AUCTION = new URLSearchParams(location.search).get('format') === 'auction';
+    /**
+     * A real seed carries the `draft_started` event, and the store reads the
+     * pick clock's limit off it (Entry 87 Fix C). Without it the harness
+     * room ran with `pickTimeLimitSec` null: the timer unclamped, and the
+     * off-clock bar's `≤ n MIN` ceiling missing. Seq 0 so it folds as a
+     * no-op ahead of the picks.
+     */
+    const started = {
+      kind: 'draft_started' as const,
+      seq: 0,
+      timestamp: '2026-09-28T18:00:00.000Z',
+      correlationId: 'harness-start',
+      startedAt: '2026-09-28T18:00:00.000Z',
+      firstPickDeadline: '2026-09-28T18:00:30.000Z',
+      totalRounds: ROUNDS,
+      totalTeams: TEAMS.length,
+      pickTimeLimitSeconds: CLOCK_SECONDS,
+      draftFormat: (AUCTION ? 'auction' : 'snake') as 'snake' | 'auction',
+    };
+    /**
+     * `?format=auction` (2026-09-05): the same room with the engine's
+     * auction state -- a nomination on the clock with a leading bid, every
+     * team's budget and open slots -- so the AuctionPanel can be looked at
+     * on a phone. The figures are fixtures and say so here.
+     */
+    const auctionState = AUCTION
+      ? {
+          currentNomination: {
+            nominationId: 'harness-nom-1',
+            playerId: String(PLAYERS_FOR_AUCTION[0]),
+            nominatorTeamId: TEAMS[1].id,
+            leadingBid: 23,
+            leadingBidderId: TEAMS[2].id,
+            clockDeadline: new Date(Date.now() + 18_000).toISOString(),
+          },
+          teamBudgets: Object.fromEntries(TEAMS.map((t, i) => [t.id, 200 - i * 7])),
+          teamRosterSlotsRemaining: Object.fromEntries(TEAMS.map((t, i) => [t.id, ROUNDS - (i % 3)])),
+          nominationsCompleted: PRE_PICKS,
+        }
+      : undefined;
+    const recentEvents = [started, ...Array.from({ length: PRE_PICKS }, (_, i) => pickEvent(i + 1))];
     const next = MATRIX[PRE_PICKS];
     queueMicrotask(() => {
       this.cbs.onSnapshot?.({
         lobbyId: 'harness-lobby',
-        format: 'snake',
+        format: AUCTION ? 'auction' : 'snake',
+        auctionState,
         recentEvents,
         stateSnapshot: {
           currentPickNumber: next.pickNumber,

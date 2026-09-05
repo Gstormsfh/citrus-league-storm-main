@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from "react";
+import React, { Suspense, lazy, useEffect } from "react";
 import { CitrusToaster } from "@/components/notifications/CitrusToaster";
 import { logger } from '@/utils/logger';
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -12,7 +12,9 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { StormyChatBubble } from "./components/StormyChatBubble";
 import MobileBottomNav from "./components/MobileBottomNav";
 import NativeBootSplash from "./components/NativeBootSplash";
+import { reportBootStage } from "@/lib/bootStages";
 import { LeagueLoadErrorBanner } from "./components/LeagueLoadErrorBanner";
+import { TermsGate } from "./components/TermsGate";
 import { CookieConsent } from "./components/CookieConsent";
 import ScrollToTop from "./components/ScrollToTop";
 import PushDeepLink from "./components/PushDeepLink";
@@ -134,6 +136,18 @@ const PreviewDashboardPrimitives = lazyWithErrorHandling(() => import("./pages/P
 // Use the picturesque LoadingScreen as the Suspense fallback for lazy-loaded routes
 const PageLoader = () => <LoadingScreen />;
 
+/**
+ * The boot splash's last stage (PR3): the first route's chunk has resolved
+ * and painted. Sits inside the same Suspense boundary as <Routes>, so it
+ * cannot mount until the route it shares the boundary with has.
+ */
+const BootPaintReporter = () => {
+  useEffect(() => {
+    reportBootStage('paint');
+  }, []);
+  return null;
+};
+
 // ===================================================================
 // EGRESS OPTIMIZATION: React Query Caching Configuration
 // ===================================================================
@@ -189,6 +203,9 @@ const App = () => {
                     silently became "you have no leagues, create one".
                     Mounted here so every page inherits it. */}
                 <LeagueLoadErrorBanner />
+                {/* Terms sign-off (2026-09-05): one sheet, once, on the
+                    first session a policy is due. See lib/consent.ts. */}
+                <TermsGate />
                 <Suspense fallback={<PageLoader />}>
                   <main id="main-content">
                   <Routes>
@@ -286,6 +303,7 @@ const App = () => {
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
+                  <BootPaintReporter />
                   </main>
             </Suspense>
             <StormyChatBubble />

@@ -5,10 +5,12 @@ import { logger } from '@citrus/shared';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 import { Badge } from '@/components/ui/badge';
-import { Trophy } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Trophy, MessageCircle, ArrowLeftRight, UserPlus, BarChart3, ClipboardList, CalendarDays, Target, Lock } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { PB_TYPE, PressBoxSectionHead, PressBoxSettingGroup, PressBoxSettingRow, PressBoxTile } from '@/components/pressbox';
 import {
   HockeyFooter,
   StormyChatTile,
@@ -114,6 +116,22 @@ const getPoolActions = (leagueType: string, leagueId: string): GMAction[] => [
   },
 ];
 
+/**
+ * PRESS BOX (2026-09-04): the phone's tile glyphs. The desktop cards wear
+ * the custom hockey SVGs; PressBoxTile takes a Lucide icon, the same set
+ * the league menu draws, so the office reads as the menu's cousin.
+ */
+const PHONE_ICON: Record<string, LucideIcon> = {
+  'Stormy AI Assistant': MessageCircle,
+  'Make a Trade': ArrowLeftRight,
+  'Free Agents': UserPlus,
+  'Team Analytics': BarChart3,
+  'Waiver Wire': ClipboardList,
+  'Lineup Manager': CalendarDays,
+  'Make Picks': Target,
+  Standings: Trophy,
+};
+
 const chipClasses = {
   orange: 'bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft',
   sage: 'bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-sage-soft',
@@ -122,6 +140,7 @@ const chipClasses = {
 
 const GMOffice = () => {
   const { userLeagueState, activeLeagueId, activeLeagueFormat } = useLeague();
+  const navigate = useNavigate();
   const leagueType = activeLeagueFormat?.leagueType;
   const isPool = isPoolLeague(leagueType) && !!activeLeagueId;
   const actions = isPool ? getPoolActions(leagueType!, activeLeagueId!) : gmActions;
@@ -164,15 +183,79 @@ const GMOffice = () => {
       </div>
 
       {/* MOBILE: Compact sticky header */}
-      <div className="lg:hidden sticky top-0 z-page-header bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">GM's Office</h1>
-          <MobileMenuButton />
+      {/* PRESS BOX (2026-09-04): the league chrome — header, sub-tabs and
+          the league menu — replaces the 09-01 title bar and its hamburger,
+          which opened the old menu sheet. One menu in the app. */}
+      <PressBoxLeagueChrome />
+
+      {/* PRESS BOX (2026-09-04): below lg the office is the league menu's
+          cousin — the season's state as rows, then the six actions as
+          tiles, a locked one at half strength with the lock. The desktop
+          main is unchanged from lg. */}
+      <div className={`${PB_TYPE} lg:hidden bg-pressbox-surface text-pressbox-text px-3.5 pt-3 pb-app-chrome`} data-testid="gm-office-phone">
+        {isGuestMode(userLeagueState) && (
+          <div className="mb-3">
+            <LeagueCreationCTA
+              title="You're viewing demo GM Office"
+              description="Sign up to access all GM tools and manage your team."
+              variant="compact"
+            />
+          </div>
+        )}
+        {(playoffChampion.status === 'completed' || playoffChampion.status === 'in_progress' || seasonComplete) && activeLeagueId && (
+          <PressBoxSettingGroup className="mb-4" label="THE SEASON">
+            {playoffChampion.status === 'completed' && (
+              <PressBoxSettingRow
+                label={`${playoffChampion.championTeamName}, league champion`}
+                help="The bracket, as it finished"
+                value="Bracket"
+                onPress={() => navigate(`/league/${activeLeagueId}/playoffs`)}
+                last={!seasonComplete}
+              />
+            )}
+            {playoffChampion.status === 'in_progress' && (
+              <PressBoxSettingRow
+                label="Playoffs in progress"
+                help="The bracket, live"
+                value="Bracket"
+                onPress={() => navigate(`/league/${activeLeagueId}/playoffs`)}
+                last={!seasonComplete}
+              />
+            )}
+            {seasonComplete && (
+              <PressBoxSettingRow label="Season complete" help="Rosters are locked" value="Read only" last />
+            )}
+          </PressBoxSettingGroup>
+        )}
+
+        <PressBoxSectionHead title="GM office" count={String(actions.length)} />
+        <div className="mt-2 grid grid-cols-2 gap-1.5" data-testid="gm-office-phone-tiles">
+          {actions.map((action) => {
+            const isLocked = seasonComplete && LOCKED_ACTION_TITLES.has(action.title);
+            const Icon = PHONE_ICON[action.title] ?? Target;
+            const title = action.title.replace(' AI Assistant', '');
+            if (isLocked) {
+              return (
+                <div
+                  key={action.title}
+                  data-testid="gm-office-phone-locked"
+                  className="flex flex-col min-h-[88px] p-3 rounded-[14px] bg-pressbox-tile border border-white/[0.08] opacity-50"
+                >
+                  <Lock className="w-[18px] h-[18px] text-pressbox-text/60" aria-hidden="true" />
+                  <span className="block mt-auto font-barlow font-bold text-[15px] text-pressbox-text">{title}</span>
+                  <span className="block mt-0.5 font-barlow text-[11px] text-pressbox-text/55">Locked for the season</span>
+                </div>
+              );
+            }
+            // The desktop card's one-line description as the tile's line
+            // (2026-09-05): a tile with a title alone said nothing about
+            // whether to open it. A label, not a figure.
+            return <PressBoxTile key={action.title} title={title} to={action.link} Icon={Icon} stat={action.description} />;
+          })}
         </div>
       </div>
 
-      <main className="w-full lg:pt-24 lg:pb-8 pb-[calc(5rem+env(safe-area-inset-bottom))] m-0 p-0 relative z-10">
+      <main className="hidden lg:block w-full lg:pt-24 lg:pb-8 m-0 p-0 relative z-10">
         <div className="w-full m-0 p-0">
           <div className={cn(
             "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",

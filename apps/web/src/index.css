@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800;900&family=Graduate&family=Alfa+Slab+One&family=Pacifico&family=Bangers&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,700&family=Bebas+Neue&family=Calistoga&family=JetBrains+Mono:wght@400;500;600&display=swap');
+/* The Google Fonts sheet is linked from index.html, off the render path (PR18). */
 
 @tailwind base;
 @tailwind components;
@@ -166,6 +166,70 @@
     color: #007AFF;
   }
   
+  /* PRESS BOX (2026-09-04): the room a page leaves for the fixed bottom
+     chrome on a phone — the 76px bottom nav plus the 40px Stormy bar above
+     it (chromeMetrics.BOTTOM_CHROME_H = 116) plus the home-indicator inset.
+     One class, because twenty pages carried `pb-[calc(5rem+…)]` for the nav
+     alone and the bar would have covered the last row on every one of them.
+     pressboxChromeGuard pins this number to BOTTOM_CHROME_H. */
+  /* TAP TARGETS (PR18, 2026-09-05). The artboard draws a chip 25px tall, a
+     segmented pill 30, a tab 27, a slot chip 30 -- and Apple wants 44pt
+     under the finger. The visual stays the artboard's; the hit area is a
+     pseudo-element. `pb-hit-y` grows the target to 44px tall only, for a
+     pill in a row of pills (sideways growth would hand a tap to the
+     neighbour); `pb-hit` grows it both ways, for something standing alone.
+     The element must be positioned; both classes set `relative`. The
+     week arrows, the star and the day arrows already carry their own
+     `after:` insets and are left as they are. */
+  .pb-hit,
+  .pb-hit-y {
+    position: relative;
+  }
+  .pb-hit::after,
+  .pb-hit-y::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: max(100%, 44px);
+  }
+  .pb-hit::after {
+    width: max(100%, 44px);
+  }
+
+  .pb-app-chrome {
+    padding-bottom: calc(116px + env(safe-area-inset-bottom));
+  }
+
+  /* PRESS BOX skeleton shimmer (PR3, motion board 2b): the tile colour
+     with a lighter band sweeping through, 1.6s, on the existing
+     citrus-shimmer keyframe. Rows stagger via animation-delay in the
+     markup. Reduced-motion keeps the tile colour and drops the sweep. */
+  .pb-shimmer {
+    background: linear-gradient(90deg, #16241B 25%, #1d2e23 50%, #16241B 75%);
+    background-size: 200% 100%;
+    animation: citrus-shimmer 1.6s ease-in-out infinite;
+  }
+  /* The same sweep one step up the surface scale, for a bar that sits ON a
+     tile: the tile is #16241B, so a tile-coloured bar on it is invisible. */
+  .pb-shimmer-high {
+    background: linear-gradient(90deg, #1f3327 25%, #27412f 50%, #1f3327 75%);
+    background-size: 200% 100%;
+    animation: citrus-shimmer 1.6s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pb-shimmer,
+    .pb-shimmer-high {
+      animation: none;
+      background: #1d2e23;
+    }
+    .pb-shimmer-high {
+      background: #27412f;
+    }
+  }
+
   /* Hide scrollbar but keep functionality */
   .scrollbar-hide {
     -ms-overflow-style: none;
@@ -398,7 +462,13 @@
   }
   
   html {
-  background: #0F1F15;
+  /* PRESS BOX (PR18, 2026-09-05): the ground under the app is the Press
+     Box surface, so the launch image, the native web view
+     (capacitor.config backgroundColor), the pre-paint frame and the boot
+     splash are one colour and the cold start is one motion. Desktop pages
+     paint their own #0F1F15; this shows only at overscroll and before the
+     first paint. capacitorShellGuard pins the three together. */
+  background: #0C1811;
   }
 
   .dark html, html.dark {
@@ -411,7 +481,7 @@
      (hidden forces overflow-y into auto per spec, which created the
      second scroller that broke wheel routing). No overflow-y here ever. */
   overflow-x: clip;
-  background: #0F1F15;
+  background: #0C1811;
   /* 2026-08-19: was `text-citrus-forest` (#4A5F4D) — a DARK green
      default on this DARK background. tailwind.config.ts warns in its
      own comment that forest* are TEXT colours for LIGHT surfaces and
@@ -472,6 +542,86 @@
   body, p, span, .font-body {
   font-family: 'Montserrat', sans-serif;
   font-weight: 500; /* font-medium */
+  }
+
+  /* ══════════════════════════════════════════════════════════════════
+     PRESS BOX TYPE INHERITANCE (2026-09-04)
+
+     The rule directly above is an ELEMENT selector, so it does not just
+     set a default — it BEATS INHERITANCE. A <span> inside a row marked
+     `font-plex font-semibold` renders in Montserrat 500 anyway, because
+     `span` matches the span and `font-plex` only matches its parent.
+     Same story for `h1, h2, .font-varsity` (Graduate, uppercase, 900)
+     and the `h3..h6` rules below: any heading inside a Press Box panel
+     silently comes out in the varsity face.
+
+     This is the same class of bug as the `p, span, div { text-citrus-
+     forest }` rule removed on 2026-08-19 and documented below — an
+     element rule quietly overriding the utility on the ancestor — and
+     it is why the first Press Box screens read as "not the design"
+     while every value in them was right: the sizes and colours were
+     the artboard's, the FACES were not. Every figure on artboard 1a is
+     IBM Plex Mono and every name is Barlow.
+
+     `.pb-type` turns inheritance back on for a Press Box subtree.
+     The element list is wrapped in `:where()` ON PURPOSE, and the first
+     draft of this rule was wrong for want of it. Tailwind v3 INLINES
+     `@layer` — the output is ordinary source order, not native cascade
+     layers — so a plain `.pb-type span` (0,1,1) outranks `.font-barlow`
+     (0,1,0) and the reset ate the very utilities it exists to let
+     through: team names came out in Plex Mono 500. `:where()` adds no
+     specificity, so the selector is (0,1,0): it still beats the bare
+     `span` (0,0,1), and a `font-*` utility on the element ties on
+     specificity and wins on source order, because Tailwind emits
+     utilities after base. That is the behaviour Tailwind assumes and
+     this stylesheet had taken away.
+
+     Applied via PB_TYPE in components/pressbox/rowScale.ts. Do not
+     widen it past the Press Box: the rest of the app has been drawn
+     against the element rules and would shift under it.
+     ══════════════════════════════════════════════════════════════════ */
+  .pb-type {
+  /* The artboard writes every rule with the `font:` shorthand, which resets
+     line-height to `normal`. This app's base is 1.5, which added 7px to
+     every two-line row. It lives HERE rather than in the PB_TYPE class
+     string because `cn()` is tailwind-merge, and tailwind-merge drops a
+     `leading-*` class when a `text-{size}` class follows it — `text-sm` and
+     friends set both, so it treats them as conflicting. A CSS declaration
+     cannot be merged away; a `leading-*` utility on the same element still
+     wins, on source order. */
+  line-height: normal;
+  }
+
+  .pb-type :where(p, span, button, h1, h2, h3, h4, h5, h6) {
+  font-family: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  /* `inherit`, not `none`. `none` also cancels an `uppercase` written on an
+     ancestor — the roster's column header is an uppercase <div> of <span>s,
+     and it came back mixed-case the moment this rule said `none`. Restoring
+     inheritance is the whole point; asserting a value is not.
+
+     `button` is in the list for this property above all: Tailwind's own
+     preflight ships `button, select { text-transform: none }` to normalise
+     Firefox, so an `uppercase` written on a tab strip never reaches the tab
+     BUTTONS inside it. The matchup's LINEUPS / CATEGORIES / BENCH bar came
+     out in sentence case for exactly that reason. */
+  text-transform: inherit;
+  }
+
+  /* The same reset, below lg only (PR18 paint sweep, 2026-09-05): for a page
+     that is one tree re-skinned with `max-lg:` classes -- Auth -- where the
+     desktop must keep Montserrat and the phone must get Plex and Barlow. */
+  @media (max-width: 1023.98px) {
+    .pb-type-phone {
+    line-height: normal;
+    }
+    .pb-type-phone :where(p, span, button, h1, h2, h3, h4, h5, h6) {
+    font-family: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    }
   }
   
   /* 2026-08-19: citrus-charcoal (#5C5C5C) measured 2.25:1 on the dark
@@ -2192,31 +2342,61 @@ body {
   to { opacity: 1; }
 }
 
-/* ═══ Native boot splash (2026-09-01) ══════════════════════════════
-   The app-open motion for the iOS/Android shell (NativeBootSplash).
-   Purposeful and short per HIG: the mark assembles, the wordmark
-   settles, the halo breathes once. Reduced-motion collapses all of it
-   to a plain crossfade. */
+/* ═══ Native boot splash (PR3, 2026-09-04) ═════════════════════════
+   Motion board 2a. The puck bobs (1.6s) and slowly spins (6s), a light
+   band sweeps top to bottom (3.2s), the tip fades in (250ms, 6px), and
+   Stormy's three dots pulse (1.2s, staggered 200ms in the markup). The
+   loops are the only indefinite motion in the app besides the live dot,
+   per the motion rules. Reduced-motion keeps colour and kills every
+   transform and loop; the bar's width transition stays (it is data). */
+@keyframes citrus-boot-bob {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-10px) scale(1.04); }
+}
+@keyframes citrus-boot-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes citrus-boot-ground {
+  0%, 100% { transform: scaleX(1); opacity: 0.6; }
+  50% { transform: scaleX(0.7); opacity: 0.35; }
+}
+@keyframes citrus-boot-sweep {
+  from { top: -140px; }
+  to { top: 100%; }
+}
+@keyframes citrus-boot-tip-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes citrus-boot-dot {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+.citrus-boot-puck { animation: citrus-boot-bob 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+.citrus-boot-spin { animation: citrus-boot-spin 6s linear infinite; }
+.citrus-boot-ground { animation: citrus-boot-ground 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+.citrus-boot-sweep {
+  background: linear-gradient(180deg, transparent, rgba(243, 239, 230, 0.05), transparent);
+  animation: citrus-boot-sweep 3.2s linear infinite;
+}
+.citrus-boot-tip { animation: citrus-boot-tip-in 250ms ease-out both; }
+.citrus-boot-dot { animation: citrus-boot-dot 1.2s ease-in-out infinite; }
+/* The 2026-09-01 mark still exists for anything that referenced it. */
 @keyframes citrus-boot-mark-in {
   0% { opacity: 0; transform: scale(0.82); }
   60% { opacity: 1; transform: scale(1.04); }
   100% { opacity: 1; transform: scale(1); }
 }
-@keyframes citrus-boot-word-in {
-  0%, 35% { opacity: 0; transform: translateY(6px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-@keyframes citrus-boot-halo-breathe {
-  0% { opacity: 0; transform: scale(0.9); }
-  100% { opacity: 1; transform: scale(1); }
-}
 .citrus-boot-mark { animation: citrus-boot-mark-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-.citrus-boot-word { animation: citrus-boot-word-in 900ms ease-out both; }
-.citrus-boot-halo { animation: citrus-boot-halo-breathe 1100ms ease-out both; }
 @media (prefers-reduced-motion: reduce) {
-  .citrus-boot-mark,
-  .citrus-boot-word,
-  .citrus-boot-halo {
+  .citrus-boot-puck,
+  .citrus-boot-spin,
+  .citrus-boot-ground,
+  .citrus-boot-sweep,
+  .citrus-boot-tip,
+  .citrus-boot-dot,
+  .citrus-boot-mark {
     animation: none;
   }
 }

@@ -30,6 +30,7 @@
  */
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
+import '../src/pressboxFonts';
 import '../src/index.css';
 import { PlayerAdvancedCard } from '../src/components/player/PlayerAdvancedCard';
 import type { DashboardIndexEntry } from '../src/hooks/usePlayerDashboardIndex';
@@ -110,6 +111,12 @@ function dashboardRow(p: HarnessPlayer, index: number): DashboardIndexEntry {
     save_pct: p.savePct ?? 0,
     gaa: p.gaa ?? 0,
     shutouts: isGoalie ? index % 4 : 0,
+    pim: isGoalie ? 0 : 12 + (index % 30),
+    shp: isGoalie ? 0 : index % 5,
+    toi_seconds: isGoalie ? 0 : 18 * 60 * 70,
+    losses: isGoalie ? 12 : 0,
+    ot_losses: isGoalie ? 3 : 0,
+    goals_against: isGoalie ? 130 : 0,
     xg_per_60: xgPer60,
     xg_rating: null,
     gar_per_60: garTotal,

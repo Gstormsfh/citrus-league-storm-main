@@ -73,6 +73,16 @@ interface MatchupComparisonProps {
    * ScoreCard's identically-named prop.
    */
   isOwnTeam?: boolean;
+  /**
+   * PRESS BOX (2026-09-04). On a phone the page draws the artboard's Match
+   * screen around this: the score block names both teams and carries the
+   * totals, and a LINEUPS / BENCH tab strip chooses the section. So the
+   * `pressbox` variant drops the sticky team header, the total row and the
+   * bench disclosure, and renders ONE section — the one the tab names. The
+   * default variant is the desktop's and is unchanged.
+   */
+  variant?: 'default' | 'pressbox';
+  section?: 'lineups' | 'bench';
 }
 
 export const MatchupComparison = ({
@@ -92,8 +102,11 @@ export const MatchupComparison = ({
   scoringSettings,
   userTeamName,
   opponentTeamName,
-  isOwnTeam = false
+  isOwnTeam = false,
+  variant = 'default',
+  section = 'lineups',
 }: MatchupComparisonProps) => {
+  const pressbox = variant === 'pressbox';
   // Create scoring calculator with league-specific settings
   const scorer = useMemo(() => new ScoringCalculator(scoringSettings), [scoringSettings]);
   // Organize players by slot order (flattened, no position grouping)
@@ -308,6 +321,72 @@ export const MatchupComparison = ({
       }
     }
   }, [userTotal, opponentTotal, isShowingDailyView, onTotalsCalculated, selectedDate]);
+
+  if (pressbox) {
+    return (
+      <div className="w-full" data-testid="matchup-comparison" data-section={section}>
+        {section === 'bench' ? (
+          benchRows > 0 ? (
+            <div className="matchup-position-group">
+              <MatchupPositionGroup
+                userPlayers={userBench}
+                opponentPlayers={opponentBench}
+                isUtilSlot={[]}
+                isBench={true}
+                onPlayerClick={onPlayerClick}
+                selectedDate={selectedDate}
+                dailyStatsMap={dailyStatsMap}
+              />
+            </div>
+          ) : (
+            <p className="px-3 py-8 text-center font-plex font-medium text-[10px] text-pressbox-text/45">
+              No bench this week
+            </p>
+          )
+        ) : (
+          <>
+            <div className="matchup-position-group">
+              <MatchupPositionGroup
+                userPlayers={allUserPlayers}
+                opponentPlayers={allOpponentPlayers}
+                isUtilSlot={isUtilSlot}
+                slotPositions={slotPositions}
+                onPlayerClick={onPlayerClick}
+                selectedDate={selectedDate}
+                dailyStatsMap={dailyStatsMap}
+              />
+            </div>
+            {/* THE BENCH, IN VIEW (2026-09-05). "You can't see the bench on
+                the matchup tab." It was a tab away; now it also sits under
+                the lineups, dimmed, the way the Team screen draws it, so a
+                scroll answers who is not playing without a tap. The BENCH
+                tab stays for the two-column bench on its own. */}
+            {benchRows > 0 && (
+              <div className="mt-3" data-testid="matchup-bench-inline">
+                <div className="flex items-center justify-between px-3 pb-1.5 border-b border-white/[0.08]">
+                  <span className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text">
+                    Bench <span className="text-pressbox-text/45">· {benchRows}</span>
+                  </span>
+                  <span className="font-plex font-medium text-[10px] text-pressbox-orange-soft">PTS DON'T COUNT</span>
+                </div>
+                <div className="matchup-position-group">
+                  <MatchupPositionGroup
+                    userPlayers={userBench}
+                    opponentPlayers={opponentBench}
+                    isUtilSlot={[]}
+                    isBench={true}
+                    onPlayerClick={onPlayerClick}
+                    selectedDate={selectedDate}
+                    dailyStatsMap={dailyStatsMap}
+                  />
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="w-full">

@@ -98,7 +98,9 @@ function ButtonContent({ children, arrow, loading }: { children: ReactNode; arro
           <path d="M12 2a10 10 0 0110 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
         </svg>
       )}
-      <span>{children}</span>
+      {/* inline-flex: Tailwind's preflight makes every svg a block, so an
+          icon passed as a child stacked above its label (Auth, 2026-09-05). */}
+      <span className="inline-flex items-center gap-2">{children}</span>
       {arrow && (
         <ArrowRight
           className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-0.5"

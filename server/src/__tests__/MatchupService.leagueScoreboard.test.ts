@@ -158,6 +158,18 @@ describe('projectLeagueWeek: banked + the unplayed share of every remaining star
     expect(totals.get('m1')?.team2).toBeCloseTo(12.8);
   });
 
+  it('counts the starter-games still to be played: the final one is not, the live one still is', () => {
+    const totals = projectLeagueWeek(input());
+    // t1: player 2 today (scheduled) and player 1 on 10-16; player 1's final today is done.
+    expect(totals.get('m1')?.team1GamesLeft).toBe(2);
+    // t2: player 3's game is in the 2nd period -- still a game left.
+    expect(totals.get('m1')?.team2GamesLeft).toBe(1);
+    // Tomorrow: only the 10-16 game remains for t1, nothing for t2.
+    const later = projectLeagueWeek(input({ today: '2026-10-15' })).get('m1');
+    expect(later?.team1GamesLeft).toBe(1);
+    expect(later?.team2GamesLeft).toBe(0);
+  });
+
   it('a frozen roster for the day wins over the current lineup; a day with no frozen row falls back to it', () => {
     // Today's frozen row benches player 1 for t1 (only player 2 starts) while
     // the current lineup still names both. Give player 1 an OPEN game today:
@@ -198,7 +210,7 @@ describe('projectLeagueWeek: banked + the unplayed share of every remaining star
   });
 
   it('null, never 0: closed matchup, bye, a side with no lineup, or no projections at all', () => {
-    const nothing = { team1: null, team2: null };
+    const nothing = { team1: null, team2: null, team1GamesLeft: null, team2GamesLeft: null };
     expect(projectLeagueWeek(input({ matchups: [matchup({ status: 'completed' })] })).get('m1')).toEqual(nothing);
     expect(projectLeagueWeek(input({ matchups: [matchup({ week_end_date: '2026-10-13' })] })).get('m1')).toEqual(nothing);
     expect(projectLeagueWeek(input({ matchups: [matchup({ team2_id: null })] })).get('m1')).toEqual(nothing);
@@ -253,6 +265,8 @@ describe('MatchupService.getLeagueScoreboard: the reads', () => {
     const m1 = matchups.find((m) => m.id === 'm1')!;
     expect(m1.team1_projected_total).toBeCloseTo(19.4);
     expect(m1.team2_projected_total).toBeCloseTo(12.8);
+    expect(m1.team1_games_left).toBe(2);
+    expect(m1.team2_games_left).toBe(1);
     // The row shape the page already reads is untouched.
     expect(m1.team1).toEqual({ id: 't1', team_name: 'A' });
     expect(m1.team1_score).toBe('12.4');
