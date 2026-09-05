@@ -23,6 +23,7 @@
 import { createRoot } from 'react-dom/client';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router-dom';
+import '../src/pressboxFonts';
 import '../src/index.css';
 import { BOTTOM_CHROME_H } from '../src/components/pressbox';
 import {

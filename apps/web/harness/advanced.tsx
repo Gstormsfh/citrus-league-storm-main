@@ -30,6 +30,7 @@
  */
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
+import '../src/pressboxFonts';
 import '../src/index.css';
 import { PlayerAdvancedCard } from '../src/components/player/PlayerAdvancedCard';
 import type { DashboardIndexEntry } from '../src/hooks/usePlayerDashboardIndex';

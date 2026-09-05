@@ -210,7 +210,7 @@ Harness knobs added: `page.html?p=auth&signedout=1`, `?p=profilesetup&fresh=1`,
 
 ### Still open
 
-- Self-host Barlow Condensed / Barlow / IBM Plex Mono (`@fontsource`, needs `npm i` on the Mac), then measure first league page on 4G.
+- Measure first league page interactive on 4G (fonts are bundled now; `f9cdcded`+).
 - Store screenshots from the simulator; a VoiceOver hour on a device.
 - ArmchairGM (the league menu's Mock draft tile) is still Citrus 2.0 on a phone.
 - `FreeAgentRow` + its tests, once Players is signed off.

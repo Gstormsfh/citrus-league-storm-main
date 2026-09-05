@@ -46,8 +46,28 @@ describe('the first paint does not wait on Google', () => {
   it('the fonts sheet is a non-blocking link in index.html, not an @import in index.css', () => {
     expect(read('src/index.css')).not.toMatch(/@import url\(['"]https:\/\/fonts\.googleapis\.com/);
     const html = read('index.html');
-    expect(html).toMatch(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com\/css2\?[^"]*Barlow\+Condensed[^"]*" media="print" onload="this\.media='all'" \/>/);
+    expect(html).toMatch(/<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com\/css2\?[^"]*" media="print" onload="this\.media='all'" \/>/);
     expect(html).toMatch(/<noscript><link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com/);
+  });
+
+  it('the three Press Box faces are bundled, not fetched, and not fetched twice', () => {
+    const fonts = read('src/pressboxFonts.ts');
+    for (const face of [
+      'barlow-condensed/latin-700', 'barlow-condensed/latin-800',
+      'barlow/latin-400', 'barlow/latin-500', 'barlow/latin-600', 'barlow/latin-700',
+      'ibm-plex-mono/latin-500', 'ibm-plex-mono/latin-600',
+    ]) {
+      expect(fonts).toContain(`import '@fontsource/${face}.css';`);
+    }
+    const main = read('src/main.tsx');
+    expect(main.indexOf("import './pressboxFonts'")).toBeGreaterThan(-1);
+    expect(main.indexOf("import './pressboxFonts'")).toBeLessThan(main.indexOf("import './index.css'"));
+    const google = read('index.html').match(/href="(https:\/\/fonts\.googleapis\.com\/css2\?[^"]*)"/)![1];
+    expect(google).not.toMatch(/Barlow|IBM\+Plex/);
+    const pkg = JSON.parse(read('package.json'));
+    for (const dep of ['@fontsource/barlow-condensed', '@fontsource/barlow', '@fontsource/ibm-plex-mono']) {
+      expect(pkg.dependencies[dep] ?? pkg.devDependencies?.[dep], dep).toBeTruthy();
+    }
   });
 
   it('every harness page links the same sheet, so the harness draws the real faces', () => {
@@ -55,6 +75,7 @@ describe('the first paint does not wait on Google', () => {
     const url = html.match(/href="(https:\/\/fonts\.googleapis\.com\/css2\?[^"]*)"/)![1];
     for (const page of ['page', 'skeleton', 'boot', 'draft', 'pressbox']) {
       expect(read(`harness/${page}.html`), page).toContain(url);
+      expect(read(`harness/${page}.tsx`), page).toContain("import '../src/pressboxFonts';");
     }
   });
 });

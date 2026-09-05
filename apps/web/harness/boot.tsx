@@ -5,6 +5,7 @@
  * (the >4s case); `fade=1` the dissolve.
  */
 import { createRoot } from 'react-dom/client';
+import '../src/pressboxFonts';
 import '../src/index.css';
 import { BootSplashView } from '../src/components/NativeBootSplash';
 

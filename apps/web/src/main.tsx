@@ -3,6 +3,8 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { logger } from '@/utils/logger'
+// The Press Box faces, bundled (PR18): see pressboxFonts.ts. Before index.css.
+import './pressboxFonts'
 import './index.css'
 import { ErrorBoundary } from './components/ErrorBoundary'
 // Import logger early to silence all console output (Sleeper-style)

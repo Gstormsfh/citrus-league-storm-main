@@ -10,6 +10,7 @@
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { BarChart3, ArrowLeftRight, TrendingUp, MessageSquare, CalendarDays, Trophy } from 'lucide-react';
+import '../src/pressboxFonts';
 import '../src/index.css';
 import {
   BOTTOM_CHROME_H,

@@ -16,6 +16,7 @@
  * (`@media (max-width: 1023px)`) applies exactly as it does on the page.
  */
 import { createRoot } from 'react-dom/client';
+import '../src/pressboxFonts';
 import '../src/index.css';
 import { MatchupPositionGroup } from '../src/components/matchup/MatchupPositionGroup';
 

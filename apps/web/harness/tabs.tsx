@@ -1,5 +1,6 @@
 /** Mobile harness — the Roster page's real tab bar, real classes, real primitives. */
 import { createRoot } from 'react-dom/client';
+import '../src/pressboxFonts';
 import '../src/index.css';
 import { Tabs, TabsList, TabsTrigger } from '../src/components/ui/tabs';
 

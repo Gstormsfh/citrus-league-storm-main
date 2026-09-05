@@ -7,6 +7,7 @@
  */
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
+import '../src/pressboxFonts';
 import '../src/index.css';
 import LoadingScreen from '../src/components/LoadingScreen';
 import { PressBoxSkeletonRoster, PressBoxSkeletonScreen, type PressBoxSkeletonKind } from '../src/components/pressbox/Skeleton';

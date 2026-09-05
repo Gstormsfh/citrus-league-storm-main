@@ -11,6 +11,7 @@
  */
 import { createRoot } from 'react-dom/client';
 import { useState } from 'react';
+import '../src/pressboxFonts';
 import '../src/index.css';
 import { ScoreboardStrip } from '../src/components/matchup/ScoreboardStrip';
 import type { WeekMatchupRow } from '../src/components/matchup/scoreboard';
