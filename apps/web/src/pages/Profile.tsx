@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
 import { supabase } from '@/integrations/supabase/client';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { HockeyFooter } from '@/components/citrus2';
 import { accountApi } from '@/api/account';
 import { leagueApi } from '@/api/leagues';
@@ -15,6 +15,8 @@ import { DraftService } from '@/services/DraftService';
 import { WaiverService } from '@/services/WaiverService';
 import Navbar from '@/components/Navbar';
 import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
+import { ProfilePhone, type ProfileTab } from '@/components/account/ProfilePhone';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1013,10 +1015,19 @@ const Profile = () => {
     }
   };
 
+  /**
+   * PRESS BOX (2026-09-04, PR10p): the phone draws the account as the
+   * settings screen's rows. The layers are gated on the viewport rather than
+   * stacked, so one form owns each input and the page's tests see one set
+   * of strings. Every handler is the page's own.
+   */
+  const isMobile = useIsMobile();
+  const navigate = useNavigate();
+
   // If user is not logged in, show signup prompt
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
+      <div className="min-h-screen bg-pressbox-surface text-pastel-cream">
         {/* MOBILE CHROME (2026-09-01): Profile was the last core page on the
             old shell — global fixed Navbar + a hard pt-16. The fixed bar
             grows by env(safe-area-inset-top) on notched phones while pt-16
@@ -1032,7 +1043,20 @@ const Profile = () => {
         <div className="lg:hidden pt-[env(safe-area-inset-top)]">
           <PressBoxAppHeader title="Account" logoSrc="/favicon.svg" />
         </div>
-        <main className="w-full pt-6 lg:pt-24 pb-app-chrome lg:pb-16">
+        {isMobile && (
+          <div className="pb-type px-3.5 pt-6 pb-app-chrome text-center" data-testid="profile-phone-signed-out">
+            <p className="font-plex font-semibold text-[9px] tracking-[0.14em] text-pressbox-orange-soft">SIGN IN REQUIRED</p>
+            <h2 className="mt-2 font-condensed font-extrabold text-[24px] uppercase tracking-[0.02em] leading-none text-pressbox-text">Your account</h2>
+            <p className="mt-2 font-barlow text-[13px] leading-[1.45] text-pressbox-text/60">Sign in or create an account to see your profile.</p>
+            <Link to="/auth" className="mt-5 inline-flex w-full h-11 items-center justify-center rounded-[10px] bg-pressbox-orange text-pressbox-orange-ink font-condensed font-bold text-[15px] uppercase tracking-[0.06em]">
+              Sign in or sign up
+            </Link>
+            <Link to="/" className="mt-2 inline-flex w-full h-11 items-center justify-center rounded-[10px] border border-white/[0.12] bg-white/[0.03] text-pressbox-text/80 font-condensed font-bold text-[15px] uppercase tracking-[0.06em]">
+              Home
+            </Link>
+          </div>
+        )}
+        {!isMobile && <main className="w-full pt-6 lg:pt-24 pb-app-chrome lg:pb-16">
           <div className="container mx-auto px-3 sm:px-4">
             <div className="max-w-2xl mx-auto">
               <Card className="bg-[#1A2A20] border-0 ring-1 ring-pastel-orange/30 rounded-2xl shadow-[0_24px_60px_-16px_rgba(255,168,87,0.25)] relative overflow-hidden">
@@ -1057,14 +1081,14 @@ const Profile = () => {
               </Card>
             </div>
           </div>
-        </main>
+        </main>}
         <HockeyFooter variant="app" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
+    <div className="min-h-screen bg-pressbox-surface text-pastel-cream">
       {/* MOBILE CHROME (2026-09-01) — same pattern as the signed-out branch
           above and every other core page: Navbar is desktop-only, phones get
           the sticky safe-area header + bottom nav. */}
@@ -1075,7 +1099,80 @@ const Profile = () => {
       <div className="lg:hidden pt-[env(safe-area-inset-top)]">
         <PressBoxAppHeader title="Account" logoSrc="/favicon.svg" />
       </div>
-      <main className="w-full pt-6 lg:pt-24 pb-app-chrome lg:pb-16">
+      {isMobile && (
+        <ProfilePhone
+          tab={activeTab as ProfileTab}
+          onTabChange={handleTabChange}
+          hero={{
+            avatarUrl: profile?.avatar_url,
+            initials: getInitials(),
+            displayName: getDisplayName(),
+            teamName: formData.teamName,
+            since: getMemberSince(),
+            championships: userStats.championships,
+            uploading: uploadingAvatar,
+            onAvatarInput: handleAvatarUpload,
+          }}
+          identity={{
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            phone: formData.phone,
+            location: formData.location,
+            bio: formData.bio,
+            editing: isEditing,
+            onEditing: setIsEditing,
+            onChange: handleInputChange,
+            onSave: handleSave,
+          }}
+          stats={userStats}
+          activity={recentActivity}
+          achievements={achievements}
+          hasLeague={userLeagueState === 'active-user'}
+          settings={{
+            message: settingsMessage,
+            displayName: displayNameInput,
+            onDisplayName: setDisplayNameInput,
+            canSaveDisplayName: displayNameInput.trim() !== (profile?.display_name || ''),
+            savingDisplayName,
+            onSaveDisplayName: handleSaveDisplayName,
+            email: user.email ?? '',
+            newPassword,
+            confirmPassword,
+            onNewPassword: setNewPassword,
+            onConfirmPassword: setConfirmPassword,
+            changingPassword: changePasswordLoading,
+            onChangePassword: handleChangePasswordReal,
+            team: {
+              name: formData.teamName,
+              abbr: formData.teamAbbr,
+              slogan: formData.teamDescription,
+              onChange: handleInputChange,
+              onSave: handleSaveTeamName,
+            },
+            commissionerLeagues,
+            loadingLeagues,
+            onResetDraft: handleResetLeagueDraft,
+            onOpenLeague: (id) => navigate(`/league/${id}?league=${id}`),
+            consent: {
+              rows: consentRows,
+              loading: consentLoading,
+              error: consentError,
+              busy: consentBusy,
+              onGrant: handleGrantConsent,
+              onWithdraw: handleWithdrawConsent,
+              onRetry: loadConsent,
+            },
+            exporting: exportLoading,
+            onExport: handleExportData,
+            deleteConfirmation,
+            onDeleteConfirmation: setDeleteConfirmation,
+            deleting: deleteAccountLoading,
+            onDelete: handleDeleteAccount,
+          }}
+        />
+      )}
+      {!isMobile && <main className="w-full pt-6 lg:pt-24 pb-app-chrome lg:pb-16">
         <div className="container mx-auto px-3 sm:px-4">
           <div className="max-w-6xl mx-auto">
             <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6 lg:space-y-8">
@@ -2383,7 +2480,7 @@ const Profile = () => {
             </Tabs>
           </div>
         </div>
-      </main>
+      </main>}
       <HockeyFooter variant="app" />
     </div>
   );

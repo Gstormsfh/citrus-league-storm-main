@@ -242,8 +242,12 @@ export interface PressBoxTextRowProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  inputType?: 'text' | 'datetime-local';
+  inputType?: 'text' | 'datetime-local' | 'password' | 'email' | 'tel';
   maxLength?: number;
+  /** A bio, a slogan: three lines instead of one. */
+  multiline?: boolean;
+  disabled?: boolean;
+  autoComplete?: string;
   last?: boolean;
   className?: string;
 }
@@ -256,25 +260,44 @@ export function PressBoxTextRow({
   placeholder,
   inputType = 'text',
   maxLength,
+  multiline,
+  disabled,
+  autoComplete,
   last,
   className,
 }: PressBoxTextRowProps) {
+  const field = cn(
+    'focus-citrus mt-2 w-full rounded-[8px] bg-white/[0.04] border border-white/[0.1] px-3',
+    'font-barlow text-[15px] text-pressbox-text placeholder:text-pressbox-text/35 disabled:opacity-50',
+    multiline ? 'min-h-[84px] py-2 leading-[1.4]' : 'h-10',
+    inputType === 'datetime-local' && 'font-plex text-[13px] [color-scheme:dark]',
+  );
   return (
     <label className={cn('block px-3.5 py-3 w-full', !last && 'border-b border-white/[0.06]', className)}>
       <span className="block font-barlow font-semibold text-[14px] text-pressbox-text">{label}</span>
       {help && <span className="block mt-px font-barlow text-[11px] text-pressbox-text/50">{help}</span>}
-      <input
-        type={inputType}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        maxLength={maxLength}
-        className={cn(
-          'focus-citrus mt-2 w-full h-10 rounded-[8px] bg-white/[0.04] border border-white/[0.1] px-3',
-          'font-barlow text-[15px] text-pressbox-text placeholder:text-pressbox-text/35',
-          inputType === 'datetime-local' && 'font-plex text-[13px] [color-scheme:dark]',
-        )}
-      />
+      {multiline ? (
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          maxLength={maxLength}
+          disabled={disabled}
+          rows={3}
+          className={field}
+        />
+      ) : (
+        <input
+          type={inputType}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          maxLength={maxLength}
+          disabled={disabled}
+          autoComplete={autoComplete}
+          className={field}
+        />
+      )}
     </label>
   );
 }

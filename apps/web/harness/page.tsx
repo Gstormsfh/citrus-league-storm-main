@@ -31,6 +31,7 @@ import { DraftService } from '../src/services/DraftService';
 import { PlayoffService } from '../src/services/PlayoffService';
 import { matchupApi } from '../src/api/matchups';
 import { leagueApi } from '../src/api/leagues';
+import { accountApi } from '../src/api/account';
 import { rosterApi } from '../src/api/rosters';
 import { tradeApi } from '../src/api/trades';
 import { scheduleApi } from '../src/api/schedule';
@@ -723,6 +724,28 @@ const ANALYTICS_ROWS = (
 (LeagueService as any).addToWatchlist = async () => ({ error: null });
 (LeagueService as any).removeFromWatchlist = async () => ({ error: null });
 (leagueApi as any).getUserLeagues = async () => ({ data: [{ id: 'harness-league', name: 'Harness League' }] });
+
+/**
+ * The account screen (2026-09-04, PR10p): a profile, a season of results and
+ * a consent record, so the phone's rows have something true to show.
+ * `api/account.ts` imports its client by relative path, so the apiClient
+ * alias does not reach it; the module object is patched like the others.
+ */
+(accountApi as any).getProfile = async () => ({
+  data: {
+    id: 'harness-user', username: 'gstorms', display_name: 'Garrett', first_name: 'Garrett', last_name: 'Storms',
+    phone: '', location: 'Kelowna, BC', bio: 'Commissioner. Oilers fan. Never trades a goalie.', default_team_name: 'Finalsz',
+    timezone: 'America/Vancouver', avatar_url: null, created_at: '2025-08-01T00:00:00.000Z', updated_at: '2026-09-01T00:00:00.000Z',
+  },
+});
+(accountApi as any).getStats = async () => ({ data: { totalSeasons: 2, wins: 21, losses: 13, ties: 2, totalPoints: 3412.6 } });
+(accountApi as any).getConsentStatus = async () => ({
+  data: [
+    { policy_type: 'privacy_policy', status: 'current', required_version: '2026-08', consented_version: '2026-08', consented_at: '2026-08-14T00:00:00.000Z', withdrawn_at: null },
+    { policy_type: 'terms_of_service', status: 'outdated', required_version: '2026-09', consented_version: '2026-06', consented_at: '2026-06-02T00:00:00.000Z', withdrawn_at: null },
+  ],
+});
+(accountApi as any).updateProfile = async (fields: Record<string, unknown>) => ({ data: fields });
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
@@ -787,6 +810,8 @@ const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   stormy: { path: '/gm-office/stormy', at: '/gm-office/stormy?league=harness-league' },
   // `&type=playoff` for the playoff-pool funnel, `&tab=join` for the join pane.
   createleague: { path: '/create-league', at: `/create-league${location.search.replace(/^\?p=[^&]*/, '?_')}` },
+  // `&tab=stats|achievements|settings` for the other panes.
+  profile: { path: '/profile', at: `/profile${location.search.replace(/^\?p=[^&]*/, '?_')}` },
   // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
   // the week into the URL as soon as it resolves one. Under the old
   // `/matchup/:leagueId?` the very first push ("/matchup/harness-league/1")
