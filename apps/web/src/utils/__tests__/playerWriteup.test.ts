@@ -566,3 +566,19 @@ describe('the voice (2026-09-05)', () => {
     expect(w.summary).toMatch(/16%/);
   });
 });
+
+describe('ice time that is not there says nothing (2026-09-05)', () => {
+  it("a '0:00' TOI is a missing number: no minutes clause, no Limited ice time tag", () => {
+    const player = {
+      id: '8471214',
+      name: 'Alex Ovechkin',
+      position: 'LW',
+      team: 'WSH',
+      stats: { gamesPlayed: 82, points: 64, goals: 32, assists: 32, shots: 244, powerPlayPoints: 19, toi: '0:00' },
+    } as unknown as Parameters<typeof generatePlayerWriteup>[0];
+    const w = generatePlayerWriteup(player);
+    expect(w.summary).not.toMatch(/minutes a night/);
+    expect(w.analysis).not.toMatch(/0 a night|minutes a night/);
+    expect(w.tags.some((t) => t.label === 'Limited ice time')).toBe(false);
+  });
+});

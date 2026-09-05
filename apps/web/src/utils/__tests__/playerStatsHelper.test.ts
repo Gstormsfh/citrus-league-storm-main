@@ -122,12 +122,12 @@ describe('getPlayerWithSeasonStats', () => {
     expect(result!.stats.toi).toBe('21:00');
   });
 
-  it('returns 0:00 for TOI when no icetime', async () => {
+  it('leaves TOI undefined when there is no icetime (missing is not zero)', async () => {
     const player = makePlayer({ icetime_seconds: undefined });
     mockGetPlayersByIds.mockResolvedValue([player]);
 
     const result = await getPlayerWithSeasonStats('8478402');
-    expect(result!.stats.toi).toBe('0:00');
+    expect(result!.stats.toi).toBeUndefined();
   });
 
   it('maps goalie stats correctly', async () => {

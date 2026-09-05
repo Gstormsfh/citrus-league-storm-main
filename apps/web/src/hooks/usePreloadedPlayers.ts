@@ -90,6 +90,13 @@ interface SeasonStatsRow {
   nhl_pim: number | null;
   nhl_ppp: number | null;
   nhl_shp: number | null;
+  /**
+   * ICE TIME (2026-09-05, from the first live auction): this loader never
+   * fetched it, so every player the draft room opened read `TOI/G 0:00`,
+   * the writeup said "0 minutes a night", and Ovechkin wore LIMITED ICE
+   * TIME. The API normalizer maps it as `icetime_seconds`; so does this.
+   */
+  nhl_toi_seconds: number | null;
   nhl_plus_minus: number | null;
   nhl_wins: number | null;
   nhl_losses: number | null;
@@ -153,6 +160,7 @@ function applySeasonStats(p: Player, s: SeasonStatsRow): void {
   p.ppp = n(s.nhl_ppp);
   p.shp = n(s.nhl_shp);
   p.plus_minus = n(s.nhl_plus_minus);
+  p.icetime_seconds = n(s.nhl_toi_seconds);
   // xG (2026-08-13) — see SeasonStatsRow.x_goals. Skaters only in
   // practice; goalie rows carry 0 here and their xG-flavoured stat is
   // goals-saved-above-expected, which lives in raw_player_stats and is
@@ -373,7 +381,7 @@ export function usePreloadedPlayers(): UsePreloadedPlayersResult {
             const { data: statsData, error: statsErr } = await statsClient
               .from('player_season_stats')
               .select(
-                'player_id, games_played, goalie_gp, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa, x_goals',
+                'player_id, games_played, goalie_gp, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_toi_seconds, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa, x_goals',
               )
               .eq('season', CURRENT_SEASON)
               .order('player_id', { ascending: true })

@@ -349,7 +349,10 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
   const hitsPerGame = (s.hits ?? 0) / gp;
   const blocksPerGame = (s.blockedShots ?? 0) / gp;
   const ppPoints = s.powerPlayPoints ?? 0;
-  const toiMinutes = parseToiToMinutes(s.toi);
+  // A zero is a missing number, not a benched player (2026-09-05): nobody
+  // dresses for a game and skates 0:00. Unknown ice time says nothing.
+  const toiParsed = parseToiToMinutes(s.toi);
+  const toiMinutes = toiParsed !== null && toiParsed > 0 ? toiParsed : null;
   const defenceman = isDefence(player.position);
 
   // Headline band. Defencemen are judged on a lower points curve — a 0.65 PPG
