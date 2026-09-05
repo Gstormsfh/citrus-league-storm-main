@@ -8,6 +8,7 @@ import { useLeague } from '@/contexts/LeagueContext';
 import { cn } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
 import { PB_TYPE, PressBoxChips, PressBoxScoreBlock, PressBoxTabs, type PressBoxScoreDay } from '@/components/pressbox';
+import { PressBoxMatchupCategories } from '@/components/pressbox/MatchupCategories';
 import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 import { PressBoxPageLoading } from '@/components/pressbox/PageLoading';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -205,7 +206,7 @@ const Matchup = () => {
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   /** PRESS BOX (2026-09-04): the phone's league menu and its LINEUPS / BENCH tab. */
-  const [phoneSection, setPhoneSection] = useState<'lineups' | 'bench'>('lineups');
+  const [phoneSection, setPhoneSection] = useState<'lineups' | 'bench' | 'categories'>('lineups');
   const isMobile = useIsMobile();
   // In-place reload trigger for the main loader (2026-09-01): bumped by the
   // visibility-change refresh instead of a full window.location reload.
@@ -5906,13 +5907,17 @@ const Matchup = () => {
                     activeKey={
                       phoneSection === 'bench'
                         ? 'bench'
-                        : phoneScore.today && selectedDate === phoneScore.today
-                          ? 'tonight'
-                          : 'lineups'
+                        : phoneSection === 'categories'
+                          ? 'categories'
+                          : phoneScore.today && selectedDate === phoneScore.today
+                            ? 'tonight'
+                            : 'lineups'
                     }
                     onSelect={(k) => {
                       if (k === 'bench') {
                         setPhoneSection('bench');
+                      } else if (k === 'categories') {
+                        setPhoneSection('categories');
                       } else if (k === 'tonight') {
                         setPhoneSection('lineups');
                         setSelectedDate(phoneScore.today);
@@ -5923,6 +5928,7 @@ const Matchup = () => {
                     }}
                     tabs={[
                       { key: 'lineups', label: 'Lineups' },
+                      { key: 'categories', label: 'Categories' },
                       { key: 'bench', label: 'Bench' },
                       ...(phoneScore.tonight !== null
                         ? [{ key: 'tonight', label: `Tonight · ${phoneScore.tonight}` }]
@@ -5930,9 +5936,19 @@ const Matchup = () => {
                     ]}
                   />
                 )}
+                {/* CATEGORIES (2026-09-05, artboard 1a): the week's totals by
+                    counting stat, both sides, from the starters' matchupStats. */}
+                {isMobile && phoneSection === 'categories' ? (
+                  <PressBoxMatchupCategories
+                    yours={displayStarters as MatchupPlayer[]}
+                    theirs={displayOpponentStarters as MatchupPlayer[]}
+                    yourName={phoneScore?.you.name ?? 'You'}
+                    theirName={phoneScore?.them.name ?? 'Them'}
+                  />
+                ) : (
                 <MatchupComparison
                   variant={isMobile ? 'pressbox' : 'default'}
-                  section={phoneSection}
+                  section={phoneSection === 'categories' ? 'lineups' : phoneSection}
                   userStarters={displayStarters as MatchupPlayer[]}
                   opponentStarters={displayOpponentStarters as MatchupPlayer[]}
                   userBench={myBench as MatchupPlayer[]}
@@ -5975,6 +5991,7 @@ const Matchup = () => {
                   opponentTeamName={userLeagueState === 'active-user' ? (viewingOpponentTeamName || opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
                   isOwnTeam={isOwnTeamOnLeft}
                 />
+                )}
               </>
             )}
           </div>

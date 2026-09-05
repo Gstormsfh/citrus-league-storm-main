@@ -45,8 +45,33 @@ export const proj = (pts: number, over: Record<string, unknown> = {}) => ({
  * its own game renders the wrong "vs / @" and the wrong crest. Every
  * substitution below keeps the player and the game on the same side.
  */
+/**
+ * THE WEEK'S LINE (2026-09-05, artboard 1a · CATEGORIES): production hands
+ * every matchup player a `matchupStats` (skater) or `goalieMatchupStats`
+ * (goalie) from the week RPC, and a fixture without one showed the
+ * CATEGORIES tab as twelve `0 – 0` rows. Spread from the id so no row
+ * repeats another; the goalie's GA is the one column where less is more.
+ */
+const weekLine = (id: number, goalie: boolean): Partial<MatchupPlayer> =>
+  goalie
+    ? { goalieMatchupStats: { wins: 1 + (id % 2), saves: 48 + (id % 7) * 5, shutouts: id % 5 === 2 ? 1 : 0, goalsAgainst: 3 + (id % 4) } }
+    : {
+        matchupStats: {
+          goals: id % 3,
+          assists: 1 + (id % 3),
+          sog: 5 + (id % 6),
+          blocks: id % 4,
+          ppp: id % 2,
+          shp: id % 7 === 0 ? 1 : 0,
+          hits: 2 + (id % 5),
+          pim: id % 3 === 0 ? 2 : 0,
+          xGoals: Number((0.8 + (id % 4) * 0.3).toFixed(2)),
+        },
+      };
+
 export const skater = (who: string, over: Partial<MatchupPlayer>): MatchupPlayer => {
   const p = harnessPlayer(who);
+  const week = weekLine(Number(over.id ?? 1), over.isGoalie === true || p.position === 'G');
   return {
     id: 1,
     ...harnessMug(p),
@@ -59,6 +84,7 @@ export const skater = (who: string, over: Partial<MatchupPlayer>): MatchupPlayer
     total_points: 22.4,
     daily_projection: proj(6.2),
     games: [],
+    ...week,
     ...over,
   } as MatchupPlayer;
 };
