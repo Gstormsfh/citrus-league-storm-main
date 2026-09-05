@@ -344,17 +344,45 @@ export const MatchupComparison = ({
             </p>
           )
         ) : (
-          <div className="matchup-position-group">
-            <MatchupPositionGroup
-              userPlayers={allUserPlayers}
-              opponentPlayers={allOpponentPlayers}
-              isUtilSlot={isUtilSlot}
-              slotPositions={slotPositions}
-              onPlayerClick={onPlayerClick}
-              selectedDate={selectedDate}
-              dailyStatsMap={dailyStatsMap}
-            />
-          </div>
+          <>
+            <div className="matchup-position-group">
+              <MatchupPositionGroup
+                userPlayers={allUserPlayers}
+                opponentPlayers={allOpponentPlayers}
+                isUtilSlot={isUtilSlot}
+                slotPositions={slotPositions}
+                onPlayerClick={onPlayerClick}
+                selectedDate={selectedDate}
+                dailyStatsMap={dailyStatsMap}
+              />
+            </div>
+            {/* THE BENCH, IN VIEW (2026-09-05). "You can't see the bench on
+                the matchup tab." It was a tab away; now it also sits under
+                the lineups, dimmed, the way the Team screen draws it, so a
+                scroll answers who is not playing without a tap. The BENCH
+                tab stays for the two-column bench on its own. */}
+            {benchRows > 0 && (
+              <div className="mt-3" data-testid="matchup-bench-inline">
+                <div className="flex items-center justify-between px-3 pb-1.5 border-b border-white/[0.08]">
+                  <span className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text">
+                    Bench <span className="text-pressbox-text/45">· {benchRows}</span>
+                  </span>
+                  <span className="font-plex font-medium text-[10px] text-pressbox-orange-soft">PTS DON'T COUNT</span>
+                </div>
+                <div className="matchup-position-group">
+                  <MatchupPositionGroup
+                    userPlayers={userBench}
+                    opponentPlayers={opponentBench}
+                    isUtilSlot={[]}
+                    isBench={true}
+                    onPlayerClick={onPlayerClick}
+                    selectedDate={selectedDate}
+                    dailyStatsMap={dailyStatsMap}
+                  />
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     );

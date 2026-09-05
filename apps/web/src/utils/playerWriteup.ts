@@ -248,7 +248,7 @@ function buildGoalieWriteup(player: HockeyPlayer): PlayerWriteup {
     pick([
       `${full} is carrying a ${fmtSavePct(savePct)} save percentage${gaaClause} across ${apps}.`,
       `${full} has a ${fmtSavePct(savePct)} save percentage${gaaClause} through ${apps}.`,
-      `Through ${apps}, ${full} sits at a ${fmtSavePct(savePct)} save percentage${gaaClause}.`,
+      `${full} sits at a ${fmtSavePct(savePct)} save percentage${gaaClause} through ${apps}.`,
       `${full}: ${fmtSavePct(savePct)} save percentage${gaaClause}, ${apps} in.`,
     ]),
   );
@@ -407,7 +407,7 @@ function buildSkaterWriteup(player: HockeyPlayer): PlayerWriteup {
     pick([
       `${full} has ${pts} (${goals}G, ${assists}A) in ${gp} games, ${rate}.`,
       `${full} is at ${pts} through ${gp} games, ${goals} goals and ${assists} assists, ${rate}.`,
-      `${gp} games, ${pts} for ${full}: ${goals} goals, ${assists} assists, ${rate}.`,
+      `${full}, ${gp} games in: ${pts}, ${goals} goals and ${assists} assists, ${rate}.`,
       `${full} has put up ${goals} goals and ${assists} assists in ${gp} games, ${pts} at ${rate}.`,
     ]),
   );

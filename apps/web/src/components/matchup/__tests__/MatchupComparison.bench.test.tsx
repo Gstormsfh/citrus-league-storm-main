@@ -136,3 +136,27 @@ describe('MatchupComparison — collapsible bench', () => {
     expect(container.querySelector('.matchup-total-center .matchup-slot-chip')!.textContent).toBe('DAY');
   });
 });
+
+describe('MatchupComparison — Press Box bench in view (2026-09-05)', () => {
+  it('LINEUPS shows the bench under the starters, dimmed, with its count', () => {
+    render(
+      <MatchupComparison {...baseProps} variant="pressbox" section="lineups" userBench={[p(1), p(2)]} opponentBench={[p(3)]} />,
+    );
+    expect(screen.getByTestId('starter-rows')).toBeInTheDocument();
+    const inline = screen.getByTestId('matchup-bench-inline');
+    expect(inline.textContent).toContain('Bench');
+    expect(inline.textContent).toContain('· 2');
+    expect(inline.textContent).toContain("PTS DON'T COUNT");
+    expect(screen.getByTestId('bench-rows')).toBeInTheDocument();
+  });
+  it('LINEUPS draws no bench block when both benches are empty', () => {
+    render(<MatchupComparison {...baseProps} variant="pressbox" section="lineups" />);
+    expect(screen.queryByTestId('matchup-bench-inline')).toBeNull();
+  });
+  it('BENCH shows the bench alone', () => {
+    render(<MatchupComparison {...baseProps} variant="pressbox" section="bench" userBench={[p(1)]} />);
+    expect(screen.queryByTestId('starter-rows')).toBeNull();
+    expect(screen.getByTestId('bench-rows')).toBeInTheDocument();
+    expect(screen.queryByTestId('matchup-bench-inline')).toBeNull();
+  });
+});
