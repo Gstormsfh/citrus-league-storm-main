@@ -33,6 +33,7 @@ import { matchupApi } from '../src/api/matchups';
 import { leagueApi } from '../src/api/leagues';
 import { rosterApi } from '../src/api/rosters';
 import { tradeApi } from '../src/api/trades';
+import { scheduleApi } from '../src/api/schedule';
 import { waiverApi } from '../src/api/waivers';
 import { scoresApi } from '../src/api/scores';
 import { ScoringCalculator, extractScoringSettings } from '../src/utils/scoringUtils';
@@ -491,6 +492,31 @@ const HARNESS_GAMES = new Map<string, any[]>(
 });
 (LeagueSettingsService as any).updateScoringRules = async () => ({ success: true, error: null });
 
+/**
+ * The Schedule screen (2026-09-04): a seven-day slate, three games a day
+ * with a heavier Saturday and one club on a back-to-back, from the same
+ * team list the roster uses.
+ */
+(scheduleApi as any).getGames = async () => {
+  const games: any[] = [];
+  let n = 0;
+  for (let off = 0; off < 7; off++) {
+    const date = isoDay(off);
+    const perDay = off === 6 ? 6 : off === 2 ? 1 : 3;
+    for (let g = 0; g < perDay; g++) {
+      const home = TEAMS[(n * 2) % TEAMS.length];
+      const away = TEAMS[(n * 2 + 1) % TEAMS.length];
+      games.push({ id: `sched-${n}`, game_date: date, game_time: `${date}T${g === 0 ? '23:00' : '01:30'}:00.000Z`, home_team: home, away_team: away, status: 'scheduled' });
+      n += 1;
+    }
+  }
+  // One back-to-back on purpose: the first club plays day 3 and day 4.
+  games.push({ id: 'sched-b2b', game_date: isoDay(3), game_time: `${isoDay(3)}T02:00:00.000Z`, home_team: TEAMS[0], away_team: TEAMS[5], status: 'scheduled' });
+  games.push({ id: 'sched-b2b2', game_date: isoDay(4), game_time: `${isoDay(4)}T02:00:00.000Z`, home_team: TEAMS[7], away_team: TEAMS[0], status: 'scheduled' });
+  games.sort((a, b) => a.game_date.localeCompare(b.game_date));
+  return { data: games, error: null };
+};
+(rosterApi as any).getLineup = async () => ({ data: null });
 (matchupApi as any).getPlayerGameLog = async (playerId: number, start: string, end: string) => {
   const p = PLAYERS.find((x: any) => String(x.id) === String(playerId)) as any;
   const goalie = p?.position === 'G';
@@ -649,6 +675,7 @@ const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
   scores: () => import('../src/pages/Scores'),
   players: () => import('../src/pages/Players'),
   news: () => import('../src/pages/News'),
+  schedule: () => import('../src/pages/ScheduleManager'),
 };
 
 const which = new URLSearchParams(location.search).get('p') || 'waivers';
@@ -671,6 +698,9 @@ const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   scores: { path: '/scores', at: '/scores' },
   players: { path: '/players', at: '/players' },
   news: { path: '/news', at: '/news' },
+  schedule: { path: '/schedule-manager', at: '/schedule-manager?league=harness-league' },
+  trade: { path: '/trade-analyzer', at: '/trade-analyzer?league=harness-league' },
+  waivers: { path: '/waiver-wire', at: '/waiver-wire?league=harness-league' },
   // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
   // the week into the URL as soon as it resolves one. Under the old
   // `/matchup/:leagueId?` the very first push ("/matchup/harness-league/1")
