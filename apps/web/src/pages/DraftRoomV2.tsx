@@ -1087,7 +1087,14 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
 
   return (
     <Card
-      className="mb-4 overflow-hidden border-0 bg-pastel-surface-tile p-0 ring-1 ring-white/10 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.6)]"
+      /* PRESS BOX (PR18 paint sweep, 2026-09-05). The lobby is the screen
+         twelve managers sit on for minutes before a draft, under a Press
+         Box header, and it was the last Citrus 2.0 card in the room: Inter
+         and Montserrat, JetBrains Mono eyebrows, the varsity button. Now
+         the room's own vocabulary -- Barlow Condensed for the one line
+         that matters, Plex for every label, the orange pill. Classes only;
+         every handler, id and test hook is the same element. */
+      className="mb-4 overflow-hidden border-0 bg-pressbox-tile p-0 ring-1 ring-white/[0.08] rounded-[12px] shadow-none"
       data-testid="draft-lobby-v2"
     >
       {/* Hero — this is the last screen before a live draft, so it should
@@ -1100,22 +1107,22 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
         />
         <div className="relative flex items-start justify-between gap-5 flex-wrap">
           <div className="min-w-0">
-            <div className="font-jbmono text-[10px] font-bold uppercase tracking-[0.32em] text-pastel-orange-soft">
+            <div className="font-plex font-semibold text-[9px] uppercase tracking-[0.12em] text-pressbox-orange-soft">
               {isCommissioner ? "You're the commissioner" : 'Draft lobby'}
             </div>
-            <h2 className="mt-1.5 font-sans text-[1.75rem] sm:text-[2.25rem] font-black leading-none tracking-[-0.03em] text-pastel-cream">
+            <h2 className="mt-1.5 font-condensed font-extrabold text-[28px] sm:text-[32px] uppercase leading-none tracking-[0.02em] text-pressbox-text">
               {roomFull ? (
                 <>Everyone&apos;s here.</>
               ) : (
-                <>Waiting on the <span className="text-pastel-orange">room</span>.</>
+                <>Waiting on the <span className="text-pressbox-orange-soft">room</span>.</>
               )}
             </h2>
-            <p className="mt-2 text-sm text-white/55">
+            <p className="mt-2 font-barlow text-[13px] text-pressbox-text/60">
               {teamsError ? (
                 'Team list unavailable. See the list below.'
               ) : (
                 <>
-                  <span className="font-semibold text-pastel-cream">
+                  <span className="font-plex font-semibold text-pressbox-text">
                     {teams.length} of {leagueSize ?? teams.length}
                   </span>{' '}
                   seats filled
@@ -1131,18 +1138,18 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
           </div>
 
           {isCommissioner && (
-            <div className="flex flex-col items-end gap-1.5">
+            <div className="flex flex-col items-stretch gap-1.5 w-full lg:w-auto lg:items-end">
               <Button
                 onClick={handleStart}
                 disabled={isStarting || !roomFull}
                 data-testid="draft-lobby-v2-start"
                 size="lg"
-                className="bg-pastel-orange text-[#2A0F00] hover:bg-pastel-orange-soft border-0 rounded-full px-8 font-black tracking-tight shadow-[0_8px_24px_-6px_rgba(255,107,26,0.55)] disabled:shadow-none"
+                className="h-12 rounded-[12px] px-8 border-0 outline-none shadow-none bg-pressbox-orange text-pressbox-orange-ink hover:bg-pressbox-orange-soft font-plex font-semibold text-[12px] tracking-[0.08em] uppercase"
               >
                 {isStarting ? 'Starting…' : 'Start Draft'}
               </Button>
               {roomFull && !isStarting && (
-                <span className="font-jbmono text-[10px] uppercase tracking-[0.18em] text-white/55">
+                <span className="font-plex font-medium text-[9px] uppercase tracking-[0.12em] text-pressbox-text/55 text-center lg:text-right">
                   This goes live immediately
                 </span>
               )}
@@ -1159,7 +1166,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                   disabled={isFilling}
                   data-testid="draft-lobby-v2-fill-ai"
                   variant="outline"
-                  className="rounded-full border-white/20 bg-white/5 text-pastel-cream hover:bg-white/10"
+                  className="h-11 rounded-[12px] border-white/[0.08] bg-pressbox-tile-high text-pressbox-text hover:bg-pressbox-tile-high font-plex font-semibold text-[12px] tracking-[0.06em] uppercase"
                 >
                   {isFilling
                     ? 'Adding AI teams…'
@@ -1198,12 +1205,12 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
               return (
                 <div
                   key={c.label}
-                  className="rounded-lg bg-white/5 px-3 py-1.5 ring-1 ring-white/10"
+                  className="rounded-[10px] bg-pressbox-tile-high px-3 py-1.5 ring-1 ring-white/[0.08]"
                 >
-                  <span className="font-jbmono text-[9px] uppercase tracking-[0.18em] text-white/55">
+                  <span className="font-plex font-medium text-[9px] uppercase tracking-[0.06em] text-pressbox-text/55">
                     {c.label}
                   </span>
-                  <span className="ml-2 text-sm font-bold text-pastel-cream">{c.value}</span>
+                  <span className="ml-2 font-plex font-semibold text-[13px] text-pressbox-text">{c.value}</span>
                 </div>
               );
             })}
@@ -1216,17 +1223,17 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
             first, link copy beside it. Mechanics live in inviteShare. */}
         {league?.join_code && !roomFull && (
           <div
-            className="relative mt-5 rounded-xl bg-pastel-orange/[0.07] ring-1 ring-pastel-orange/35 p-4"
+            className="relative mt-5 rounded-[12px] bg-pressbox-orange/[0.08] ring-1 ring-pressbox-orange/30 p-4"
             data-testid="draft-lobby-v2-invite"
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="font-jbmono text-[10px] font-bold uppercase tracking-[0.32em] text-pastel-orange-soft">
+                <div className="font-plex font-semibold text-[9px] uppercase tracking-[0.12em] text-pressbox-orange-soft">
                   Invite managers
                 </div>
                 <button
                   type="button"
-                  className="focus-citrus mt-1 font-mono text-2xl font-bold tracking-[0.2em] text-pastel-cream active:opacity-70"
+                  className="focus-citrus mt-1 font-plex text-2xl font-semibold tracking-[0.2em] text-pressbox-text active:opacity-70"
                   onClick={() => {
                     void navigator.clipboard.writeText(league.join_code as string);
                     toast.success('Join code copied');
@@ -1234,7 +1241,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                 >
                   {league.join_code}
                 </button>
-                <div className="text-xs text-white/55">Tap the code to copy it</div>
+                <div className="font-barlow text-[12px] text-pressbox-text/55">Tap the code to copy it</div>
               </div>
               <div className="flex flex-col gap-1.5 w-full sm:w-auto">
                 {canSystemShare() && (
@@ -1314,11 +1321,11 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
           confident lie — you would read "3rd" in the lobby and pick ninth.
           So the seats say who is here, the badge is an initial rather than
           a rank, and the line below says when the order is decided. */}
-      <div className="border-t border-white/5 bg-black/15 px-5 py-4 sm:px-7">
-        <div className="mb-1 font-jbmono text-[10px] font-bold uppercase tracking-[0.28em] text-white/55">
+      <div className="border-t border-white/[0.08] bg-black/15 px-5 py-4 sm:px-7">
+        <div className="mb-1 font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text">
           The room
         </div>
-        <div className="mb-3 text-xs text-white/55">
+        <div className="mb-3 font-barlow text-[12px] text-pressbox-text/55">
           Draft order is randomized when the draft starts.
         </div>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -1327,18 +1334,18 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
             return (
               <div
                 key={t.id}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 ring-1 transition-colors ${
+                className={`flex items-center gap-3 rounded-[12px] px-3 min-h-[52px] py-2 ring-1 transition-colors ${
                   isMine
-                    ? 'bg-pastel-orange/10 ring-pastel-orange/40'
-                    : 'bg-white/5 ring-white/10'
+                    ? 'bg-pressbox-orange/10 ring-pressbox-orange/40'
+                    : 'bg-pressbox-tile-high ring-white/[0.08]'
                 }`}
               >
                 <span
                   aria-hidden="true"
-                  className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg font-jbmono text-[11px] font-bold ${
+                  className={`grid h-8 w-8 flex-shrink-0 place-items-center rounded-full font-condensed text-[12px] font-extrabold ${
                     isMine
-                      ? 'bg-pastel-orange text-[#2A0F00]'
-                      : 'bg-white/10 text-white/55'
+                      ? 'bg-pressbox-orange text-pressbox-orange-ink'
+                      : 'bg-white/10 text-pressbox-text/70'
                   }`}
                 >
                   {(t.team_name ?? '').trim().charAt(0).toUpperCase() || '\u00b7'}
@@ -1357,21 +1364,21 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                       }}
                       aria-label="Your team name"
                       data-testid="lobby-rename-input"
-                      className="min-w-0 flex-1 rounded-md bg-black/30 px-2 py-1 text-sm font-bold text-pastel-cream ring-1 ring-pastel-orange/40 outline-none"
+                      className="min-w-0 flex-1 rounded-[8px] bg-black/30 px-2 py-1.5 font-barlow text-[15px] font-semibold text-pressbox-text ring-1 ring-pressbox-orange/40 outline-none"
                     />
                     <button
                       type="button"
                       onClick={() => void saveTeamName()}
                       disabled={renameSaving}
                       data-testid="lobby-rename-save"
-                      className="shrink-0 rounded-md bg-pastel-orange px-2 py-1 font-jbmono text-[10px] font-bold uppercase tracking-[0.12em] text-[#2A0F00] active:scale-95"
+                      className="shrink-0 rounded-[8px] bg-pressbox-orange px-2.5 py-1.5 font-plex text-[10px] font-semibold uppercase tracking-[0.08em] text-pressbox-orange-ink active:scale-95"
                     >
                       {renameSaving ? '…' : 'Save'}
                     </button>
                   </>
                 ) : (
                   <>
-                    <span className="min-w-0 flex-1 truncate text-sm font-bold text-pastel-cream">
+                    <span className="min-w-0 flex-1 truncate font-barlow text-[15px] font-semibold text-pressbox-text">
                       {t.team_name}
                     </span>
                     {isMine && (
@@ -1383,7 +1390,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                         }}
                         data-testid="lobby-rename-open"
                         aria-label="Rename your team"
-                        className="shrink-0 rounded-md px-2 py-1 font-jbmono text-[9px] font-bold uppercase tracking-[0.16em] text-pastel-orange-soft ring-1 ring-pastel-orange/40 active:scale-95"
+                        className="shrink-0 rounded-full px-2.5 py-1.5 font-plex text-[9px] font-semibold uppercase tracking-[0.1em] text-pressbox-orange-soft ring-1 ring-pressbox-orange/40 active:scale-95"
                       >
                         Rename
                       </button>
@@ -1396,7 +1403,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                         data-testid="lobby-remove-ai"
                         aria-label={`Remove ${t.team_name} and open the seat`}
                         title="Open this seat for a manager"
-                        className="shrink-0 rounded-md px-2 py-1 font-jbmono text-[11px] font-bold leading-none text-white/55 ring-1 ring-white/15 active:scale-95"
+                        className="shrink-0 rounded-full px-2.5 py-1.5 font-plex text-[11px] font-semibold leading-none text-pressbox-text/55 ring-1 ring-white/15 active:scale-95"
                       >
                         {removingTeamId === t.id ? '…' : '\u00d7'}
                       </button>
@@ -1405,7 +1412,7 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
                 )}
                 <span
                   className={`h-2 w-2 flex-shrink-0 rounded-full ${
-                    t.owner_id ? 'bg-pastel-sage' : 'bg-white/20'
+                    t.owner_id ? 'bg-pressbox-sage' : 'bg-white/20'
                   }`}
                   title={t.owner_id ? 'Manager ready' : 'Seat open'}
                 />

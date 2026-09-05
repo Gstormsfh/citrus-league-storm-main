@@ -40,6 +40,14 @@ export class DraftClientRunner {
 
   connect(_params: unknown, callbacks: Record<string, unknown> = {}) {
     this.cbs = callbacks as never;
+    // `?lobby=1`: the draft has not been started -- discovery answered
+    // DRAFT_NOT_CONNECTABLE / not_started -- so the room shows the lobby.
+    if (new URLSearchParams(location.search).get('lobby') === '1') {
+      queueMicrotask(() => {
+        this.set({ kind: 'reconnecting', nextAttemptAt: Date.now() + 3000, attempt: 0, lastError: null, waitingForStart: true });
+      });
+      return;
+    }
     const deadline = new Date(Date.now() + CLOCK_SECONDS * 1000).toISOString();
     /**
      * A real seed carries the `draft_started` event, and the store reads the
