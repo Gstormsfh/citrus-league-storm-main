@@ -328,3 +328,33 @@ The proof also caught a defect in this migration before it reached prod: `pg_get
 **Reversal.** `DROP FUNCTION public.get_player_ownership();` — the route returns `[]` and the rows print no percentages; nothing else depends on it.
 
 **Ledger note.** SQL Editor apply; no `schema_migrations` row; the repo file is the record.
+
+## Ops change: prod draft engine redeployed to `599b1f69` (2026-09-05 ~11:10Z)
+
+**What.** `citrus-draft-engine-prod` (project `citrus-fantasy-prod`, zone `northamerica-northeast1-a`) moved from image `sha256:624c63bd505f3cf898574e6ba2fbd7f0ba6e0a5e3bb96ade2e594bad344399dd` (commit `60f81e45`, booted 2026-09-01 20:31Z) to `northamerica-northeast1-docker.pkg.dev/citrus-fantasy-prod/citrus-draft-engine/draft-engine:engine-599b1f69`, digest `sha256:9745fc3fb78cbbe151418f3cf0a70050cabffc2dfe842ff306774c1beb265bc5`, commit `599b1f69a96e74cd202f055132d7501b1af133e8` (branch `redesign/pressbox`, a superset of `origin/master` at `8a4a596d`). Built with Cloud Build `578f2ec7-3f2e-49e4-860b-11ec9c40698a` from `infra/gce/cloudbuild-draft-engine.yaml` (3m57s, SUCCESS); digest confirmed with `gcloud artifacts docker images describe` before the metadata write; VM metadata set in one `add-metadata` call (`image-tag`, `image-sha`, `commit-sha`); `reset`.
+
+**Why.** The running build predated `aced0e6f` (2026-09-03), the auction foreign-pick guard in `server/src/draft/LobbyManager.ts` -- the fix for the 2026-09-01 incident in which the format-blind pgmq safety net wrote 53 snake picks into auction league a1a125c8. The Sep 3 brief's order: redeploy the engine, apply 11g.9 steps 1-3, then test an auction.
+
+**Executed by.** Garrett, from his Mac (`gcloud` installed via Homebrew tonight), 2026-09-05 10:48Z-11:10Z. The daylight rule (DEPLOY_PROTOCOL_F26_F27 §4d, no engine deploy after midnight MT) was knowingly set aside: 0 drafts in progress, the operator awake and testing immediately.
+
+**After** (Garrett's paste, 11:10:08Z). `uws.listening 3002`; `deployment.fingerprint` imageSha `sha256:9745fc…265bc5`, commitSha `599b1f69a96e…33e8`, all seven env vars present, startup 41ms; `registry.boot_scan_complete scanned 0, resumed 0, failed 0`. `https://draft.citrusfantasysports.com/` answers the uWebSockets 404, which is the deploy workflow's own healthy-endpoint check.
+
+**Rollback.** One call, then a reset:
+`gcloud compute instances add-metadata citrus-draft-engine-prod --project citrus-fantasy-prod --zone northamerica-northeast1-a --metadata="image-tag=engine-60f81e45,image-sha=sha256:624c63bd505f3cf898574e6ba2fbd7f0ba6e0a5e3bb96ade2e594bad344399dd,commit-sha=60f81e45"` ·
+`gcloud compute instances reset citrus-draft-engine-prod --project citrus-fantasy-prod --zone northamerica-northeast1-a --quiet`.
+
+## Rule 1 recorded change: chunk 11g.9 steps 1-3 applied -- the pgmq autopick path retired (2026-09-05 ~11:15Z)
+
+**What.** `supabase/migrations/20260824230000_chunk_11g9_decommission_pgmq_autopick.sql`, steps 1-3 (steps 4-5 remain commented out in the file and were NOT run): `cron.unschedule('draft-autopick-keepalive')`; `CREATE OR REPLACE FUNCTION public.draft_deadline_sweep()` without the `pgmq.send`; `DROP FUNCTION IF EXISTS` for `draft_autopick_read(integer, integer)`, `draft_autopick_read(integer)`, `draft_autopick_archive(bigint)`, `draft_autopick_dlq(uuid, integer, integer, text, bigint)`. Capture: `captures/2026-09-03_pre_chunk_11g9_decommission_pgmq_autopick.sql`.
+
+**Why.** The header of that file, and the two incidents it cites (2026-08-21 f548834a, 2026-09-01 a1a125c8): the Edge worker had no notion of draft format and finished two auctions as snake drafts. The prod engine's own `OrphanedDraftScanner` is the safety net now; it required a prod engine, which exists since 2026-08-18 and was redeployed to the current build minutes before this (entry above).
+
+**Measured before applying** (read-only, Claude, ~10:40Z): 0 drafts in progress; `draft_deadline_sweep` body md5 `edcd02ced675ff61d5b685e8ccbd6022` = the captured body; queue depth 0; both safety-net cron jobs active.
+
+**Executed by.** Garrett, SQL Editor, `pbcopy` of the whole file, 2026-09-05 ~11:15Z. "Success. No rows returned."
+
+**After** (read-only, Claude, ~11:20Z). `draft-autopick-keepalive` cron rows: 0. `draft-deadline-sweep` cron still scheduled and active (by design: the sweep keeps running, now without a queue write); its body md5 `a5cd5454e93d91ef0121429a1d26446a`, `pgmq.send` absent. Wrapper RPCs in `public`: 0. `pgmq.q_draft_deadlines` depth 0. Drafts in progress 0.
+
+**Reversal.** Restore the captured body of `draft_deadline_sweep` from the capture file; `SELECT cron.schedule('draft-autopick-keepalive', '*/2 * * * *', <the captured command>)`; the wrapper RPC bodies are in the same capture. Reversal re-arms the format-blind path and should not be done while any auction league is in progress.
+
+**Ledger note.** SQL Editor apply; no `schema_migrations` row; the repo file is the record.
