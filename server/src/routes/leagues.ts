@@ -11,8 +11,8 @@ import { TeamAnalyticsService } from '../services/TeamAnalyticsService';
 import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
-import { mirrorRulesIntoSettings, settingsDiffer } from '../lib/scoringMirror';
-import { getCurrentSeason, logger } from '@citrus/shared';
+import { mirrorRulesIntoSettings, mirrorRulesIntoStatsList, settingsDiffer } from '../lib/scoringMirror';
+import { getCurrentSeason, logger, SCORING_DEFAULTS } from '@citrus/shared';
 
 const leagueRoutes = new Hono<Env>();
 
@@ -578,7 +578,7 @@ leagueRoutes.put('/:leagueId/scoring-rules', commissionerMiddleware, async (c) =
       const [catalogRes, effectiveRes, leagueRes] = await Promise.all([
         admin.from('stat_catalog').select('stat_key, applies_to'),
         admin.rpc('get_effective_scoring_rules', { p_league_id: leagueId }),
-        admin.from('leagues').select('scoring_settings').eq('id', leagueId).single(),
+        admin.from('leagues').select('scoring_settings, settings').eq('id', leagueId).single(),
       ]);
       if (catalogRes.error) throw new Error(catalogRes.error.message);
       if (effectiveRes.error) throw new Error(effectiveRes.error.message);
@@ -588,8 +588,21 @@ leagueRoutes.put('/:leagueId/scoring-rules', commissionerMiddleware, async (c) =
         (catalogRes.data ?? []) as Array<{ stat_key: string; applies_to: string }>,
         (effectiveRes.data ?? []) as Array<{ stat_key: string; multiplier: number | string }>,
       );
-      if (settingsDiffer(leagueRes.data?.scoring_settings ?? null, mirrored)) {
-        const { error: mirrorErr } = await admin.from('leagues').update({ scoring_settings: mirrored }).eq('id', leagueId);
+      const update: Record<string, unknown> = {};
+      if (settingsDiffer(leagueRes.data?.scoring_settings ?? null, mirrored)) update.scoring_settings = mirrored;
+      // The form's own copy (settings.stats) too: the scoring-change audit
+      // trigger watches it, so leaving it stale left no trail of the edit.
+      const currentSettings = (leagueRes.data?.settings ?? null) as Record<string, unknown> | null;
+      const statsList = mirrorRulesIntoStatsList(
+        currentSettings?.stats,
+        (effectiveRes.data ?? []) as Array<{ stat_key: string; multiplier: number | string }>,
+        new Map(SCORING_DEFAULTS.stats.map((s) => [s.id, s.key])),
+      );
+      if (statsList && currentSettings && settingsDiffer(currentSettings.stats, statsList)) {
+        update.settings = { ...currentSettings, stats: statsList };
+      }
+      if (Object.keys(update).length > 0) {
+        const { error: mirrorErr } = await admin.from('leagues').update(update).eq('id', leagueId);
         if (mirrorErr) throw new Error(mirrorErr.message);
       }
     } catch (mirrorFail) {

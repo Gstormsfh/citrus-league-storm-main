@@ -62,3 +62,39 @@ function stable(v: unknown): string {
     .map((k) => `${JSON.stringify(k)}:${stable(o[k])}`)
     .join(',')}}`;
 }
+
+/**
+ * The third copy: `settings.stats`, the Create League form's rows
+ * ({ id, name, points, enabled, ... }, ids like `g`, `ppp`). Nothing in
+ * the app reads it, but the `log_league_scoring_change` trigger audits a
+ * scoring change by watching it, so a rule edit that left it stale left
+ * no audit trail. Update points and enabled in place from the effective
+ * rules, by the catalog's id → key map; rows for stats the rules do not
+ * cover are kept as they are.
+ */
+export interface StatsListRow {
+  id: string;
+  points?: number;
+  enabled?: boolean;
+  [k: string]: unknown;
+}
+
+export function mirrorRulesIntoStatsList(
+  existing: unknown,
+  effective: readonly EffectiveRule[],
+  keyById: ReadonlyMap<string, string>,
+): StatsListRow[] | null {
+  if (!Array.isArray(existing)) return null;
+  const byKey = new Map<string, number>();
+  for (const r of effective) {
+    const m = Number(r.multiplier);
+    if (Number.isFinite(m)) byKey.set(r.stat_key, m);
+  }
+  return (existing as StatsListRow[]).map((row) => {
+    if (!row || typeof row !== 'object' || typeof row.id !== 'string') return row;
+    const key = keyById.get(row.id);
+    if (!key || !byKey.has(key)) return row;
+    const m = byKey.get(key) as number;
+    return { ...row, points: m, enabled: m !== 0 };
+  });
+}

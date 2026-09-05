@@ -155,6 +155,11 @@ export class LeagueService {
       settings: settings || {},
       scoring_settings: effectiveScoringSettings,
     };
+    // SETTINGS PASS-THROUGH (2026-09-05): mirror the commissioner's slot
+    // shape into the dedicated column (see updateRosterSlotSettings).
+    if (settings?.rosterSlots && typeof settings.rosterSlots === 'object') {
+      insertRow.roster_slots = settings.rosterSlots;
+    }
 
     // Write waiver settings to dedicated columns (fantasy leagues)
     // These come merged into settings from the client, or via waiverSettings param
@@ -470,6 +475,10 @@ export class LeagueService {
       .update({
         settings: updatedSettings,
         roster_size: newRosterSize,
+        // SETTINGS PASS-THROUGH (2026-09-05): the dedicated column carried
+        // its default forever; settings.rosterSlots is what the app reads
+        // (resolveSlotConfig), so the column mirrors it and never disagrees.
+        roster_slots: rosterSlots,
         updated_at: new Date().toISOString(),
       })
       .eq('id', leagueId);
