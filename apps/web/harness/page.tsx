@@ -885,7 +885,8 @@ const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   // So does Free Agents — and the LeagueHeader's PLAYERS underline matches on
   // the pathname, so under the harness's own path it lit LEAGUE instead.
   freeagents: { path: '/free-agents', at: '/free-agents?league=harness-league' },
-  home: { path: '/', at: '/' },
+  // `/` opens the active league's HQ since 2026-09-05; the list is `?all=1`.
+  home: { path: '/', at: '/?all=1' },
   scores: { path: '/scores', at: '/scores' },
   players: { path: '/players', at: '/players' },
   news: { path: '/news', at: '/news' },

@@ -79,11 +79,11 @@ export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, .
         leagueName={resolvedName}
         tiles={tiles}
         user={menuUserFromProfile(profile)}
-        /* SWITCH ▾ goes to the LEAGUES tab, which lists them: the artboard's
-           home is the league switcher, and one list beats a second picker. */
+        /* SWITCH ▾ goes to the league list (the artboard's home). `/` itself
+           opens the active league's HQ since 2026-09-05; `?all=1` is the list. */
         onSwitchLeague={() => {
           setMenuOpen(false);
-          navigate('/');
+          navigate('/?all=1');
         }}
       />
     </>

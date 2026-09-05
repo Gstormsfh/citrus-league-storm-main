@@ -41,6 +41,9 @@ const OTHER_PREFIXES = ['/scores', '/players', '/news', '/profile'];
 export function PressBoxBottomNav({ className }: { className?: string }) {
   const { pathname } = useLocation();
   const leaguesActive = !OTHER_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  // `/` opens the active league's HQ (2026-09-05). From inside a league,
+  // LEAGUES is the way to the list of them, so a second tap goes there.
+  const leaguesTo = leaguesActive && pathname !== '/' ? '/?all=1' : '/';
   return (
     <nav
       aria-label="Main"
@@ -56,7 +59,7 @@ export function PressBoxBottomNav({ className }: { className?: string }) {
         {TABS.map(({ to, label, Icon, end }) => (
           <li key={to} className="contents">
             <NavLink
-              to={to}
+              to={to === '/' ? leaguesTo : to}
               end={end}
               aria-current={to === '/' && leaguesActive ? 'page' : undefined}
               className={({ isActive }) =>

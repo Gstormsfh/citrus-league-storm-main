@@ -6,6 +6,7 @@ import { useLeague } from '@/contexts/LeagueContext';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useSeasonStatus } from '@/hooks/useSeasonStatus';
 import { PressBoxHome } from '@/components/home/PressBoxHome';
+import { Navigate, useLocation } from 'react-router-dom';
 import LoadingScreen from '@/components/LoadingScreen';
 
 /**
@@ -37,6 +38,7 @@ const Index = () => {
   const league = useLeague();
   const isMobile = useIsMobile();
   const { status: seasonStatus } = useSeasonStatus();
+  const location = useLocation();
 
   const native = Capacitor.isNativePlatform();
   if (native) {
@@ -57,6 +59,16 @@ const Index = () => {
 
   const hasLeagues = (league?.userLeagues?.length ?? 0) > 0;
   if (auth?.user && hasLeagues && (native || isMobile)) {
+    // LEAGUE HQ IS HOME (2026-09-05). "I want to see LEAGUE HQ when I log
+    // in; it adds a lot more value, like a main menu." With an active league
+    // the app opens on its HQ; the league list is one tap away (`?all=1`,
+    // which is where SWITCH in the league menu and a second tap on LEAGUES
+    // go). A manager with leagues but no active one still gets the list.
+    const wantsList = new URLSearchParams(location.search).get('all') === '1';
+    const activeId = league?.activeLeagueId;
+    if (!wantsList && activeId && league?.userLeagues?.some((l) => l.id === activeId)) {
+      return <Navigate to={`/league/${activeId}`} replace />;
+    }
     return <PressBoxHome inOffseason={seasonStatus.isDormant && seasonStatus.phase === 'offseason'} />;
   }
 
