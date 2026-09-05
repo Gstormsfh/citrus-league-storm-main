@@ -32,6 +32,7 @@ import { PlayoffService } from '../src/services/PlayoffService';
 import { matchupApi } from '../src/api/matchups';
 import { leagueApi } from '../src/api/leagues';
 import { rosterApi } from '../src/api/rosters';
+import { tradeApi } from '../src/api/trades';
 import { waiverApi } from '../src/api/waivers';
 import { scoresApi } from '../src/api/scores';
 import { ScoringCalculator, extractScoringSettings } from '../src/utils/scoringUtils';
@@ -321,6 +322,35 @@ const HARNESS_NOW = Date.now();
   })),
 });
 (rosterApi as any).getTeamRoster = async () => ({ data: MY_ROSTER.map((p: any) => ({ player_id: p.id })) });
+/**
+ * The trade center (2026-09-04): every team's roster, so a partner has a
+ * roster to pick from — t1 is MY_ROSTER, the other nine take the rest of
+ * the directory in turn — and a wire of trade offers in every state the
+ * OFFERS tab draws: one waiting on you, one you sent, two settled.
+ */
+(rosterApi as any).getLeagueRosters = async () => ({
+  data: PRIORITY.flatMap((t, ti) =>
+    (ti === 0 ? MY_ROSTER : PLAYERS.slice(18 + (ti - 1) * 4, 18 + ti * 4)).map((p: any) => ({ team_id: t.team_id, player_id: Number(p.id) })),
+  ),
+});
+(tradeApi as any).getLeagueTrades = async (_leagueId: string, status?: string) => {
+  const summary = (p: any) => ({ player_id: Number(p.id), full_name: p.full_name, position_code: p.position, team_abbrev: p.team });
+  const offer = (id: string, from: number, to: number, status: string, give: any[], get: any[], over: Record<string, unknown> = {}) => ({
+    id, league_id: 'harness-league', from_team_id: PRIORITY[from].team_id, to_team_id: PRIORITY[to].team_id,
+    from_team_name: PRIORITY[from].team_name, to_team_name: PRIORITY[to].team_name,
+    offered_player_ids: give.map((p) => Number(p.id)), requested_player_ids: get.map((p) => Number(p.id)),
+    offered_players: give.map(summary), requested_players: get.map(summary),
+    status, message: null, created_at: new Date(HARNESS_NOW - 3_600_000).toISOString(), expires_at: null, processed_at: null,
+    counter_offer_id: null, review_type: 'none', review_started_at: null, review_ends_at: null, vetoed_at: null, ...over,
+  });
+  const all = [
+    offer('tr-1', 2, 0, 'pending', [PLAYERS[22]], [MY_ROSTER[3]], { message: 'Need a winger, you need D. Fair?' }),
+    offer('tr-2', 0, 4, 'pending', [MY_ROSTER[7]], [PLAYERS[30]]),
+    offer('tr-3', 0, 3, 'accepted', [MY_ROSTER[10]], [PLAYERS[27]]),
+    offer('tr-4', 5, 0, 'rejected', [PLAYERS[34]], [MY_ROSTER[1]]),
+  ];
+  return { data: status ? all.filter((o) => o.status === status) : all, error: null };
+};
 (rosterApi as any).getPlayerIds = async () => ({ data: MY_ROSTER.map((p: any) => Number(p.id)) });
 /**
  * A REAL SCHEDULE, not an empty Map (2026-09-04).
