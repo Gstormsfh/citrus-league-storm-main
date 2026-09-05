@@ -236,8 +236,8 @@ const Auth = () => {
               setLoading(false);
               return;
             }
-            if (oauthProviders.includes('google')) { setError("This email signed up with Google. Click 'Continue with Google' above."); setLoading(false); return; }
-            if (oauthProviders.includes('apple')) { setError("This email signed up with Apple. Click 'Continue with Apple' above."); setLoading(false); return; }
+            if (oauthProviders.includes('google')) { setError("This email signed up with Google. Use Continue with Google above."); setLoading(false); return; }
+            if (oauthProviders.includes('apple')) { setError("This email signed up with Apple. Use Continue with Apple above."); setLoading(false); return; }
             if (oauthProviders.length > 0) { setError(`This email signed up with ${oauthProviders[0]}. Use that option above.`); setLoading(false); return; }
           }
         } catch { /* fall through */ }

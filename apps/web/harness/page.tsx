@@ -759,8 +759,9 @@ const consentRows: Array<Record<string, unknown>> =
           { policy_type: 'privacy_policy', status: 'current', required_version: '2026-01-13', consented_version: '2026-01-13', consented_at: '2026-01-20T00:00:00.000Z', withdrawn_at: null },
         ]
       : [
-          { policy_type: 'privacy_policy', status: 'current', required_version: '2026-08', consented_version: '2026-08', consented_at: '2026-08-14T00:00:00.000Z', withdrawn_at: null },
-          { policy_type: 'terms_of_service', status: 'outdated', required_version: '2026-09', consented_version: '2026-06', consented_at: '2026-06-02T00:00:00.000Z', withdrawn_at: null },
+          // Default: everything current, so the gate stays out of every other page's review.
+          { policy_type: 'terms_of_service', status: 'current', required_version: '2026-01-13', consented_version: '2026-01-13', consented_at: '2026-01-20T00:00:00.000Z', withdrawn_at: null },
+          { policy_type: 'privacy_policy', status: 'current', required_version: '2026-01-13', consented_version: '2026-01-13', consented_at: '2026-01-20T00:00:00.000Z', withdrawn_at: null },
         ];
 // A fresh array each read, as the network gives: React skips a state set to the same reference.
 (accountApi as any).getConsentStatus = async () => ({ data: consentRows.map((r) => ({ ...r })) });

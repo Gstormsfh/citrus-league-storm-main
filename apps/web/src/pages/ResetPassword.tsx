@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Lock, CheckCircle2, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { PasswordStrength } from '@/components/auth/PasswordStrength';
-import { DarkLayout } from '@/components/citrus2';
+import { CitrusLogo, DarkLayout } from '@/components/citrus2';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -97,7 +97,7 @@ const ResetPassword = () => {
     const timer = setTimeout(() => {
       if (accepted) return;
       setChecking(false);
-      setError('Invalid or expired reset link. Please request a new password reset.');
+      setError('That link has expired or was already used. Ask for a fresh one with Forgot password on the sign-in screen.');
     }, 6000);
 
     return () => {
@@ -152,12 +152,14 @@ const ResetPassword = () => {
         <div className="hidden lg:block"><Navbar /></div>
         <main className="pb-type-phone relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)] max-lg:min-h-screen max-lg:bg-pressbox-surface max-lg:text-pressbox-text max-lg:px-5 max-lg:pt-[calc(2.5rem+env(safe-area-inset-top))]">
           <Card className="w-full max-w-md bg-[#1A2A20] border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] max-lg:bg-transparent max-lg:border-0 max-lg:ring-0 max-lg:shadow-none max-lg:rounded-none">
-            <CardHeader className="max-lg:p-0 max-lg:pb-5">
-              <CardTitle className="flex items-center gap-2 text-pastel-cream max-lg:font-condensed max-lg:font-extrabold max-lg:text-[24px] max-lg:uppercase max-lg:tracking-[0.02em] max-lg:text-pressbox-text">
-                <CheckCircle2 className="h-5 w-5 text-pastel-sage" aria-hidden="true" />
-                Password Reset Successful
+                        {/* The crest, phone only: the same front door as /auth (2026-09-05). */}
+            <div className="lg:hidden flex justify-center mb-5"><CitrusLogo className="w-14 h-14" variant="on-dark" /></div>
+            <CardHeader className="max-lg:p-0 max-lg:pb-5 max-lg:text-center">
+              <CardTitle className="flex items-center gap-2 max-lg:justify-center text-pastel-cream max-lg:font-condensed max-lg:font-extrabold max-lg:text-[24px] max-lg:uppercase max-lg:tracking-[0.02em] max-lg:text-pressbox-text">
+                <CheckCircle2 className="max-lg:hidden h-5 w-5 text-pastel-sage" aria-hidden="true" />
+                Password updated
               </CardTitle>
-              <CardDescription className="text-white/60 max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">Your password has been updated successfully.</CardDescription>
+              <CardDescription className="text-white/60 max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">You are signed in with the new one. Taking you back now.</CardDescription>
             </CardHeader>
             <CardContent className="max-lg:p-0">
               <Alert className="bg-pastel-sage/15 ring-1 ring-pastel-sage/40 border-0 text-pastel-sage-soft">
@@ -194,16 +196,18 @@ const ResetPassword = () => {
         <div className="hidden lg:block"><Navbar /></div>
         <main className="pb-type-phone relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)] max-lg:min-h-screen max-lg:bg-pressbox-surface max-lg:text-pressbox-text max-lg:px-5 max-lg:pt-[calc(2.5rem+env(safe-area-inset-top))]">
           <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] max-lg:bg-transparent max-lg:border-0 max-lg:ring-0 max-lg:shadow-none max-lg:rounded-none">
-            <CardHeader className="max-lg:p-0 max-lg:pb-5">
-              <CardTitle className="flex items-center gap-2 text-pastel-cream max-lg:font-condensed max-lg:font-extrabold max-lg:text-[24px] max-lg:uppercase max-lg:tracking-[0.02em] max-lg:text-pressbox-text">
-                <XCircle className="h-5 w-5 text-pastel-orange" aria-hidden="true" />
-                Invalid Reset Link
+                        {/* The crest, phone only: the same front door as /auth (2026-09-05). */}
+            <div className="lg:hidden flex justify-center mb-5"><CitrusLogo className="w-14 h-14" variant="on-dark" /></div>
+            <CardHeader className="max-lg:p-0 max-lg:pb-5 max-lg:text-center">
+              <CardTitle className="flex items-center gap-2 max-lg:justify-center text-pastel-cream max-lg:font-condensed max-lg:font-extrabold max-lg:text-[24px] max-lg:uppercase max-lg:tracking-[0.02em] max-lg:text-pressbox-text">
+                <XCircle className="max-lg:hidden h-5 w-5 text-pastel-orange" aria-hidden="true" />
+                That link is done
               </CardTitle>
-              <CardDescription className="text-white/60 max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">{error || 'This password reset link is invalid or has expired.'}</CardDescription>
+              <CardDescription className="text-white/60 max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">{error || 'That link has expired or was already used.'}</CardDescription>
             </CardHeader>
             <CardContent className="max-lg:p-0">
               <Button onClick={() => navigate('/auth')} className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft max-lg:h-12 max-lg:rounded-[12px] max-lg:border-0 max-lg:outline-none max-lg:shadow-none max-lg:bg-pressbox-orange max-lg:text-pressbox-orange-ink max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.08em] max-lg:uppercase">
-                Return to Sign In
+                Back to sign in
               </Button>
             </CardContent>
           </Card>
@@ -217,9 +221,11 @@ const ResetPassword = () => {
       <div className="hidden lg:block"><Navbar /></div>
       <main className="pb-type-phone relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)] max-lg:min-h-screen max-lg:bg-pressbox-surface max-lg:text-pressbox-text max-lg:px-5 max-lg:pt-[calc(2.5rem+env(safe-area-inset-top))]">
         <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] max-lg:bg-transparent max-lg:border-0 max-lg:ring-0 max-lg:shadow-none max-lg:rounded-none">
-          <CardHeader className="max-lg:p-0 max-lg:pb-5">
-            <CardTitle className="text-2xl font-bold text-pastel-cream max-lg:font-condensed max-lg:font-extrabold max-lg:text-[24px] max-lg:uppercase max-lg:tracking-[0.02em] max-lg:text-pressbox-text max-lg:text-[28px]">Reset Your Password</CardTitle>
-            <CardDescription className="text-white/60 max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">Enter your new password below</CardDescription>
+                      {/* The crest, phone only: the same front door as /auth (2026-09-05). */}
+            <div className="lg:hidden flex justify-center mb-5"><CitrusLogo className="w-14 h-14" variant="on-dark" /></div>
+            <CardHeader className="max-lg:p-0 max-lg:pb-5 max-lg:text-center">
+            <CardTitle className="text-2xl font-bold text-pastel-cream max-lg:font-condensed max-lg:font-extrabold max-lg:text-[24px] max-lg:uppercase max-lg:tracking-[0.02em] max-lg:text-pressbox-text max-lg:text-[28px]">Choose a new password</CardTitle>
+            <CardDescription className="text-white/60 max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">At least 8 characters. Something you have not used here before.</CardDescription>
           </CardHeader>
         <CardContent className="max-lg:p-0">
           <form onSubmit={handleSubmit} className="space-y-4">

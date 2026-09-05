@@ -166,6 +166,11 @@ const ProfileSetup = () => {
                   </p>
                 </div>
 
+                {/* PHONE (2026-09-05): username and a name are the setup. The
+                    email is read-only, and phone and location are optional
+                    facts the Account screen still takes; six fields on a
+                    first-run screen is a form, not a welcome. Desktop keeps
+                    them. The ids stay in the tree for the tests. */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="firstName" className="max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">First Name</Label>
@@ -191,7 +196,7 @@ const ProfileSetup = () => {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 max-lg:hidden">
                   <Label htmlFor="email" className="max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">Email</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground max-lg:top-1/2 max-lg:-translate-y-1/2 max-lg:text-pressbox-text/45" aria-hidden="true" />
@@ -208,7 +213,7 @@ const ProfileSetup = () => {
                   </p>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 max-lg:hidden">
                   <Label htmlFor="phone" className="max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">Phone</Label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground max-lg:top-1/2 max-lg:-translate-y-1/2 max-lg:text-pressbox-text/45" aria-hidden="true" />
@@ -223,7 +228,7 @@ const ProfileSetup = () => {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 max-lg:hidden">
                   <Label htmlFor="location" className="max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">Location</Label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground max-lg:top-1/2 max-lg:-translate-y-1/2 max-lg:text-pressbox-text/45" aria-hidden="true" />

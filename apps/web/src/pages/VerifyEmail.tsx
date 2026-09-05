@@ -99,7 +99,7 @@ const VerifyEmail = () => {
               <Alert>
                 <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                 <AlertDescription>
-                  Verification email sent! Check your inbox and click the link to verify your account.
+                  Verification email sent. Check your inbox and open the link to verify your account.
                 </AlertDescription>
               </Alert>
             )}
@@ -112,10 +112,10 @@ const VerifyEmail = () => {
 
             <div className="space-y-2 text-center">
               <p className="text-sm text-muted-foreground max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">
-                Click the verification link in the email to activate your Citrus Fantasy Sports account. The link expires after 24 hours.
+                Open the link in that email to activate your Citrus account. It expires after 24 hours.
               </p>
               <p className="text-sm text-muted-foreground max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">
-                Didn't receive it? Check your spam folder or click below to resend.
+                Nothing there? Check spam, or send it again.
               </p>
             </div>
 

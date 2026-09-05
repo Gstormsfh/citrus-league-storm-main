@@ -137,20 +137,22 @@ const AuthCallback = () => {
               <MascotAvatar id="stormy" size="lg" />
             </div>
             <CardTitle className="flex items-center justify-center gap-2 text-pastel-cream max-lg:font-condensed max-lg:font-extrabold max-lg:text-[24px] max-lg:uppercase max-lg:tracking-[0.02em] max-lg:text-pressbox-text">
-              {status === 'loading' && <Loader2 className="h-5 w-5 animate-spin text-pastel-orange-soft" aria-hidden="true" />}
+              {status === 'loading' && <Loader2 className="max-lg:hidden h-5 w-5 animate-spin text-pastel-orange-soft" aria-hidden="true" />}
               {status === 'success' && <CheckCircle2 className="h-5 w-5 text-pastel-sage" aria-hidden="true" />}
               {status === 'error' && <XCircle className="h-5 w-5 text-pastel-orange" aria-hidden="true" />}
               {status === 'loading' && 'Signing you in'}
               {status === 'success' && 'Welcome to Citrus'}
               {status === 'error' && "Sign-In Snag"}
             </CardTitle>
-            <CardDescription className="text-white/60 max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60">{message}</CardDescription>
+            {/* The phone shows one line under the title; "Completing sign-in..." and
+                "Stormy is checking you in" were the same fact twice. */}
+            <CardDescription className={`text-white/60 max-lg:font-barlow max-lg:text-[13px] max-lg:text-pressbox-text/60 ${status === 'loading' ? 'max-lg:hidden' : ''}`}>{message}</CardDescription>
           </CardHeader>
           <CardContent className="max-lg:p-0">
             {status === 'loading' && (
-              <div className="flex flex-col items-center gap-4">
-                <Loader2 className="h-8 w-8 animate-spin text-pastel-orange-soft" />
-                <p className="text-sm text-white/55 max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">Stormy is checking you in...</p>
+              <div className="flex flex-col items-center gap-4 max-lg:gap-3 max-lg:pt-1">
+                <Loader2 className="h-8 w-8 animate-spin text-pastel-orange-soft max-lg:h-7 max-lg:w-7" />
+                <p className="text-sm text-white/55 max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">Stormy is checking you in</p>
               </div>
             )}
             {status === 'error' && (
