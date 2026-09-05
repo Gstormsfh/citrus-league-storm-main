@@ -335,13 +335,16 @@ const Profile = () => {
     confirm: ''
   });
 
-  // Preferences
-  const [preferences, setPreferences] = useState({
-    emailNotifications: true,
-    pushNotifications: true,
-    darkMode: false,
-    publicProfile: true
-  });
+  /**
+   * THE ONE NOTIFICATION SWITCH THAT IS REAL (2026-09-04). This was a
+   * `preferences` state object with four keys (email, push, dark mode,
+   * public profile) that `handlePreferenceChange` wrote to and then toasted
+   * "saved automatically". Nothing was saved anywhere. The app sends exactly
+   * one push -- "You're on the clock", from the draft engine -- and no email
+   * at all (no mailer in the repo), so the switch that exists is the push
+   * opt-in, stored on the profile and honoured by PushService.
+   */
+  const pushEnabled = profile?.push_notifications ?? true;
 
   // Commissioner leagues for reset
   const [commissionerLeagues, setCommissionerLeagues] = useState<Array<{ id: string; name: string; draft_status: string }>>([]);
@@ -722,12 +725,20 @@ const Profile = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handlePreferenceChange = (field: string, value: boolean) => {
-    setPreferences(prev => ({ ...prev, [field]: value }));
-    toast({
-      title: "Preference updated",
-      description: "Your settings have been saved automatically.",
-    });
+  const handlePushToggle = async (value: boolean) => {
+    try {
+      await updateProfile.mutateAsync({ push_notifications: value });
+      toast({
+        title: value ? 'On-the-clock alerts on' : 'On-the-clock alerts off',
+        description: value ? "We'll push when a pick is yours." : 'No push when a pick is yours.',
+      });
+    } catch (error: unknown) {
+      toast({
+        title: 'Could not save that',
+        description: userMessage(error, 'Try the switch again in a moment.'),
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleSave = async () => {
@@ -1163,6 +1174,9 @@ const Profile = () => {
               onWithdraw: handleWithdrawConsent,
               onRetry: loadConsent,
             },
+            pushEnabled,
+            pushSaving: updateProfile.isPending,
+            onPushToggle: (on) => void handlePushToggle(on),
             exporting: exportLoading,
             onExport: handleExportData,
             deleteConfirmation,
@@ -2183,31 +2197,23 @@ const Profile = () => {
                         <Settings className="h-5 w-5 text-pastel-orange" />
                         Game Preferences
                       </CardTitle>
-                      <CardDescription className="text-white/55">Manage automation and gameplay</CardDescription>
+                      <CardDescription className="text-white/55">The alerts the app sends</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
+                      {/* One switch, because the app sends one push: the draft
+                          engine's "You're on the clock". The email switch that
+                          stood beside it had no sender behind it. */}
                       <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
                         <div className="space-y-0.5">
-                          <Label className="text-sm font-bold text-pastel-cream">Email Notifications</Label>
+                          <Label className="text-sm font-bold text-pastel-cream">On-the-clock push</Label>
                           <p className="text-xs text-white/55">
-                            Receive weekly summaries and alerts
+                            A push the moment a draft pick is yours. iOS app only.
                           </p>
                         </div>
                         <Switch
-                          checked={preferences.emailNotifications}
-                          onCheckedChange={(c) => handlePreferenceChange('emailNotifications', c)}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
-                        <div className="space-y-0.5">
-                          <Label className="text-sm font-bold text-pastel-cream">Push Notifications</Label>
-                          <p className="text-xs text-white/55">
-                            Live scoring and injury alerts
-                          </p>
-                        </div>
-                        <Switch
-                          checked={preferences.pushNotifications}
-                          onCheckedChange={(c) => handlePreferenceChange('pushNotifications', c)}
+                          checked={pushEnabled}
+                          disabled={updateProfile.isPending}
+                          onCheckedChange={(c) => void handlePushToggle(c)}
                         />
                       </div>
                     </CardContent>

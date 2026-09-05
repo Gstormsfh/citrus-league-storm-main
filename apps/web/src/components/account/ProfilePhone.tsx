@@ -12,8 +12,9 @@
  *
  * Presentational. The page owns the state, the loads and the saves; every
  * handler here is the page's own. What is NOT drawn, and why:
- *  - the "Game Preferences" switches: `handlePreferenceChange` sets local
- *    state and toasts "saved automatically"; nothing is saved anywhere.
+ *  - the old "Email Notifications" switch: there is no email sender in the
+ *    repo. The push switch IS drawn now (ALERTS): it writes
+ *    profiles.push_notifications and PushService honours it.
  *  - the "Commissioner League Settings" card: a 340-line copy of League
  *    HQ's settings dialog. On a phone the commissioner's leagues are rows
  *    that open League HQ, where the Press Box settings screen already is.
@@ -120,6 +121,10 @@ export interface ProfilePhoneProps {
       onWithdraw: (row: ConsentStatus) => void;
       onRetry: () => void;
     };
+    /** The on-the-clock push opt-in: the app's one push, stored on the profile. */
+    pushEnabled: boolean;
+    pushSaving: boolean;
+    onPushToggle: (on: boolean) => void;
     exporting: boolean;
     onExport: () => void;
     deleteConfirmation: string;
@@ -428,6 +433,16 @@ export function ProfilePhone({ tab, onTabChange, hero, identity, stats, activity
                 )}
               </PressBoxSettingGroup>
             )}
+
+            <PressBoxSettingGroup label="ALERTS">
+              <PressBoxSettingRow
+                label="On-the-clock push"
+                help="A push the moment a draft pick is yours. iOS app only"
+                checked={settings.pushEnabled}
+                onToggle={settings.pushSaving ? undefined : settings.onPushToggle}
+                last
+              />
+            </PressBoxSettingGroup>
 
             <PressBoxSettingGroup label="PRIVACY & CONSENT">
               {settings.consent.loading ? (

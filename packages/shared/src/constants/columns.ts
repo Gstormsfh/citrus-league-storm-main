@@ -114,7 +114,12 @@ export const MATCHUP_LINES_COLUMNS_SLIM = 'id, matchup_id, player_id, team_id, t
 // ============================================================================
 // PROFILE COLUMNS
 // ============================================================================
-export const PROFILE_COLUMNS = 'id, username, display_name, first_name, last_name, phone, location, bio, default_team_name, timezone, created_at, updated_at';
+// `avatar_url` was missing until 2026-09-04: the account page uploaded one,
+// PUT /api/account/profile stored it, and GET /api/account/profile never
+// returned it, so the avatar vanished on the next load while the league
+// rows (which fetch it themselves) still showed it. `push_notifications` is
+// the on-the-clock opt-in (migration 20260905001000).
+export const PROFILE_COLUMNS = 'id, username, display_name, first_name, last_name, phone, location, bio, default_team_name, timezone, avatar_url, push_notifications, created_at, updated_at';
 
 // ============================================================================
 // DRAFT ORDER COLUMNS

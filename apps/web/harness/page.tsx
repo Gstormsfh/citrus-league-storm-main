@@ -735,7 +735,7 @@ const ANALYTICS_ROWS = (
   data: {
     id: 'harness-user', username: 'gstorms', display_name: 'Garrett', first_name: 'Garrett', last_name: 'Storms',
     phone: '', location: 'Kelowna, BC', bio: 'Commissioner. Oilers fan. Never trades a goalie.', default_team_name: 'Finalsz',
-    timezone: 'America/Vancouver', avatar_url: null, created_at: '2025-08-01T00:00:00.000Z', updated_at: '2026-09-01T00:00:00.000Z',
+    timezone: 'America/Vancouver', avatar_url: null, push_notifications: true, created_at: '2025-08-01T00:00:00.000Z', updated_at: '2026-09-01T00:00:00.000Z',
   },
 });
 (accountApi as any).getStats = async () => ({ data: { totalSeasons: 2, wins: 21, losses: 13, ties: 2, totalPoints: 3412.6 } });

@@ -141,6 +141,33 @@ describe('PushService — recipient resolution', () => {
     expect(result).toEqual({ sent: 0, failed: 0, skipped: true, reason: 'no_devices' });
   });
 
+  it('sends nothing when the owner turned the push off, and says so, without reading the devices', async () => {
+    // profiles.push_notifications (2026-09-04): the account screen's one real
+    // notification switch. Off means no nudge even with registered devices,
+    // and the reason is distinct from "no devices" so the log can tell them apart.
+    const supabase = makeSupabase({
+      profiles: createChain({ data: { push_notifications: false }, error: null }),
+    });
+    const svc = new PushService(supabase, testConfig());
+
+    const result = await svc.notifyOnTheClock(input);
+    expect(result).toEqual({ sent: 0, failed: 0, skipped: true, reason: 'opted_out' });
+    const from = (supabase as unknown as { from: ReturnType<typeof vi.fn> }).from;
+    expect(from.mock.calls.map((c) => c[0])).not.toContain('device_tokens');
+  });
+
+  it('treats a missing or unreadable profile as opted in — the column defaults true', async () => {
+    const opted = makeSupabase({ profiles: createChain({ data: null, error: { message: 'boom' } }) });
+    const svc = new PushService(opted, testConfig());
+    // Reaches the device lookup: makeSupabase's default device has one token,
+    // and the APNs session is not mocked, so the send itself fails — which is
+    // the point: the opt-out did not stop it.
+    const result = await svc.notifyOnTheClock(input);
+    expect(result.reason).not.toBe('opted_out');
+    const from = (opted as unknown as { from: ReturnType<typeof vi.fn> }).from;
+    expect(from.mock.calls.map((c) => c[0])).toContain('device_tokens');
+  });
+
   it('sends nothing when the owner has registered no devices', async () => {
     const supabase = makeSupabase({
       device_tokens: createChain({ data: [], error: null }),

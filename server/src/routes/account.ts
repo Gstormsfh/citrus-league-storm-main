@@ -140,6 +140,14 @@ accountRoutes.put('/profile', async (c) => {
         fields[key] = body[key];
       }
     }
+    // The on-the-clock push opt-in (2026-09-04). A boolean column takes a
+    // boolean; anything else is a 400 here rather than a Postgres cast error.
+    if ('push_notifications' in body) {
+      if (typeof body.push_notifications !== 'boolean') {
+        return fail(c, AppError.badRequest('push_notifications must be a boolean'));
+      }
+      fields.push_notifications = body.push_notifications;
+    }
 
     if (Object.keys(fields).length === 0) {
       return fail(c, AppError.badRequest('No valid fields provided'));
