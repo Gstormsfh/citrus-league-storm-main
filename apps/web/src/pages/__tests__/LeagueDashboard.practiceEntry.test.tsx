@@ -26,7 +26,6 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { SeasonStatus } from '@citrus/shared';
 
 vi.mock('@/components/Navbar', () => ({ default: () => <nav data-testid="navbar" /> }));
-vi.mock('@/components/MobileMenuButton', () => ({ default: () => <button type="button" /> }));
 vi.mock('@/components/matchup/LeagueNotifications', () => ({ default: () => null }));
 vi.mock('@/components/dashboard/LeagueTimelineCard', () => ({ LeagueTimelineCard: () => null }));
 vi.mock('@/components/InvitePlayersButton', () => ({ InvitePlayersButton: () => null }));

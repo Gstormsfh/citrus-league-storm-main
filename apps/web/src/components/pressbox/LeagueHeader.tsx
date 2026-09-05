@@ -67,11 +67,16 @@ type SubTab = { key: string; label: string; to: (leagueId: string) => string; ma
  * (`/roster?league=`), so a pathname prefix is the whole answer for them,
  * while Match and League carry it in the PATH.
  */
+// The league menu's destinations light LEAGUE (2026-09-04): Waivers, Trades,
+// Schedule, the GM office, the bracket and another manager's team are all
+// reached from it, and the tab that opened a screen is the tab that stays
+// lit. Your own analytics is TEAM.
+const LEAGUE_PATHS = ['/league', '/standings', '/waiver-wire', '/trade-analyzer', '/schedule-manager', '/gm-office', '/team/'];
 const SUB_TABS: SubTab[] = [
   { key: 'match', label: 'Match', to: (id) => `/matchup/${id}`, match: (p) => p.startsWith('/matchup') },
-  { key: 'team', label: 'Team', to: (id) => `/roster?league=${id}`, match: (p) => p.startsWith('/roster') },
+  { key: 'team', label: 'Team', to: (id) => `/roster?league=${id}`, match: (p) => p.startsWith('/roster') || p.startsWith('/team-analytics') },
   { key: 'players', label: 'Players', to: (id) => `/free-agents?league=${id}`, match: (p) => p.startsWith('/free-agents') },
-  { key: 'league', label: 'League', to: (id) => `/league/${id}`, match: (p) => p.startsWith('/league') || p.startsWith('/standings') },
+  { key: 'league', label: 'League', to: (id) => `/league/${id}`, match: (p) => LEAGUE_PATHS.some((x) => p.startsWith(x)) },
 ];
 
 export function LeagueHeader({

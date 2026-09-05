@@ -29,7 +29,8 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
-import { LeagueHeader, LeagueMenu, PressBoxRosterList, PressBoxTeamCard } from '@/components/pressbox';
+import { PressBoxRosterList, PressBoxTeamCard } from '@/components/pressbox';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 import { buildRosterRows } from '@/components/pressbox/rosterRows';
 import { buildSlotConfig } from '@/components/roster/slotConfig';
 import { FillSlotSheet } from '@/components/roster/FillSlotSheet';
@@ -40,7 +41,6 @@ import { planAutoLineup, type AutoLineupPlan } from '@/components/roster/autoLin
 import { irSlotIds, resolveIrSlotCount } from '@/components/roster/irSlots';
 import { gameOnDate, rowGameFor } from '@/components/roster/gameDay';
 import { ApiError } from '@/api/client';
-import MobileMenuButton from '@/components/MobileMenuButton';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useToast } from '@/hooks/use-toast';
 import { PlayerService, Player } from '@/services/PlayerService';
@@ -2161,16 +2161,13 @@ const Roster = () => {
    * page's own `selectedWeek === 0` sentinel would otherwise print.
    */
   /**
-   * The league menu, opened from the header's settings control. The page used
-   * to carry `MobileMenuButton` in its own phone header; the Press Box header
-   * replaced that bar, and for one commit the roster had NO menu at all on a
-   * phone. `mobileHeaderMenuGuard` did not catch it — it scans for pages
-   * containing the legacy header string, so this page simply dropped out of
-   * its list and the case vanished instead of failing. A guard that stops
-   * covering a screen is worse than one that fails on it; the guard now has a
-   * Press Box case too.
+   * The league menu now comes with the header, in `PressBoxLeagueChrome`
+   * (2026-09-04): the page no longer keeps its open state. The history is
+   * the reason the guard exists — for one commit the roster had NO menu on
+   * a phone and `mobileHeaderMenuGuard` did not notice, because it scanned
+   * for the legacy header string and this page had dropped out of its
+   * list. The guard now pins the chrome on every league page by name.
    */
-  const [leagueMenuOpen, setLeagueMenuOpen] = useState(false);
 
   const weekLabelForHeader = useMemo(
     () => (selectedWeek > 0 ? `WK ${selectedWeek}` : null),
@@ -3481,28 +3478,8 @@ const Roster = () => {
           pills in a well, the vocabulary for "one team, four views" — so
           the two are told apart on sight rather than stacked as twin
           underline strips. */}
-      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
-        <LeagueHeader
-          weekLabel={weekLabelForHeader}
-          onSettingsPress={() => setLeagueMenuOpen(true)}
-        />
-      </div>
-      <LeagueMenu
-        open={leagueMenuOpen}
-        onClose={() => setLeagueMenuOpen(false)}
-        leagueId={userTeam?.league_id ?? ''}
-        leagueName={activeLeague?.name ?? ''}
-        user={
-          profile
-            ? {
-                displayName:
-                  profile.display_name
-                  || (profile.username && !/^user_[0-9a-f]{6,}$/i.test(profile.username) ? profile.username : null)
-                  || 'You',
-                handle: profile.username ?? null,
-              }
-            : null
-        }
+      <PressBoxLeagueChrome
+        weekLabel={weekLabelForHeader}
       />
       
       {/* MOBILE: Full-screen scrollable content / DESKTOP: Grid layout */}

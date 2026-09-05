@@ -5,7 +5,7 @@ import { logger } from '@citrus/shared';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 import { Badge } from '@/components/ui/badge';
 import { Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -164,13 +164,10 @@ const GMOffice = () => {
       </div>
 
       {/* MOBILE: Compact sticky header */}
-      <div className="lg:hidden sticky top-0 z-page-header bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">GM's Office</h1>
-          <MobileMenuButton />
-        </div>
-      </div>
+      {/* PRESS BOX (2026-09-04): the league chrome — header, sub-tabs and
+          the league menu — replaces the 09-01 title bar and its hamburger,
+          which opened the old menu sheet. One menu in the app. */}
+      <PressBoxLeagueChrome />
 
       <main className="w-full lg:pt-24 lg:pb-8 pb-app-chrome m-0 p-0 relative z-10">
         <div className="w-full m-0 p-0">

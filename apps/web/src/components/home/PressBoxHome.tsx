@@ -28,7 +28,7 @@ import { leagueApi } from '@/api/leagues';
 import { matchupApi } from '@/api/matchups';
 import { useLeague } from '@/contexts/LeagueContext';
 import { getLeagueFormat } from '@/services/LeagueService';
-import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
+import { isPoolLeague, leagueSwitchDestination } from '@/utils/leagueTypeHelpers';
 import { getTodayMST } from '@/utils/timezoneUtils';
 import { isBye, scoreOf, teamNameOf, type WeekMatchupRow } from '@/components/matchup/scoreboard';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
@@ -146,7 +146,13 @@ export function PressBoxHome({ inOffseason, className }: PressBoxHomeProps) {
               ]
                 .filter(Boolean)
                 .join(' · ');
-              const to = pool ? getPoolRoute(fmt.leagueType, l.id) : `/league/${l.id}`;
+              // THE ONE SWITCH RULE (2026-09-04). This card IS the phone's league
+              // switcher, and it goes through `leagueSwitchDestination` like
+              // the Navbar's: `/league/:id` alone leaves LeagueContext on the
+              // previous league (it reads only `?league=`), and the header
+              // over the next screen names the wrong league. A pool goes to
+              // its pool route inside the same helper.
+              const to = leagueSwitchDestination(l.id, fmt.leagueType, '/');
 
               const myId = teamQueries[i]?.data?.id ?? null;
               const rows = weekQueries[i]?.data;

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useAuth } from '@/contexts/AuthContext';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import {
   HockeyFooter,
   XGModelIcon,
@@ -274,12 +274,11 @@ const StormyAssistant = () => {
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col relative">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">Stormy Assistant</h1>
-          <MobileMenuButton />
-        </div>
+      {/* PRESS BOX (2026-09-04): the app header in place of the 09-01 title
+          bar and its hamburger, which opened the old menu sheet. The app
+          nav is the way around; the header names the screen. */}
+      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+        <PressBoxAppHeader title="Stormy" logoSrc="/favicon.svg" />
       </div>
 
       <main className="w-full lg:pt-24 lg:pb-8 pb-app-chrome relative z-10">

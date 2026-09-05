@@ -7,7 +7,8 @@ import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
 import { cn } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
-import { LeagueHeader, LeagueMenu, PB_TYPE, PressBoxChips, PressBoxScoreBlock, PressBoxTabs, type PressBoxScoreDay } from '@/components/pressbox';
+import { PB_TYPE, PressBoxChips, PressBoxScoreBlock, PressBoxTabs, type PressBoxScoreDay } from '@/components/pressbox';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { MatchupComparison } from "@/components/matchup/MatchupComparison";
@@ -203,7 +204,6 @@ const Matchup = () => {
   const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   /** PRESS BOX (2026-09-04): the phone's league menu and its LINEUPS / BENCH tab. */
-  const [leagueMenuOpen, setLeagueMenuOpen] = useState(false);
   const [phoneSection, setPhoneSection] = useState<'lineups' | 'bench'>('lineups');
   const isMobile = useIsMobile();
   // In-place reload trigger for the main loader (2026-09-01): bumped by the
@@ -5574,30 +5574,12 @@ const Matchup = () => {
         * strip, the ScoreCard, the day strip and the Top Performers card are
         * the desktop's from `lg` and are not rendered below it.
         */}
-      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
-        <LeagueHeader
-          weekLabel={currentMatchup ? `WK ${selectedWeek}` : null}
-          onWeekPrev={prevWeek !== null ? () => handleWeekChange(prevWeek) : null}
-          onWeekNext={nextWeek !== null ? () => handleWeekChange(nextWeek) : null}
-          onSettingsPress={() => setLeagueMenuOpen(true)}
-        />
-      </div>
-      <LeagueMenu
-        open={leagueMenuOpen}
-        onClose={() => setLeagueMenuOpen(false)}
+      <PressBoxLeagueChrome
+        weekLabel={currentMatchup ? `WK ${selectedWeek}` : null}
+        onWeekPrev={prevWeek !== null ? () => handleWeekChange(prevWeek) : null}
+        onWeekNext={nextWeek !== null ? () => handleWeekChange(nextWeek) : null}
         leagueId={league?.id ?? activeLeagueId ?? ''}
         leagueName={league?.name ?? ''}
-        user={
-          profile
-            ? {
-                displayName:
-                  profile.display_name
-                  || (profile.username && !/^user_[0-9a-f]{6,}$/i.test(profile.username) ? profile.username : null)
-                  || 'You',
-                handle: profile.username ?? null,
-              }
-            : null
-        }
       />
 
       {/* MOBILE: Full-screen scrollable content / DESKTOP: Grid layout */}

@@ -20,7 +20,6 @@ import {
 import { StormyLoading } from '@/components/citrus2/StormyLoading';
 import { getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
-import { useProfile } from '@/hooks/useProfile';
 import { useSeasonStatus } from '@/hooks/useSeasonStatus';
 import { shortDateLabel } from '@/components/scores/scoresFormat';
 import { LeagueService, League, Team } from '@/services/LeagueService';
@@ -29,7 +28,7 @@ import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import { waiverApi } from '@/api/waivers';
 import Navbar from '@/components/Navbar';
-import { LeagueHeader, LeagueMenu } from '@/components/pressbox';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 import { LeagueHQPhone, type LeagueHQMatchup } from '@/components/league/LeagueHQPhone';
 import { LeagueSettingsPhone } from '@/components/league/LeagueSettingsPhone';
 import { buildLeagueSettingsSections } from '@/components/league/leagueSettingsSections';
@@ -65,7 +64,6 @@ const LeagueDashboard = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: profile } = useProfile();
   const { status: seasonStatus } = useSeasonStatus();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -82,7 +80,6 @@ const LeagueDashboard = () => {
   // Commissioner Settings State
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** PRESS BOX (2026-09-04): the league menu behind the header's sliders. */
-  const [leagueMenuOpen, setLeagueMenuOpen] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [processingWaivers, setProcessingWaivers] = useState(false);
   const [waiverSettings, setWaiverSettings] = useState({
@@ -888,28 +885,10 @@ const LeagueDashboard = () => {
         * still opens on a phone: the Dialog is controlled (`settingsOpen`)
         * and portals to the body, so a hidden trigger costs it nothing.
         */}
-      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
-        <LeagueHeader
-          weekLabel={currentWeek !== null ? `WK ${currentWeek}` : null}
-          onSettingsPress={() => setLeagueMenuOpen(true)}
-        />
-      </div>
-      <LeagueMenu
-        open={leagueMenuOpen}
-        onClose={() => setLeagueMenuOpen(false)}
+      <PressBoxLeagueChrome
+        weekLabel={currentWeek !== null ? `WK ${currentWeek}` : null}
         leagueId={leagueId ?? ''}
         leagueName={league.name}
-        user={
-          profile
-            ? {
-                displayName:
-                  profile.display_name
-                  || (profile.username && !/^user_[0-9a-f]{6,}$/i.test(profile.username) ? profile.username : null)
-                  || 'You',
-                handle: profile.username ?? null,
-              }
-            : null
-        }
       />
       <div className="lg:hidden pb-app-chrome">
         <LeagueHQPhone

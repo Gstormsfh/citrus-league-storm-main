@@ -14,7 +14,7 @@ import { LeagueService } from '@/services/LeagueService';
 import { DraftService } from '@/services/DraftService';
 import { WaiverService } from '@/services/WaiverService';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1026,12 +1026,11 @@ const Profile = () => {
             lg and renders its own sticky safe-area header (see
             LeagueDashboard); Profile now matches. */}
         <div className="hidden lg:block"><Navbar /></div>
-        <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-          <div className="flex items-center justify-between h-12 px-4">
-            <div className="w-10" />
-            <h1 className="text-lg font-bold text-pastel-cream">Profile</h1>
-            <MobileMenuButton />
-          </div>
+        {/* PRESS BOX (2026-09-04): the app header in place of the 09-01 title
+            bar and its hamburger, which opened the old menu sheet. The app
+            nav is the way around; the header names the screen. */}
+        <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+          <PressBoxAppHeader title="Account" logoSrc="/favicon.svg" />
         </div>
         <main className="w-full pt-6 lg:pt-24 pb-app-chrome lg:pb-16">
           <div className="container mx-auto px-3 sm:px-4">
@@ -1070,12 +1069,11 @@ const Profile = () => {
           above and every other core page: Navbar is desktop-only, phones get
           the sticky safe-area header + bottom nav. */}
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">Profile</h1>
-          <MobileMenuButton />
-        </div>
+      {/* PRESS BOX (2026-09-04): the app header in place of the 09-01 title
+          bar and its hamburger, which opened the old menu sheet. The app
+          nav is the way around; the header names the screen. */}
+      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+        <PressBoxAppHeader title="Account" logoSrc="/favicon.svg" />
       </div>
       <main className="w-full pt-6 lg:pt-24 pb-app-chrome lg:pb-16">
         <div className="container mx-auto px-3 sm:px-4">

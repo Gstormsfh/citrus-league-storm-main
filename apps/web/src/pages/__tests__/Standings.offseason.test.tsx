@@ -44,7 +44,6 @@ vi.mock('react-router-dom', async (importOriginal) => {
 // Chrome. Each of these drags the auth/league/supabase shell in behind it, so
 // a failure here would be a failure of the shell and not of the standings.
 vi.mock('@/components/Navbar', () => ({ default: () => <nav data-testid="navbar" /> }));
-vi.mock('@/components/MobileMenuButton', () => ({ default: () => <button type="button" /> }));
 vi.mock('@/components/LeagueCreationCTA', () => ({ LeagueCreationCTA: () => null }));
 vi.mock('@/components/matchup/LeagueNotifications', () => ({ default: () => null }));
 // A STABLE `toast`, not a fresh spy per render. Standings' load effect lists

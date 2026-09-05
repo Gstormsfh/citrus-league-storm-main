@@ -80,7 +80,9 @@ describe('menu tiles', () => {
     for (const t of tiles) {
       expect(t.to, `${t.key} must route`).toBeTruthy();
       expect(t.to).toMatch(/^\//);
-      expect(t.to, `${t.key} must name the league`).toContain('lg-1');
+      // The simulator is league-less by design (leagueSwitchAndMockDraftReach):
+      // it is public, ungated, and the same for every league.
+      if (t.key !== 'mockdraft') expect(t.to, `${t.key} must name the league`).toContain('lg-1');
     }
   });
 

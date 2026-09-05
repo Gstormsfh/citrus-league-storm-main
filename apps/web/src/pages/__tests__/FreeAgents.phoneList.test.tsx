@@ -61,9 +61,11 @@ describe('the Press Box chrome carries the search (PR6b, 2026-09-04)', () => {
   // The compact title bar of 2026-09-02 is gone with the hero it replaced:
   // below lg the page is the shared LeagueHeader over PlayersPhone, whose
   // SEARCH cell opens a field bound to the same state the desktop input uses.
-  it('the phone layer is the LeagueHeader over PlayersPhone, bound to the page search', () => {
-    const chrome = blockFrom('className="lg:hidden pt-[env(safe-area-inset-top)]"', 600);
-    expect(chrome).toContain('<LeagueHeader');
+  it('the phone layer is the league chrome over PlayersPhone, bound to the page search', () => {
+    // PressBoxLeagueChrome (2026-09-04) is the LeagueHeader and the menu in
+    // one piece; it sits above the phone layer.
+    const chrome = blockFrom('<PressBoxLeagueChrome', 1200);
+    expect(chrome).toContain('<PlayersPhone');
     const phone = blockFrom('<PlayersPhone', 2400);
     expect(phone).toContain('searchQuery={searchQuery}');
     expect(phone).toContain('onSearchQuery={setSearchQuery}');
@@ -171,7 +173,8 @@ describe('the row list gives way to the table where the table fits', () => {
   it('the tablet keeps the mobile chrome — the breakpoints answer different questions', () => {
     // The page header, the hero and the nav still split at `lg`, because
     // "does this screen want app chrome" is not "does this table fit".
-    expect(PAGE).toContain('className="lg:hidden pt-[env(safe-area-inset-top)]"');
+    expect(PAGE).toContain('<PressBoxLeagueChrome');
+    expect(PAGE).toContain('className="lg:hidden pb-app-chrome"');
     expect(PAGE).toContain('hidden lg:flex flex-col md:flex-row justify-between');
     expect(PAGE).toContain('<div className="hidden lg:block"><Navbar /></div>');
   });

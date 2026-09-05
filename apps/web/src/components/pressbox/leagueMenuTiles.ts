@@ -11,7 +11,7 @@
  * and `linkGraphIntegrity` can only see targets that exist.
  */
 import type { LucideIcon } from 'lucide-react';
-import { Trophy, ArrowLeftRight, ClipboardList, CalendarDays } from 'lucide-react';
+import { Trophy, ArrowLeftRight, ClipboardList, CalendarDays, Shuffle } from 'lucide-react';
 
 export interface LeagueMenuTile {
   key: string;
@@ -43,5 +43,9 @@ export function defaultLeagueTiles(leagueId: string): LeagueMenuTile[] {
     { key: 'trades', title: 'Trades', to: `/trade-analyzer?league=${leagueId}`, Icon: ArrowLeftRight },
     { key: 'waivers', title: 'Waivers', to: `/waiver-wire?league=${leagueId}`, Icon: ClipboardList },
     { key: 'schedule', title: 'Schedule', to: `/schedule-manager?league=${leagueId}`, Icon: CalendarDays },
+    // A manager inside a league can reach the simulator (2026-09-04): the
+    // old hamburger menu carried this link and is gone; the tile keeps the
+    // way in. /armchair-gm is public and ungated (leagueSwitchAndMockDraftReach).
+    { key: 'mockdraft', title: 'Mock draft', to: '/armchair-gm?tab=mockdraft', Icon: Shuffle },
   ];
 }

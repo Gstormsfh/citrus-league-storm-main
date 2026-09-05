@@ -1,87 +1,94 @@
 /**
- * MOBILE HEADER MENU (2026-09-01) — iOS sim: League HQ, Profile, Trade
- * Center, Analytics, Team View, Playoffs, Schedule, Stormy, and Create
- * League all rendered the mobile chrome header as a centered title with
- * no hamburger — from those screens there was NO path to the league
- * switcher, Create / Join League, News, or Contact. Only half the app's
- * pages carried the menu, so navigation depended on which tab you
- * happened to be standing on.
+ * THE PHONE HEADER AND THE MENU.
  *
- * Contract: every page that renders the shared mobile chrome header
- * must mount MobileMenuButton inside that header. jsdom has no layout
- * engine; this is a source contract across src/pages.
+ * 2026-09-01 — iOS sim: League HQ, Profile, Trade Center, Analytics, Team
+ * View, Playoffs, Schedule, Stormy and Create League rendered the mobile
+ * chrome header as a centred title with no hamburger — from those
+ * screens there was NO path to the league switcher, Create / Join League,
+ * News or Contact. Only half the app's pages carried the menu, so
+ * navigation depended on which tab you happened to be standing on.
+ *
+ * 2026-09-04 (PRESS BOX) — the old title bar and its hamburger are gone
+ * from every page. A league screen mounts `PressBoxLeagueChrome`, which
+ * is the LeagueHeader (crest, name, week, the sliders, the four sub-tabs)
+ * and the LeagueMenu the sliders open, wired in one place; an account
+ * screen mounts `PressBoxAppHeader`, and the app nav is the way around.
+ * The league switcher on a phone is the LEAGUES tab (the home's league
+ * list), which the menu's SWITCH reaches.
+ *
+ * Contract: every page that renders a phone header renders one of the two
+ * Press Box headers; no page carries the legacy header string or the old
+ * menu; and the chrome wires the sliders to the menu and SWITCH to home.
+ * jsdom has no layout engine; this is a source contract across src/pages.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const pagesDir = resolve(here, '../pages');
+const read = (rel: string) => readFileSync(resolve(here, rel), 'utf-8');
 
-// The shared mobile chrome header (core-page pattern). `z-page-header` is
-// the rung, not a number: src/styles/zLayers.ts owns the scale and
-// zLayerScaleGuard fails any layer that stacks off it.
-const HEADER = 'lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95';
+const LEGACY_HEADER = 'lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95';
 
-const pagesWithHeader: Array<[string, string]> = readdirSync(pagesDir)
+const pages: Array<[string, string]> = readdirSync(pagesDir)
   .filter((f) => f.endsWith('.tsx'))
-  .map((f) => [f, readFileSync(join(pagesDir, f), 'utf-8')] as [string, string])
-  .filter(([, text]) => text.includes(HEADER));
+  .map((f) => [f, readFileSync(join(pagesDir, f), 'utf-8')] as [string, string]);
 
-/**
- * PRESS BOX (2026-09-04). A converted screen drops the legacy header string
- * entirely, so it falls out of `pagesWithHeader` and this guard silently
- * STOPS COVERING IT — which is exactly what happened to Roster.tsx: it shipped
- * for one commit with no menu on a phone at all, and no case failed, because
- * the case had disappeared. A guard that quietly narrows its own scope is
- * worse than one that fails.
- *
- * So the Press Box header gets the same contract: a page that mounts
- * `LeagueHeader` must mount `LeagueMenu` and must wire the header's settings
- * control to open it. The two describes together cover every phone header in
- * the app, old chrome or new.
- */
-const pagesWithPressBoxHeader: Array<[string, string]> = readdirSync(pagesDir)
-  .filter((f) => f.endsWith('.tsx'))
-  .map((f) => [f, readFileSync(join(pagesDir, f), 'utf-8')] as [string, string])
-  .filter(([, text]) => text.includes('<LeagueHeader'));
+const LEAGUE_PAGES = [
+  'LeagueDashboard.tsx', 'Matchup.tsx', 'Roster.tsx', 'FreeAgents.tsx', 'Standings.tsx',
+  'WaiverWire.tsx', 'TradeAnalyzer.tsx', 'ScheduleManager.tsx', 'GMOffice.tsx', 'OtherTeam.tsx',
+  'TeamAnalytics.tsx', 'PlayoffBracket.tsx',
+];
+const APP_PAGES = ['Profile.tsx', 'CreateLeague.tsx', 'StormyAssistant.tsx', 'Scores.tsx', 'News.tsx', 'Players.tsx'];
 
-describe('every Press Box header reaches the league menu', () => {
-  it.each(pagesWithPressBoxHeader.map(([f]) => [f] as const))(
-    '%s mounts LeagueMenu and opens it from the header',
-    (file) => {
-      const text = pagesWithPressBoxHeader.find(([f]) => f === file)![1];
-      expect(text, `${file} mounts LeagueHeader without LeagueMenu`).toContain('<LeagueMenu');
-      const header = text.slice(text.indexOf('<LeagueHeader'), text.indexOf('/>', text.indexOf('<LeagueHeader')) + 2);
-      expect(header, `${file} header has no way to open the menu`).toContain('onSettingsPress');
-    },
-  );
-});
-
-describe('every mobile chrome header carries the menu button', () => {
-  it('the header pattern is in use', () => {
-    expect(pagesWithHeader.length).toBeGreaterThanOrEqual(9);
+describe('the legacy phone chrome is gone', () => {
+  it('no page carries the old title bar', () => {
+    const carriers = pages.filter(([, t]) => t.includes(LEGACY_HEADER)).map(([f]) => f);
+    expect(carriers).toEqual([]);
   });
 
-  it.each(pagesWithHeader.map(([f]) => [f] as const))(
-    '%s mounts MobileMenuButton in each mobile header',
-    (file) => {
-      const text = pagesWithHeader.find(([f]) => f === file)![1];
-      let from = 0;
-      let headers = 0;
-      for (;;) {
-        const start = text.indexOf(HEADER, from);
-        if (start === -1) break;
-        headers += 1;
-        // The header block is small — title row + affordances; the
-        // richest (Roster: team name, league subtitle, record) sits
-        // within ~800 chars. A missing button cannot hide inside 1200.
-        const slice = text.slice(start, start + 1200);
-        expect(slice, `${file} header #${headers} lacks the menu button`).toContain('<MobileMenuButton />');
-        from = start + 1;
-      }
-      expect(headers).toBeGreaterThan(0);
-    },
-  );
+  it('the old menu sheet no longer exists and nothing imports it', () => {
+    expect(existsSync(resolve(here, '../components/MobileMenuButton.tsx'))).toBe(false);
+    const importers = pages.filter(([, t]) => t.includes('MobileMenuButton')).map(([f]) => f);
+    expect(importers).toEqual([]);
+  });
+});
+
+describe('every league screen wears the league chrome', () => {
+  it.each(LEAGUE_PAGES)('%s mounts PressBoxLeagueChrome and nothing else as its phone header', (file) => {
+    const text = pages.find(([f]) => f === file)?.[1] ?? '';
+    expect(text, `${file} missing`).not.toBe('');
+    expect(text).toContain('<PressBoxLeagueChrome');
+    // The pair is assembled in the chrome, not by hand on the page.
+    expect(text).not.toContain('<LeagueHeader');
+    expect(text).not.toContain('<LeagueMenu');
+  });
+});
+
+describe('every account screen wears the app header', () => {
+  it.each(APP_PAGES)('%s mounts PressBoxAppHeader below lg', (file) => {
+    const text = pages.find(([f]) => f === file)?.[1] ?? '';
+    expect(text, `${file} missing`).not.toBe('');
+    expect(text).toContain('<PressBoxAppHeader');
+  });
+});
+
+describe('the chrome itself', () => {
+  const chrome = read('../components/pressbox/LeagueChrome.tsx');
+
+  it('opens the menu from the sliders', () => {
+    expect(chrome).toContain('onSettingsPress={() => setMenuOpen(true)}');
+    expect(chrome).toMatch(/<LeagueMenu\s+open=\{menuOpen\}/);
+  });
+
+  it('SWITCH goes to the LEAGUES tab, which lists the leagues', () => {
+    expect(chrome).toContain("navigate('/')");
+    expect(chrome).toContain('onSwitchLeague=');
+  });
+
+  it('honours the league the URL names over the context, as the header does', () => {
+    expect(chrome).toContain('leagueId={leagueId ?? params.leagueId ?? league?.activeLeagueId ?? \'\'}');
+  });
 });

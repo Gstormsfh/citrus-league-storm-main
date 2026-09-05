@@ -4,7 +4,7 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
-import MobileMenuButton from '@/components/MobileMenuButton';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 import {
   HockeyFooter,
   CupIcon,
@@ -664,13 +664,10 @@ const PlayoffBracket = () => {
   const PageLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-[#0F1F15]/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
-        <div className="flex items-center justify-between h-12 px-4">
-          <div className="w-10" />
-          <h1 className="text-lg font-bold text-pastel-cream">Playoffs</h1>
-          <MobileMenuButton />
-        </div>
-      </div>
+      {/* PRESS BOX (2026-09-04): the league chrome — header, sub-tabs and
+          the league menu — replaces the 09-01 title bar and its hamburger,
+          which opened the old menu sheet. One menu in the app. */}
+      <PressBoxLeagueChrome />
       <main className="w-full lg:pt-24 lg:pb-8 pb-app-chrome">
         <div className="w-full m-0 p-0">
           <div className={cn(

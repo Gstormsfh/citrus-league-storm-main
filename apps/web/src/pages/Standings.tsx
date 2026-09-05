@@ -37,8 +37,8 @@ import { PlayoffService, type PlayoffPictureTeam, type PlayoffBracket as Bracket
 import { logger } from '@/utils/logger';
 // Citrus decorative imports removed — cleaner layout
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
-import { LeagueHeader, LeagueMenu, PB_TYPE, PressBoxSectionHead, PressBoxStandingsTable } from '@/components/pressbox';
-import { useProfile } from '@/hooks/useProfile';
+import { PB_TYPE, PressBoxSectionHead, PressBoxStandingsTable } from '@/components/pressbox';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 
 interface StandingsTeam {
   id: string;
@@ -73,8 +73,6 @@ const Standings = () => {
   const [playoffBracket, setPlayoffBracket] = useState<BracketType | null>(null);
   const [playoffPictureLoaded, setPlayoffPictureLoaded] = useState(false);
   /** PRESS BOX (2026-09-04): the league menu behind the header's sliders. */
-  const [leagueMenuOpen, setLeagueMenuOpen] = useState(false);
-  const { data: profile } = useProfile();
   const hasInitializedRef = useRef(false);
   const navigate = useNavigate();
 
@@ -557,26 +555,7 @@ const Standings = () => {
         * this app does not run (PR12); a segmented control with one live
         * segment is a promise the screen cannot keep. It lands with them.
         */}
-      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
-        <LeagueHeader onSettingsPress={() => setLeagueMenuOpen(true)} />
-      </div>
-      <LeagueMenu
-        open={leagueMenuOpen}
-        onClose={() => setLeagueMenuOpen(false)}
-        leagueId={activeLeagueId ?? ''}
-        leagueName={activeLeague?.name ?? ''}
-        user={
-          profile
-            ? {
-                displayName:
-                  profile.display_name
-                  || (profile.username && !/^user_[0-9a-f]{6,}$/i.test(profile.username) ? profile.username : null)
-                  || 'You',
-                handle: profile.username ?? null,
-              }
-            : null
-        }
-      />
+      <PressBoxLeagueChrome />
       <div className={`${PB_TYPE} lg:hidden px-3 pt-3 pb-app-chrome`} data-testid="standings-phone">
         {userLeagueState === 'logged-in-no-league' && (
           <div className="mb-4">

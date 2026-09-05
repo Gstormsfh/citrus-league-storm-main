@@ -44,8 +44,11 @@ describe('League HQ composition', () => {
     // (pressboxChromeGuard) — so the page keeps ONE h1 of its own, the
     // desktop identity at sm+. The phone must still mount the header.
     expect(H1S.length, 'page h1').toBeGreaterThanOrEqual(1);
-    const phoneChrome = SOURCE.slice(SOURCE.indexOf('className="lg:hidden pt-[env(safe-area-inset-top)]"'));
-    expect(phoneChrome).toContain('<LeagueHeader');
+    // The header and the menu come as one piece now (PressBoxLeagueChrome,
+    // 2026-09-04); the chrome mounts above the phone layer.
+    const phoneChrome = SOURCE.slice(SOURCE.indexOf('<PressBoxLeagueChrome'));
+    expect(phoneChrome.length).toBeGreaterThan(0);
+    expect(phoneChrome).toContain('<LeagueHQPhone');
     expect(SOURCE).not.toContain('>League</h1>');
   });
 

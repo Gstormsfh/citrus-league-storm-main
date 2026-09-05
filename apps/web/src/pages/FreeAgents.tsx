@@ -59,8 +59,7 @@ import {
   type PlayersPhoneView,
   type PlayersTrendMode,
 } from '@/components/freeagents/PlayersPhone';
-import { LeagueHeader, LeagueMenu } from '@/components/pressbox';
-import { useProfile } from '@/hooks/useProfile';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 import {
   FA_CHIP,
   FA_CHIP_ROW,
@@ -179,11 +178,9 @@ const FreeAgents = () => {
    * rotation keeps its place; the two toggles and the search field are
    * phone-only and live here.
    */
-  const [leagueMenuOpen, setLeagueMenuOpen] = useState(false);
   const [trendMode, setTrendMode] = useState<PlayersTrendMode>('adds');
   const [availableMode, setAvailableMode] = useState<PlayersAvailableMode>('proj');
   const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
-  const { data: profile } = useProfile();
 
   // SETTINGS-ENFORCEMENT (2026-08-16) — league scoring for FPTS
   // display. Undefined → DEFAULT_SCORING inside ScoringCalculator, so
@@ -1643,26 +1640,7 @@ const FreeAgents = () => {
         * Both are Tailwind branches, not a `useIsMobile()` read: no hydration
         * flash, no `window.innerWidth` on the render path.
         */}
-      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
-        <LeagueHeader onSettingsPress={() => setLeagueMenuOpen(true)} />
-      </div>
-      <LeagueMenu
-        open={leagueMenuOpen}
-        onClose={() => setLeagueMenuOpen(false)}
-        leagueId={activeLeagueId ?? ''}
-        leagueName={activeLeague?.name ?? ''}
-        user={
-          profile
-            ? {
-                displayName:
-                  profile.display_name
-                  || (profile.username && !/^user_[0-9a-f]{6,}$/i.test(profile.username) ? profile.username : null)
-                  || 'You',
-                handle: profile.username ?? null,
-              }
-            : null
-        }
-      />
+      <PressBoxLeagueChrome />
       <div className="lg:hidden pb-app-chrome">
         <PlayersPhone
           view={phoneView}
