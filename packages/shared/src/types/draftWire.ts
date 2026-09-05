@@ -584,6 +584,14 @@ export interface TerminalSnapshotPick {
   isAutopick: boolean;
 }
 
+/** KEEPERS (2026-09-05): one kept player and the round his team pays for him. */
+export interface SnapshotKeeper {
+  teamId: string;
+  /** NHL player id as a string, the wire's player-id domain. */
+  playerId: string;
+  round: number;
+}
+
 export interface DraftSnapshot {
   lobbyId: string;
   format: DraftFormat;
@@ -620,6 +628,13 @@ export interface DraftSnapshot {
    * Root cause + fix pre-ratified in inbox Entry 103.
    */
   picks?: ReadonlyArray<TerminalSnapshotPick>;
+  /**
+   * KEEPERS (2026-09-05): the league's locked keepers and the slot each
+   * one costs. The engine makes those picks itself when the slots come up;
+   * until then the client treats the players as off the board and shows
+   * the slot as spoken for. Absent for a league without keepers.
+   */
+  keepers?: ReadonlyArray<SnapshotKeeper>;
   /**
    * TIMER-1 / E121 (2026-08-12) — the SERVER's wall-clock at the
    * moment this snapshot was delivered, in epoch ms. Stamped by the

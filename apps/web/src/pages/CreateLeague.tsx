@@ -1904,7 +1904,7 @@ const CreateLeague = () => {
                                     </SelectContent>
                                   </Select>
                                   <p className="text-xs text-white/55">
-                                    {keeperPenalty === 'none' && 'Keepers have no draft pick cost.'}
+                                    {keeperPenalty === 'none' && 'No round cost: a keeper takes the team’s last-round pick so the roster still fills.'}
                                     {keeperPenalty === 'round-cost' && 'Keeping a player costs the round they were originally drafted in.'}
                                     {keeperPenalty === 'round-escalation' && 'Keeper cost increases by one round each season.'}
                                   </p>

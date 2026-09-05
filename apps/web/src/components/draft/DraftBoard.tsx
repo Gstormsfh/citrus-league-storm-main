@@ -65,6 +65,11 @@ interface DraftBoardProps {
   userTeamId?: string | null;
   /** How many of the newest picks LAST PICKS lists. 0 hides the section. */
   lastPicks?: number;
+  /**
+   * KEEPERS (2026-09-05): `${teamId}:${round}` → kept player's name for the
+   * slots spoken for before their picks land. Drawn as a KEEPER cell.
+   */
+  keeperSlots?: ReadonlyMap<string, string>;
 }
 
 const normalizePosition = (pos: string): string => {
@@ -85,6 +90,7 @@ export const DraftBoard = ({
   draftType = 'snake',
   userTeamId = null,
   lastPicks = 3,
+  keeperSlots,
 }: DraftBoardProps) => {
   const totalPicks = teams.length * totalRounds;
   const isLinear = draftType === 'linear';
@@ -235,6 +241,23 @@ export const DraftBoard = ({
                           {pick.playerTeam ? ` · ${pick.playerTeam}` : ''}
                         </span>
                       </button>
+                    );
+                  }
+
+                  const keeperName = keeperSlots?.get(`${team.id}:${round}`);
+                  if (keeperName) {
+                    return (
+                      <div
+                        key={`${round}-${team.id}`}
+                        className={cn(
+                          'h-[54px] rounded-[8px] bg-pressbox-tile/60 border border-pressbox-sage/40 px-[7px] py-1.5 min-w-0',
+                          mine && 'shadow-[inset_0_0_0_1px_rgba(255,107,26,0.35)]',
+                        )}
+                        data-testid="draft-board-keeper"
+                      >
+                        <span className="block font-barlow font-bold text-[12px] truncate text-pressbox-text/80">{surname(keeperName)}</span>
+                        <span className="block mt-[3px] font-plex font-semibold text-[8px] tracking-[0.1em] text-pressbox-sage">KEEPER</span>
+                      </div>
                     );
                   }
 

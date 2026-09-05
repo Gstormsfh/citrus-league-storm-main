@@ -241,7 +241,23 @@ export function toDraftedPlayerIds(derived: DerivedDraftState): string[] {
       out.push(String(entry.playerId));
     }
   });
+  // KEEPERS (2026-09-05): a kept player is off the board from the first
+  // pick, not from the round his team pays for him. The engine makes that
+  // pick itself; until it lands he is unavailable to everyone.
+  for (const k of derived.keepers ?? []) {
+    if (!out.includes(k.playerId)) out.push(k.playerId);
+  }
   return out;
+}
+
+/**
+ * KEEPERS: `${teamId}:${round}` → kept playerId for the slots the board
+ * should mark as spoken for before their picks land.
+ */
+export function toKeeperSlots(derived: DerivedDraftState): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const k of derived.keepers ?? []) m.set(`${k.teamId}:${k.round}`, k.playerId);
+  return m;
 }
 
 /**

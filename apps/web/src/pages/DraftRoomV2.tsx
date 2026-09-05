@@ -107,6 +107,7 @@ import {
   toAvailablePlayers,
   toDraftHistory,
   toDraftedPlayerIds,
+  toKeeperSlots,
   toV1Teams,
   participatingTeamIdsFromMatrix,
   type FetchedTeam,
@@ -2019,6 +2020,16 @@ function MainTabs({
     () => (renderDerived ? toDraftedPlayerIds(renderDerived) : []),
     [renderDerived],
   );
+  // KEEPERS (2026-09-05): the slots spoken for before their picks land,
+  // named for the board. Empty for a league without keepers.
+  const keeperSlotNames = useMemo(() => {
+    const m = new Map<string, string>();
+    if (!renderDerived) return m;
+    toKeeperSlots(renderDerived).forEach((playerId, key) => {
+      m.set(key, playersById.get(playerId)?.full_name ?? `#${playerId}`);
+    });
+    return m;
+  }, [renderDerived, playersById]);
   /** Queued players still on the board — the number the QUEUE tab carries. */
   const liveQueueCount = useMemo(
     () => queue.filter((id) => !draftedIds.includes(id)).length,
@@ -2705,6 +2716,7 @@ function MainTabs({
                 : undefined
             }
             draftType="snake"
+            keeperSlots={keeperSlotNames}
             /* PRESS BOX (2026-09-04): the outlined column and the card on tap. */
             userTeamId={myTeamId}
             onPlayerClick={(playerId) => {

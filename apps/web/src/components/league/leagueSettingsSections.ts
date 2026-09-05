@@ -543,7 +543,7 @@ export function buildLeagueSettingsSections(input: LeagueSettingsInput): Setting
                   label: 'Keeper cost',
                   value: keeper.keeperPenalty,
                   options: [
-                    { value: 'none', label: 'Free', help: 'Keepers cost nothing in the draft' },
+                    { value: 'none', label: 'Free', help: 'No round cost: a keeper takes the team’s last-round pick' },
                     { value: 'round-cost', label: 'Round cost', help: 'A keeper costs the round he was drafted in' },
                     { value: 'round-escalation', label: 'Escalating', help: 'One round earlier each year he is kept' },
                   ],

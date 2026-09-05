@@ -188,7 +188,7 @@ const PLAYOFF_WEEKS = opts([['1', '1 week'], ['2', '2 weeks'], ['3', '3 weeks'],
 const TRADE_DEADLINES = opts([['0', 'None'], ['8', 'Week 8'], ['10', 'Week 10'], ['12', 'Week 12'], ['14', 'Week 14'], ['16', 'Week 16']]);
 const KEEPER_COUNTS = opts([['0', 'Unlimited', 'Dynasty: the whole roster is kept'], ['1', '1 keeper'], ['2', '2 keepers'], ['3', '3 keepers'], ['5', '5 keepers'], ['8', '8 keepers'], ['10', '10 keepers']]);
 const KEEPER_PENALTIES = opts([
-  ['none', 'None', 'Keepers have no draft-pick cost'],
+  ['none', 'None', 'No round cost: a keeper takes the team’s last-round pick'],
   ['round-cost', 'Round cost', 'Keeping a player costs the round he was drafted in'],
   ['round-escalation', 'Escalation', 'The cost goes up one round each season'],
 ]);

@@ -47,6 +47,7 @@ import type { DraftServiceV2 } from '../services/DraftServiceV2';
 import { readAllPaged } from '../lib/pagedRead';
 import { readSystemFlag } from '../lib/systemFlags';
 import { LobbyManager } from './LobbyManager';
+import type { KeeperSlot } from './keeperSlots';
 import type {
   CommissionerAuthorizationResult,
   DraftFormat,
@@ -79,6 +80,8 @@ import type {
 export interface LobbyConfig {
   format: DraftFormat;
   draftOrder: ReadonlyArray<DraftOrderSlot>;
+  /** KEEPERS (2026-09-05): locked keepers and the slot each one costs. Absent = none. */
+  keepers?: ReadonlyArray<KeeperSlot>;
   /**
    * Pick clock duration in seconds INCLUDING the +1s pad. Source:
    * `leagues.settings.pickTimeLimit` + 1 (the +1 mirrors
@@ -1241,6 +1244,7 @@ export class LobbyRegistry {
       draftService: this.draftService,
       publish: this.publish,
       draftOrder: config.draftOrder,
+      keepers: config.keepers,
       verifyTeamAuthorization: this.verifyTeamAuthorization,
       verifyCommissionerAuthorization: this.verifyCommissionerAuthorization,
       supabase: this.supabase,

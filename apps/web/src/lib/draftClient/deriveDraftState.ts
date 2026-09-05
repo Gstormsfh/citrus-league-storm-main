@@ -39,6 +39,7 @@ import type {
   BufferedDraftEvent,
   DraftSnapshot,
   LobbyStatus,
+  SnapshotKeeper,
 } from '@citrus/shared';
 import type { DraftOrderSlot } from './fetchDraftOrderMatrix';
 
@@ -106,6 +107,13 @@ export interface DerivedDraftState {
    * lot's player from `auction_nomination_started` / `auction_auto_nominated`.
    */
   auctionLotPlayerId?: string | null;
+  /**
+   * KEEPERS (2026-09-05): the league's locked keepers from the snapshot.
+   * The engine makes each keeper's pick when his slot comes up; until then
+   * the client keeps him out of the pool and marks the slot. Carried
+   * through every fold unchanged.
+   */
+  keepers?: ReadonlyArray<SnapshotKeeper>;
 }
 
 /**
@@ -140,6 +148,7 @@ export interface FoldResult {
 export interface DerivationSeed {
   totalPicks: number;
   format: DraftSnapshot['format'];
+  keepers?: ReadonlyArray<SnapshotKeeper>;
 }
 
 /**
@@ -149,6 +158,7 @@ export function seedFromSnapshot(snapshot: DraftSnapshot): DerivationSeed {
   return {
     totalPicks: snapshot.stateSnapshot.totalPicks,
     format: snapshot.format,
+    ...(snapshot.keepers && snapshot.keepers.length > 0 ? { keepers: snapshot.keepers } : {}),
   };
 }
 
@@ -168,6 +178,7 @@ export function emptyDerivedState(seed: DerivationSeed): DerivedDraftState {
     teamRosters: new Map(),
     foldedThroughSeq: 0,
     auctionLotPlayerId: null,
+    ...(seed.keepers ? { keepers: seed.keepers } : {}),
   };
 }
 
@@ -523,6 +534,7 @@ export function foldEvents(
       teamRosters,
       foldedThroughSeq,
       auctionLotPlayerId,
+      ...(state.keepers ? { keepers: state.keepers } : {}),
     },
     gaps,
   };
@@ -631,6 +643,7 @@ function deriveFromTerminalPicks(
       draftStatus,
       teamRosters,
       foldedThroughSeq: 0,
+      ...(seed.keepers ? { keepers: seed.keepers } : {}),
     },
     gaps: [],
   };

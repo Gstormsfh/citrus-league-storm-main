@@ -248,6 +248,8 @@ function makeRawLobby(opts: MakeLobbyOpts = {}): LobbyManager {
     initialPickDeadline: opts.initialPickDeadline ?? null,
     initialDraftState: opts.initialDraftState ?? null,
     autopickStrategies: opts.autopickStrategies,
+    // KEEPERS (2026-09-05): only the keeper tests pass these.
+    keepers: opts.keepers,
     // Auction-specific (chunk 11g.6 sub-step 6a). Tests that exercise
     // auction handlers pass these via opts; snake/linear tests get
     // the empty defaults below (LobbyManager short-circuits on format).
@@ -6134,3 +6136,84 @@ async function makeUninitializedLobby() {
   // NOTE: lobby.init() deliberately NOT awaited.
   return { lobby, listDraftEvents };
 }
+
+// ── KEEPERS (2026-09-05) ─────────────────────────────────────────────
+//
+// Locked keepers reach the lobby as (team, player, round) slots. The
+// lobby refuses the kept player to everyone else, refuses the keeper's
+// team anything but the keeper at that slot, and makes the keeper pick
+// itself the moment the slot comes on the clock.
+
+describe('keepers', () => {
+  const OVI = 8471214;
+  const deadlineIn = (ms: number) => new Date(Date.now() + ms).toISOString();
+
+  it('a kept player is refused to another team before his slot, without calling the RPC', async () => {
+    const submitPick = vi.fn();
+    const lobby = await makeLobby({
+      format: 'snake',
+      submitPick,
+      keepers: [{ teamId: 'team-2', playerId: OVI, round: 1 }],
+    });
+    // team-1 is on the clock at pick 1 and tries to take team-2's keeper.
+    const result = await lobby.enqueueAction(
+      makeSubmitPick({ teamId: 'team-1', playerId: String(OVI), idempotencyKey: 'idem-keeper-steal' }),
+    );
+    expect(result).toEqual({ ok: false, reason: 'player_taken' });
+    expect(submitPick).not.toHaveBeenCalled();
+  });
+
+  it('the keeper slot takes its keeper, not a pick of the manager’s choosing', async () => {
+    const submitPick = vi.fn();
+    const lobby = await makeLobby({
+      format: 'snake',
+      submitPick,
+      keepers: [{ teamId: 'team-1', playerId: OVI, round: 1 }],
+    });
+    const result = await lobby.enqueueAction(
+      makeSubmitPick({ teamId: 'team-1', playerId: '8478402', idempotencyKey: 'idem-keeper-slot-other' }),
+    );
+    expect(result).toEqual({ ok: false, reason: 'player_taken' });
+    expect(submitPick).not.toHaveBeenCalled();
+  });
+
+  it('when a keeper slot comes on the clock the lobby makes that pick itself, as an autopick', async () => {
+    let seq = 0;
+    const submitPick = vi.fn(async () => {
+      seq += 1;
+      return { event_id: seq, seq, pick_deadline: deadlineIn(91_000), was_duplicate: false } satisfies SubmitPickResult;
+    });
+    const lobby = await makeLobby({
+      format: 'snake',
+      submitPick,
+      keepers: [{ teamId: 'team-2', playerId: OVI, round: 1 }],
+    });
+
+    // Pick 1: team-1 drafts normally. Pick 2 is team-2's keeper slot.
+    const first = await lobby.enqueueAction(makeSubmitPick({ teamId: 'team-1', idempotencyKey: 'idem-k-1' }));
+    expect(first.ok).toBe(true);
+
+    // The keeper pick is enqueued on the next tick.
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(submitPick).toHaveBeenCalledTimes(2);
+    const keeperCall = (submitPick.mock.calls[1] as unknown[])[0] as Record<string, unknown>;
+    expect(keeperCall.teamId).toBe('team-2');
+    expect(keeperCall.playerId).toBe(OVI);
+    expect(keeperCall.round).toBe(1);
+    expect(keeperCall.pickNumber).toBe(2);
+    expect((keeperCall.actor as { kind: string }).kind).toBe('autopick');
+
+    const state = lobby.getCurrentState();
+    expect(state.picksMade).toBe(2);
+    expect(state.onClockTeamId).toBe('team-3');
+
+    // The snapshot names the keeper for the client.
+    expect(lobby.getSnapshot().keepers).toEqual([{ teamId: 'team-2', playerId: String(OVI), round: 1 }]);
+  });
+
+  it('a lobby without keepers carries none in its snapshot', async () => {
+    const lobby = await makeLobby({ format: 'snake' });
+    expect(lobby.getSnapshot().keepers).toBeUndefined();
+  });
+});

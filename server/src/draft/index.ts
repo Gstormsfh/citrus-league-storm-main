@@ -71,6 +71,7 @@ import {
   createConsoleStructuredLogger,
   DEFAULT_PICK_TIME_LIMIT_SECONDS,
   PICK_CLOCK_PAD_SECONDS,
+  keeperSeasonYear,
 } from '@citrus/shared';
 import { startUwsServer, type UwsServerHandle } from './uws-server';
 import { createDraftInitializedPredicate } from './joinPathPrecheck';
@@ -92,6 +93,7 @@ import {
   DEFAULT_BID_INCREMENT_TIERS,
   validateBidIncrementTiers,
 } from './auctionBidIncrement';
+import { assignKeeperSlots, keeperEffectiveRound, type KeeperSlot } from './keeperSlots';
 
 // Enable real console logging on the server (default logger is silent).
 Object.assign(logger, createConsoleLogger());
@@ -379,6 +381,7 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
     return {
       format,
       draftOrder: [],
+      keepers: [],
       pickClockSeconds,
       initialPickDeadline,
       initialDraftState,
@@ -434,9 +437,16 @@ async function lookupLobbyConfig(leagueId: string): Promise<LobbyConfig> {
     }
   }
 
+  // KEEPERS (2026-09-05): the locked designations for the season this draft
+  // is for, each assigned the slot it costs. The lobby makes those picks
+  // itself when the slots come up and keeps the players out of the pool
+  // until then. Empty for a league without keepers.
+  const keepers = await loadKeeperSlots(leagueId, settings, orderRows.length);
+
   return {
     format,
     draftOrder,
+    keepers,
     pickClockSeconds,
     initialPickDeadline,
     initialDraftState,
@@ -968,3 +978,52 @@ function shutdown(signal: string) {
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+/**
+ * KEEPERS (2026-09-05): locked designations → draft slots. Reads
+ * `keeper_designations` for the season this draft is for (shared
+ * keeperSeasonYear: the projections season while the league has not
+ * drafted) and mirrors `get_keeper_draft_costs` for the round each one
+ * costs. A read failure is logged and returns no keepers rather than
+ * blocking the lobby: the draft opens, the commissioner can override.
+ */
+async function loadKeeperSlots(
+  leagueId: string,
+  settings: Record<string, unknown> | null | undefined,
+  draftRounds: number,
+): Promise<ReadonlyArray<KeeperSlot>> {
+  if (draftRounds <= 0) return [];
+  const enabled = settings?.keeperEnabled === true || settings?.dynastyMode === true;
+  if (!enabled) return [];
+  try {
+    const season = keeperSeasonYear(false);
+    const { data, error } = await supabaseAdmin
+      .from('keeper_designations')
+      .select('team_id, player_id, original_draft_round, years_kept, status')
+      .eq('league_id', leagueId)
+      .eq('season_year', season)
+      .eq('status', 'locked');
+    if (error) throw new Error(error.message);
+    const penalty = typeof settings?.keeperPenalty === 'string' ? (settings.keeperPenalty as string) : 'none';
+    const locked = ((data ?? []) as Array<{
+      team_id: string;
+      player_id: string | number;
+      original_draft_round: number | null;
+      years_kept: number | null;
+    }>)
+      .map((r) => ({
+        teamId: r.team_id,
+        playerId: Number(r.player_id),
+        effectiveRound: keeperEffectiveRound(penalty, r.original_draft_round, r.years_kept),
+      }))
+      .filter((k) => Number.isFinite(k.playerId) && k.playerId > 0);
+    const slots = assignKeeperSlots(locked, draftRounds);
+    if (slots.length) {
+      structuredLogger.info('lobby.keepers_loaded', { leagueId, season, penalty, count: slots.length });
+    }
+    return slots;
+  } catch (err) {
+    structuredLogger.error(`[lobby] keeper load failed for ${leagueId}; opening without keepers`, { leagueId }, err);
+    return [];
+  }
+}

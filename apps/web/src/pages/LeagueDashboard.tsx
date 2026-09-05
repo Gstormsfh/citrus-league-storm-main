@@ -2369,6 +2369,7 @@ const LeagueDashboard = () => {
               isCommissioner={isCommissioner}
               keeperCount={Number((league.settings as { keeperCount?: number } | null)?.keeperCount ?? 0)}
               dynastyMode={Boolean((league.settings as { dynastyMode?: boolean } | null)?.dynastyMode)}
+              draftCompleted={league.draft_status === 'completed'}
             />
           )}
             </div>
