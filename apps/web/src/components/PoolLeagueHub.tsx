@@ -71,7 +71,7 @@ export const PoolLeagueHub = ({ leagueId, league }: PoolLeagueHubProps) => {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 animate-spin text-citrus-sage" />
+        <Loader2 className="w-6 h-6 animate-spin text-citrus-sage max-lg:text-pressbox-sage" />
       </div>
     );
   }
@@ -79,13 +79,13 @@ export const PoolLeagueHub = ({ leagueId, league }: PoolLeagueHubProps) => {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* League info card */}
-      <Card className="border-none shadow-lg bg-[#1A2A20] overflow-hidden">
+      <Card className="border-none shadow-lg bg-[#1A2A20] max-lg:bg-pressbox-tile overflow-hidden">
         <div className="bg-gradient-to-r from-citrus-forest to-citrus-sage p-6 text-white">
           <div className="flex items-center justify-between">
             <div>
               <Badge className="bg-white/20 text-white border-0 mb-2 text-xs">{getPoolLabel(leagueType)} Pool</Badge>
-              <h2 className="text-2xl font-varsity font-black uppercase tracking-tight">{league.name}</h2>
-              <p className="text-white/70 text-sm font-display mt-1">
+              <h2 className="text-2xl font-varsity max-lg:font-condensed font-black uppercase tracking-tight">{league.name}</h2>
+              <p className="text-white/70 text-sm font-display max-lg:font-barlow mt-1">
                 {members.length}{teamsCount ? ` / ${teamsCount}` : ''} members joined
               </p>
             </div>
@@ -99,9 +99,9 @@ export const PoolLeagueHub = ({ leagueId, league }: PoolLeagueHubProps) => {
           {/* Join code + invite */}
           <div className="flex items-center gap-3 mb-6 p-3 bg-white/5 rounded-xl">
             <div className="flex-1">
-              <span className="text-xs font-display text-white/55 uppercase tracking-wider">Join Code</span>
+              <span className="text-xs font-display max-lg:font-barlow text-white/55 uppercase tracking-wider">Join Code</span>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="font-mono text-lg font-bold text-pastel-cream tracking-widest">
+                <span className="font-mono text-lg font-bold text-pastel-cream max-lg:text-pressbox-text tracking-widest">
                   {league.join_code || 'N/A'}
                 </span>
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyCode}>
@@ -117,42 +117,42 @@ export const PoolLeagueHub = ({ leagueId, league }: PoolLeagueHubProps) => {
           {/* League settings summary */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
             <div className="p-3 bg-white/5 rounded-lg text-center">
-              <div className="text-xs font-display text-white/55 uppercase">Type</div>
-              <div className="font-display font-bold text-sm text-pastel-cream">{getPoolLabel(leagueType)}</div>
+              <div className="text-xs font-display max-lg:font-barlow text-white/55 uppercase">Type</div>
+              <div className="font-display max-lg:font-barlow font-bold text-sm text-pastel-cream max-lg:text-pressbox-text">{getPoolLabel(leagueType)}</div>
             </div>
             <div className="p-3 bg-white/5 rounded-lg text-center">
-              <div className="text-xs font-display text-white/55 uppercase">Members</div>
-              <div className="font-display font-bold text-sm text-pastel-cream">{members.length}{teamsCount ? ` / ${teamsCount}` : ''}</div>
+              <div className="text-xs font-display max-lg:font-barlow text-white/55 uppercase">Members</div>
+              <div className="font-display max-lg:font-barlow font-bold text-sm text-pastel-cream max-lg:text-pressbox-text">{members.length}{teamsCount ? ` / ${teamsCount}` : ''}</div>
             </div>
             <div className="p-3 bg-white/5 rounded-lg text-center">
-              <div className="text-xs font-display text-white/55 uppercase">Status</div>
-              <div className="font-display font-bold text-sm text-pastel-cream capitalize">{poolStatus}</div>
+              <div className="text-xs font-display max-lg:font-barlow text-white/55 uppercase">Status</div>
+              <div className="font-display max-lg:font-barlow font-bold text-sm text-pastel-cream max-lg:text-pressbox-text capitalize">{poolStatus}</div>
             </div>
             {leagueType === 'pickem' && league.settings?.picksPerWeek && (
               <div className="p-3 bg-white/5 rounded-lg text-center">
-                <div className="text-xs font-display text-white/55 uppercase">Picks/Week</div>
-                <div className="font-display font-bold text-sm text-pastel-cream">
+                <div className="text-xs font-display max-lg:font-barlow text-white/55 uppercase">Picks/Week</div>
+                <div className="font-display max-lg:font-barlow font-bold text-sm text-pastel-cream max-lg:text-pressbox-text">
                   {(league.settings.picksPerWeek as number) === 0 ? 'All' : league.settings.picksPerWeek as number}
                 </div>
               </div>
             )}
             {leagueType === 'survivor' && league.settings?.survivorLives && (
               <div className="p-3 bg-white/5 rounded-lg text-center">
-                <div className="text-xs font-display text-white/55 uppercase">Lives</div>
-                <div className="font-display font-bold text-sm text-pastel-cream">{league.settings.survivorLives as number}</div>
+                <div className="text-xs font-display max-lg:font-barlow text-white/55 uppercase">Lives</div>
+                <div className="font-display max-lg:font-barlow font-bold text-sm text-pastel-cream max-lg:text-pressbox-text">{league.settings.survivorLives as number}</div>
               </div>
             )}
             {leagueType === 'confidence-pool' && league.settings?.confidenceMaxPoints && (
               <div className="p-3 bg-white/5 rounded-lg text-center">
-                <div className="text-xs font-display text-white/55 uppercase">Max Points</div>
-                <div className="font-display font-bold text-sm text-pastel-cream">{league.settings.confidenceMaxPoints as number}</div>
+                <div className="text-xs font-display max-lg:font-barlow text-white/55 uppercase">Max Points</div>
+                <div className="font-display max-lg:font-barlow font-bold text-sm text-pastel-cream max-lg:text-pressbox-text">{league.settings.confidenceMaxPoints as number}</div>
               </div>
             )}
           </div>
 
           {/* Members list */}
           <div>
-            <h3 className="font-display font-bold text-sm text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <h3 className="font-display max-lg:font-barlow font-bold text-sm text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
               <Users className="w-4 h-4" /> Members
             </h3>
             <div className="space-y-2">
@@ -162,15 +162,15 @@ export const PoolLeagueHub = ({ leagueId, league }: PoolLeagueHubProps) => {
                 const name = m.owner_name || m.owner_username || m.team_name;
                 return (
                   <div key={m.id} className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
-                    isYou ? 'bg-citrus-sage/10 border border-citrus-sage/20' : 'bg-white/5'
+                    isYou ? 'bg-citrus-sage/10 max-lg:bg-pressbox-sage/10 border border-citrus-sage/20 max-lg:border-pressbox-sage/20' : 'bg-white/5'
                   }`}>
                     {/* Rank / avatar */}
-                    <div className="w-8 h-8 rounded-full bg-citrus-forest flex items-center justify-center text-white font-varsity font-bold text-xs shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-citrus-forest flex items-center justify-center text-white font-varsity max-lg:font-condensed font-bold text-xs shrink-0">
                       {i + 1}
                     </div>
                     {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="font-display font-bold text-sm text-pastel-cream truncate flex items-center gap-1.5">
+                      <div className="font-display max-lg:font-barlow font-bold text-sm text-pastel-cream max-lg:text-pressbox-text truncate flex items-center gap-1.5">
                         {name}
                         {isComm && (
                           <Crown className="w-3.5 h-3.5 text-amber-500 shrink-0" />
@@ -179,7 +179,7 @@ export const PoolLeagueHub = ({ leagueId, league }: PoolLeagueHubProps) => {
                           <Badge variant="outline" className="text-[10px] px-1 py-0">You</Badge>
                         )}
                       </div>
-                      <div className="text-[11px] font-display text-white/55 truncate">
+                      <div className="text-[11px] font-display max-lg:font-barlow text-white/55 truncate">
                         {m.team_name}{isComm ? ' · Commissioner' : ''}
                       </div>
                     </div>
@@ -205,7 +205,7 @@ export const PoolLeagueHub = ({ leagueId, league }: PoolLeagueHubProps) => {
           {/* Commissioner controls */}
           {isCommissioner && (
             <div className="mt-6 pt-6 border-t border-white/10">
-              <h3 className="font-display font-bold text-sm text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <h3 className="font-display max-lg:font-barlow font-bold text-sm text-white/70 uppercase tracking-wider mb-3 flex items-center gap-2">
                 <Shield className="w-4 h-4" /> Commissioner Controls
               </h3>
               <div className="flex flex-wrap gap-2">

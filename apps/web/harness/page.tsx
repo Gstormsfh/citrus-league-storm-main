@@ -28,6 +28,7 @@ import { WaiverService } from '../src/services/WaiverService';
 import { PlayerService } from '../src/services/PlayerService';
 import { LeagueService } from '../src/services/LeagueService';
 import { ScheduleService } from '../src/services/ScheduleService';
+import { PoolService } from '../src/services/PoolService';
 import { MatchupService } from '../src/services/MatchupService';
 import { DraftService } from '../src/services/DraftService';
 import { PlayoffService } from '../src/services/PlayoffService';
@@ -498,6 +499,30 @@ const HARNESS_GAMES = new Map<string, any[]>(
   new Map(teams.map((t) => [t.toUpperCase(), (HARNESS_GAMES.get(t.toUpperCase()) ?? [])[1] ?? null]));
 
 /**
+ * THE POOLS (2026-09-05): Pick'em, Survivor and Confidence read the week's
+ * slate, the NHL records and the pool's own picks and table. The slate is
+ * the harness games above, de-duplicated (each game is keyed under both
+ * teams); the tables are the ten harness managers.
+ */
+const POOL_GAMES = [...new Map([...HARNESS_GAMES.values()].flat().map((g: any) => [g.game_id, g])).values()];
+(PoolService as any).getWeekGames = async () => POOL_GAMES;
+(PoolService as any).getTeamRecordsAndH2H = async () => ({
+  records: Object.fromEntries(TEAMS.map((t, i) => [t, { w: 3 + (i % 4), l: 1 + (i % 3), otl: i % 2, streak: i % 2 ? 'W2' : 'L1' }])),
+  h2h: {},
+});
+(PoolService as any).getPickemPicks = async () => [];
+(PoolService as any).getPickemStandings = async () =>
+  PRIORITY.map((p, i) => ({ user_id: i === 0 ? 'harness-user' : `owner-${i + 1}`, display_name: p.owner_name, correct_picks: 28 - i * 2, total_picks: 40, accuracy: ((28 - i * 2) / 40) * 100, current_week_correct: 5 - (i % 4) }));
+(PoolService as any).getSurvivorStandings = async () =>
+  PRIORITY.map((p, i) => ({ user_id: i === 0 ? 'harness-user' : `owner-${i + 1}`, display_name: p.owner_name, is_eliminated: i > 6, eliminated_week: i > 6 ? 3 : null, lives_remaining: i > 6 ? 0 : 1, teams_used: TEAMS.slice(0, 3), current_pick: i < 5 ? TEAMS[i] : null }));
+(PoolService as any).getSurvivorPickHistory = async () => [];
+(PoolService as any).getSurvivorUsedTeams = async () => TEAMS.slice(0, 2);
+(PoolService as any).isSurvivorEliminated = async () => false;
+(PoolService as any).getConfidencePicks = async () => [];
+(PoolService as any).getConfidenceStandings = async () =>
+  PRIORITY.map((p, i) => ({ user_id: i === 0 ? 'harness-user' : `owner-${i + 1}`, display_name: p.owner_name, total_points: 212 - i * 9, possible_points: 300, current_week_points: 31 - i, weeks_played: 4 }));
+
+/**
  * The player card's GAME LOG pane (2026-09-04). It reads the schedule one
  * team at a time (`getGamesForTeam`, singular; the roster uses the plural
  * stubbed above) and then makes one request for the player's stats and
@@ -886,6 +911,9 @@ const PAGES: Record<string, () => Promise<{ default: React.ComponentType }>> = {
   resetpassword: () => import('../src/pages/ResetPassword'),
   authcallback: () => import('../src/pages/AuthCallback'),
   armchair: () => import('../src/pages/ArmchairGM'),
+  pickem: () => import('../src/pages/PoolPickem'),
+  survivor: () => import('../src/pages/PoolSurvivor'),
+  confidence: () => import('../src/pages/PoolConfidence'),
 };
 
 const which = new URLSearchParams(location.search).get('p') || 'waivers';
@@ -931,6 +959,9 @@ const ROUTE_PATHS: Record<string, { path: string; at: string }> = {
   authcallback: { path: '/auth/callback', at: '/auth/callback' },
   // `&tab=trade|signing|buyout|projection|mockdraft` for the other tools.
   armchair: { path: '/armchair-gm', at: `/armchair-gm${location.search.replace(/^\?p=[^&]*/, '?_')}` },
+  pickem: { path: '/pool/pickem', at: '/pool/pickem' },
+  survivor: { path: '/pool/survivor', at: '/pool/survivor' },
+  confidence: { path: '/pool/confidence', at: '/pool/confidence' },
   // App.tsx routes this as `/matchup/:leagueId/:weekId?`, and the page pushes
   // the week into the URL as soon as it resolves one. Under the old
   // `/matchup/:leagueId?` the very first push ("/matchup/harness-league/1")

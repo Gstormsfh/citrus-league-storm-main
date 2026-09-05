@@ -3,6 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
+import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
+import { PressBoxPageLoading } from '@/components/pressbox/PageLoading';
+import { PressBoxTabs } from '@/components/pressbox/Tabs';
+import { PressBoxTeamMark } from '@/components/pressbox/TeamMark';
+import { PB_TYPE } from '@/components/pressbox/rowScale';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -93,8 +99,8 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
   const homeStreak = hr?.streak || '-';
 
   return (
-    <div className={`grid grid-cols-[1fr_auto_1fr] rounded-xl overflow-hidden transition-all duration-200 bg-[#1A2A20] ring-1 ${
-      picked ? 'ring-pastel-orange/40 shadow-[0_8px_24px_-12px_rgba(255,107,26,0.3)]' : 'ring-white/10 hover:ring-white/20'
+    <div className={`grid grid-cols-[1fr_auto_1fr] rounded-xl overflow-hidden transition-all duration-200 bg-[#1A2A20] max-lg:bg-pressbox-tile ring-1 ${
+      picked ? 'ring-pastel-orange/40 max-lg:ring-pressbox-orange/40 shadow-[0_8px_24px_-12px_rgba(255,107,26,0.3)]' : 'ring-white/10 hover:ring-white/20'
     } ${locked && !isLive ? 'opacity-60' : ''}`}>
 
       {/* ═══ COLUMN 1: AWAY TEAM ═══ */}
@@ -111,17 +117,18 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
         onClick={() => !locked && onPick(gid, game.away_team)}
         disabled={!!locked}
       >
-        {/* Monogram */}
-        <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-[9px] shrink-0 shadow-sm"
+        {/* The crest on the phone; the monogram from lg. */}
+        <PressBoxTeamMark abbrev={game.away_team} size="md" label={away.fullName} className="lg:hidden" />
+        <div className="max-lg:hidden w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-[9px] shrink-0 shadow-sm"
           style={{ background: away.primaryColor, color: onTeamColor(away.primaryColor) }}>
           {game.away_team}
         </div>
         {/* Name + record */}
         <div className="flex-1 text-right min-w-0">
-          <div className={`font-bold text-xs truncate ${awayWon ? 'text-pastel-cream' : isFinal ? 'text-white/55' : 'text-pastel-cream'}`}>
+          <div className={`font-bold text-xs truncate ${awayWon ? 'text-pastel-cream max-lg:text-pressbox-text' : isFinal ? 'text-white/55' : 'text-pastel-cream max-lg:text-pressbox-text'}`}>
             {away.name}
           </div>
-          <div className="text-[10px] font-jbmono text-white/55 truncate">
+          <div className="text-[10px] font-jbmono max-lg:font-plex text-white/55 truncate">
             {ar ? `${ar.w}-${ar.l}-${ar.otl}` : ''}
             {awayStreak && awayStreak !== '-' ? ` ${awayStreak}` : ''}
           </div>
@@ -133,15 +140,15 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
           </div>
         )}
         {isFinal && (
-          <span className={`font-bold text-lg shrink-0 tabular-nums ${awayWon ? 'text-pastel-cream' : 'text-white/55'}`}>{game.away_score}</span>
+          <span className={`font-bold text-lg shrink-0 tabular-nums ${awayWon ? 'text-pastel-cream max-lg:text-pressbox-text' : 'text-white/55'}`}>{game.away_score}</span>
         )}
-        {isLive && <span className="font-bold text-lg shrink-0 text-pastel-orange tabular-nums">{game.away_score}</span>}
+        {isLive && <span className="font-bold text-lg shrink-0 text-pastel-orange max-lg:text-pressbox-orange tabular-nums">{game.away_score}</span>}
         {pickedAway && !isFinal && !isLive && (
           <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: away.primaryColor, color: onTeamColor(away.primaryColor) }}>
             <Check className="w-2.5 h-2.5 text-white" aria-hidden="true" />
           </div>
         )}
-        {existingPick?.picked_team === game.away_team && existingPick.is_correct === true && <CheckCircle2 className="w-4 h-4 text-pastel-sage shrink-0" aria-hidden="true" />}
+        {existingPick?.picked_team === game.away_team && existingPick.is_correct === true && <CheckCircle2 className="w-4 h-4 text-pastel-sage max-lg:text-pressbox-sage shrink-0" aria-hidden="true" />}
         {existingPick?.picked_team === game.away_team && existingPick.is_correct === false && <XCircle className="w-4 h-4 text-red-400 shrink-0" aria-hidden="true" />}
       </button>
 
@@ -150,20 +157,20 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
         {/* Row 1: Time or Score */}
         <div className="text-center">
           {isFinal ? (
-            <span className="text-[10px] font-jbmono font-bold text-white/55 uppercase tracking-wider">Final</span>
+            <span className="text-[10px] font-jbmono max-lg:font-plex font-bold text-white/55 uppercase tracking-wider">Final</span>
           ) : isLive ? (
-            <span className="flex items-center gap-1 text-[10px] font-jbmono font-bold text-pastel-orange uppercase tracking-wider">
+            <span className="flex items-center gap-1 text-[10px] font-jbmono max-lg:font-plex font-bold text-pastel-orange max-lg:text-pressbox-orange uppercase tracking-wider">
               <LivePulse size="xs" /> Live
             </span>
           ) : locked ? (
-            <span className="flex items-center gap-0.5 text-[10px] font-jbmono text-white/55"><Lock className="w-2.5 h-2.5" aria-hidden="true" /> Locked</span>
+            <span className="flex items-center gap-0.5 text-[10px] font-jbmono max-lg:font-plex text-white/55"><Lock className="w-2.5 h-2.5" aria-hidden="true" /> Locked</span>
           ) : (
-            <span className="text-xs font-jbmono font-bold text-pastel-cream tabular-nums">{fmtTime(game)}</span>
+            <span className="text-xs font-jbmono max-lg:font-plex font-bold text-pastel-cream max-lg:text-pressbox-text tabular-nums">{fmtTime(game)}</span>
           )}
         </div>
 
         {/* Row 2: H2H */}
-        <div className="text-[9px] font-jbmono text-white/55 mt-0.5">
+        <div className="text-[9px] font-jbmono max-lg:font-plex text-white/55 mt-0.5">
           {h2hGames > 0 ? (
             <span>
               H2H:{' '}
@@ -172,20 +179,20 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
               <span className="font-bold" style={{ color: homeH2HWins > awayH2HWins ? home.primaryColor : 'rgba(255,255,255,0.35)' }}>{homeH2HWins}</span>
             </span>
           ) : (
-            <span className="text-pastel-orange-soft">★ 1st meeting</span>
+            <span className="text-pastel-orange-soft max-lg:text-pressbox-orange-soft"><span className="max-lg:hidden">★ 1st meeting</span><span className="lg:hidden">1ST MTG</span></span>
           )}
         </div>
 
-        {/* Row 3: Venue */}
+        {/* Row 3: Venue -- from lg; the phone's centre column is 64px wide. */}
         {game.venue && (
-          <div className="text-[8px] font-jbmono text-white/55 mt-0.5 truncate max-w-full">
+          <div className="max-lg:hidden text-[8px] font-jbmono max-lg:font-plex text-white/55 mt-0.5 truncate max-w-full">
             {game.venue}
           </div>
         )}
 
-        {/* Row 4: Home ice */}
+        {/* Row 4: Home ice -- from lg; the phone row already reads away at home. */}
         {!isFinal && (
-          <div className="text-[9px] font-jbmono text-white/55 mt-0.5">
+          <div className="max-lg:hidden text-[9px] font-jbmono max-lg:font-plex text-white/55 mt-0.5">
             @ {home.fullName}
           </div>
         )}
@@ -205,15 +212,16 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
         onClick={() => !locked && onPick(gid, game.home_team)}
         disabled={!!locked}
       >
-        <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-[9px] shrink-0 shadow-sm"
+        <PressBoxTeamMark abbrev={game.home_team} size="md" label={home.fullName} className="lg:hidden" />
+        <div className="max-lg:hidden w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-[9px] shrink-0 shadow-sm"
           style={{ background: home.primaryColor, color: onTeamColor(home.primaryColor) }}>
           {game.home_team}
         </div>
         <div className="flex-1 text-left min-w-0">
-          <div className={`font-bold text-xs truncate ${homeWon ? 'text-pastel-cream' : isFinal ? 'text-white/55' : 'text-pastel-cream'}`}>
+          <div className={`font-bold text-xs truncate ${homeWon ? 'text-pastel-cream max-lg:text-pressbox-text' : isFinal ? 'text-white/55' : 'text-pastel-cream max-lg:text-pressbox-text'}`}>
             {home.name}
           </div>
-          <div className="text-[10px] font-jbmono text-white/55 truncate">
+          <div className="text-[10px] font-jbmono max-lg:font-plex text-white/55 truncate">
             {hr ? `${hr.w}-${hr.l}-${hr.otl}` : ''}
             {homeStreak && homeStreak !== '-' ? ` ${homeStreak}` : ''}
           </div>
@@ -224,15 +232,15 @@ function MatchupRow({ game, picked, existingPick, onPick, records, h2hData }: {
           </div>
         )}
         {isFinal && (
-          <span className={`font-bold text-lg shrink-0 tabular-nums ${homeWon ? 'text-pastel-cream' : 'text-white/55'}`}>{game.home_score}</span>
+          <span className={`font-bold text-lg shrink-0 tabular-nums ${homeWon ? 'text-pastel-cream max-lg:text-pressbox-text' : 'text-white/55'}`}>{game.home_score}</span>
         )}
-        {isLive && <span className="font-bold text-lg shrink-0 text-pastel-orange tabular-nums">{game.home_score}</span>}
+        {isLive && <span className="font-bold text-lg shrink-0 text-pastel-orange max-lg:text-pressbox-orange tabular-nums">{game.home_score}</span>}
         {pickedHome && !isFinal && !isLive && (
           <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0" style={{ background: home.primaryColor, color: onTeamColor(home.primaryColor) }}>
             <Check className="w-2.5 h-2.5 text-white" aria-hidden="true" />
           </div>
         )}
-        {existingPick?.picked_team === game.home_team && existingPick.is_correct === true && <CheckCircle2 className="w-4 h-4 text-pastel-sage shrink-0" aria-hidden="true" />}
+        {existingPick?.picked_team === game.home_team && existingPick.is_correct === true && <CheckCircle2 className="w-4 h-4 text-pastel-sage max-lg:text-pressbox-sage shrink-0" aria-hidden="true" />}
         {existingPick?.picked_team === game.home_team && existingPick.is_correct === false && <XCircle className="w-4 h-4 text-red-400 shrink-0" aria-hidden="true" />}
       </button>
     </div>
@@ -322,8 +330,8 @@ const PoolPickem = () => {
 
   if (loading) return (
     <DarkLayout>
-      <Navbar />
-      <StormyLoading message="Loading Pick'em Pool..." />
+      <div className="hidden lg:block"><Navbar /></div>
+      <PressBoxPageLoading kind="list" message="Loading Pick'em Pool..." />
     </DarkLayout>
   );
 
@@ -335,9 +343,20 @@ const PoolPickem = () => {
 
   return (
     <DarkLayout>
-      <Navbar />
+      {/* PRESS BOX (2026-09-05): the league chrome on the phone -- crest,
+          name, `‹ WK 48 ›` from the header's own chevrons -- and the
+          desktop's Navbar from `lg`. The pool has no Match/Team/Players/
+          League axis, so the sub-tab strip is off and the page's own
+          Picks / Standings / League strip follows the hero. */}
+      <div className="hidden lg:block"><Navbar /></div>
+      <PressBoxLeagueChrome
+        showSubTabs={false}
+        weekLabel={`WK ${currentWeek}`}
+        onWeekPrev={currentWeek > 1 ? () => setCurrentWeek((w) => Math.max(1, w - 1)) : null}
+        onWeekNext={() => setCurrentWeek((w) => w + 1)}
+      />
 
-      <main className="w-full pt-20 lg:pt-24 lg:pb-8 pb-app-chrome">
+      <main className={cn(PB_TYPE, 'w-full max-lg:pt-0 pt-20 lg:pt-24 lg:pb-8 pb-app-chrome max-lg:font-barlow')}>
         <div className="flex lg:gap-0">
         {/* Main picks column — centered with padding */}
         <div className="flex-1 min-w-0 px-3 sm:px-4 lg:px-8 xl:px-12">
@@ -348,7 +367,7 @@ const PoolPickem = () => {
           )}
 
           {/* Hero banner — mascot acting in domain */}
-          <div className="relative mb-6 mt-4 w-full aspect-[21/9] sm:aspect-[24/9] rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
+          <div className="relative mb-6 max-lg:mb-3 mt-4 max-lg:mt-3 w-full aspect-[21/9] sm:aspect-[24/9] rounded-2xl max-lg:rounded-[12px] overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
             <img
               src="/mascots/scene-pickem.webp"
               alt="Lemon picking between two NHL teams"
@@ -361,38 +380,52 @@ const PoolPickem = () => {
               style={{ background: 'linear-gradient(to top, rgba(15,31,21,0.85) 0%, transparent 45%)' }}
             />
             <div className="absolute bottom-4 left-5 sm:bottom-6 sm:left-8 z-10 max-w-[80%]">
-              <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-1.5 font-bold flex items-center gap-2">
+              <div className="font-jbmono max-lg:font-plex text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft max-lg:text-pressbox-orange-soft mb-1.5 font-bold flex items-center gap-2">
                 <PickemIcon className="w-3 h-3" /> Daily Pickem
               </div>
-              <h1 className="font-sans font-black text-[1.5rem] sm:text-[2rem] md:text-[2.5rem] tracking-[-0.025em] text-pastel-cream leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
-                Pick the winners. <span className="text-pastel-orange">Stack the points.</span>
+              <h1 className="font-sans max-lg:font-condensed font-black max-lg:font-bold max-lg:uppercase max-lg:tracking-[0.02em] text-[1.5rem] max-lg:text-[22px] sm:text-[2rem] md:text-[2.5rem] tracking-[-0.025em] text-pastel-cream max-lg:text-pressbox-text leading-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+                Pick the winners. <span className="text-pastel-orange max-lg:text-pressbox-orange">Stack the points.</span>
               </h1>
             </div>
           </div>
 
           {/* Header — STICKY below navbar */}
-          <div className="sticky top-[92px] z-section-header bg-[#0F1F15]/95 backdrop-blur-md py-2 sm:py-3 mb-4 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
+          {/* The phone's strip: Picks / Standings / League as the Press Box
+              underline tabs. The week lives in the header above. */}
+          <PressBoxTabs
+            className="lg:hidden mb-3"
+            label="Pool view"
+            fill
+            activeKey={activeTab}
+            onSelect={setActiveTab}
+            tabs={[
+              { key: 'picks', label: `Picks · ${picks.size}/${required}` },
+              { key: 'standings', label: 'Standings' },
+              { key: 'league', label: 'League' },
+            ]}
+          />
+          <div className="max-lg:hidden sticky top-[92px] z-section-header bg-[#0F1F15]/95 max-lg:bg-pressbox-surface/95 backdrop-blur-md py-2 sm:py-3 mb-4 -mx-3 sm:-mx-4 lg:-mx-8 xl:-mx-12 px-3 sm:px-4 lg:px-8 xl:px-12 border-b border-white/5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex items-center bg-[#1A2A20] rounded-md ring-1 ring-white/10 overflow-hidden">
-                <Button variant="ghost" size="icon" aria-label="Previous week" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
+              <div className="flex items-center bg-[#1A2A20] max-lg:bg-pressbox-tile rounded-md ring-1 ring-white/10 overflow-hidden">
+                <Button variant="ghost" size="icon" aria-label="Previous week" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none text-pastel-cream max-lg:text-pressbox-text hover:text-pastel-orange hover:max-lg:text-pressbox-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => Math.max(1, w - 1))} disabled={currentWeek <= 1}>
                   <ChevronLeft className="w-4 h-4" aria-hidden="true" />
                 </Button>
                 <div className="px-2 sm:px-3 text-center border-x border-white/10">
-                  <div className="text-[8px] sm:text-[9px] font-jbmono text-white/55 uppercase tracking-widest leading-none">Week</div>
-                  <div className="text-base sm:text-lg font-bold text-pastel-cream leading-none tabular-nums">{currentWeek}</div>
+                  <div className="text-[8px] sm:text-[9px] font-jbmono max-lg:font-plex text-white/55 uppercase tracking-widest leading-none">Week</div>
+                  <div className="text-base sm:text-lg font-bold text-pastel-cream max-lg:text-pressbox-text leading-none tabular-nums">{currentWeek}</div>
                 </div>
-                <Button variant="ghost" size="icon" aria-label="Next week" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none text-pastel-cream hover:text-pastel-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
+                <Button variant="ghost" size="icon" aria-label="Next week" className="h-8 w-8 sm:h-10 sm:w-10 rounded-none text-pastel-cream max-lg:text-pressbox-text hover:text-pastel-orange hover:max-lg:text-pressbox-orange hover:bg-white/5" onClick={() => setCurrentWeek(w => w + 1)}>
                   <ChevronRight className="w-4 h-4" aria-hidden="true" />
                 </Button>
               </div>
 
               {/* Progress pill */}
-              <div className="hidden sm:flex items-center gap-2 bg-[#1A2A20] rounded-full px-3 py-1.5 ring-1 ring-white/10">
+              <div className="hidden sm:flex items-center gap-2 bg-[#1A2A20] max-lg:bg-pressbox-tile rounded-full px-3 py-1.5 ring-1 ring-white/10">
                 <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                  <div className="h-full bg-pastel-orange rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                  <div className="h-full bg-pastel-orange max-lg:bg-pressbox-orange rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                 </div>
-                <span className="text-xs font-bold text-pastel-cream tabular-nums">{picks.size}/{required}</span>
+                <span className="text-xs font-bold text-pastel-cream max-lg:text-pressbox-text tabular-nums">{picks.size}/{required}</span>
               </div>
             </div>
 
@@ -401,10 +434,10 @@ const PoolPickem = () => {
                 <span className="hidden sm:inline-flex"><InvitePlayersButton joinCode={activeLeague.join_code} leagueName={activeLeague.name} /></span>
               )}
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="bg-[#1A2A20] h-8 sm:h-9 ring-1 ring-white/10">
-                  <TabsTrigger value="picks" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] text-white/70">Picks</TabsTrigger>
-                  <TabsTrigger value="standings" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] text-white/70">Standings</TabsTrigger>
-                  <TabsTrigger value="league" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:text-[#581E00] text-white/70">League</TabsTrigger>
+                <TabsList className="bg-[#1A2A20] max-lg:bg-pressbox-tile h-8 sm:h-9 ring-1 ring-white/10">
+                  <TabsTrigger value="picks" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:max-lg:bg-pressbox-orange data-[state=active]:text-[#581E00] data-[state=active]:max-lg:text-pressbox-orange-ink text-white/70">Picks</TabsTrigger>
+                  <TabsTrigger value="standings" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:max-lg:bg-pressbox-orange data-[state=active]:text-[#581E00] data-[state=active]:max-lg:text-pressbox-orange-ink text-white/70">Standings</TabsTrigger>
+                  <TabsTrigger value="league" className="text-xs sm:text-sm px-2 sm:px-3 data-[state=active]:bg-pastel-orange data-[state=active]:max-lg:bg-pressbox-orange data-[state=active]:text-[#581E00] data-[state=active]:max-lg:text-pressbox-orange-ink text-white/70">League</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -417,11 +450,11 @@ const PoolPickem = () => {
               {games.length === 0 ? (
                 <GlowCard accent="orange">
                   <div className="py-16 text-center">
-                    <PickemIcon className="w-12 h-12 mx-auto mb-4 text-pastel-orange-soft/60" />
-                    <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-2">
+                    <PickemIcon className="w-12 h-12 mx-auto mb-4 text-pastel-orange-soft/60 max-lg:text-pressbox-orange-soft/60" />
+                    <div className="font-jbmono max-lg:font-plex text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-bold mb-2">
                       ✦ Between slates
                     </div>
-                    <p className="font-bold text-lg text-pastel-cream">The board is dark tonight.</p>
+                    <p className="font-bold text-lg text-pastel-cream max-lg:text-pressbox-text">The board is dark tonight.</p>
                     <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">This week's slate hasn't dropped yet. Swing back Wednesday for lock-in.</p>
                   </div>
                 </GlowCard>
@@ -431,12 +464,12 @@ const PoolPickem = () => {
                     <div key={dateKey}>
                       {/* Date header */}
                       <div className="flex items-center gap-2 mb-2 px-1">
-                        <Calendar className="w-3.5 h-3.5 text-pastel-orange-soft" aria-hidden="true" />
-                        <span className="text-xs font-jbmono font-bold text-pastel-orange-soft uppercase tracking-[0.22em]">
+                        <Calendar className="w-3.5 h-3.5 text-pastel-orange-soft max-lg:text-pressbox-orange-soft" aria-hidden="true" />
+                        <span className="text-xs font-jbmono max-lg:font-plex font-bold text-pastel-orange-soft max-lg:text-pressbox-orange-soft uppercase tracking-[0.22em]">
                           {fmtDate(dateKey)}
                         </span>
                         <div className="flex-1 h-px bg-white/10" />
-                        <span className="text-[10px] font-jbmono text-white/55 tabular-nums">{dateGames.length} games</span>
+                        <span className="text-[10px] font-jbmono max-lg:font-plex text-white/55 tabular-nums">{dateGames.length} games</span>
                       </div>
 
                       {/* Game rows — 2 columns on xl to reduce empty space */}
@@ -457,16 +490,16 @@ const PoolPickem = () => {
                   ))}
 
                   {/* Submit bar */}
-                  <div className="sticky bottom-20 lg:bottom-4 bg-[#1A2A20]/95 backdrop-blur-md ring-1 ring-pastel-orange/30 rounded-2xl py-3 px-4 flex items-center justify-between shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)]">
+                  <div className="sticky bottom-20 lg:bottom-4 bg-[#1A2A20]/95 max-lg:bg-pressbox-tile/95 backdrop-blur-md ring-1 ring-pastel-orange/30 max-lg:ring-pressbox-orange/30 rounded-2xl max-lg:rounded-[12px] py-3 px-4 flex items-center justify-between shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)]">
                     <div className="flex items-center gap-2">
                       <div className="w-20 h-2 rounded-full bg-white/10 overflow-hidden">
-                        <div className="h-full bg-pastel-orange rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        <div className="h-full bg-pastel-orange max-lg:bg-pressbox-orange rounded-full transition-all" style={{ width: `${pct}%` }} />
                       </div>
-                      <span className="text-sm text-pastel-cream font-bold">
+                      <span className="text-sm text-pastel-cream max-lg:text-pressbox-text font-bold">
                         {picks.size === 0 ? 'Tap a team' : `${picks.size}/${required} picked`}
                       </span>
                     </div>
-                    <Button onClick={handleSubmit} disabled={picks.size === 0 || submitting} size="lg" className="font-bold uppercase tracking-wider bg-pastel-orange hover:bg-pastel-orange-soft text-white border-0 active:scale-95 transition-all">
+                    <Button onClick={handleSubmit} disabled={picks.size === 0 || submitting} size="lg" className="font-bold uppercase tracking-wider bg-pastel-orange max-lg:bg-pressbox-orange hover:bg-pastel-orange-soft hover:max-lg:bg-pressbox-orange-soft text-white border-0 active:scale-95 transition-all">
                       {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
                       Submit
                     </Button>
@@ -482,16 +515,16 @@ const PoolPickem = () => {
               <div>
                 {standings.length === 0 ? (
                   <div className="text-center py-16">
-                    <PickemIcon className="w-12 h-12 mx-auto mb-4 text-pastel-orange-soft/60" />
-                    <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-2">
+                    <PickemIcon className="w-12 h-12 mx-auto mb-4 text-pastel-orange-soft/60 max-lg:text-pressbox-orange-soft/60" />
+                    <div className="font-jbmono max-lg:font-plex text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-bold mb-2">
                       ✦ Awaiting the first whistle
                     </div>
-                    <p className="font-bold text-pastel-cream text-base">Standings light up after week 1 wraps.</p>
+                    <p className="font-bold text-pastel-cream max-lg:text-pressbox-text text-base">Standings light up after week 1 wraps.</p>
                     <p className="text-[13px] text-white/55 mt-1 max-w-sm mx-auto">Get your picks in first. Every game counts.</p>
                     <button
                       type="button"
                       onClick={() => setActiveTab('picks')}
-                      className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-pastel-orange text-[#581E00] text-sm font-bold hover:bg-pastel-orange-soft transition-colors"
+                      className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-pastel-orange max-lg:bg-pressbox-orange text-[#581E00] max-lg:text-pressbox-orange-ink text-sm font-bold hover:bg-pastel-orange-soft hover:max-lg:bg-pressbox-orange-soft transition-colors"
                     >
                       Make picks →
                     </button>
@@ -501,31 +534,31 @@ const PoolPickem = () => {
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-black/20 border-white/10 hover:bg-black/20">
-                          <TableHead className="w-12 text-center text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">#</TableHead>
-                          <TableHead className="text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">Player</TableHead>
-                          <TableHead className="text-center text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">Correct</TableHead>
-                          <TableHead className="text-center hidden sm:table-cell text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">Total</TableHead>
-                          <TableHead className="text-right text-pastel-orange-soft font-jbmono uppercase text-[10px] tracking-wider">Pct</TableHead>
+                          <TableHead className="w-12 text-center text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-jbmono max-lg:font-plex uppercase text-[10px] tracking-wider">#</TableHead>
+                          <TableHead className="text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-jbmono max-lg:font-plex uppercase text-[10px] tracking-wider">Player</TableHead>
+                          <TableHead className="text-center text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-jbmono max-lg:font-plex uppercase text-[10px] tracking-wider">Correct</TableHead>
+                          <TableHead className="text-center hidden sm:table-cell text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-jbmono max-lg:font-plex uppercase text-[10px] tracking-wider">Total</TableHead>
+                          <TableHead className="text-right text-pastel-orange-soft max-lg:text-pressbox-orange-soft font-jbmono max-lg:font-plex uppercase text-[10px] tracking-wider">Pct</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {standings.map((s, i) => (
-                          <TableRow key={s.user_id} className={`border-white/5 hover:bg-white/5 transition-colors ${s.user_id === user?.id ? 'bg-pastel-orange/10' : ''}`}>
+                          <TableRow key={s.user_id} className={`border-white/5 hover:bg-white/5 transition-colors ${s.user_id === user?.id ? 'bg-pastel-orange/10 max-lg:bg-pressbox-orange/10' : ''}`}>
                             <TableCell className="text-center">
                               <span className={`inline-flex w-7 h-7 rounded-full items-center justify-center text-xs font-bold ${
-                                i === 0 ? 'bg-pastel-orange text-[#581E00]' :
-                                i === 1 ? 'bg-white/20 text-pastel-cream' :
-                                i === 2 ? 'bg-pastel-orange/40 text-white' :
+                                i === 0 ? 'bg-pastel-orange max-lg:bg-pressbox-orange text-[#581E00] max-lg:text-pressbox-orange-ink' :
+                                i === 1 ? 'bg-white/20 text-pastel-cream max-lg:text-pressbox-text' :
+                                i === 2 ? 'bg-pastel-orange/40 max-lg:bg-pressbox-orange/40 text-white' :
                                 'text-white/55'
                               }`}>{i + 1}</span>
                             </TableCell>
-                            <TableCell className="font-bold text-pastel-cream">
+                            <TableCell className="font-bold text-pastel-cream max-lg:text-pressbox-text">
                               {s.display_name}
-                              {s.user_id === user?.id && <Badge variant="outline" className="ml-2 text-[9px] font-jbmono uppercase tracking-wider border-pastel-orange text-pastel-orange-soft">YOU</Badge>}
+                              {s.user_id === user?.id && <Badge variant="outline" className="ml-2 text-[9px] font-jbmono max-lg:font-plex uppercase tracking-wider border-pastel-orange max-lg:border-pressbox-orange text-pastel-orange-soft max-lg:text-pressbox-orange-soft">YOU</Badge>}
                             </TableCell>
-                            <TableCell className="text-center font-bold text-pastel-cream tabular-nums">{s.correct_picks}</TableCell>
+                            <TableCell className="text-center font-bold text-pastel-cream max-lg:text-pressbox-text tabular-nums">{s.correct_picks}</TableCell>
                             <TableCell className="text-center text-white/55 hidden sm:table-cell tabular-nums">{s.total_picks}</TableCell>
-                            <TableCell className="text-right font-bold text-pastel-orange-soft tabular-nums">{s.accuracy.toFixed(1)}%</TableCell>
+                            <TableCell className="text-right font-bold text-pastel-orange-soft max-lg:text-pressbox-orange-soft tabular-nums">{s.accuracy.toFixed(1)}%</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>

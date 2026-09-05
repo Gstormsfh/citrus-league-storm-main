@@ -27,7 +27,7 @@ import { teamCrestUrl } from '@/components/roster/headshot';
 import { cn } from '@/lib/utils';
 import { PB_TYPE } from './rowScale';
 import { LeagueHeader, type LeagueHeaderProps } from './LeagueHeader';
-import { LeagueMenu } from './LeagueMenu';
+import { LeagueMenu, type LeagueMenuProps } from './LeagueMenu';
 import type { LeagueMenuTile } from './leagueMenuTiles';
 import { menuUserFromProfile } from './menuUser';
 import { useLeagueMenuTiles } from './useLeagueMenuTiles';
@@ -62,9 +62,12 @@ export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, .
     const abbr = (league?.activeLeague?.settings as { crestTeam?: string } | null)?.crestTeam;
     return abbr ? teamCrestUrl(abbr) : null;
   }, [resolvedId, league?.activeLeagueId, league?.activeLeague]);
-  // The tiles with their lines (2026-09-05); the reads start when the menu
-  // opens. A page that hands its own tiles keeps them.
-  const menuTiles = useLeagueMenuTiles(resolvedId, menuOpen);
+  const onSwitchLeague = () => {
+    // SWITCH ▾ goes to the league list (the artboard's home). `/` itself
+    // opens the active league's HQ since 2026-09-05; `?all=1` is the list.
+    setMenuOpen(false);
+    navigate('/?all=1');
+  };
   return (
     <>
       <div className={cn(PB_TYPE, 'lg:hidden pt-[env(safe-area-inset-top)]', className)}>
@@ -76,22 +79,37 @@ export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, .
           onSettingsPress={() => setMenuOpen(true)}
         />
       </div>
-      <LeagueMenu
-        open={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        leagueId={resolvedId}
-        leagueName={resolvedName}
-        tiles={tiles ?? menuTiles}
-        user={menuUserFromProfile(profile)}
-        /* SWITCH ▾ goes to the league list (the artboard's home). `/` itself
-           opens the active league's HQ since 2026-09-05; `?all=1` is the list. */
-        onSwitchLeague={() => {
-          setMenuOpen(false);
-          navigate('/?all=1');
-        }}
-      />
+      {/* The menu exists only while open (2026-09-05): its lines are
+          react-query reads, and mounting the hook on every league page put
+          `useQuery` under page tests that render no QueryClient. A page
+          that hands its own tiles keeps them. */}
+      {menuOpen && (tiles ? (
+        <LeagueMenu
+          open
+          onClose={() => setMenuOpen(false)}
+          leagueId={resolvedId}
+          leagueName={resolvedName}
+          tiles={tiles}
+          user={menuUserFromProfile(profile)}
+          onSwitchLeague={onSwitchLeague}
+        />
+      ) : (
+        <LeagueMenuWithReads
+          onClose={() => setMenuOpen(false)}
+          leagueId={resolvedId}
+          leagueName={resolvedName}
+          user={menuUserFromProfile(profile)}
+          onSwitchLeague={onSwitchLeague}
+        />
+      ))}
     </>
   );
+}
+
+/** The menu with its lines: the reads live here, under the open menu only. */
+function LeagueMenuWithReads(props: Omit<LeagueMenuProps, 'open' | 'tiles'>) {
+  const tiles = useLeagueMenuTiles(props.leagueId, true);
+  return <LeagueMenu open tiles={tiles} {...props} />;
 }
 
 export default PressBoxLeagueChrome;

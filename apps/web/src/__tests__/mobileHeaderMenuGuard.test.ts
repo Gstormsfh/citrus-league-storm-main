@@ -40,6 +40,8 @@ const LEAGUE_PAGES = [
   'LeagueDashboard.tsx', 'Matchup.tsx', 'Roster.tsx', 'FreeAgents.tsx', 'Standings.tsx',
   'WaiverWire.tsx', 'TradeAnalyzer.tsx', 'ScheduleManager.tsx', 'GMOffice.tsx', 'OtherTeam.tsx',
   'TeamAnalytics.tsx', 'PlayoffBracket.tsx',
+  // The pools (2026-09-05): the same chrome, sub-tabs off.
+  'PoolPickem.tsx', 'PoolSurvivor.tsx', 'PoolConfidence.tsx',
 ];
 const APP_PAGES = ['Profile.tsx', 'CreateLeague.tsx', 'StormyAssistant.tsx', 'Scores.tsx', 'News.tsx', 'Players.tsx'];
 
@@ -78,13 +80,16 @@ describe('every account screen wears the app header', () => {
 describe('the chrome itself', () => {
   const chrome = read('../components/pressbox/LeagueChrome.tsx');
 
-  it('opens the menu from the sliders', () => {
+  it('opens the menu from the sliders, and mounts it only while open', () => {
     expect(chrome).toContain('onSettingsPress={() => setMenuOpen(true)}');
-    expect(chrome).toMatch(/<LeagueMenu\s+open=\{menuOpen\}/);
+    // The menu's lines are react-query reads (2026-09-05); mounted on every
+    // league page they put `useQuery` under page tests with no QueryClient.
+    expect(chrome).toMatch(/\{menuOpen && \(tiles \? \(\s*<LeagueMenu\s+open/);
+    expect(chrome).toContain('<LeagueMenuWithReads');
   });
 
-  it('SWITCH goes to the LEAGUES tab, which lists the leagues', () => {
-    expect(chrome).toContain("navigate('/')");
+  it('SWITCH goes to the league list (`/?all=1`; `/` itself is the active league\'s HQ)', () => {
+    expect(chrome).toContain("navigate('/?all=1')");
     expect(chrome).toContain('onSwitchLeague=');
   });
 
