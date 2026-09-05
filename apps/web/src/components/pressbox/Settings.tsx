@@ -268,7 +268,9 @@ export function PressBoxTextRow({
 }: PressBoxTextRowProps) {
   const field = cn(
     'focus-citrus mt-2 w-full rounded-[8px] bg-white/[0.04] border border-white/[0.1] px-3',
-    'font-barlow text-[15px] text-pressbox-text placeholder:text-pressbox-text/35 disabled:opacity-50',
+    // 16px, not the artboard's 15: iOS zooms the page to a focused field
+    // under 16px (2026-09-05). The viewport meta stops it too; belt and braces.
+    'font-barlow text-[16px] text-pressbox-text placeholder:text-pressbox-text/35 disabled:opacity-50',
     multiline ? 'min-h-[84px] py-2 leading-[1.4]' : 'h-10',
     inputType === 'datetime-local' && 'font-plex text-[13px] [color-scheme:dark]',
   );

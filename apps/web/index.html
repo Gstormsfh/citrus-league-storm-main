@@ -7,7 +7,14 @@
       // Apply saved theme before first paint (prevents flash)
       (function(){var t=localStorage.getItem('citrus-theme');if(t==='dark'||(t==='system'&&matchMedia('(prefers-color-scheme:dark)').matches)){document.documentElement.classList.add('dark')}})();
     </script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- NO PAGE ZOOM (2026-09-05, from the simulator on the first Press Box
+         build): iOS zooms the page in on any focused text field under 16px
+         and does not zoom back out. Typing a league name left the whole app
+         scaled up -- the right edge cut off on every screen, the number
+         sheet's DONE below the screen, the create-league page scrolled
+         sideways. `maximum-scale=1` is what stops the focus zoom; WKWebView
+         honours `user-scalable=no` too, and this is an app, not a page. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Citrus - A Fresh Take on Fantasy Sports</title>
 
     <!-- Preconnect to Google Fonts for faster font loading -->

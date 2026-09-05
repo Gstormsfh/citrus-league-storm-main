@@ -365,7 +365,7 @@ const Auth = () => {
   // tile with the hairline border and Barlow at 15px, so the first screen a
   // manager sees on a phone is the same app as the second. The desktop keeps
   // the Citrus 2.0 field. Same element, same handlers -- classes only.
-  const darkInputClass = 'bg-pastel-surface border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 focus-visible:border-pastel-orange/50 h-11 max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-tile max-lg:border-white/[0.08] max-lg:font-barlow max-lg:text-[15px] max-lg:text-pressbox-text max-lg:placeholder:text-pressbox-text/40';
+  const darkInputClass = 'bg-pastel-surface border-white/10 text-pastel-cream placeholder:text-white/55 focus-visible:ring-pastel-orange/40 focus-visible:border-pastel-orange/50 h-11 max-lg:h-12 max-lg:rounded-[12px] max-lg:bg-pressbox-tile max-lg:border-white/[0.08] max-lg:font-barlow max-lg:text-[16px] max-lg:text-pressbox-text max-lg:placeholder:text-pressbox-text/40';
 
   return (
     <DarkLayout>
