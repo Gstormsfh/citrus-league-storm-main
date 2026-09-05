@@ -12,6 +12,7 @@
 import { cn } from '@/lib/utils';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { PressBoxSectionHead } from '@/components/pressbox/SectionHead';
+import { PressBoxSkeletonCard } from '@/components/pressbox/Skeleton';
 
 export interface ScheduleGame {
   id: string | number;
@@ -53,10 +54,10 @@ export function SchedulePhone(p: SchedulePhoneProps) {
       />
 
       {p.loading ? (
-        <div className="mt-2 flex flex-col gap-1.5" data-testid="schedule-phone-loading">
-          <div className="h-[96px] rounded-[10px] bg-pressbox-tile border border-white/[0.08] animate-pulse" />
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-[52px] rounded-[10px] bg-pressbox-tile border border-white/[0.08] animate-pulse" />
+        <div className="mt-2 flex flex-col gap-1.5" data-testid="schedule-phone-loading" role="status" aria-label="Loading">
+          <PressBoxSkeletonCard height={96} className="rounded-[10px]" />
+          {[1, 2, 3].map((i) => (
+            <PressBoxSkeletonCard key={i} height={52} index={i} className="rounded-[10px]" />
           ))}
         </div>
       ) : p.games.length === 0 ? (

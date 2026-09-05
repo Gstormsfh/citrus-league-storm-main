@@ -24,6 +24,7 @@ import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { PressBoxChips } from '@/components/pressbox/Chips';
 import { PressBoxSegmented } from '@/components/pressbox/Segmented';
 import { PressBoxSectionHead } from '@/components/pressbox/SectionHead';
+import { PressBoxSkeletonRows } from '@/components/pressbox/Skeleton';
 import { PressBoxOptionSheet } from '@/components/pressbox/Settings';
 import { pressBoxPositionChipClasses, positionChipKey } from '@/components/pressbox/positionChip';
 import { Mug } from '@/components/roster/Mug';
@@ -176,10 +177,17 @@ export function PlayersBrowsePhone({
       />
 
       {loading ? (
-        <div className="mt-2 flex flex-col gap-1.5" data-testid="players-browse-loading">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-[56px] rounded-[10px] bg-pressbox-tile border border-white/[0.08] animate-pulse" />
-          ))}
+        <div data-testid="players-browse-loading">
+          <div
+            className="grid grid-cols-[22px_1fr_44px_64px] gap-2 pt-3 pb-1 px-0.5 font-plex font-medium text-[9px] tracking-[0.06em] uppercase text-pressbox-text/40"
+            aria-hidden="true"
+          >
+            <span>#</span>
+            <span>Player · team · pos</span>
+            <span className="text-right">GP</span>
+            <span className="text-right">{sort.label}</span>
+          </div>
+          <PressBoxSkeletonRows rows={8} height={56} rank />
         </div>
       ) : error ? (
         <div className="mt-2 px-4 py-8 rounded-[12px] bg-pressbox-tile border border-white/[0.08] text-center" data-testid="players-browse-error">

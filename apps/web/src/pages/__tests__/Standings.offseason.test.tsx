@@ -190,7 +190,7 @@ const mount = () =>
     </MemoryRouter>,
   );
 
-/** The loading screen holds for a minimum 800ms (useMinimumLoadingTime). */
+/** The loading state holds for PB_LOADING_MIN_MS (useMinimumLoadingTime). */
 const settled = (text: string | RegExp) => screen.findByText(text, undefined, { timeout: 4000 });
 /**
  * A team name appears in three places once the page is populated — the table

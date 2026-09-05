@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { PressBoxTabs } from '@/components/pressbox/Tabs';
 import { PressBoxSectionHead } from '@/components/pressbox/SectionHead';
+import { PressBoxSkeletonRows } from '@/components/pressbox/Skeleton';
 import { PressBoxNoteCard } from '@/components/pressbox/PlayerCard';
 import { PressBoxOptionSheet, PressBoxSaveBar, PressBoxSettingGroup, PressBoxSettingRow } from '@/components/pressbox/Settings';
 import { Mug } from '@/components/roster/Mug';
@@ -236,11 +237,7 @@ export function TradesPhone(p: TradesPhoneProps) {
             />
             <SearchRow value={p.searchMine} onChange={p.onSearchMine} placeholder="Search your roster" testId="trades-phone-search-mine" />
             {p.loading ? (
-              <div className="mt-2 flex flex-col gap-1.5">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="h-[56px] rounded-[10px] bg-pressbox-tile border border-white/[0.08] animate-pulse" />
-                ))}
-              </div>
+              <PressBoxSkeletonRows className="mt-2" rows={4} height={56} />
             ) : (
               <RosterPick
                 players={mine}

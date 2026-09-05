@@ -35,11 +35,13 @@ Tick every box before merging. The four **bold** items are the ones that actuall
 - [ ] `zLayerScaleGuard` covers the chat bar and nav rungs
 
 ## PR3 — loading + skeletons
-- [ ] Loading screen matches Motion `2a`: bobbing/spinning puck, real boot-stage progress, rotating tips, Stormy footer
-- [ ] Progress is driven by real stages — never fake-completes; stage name appears after 4s
-- [ ] Min display 600ms, ceiling 6s (`useMinimumLoadingTime` / `useLoadCeiling`)
-- [ ] Skeletons mirror final layout exactly; position chips at 50% opacity; 100–150ms row stagger
-- [ ] Full-screen Stormy loader removed from Roster
+- [x] Loading screen matches Motion `2a`: bobbing/spinning puck, real boot-stage progress, rotating tips, Stormy footer (`NativeBootSplash`, `harness/boot.html`)
+- [x] Progress is driven by real stages — never fake-completes; stage name appears after 4s (`lib/bootStages.ts`: auth 25 → leagues 55 → first paint 100)
+- [x] Min display 600ms, ceiling 6s — the splash has both; every page's hold is `PB_LOADING_MIN_MS = 600`; `useLoadCeiling` stays on Matchup, the page that shipped the infinite spinner (the other pages' ceilings are a behaviour change for after the test drafts)
+- [x] Skeletons mirror final layout exactly; position chips at 50% opacity; 100–150ms row stagger (`pressbox/Skeleton.tsx`, 120ms; `harness/skeleton.html?route=/roster`)
+- [x] Full-screen Stormy loader removed from Roster — and from Standings, Matchup, League HQ, Playoffs and Players below `lg` (`PressBoxPageLoading`); the desktop keeps Stormy
+- [x] Route fallback (`LoadingScreen`) is the URL's skeleton under the nav below `lg`, not a fixed sheet over it
+- [x] No `animate-pulse` on a phone component (`pressboxLoadingGuard`)
 
 ## PR4–PR11 — screens
 - [ ] Every element on the screen is either in the spec or from a source file you read — nothing from memory

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { HockeyFooter, StormyLoading } from '@/components/citrus2';
+import { HockeyFooter } from '@/components/citrus2';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -29,7 +29,7 @@ import {
 } from '@/types/leagueTypes';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
+import { PB_LOADING_MIN_MS, useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { useSeasonStatus } from '@/hooks/useSeasonStatus';
 import { shortDateLabel } from '@/components/scores/scoresFormat';
 
@@ -39,6 +39,7 @@ import { logger } from '@/utils/logger';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { PB_TYPE, PressBoxSectionHead, PressBoxStandingsTable } from '@/components/pressbox';
 import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
+import { PressBoxPageLoading } from '@/components/pressbox/PageLoading';
 
 interface StandingsTeam {
   id: string;
@@ -512,7 +513,7 @@ const Standings = () => {
   const shouldShowLoadingScreen = teams.length === 0 && leagues.length === 0 && loading;
   
   // Apply minimum display time to prevent flash
-  const displayLoading = useMinimumLoadingTime(shouldShowLoadingScreen, 800);
+  const displayLoading = useMinimumLoadingTime(shouldShowLoadingScreen, PB_LOADING_MIN_MS);
 
   // Redirect pool leagues to their pool page's standings tab
   if (isPool && activeLeagueId && leagueFormat.leagueType) {
@@ -520,11 +521,8 @@ const Standings = () => {
   }
   
   if (displayLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0F1F15]">
-        <StormyLoading message="Loading the standings…" />
-      </div>
-    );
+    // PR3: the league chrome over the table's skeleton below lg; Stormy from lg.
+    return <PressBoxPageLoading kind="standings" message="Loading the standings…" />;
   }
   
   // CRITICAL: If we reach here, we MUST render content (even if loading is still true but we have data)

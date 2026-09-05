@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { LeagueType, ScoringFormat, DraftType } from '@/types/leagueTypes';
 import { logger } from '@/utils/logger';
+import { reportBootStage } from '@/lib/bootStages';
 
 export type UserLeagueState = 'guest' | 'logged-in-no-league' | 'active-user';
 
@@ -99,6 +100,11 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   const [isChangingLeague, setIsChangingLeague] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPlayoffs, setShowPlayoffs] = useState(false);
+
+  // The boot splash's second stage (PR3): the leagues are known, or failed.
+  useEffect(() => {
+    if (!loading) reportBootStage('league');
+  }, [loading]);
 
   // Track the current active league in a ref so closures (TOKEN_REFRESHED
   // handler, loadUserLeagues) always see the user's latest in-session

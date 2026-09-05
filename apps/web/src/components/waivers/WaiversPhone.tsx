@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { PressBoxChips } from '@/components/pressbox/Chips';
 import { PressBoxSectionHead } from '@/components/pressbox/SectionHead';
+import { PressBoxSkeletonRows } from '@/components/pressbox/Skeleton';
 import { PressBoxSheet } from '@/components/pressbox/Sheet';
 import { PressBoxOptionSheet, PressBoxSaveBar, PressBoxSettingGroup, PressBoxSettingRow } from '@/components/pressbox/Settings';
 import { pressBoxPositionChipClasses, positionChipKey } from '@/components/pressbox/positionChip';
@@ -200,10 +201,8 @@ export function WaiversPhone(p: WaiversPhoneProps) {
       </div>
 
       {p.playersLoading && p.players.length === 0 ? (
-        <div className="mt-2 flex flex-col gap-1.5" data-testid="waivers-phone-loading">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-[56px] rounded-[10px] bg-pressbox-tile border border-white/[0.08] animate-pulse" />
-          ))}
+        <div className="mt-2" data-testid="waivers-phone-loading">
+          <PressBoxSkeletonRows rows={6} height={56} />
         </div>
       ) : p.players.length === 0 ? (
         <div className="mt-2 px-4 py-8 rounded-[12px] bg-pressbox-tile border border-white/[0.08] text-center" data-testid="waivers-phone-empty">

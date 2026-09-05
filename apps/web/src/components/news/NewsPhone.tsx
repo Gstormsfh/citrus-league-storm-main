@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { PressBoxChips } from '@/components/pressbox/Chips';
 import { PressBoxSectionHead } from '@/components/pressbox/SectionHead';
+import { PressBoxSkeletonCard } from '@/components/pressbox/Skeleton';
 import type { NewsArticle } from '@/services/NewsService';
 import { agoLabel } from './newsFormat';
 
@@ -126,10 +127,10 @@ export function NewsPhone({
       />
 
       {loading ? (
-        <div className="mt-2.5 flex flex-col gap-2" data-testid="news-phone-loading">
-          <div className="h-[220px] rounded-[12px] bg-pressbox-tile border border-white/[0.08] animate-pulse" />
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-[84px] rounded-[12px] bg-pressbox-tile border border-white/[0.08] animate-pulse" />
+        <div className="mt-2.5 flex flex-col gap-2" data-testid="news-phone-loading" role="status" aria-label="Loading">
+          <PressBoxSkeletonCard height={220} lines={3} className="justify-end" />
+          {[1, 2, 3].map((i) => (
+            <PressBoxSkeletonCard key={i} height={84} index={i} />
           ))}
         </div>
       ) : !lead ? (

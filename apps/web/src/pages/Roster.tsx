@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Wand2, Trophy, Activity, ArrowUpRight, Users, Calendar, Target, Shield, Skull, Zap, BarChart3, PieChart, Lock, Clock, AlertCircle } from 'lucide-react';
-import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
+import { PB_LOADING_MIN_MS, useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { TeamIntelHub } from '@/components/gm-office/TeamIntelHub';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cell } from 'recharts';
@@ -29,7 +29,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
 import { StartersGrid, BenchGrid, IRSlot } from '@/components/roster';
-import { PressBoxRosterList, PressBoxTeamCard } from '@/components/pressbox';
+import { PressBoxRosterList, PressBoxSkeletonRoster, PressBoxTeamCard } from '@/components/pressbox';
 import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 import { buildRosterRows } from '@/components/pressbox/rosterRows';
 import { buildSlotConfig } from '@/components/roster/slotConfig';
@@ -408,7 +408,7 @@ const Roster = () => {
     };
   }, []);
 
-  const rosterDisplayLoading = useMinimumLoadingTime(loading || leagueLoading, 800);
+  const rosterDisplayLoading = useMinimumLoadingTime(loading || leagueLoading, PB_LOADING_MIN_MS);
 
   // Calculate positional stats
   const posStats = useMemo(() => calculateTeamCategoryStats(roster.starters), [roster.starters]);
@@ -3869,7 +3869,18 @@ const Roster = () => {
                 {(() => {
                   // Apply minimum display time to prevent flash
                   if (rosterDisplayLoading) {
-                    return <StormyLoading message="Loading your roster…" />;
+                    // PR3: below lg the list arrives as itself with the words
+                    // missing -- the team card, the segmented control and the
+                    // day strip above are already on screen, so only the rows
+                    // settle. Stormy stays on the desktop. `-mx-3` is the same
+                    // gutter cancel the real list gets below.
+                    return isMobile ? (
+                      <div className="-mx-3">
+                        <PressBoxSkeletonRoster />
+                      </div>
+                    ) : (
+                      <StormyLoading message="Loading your roster…" />
+                    );
                   }
                   
                   if (userLeagueState === 'logged-in-no-league') {

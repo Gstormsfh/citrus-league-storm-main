@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 
 /**
+ * The floor every Press Box page holds its loading state for (PR3, motion
+ * board 2a/2b: "min display 600ms"). Five pages each carried their own
+ * number -- 800, 800, 800, 800, 1000 -- and a skeleton that settles into
+ * the real rows has no flash to hide, so the floor is the board's.
+ */
+export const PB_LOADING_MIN_MS = 600;
+
+/**
  * Custom hook that enforces a minimum display time for loading screens.
  * This prevents the jarring "flash" effect when content loads too quickly.
  * 

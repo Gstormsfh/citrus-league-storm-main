@@ -38,9 +38,11 @@ const LEAGUE = {
       created_at: '2026-09-01T18:00:00.000Z', settings: { teamsCount: 24, leagueType: 'pickem' },
     },
   ],
-  loading: false,
+  // `?hold=1` freezes the context in its loading state, so a page's loading
+  // branch (PR3: the chrome over the skeleton) can be reviewed.
+  loading: new URLSearchParams(location.search).get('hold') === '1',
   isChangingLeague: false,
-  leagueContextLoading: false,
+  leagueContextLoading: new URLSearchParams(location.search).get('hold') === '1',
   setActiveLeagueId: () => {},
   refreshLeagues: async () => {},
 };

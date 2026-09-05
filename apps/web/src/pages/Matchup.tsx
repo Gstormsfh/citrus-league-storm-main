@@ -1,7 +1,7 @@
 import { userMessage } from '@/lib/userMessage';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate, Navigate, Link } from "react-router-dom";
-import { HockeyFooter, StormyLoading } from '@/components/citrus2';
+import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
 import { PB_TYPE, PressBoxChips, PressBoxScoreBlock, PressBoxTabs, type PressBoxScoreDay } from '@/components/pressbox';
 import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
+import { PressBoxPageLoading } from '@/components/pressbox/PageLoading';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { MatchupComparison } from "@/components/matchup/MatchupComparison";
@@ -34,7 +35,7 @@ import { ScheduleService } from '@/services/ScheduleService';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate, clampToSeasonStart } from '@/utils/weekCalculator';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { DemoMatchupCacheService, type DemoMatchupPayload } from '@/services/DemoMatchupCacheService';
-import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
+import { PB_LOADING_MIN_MS, useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { MatchupScoreJobService } from '@/services/MatchupScoreJobService';
 import { DataCacheService, TTL } from '@/services/DataCacheService';
 import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
@@ -5532,7 +5533,7 @@ const Matchup = () => {
 
   // Apply minimum display time (1000ms) to prevent jarring flash effect
   // This ensures a single, smooth loading screen without cycling
-  const shouldShowLoading = useMinimumLoadingTime(actualLoading, 1000);
+  const shouldShowLoading = useMinimumLoadingTime(actualLoading, PB_LOADING_MIN_MS);
   
   // Playoff champion / in-progress banner data (fantasy leagues only)
   const playoffChampion = usePlayoffChampion(
@@ -5548,10 +5549,13 @@ const Matchup = () => {
 
   // Early return for loading - must be after all hooks are declared
   if (shouldShowLoading) {
+    // PR3: the league chrome over the match's skeleton below lg; Stormy from lg.
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0F1F15]">
-        <StormyLoading message="Loading the matchup…" />
-      </div>
+      <PressBoxPageLoading
+        kind="matchup"
+        message="Loading the matchup…"
+        chrome={{ leagueId: league?.id ?? activeLeagueId ?? '', leagueName: league?.name ?? '' }}
+      />
     );
   }
 

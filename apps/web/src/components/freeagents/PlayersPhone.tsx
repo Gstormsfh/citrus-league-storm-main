@@ -43,6 +43,7 @@ import { PressBoxActionGrid } from '@/components/pressbox/ActionGrid';
 import { PressBoxSectionHead } from '@/components/pressbox/SectionHead';
 import { PressBoxSegmented } from '@/components/pressbox/Segmented';
 import { PressBoxChips } from '@/components/pressbox/Chips';
+import { PressBoxSkeletonRows } from '@/components/pressbox/Skeleton';
 
 export type PlayersPhoneView = 'trend' | 'available' | 'watch';
 export type PlayersTrendMode = 'adds' | 'drops';
@@ -79,7 +80,10 @@ export interface PlayersPhoneProps<P> {
   onMore?: () => void;
 
   loading?: boolean;
-  /** Rendered in place of the list while `loading`. */
+  /**
+   * Rendered in place of the list while `loading`. Absent, the list's own
+   * skeleton: the column head and eight rows with the words missing (PR3).
+   */
   loadingSlot?: ReactNode;
   /** Above the list: a warning, a demo-mode call to action. */
   banner?: ReactNode;
@@ -244,7 +248,22 @@ export function PlayersPhone<P>({
       {banner && <div className="mt-3">{banner}</div>}
 
       {loading ? (
-        <div className="mt-3">{loadingSlot}</div>
+        loadingSlot ? (
+          <div className="mt-3">{loadingSlot}</div>
+        ) : (
+          <div data-testid="players-phone-loading">
+            <div
+              className="grid grid-cols-[22px_1fr_60px_40px] gap-2 pt-3 pb-1 px-0.5 font-plex font-medium text-[9px] tracking-[0.06em] uppercase text-pressbox-text/40"
+              aria-hidden="true"
+            >
+              <span>#</span>
+              <span>Player · WK proj</span>
+              <span className="text-right">{movementHead}</span>
+              <span />
+            </div>
+            <PressBoxSkeletonRows rows={8} rank action />
+          </div>
+        )
       ) : rows.length === 0 ? (
         <div className="py-10 text-center" data-testid="players-phone-empty">
           <div className="font-condensed font-bold text-[15px] uppercase tracking-[0.08em] text-pressbox-text/70">

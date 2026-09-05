@@ -30,6 +30,7 @@ import { RefreshCw } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
+import { PressBoxSkeletonCard } from '@/components/pressbox/Skeleton';
 import { cn } from '@/lib/utils';
 import { useLeague } from '@/contexts/LeagueContext';
 import { scoresApi } from '@/api/scores';
@@ -134,9 +135,9 @@ export default function Scores() {
         </div>
 
         {isLoading ? (
-          <div className="px-3.5 py-3 flex flex-col gap-2" data-testid="scores-loading">
+          <div className="px-3.5 py-3 flex flex-col gap-2" data-testid="scores-loading" role="status" aria-label="Loading">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-[92px] rounded-[12px] bg-pressbox-tile border border-white/[0.08] animate-pulse" />
+              <PressBoxSkeletonCard key={i} height={92} index={i} />
             ))}
           </div>
         ) : isError ? (

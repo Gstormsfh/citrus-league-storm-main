@@ -17,7 +17,6 @@ import {
   MascotAvatar,
   MascotPortrait,
 } from '@/components/citrus2';
-import { StormyLoading } from '@/components/citrus2/StormyLoading';
 import { getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSeasonStatus } from '@/hooks/useSeasonStatus';
@@ -29,6 +28,7 @@ import { rosterApi } from '@/api/rosters';
 import { waiverApi } from '@/api/waivers';
 import Navbar from '@/components/Navbar';
 import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
+import { PressBoxPageLoading } from '@/components/pressbox/PageLoading';
 import { LeagueHQPhone, type LeagueHQMatchup } from '@/components/league/LeagueHQPhone';
 import { LeagueSettingsPhone } from '@/components/league/LeagueSettingsPhone';
 import { buildLeagueSettingsSections } from '@/components/league/leagueSettingsSections';
@@ -836,11 +836,10 @@ const LeagueDashboard = () => {
   }, [league, leagueId, isCommissioner, teams.length]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0F1F15]">
-        <StormyLoading message="Loading your league…" />
-      </div>
-    );
+    // PR3: the league chrome over HQ's skeleton below lg; Stormy from lg.
+    // The name comes from the URL's league once it loads; until then the
+    // chrome shows the id's league only if it is the context's active one.
+    return <PressBoxPageLoading kind="hq" message="Loading your league…" chrome={{ leagueId: leagueId ?? '' }} />;
   }
 
   if (error || !league) {

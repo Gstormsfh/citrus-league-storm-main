@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import Navbar from '@/components/Navbar';
 import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
+import { PressBoxPageLoading } from '@/components/pressbox/PageLoading';
 import {
   HockeyFooter,
   CupIcon,
@@ -13,7 +14,6 @@ import {
   MaskIcon,
   RangeIcon,
   MascotPortrait,
-  StormyLoading,
 } from '@/components/citrus2';
 import { LeagueService } from '@/services/LeagueService';
 import {
@@ -31,7 +31,7 @@ import { Button } from '@/components/ui/button';
 import { PressBoxSettingGroup, PressBoxSettingRow } from '@/components/pressbox/Settings';
 import { PressBoxNoteCard } from '@/components/pressbox/PlayerCard';
 import { DestructiveConsequence } from '@/components/confirm/DestructiveConsequence';
-import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
+import { PB_LOADING_MIN_MS, useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { LeagueMembershipService } from '@/services/LeagueMembershipService';
 import { useToast } from '@/hooks/use-toast';
@@ -634,7 +634,7 @@ const PlayoffBracket = () => {
   winnersByRound.forEach(roundSeries => roundSeries.sort((a, b) => a.match_number - b.match_number));
   consolationByRound.forEach(roundSeries => roundSeries.sort((a, b) => a.match_number - b.match_number));
 
-  const displayLoading = useMinimumLoadingTime(loading, 800);
+  const displayLoading = useMinimumLoadingTime(loading, PB_LOADING_MIN_MS);
 
   // Redirect pool leagues to their pool page
   const _poolType = activeLeagueFormat?.leagueType;
@@ -643,11 +643,8 @@ const PlayoffBracket = () => {
   }
 
   if (displayLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-pressbox-surface">
-        <StormyLoading message="Loading the playoff bracket…" />
-      </div>
-    );
+    // PR3: the league chrome over the bracket's skeleton below lg; Stormy from lg.
+    return <PressBoxPageLoading kind="bracket" message="Loading the playoff bracket…" />;
   }
 
   // Layout wrapper used throughout

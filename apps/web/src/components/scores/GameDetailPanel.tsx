@@ -23,6 +23,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
+import { PressBoxSkeletonBar } from '@/components/pressbox/Skeleton';
 import type { ScoresGameDetailResponse, ScoresPlayerLine } from '@citrus/shared';
 import { TeamChip } from '@/components/citrus2/TeamChip';
 import { scoresApi } from '@/api/scores';
@@ -137,9 +138,9 @@ export function GameDetailPanel({
   if (isLoading) {
     return (
       <div className="px-3 py-4" data-testid="scores-detail-loading">
-        <div className="h-3 w-24 rounded bg-white/[0.06] animate-pulse mb-2" />
-        <div className="h-3 w-full rounded bg-white/[0.06] animate-pulse mb-1.5" />
-        <div className="h-3 w-5/6 rounded bg-white/[0.06] animate-pulse" />
+        <PressBoxSkeletonBar className="h-3 w-24 mb-2" />
+        <PressBoxSkeletonBar className="h-3 w-full mb-1.5" style={{ animationDelay: '120ms' }} />
+        <PressBoxSkeletonBar className="h-3 w-5/6" style={{ animationDelay: '240ms' }} />
       </div>
     );
   }

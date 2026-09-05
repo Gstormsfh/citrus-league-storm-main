@@ -114,11 +114,67 @@ cd ~/dev/citrus/apps/web && npm run lint && npm run test
    is. The desktop keeps both. Wire the switches to real preferences and
    they can come back as toggle rows in one line each.
 
+### PR3 — the loading screen and the skeletons (2026-09-05, after the run above)
+
+**The boot splash** (motion 2a): `NativeBootSplash` draws the puck, the
+wordmark, a 200×3 bar driven by REAL stages — `lib/bootStages.ts`, reported
+by AuthContext (25), LeagueContext (55) and the first route paint (100) —
+never a fake fill; the stage name appears after 4s; 600ms floor, 6s
+ceiling, 300ms fade; three tips; the Stormy footer. Native only, once per
+cold start. `harness/boot.html?pct=55&stage=1`.
+
+**The skeletons** (motion 2b): `pressbox/Skeleton.tsx`. Each kind mirrors
+the screen it stands in for — the roster skeleton is `PressBoxRosterList`'s
+grid and heights with the real chips at half strength; the standings one
+is `PressBoxStandingsTable`'s grid and column head; the match one is the
+chips, the score block, the day strip and the comparison rows; League HQ,
+Players, the Players tab, Scores, News, Home, Account, the bracket. 120ms
+stagger. Bars on a tile use `pb-shimmer-high` (a tile-coloured bar on a
+tile is invisible — found in the harness). Reduced motion stops the sweep.
+`harness/skeleton.html?route=/standings`, `?kind=roster`.
+
+**Where they load:** Roster's list arrives as itself under the team card
+(`isMobile ?`, Stormy from `lg`). Standings, Matchup, League HQ and
+Playoffs return `PressBoxPageLoading` — the league chrome over the
+skeleton below `lg`, exactly the Stormy they had from `lg`, so the desktop
+and the page tests (1024px) see no change. `PlayersPhone` draws its own
+rows. Every pulsing block on Scores, News, Schedule, Trades, Waivers, the
+Players tab and the game detail is now a shimmer of the real shape.
+
+**The route fallback:** `LoadingScreen` (the Suspense one) below `lg` is
+the skeleton of the screen the URL names (`lib/routeSkeleton.ts`), in the
+page column under the nav, with a header-shaped silhouette — not the fixed
+sheet that covered the tab you had just tapped. With a message (the v1
+draft room) or from `lg` it is the overlay it was, on Press Box paint.
+
+**The floor:** `PB_LOADING_MIN_MS = 600` in `useMinimumLoadingTime`; the
+five pages carried 800/800/800/800/1000.
+
+**Not done, on purpose:** `useLoadCeiling` on the other four pages (what
+happens at the ceiling is a behaviour change — after Tuesday); the draft
+room's loaders (the one surface with no undo); a shimmer in the league
+header's name slot (Roster renders the chrome with no league in the
+no-league state, and a shimmer that never resolves would be a lie).
+
+**Tests:** `pressbox/__tests__/Skeleton.test.tsx` (pinned to the roster
+and standings sources), `lib/__tests__/routeSkeleton.test.ts` (pinned to
+`App.tsx`'s routes), `__tests__/pressboxLoadingGuard.test.ts`,
+`NativeBootSplash.test.tsx`.
+
+**Prod, the same night:** the three migrations are applied and verified
+(ledger entries in `docs/PROD_CHANGE_LEDGER.md`), plus a fourth found
+while verifying: two SECURITY DEFINER writers were callable by any
+signed-in user through PostgREST because Supabase's default privileges
+grant `authenticated` EXECUTE at CREATE and `REVOKE ... FROM PUBLIC` does
+not touch it. Revoked. `sync_roster_assignments_for_league` has the same
+shape but the server calls it with the user's token after a draft — left
+alone until after Tuesday, with the fix written down.
+
 ### Still open
 
-- Two migrations, unapplied: `20260904100000`, `20260904101000`.
 - `FreeAgentRow` + its tests, once Players is signed off.
-- PR3 skeletons, PR12 aggregates, PR13 motion, PR14/15 moments, PR17, PR18.
+- `sync_roster_assignments_for_league`: membership check inside the body (after 2026-09-08).
+- PR12 aggregates, PR13 motion, PR14/15 moments, PR17, PR18.
 
 ---
 

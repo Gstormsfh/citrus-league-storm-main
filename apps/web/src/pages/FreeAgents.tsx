@@ -26,7 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Calendar, TrendingUp, Filter, List, Grid, Star, Info, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle, Loader2 } from 'lucide-react';
-import { useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
+import { PB_LOADING_MIN_MS, useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { LeagueService, League } from '@/services/LeagueService';
 import { ScheduleService, NHLGame } from '@/services/ScheduleService';
@@ -209,7 +209,7 @@ const FreeAgents = () => {
     observerRef.current.observe(node);
   }, []);
 
-  const displayLoading = useMinimumLoadingTime(loading, 800);
+  const displayLoading = useMinimumLoadingTime(loading, PB_LOADING_MIN_MS);
 
   useEffect(() => {
     // Skip if league is changing
@@ -1669,7 +1669,6 @@ const FreeAgents = () => {
             displayLoading ||
             (phoneView === 'available' && availableMode === 'games' && (loadingMaximizers || loadingProjections))
           }
-          loadingSlot={<StormyLoading message="Loading free agents…" />}
           watchCount={watchRows.length}
           empty={phoneEmpty}
           banner={

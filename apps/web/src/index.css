@@ -176,6 +176,33 @@
     padding-bottom: calc(116px + env(safe-area-inset-bottom));
   }
 
+  /* PRESS BOX skeleton shimmer (PR3, motion board 2b): the tile colour
+     with a lighter band sweeping through, 1.6s, on the existing
+     citrus-shimmer keyframe. Rows stagger via animation-delay in the
+     markup. Reduced-motion keeps the tile colour and drops the sweep. */
+  .pb-shimmer {
+    background: linear-gradient(90deg, #16241B 25%, #1d2e23 50%, #16241B 75%);
+    background-size: 200% 100%;
+    animation: citrus-shimmer 1.6s ease-in-out infinite;
+  }
+  /* The same sweep one step up the surface scale, for a bar that sits ON a
+     tile: the tile is #16241B, so a tile-coloured bar on it is invisible. */
+  .pb-shimmer-high {
+    background: linear-gradient(90deg, #1f3327 25%, #27412f 50%, #1f3327 75%);
+    background-size: 200% 100%;
+    animation: citrus-shimmer 1.6s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pb-shimmer,
+    .pb-shimmer-high {
+      animation: none;
+      background: #1d2e23;
+    }
+    .pb-shimmer-high {
+      background: #27412f;
+    }
+  }
+
   /* Hide scrollbar but keep functionality */
   .scrollbar-hide {
     -ms-overflow-style: none;
@@ -2267,31 +2294,61 @@ body {
   to { opacity: 1; }
 }
 
-/* ═══ Native boot splash (2026-09-01) ══════════════════════════════
-   The app-open motion for the iOS/Android shell (NativeBootSplash).
-   Purposeful and short per HIG: the mark assembles, the wordmark
-   settles, the halo breathes once. Reduced-motion collapses all of it
-   to a plain crossfade. */
+/* ═══ Native boot splash (PR3, 2026-09-04) ═════════════════════════
+   Motion board 2a. The puck bobs (1.6s) and slowly spins (6s), a light
+   band sweeps top to bottom (3.2s), the tip fades in (250ms, 6px), and
+   Stormy's three dots pulse (1.2s, staggered 200ms in the markup). The
+   loops are the only indefinite motion in the app besides the live dot,
+   per the motion rules. Reduced-motion keeps colour and kills every
+   transform and loop; the bar's width transition stays (it is data). */
+@keyframes citrus-boot-bob {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-10px) scale(1.04); }
+}
+@keyframes citrus-boot-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes citrus-boot-ground {
+  0%, 100% { transform: scaleX(1); opacity: 0.6; }
+  50% { transform: scaleX(0.7); opacity: 0.35; }
+}
+@keyframes citrus-boot-sweep {
+  from { top: -140px; }
+  to { top: 100%; }
+}
+@keyframes citrus-boot-tip-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes citrus-boot-dot {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+.citrus-boot-puck { animation: citrus-boot-bob 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+.citrus-boot-spin { animation: citrus-boot-spin 6s linear infinite; }
+.citrus-boot-ground { animation: citrus-boot-ground 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+.citrus-boot-sweep {
+  background: linear-gradient(180deg, transparent, rgba(243, 239, 230, 0.05), transparent);
+  animation: citrus-boot-sweep 3.2s linear infinite;
+}
+.citrus-boot-tip { animation: citrus-boot-tip-in 250ms ease-out both; }
+.citrus-boot-dot { animation: citrus-boot-dot 1.2s ease-in-out infinite; }
+/* The 2026-09-01 mark still exists for anything that referenced it. */
 @keyframes citrus-boot-mark-in {
   0% { opacity: 0; transform: scale(0.82); }
   60% { opacity: 1; transform: scale(1.04); }
   100% { opacity: 1; transform: scale(1); }
 }
-@keyframes citrus-boot-word-in {
-  0%, 35% { opacity: 0; transform: translateY(6px); }
-  100% { opacity: 1; transform: translateY(0); }
-}
-@keyframes citrus-boot-halo-breathe {
-  0% { opacity: 0; transform: scale(0.9); }
-  100% { opacity: 1; transform: scale(1); }
-}
 .citrus-boot-mark { animation: citrus-boot-mark-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-.citrus-boot-word { animation: citrus-boot-word-in 900ms ease-out both; }
-.citrus-boot-halo { animation: citrus-boot-halo-breathe 1100ms ease-out both; }
 @media (prefers-reduced-motion: reduce) {
-  .citrus-boot-mark,
-  .citrus-boot-word,
-  .citrus-boot-halo {
+  .citrus-boot-puck,
+  .citrus-boot-spin,
+  .citrus-boot-ground,
+  .citrus-boot-sweep,
+  .citrus-boot-tip,
+  .citrus-boot-dot,
+  .citrus-boot-mark {
     animation: none;
   }
 }
