@@ -18,6 +18,7 @@
  * Orange for you, ice for them, sage for a neutral matchup you are only
  * watching: the same three-colour rule as every other Press Box surface.
  */
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { PB_TYPE } from './rowScale';
 
@@ -55,10 +56,16 @@ function Disc({ side, mine }: { side: PressBoxLeagueMatchupSide; mine: boolean }
   );
 }
 
-function Side({ side, mirrored }: { side: PressBoxLeagueMatchupSide; mirrored: boolean }) {
+/**
+ * The leading score is sage on WHICHEVER side leads (artboard 1a: `118.4`
+ * sage on the left of the first card, `127.5` sage on the right of the
+ * third); the trailing one stays in the line's own colour. A tie is nobody's.
+ */
+function Side({ side, mirrored, leading }: { side: PressBoxLeagueMatchupSide; mirrored: boolean; leading: boolean }) {
   const mine = !!side.isYou;
   const bar = mine ? 'bg-pressbox-orange' : mirrored ? 'bg-pressbox-ice' : 'bg-pressbox-sage';
   const line = [pct(side.winPct), fig(side.points)];
+  const points = leading ? 'text-pressbox-sage' : mine ? 'text-pressbox-orange-soft' : 'text-pressbox-text/55';
   return (
     <span className={cn('flex items-center gap-2 min-w-0', mirrored && 'flex-row-reverse text-right')}>
       <Disc side={side} mine={mine} />
@@ -74,7 +81,7 @@ function Side({ side, mirrored }: { side: PressBoxLeagueMatchupSide; mirrored: b
         >
           {mirrored ? (
             <>
-              {line[1] && <span className="text-pressbox-text/55">{line[1]}</span>}
+              {line[1] && <span className={points}>{line[1]}</span>}
               {line[1] && line[0] ? ' · ' : ''}
               {line[0]}
             </>
@@ -82,7 +89,7 @@ function Side({ side, mirrored }: { side: PressBoxLeagueMatchupSide; mirrored: b
             <>
               {line[0]}
               {line[0] && line[1] ? ' · ' : ''}
-              {line[1] && <span className={mine ? 'text-pressbox-sage' : 'text-pressbox-sage'}>{line[1]}</span>}
+              {line[1] && <span className={points}>{line[1]}</span>}
             </>
           )}
         </span>
@@ -111,15 +118,17 @@ export function PressBoxLeagueMatchupCard({
   const left = home.gamesLeft;
   const right = away.gamesLeft;
   const leftLine = left != null && right != null ? `${left} · ${right} LEFT` : null;
+  const homeLeads = home.points != null && away.points != null && home.points > away.points;
+  const awayLeads = home.points != null && away.points != null && away.points > home.points;
 
   const body = (
     <>
-      <Side side={home} mirrored={false} />
+      <Side side={home} mirrored={false} leading={homeLeads} />
       <span className="text-center font-plex font-semibold text-[9px] text-pressbox-text/40">
         VS
         {leftLine && <span className="block mt-0.5 text-pressbox-text/70">{leftLine}</span>}
       </span>
-      <Side side={away} mirrored />
+      <Side side={away} mirrored leading={awayLeads} />
     </>
   );
 
@@ -131,10 +140,12 @@ export function PressBoxLeagueMatchupCard({
   );
 
   if (to) {
+    // A router Link, not an anchor (2026-09-05): an `<a href>` inside the
+    // app is a full page load -- the whole bundle again, for one tap.
     return (
-      <a href={to} className={cn(shell, 'focus-citrus')} aria-label={`${home.name} versus ${away.name}`}>
+      <Link to={to} className={cn(shell, 'focus-citrus')} aria-label={`${home.name} versus ${away.name}`}>
         {body}
-      </a>
+      </Link>
     );
   }
   return (

@@ -21,7 +21,8 @@ import { getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSeasonStatus } from '@/hooks/useSeasonStatus';
 import { shortDateLabel } from '@/components/scores/scoresFormat';
-import { LeagueService, League, Team } from '@/services/LeagueService';
+import { LeagueService, League, Team, getLeagueFormat } from '@/services/LeagueService';
+import { getTodayMST } from '@/utils/timezoneUtils';
 import { WaiverService } from '@/services/WaiverService';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
@@ -35,7 +36,9 @@ import { buildLeagueSettingsSections } from '@/components/league/leagueSettingsS
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useScoringRules } from '@/components/league/useScoringRules';
 import { matchupApi } from '@/api/matchups';
-import { isBye, scoreOf, teamNameOf, type WeekMatchupRow } from '@/components/matchup/scoreboard';
+import { gamesLeftOf, isBye, scoreOf, teamNameOf, winChanceOf, type WeekMatchupRow } from '@/components/matchup/scoreboard';
+import { standingsLine, type StandingsLineRow } from '@/components/league/hqLines';
+import { tradeApi } from '@/api/trades';
 import { clampToSeasonStart, getCurrentWeekNumber, getDraftCompletionDate, getFirstWeekStartDate } from '@/utils/weekCalculator';
 import { LeagueTimelineCard } from '@/components/dashboard/LeagueTimelineCard';
 import { FEATURE_PRACTICE_DRAFT } from '@/lib/featureFlags';
@@ -786,19 +789,79 @@ const LeagueDashboard = () => {
     return rows.filter((r) => r.created_at && new Date(r.created_at).getTime() >= since).length;
   }, [transactionsQuery.data]);
 
+  /**
+   * THE TILES' ONE LIVE NUMBER (2026-09-05, artboard 1a): `You're 2nd · 1.5
+   * GB · 588.9 PF` under Standings and `2 trades pending` after the week's
+   * transaction count. Standings is the same ranked read the Standings
+   * page makes; the pending trades are the league's open offers. Neither
+   * blocks the screen: a tile with no number is a tile with a title.
+   */
+  const standingsQuery = useQuery({
+    queryKey: ['league-standings', leagueId],
+    enabled: !!leagueId && league?.draft_status === 'completed',
+    queryFn: async () => {
+      const res = await leagueApi.getStandings(leagueId!);
+      const rows = ((res as { data?: unknown }).data ?? res) as unknown;
+      return Array.isArray(rows) ? (rows as StandingsLineRow[]) : [];
+    },
+    staleTime: 60_000,
+  });
+  const pendingTradesQuery = useQuery({
+    queryKey: ['league-pending-trades', leagueId],
+    enabled: !!leagueId && league?.draft_status === 'completed',
+    queryFn: async () => {
+      const res = await tradeApi.getLeagueTrades(leagueId!, 'pending');
+      const rows = ((res as { data?: unknown }).data ?? res) as unknown;
+      return Array.isArray(rows) ? rows.length : 0;
+    },
+    staleTime: 60_000,
+  });
+  const standingsStat = useMemo(
+    () => (standingsQuery.data && userTeam ? standingsLine(standingsQuery.data, userTeam.id) : null),
+    [standingsQuery.data, userTeam],
+  );
+  const transactionsStat = useMemo(() => {
+    const parts: string[] = [];
+    if (transactionsThisWeek !== null) parts.push(`${transactionsThisWeek} this week`);
+    const pending = pendingTradesQuery.data;
+    if (pending) parts.push(`${pending} trade${pending === 1 ? '' : 's'} pending`);
+    return parts.length ? parts.join(' · ') : null;
+  }, [transactionsThisWeek, pendingTradesQuery.data]);
+  const draftStat = useMemo(() => {
+    if (!league) return null;
+    const type = getLeagueFormat(league).draftType;
+    const label = type === 'auction' ? 'Auction' : type === 'linear' ? 'Linear' : type === 'offline' ? 'Offline' : 'Snake';
+    return `${draftSettings.draft_rounds} rds · ${label}`;
+  }, [league, draftSettings.draft_rounds]);
+
   const hqMatchups = useMemo<LeagueHQMatchup[] | undefined>(() => {
     if (currentWeek === null || !leagueId) return [];
     const rows = weekMatchupsQuery.data;
     if (!rows) return weekMatchupsQuery.isError ? [] : undefined;
     const mine = userTeam?.id ?? null;
     const to = `/matchup/${leagueId}/${currentWeek}`;
-    // LeagueHQPhone puts yours first; this is the week's order.
+    const today = getTodayMST();
+    // LeagueHQPhone puts yours first; this is the week's order. Win chance
+    // and games left come off the scoreboard row (2026-09-05) through the
+    // same rule as the Match screen's header; null draws nothing.
     return rows.map((row) => ({
       id: row.id,
-      home: { name: teamNameOf(row, 'team1'), points: scoreOf(row.team1_score), isYou: mine !== null && row.team1_id === mine },
+      home: {
+        name: teamNameOf(row, 'team1'),
+        points: scoreOf(row.team1_score),
+        winPct: winChanceOf(row, 'team1', today),
+        gamesLeft: gamesLeftOf(row, 'team1', today),
+        isYou: mine !== null && row.team1_id === mine,
+      },
       away: isBye(row)
         ? { name: 'Bye week' }
-        : { name: teamNameOf(row, 'team2'), points: scoreOf(row.team2_score), isYou: mine !== null && row.team2_id === mine },
+        : {
+            name: teamNameOf(row, 'team2'),
+            points: scoreOf(row.team2_score),
+            winPct: winChanceOf(row, 'team2', today),
+            gamesLeft: gamesLeftOf(row, 'team2', today),
+            isYou: mine !== null && row.team2_id === mine,
+          },
       to,
     }));
   }, [currentWeek, leagueId, weekMatchupsQuery.data, weekMatchupsQuery.isError, userTeam?.id]);
@@ -896,12 +959,12 @@ const LeagueDashboard = () => {
           matchups={hqMatchups}
           draft={hqDraft}
           tiles={[
-            { title: 'Standings', to: `/standings?league=${leagueId}`, Icon: BarChart3 },
+            { title: 'Standings', to: `/standings?league=${leagueId}`, Icon: BarChart3, stat: standingsStat },
             {
               title: 'Transactions',
               to: `/waiver-wire?league=${leagueId}`,
               Icon: ArrowUpDown,
-              stat: transactionsThisWeek !== null ? `${transactionsThisWeek} this week` : null,
+              stat: transactionsStat,
             },
             { title: 'Trades', to: `/trade-analyzer?league=${leagueId}`, Icon: ArrowLeftRight },
             { title: 'Schedule', to: `/schedule-manager?league=${leagueId}`, Icon: CalendarDays },
@@ -917,7 +980,7 @@ const LeagueDashboard = () => {
                   title: 'Draft results',
                   to: `/draft-v2/${leagueId}`,
                   Icon: ClipboardList,
-                  stat: `${draftSettings.draft_rounds} rds`,
+                  stat: draftStat,
                 }]
               : []),
             ...(isCommissioner

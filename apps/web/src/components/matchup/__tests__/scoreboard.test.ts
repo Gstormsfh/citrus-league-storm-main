@@ -13,6 +13,8 @@ import {
   leaderOf,
   ownSideOf,
   projectionOf,
+  gamesLeftOf,
+  winChanceOf,
   scoreOf,
   scoreboardState,
   teamNameOf,
@@ -190,5 +192,37 @@ describe('anyGameLive — the cheap strip-level signal from the rosters the page
     expect(anyGameLive([player([{ game_date: '2026-10-14', status: 'final' }])], TODAY)).toBe(false);
     expect(anyGameLive([{ games: null }, {}], TODAY)).toBe(false);
     expect(anyGameLive([], TODAY)).toBe(false);
+  });
+});
+
+describe('gamesLeftOf / winChanceOf — the HQ card and the Home card, from the scoreboard row (2026-09-05)', () => {
+  const open = row({ team1_projected_total: 257.2, team2_projected_total: 215.2, team1_games_left: 27, team2_games_left: '26' });
+
+  it('reads games left as a number or a numeric string, on the same terms as the projection', () => {
+    expect(gamesLeftOf(open, 'team1', TODAY)).toBe(27);
+    expect(gamesLeftOf(open, 'team2', TODAY)).toBe(26);
+    expect(gamesLeftOf(row(), 'team1', TODAY)).toBeNull();
+    expect(gamesLeftOf(row({ ...open, status: 'completed' }), 'team1', TODAY)).toBeNull();
+    expect(gamesLeftOf(row({ ...open, team2_id: null }), 'team2', TODAY)).toBeNull();
+    expect(gamesLeftOf(row({ team1_games_left: -3 }), 'team1', TODAY)).toBeNull();
+  });
+
+  it('the two sides sum to 100 and the favourite is the higher projected final', () => {
+    const you = winChanceOf(open, 'team1', TODAY)!;
+    const them = winChanceOf(open, 'team2', TODAY)!;
+    expect(you).toBeGreaterThan(50);
+    expect(you + them).toBe(100);
+  });
+
+  it('a settled week is the score: 100 to the side ahead, 0 to the other', () => {
+    const settled = row({ team1_projected_total: 130, team2_projected_total: 120, team1_games_left: 0, team2_games_left: 0 });
+    expect(winChanceOf(settled, 'team1', TODAY)).toBe(100);
+    expect(winChanceOf(settled, 'team2', TODAY)).toBe(0);
+  });
+
+  it('null, never a coin flip, when a projection or a games-left count is missing', () => {
+    expect(winChanceOf(row({ team1_projected_total: 130, team2_projected_total: 120 }), 'team1', TODAY)).toBeNull();
+    expect(winChanceOf(row({ team1_games_left: 3, team2_games_left: 4 }), 'team1', TODAY)).toBeNull();
+    expect(winChanceOf(row({ ...open, status: 'completed' }), 'team1', TODAY)).toBeNull();
   });
 });

@@ -106,6 +106,14 @@ export interface ScoreboardProjectionInput {
 export interface ScoreboardSideTotals {
   team1: number | null;
   team2: number | null;
+  /**
+   * Starter-games still to be played on each side (2026-09-05): every
+   * remaining-day starter whose game has an unplayed share, a game in
+   * progress included. The League HQ card's `27 · 26 LEFT`. null on the
+   * same terms as the totals.
+   */
+  team1GamesLeft: number | null;
+  team2GamesLeft: number | null;
 }
 
 const REGULATION_PERIODS = 3;
@@ -211,7 +219,7 @@ export function isOpenScoreboardMatchup(row: ScoreboardMatchupRow, today: string
  */
 export function projectLeagueWeek(input: ScoreboardProjectionInput): Map<string, ScoreboardSideTotals> {
   const out = new Map<string, ScoreboardSideTotals>();
-  const nothing: ScoreboardSideTotals = { team1: null, team2: null };
+  const nothing: ScoreboardSideTotals = { team1: null, team2: null, team1GamesLeft: null, team2GamesLeft: null };
   const noProjections = input.projections.length === 0;
 
   const frozen = new Map<string, Set<number>>();
@@ -258,9 +266,10 @@ export function projectLeagueWeek(input: ScoreboardProjectionInput): Map<string,
     }
     const remainingDates = scoreboardWeekDates(m.week_start_date, m.week_end_date).filter((d) => d >= input.today);
 
-    const side = (teamId: string): { hasLineup: boolean; remaining: number } => {
+    const side = (teamId: string): { hasLineup: boolean; remaining: number; gamesLeft: number } => {
       let hasLineup = false;
       let remaining = 0;
+      let gamesLeft = 0;
       for (const date of remainingDates) {
         const saved = frozen.get(`${m.id}|${teamId}|${date}`);
         const starters = saved && saved.size > 0 ? saved : current.get(teamId);
@@ -274,10 +283,11 @@ export function projectLeagueWeek(input: ScoreboardProjectionInput): Map<string,
             ? scoreboardGameFraction(game)
             : scoreboardFractionFromStartTime(projection.game_start_time, input.nowMs);
           if (fraction <= 0) continue;
+          gamesLeft += 1;
           remaining += fraction * toPoints(projection.total_projected_points);
         }
       }
-      return { hasLineup, remaining };
+      return { hasLineup, remaining, gamesLeft };
     };
 
     const one = side(m.team1_id);
@@ -289,6 +299,8 @@ export function projectLeagueWeek(input: ScoreboardProjectionInput): Map<string,
     out.set(m.id, {
       team1: toPoints(m.team1_score) + one.remaining,
       team2: toPoints(m.team2_score) + two.remaining,
+      team1GamesLeft: one.gamesLeft,
+      team2GamesLeft: two.gamesLeft,
     });
   }
   return out;
@@ -369,6 +381,8 @@ export class MatchupService {
         ...(row as unknown as LeagueScoreboardMatchup),
         team1_projected_total: totals.get(row.id)?.team1 ?? null,
         team2_projected_total: totals.get(row.id)?.team2 ?? null,
+        team1_games_left: totals.get(row.id)?.team1GamesLeft ?? null,
+        team2_games_left: totals.get(row.id)?.team2GamesLeft ?? null,
       }));
     const none = new Map<string, ScoreboardSideTotals>();
 

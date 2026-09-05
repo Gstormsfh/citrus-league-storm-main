@@ -379,10 +379,28 @@ const HARNESS_NOW = Date.now();
       team1_id: a.team_id, team2_id: b.team_id,
       team1: { id: a.team_id, team_name: a.team_name }, team2: { id: b.team_id, team_name: b.team_name },
       team1_score: [118.4, 104.7, 71.3, 96.2, 88.0][i], team2_score: [96.1, 103.9, 127.5, 90.4, 91.7][i],
-      team1_projected_total: 140, team2_projected_total: 120,
+      team1_projected_total: [257.2, 231.4, 190.8, 244.0, 236.5][i], team2_projected_total: [215.2, 228.9, 262.1, 240.3, 239.9][i],
+      team1_games_left: [27, 25, 24, 26, 28][i], team2_games_left: [26, 28, 27, 25, 26][i],
       status: 'in_progress', week_start_date: '2026-09-27', week_end_date: '2026-10-03',
     };
   }),
+});
+/**
+ * THE STANDINGS READ (2026-09-05): the ranked table League HQ's Standings
+ * tile and the Home card's `2ND` read. Wins descending, PF breaks ties, the
+ * caller's team second, the way the artboard has it.
+ */
+(leagueApi as any).getStandings = async () => ({
+  data: [
+    { team_id: PRIORITY[3].team_id, team_name: PRIORITY[3].team_name, owner_id: 'owner-4', wins: 5, losses: 0, ties: 0, pointsFor: 612.4, pointsAgainst: 498.1, streak: 'W5', last5: { wins: 5, losses: 0, ties: 0 }, gamesPlayed: 5, winPct: 1 },
+    { team_id: 't1', team_name: 'Team 1', owner_id: 'harness-user', wins: 4, losses: 1, ties: 0, pointsFor: 588.9, pointsAgainst: 521.3, streak: 'W2', last5: { wins: 4, losses: 1, ties: 0 }, gamesPlayed: 5, winPct: 0.8 },
+    ...PRIORITY.filter((_, i) => i !== 0 && i !== 3).map((p, i) => ({
+      team_id: p.team_id, team_name: p.team_name, owner_id: i < 4 ? `owner-${i + 2}` : null,
+      wins: Math.max(0, 4 - Math.floor(i / 2)), losses: Math.min(5, 1 + Math.floor(i / 2)), ties: 0,
+      pointsFor: Number((561.2 - i * 12.6).toFixed(1)), pointsAgainst: Number((530 + i * 4.1).toFixed(1)),
+      streak: i % 2 ? 'L1' : 'W1', last5: { wins: 3 - (i % 3), losses: 2 + (i % 3), ties: 0 }, gamesPlayed: 5, winPct: Math.max(0, 4 - Math.floor(i / 2)) / 5,
+    })),
+  ],
 });
 (leagueApi as any).getTransactions = async () => ({
   data: [1, 2, 3, 12].map((daysAgo, i) => ({

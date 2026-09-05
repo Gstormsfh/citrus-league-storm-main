@@ -14,10 +14,14 @@
  *     Two small reads per league, cached by react-query; a league with no
  *     week (pre-draft, offseason) makes neither.
  *
- * NOTHING IS INVENTED. The artboard prints a rank (`2ND`) in the meta line
- * and a `TRAILING 3 CATS` note; neither is a read this screen makes, so
- * neither is drawn. `LIVE` is drawn when the week's matchup is in progress
- * and an NHL game is live right now — both facts, neither a guess.
+ * NOTHING IS INVENTED. The rank in the meta line (`2ND`) is the ranked
+ * standings read (2026-09-05, one per league whose draft is done, the same
+ * cache entry League HQ's Standings tile reads); the `64% WIN` under each
+ * name is the scoreboard row's projected finals and games left through the
+ * Match screen's own win rule. A league without either draws neither. The
+ * `TRAILING 3 CATS` note is not a read this screen makes, so it is not
+ * drawn. `LIVE` is drawn when the week's matchup is in progress and an NHL
+ * game is live right now — both facts, neither a guess.
  */
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -30,7 +34,8 @@ import { useLeague } from '@/contexts/LeagueContext';
 import { getLeagueFormat } from '@/services/LeagueService';
 import { isPoolLeague, leagueSwitchDestination } from '@/utils/leagueTypeHelpers';
 import { getTodayMST } from '@/utils/timezoneUtils';
-import { isBye, scoreOf, teamNameOf, type WeekMatchupRow } from '@/components/matchup/scoreboard';
+import { isBye, scoreOf, teamNameOf, winChanceOf, type WeekMatchupRow } from '@/components/matchup/scoreboard';
+import { placeOf, type StandingsLineRow } from '@/components/league/hqLines';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { PressBoxScoreTicker } from '@/components/pressbox/ScoreTicker';
@@ -89,6 +94,19 @@ export function PressBoxHome({ inOffseason, className }: PressBoxHomeProps) {
     })),
   });
 
+  const standingsQueries = useQueries({
+    queries: fantasy.map(({ league: l, week }) => ({
+      queryKey: ['league-standings', l.id],
+      enabled: week !== null && l.draft_status === 'completed',
+      staleTime: 60_000,
+      queryFn: async () => {
+        const res = await leagueApi.getStandings(l.id);
+        const rows = ((res as { data?: unknown }).data ?? res) as unknown;
+        return Array.isArray(rows) ? (rows as StandingsLineRow[]) : [];
+      },
+    })),
+  });
+
   const anyLive = dayQuery.data?.games.some((g) => g.state === 'live') ?? false;
   const ticker = useMemo(() => (dayQuery.data?.games ?? []).map(tickerGame), [dayQuery.data]);
   const tonight = useMemo(() => tonightPlayers(dayQuery.data), [dayQuery.data]);
@@ -137,12 +155,15 @@ export function PressBoxHome({ inOffseason, className }: PressBoxHomeProps) {
               const fmt = getLeagueFormat(l);
               const pool = isPoolLeague(fmt.leagueType);
               const teams = (l.settings as { teamsCount?: number } | null)?.teamsCount;
+              const myId = teamQueries[i]?.data?.id ?? null;
+              const place = myId && standingsQueries[i]?.data ? placeOf(standingsQueries[i].data!, myId) : null;
               const metaLine = [
                 teams ? (pool ? `${teams} PLAYERS` : `${teams}-TEAM`) : null,
                 pool
                   ? ((LEAGUE_TYPE_LABELS as Record<string, string>)[fmt.leagueType] ?? fmt.leagueType).replace(/\s+pool$/i, '').toUpperCase()
                   : FORMAT_SHORT[fmt.scoringFormat] ?? null,
                 l.draft_status !== 'completed' && !pool ? (l.draft_status === 'in_progress' ? 'DRAFT LIVE' : 'PRE-DRAFT') : null,
+                place ? place.toUpperCase() : null,
               ]
                 .filter(Boolean)
                 .join(' · ');
@@ -154,13 +175,14 @@ export function PressBoxHome({ inOffseason, className }: PressBoxHomeProps) {
               // its pool route inside the same helper.
               const to = leagueSwitchDestination(l.id, fmt.leagueType, '/');
 
-              const myId = teamQueries[i]?.data?.id ?? null;
               const rows = weekQueries[i]?.data;
               const mine = myId && rows ? rows.find((r) => r.team1_id === myId || r.team2_id === myId) : undefined;
               const iAmTeam1 = mine ? mine.team1_id === myId : false;
               const youSide = mine ? (iAmTeam1 ? 'team1' : 'team2') : null;
               const themSide = mine ? (iAmTeam1 ? 'team2' : 'team1') : null;
               const live = !!mine && mine.status === 'in_progress' && anyLive;
+              const youWin = mine && youSide ? winChanceOf(mine, youSide, today) : null;
+              const themWin = mine && themSide ? winChanceOf(mine, themSide, today) : null;
 
               return (
                 <PressBoxLeagueCard
@@ -180,6 +202,7 @@ export function PressBoxHome({ inOffseason, className }: PressBoxHomeProps) {
                             const p = youSide === 'team1' ? mine.team1_projected_total : mine.team2_projected_total;
                             return p == null ? null : Number(p);
                           })(),
+                          winPct: youWin,
                           isYou: true,
                         }
                       : null
@@ -195,6 +218,7 @@ export function PressBoxHome({ inOffseason, className }: PressBoxHomeProps) {
                               const p = themSide === 'team1' ? mine.team1_projected_total : mine.team2_projected_total;
                               return p == null ? null : Number(p);
                             })(),
+                            winPct: themWin,
                           }
                       : null
                   }
