@@ -1190,3 +1190,36 @@ with a player on the ice, `lockedTeamForTrade`). Still open, and deliberate
 for after Tuesday: keepers lock (`lock_keepers_for_season`) but the v2
 engine does not seat them or skip the consumed rounds; `roster_slots` is
 never written and `settings.stats[]` never read.
+
+**Keepers in the engine (5aac9eea).** Garrett: "Do them today." Locked
+designations load when the lobby opens (`keeperSlots.ts`: round-cost,
+escalation, or the team's last-round pick for "no penalty"; collisions
+push the cheaper keeper later); a kept player is refused to every other
+team and the keeper's slot refuses anything but him; when his slot comes
+on the clock the lobby submits the pick itself through `enqueueAction` as
+an autopick, so `submit_pick_v2`, the board and the roster sync see an
+ordinary pick in the round he cost. The pick clock stays armed and its
+autopick IS the keeper, so the slot cannot stall. The snapshot carries
+`keepers`; the client keeps them off the board from pick 1 and draws a
+KEEPER cell in each spoken-for slot. Shared `keeperSeasonYear` replaces
+the panel's July +1, which would have designated past a September draft.
+
+**More pass-through (b6ac4ece, c75c39d8, 786889ff).** `roster_slots`
+mirrors `settings.rosterSlots`; a scoring-rules edit refreshes
+`settings.stats` so the audit trigger fires; league size and rounds lock
+once the draft starts and never drop below the teams in; an h2h-categories
+league's weekly score is categories won (ties half each), so standings,
+seeding, advancement and completion follow the format (migration
+20260905233000).
+
+**The career (c89fcb71).** `player_directory.career` from the NHL landing
+endpoint (`populate_career_totals.py`, weekly, stale-first, `--all` to
+rebuild), read through `/api/players/directory`, said by the writeup as
+plain numbers: "Career: 897 goals and 1,623 points in 1,491 games over 21
+NHL seasons. Trophies: Rocket Richard x9, Hart x3, Art Ross. Drafted 1st
+overall in 2004 by WSH." Tags: 500-goal club, 1,000-point club, 1,000
+games, 300 wins.
+
+Open: the Matchup page in a categories league shows the weekly score as a
+number, not a per-category grid; tapping a player's name on a News Room
+row does not yet open his card.
