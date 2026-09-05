@@ -70,7 +70,16 @@ export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, .
   };
   return (
     <>
-      <div className={cn(PB_TYPE, 'lg:hidden pt-[env(safe-area-inset-top)]', className)}>
+      {/* THE WRAPPER IS THE STICKY ELEMENT (2026-09-05, from a phone
+          screenshot of the Team screen scrolled under the status bar). The
+          header's own `sticky` could never leave a wrapper exactly its own
+          height, so it scrolled away with the page and the content slid
+          under the clock. Sticky here, with the safe-area padding painted in
+          surface, keeps the league name and the four tabs on screen. */}
+      <div
+        className={cn(PB_TYPE, 'lg:hidden sticky top-0 z-app-nav bg-pressbox-surface pt-[env(safe-area-inset-top)]', className)}
+        data-testid="pb-league-chrome"
+      >
         <LeagueHeader
           {...header}
           leagueId={resolvedId || null}
