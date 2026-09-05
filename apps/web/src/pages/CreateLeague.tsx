@@ -237,6 +237,10 @@ const CreateLeague = () => {
     // ?type=playoff → default to bracket pickem (most common playoff format)
     if (type === 'playoff') {
       setLeagueType('playoff-bracket-pickem');
+    } else if (type === 'pickem' || type === 'survivor' || type === 'confidence-pool') {
+      // Citrus Game Day (2026-09-05): the home screen's tiles arrive with
+      // the game already chosen.
+      setLeagueType(type);
     }
   }, [searchParams]);
 

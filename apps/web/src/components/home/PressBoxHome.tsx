@@ -42,6 +42,7 @@ import { PressBoxScoreTicker } from '@/components/pressbox/ScoreTicker';
 import { PressBoxSectionHead } from '@/components/pressbox/SectionHead';
 import { PressBoxLeagueCard } from '@/components/pressbox/LeagueCard';
 import { PressBoxTonightCards } from '@/components/pressbox/TonightCard';
+import { PressBoxGameDay } from './GameDay';
 import { FORMAT_SHORT, crestOf, tickerGame, tonightPlayers, weekOf } from './homeFormat';
 import { cn } from '@/lib/utils';
 
@@ -227,6 +228,8 @@ export function PressBoxHome({ inOffseason, className }: PressBoxHomeProps) {
             })}
           </div>
         )}
+
+        <PressBoxGameDay />
 
         {tonight.players.length > 0 && (
           <>
