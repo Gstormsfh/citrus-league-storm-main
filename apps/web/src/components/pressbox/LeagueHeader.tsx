@@ -17,17 +17,31 @@
  * The week label is a PROP, not a fetch. Chrome that fetches is chrome that
  * flickers on every route change, and the screens already hold the current
  * matchup -- see `useLeagueChrome` when a screen has nothing to pass.
+ *
+ * PRESENTATIONAL (2026-09-04, after the test run). The league's id, name
+ * and crest are props too, resolved by `PressBoxLeagueChrome` from the
+ * context. This file used to read the league context itself, and because the
+ * `@/components/pressbox` barrel exports it, every component that imported
+ * a row from the barrel pulled LeagueContext -> AuthContext -> the Supabase
+ * client, which throws at module scope under the hermetic test env: two
+ * matchup suites could not load. Chrome that reads no context can be
+ * imported anywhere.
  */
-import { useMemo } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { SlidersHorizontal } from 'lucide-react';
-import { useLeague } from '@/contexts/LeagueContext';
-import { teamCrestUrl } from '@/components/roster/headshot';
 import { cn } from '@/lib/utils';
 import { HEADER_ROW1_H, HEADER_SUBTAB_H, SCANLINE } from './chromeMetrics';
 import { PB_TYPE } from './rowScale';
 
 export interface LeagueHeaderProps {
+  /**
+   * The league the header names. `PressBoxLeagueChrome` resolves these from
+   * the context; the URL's `:leagueId` still wins over `leagueId` here.
+   */
+  leagueId?: string | null;
+  leagueName?: string | null;
+  /** The crest image, already resolved to a URL. Absent draws the initial. */
+  crestSrc?: string | null;
   /** `WK 1 · SEP 28–OCT 4`. Omitted while the week is still loading. */
   weekLabel?: string | null;
   /** Tap target for the week label — the week picker. Omit to render it inert. */
@@ -86,9 +100,11 @@ export function LeagueHeader({
   onWeekNext,
   onSettingsPress,
   showSubTabs = true,
+  leagueId: leagueIdProp,
+  leagueName: leagueNameProp,
+  crestSrc,
   className,
 }: LeagueHeaderProps) {
-  const league = useLeague();
   const location = useLocation();
   const navigate = useNavigate();
   const params = useParams<{ leagueId?: string }>();
@@ -97,12 +113,9 @@ export function LeagueHeader({
   // matchupUrlSync.ts argues for: the path is the source of truth, and a
   // header that disagrees with the page under it is how a manager ends up
   // reading one league's name over another league's rows.
-  const leagueId = params.leagueId ?? league?.activeLeagueId ?? null;
-  const leagueName = league?.activeLeague?.name ?? '';
-  const crest = useMemo(() => {
-    const abbr = (league?.activeLeague?.settings as { crestTeam?: string } | null)?.crestTeam;
-    return abbr ? teamCrestUrl(abbr) : null;
-  }, [league?.activeLeague]);
+  const leagueId = params.leagueId ?? leagueIdProp ?? null;
+  const leagueName = leagueNameProp ?? '';
+  const crest = crestSrc ?? null;
 
   const activeKey = SUB_TABS.find((t) => t.match(location.pathname))?.key ?? 'league';
 

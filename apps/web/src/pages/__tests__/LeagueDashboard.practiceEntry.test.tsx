@@ -42,6 +42,12 @@ const USER = { id: 'user-1' };
 const PROFILE = { data: { username: 'alex' } };
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: USER }) }));
 vi.mock('@/hooks/useProfile', () => ({ useProfile: () => PROFILE }));
+// The Press Box league chrome (PR10f) reads the active league from the
+// context; the real module imports DemoLeagueService, which builds the
+// Supabase client at module scope and throws under the hermetic env.
+vi.mock('@/contexts/LeagueContext', () => ({
+  useLeague: () => ({ activeLeagueId: null, activeLeague: null, userLeagueState: 'active-user' }),
+}));
 
 type DraftStatus = 'not_started' | 'in_progress' | 'completed';
 

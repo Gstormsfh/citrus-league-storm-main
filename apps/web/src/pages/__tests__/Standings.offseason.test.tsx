@@ -57,6 +57,10 @@ vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: toastSpy }) }));
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'user-1' } }),
 }));
+// The Press Box league chrome (PR10f) reads the profile for the menu's
+// avatar; the real hook reaches api/account -> api/client -> the Supabase
+// client, which throws at module scope under the hermetic env.
+vi.mock('@/hooks/useProfile', () => ({ useProfile: () => ({ data: null }) }));
 
 const LEAGUE = {
   id: 'league-1',

@@ -19,10 +19,11 @@
  * wrapper of the page's own: the menu is a fixed overlay and takes care
  * of its own breakpoint.
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useProfile } from '@/hooks/useProfile';
+import { teamCrestUrl } from '@/components/roster/headshot';
 import { cn } from '@/lib/utils';
 import { PB_TYPE } from './rowScale';
 import { LeagueHeader, type LeagueHeaderProps } from './LeagueHeader';
@@ -49,16 +50,33 @@ export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, .
   const params = useParams<{ leagueId?: string }>();
   const navigate = useNavigate();
   const { data: profile } = useProfile();
+  // The header is presentational; this is where the league is resolved.
+  // The URL's league wins, then the page's, then the context's -- and the
+  // crest comes only from the context's league when it IS that league,
+  // never a different league's crest beside this one's name.
+  const resolvedId = params.leagueId ?? leagueId ?? league?.activeLeagueId ?? '';
+  const resolvedName = leagueName ?? league?.activeLeague?.name ?? '';
+  const crestSrc = useMemo(() => {
+    if (!resolvedId || resolvedId !== league?.activeLeagueId) return null;
+    const abbr = (league?.activeLeague?.settings as { crestTeam?: string } | null)?.crestTeam;
+    return abbr ? teamCrestUrl(abbr) : null;
+  }, [resolvedId, league?.activeLeagueId, league?.activeLeague]);
   return (
     <>
       <div className={cn(PB_TYPE, 'lg:hidden pt-[env(safe-area-inset-top)]', className)}>
-        <LeagueHeader {...header} onSettingsPress={() => setMenuOpen(true)} />
+        <LeagueHeader
+          {...header}
+          leagueId={resolvedId || null}
+          leagueName={resolvedName}
+          crestSrc={crestSrc}
+          onSettingsPress={() => setMenuOpen(true)}
+        />
       </div>
       <LeagueMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
-        leagueId={leagueId ?? params.leagueId ?? league?.activeLeagueId ?? ''}
-        leagueName={leagueName ?? league?.activeLeague?.name ?? ''}
+        leagueId={resolvedId}
+        leagueName={resolvedName}
         tiles={tiles}
         user={menuUserFromProfile(profile)}
         /* SWITCH ▾ goes to the LEAGUES tab, which lists them: the artboard's

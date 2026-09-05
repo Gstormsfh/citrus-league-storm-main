@@ -88,7 +88,13 @@ describe('the chrome itself', () => {
     expect(chrome).toContain('onSwitchLeague=');
   });
 
-  it('honours the league the URL names over the context, as the header does', () => {
-    expect(chrome).toContain('leagueId={leagueId ?? params.leagueId ?? league?.activeLeagueId ?? \'\'}');
+  it('resolves the league once — URL, then the page, then the context — and hands it to both header and menu', () => {
+    // The header is presentational (it reads no context, so the pressbox
+    // barrel stays importable under the hermetic test env); the chrome is
+    // where the league is resolved, and the same answer goes to both.
+    expect(chrome).toContain("const resolvedId = params.leagueId ?? leagueId ?? league?.activeLeagueId ?? '';");
+    expect(chrome).toContain('leagueId={resolvedId || null}');
+    expect(chrome).toContain('leagueId={resolvedId}');
+    expect(read('../components/pressbox/LeagueHeader.tsx')).not.toMatch(/useLeague\(\)/);
   });
 });

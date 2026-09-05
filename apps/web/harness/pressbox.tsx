@@ -144,7 +144,7 @@ function Harness() {
       className="relative bg-pressbox-surface"
       data-phone-frame="393x852"
     >
-      <LeagueHeader weekLabel="WK 1 · SEP 28-OCT 4" onWeekPress={() => log('week')} />
+      <LeagueHeader leagueId="harness-league" leagueName="Finalsz" weekLabel="WK 1 · SEP 28-OCT 4" onWeekPress={() => log("week")} />
       <PressBoxRosterList
         days={['THU', 'FRI', 'SAT', 'WEEK']}
         activeDay={day}

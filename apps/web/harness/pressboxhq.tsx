@@ -53,7 +53,7 @@ function Harness() {
       className="relative bg-pressbox-surface"
       data-phone-frame="393x852"
     >
-      <LeagueHeader weekLabel="WK 1 · SEP 28–OCT 4" />
+      <LeagueHeader leagueId="harness-league" leagueName="Finalsz" weekLabel="WK 1 · SEP 28–OCT 4" />
 
       <div className={`${PB_TYPE} flex flex-col gap-3 border-t border-white/[0.08] px-3 pt-3`}>
         <PressBoxSectionHead

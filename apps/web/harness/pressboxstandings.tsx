@@ -53,7 +53,7 @@ function Harness() {
       className="relative bg-pressbox-surface"
       data-phone-frame="393x852"
     >
-      <LeagueHeader weekLabel="WK 5" />
+      <LeagueHeader leagueId="harness-league" leagueName="Finalsz" weekLabel="WK 5" />
 
       <div className={`${PB_TYPE} px-3 pt-2.5 border-t border-white/[0.08]`}>
         <PressBoxSegmented segments={SEGMENTS} activeKey="standings" label="Standings view" />

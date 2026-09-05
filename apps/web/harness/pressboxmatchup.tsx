@@ -78,7 +78,7 @@ function Harness() {
       className="relative bg-pressbox-surface"
       data-phone-frame="393x852"
     >
-      <LeagueHeader weekLabel="WK 1" onWeekPress={() => log('week')} />
+      <LeagueHeader leagueId="harness-league" leagueName="Finalsz" weekLabel="WK 1" onWeekPress={() => log("week")} />
 
       <PressBoxScoreBlock
         you={{ name: 'Gstorms', record: '4–1 · 2ND', score: 118.4, projection: 257.2, gamesLeft: 27, winPct: 64 }}

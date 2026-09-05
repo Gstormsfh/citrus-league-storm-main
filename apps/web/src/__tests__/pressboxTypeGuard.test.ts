@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -40,7 +40,11 @@ import { fileURLToPath } from 'node:url';
  *     silently lost its leading the first time.
  */
 
-const here = resolve(fileURLToPath(new URL('.', import.meta.url)));
+// `dirname(fileURLToPath(import.meta.url))`, like every other guard: Vite's
+// asset plugin rewrites the `new URL('.', import.meta.url)` form into a
+// served `/src/...` URL, which is not a file: URL, and under vitest 4 the
+// suite could not load ("The URL must be of scheme file", 2026-09-04).
+const here = dirname(fileURLToPath(import.meta.url));
 const PRESSBOX = resolve(here, '..', 'components', 'pressbox');
 const INDEX_CSS = resolve(here, '..', 'index.css');
 
