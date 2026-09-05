@@ -33,7 +33,7 @@ const base = (over: Partial<LeagueSettingsInput> = {}): LeagueSettingsInput => (
   setWaiver: noop,
   draft: { draft_rounds: 21, pickTimeLimit: 90 },
   setDraft: noop,
-  trade: { trade_review_type: 'none', trade_review_period_hours: 48, trade_veto_threshold: 0.5 },
+  trade: { trade_review_type: 'none', trade_review_period_hours: 48, trade_veto_threshold: 0.5, tradeDeadlineWeek: 0 },
   setTrade: noop,
   keeper: { keeperEnabled: false, keeperCount: 0, keeperPenalty: 'none', dynastyMode: false },
   setKeeper: noop,
@@ -117,11 +117,21 @@ describe('buildLeagueSettingsSections', () => {
   });
 
   it('trades: the window and the veto threshold appear only for a league vote, with the votes counted', () => {
-    expect(keys(fields(base(), 'trades'))).toEqual(['trade_review_type']);
-    const vote = base({ trade: { trade_review_type: 'league_vote', trade_review_period_hours: 24, trade_veto_threshold: 0.25 } });
+    expect(keys(fields(base(), 'trades'))).toEqual(['tradeDeadlineWeek', 'trade_review_type']);
+    const vote = base({
+      trade: { trade_review_type: 'league_vote', trade_review_period_hours: 24, trade_veto_threshold: 0.25, tradeDeadlineWeek: 0 },
+    });
     const f = fields(vote, 'trades');
-    expect(keys(f)).toEqual(['trade_review_type', 'trade_review_period_hours', 'trade_veto_threshold']);
-    expect(f[2].help).toBe('3 of 12 votes to veto');
+    expect(keys(f)).toEqual(['tradeDeadlineWeek', 'trade_review_type', 'trade_review_period_hours', 'trade_veto_threshold']);
+    expect(f[3].help).toBe('3 of 12 votes to veto');
+  });
+
+  it('trades: the deadline is editable after creation and says what it does', () => {
+    // SETTINGS PASS-THROUGH (2026-09-05): set at creation, never editable.
+    const open = fields(base(), 'trades')[0];
+    expect(open).toMatchObject({ kind: 'select', value: '0', help: 'Trades stay open all season' });
+    const wk = fields(base({ trade: { ...base().trade, tradeDeadlineWeek: 12 } }), 'trades')[0];
+    expect(wk).toMatchObject({ value: '12', help: 'No trades after week 12' });
   });
 
   it('keepers: count and cost appear only for a keeper league that is not dynasty', () => {

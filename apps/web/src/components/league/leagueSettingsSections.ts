@@ -134,6 +134,8 @@ export interface TradeState {
   trade_review_type: 'none' | 'commissioner' | 'league_vote';
   trade_review_period_hours: number;
   trade_veto_threshold: number;
+  /** Matchup week after which trades close; 0 = no deadline. Editable since 2026-09-05. */
+  tradeDeadlineWeek: number;
 }
 export interface KeeperState {
   keeperEnabled: boolean;
@@ -431,6 +433,10 @@ export function buildLeagueSettingsSections(input: LeagueSettingsInput): Setting
     ],
   };
 
+  const TRADE_DEADLINE_WEEKS: SettingOption[] = [
+    { value: '0', label: 'None' },
+    ...[8, 10, 12, 14, 16, 18, 20].map((w) => ({ value: String(w), label: `Week ${w}` })),
+  ];
   const REVIEW: SettingOption[] = [
     { value: 'none', label: 'Instant', help: 'Trades go through the moment they are accepted' },
     { value: 'commissioner', label: 'Commissioner', help: 'You approve every trade before it goes through' },
@@ -442,6 +448,21 @@ export function buildLeagueSettingsSections(input: LeagueSettingsInput): Setting
     saveable: true,
     callout: `${notify}.`,
     groups: [
+      {
+        key: 'deadline',
+        label: 'DEADLINE',
+        fields: [
+          {
+            kind: 'select',
+            key: 'tradeDeadlineWeek',
+            label: 'Trade deadline',
+            help: trade.tradeDeadlineWeek > 0 ? `No trades after week ${trade.tradeDeadlineWeek}` : 'Trades stay open all season',
+            value: String(trade.tradeDeadlineWeek),
+            options: TRADE_DEADLINE_WEEKS,
+            onChange: (v) => setTrade((p) => ({ ...p, tradeDeadlineWeek: parseInt(v, 10) || 0 })),
+          },
+        ],
+      },
       {
         key: 'review',
         label: 'REVIEW',

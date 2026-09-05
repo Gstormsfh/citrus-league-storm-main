@@ -110,6 +110,8 @@ const LeagueDashboard = () => {
     trade_review_type: 'none' as 'none' | 'commissioner' | 'league_vote',
     trade_review_period_hours: 48,
     trade_veto_threshold: 0.5,
+    // SETTINGS PASS-THROUGH (2026-09-05): the deadline was create-time only.
+    tradeDeadlineWeek: 0,
   });
 
   // Keeper/Dynasty settings state
@@ -234,12 +236,23 @@ const LeagueDashboard = () => {
         pickTimeLimit: (leagueData.settings as LeagueSettings)?.pickTimeLimit as number || 90,
       });
 
-      // Update trade review settings
+      // Update trade review settings.
+      // SETTINGS PASS-THROUGH (2026-09-05): the review settings are saved to
+      // the leagues.trade_review_* COLUMNS (TradeService.updateTradeReviewSettings)
+      // and enforced from there; this screen read settings.tradeReviewType, a
+      // key nothing writes, so it showed "Instant" after "Commissioner" had
+      // been saved. Read the columns; the JSONB key is the legacy fallback.
       const fmt = extractFormatSettings((leagueData.settings as LeagueSettings) || {});
+      const cols = leagueData as unknown as {
+        trade_review_type?: string | null;
+        trade_review_period_hours?: number | null;
+        trade_veto_threshold?: number | null;
+      };
       setTradeSettings({
-        trade_review_type: (fmt.tradeReviewType || 'none') as 'none' | 'commissioner' | 'league_vote',
-        trade_review_period_hours: fmt.tradeReviewPeriodHours || 48,
-        trade_veto_threshold: fmt.tradeVetoThreshold || 0.5,
+        trade_review_type: (cols.trade_review_type || fmt.tradeReviewType || 'none') as 'none' | 'commissioner' | 'league_vote',
+        trade_review_period_hours: cols.trade_review_period_hours || fmt.tradeReviewPeriodHours || 48,
+        trade_veto_threshold: cols.trade_veto_threshold || fmt.tradeVetoThreshold || 0.5,
+        tradeDeadlineWeek: Number(fmt.tradeDeadlineWeek) || 0,
       });
 
       // Update keeper/dynasty settings
@@ -573,8 +586,14 @@ const LeagueDashboard = () => {
         description: `League ${activeSettingsTab} settings have been updated. All league members have been notified.`,
       });
       setSettingsOpen(false);
-      
-      // Reload league data to reflect changes
+
+      // Reload league data to reflect changes. Both league caches first
+      // (SETTINGS PASS-THROUGH, 2026-09-05): the trade, keeper and draft
+      // saves go through their own endpoints and invalidated nothing, so
+      // this reload handed back the 30s-cached league and the dialog
+      // reopened on the values from BEFORE the save.
+      LeagueService.clearLeagueCache();
+      leagueApi.invalidate(`leagues:${leagueId}`);
       loadLeagueData();
     } catch (err: unknown) {
       toast({
@@ -1563,6 +1582,31 @@ const LeagueDashboard = () => {
                                 {tradeSettings.trade_review_type === 'none' && 'Trades are executed immediately when accepted.'}
                                 {tradeSettings.trade_review_type === 'commissioner' && 'Trades require commissioner approval before being processed.'}
                                 {tradeSettings.trade_review_type === 'league_vote' && 'League members vote on trades during the review window.'}
+                              </p>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Trade Deadline</Label>
+                              <Select
+                                value={String(tradeSettings.tradeDeadlineWeek)}
+                                onValueChange={(value) =>
+                                  setTradeSettings(prev => ({ ...prev, tradeDeadlineWeek: parseInt(value, 10) || 0 }))
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="0">None</SelectItem>
+                                  {[8, 10, 12, 14, 16, 18, 20].map((w) => (
+                                    <SelectItem key={w} value={String(w)}>Week {w}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-white/55">
+                                {tradeSettings.tradeDeadlineWeek > 0
+                                  ? `No trades after week ${tradeSettings.tradeDeadlineWeek}.`
+                                  : 'Trades stay open all season.'}
                               </p>
                             </div>
 

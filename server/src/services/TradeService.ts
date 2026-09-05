@@ -668,19 +668,28 @@ export class TradeService {
       trade_review_type: 'none' | 'commissioner' | 'league_vote';
       trade_review_period_hours: number;
       trade_veto_threshold: number;
+      /** Matchup week after which trades close; 0 = none. Merged into settings JSONB. */
+      tradeDeadlineWeek?: number;
     },
   ) {
     await this.membership.requireCommissioner(leagueId, commissionerId);
 
-    const { error } = await this.supabase
-      .from('leagues')
-      .update({
-        trade_review_type: settings.trade_review_type,
-        trade_review_period_hours: settings.trade_review_period_hours,
-        trade_veto_threshold: settings.trade_veto_threshold,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', leagueId);
+    const update: Record<string, unknown> = {
+      trade_review_type: settings.trade_review_type,
+      trade_review_period_hours: settings.trade_review_period_hours,
+      trade_veto_threshold: settings.trade_veto_threshold,
+      updated_at: new Date().toISOString(),
+    };
+    if (typeof settings.tradeDeadlineWeek === 'number') {
+      // The deadline lives in settings JSONB (isPastTradeDeadline reads
+      // settings.tradeDeadlineWeek). Merge, never replace, the document.
+      const { data: row, error: readErr } = await this.supabase.from('leagues').select('settings').eq('id', leagueId).single();
+      if (readErr) return { success: false, error: readErr };
+      const current = (row?.settings && typeof row.settings === 'object' ? row.settings : {}) as Record<string, unknown>;
+      update.settings = { ...current, tradeDeadlineWeek: settings.tradeDeadlineWeek };
+    }
+
+    const { error } = await this.supabase.from('leagues').update(update).eq('id', leagueId);
 
     if (!error) {
       await this.supabase.rpc('notify_league_members', {
