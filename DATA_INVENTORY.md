@@ -236,6 +236,11 @@ create-only result wrapper that replays frozen source membership again, binds
 all completed artifacts, predictions and calibrator lineage, and applies the
 declared shortlist without fitting or deserializing a model. Result evidence is
 separate at `scripts/proof/results/official-development-result-20260906/`.
+`scripts/proof/archive_development_checkpoint.py` creates an additive scoped
+source/evidence duplicate and streams every archive member through independent
+hash and membership verification without extraction or model loading. Its
+regressions are `data-pipeline/tests/test_development_archive.py`; prior archives
+remain separately retained. A local duplicate is not a remote backup.
 
 `projections/development_shortlist.py` applies only the frozen earlier-fold
 selection rule to caller-verified completed scorecards. Its manifest pin is the
