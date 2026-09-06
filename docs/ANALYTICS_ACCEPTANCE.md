@@ -38,6 +38,13 @@ promotion was selected. Local clock/hash closure is not an independent timestamp
 or proof of future quality. The original pre-fit declaration remains unchanged;
 this checkpoint supersedes its historical execution status.
 
+The [completed-experiment archive](analytics-completed-experiment-archive-20260906.json)
+retains 29788 selected evidence files and 909 tracked source/proof/doc files at
+commit `d84d3f585885093535be9d00c6510b7d2e8b9931`. Every archived file was byte-hash
+compared to its retained original, and complete selected file membership was
+checked independently. No originals were removed. Both archives remain local;
+they are not an off-machine backup or an inventory of every external input.
+
 The original 32 goal/SOG conflicts now have source-specific statistical evidence
 and a separately pinned local overlay. Root replayed every exact original receipt;
 the source bytes and goal credit remain unchanged. Newly observed revisions do

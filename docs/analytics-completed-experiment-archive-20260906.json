@@ -1,0 +1,77 @@
+{
+  "contract": "citrus-local-evidence-and-source-archive-v1",
+  "verified_at": "2026-09-06T07:14:10.499482+00:00",
+  "source_commit": "d84d3f585885093535be9d00c6510b7d2e8b9931",
+  "archives": [
+    {
+      "path": "scripts/proof/results/analytics-preserved-checkpoint-20260906.yHegVY/source-head.tar.gz",
+      "sha256": "e8733738619781d4d34143bed541ecdf31ee69a062c3846e02afe637e95c338d",
+      "bytes": 11764677,
+      "counts": {
+        "regular_files": 909,
+        "directories": 21,
+        "symlinks": 0,
+        "regular_bytes": 30302521
+      },
+      "pax_headers": {
+        "comment": "d84d3f585885093535be9d00c6510b7d2e8b9931"
+      },
+      "every_member_matches_local_bytes": true,
+      "extracted_to_filesystem": false,
+      "inventory": {
+        "complete_selected_file_membership": true,
+        "expected_files": 909,
+        "roots": [
+          "data-pipeline/projections",
+          "data-pipeline/acquisition",
+          "data-pipeline/monitoring",
+          "data-pipeline/models",
+          "supabase/migrations",
+          "scripts/proof",
+          "docs"
+        ],
+        "sorted_file_inventory_sha256": "34775a714e0aa5378dd26f49b111ceef0c9450372827343418595bcd89c7a0ed"
+      }
+    },
+    {
+      "path": "scripts/proof/results/analytics-preserved-checkpoint-20260906.yHegVY/evidence.tar.gz",
+      "sha256": "e1f66811c6ae2d0e24e25399d9746a0ef170d3e4c46012337374f5da02120f48",
+      "bytes": 829467363,
+      "counts": {
+        "regular_files": 29788,
+        "directories": 35,
+        "symlinks": 0,
+        "regular_bytes": 8769390980
+      },
+      "pax_headers": {},
+      "every_member_matches_local_bytes": true,
+      "extracted_to_filesystem": false,
+      "inventory": {
+        "complete_selected_file_membership": true,
+        "expected_files": 29788,
+        "roots": [
+          "scripts/proof/results/historical-official-freeze-20260906",
+          "scripts/proof/results/historical-feature-reports-20260906",
+          "scripts/proof/results/official-neutral-features-20260906",
+          "scripts/proof/results/official-neutral-experiment-20260906",
+          "scripts/proof/results/official-neutral-coverage-20260906.json",
+          "scripts/proof/results/official-neutral-prospective-reservation-20260906",
+          "scripts/proof/results/historical-report-terminal-review-completed-20260906.json",
+          "scripts/proof/results/goal-sog-supplement-20260906",
+          "scripts/proof/results/goal-sog-definitions-20260906",
+          "scripts/proof/results/goal-sog-new-revision-review-20260906.json"
+        ],
+        "sorted_file_inventory_sha256": "69d1de29bcbc1231ee261887bb37c0c3e7d7f6d20149e5b6ea282a49462f94d4"
+      }
+    }
+  ],
+  "method": "stdlib streaming tar reader; SHA256 every regular member against retained local file; no model deserialization or extraction",
+  "limitations": [
+    "Local duplicate, not an off-machine backup.",
+    "Contains the explicitly selected completed new captures, experiment, coverage, reservation and supplementary evidence; prior archives remain separately retained.",
+    "Source archive includes selected tracked code, migrations, proofs and docs at the recorded commit; it is not an archive of all repository paths or external inputs.",
+    "This receipt is created after the archives and cannot be included in its own checksum."
+  ],
+  "originals_removed": false,
+  "publishable": false
+}
