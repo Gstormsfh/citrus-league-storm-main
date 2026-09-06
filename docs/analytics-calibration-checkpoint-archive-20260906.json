@@ -1,0 +1,86 @@
+{
+  "archives": [
+    {
+      "bytes": 15339570,
+      "complete_membership_verified": true,
+      "every_member_matches_retained_source": true,
+      "extracted_to_filesystem": false,
+      "member_inventory_sha256": "1669a8956e3c54ba1fbc94d1771a332239f1489b2ee56058fd02510108f79269",
+      "path": "scripts/proof/results/analytics-calibration-checkpoint-20260906-0918/source-head.tar.gz",
+      "regular_bytes": 44849175,
+      "regular_files": 2098,
+      "sha256": "1eb2c4b5b530034659352802500f677ccaceba429e6291176d3cfd7929086a0d"
+    },
+    {
+      "bytes": 20151212,
+      "complete_membership_verified": true,
+      "every_member_matches_retained_source": true,
+      "extracted_to_filesystem": false,
+      "member_inventory_sha256": "040ba5a647bd3a59ca72876e576bb54f492199a3b8f7ef6f7d949528e857533f",
+      "path": "scripts/proof/results/analytics-calibration-checkpoint-20260906-0918/evidence.tar.gz",
+      "regular_bytes": 181239812,
+      "regular_files": 30,
+      "sha256": "f5fbc5142e01ef60e5ddb63c50ce2f20172a53fa8c5eb4d078cb453b0d7b085f"
+    }
+  ],
+  "contract": "citrus-local-calibration-checkpoint-archive-v1",
+  "evidence_roots": [
+    "scripts/proof/results/official-calibration-experiment-20260906",
+    "scripts/proof/results/official-calibration-typescript-parity-20260906",
+    "scripts/proof/results/official-calibration-review-20260906"
+  ],
+  "limitations": [
+    "Local duplicate, not off-machine backup or acceptance.",
+    "Old source/experiment archives and prospective reservations remain separately preserved."
+  ],
+  "originals_removed": false,
+  "publishable": false,
+  "review_bound_file_sha256": {
+    "scripts/proof/results/official-calibration-experiment-20260906/attempt-started.json": "0d721d247b734b4e2be561c391394761ed1bac81057346e30b08d1ba7dcb62a2",
+    "scripts/proof/results/official-calibration-experiment-20260906/declaration.json": "0c5b24972002ce2e11d62b16bd19c389705fc2ac4e73f4cbc76e67a476b7c09a",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold1/attempt-started.json": "e9d4255a0dc75cf13ba7fe054af6448c8ac752e93304946fc6e63bbeda39c979",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold1/calibration-predictions.json": "2c8461d66a58bdcfc8a8eef9f42d6bb90704ec2f7c84c9456c730879a389bace",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold1/calibrator-beta.json": "6312715bc3420f40107e9a4a61778625d859be8117bc183bd2aa9df73548297e",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold1/calibrator-beta_group.json": "b887a21355c100dcaeb13eb43a87f79334249bb784d1f4d2156bb98682647b35",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold1/calibrator-isotonic.json": "342047aadee7bea237d849151ad5b3efc881207d7d95d6e82be63cc88524298b",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold1/calibrator-logit_sigmoid.json": "6c1976847ac43c61f022fd91d9efd61af7f51092ec14226d3ba0fd473532e34f",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold1/calibrator-raw.json": "1f0620320c570a9d2fcdba19cc81d8cf6cf5e1fa2f219b6f80aee5cb3671e9c3",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold1/fit-receipt.json": "16ae2a12fa686f4b019398aab382f7f8539f140b05653c81eebed1f9d2fc5bb4",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold1/model.json": "20f60ed9bb397d2c50849ec19983f9724434a8f8b2dfdf11ad62436e87210e81",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold1/predictions.json": "1fae34730027ad7af2fdaf49e786ae4d612fb9f7ed4756ee2d1fa2e96990c7ed",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold1/scorecard.json": "e558ecf969a67ed6fa51d325ef56d18b40ac5cc2cd536f61c05a630219aaf256",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold2/attempt-started.json": "65c9ae5ff2f727128fbb6be48ea6c3565314a4087ea0b9e800d73cf012122685",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold2/calibration-predictions.json": "92fb9153339007649331288a09e586edf557047b5f3c6d20b24cea5b4a3d2ed2",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold2/calibrator-beta.json": "692dd2f9f9707c3736fd6b65e9257ae57326539501bd8b8df1361e82079be941",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold2/calibrator-beta_group.json": "dc3a9b06a5f4ffc57e563f2b723b5c20d300265212b184153e211e81e53464d7",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold2/calibrator-isotonic.json": "71e881007eb8b3bc18d14282da2df99a23b4d3f4a8b94908a7aa4c2345ac089a",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold2/calibrator-logit_sigmoid.json": "ed865291524d41dc51475b288112892d3e2664af0e2bbcbfb672c1243f50773e",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold2/calibrator-raw.json": "1f0620320c570a9d2fcdba19cc81d8cf6cf5e1fa2f219b6f80aee5cb3671e9c3",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold2/fit-receipt.json": "8ca672dfe48cee2b2d920cf1cef5d4c8f77e792ddc2d4100e0cee38014d4228e",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold2/model.json": "3303fbcb5ad2a2be5fa8c445c180973fff0459550a204ebce0d2e44833410793",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold2/predictions.json": "d9ae7eb96ca7ea5baf18c165c47601b67a6cd28cdec8aeca9d2044b21cd36ced",
+    "scripts/proof/results/official-calibration-experiment-20260906/fold2/scorecard.json": "0925cfa7ab34b0e666e0c136635d9b2f26989db14e548d55053a82d137c124d5",
+    "scripts/proof/results/official-calibration-experiment-20260906/health.json": "9e16e047848ade1d02611312be285f14fec48d5de9dadae7afd2dab36d895642",
+    "scripts/proof/results/official-calibration-experiment-20260906/result.json": "f079a45c2d709809566388c8619ec44bf83f994626c00a96496fe53015506694",
+    "scripts/proof/results/official-calibration-typescript-parity-20260906/attempt-started.json": "3db20b350f94e576a23ecca6e0ccb7d1e89f56ff46cb7ef1d5f1d31619a66993",
+    "scripts/proof/results/official-calibration-typescript-parity-20260906/health.json": "87ca44d99785b58ebac45aef36ef1bf427fa57def3b2aa210e6b45a31a00144c",
+    "scripts/proof/results/official-calibration-typescript-parity-20260906/result.json": "573222039935acbfb303ef37cd1208b47da0cc1b6038605bdaf93c6dadcfc7e3"
+  },
+  "source_commit": "156d724414037ab28445d43312e679510b5a2dc3",
+  "source_roots": [
+    "data-pipeline/projections",
+    "data-pipeline/acquisition",
+    "data-pipeline/monitoring",
+    "data-pipeline/models",
+    "data-pipeline/tests",
+    "supabase/migrations",
+    "scripts/proof",
+    "docs",
+    "server/src",
+    "packages/shared/src",
+    "apps/web/src",
+    "DATA_INVENTORY.md"
+  ],
+  "status": "complete-verified-local-duplicate",
+  "verified_at": "2026-09-06T09:11:30.334766+00:00"
+}

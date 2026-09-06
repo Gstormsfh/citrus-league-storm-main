@@ -109,11 +109,18 @@ separate create-only local archive; see
 Original files and earlier archives remain in place. These are local
 duplicates, not off-machine disaster-recovery backups.
 
+The closing independent hash check matched all 17 inventoried legacy model
+artifacts, all 18 first-experiment proof files (including the original
+reservation), all six compressed archives across the three checkpoints, and
+the five newly indexed result/review files. No model was deserialized.
+
 Verification before the real fit: 1,611 offline Python tests passed, 16 network
 tests deselected, 33 existing datetime warnings. The full shared TypeScript
 suite passed 284 tests and type checking. The separate proof harness passed
 8 synthetic tests; preservation orchestration passed 3. These counts are
 implementation checks, not quality claims.
+Final web and server TypeScript checks also passed using their existing
+project configurations; no application-serving code was changed by this step.
 
 ## Research and next overnight work
 
