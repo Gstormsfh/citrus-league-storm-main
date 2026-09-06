@@ -81,6 +81,9 @@ FOR EACH ROW EXECUTE FUNCTION public.analytics_hash_snapshot();
 CREATE FUNCTION public.analytics_guard_value_insert() RETURNS trigger
 LANGUAGE plpgsql SET search_path=public AS $$
 BEGIN
+  IF current_setting('transaction_isolation')<>'read committed' THEN
+    RAISE EXCEPTION 'Analytics writes require READ COMMITTED isolation';
+  END IF;
   -- Same row lock as publication: no insert can race the completeness check.
   PERFORM 1 FROM public.analytics_metric_batches WHERE id=NEW.batch_id FOR UPDATE;
   IF EXISTS(SELECT 1 FROM public.analytics_publications WHERE batch_id=NEW.batch_id) THEN
@@ -94,6 +97,9 @@ LANGUAGE plpgsql SET search_path=public AS $$
 DECLARE b public.analytics_metric_batches; actual bigint; observed timestamptz;
   expected_ids bigint[]; actual_ids bigint[];
 BEGIN
+  IF current_setting('transaction_isolation')<>'read committed' THEN
+    RAISE EXCEPTION 'Analytics writes require READ COMMITTED isolation';
+  END IF;
   SELECT * INTO STRICT b FROM public.analytics_metric_batches WHERE id=NEW.batch_id FOR UPDATE;
   SELECT count(*) INTO actual FROM public.analytics_metric_values WHERE batch_id=b.id;
   IF actual <> b.expected_entities THEN

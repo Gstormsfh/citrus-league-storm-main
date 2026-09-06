@@ -43,6 +43,8 @@ export class AnalyticsPublicationService {
       if (batch[key] !== value) throw new Error('Publication variant/version mismatch');
     }
     if (typeof batch.id !== 'string' || typeof batch.data_cutoff !== 'string' ||
+        typeof batch.source_snapshot_id !== 'string' || typeof batch.code_revision !== 'string' ||
+        !/^[a-f0-9]{40}$/.test(batch.code_revision) ||
         !record(batch.validation) || batch.validation.status !== 'passed' ||
         !Array.isArray(batch.validation.entity_ids)) throw new Error('Missing publication evidence');
     const expected = batch.validation.entity_ids;
@@ -53,7 +55,10 @@ export class AnalyticsPublicationService {
     const cutoff = Date.parse(batch.data_cutoff);
     const now = this.now();
     if (!Number.isFinite(cutoff) || cutoff > now) throw new Error('Invalid source cutoff');
-    const stale = now - cutoff > maxSourceAgeMs;
+    const freshness = batch.validation.freshness_observed_at;
+    const observed = typeof freshness === 'string' ? Date.parse(freshness) : NaN;
+    if (!Number.isFinite(observed) || observed > cutoff) throw new Error('Missing or invalid source freshness evidence');
+    const stale = now - observed > maxSourceAgeMs;
     const rows: PublishedMetricValue[] = [];
     for (let offset = 0; offset < expected.length; offset += 500) {
       const page = await this.db.from('analytics_metric_values')
@@ -77,6 +82,7 @@ export class AnalyticsPublicationService {
     }
     if (new Set(rows.map(r => r.entityId)).size !== expected.length) throw new Error('Duplicate publication entities');
     return { batchId: batch.id, sourceSnapshotId: batch.source_snapshot_id,
-      dataCutoff: batch.data_cutoff, codeRevision: batch.code_revision, selector, values: rows };
+      dataCutoff: batch.data_cutoff, sourceObservedAt: freshness as string,
+      codeRevision: batch.code_revision, selector, values: rows };
   }
 }

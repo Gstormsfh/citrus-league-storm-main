@@ -5,7 +5,7 @@ import { createChain, createMockSupabase } from './helpers';
 const selector: MetricSelector = {metric:'avg_toi_per_game',variant:'official-reconciled',unit:'minutes_per_appearance',
   season:2025,game_type:'regular',population:'skaters',feature_version:'v2',model_version:'none'};
 const batch = {...selector,id:'batch',source_snapshot_id:'source',data_cutoff:'2026-09-05T00:00:00Z',
-  expected_entities:2,validation:{status:'passed',entity_ids:[1,2]},code_revision:'0'.repeat(40)};
+  expected_entities:2,validation:{status:'passed',entity_ids:[1,2],freshness_observed_at:'2026-09-05T00:00:00Z'},code_revision:'0'.repeat(40)};
 const rows = [{entity_id:1,value:0,availability:'available',reason:'verified'},
   {entity_id:2,value:null,availability:'unavailable',reason:'source_mismatch'}];
 function service(values = rows, count = 2, metadata = batch) {
@@ -29,5 +29,14 @@ describe('published metric availability',()=>{
   });
   it('rejects a different model variant',async()=>{
     await expect(service(rows,2,{...batch,model_version:'other'}).readLatest(selector,7200000)).rejects.toThrow('variant/version');
+  });
+  it('does not refresh old source data by giving it a newer computation cutoff',async()=>{
+    const oldSource = {...batch,validation:{...batch.validation,freshness_observed_at:'2026-08-01T00:00:00Z'}};
+    const result=await service(rows,2,oldSource).readLatest(selector,7200000);
+    expect(result?.values.every(v=>v.value===null && v.reason==='stale_source')).toBe(true);
+  });
+  it('rejects future or missing source freshness evidence',async()=>{
+    const bad = {...batch,validation:{...batch.validation,freshness_observed_at:''}};
+    await expect(service(rows,2,bad).readLatest(selector,7200000)).rejects.toThrow('freshness');
   });
 });

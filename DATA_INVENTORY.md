@@ -319,6 +319,23 @@ is the background consumer adapter: exact variant/version matching, expected
 entity verification and explicit freshness expiry. These adapters are not enabled
 in production jobs or legacy readers pending rollout.
 
+Canonical source observations (UNAPPLIED): migration `20260906013428` adds
+service-only immutable `analytics_event_observations` and sealed
+`analytics_event_observation_sets`. `acquisition/canonical_events.py` preserves
+raw source coordinates, nullable context and event identity;
+`event_observation_service.py` retains correction revisions and resumes partial
+inserts before sealing. Quarantine is retained in the immutable source payload.
+`acquisition/collect_observations.py` is a read-only official-feed collector with
+real observation timestamps, per-request receipts and affirmative health counts.
+The conflict-game manifest is `docs/analytics-conflict-game-manifest-20260906.json`;
+live receipt files are outside Git at
+`/private/tmp/citrus-official-observations-20260906-0211` (ephemeral, not an archive).
+SQL fixtures run through `scripts/test_canonical_observations.mjs`.
+`scripts/test_analytics_races.mjs` requires an explicitly selected empty local
+Postgres database; it refuses remote hosts. Its native execution is currently
+blocked by the desktop sandbox's shared-memory restriction, not certified by
+the single-connection PGlite tests.
+
 **When adding a new data artifact, update this doc:**
 
 1. **New table** → add to §1.2 with row count + writer script + size

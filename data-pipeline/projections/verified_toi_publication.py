@@ -46,4 +46,5 @@ def build_candidate(expected_players, stored_rows, evidence, season, cutoff, cod
                     'feature_version':'official-appearance-v2','model_version':'none',
                     'code_revision':code_revision,'data_cutoff':cutoff},values,
                    {'status':'passed','gate_version':'official-appearance-v2',
+                    'freshness_observed_at':min(receipts),
                     'evidence_sha256':fingerprint(payload)})

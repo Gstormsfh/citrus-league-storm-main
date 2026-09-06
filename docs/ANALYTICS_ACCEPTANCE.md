@@ -6,19 +6,47 @@ Status: foundation NOT accepted. Local work only; no production rollout authoriz
 | Gate | Source → writer → consumer | Acceptance evidence | Current state |
 |---|---|---|---|
 | Event identity | NHL/raw shots → scoring/season aggregates → player/goalie surfaces | Unique game/event plus shooter, period, outcome, population reconciliation; quarantine every conflict | BLOCKED: live 2026-09-06 season 2025: 119357 NHL rows, 118746 unique raw key matches, 598 unmatched, 13 ambiguous; unique matches include 53 shooter and 1 outcome disagreements (may overlap) |
-| TOI provenance | NHL landing/game log → game/season/talent writers → deployment metrics | Exact event sets and every TOI value; official GP; historical seasons; source timestamps; late corrections | PARTIAL: local null/zero/GP checks; live talent 940 rows, 0 averages; one stored zero at player 8476453/game 2025020538. Positive-value and event-set reconciliation pending |
+| TOI provenance | NHL landing/game log → game/season/talent writers → deployment metrics | Exact event sets and every TOI value; official GP; historical seasons; source timestamps; late corrections | PARTIAL: exact official appearance/positive and zero TOI reconciliation implemented and tested; live extra stored appearance confirmed. Frozen full-population receipts and historical/traded coverage pending; no backfill applied |
 | Season boundaries | NHL game identity → all writers | Explicit regular/playoff/shootout contract, ordered complete pagination | PARTIAL: rollup regular range + local guard; consumers already select variants; remaining writers unverified |
-| Traded players | Team stints → season aggregator → charts | Sum exposures/counts, recompute rates, no duplicate totals | Existing regression coverage; live corpus recheck pending |
-| Availability/freshness | Field source → publication → consumers | Missing is unavailable; field-level age and reason, no stale row timestamp inference | BLOCKED: season TOI NOT NULL/default 0; omission preserves prior value without field freshness |
-| Ownership/idempotence | Ingest/calculation → shared tables | Narrow writes, stable identities, replay and corrections, atomic publication | PARTIAL: narrow talent writes and REST key grouping tests; atomic publication/rollback pending |
-| Version lineage | Features/model/calibrator → scores → aggregates | Same variant/version/population, immutable evidence, reversible serving selection | BLOCKED: legacy/new model families not yet reconciled |
-| Migration/security | Local migrations/live schema → readers/writers | Compare actual definitions/ledger; scoped RLS, staging, backup/rollback | Production and staging discovered; no blanket replay. Current schema verified NOT NULL/default 0 for game and season TOI. Detailed drift/security capture pending |
-| Health | Source expectations → completed batches | Affirmative expected/actual/withheld; partial read failure cannot publish | PARTIAL: talent counts present; existing xG partial-read catch still needs repair |
+| Traded players | Team stints → season aggregator → charts | Sum exposures/counts, recompute rates, no duplicate totals | PARTIAL: history and actual dashboard aggregation tested; unknown multi-stint distance denominator returns NULL. Live regular-season shot/xG totals agree for 937 players; remaining consumer/exposure coverage pending |
+| Availability/freshness | Field source → publication → consumers | Missing is unavailable; field-level age and reason, no stale row timestamp inference | PARTIAL: verified candidate, immutable publisher and stale/variant-aware reader tested locally. Adapter NOT connected to real consumers; legacy preserved season values lack field freshness |
+| Ownership/idempotence | Ingest/calculation → shared tables | Narrow writes, stable identities, replay and corrections, atomic publication | PARTIAL: replay preflight, narrow writes, resumable immutable batches and sealed publication tested; staging rollback fixtures verified. Multi-connection race proof and correction-safe acquisition integration pending |
+| Version lineage | Features/model/calibrator → scores → aggregates | Same variant/version/population, immutable evidence, reversible serving selection | PARTIAL: new publication contract pins source/feature/model/code/variant and supports explicit rollback. Existing model families and stored-score lineage remain unverified |
+| Migration/security | Local migrations/live schema → readers/writers | Compare actual definitions/ledger; scoped RLS, staging, backup/rollback | PARTIAL: ledger drift captured, six legacy tables/policies inspected, publication RLS/rejection/rollback tested. No migration applied; actual definition drift, broader security and canonical-event staging validation pending |
+| Health | Source expectations → completed batches | Affirmative expected/actual/withheld; partial read failure cannot publish | PARTIAL: exact-page failure propagation and TOI expected/publishable/withheld exit status implemented; exact publication manifests tested. Remaining jobs and end-to-end operational coverage pending |
 | Chronological quality | Frozen earlier fit → later calibration → untouched test | Proper scores, reliability, game-cluster uncertainty, subgroups, fixed lineage | BLOCKED by foundation; stored-score replay is not independent evaluation |
 | Expected finishing/GAR/forecasts | Versioned history/context → persistent estimates | Observed G−xG distinct from persistent talent; exposure/units/opportunity/interval validation | Pending foundation and chronological evidence |
 | Fantasy and database integration | ScoringCalculator + feasible roster/waiver state → versioned outputs | League/horizon/eligibility, joint allocation, non-additive move value separate, RLS | Deferred until earlier gates pass |
 
 Live observations above are read-only SQL measurements, not mock-test results.
+Matrix refreshed at implementation resumption, HEAD b8aa3243. Targeted local
+verification at resumption: 46 Python tests (including three uncommitted
+canonical-event normalizer tests), 15 isolated publication SQL checks. These
+results do not establish live consumer correctness, concurrency or model quality.
+
+Resumption implementation: canonical official-feed normalization, correction-
+preserving observation writer, exact event-set sealing, and read-only receipt
+collection are implemented. Fifteen targeted Python tests (canonical/acquisition/
+publication candidates) and 16 isolated canonical SQL checks pass. Both unapplied
+migrations pass the repository static validator. A live read-only conflict scan
+produced a 498-game manifest (regular and playoff); receipt collection is running,
+not yet a full-corpus acceptance claim.
+
+Hosted staging: a uniquely named synthetic-test schema was temporarily committed
+to attempt independent-connection races. Different backend IDs were observed, but
+no overlapping lock wait was captured (the second request elapsed only 0.008s),
+so this is NOT concurrency proof. Canonical incomplete/sealed rejection and
+repeatable-read refusal were verified in rollback transactions. All six synthetic
+tables, six functions and the test schema were explicitly removed without CASCADE;
+follow-up count of matching schemas was zero. No production writes or persistent
+staging changes. A native PG 17.6 test harness exists; sandbox shmget permission
+denial prevents running it here. This gate remains OPEN.
+
+Freshness correction: a newer computation cutoff no longer refreshes old evidence.
+Prepared batches carry `validation.freshness_observed_at`; TOI uses the oldest
+receipt conservatively. The reader rejects missing/future freshness and returns
+NULL for stale source evidence. Six targeted reader tests pass. This is not yet
+the real-consumer transition.
 Fresh official NHL endpoint check for player 8476453: landing regular-season GP
 and game-log length both 76; stored regular-season game rows count 77. Game
 2025020538 is absent from that official game log. Stored TOI totals 92728 seconds.

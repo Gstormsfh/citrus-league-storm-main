@@ -53,8 +53,12 @@ def prepare(source, observed_at, payload, metadata, values, validation):
     meta = {**metadata,'data_cutoff':timestamp(metadata['data_cutoff'])}
     if datetime.fromisoformat(snapshot['observed_at'])>datetime.fromisoformat(meta['data_cutoff']):
         raise ValueError('Source observed after data cutoff')
+    freshness = timestamp(validation.get('freshness_observed_at', snapshot['observed_at']))
+    if datetime.fromisoformat(freshness)>datetime.fromisoformat(snapshot['observed_at']):
+        raise ValueError('Freshness cannot be newer than source observation')
     batch = {**meta,'source_snapshot_id':snapshot['id'],'expected_entities':len(ids),
-             'validation':{**validation,'entity_ids':ids,'values_sha256':fingerprint(values)}}
+             'validation':{**validation,'freshness_observed_at':freshness,
+                           'entity_ids':ids,'values_sha256':fingerprint(values)}}
     batch['id'] = stable_id('batch',batch)
     return json.loads(json.dumps([snapshot,batch,[{**r,'batch_id':batch['id']} for r in values]],allow_nan=False))
 
