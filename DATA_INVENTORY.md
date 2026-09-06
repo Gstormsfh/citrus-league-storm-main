@@ -297,6 +297,11 @@ is a read-only JSON snapshot reconciler. It fingerprints both inputs and
 quarantines missing/duplicate/conflicting shot identities without rewriting
 probabilities. `docs/ANALYTICS_ACCEPTANCE.md` records live evidence separately
 from local tests and tracks the remaining foundation/metric gates.
+`monitoring/shot_replay_guard.py` now runs before coordinate deduplication in
+both acquisition save paths. Existing revisions, removed/ambiguous events and
+coordinate collisions are quarantined by raising before write; partial saves
+also raise instead of continuing to apparently complete aggregates. This is a
+preflight barrier, not a concurrent/atomic replacement protocol.
 
 Unapplied migration `20260906005705_analytics_versioned_publication_contract.sql`
 defines service-only, RLS-enabled `analytics_source_snapshots`,

@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import _bootstrap  # noqa: F401
 
 from data_pipeline.utils.citrus_request import citrus_request
+from data_pipeline.monitoring.shot_replay_guard import preflight_raw_shot_replay
 
 # Set UTF-8 encoding for stdout to handle Unicode characters on Windows
 import sys
@@ -2038,6 +2039,9 @@ def _save_shots_to_database(df_shots, db_client, game_id):
             record = {k: v for k, v in record.items() if v is not None or k in nullable_fields}
             raw_shots_records.append(record)
         
+        # Refuse event revisions/collisions before coordinate deduplication can
+        # silently discard an event or insert a second copy of a revised event.
+        preflight_raw_shot_replay(db_client, raw_shots_records)
         # Deduplicate
         df_shots_to_save = pd.DataFrame(raw_shots_records)
         initial_count = len(df_shots_to_save)
@@ -2143,8 +2147,8 @@ def _save_shots_to_database(df_shots, db_client, game_id):
         logger.info(f"Game {game_id}: Saved {total_saved} shot records to database")
         
         # CRITICAL: Raise exception if no shots were saved (prevents marking game as processed)
-        if total_saved == 0 and len(cleaned_shot_records) > 0:
-            raise Exception(f"Failed to save any shots - attempted {len(cleaned_shot_records)} but saved 0")
+        if total_saved != len(cleaned_shot_records):
+            raise RuntimeError(f"Incomplete shot save: expected {len(cleaned_shot_records)}, saved {total_saved}")
         
     except Exception as e:
         logger.error(f"Game {game_id}: Error saving shots to database: {e}")
@@ -4199,6 +4203,7 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                 record = {k: v for k, v in record.items() if v is not None or k in nullable_fields}
                 raw_shots_records.append(record)
             
+            preflight_raw_shot_replay(get_fresh_supabase_client(), raw_shots_records)
             # CRITICAL FIX: Filter out duplicates based on unique constraint BEFORE batching
             # The unique constraint is: (game_id, player_id, shot_x, shot_y, shot_type_code)
             # This prevents "ON CONFLICT DO UPDATE command cannot affect row a second time" errors
@@ -4337,12 +4342,14 @@ def scrape_pbp_and_process(date_str='2025-12-07'):
                                     pass  # Skip duplicates silently
             
             logger.info(f"[OK] Successfully saved/updated {total_saved} shot records to raw_shots table.")
+            if total_saved != len(cleaned_shot_records):
+                raise RuntimeError(f"Incomplete shot save: expected {len(cleaned_shot_records)}, saved {total_saved}")
             
     except Exception as e:
         logger.error(f"[WARNING]  Error saving raw shots to database: {e}")
         import traceback
         traceback.print_exc()
-        logger.info("   Continuing with aggregation...")
+        raise  # A failed raw batch must never produce apparently complete aggregates.
 
     # 3. Aggregate xG per player (shooter) for the final stats table
     # This groups all the calculated xG values and sums them up per player and per game.
@@ -4453,4 +4460,3 @@ if __name__ == "__main__":
         except Exception as e:
             logger.error(f"ERROR: Could not upload data to Supabase: {e}")
             logger.error(f"Error details: {e}")
-

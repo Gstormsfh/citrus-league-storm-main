@@ -49,6 +49,15 @@ rejected; complete fixture published once; ROLLBACK executed; follow-up query
 confirmed zero remaining test tables. Production untouched. Multi-connection
 race behavior and integration of field-level availability into consumers remain
 open gates; the single-connection local test cannot prove concurrency behavior.
+
+Fresh NHL PBP spot checks: game 2025021165/event 1088 is a goal (NHL-shot row
+agrees; raw row says false). Game 2025020535/event 258 shooter is 8479336
+(NHL-shot row agrees; raw row says 8477499). These two checks do not resolve the
+whole corpus. Both legacy acquisition save paths now run event replay preflight
+before coordinate dedup/upsert, and partial-save errors propagate. The actual
+saver boundary test demonstrates quarantine before dedup or DB write without
+loading unrelated model binaries. Existing source revisions remain quarantined;
+they need a versioned correction publication, not naive coordinate-key replay.
 Source research: user-provided audit, next steps, calibration investigation and
 hockey blueprint dated 2026-09-05. Stored probabilities are retrospective until
 the complete fit/calibration lineage proves otherwise. No novelty or superiority
