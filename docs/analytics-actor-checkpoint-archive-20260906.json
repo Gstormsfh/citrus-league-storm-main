@@ -1,0 +1,64 @@
+{
+  "archives": [
+    {
+      "bytes": 15617480,
+      "complete_membership_verified": true,
+      "every_member_matches_retained_source": true,
+      "extracted_to_filesystem": false,
+      "member_inventory_sha256": "6efa953c697b46141502fed6390105774a282273ac9bdd89832e38d963639ee4",
+      "path": "scripts/proof/results/analytics-actor-checkpoint-20260906-1257/source-head.tar.gz",
+      "regular_bytes": 46036561,
+      "regular_files": 2152,
+      "sha256": "713a1b755eaf94be2992f82b915e7386278cc9aac0ad3894dcfd5d63c8d3b90e"
+    },
+    {
+      "bytes": 20786631,
+      "complete_membership_verified": true,
+      "every_member_matches_retained_source": true,
+      "extracted_to_filesystem": false,
+      "member_inventory_sha256": "fb19cb65426e0992f1e241b6141761175441b5ac85dad3a0d1cbe086ae987901",
+      "path": "scripts/proof/results/analytics-actor-checkpoint-20260906-1257/evidence.tar.gz",
+      "regular_bytes": 185073682,
+      "regular_files": 2780,
+      "sha256": "64668d9acaa502ab9b8b6d394d015bd7d830837bc23c00115cbf0c621252be3a"
+    }
+  ],
+  "contract": "citrus-local-actor-checkpoint-v1",
+  "evidence_roots": [
+    "scripts/proof/results/official-actor-attribution-20260906",
+    "scripts/proof/results/actor-attribution-review-20260906",
+    "scripts/proof/results/actor-attribution-verification-20260906"
+  ],
+  "health_sha256": "167e0b7eed959083b4c93d5bf33673755a8e3fb8fe60c9fde0a74ccfe790a755",
+  "limitations": [
+    "Local duplicate, not off-machine backup or complete runtime environment.",
+    "Prior archives, source captures and prospective reservations remain separately preserved."
+  ],
+  "originals_removed": false,
+  "production_changed": false,
+  "publishable": false,
+  "review_sha256": "c2a6d3c7310ca5d38a41132df34f868c84b7afdeed92150f9ea82da0e802e8be",
+  "source_commit": "4560b03a169d216f1ebac3727471c1a3483d10ba",
+  "source_roots": [
+    "data-pipeline/projections",
+    "data-pipeline/acquisition",
+    "data-pipeline/monitoring",
+    "data-pipeline/models",
+    "data-pipeline/tests",
+    "supabase/migrations",
+    "scripts/proof",
+    "docs",
+    "server/src",
+    "packages/shared/src",
+    "apps/web/src",
+    "DATA_INVENTORY.md",
+    "data-pipeline/utils",
+    "data-pipeline/requirements.txt",
+    "package.json",
+    "package-lock.json",
+    "server/package.json",
+    "packages/shared/package.json"
+  ],
+  "status": "complete-verified-local-duplicate",
+  "verified_at": "2026-09-06T12:56:59.228533+00:00"
+}

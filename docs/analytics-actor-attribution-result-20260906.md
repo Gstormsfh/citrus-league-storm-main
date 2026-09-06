@@ -116,6 +116,12 @@ Those files were hashed, not deserialized. The complete source-model-actor resul
 independent review and special-state context are pinned in the
 [machine index](analytics-actor-attribution-result-index-20260906.json).
 
+The [verified local archive](analytics-actor-checkpoint-archive-20260906.json)
+preserves 2,152 selected tracked source files and 2,780 new evidence files.
+Every member matches its retained original; compressed hashes and sizes were
+also separately rechecked. Nothing was removed. Dependency declarations are
+included, but this is not a bundled runtime environment or off-machine backup.
+
 Next: a separately versioned penalty-shot/special-state contract, independent
 adjudication of the unpaired cases, and an exact appearance/TOI join before rates.
 Then complete the remaining nightly writer/dependency path, including the native

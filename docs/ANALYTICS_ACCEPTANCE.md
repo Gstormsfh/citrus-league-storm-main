@@ -45,6 +45,12 @@ Next: versioned special-state semantics, independent adjudication of the three
 unpaired cases, and exact appearance/TOI joins before rates; then remaining
 nightly dependencies and validated physical forecasts. FPAR remains gated.
 
+The [actor archive](analytics-actor-checkpoint-archive-20260906.json) independently
+verifies every member of 2,152 selected tracked source files and 2,780 new
+evidence files. Compressed hashes and sizes were separately rechecked; all
+originals remain. This is a local duplicate, not an off-machine backup or model
+acceptance. No new disposable or hosted database was needed for this lane.
+
 ### Saved model → native publication → actual reader
 
 The [local diagnostic checkpoint](analytics-model-publication-result-20260906.md)
