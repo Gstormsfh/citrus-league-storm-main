@@ -1,5 +1,6 @@
 """Pure official appearance reconciliation; no fabricated historical provenance."""
 import re
+from monitoring.toi_source_receipt import receipt_time
 
 
 SUMMARY_URL = "https://api.nhle.com/stats/rest/en/skater/summary"
@@ -18,15 +19,23 @@ def official_summary_population(receipts, season):
     total = None
     offset = 0
     for receipt in receipts:
-        if not isinstance(receipt, dict) or receipt.get("status") != "ok":
+        if (not isinstance(receipt, dict) or receipt.get("status") != "ok"
+                or type(receipt.get("http_status")) is not int or receipt["http_status"] != 200):
+            return None
+        try:
+            if receipt_time(receipt.get('requested_at')) > receipt_time(receipt.get('observed_at')):
+                return None
+        except (ValueError, OverflowError):
             return None
         params = receipt.get("params", {})
         payload = receipt.get("payload")
         if (receipt.get("url") != SUMMARY_URL or not isinstance(payload, dict)
+                or not isinstance(params, dict)
+                or set(params) != {'isAggregate','isGame','start','limit','sort','cayenneExp'}
                 or params.get("cayenneExp") != f"seasonId={season}{season + 1} and gameTypeId=2"
                 or params.get("isAggregate") != "false" or params.get("isGame") != "false"
                 or params.get("sort") != '[{"property":"playerId","direction":"ASC"}]'
-                or params.get("start") != offset or type(params.get("limit")) is not int
+                or type(params.get("start")) is not int or params["start"] != offset or type(params.get("limit")) is not int
                 or params["limit"] <= 0):
             return None
         count = payload.get("total")
@@ -42,7 +51,7 @@ def official_summary_population(receipts, season):
             if not isinstance(row, dict):
                 return None
             pid, gp = row.get("playerId"), row.get("gamesPlayed")
-            if (row.get("seasonId") != season * 10000 + season + 1
+            if (type(row.get("seasonId")) is not int or row["seasonId"] != season * 10000 + season + 1
                     or type(pid) is not int or pid <= 0 or pid in players
                     or (players and pid <= next(reversed(players)))
                     or type(gp) is not int or gp <= 0):

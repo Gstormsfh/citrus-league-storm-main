@@ -9,7 +9,8 @@ from projections.verified_toi_publication import build_candidate
 def summary(rows=None):
     if rows is None:
         rows = [{'playerId':1,'gamesPlayed':1,'seasonId':20242025,'teamAbbrevs':'COL,CAR,DAL'}]
-    return {'url':SUMMARY_URL,'status':'ok','observed_at':'2026-09-05T00:00:00Z',
+    return {'url':SUMMARY_URL,'status':'ok','http_status':200,
+            'requested_at':'2026-09-04T23:59:59Z','observed_at':'2026-09-05T00:00:00Z',
             'params':{'isAggregate':'false','isGame':'false','start':0,'limit':100,
                       'sort':'[{"property":"playerId","direction":"ASC"}]',
                       'cayenneExp':'seasonId=20242025 and gameTypeId=2'},
@@ -18,6 +19,14 @@ def summary(rows=None):
 
 def response(payload):
     return SimpleNamespace(status_code=200,json=lambda:payload,raise_for_status=lambda:None)
+
+
+def player_receipt(pid,observed='2026-09-05T00:00:01Z'):
+    log=[{'gameId':2024020001,'toi':'10:00'}]
+    return {'observed_at':observed,'game_log':deepcopy(log),'source_receipt':{
+        'url':f'https://api-web.nhle.com/v1/player/{pid}/game-log/20242025/2',
+        'params':{},'status':'ok','http_status':200,'requested_at':observed,'observed_at':observed,
+        'payload':{'gameLog':deepcopy(log),'seasonId':20242025,'gameTypeId':2}}}
 
 
 def test_summary_treats_multiteam_player_as_one_independent_gp_row():
@@ -76,8 +85,7 @@ def test_player_failure_still_has_explicit_receipt_and_null_log():
 def test_candidate_uses_summary_for_historical_traded_players_and_full_population():
     pages = [summary([{'playerId':pid,'gamesPlayed':1,'seasonId':20242025,
                        'teamAbbrevs':'COL,CAR,DAL'} for pid in (1,2)])]
-    evidence = {pid:{'observed_at':'2026-09-05T00:00:01Z',
-                     'game_log':[{'gameId':2024020001,'toi':'10:00'}]} for pid in (1,2)}
+    evidence = {pid:player_receipt(pid) for pid in (1,2)}
     stored = [{'season':2024,'player_id':1,'game_id':2024020001,'nhl_toi_seconds':600}]
     prepared = build_candidate([1,2],stored,evidence,2024,'2026-09-05T00:00:02Z','a'*40,
                                summary_receipts=pages,stored_observed_at='2026-09-04T00:00:00Z')
@@ -96,8 +104,7 @@ def test_candidate_uses_summary_for_historical_traded_players_and_full_populatio
 def test_freshness_includes_first_summary_receipt_before_player_logs():
     pages = [summary()]
     rows = [{'season':2024,'player_id':1,'game_id':2024020001,'nhl_toi_seconds':600}]
-    evidence = {1:{'observed_at':'2026-09-05T00:05:00Z',
-                   'game_log':[{'gameId':2024020001,'toi':'10:00'}]}}
+    evidence = {1:player_receipt(1,'2026-09-05T00:05:00Z')}
     prepared = build_candidate([1],rows,evidence,2024,'2026-09-05T00:06:00Z','a'*40,
                                summary_receipts=pages,stored_observed_at='2026-09-05T00:02:00Z')
     assert prepared[1]['validation']['freshness_observed_at'] == '2026-09-05T00:00:00+00:00'

@@ -1,13 +1,17 @@
 """Build a publication candidate from frozen official responses and DB export.
 
-Input evidence per player: {observed_at, landing, game_log}; failed responses may
-use None for either payload, yielding unavailable output. Capture actual retrieval
+Input evidence per player: {observed_at, source_receipt, game_log}; the raw
+HTTP receipt must identify this player, season and population. Complete raw NHL
+summary receipts independently prove GP. Missing raw receipts yield unavailable
+output; inline legacy landing/game-log copies cannot verify a publication.
+Capture actual retrieval
 timestamps; never backdate current corrected data to an imagined historical date.
 No legacy table is modified. A separately authorized publisher installs the result.
 """
 from collections import defaultdict
 from datetime import datetime
-from monitoring.appearance_contract import official_gp_from_landing, official_summary_population, reconcile_appearances
+from monitoring.appearance_contract import official_summary_population, reconcile_appearances
+from monitoring.toi_source_receipt import validate_game_log_receipt
 from projections.analytics_publication import prepare, fingerprint, timestamp
 
 
@@ -40,9 +44,12 @@ def build_candidate(expected_players, stored_rows, evidence, season, cutoff, cod
     for pid in sorted(expected_players):
         receipt=evidence[pid]
         receipts.append(timestamp(receipt['observed_at']))
-        gp=(official_population.get(pid) if official_population is not None else None) if summary_receipts is not None else official_gp_from_landing(receipt.get('landing') or {},season)
-        log=receipt.get('game_log')
-        proof=reconcile_appearances(grouped[pid],log,gp,season)
+        source = validate_game_log_receipt(receipt,pid,season)
+        if source['observed_at'] is not None:
+            receipts.append(source['observed_at'])
+        gp=official_population.get(pid) if official_population is not None else None
+        proof=(reconcile_appearances(grouped[pid],source['game_log'],gp,season)
+               if source['available'] else {'available':False,'reason':source['reason']})
         proofs[str(pid)]=proof
         values.append({'entity_id':pid, 'availability':'available' if proof['available'] else 'unavailable',
                        'value':proof.get('avg_toi_per_game'), 'reason':proof['reason'],

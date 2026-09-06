@@ -272,6 +272,9 @@ def process_single_game(game_id: str, game_date: str) -> Dict[str, Any]:
                 }
             # TTL expired but <24h old - re-fetch to catch stat corrections
             logger.info(f"   [Game {game_id}] Re-checking FINAL game for stat corrections...")
+            # A failed refresh cannot leave an expired entry that later crosses
+            # max_age and becomes permanently successful without persistence.
+            game_state_cache.pop(game_id, None)
         else:
             # Game is >24h old - it's truly final, cache forever
             return {
@@ -309,10 +312,6 @@ def process_single_game(game_id: str, game_date: str) -> Dict[str, Any]:
             state = box.get("gameState", "").upper()
             logger.warning(f"   [Game {game_id}] PBP unavailable — using boxscore for game state ({state})")
 
-        # Update cache with current state
-        if state:
-            game_state_cache[game_id] = {"state": state, "last_check": time.time()}
-
         # 2. Ingest Raw PBP (for xG processing later)
         if pbp:
             try:
@@ -329,8 +328,13 @@ def process_single_game(game_id: str, game_date: str) -> Dict[str, Any]:
                 details["boxscore"] = True
                 try:
                     from scrape_live_nhl_stats import process_game_data_citrus
-                    process_game_data_citrus(game_id, box, pbp, game_date=game_date)
+                    completed = process_game_data_citrus(game_id, box, pbp, game_date=game_date)
+                    if completed is not True:
+                        logger.warning(f"   [Game {game_id}] Stats processing withheld or incomplete")
+                        return {"game_id": game_id, "state": state, "success": False, "details": details}
                     details["stats"] = True
+                    # Cache FINAL/OFF only after the stats writer affirms success.
+                    game_state_cache[game_id] = {"state": state, "last_check": time.time()}
                     return {"game_id": game_id, "state": state, "success": True, "details": details}
                 except Exception as e:
                     logger.error(f"   [Game {game_id}] Stats processing error: {e}")
@@ -340,6 +344,8 @@ def process_single_game(game_id: str, game_date: str) -> Dict[str, Any]:
                 return {"game_id": game_id, "state": state, "success": False, "details": details}
 
         # Scheduled game - no stats to process yet
+        if state:
+            game_state_cache[game_id] = {"state": state, "last_check": time.time()}
         return {"game_id": game_id, "state": state, "success": True, "details": details}
         
     except Exception as e:
