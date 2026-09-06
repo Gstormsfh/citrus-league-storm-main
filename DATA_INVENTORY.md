@@ -144,6 +144,12 @@ remain unchanged. `local_model_publication_e2e_v2.py` and infrastructure v4 use
 envelope; invalid JWT errors cannot count as access-denial proof. The versioned
 test correction leaves model/aggregation function bodies, SQL, clients and the
 actual TypeScript reader unchanged. New tests verify that boundary explicitly.
+Infrastructure v4 / proof v2 completed on two fresh owned fixtures in
+`local-model-publication-20260906-1119` and `local-model-publication-20260906-1122`.
+`record_local_model_publication_checkpoint.py` independently re-aggregates the
+retained event predictions, binds complete native/reader/security/cleanup evidence,
+and archives both successes plus all three failures. It creates a new local
+duplicate, retaining originals. No candidate or foundation gate is promoted.
 
 Additive shape-calibration experiment (2026-09-06):
 `docs/analytics-calibration-shape-plan-20260906.json` predeclares four new
