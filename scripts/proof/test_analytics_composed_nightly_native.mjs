@@ -4,7 +4,7 @@ import {Client} from 'pg';
 import assert from 'node:assert/strict';
 import {install,snapshot} from './test_analytics_composed_nightly_fixture.mjs';
 const port=Number(process.env.ANALYTICS_TEST_PG_PORT);
-const options={legacyRefresh:process.env.ANALYTICS_COMPOSED_LEGACY_REFRESH==='1'};
+const options={legacyRefresh:process.env.ANALYTICS_COMPOSED_LEGACY_REFRESH==='1',legacyCells:process.env.ANALYTICS_COMPOSED_LEGACY_CELLS==='1'};
 if(!Number.isInteger(port)||port<1024||port>65535) throw new Error('Explicit disposable local port required');
 const clients=Array.from({length:3},()=>new Client({host:'127.0.0.1',port,user:'postgres',database:'postgres',password:'',
  ssl:false,connectionTimeoutMillis:3000,application_name:'citrus-composed-nightly-proof'}));
@@ -85,9 +85,13 @@ try {
   assert.equal(built.player_xg_season.length,5);assert.equal(built.goalie_xg_season.length,3);
   assert.equal(built.team_xg_season.length,3);assert.equal(built.goalie_gsax_primary.length,3);
   assert.deepEqual((await older()).rows,priorSeason);
+  if(options.legacyCells) {
+   assert.match(outcomes[0].rows[0].result,/legacy_scored=4/);
+   assert.ok((await admin.query('SELECT xg_sql FROM nhl_shots')).rows.every(r=>r.xg_sql===.4));
+  }
   await a.query('BEGIN');await a.query('SELECT nightly_xg_pipeline()');
   await b.query('BEGIN');
-  const legacyWriter=settle(b.query('UPDATE nhl_shots SET xg_sql=1.5 WHERE event_id=1'));pending=[legacyWriter];
+  const legacyWriter=settle(b.query(`UPDATE nhl_shots SET xg_sql=1.5${options.legacyCells?',angle=NULL':''} WHERE event_id=1`));pending=[legacyWriter];
   await witness('legacy correction blocked behind composed refresh and GSAx source SHARE',rows=>{
    const x=rows.find(r=>r.pid===pids[1]),y=rows.find(r=>r.pid===pids[2]);return lock(x,'nhl_shots','ShareLock',true)
     &&lock(y,'nhl_shots','RowExclusiveLock',false)&&y.blockers.includes(x.pid);});
@@ -95,7 +99,7 @@ try {
   const before=await state();const rejection=await settle(a.query('SELECT nightly_xg_pipeline()'));
   assert.equal(rejection.ok,false);assert.match(rejection.message,/missing or invalid probabilities/);
   assert.deepEqual(await state(),before);
-  await b.query('UPDATE nhl_shots SET xg_sql=.5 WHERE event_id=1');
+  await b.query(`UPDATE nhl_shots SET xg_sql=.5${options.legacyCells?',angle=0':''} WHERE event_id=1`);
   const replay=(await a.query('SELECT nightly_xg_pipeline() result')).rows[0];assert.match(replay.result,/gsax=2/);
   assert.deepEqual((await older()).rows,priorSeason);
   cases.push({name:'actual legacy refresh-to-GSAx rejection/correction preserves all outputs and prior season',rejection,replay});

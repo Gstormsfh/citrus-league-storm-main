@@ -1,0 +1,3678 @@
+{
+  "status": "passed-native-partial-composed-nightly",
+  "version": "17.6 (Debian 17.6-2.pgdg12+1)",
+  "independent_backend_ids": [
+    72,
+    73,
+    74
+  ],
+  "boundary": {
+    "exact": [
+      {
+        "signature": "apply_rink_adjustment_live(integer)",
+        "predecessor_md5": "3066f66cecf420c47cf503359d90560c",
+        "installed_md5": "615d3ec4fbeb359008b3c9a8e9e39f60"
+      },
+      {
+        "signature": "citrus_build_onice_batch(integer)",
+        "predecessor_md5": "f87cbc7df5bfde0950d753a393613262",
+        "installed_md5": "ba9b3c40b1b644a6b5c99160255ac2d0"
+      },
+      {
+        "signature": "citrus_build_strength_batch(integer)",
+        "predecessor_md5": "fbf1a7cc642cc92911c9669f4830949f",
+        "installed_md5": "126de0dde25592ed8da192b375bd0e80"
+      },
+      {
+        "signature": "citrus_build_toi_batch(integer)",
+        "predecessor_md5": "e776d589e70df77fac5445927d7f7c20",
+        "installed_md5": "e78e0e73dcb84270e99b3d0d95ccedd5"
+      },
+      {
+        "signature": "citrus_rebuild_gar_components(integer[],numeric,numeric,boolean,numeric)",
+        "predecessor_md5": "5d454e7fd869a0d7caf087a9700fa7dc",
+        "installed_md5": "28b3d87ab6dc8cef85bb1d64233ecb53"
+      },
+      {
+        "signature": "citrus_rebuild_gar_components(integer[],numeric,numeric,boolean)",
+        "predecessor_md5": "e5a2ce0769ffe7cd49dd25555cc380b4",
+        "installed_md5": "42a9e45bc7778aed7debe04d91602e8f"
+      },
+      {
+        "signature": "citrus_recompute_gar_totals()",
+        "predecessor_md5": "18e52cf49616ebebe33dd8f486eb6b46",
+        "installed_md5": "a3db69cbff42b95eebb56eb4f958b6ee"
+      },
+      {
+        "signature": "citrus_repair_shift_clocks(integer)",
+        "predecessor_md5": "d3c95d8be8b38dbf77b636e94c82f3c7",
+        "installed_md5": "74050c8de70803ab7fd6fcf47e00791c"
+      },
+      {
+        "signature": "citrus_score_v5_batch(integer)",
+        "predecessor_md5": "df49815cab7c24d6f733b680806c8184",
+        "installed_md5": "31ce4f63429d41b3d73fbafc29af5b26"
+      },
+      {
+        "signature": "nightly_xg_pipeline()",
+        "predecessor_md5": "d2d83cd96d845d95d9bbe14bf3128471",
+        "installed_md5": "96c124e7fe7e54d78bf050e2d4ed8924"
+      },
+      {
+        "signature": "rebuild_goalie_gsax_primary(integer)",
+        "predecessor_md5": "cc6e28f83ab2efe21357223b20ebef78",
+        "installed_md5": "a19c0e04254ca744dd8fb955d02e4cc0"
+      },
+      {
+        "signature": "rebuild_onice_xg(integer[])",
+        "predecessor_md5": "3963fa98ce95d3f6db26ae8e38ce8373",
+        "installed_md5": "7aed2f1e41fa50854e0087ad23072d0c"
+      },
+      {
+        "signature": "rebuild_strength_intervals(integer[])",
+        "predecessor_md5": "3d555d4d3364fd836af819ae6ad0636e",
+        "installed_md5": "ae8a2dc96f1c1d8df62dd102fec4674d"
+      },
+      {
+        "signature": "rebuild_toi_by_state(integer[])",
+        "predecessor_md5": "75d813128f93ebc22922eeff8fc1c7ef",
+        "installed_md5": "39d1a61effdd75a57652c4c02f3eb4fa"
+      },
+      {
+        "signature": "refresh_xg_season_layer(integer)",
+        "predecessor_md5": "c942f1880ab8aeb2493c4073e2a0c68e",
+        "installed_md5": "49395959bc4d32fe587612fc68512eee"
+      },
+      {
+        "signature": "score_xg_sql_v2(integer)",
+        "predecessor_md5": "3016295a18bc999083fbeb9e12ba2fe6",
+        "installed_md5": "d3e607f074e1edd20b7f7ac5701b40d3"
+      }
+    ],
+    "stubs": [],
+    "cellBoundary": {
+      "signature": "score_xg_sql_v2(integer)",
+      "installed_md5": "d3e607f074e1edd20b7f7ac5701b40d3",
+      "views": [
+        {
+          "relation": "nhl_shot_features",
+          "definition_md5": "360a55f19354d000e9bd4482e807ee0e",
+          "observed_utc": "2026-09-06 08:03:10.323786"
+        },
+        {
+          "relation": "nhl_shot_fold",
+          "definition_md5": "9e9918be32e6bfaa94f5a0b19cb0ee48",
+          "observed_utc": "2026-09-06 08:04:06.712399"
+        },
+        {
+          "relation": "nhl_xg_sql_keys",
+          "definition_md5": "ab06e2512d135aba24dbbd47ece767db",
+          "observed_utc": "2026-09-06 08:04:06.713479"
+        }
+      ],
+      "scope": "exact feature/fold/key/scorer plumbing with synthetic .4 global cells; no fitted-model validity or calibration acceptance"
+    },
+    "modelInference": "throw-on-use xg_v5; pre-scored synthetic raw rows; scorer zero eligible rows",
+    "rink": "exact interpolation with explicitly synthetic CDF/knots, not learned rink adjustment acceptance",
+    "source": "8 synthetic games, 3 regulation periods, 5v5/PP/PK segments; shift quality is a declared synthetic table input"
+  },
+  "cases": [
+    {
+      "name": "two exact composed nightly calls serialize",
+      "outcomes": [
+        {
+          "ok": true,
+          "rows": [
+            {
+              "result": "season=2025 v5_scored=0 v5_left=0 strength=8 toi=8 onice=8 gar=10 arena=1 adjusted=4 legacy_scored=4 gsax=2 legacy_unscored=0"
+            }
+          ]
+        },
+        {
+          "ok": true,
+          "rows": [
+            {
+              "result": "season=2025 v5_scored=0 v5_left=0 strength=0 toi=0 onice=0 gar=10 arena=1 adjusted=0 legacy_scored=0 gsax=2 legacy_unscored=0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "committed invalid source fails without partial outputs/markers/audit",
+      "outcome": {
+        "ok": false,
+        "code": "P0001",
+        "message": "Invalid or duplicate recorded shot identity, score, clock or team"
+      }
+    },
+    {
+      "name": "source correction replay restores completed pipeline",
+      "result": {
+        "result": "season=2025 v5_scored=0 v5_left=0 strength=0 toi=0 onice=1 gar=10 arena=1 adjusted=0 legacy_scored=0 gsax=2 legacy_unscored=0"
+      }
+    },
+    {
+      "name": "actual legacy refresh-to-GSAx rejection/correction preserves all outputs and prior season",
+      "rejection": {
+        "ok": false,
+        "code": "P0001",
+        "message": "Recorded xG population contains 1 missing or invalid probabilities"
+      },
+      "replay": {
+        "result": "season=2025 v5_scored=0 v5_left=0 strength=0 toi=0 onice=0 gar=10 arena=1 adjusted=0 legacy_scored=1 gsax=2 legacy_unscored=0"
+      }
+    }
+  ],
+  "witnesses": [
+    {
+      "name": "actual nightly strength input blocked after protected entry",
+      "backends": [
+        {
+          "pid": 72,
+          "wait_event_type": null,
+          "wait_event": null,
+          "blockers": [],
+          "locks": [
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_relname_nsp_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_tblspc_relfilenode_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_database_datname_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_database_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_authid_rolname_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_authid_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_authid",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": "raw_nhl_data",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_database",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_locks",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_stat_activity",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "transactionid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "virtualxid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            }
+          ]
+        },
+        {
+          "pid": 73,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            72
+          ],
+          "locks": [
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "raw_shots_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "raw_shots_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "player_shifts_official_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_shifts_official_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "shift_clock_repairs_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "strength_build_state_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_relname_nsp_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_tblspc_relfilenode_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_namespace_nspname_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_namespace_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "raw_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "raw_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "raw_nhl_data",
+              "classid": null,
+              "granted": false,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "player_shifts_official",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_shifts_official",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "shift_clock_repairs",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "strength_build_state",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_namespace",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_locks",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "transactionid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "object",
+              "mode": "AccessShareLock",
+              "objid": "17070",
+              "table": null,
+              "classid": "2615",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "advisory",
+              "mode": "ExclusiveLock",
+              "objid": "54106",
+              "table": null,
+              "classid": "60906",
+              "granted": true,
+              "objsubid": 2
+            },
+            {
+              "kind": "virtualxid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            }
+          ]
+        },
+        {
+          "pid": 74,
+          "wait_event_type": "Client",
+          "wait_event": "ClientRead",
+          "blockers": [],
+          "locks": []
+        }
+      ]
+    },
+    {
+      "name": "second full composed nightly waits before protected DML",
+      "backends": [
+        {
+          "pid": 72,
+          "wait_event_type": null,
+          "wait_event": null,
+          "blockers": [],
+          "locks": [
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_relname_nsp_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_tblspc_relfilenode_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_database_datname_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_database_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_authid_rolname_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_authid_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_authid",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": "raw_nhl_data",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_database",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_locks",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_stat_activity",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "transactionid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "virtualxid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            }
+          ]
+        },
+        {
+          "pid": 73,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            72
+          ],
+          "locks": [
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "raw_shots_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "raw_shots_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "player_shifts_official_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_shifts_official_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "shift_clock_repairs_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "strength_build_state_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_relname_nsp_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_tblspc_relfilenode_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_namespace_nspname_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_namespace_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "raw_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "raw_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "raw_nhl_data",
+              "classid": null,
+              "granted": false,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "player_shifts_official",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_shifts_official",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "shift_clock_repairs",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "strength_build_state",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_namespace",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_locks",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "transactionid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "object",
+              "mode": "AccessShareLock",
+              "objid": "17070",
+              "table": null,
+              "classid": "2615",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "advisory",
+              "mode": "ExclusiveLock",
+              "objid": "54106",
+              "table": null,
+              "classid": "60906",
+              "granted": true,
+              "objsubid": 2
+            },
+            {
+              "kind": "virtualxid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            }
+          ]
+        },
+        {
+          "pid": 74,
+          "wait_event_type": "Lock",
+          "wait_event": "advisory",
+          "blockers": [
+            73
+          ],
+          "locks": [
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_relname_nsp_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_tblspc_relfilenode_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_namespace_nspname_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_namespace_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_namespace",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_locks",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "advisory",
+              "mode": "ExclusiveLock",
+              "objid": "54106",
+              "table": null,
+              "classid": "60906",
+              "granted": false,
+              "objsubid": 2
+            },
+            {
+              "kind": "virtualxid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "independent source correction waits behind composed GAR source SHARE",
+      "backends": [
+        {
+          "pid": 72,
+          "wait_event_type": null,
+          "wait_event": null,
+          "blockers": [],
+          "locks": [
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_relname_nsp_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_tblspc_relfilenode_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_database_datname_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_database_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_authid_rolname_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_authid_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_authid",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_database",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_locks",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_stat_activity",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "virtualxid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            }
+          ]
+        },
+        {
+          "pid": 73,
+          "wait_event_type": "Client",
+          "wait_event": "ClientRead",
+          "blockers": [],
+          "locks": [
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "raw_shots_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "raw_shots_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "raw_nhl_data_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "player_shifts_official_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_shifts_official_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "shift_clock_repairs_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_onice_xg_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "shift_ingest_quality_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "strength_build_state_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "strength_build_state_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "nhl_game_arena_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_game_arena_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "player_xg_season_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_relname_nsp_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_tblspc_relfilenode_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_namespace_nspname_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_namespace_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "goalie_xg_season_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "goalie_xg_season_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "team_xg_season_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "goalie_gsax_primary_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "goalie_gsax_primary_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": "raw_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "raw_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "raw_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "raw_nhl_data",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "player_shifts_official",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_shifts_official",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "shift_clock_repairs",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareRowExclusiveLock",
+              "objid": null,
+              "table": "player_gar_components",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "player_gar_components",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "nhl_game_arena",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_game_arena",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareRowExclusiveLock",
+              "objid": null,
+              "table": "goalie_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": "goalie_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "goalie_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "goalie_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": "player_onice_xg",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_onice_xg",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": "player_toi_by_state",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_toi_by_state",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "shift_ingest_quality",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "strength_build_state",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "strength_build_state",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": "player_game_stats",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_game_stats",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": "player_penalty_events",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_penalty_events",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "xg_rebuild_audit",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareRowExclusiveLock",
+              "objid": null,
+              "table": "player_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "player_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareRowExclusiveLock",
+              "objid": null,
+              "table": "team_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "team_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareRowExclusiveLock",
+              "objid": null,
+              "table": "goalie_gsax_primary",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "goalie_gsax_primary",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "goalie_gsax_primary",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_rink_cdf",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_rink_ref_knots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_gar_inputs_by_type",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_gar_inputs",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_namespace",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_locks",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": "nhl_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "nhl_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_xg_sql_cells_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_xg_sql_cells",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_shot_features",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_shot_fold",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_xg_sql_keys",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17182",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17172",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17178",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17168",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17161",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17177",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessShareLock",
+              "objid": "17070",
+              "table": null,
+              "classid": "2615",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "transactionid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17166",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "advisory",
+              "mode": "ExclusiveLock",
+              "objid": "54106",
+              "table": null,
+              "classid": "60906",
+              "granted": true,
+              "objsubid": 2
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17169",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17183",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17173",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17160",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17165",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "virtualxid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            }
+          ]
+        },
+        {
+          "pid": 74,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            73
+          ],
+          "locks": [
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "raw_shots",
+              "classid": null,
+              "granted": false,
+              "objsubid": null
+            },
+            {
+              "kind": "virtualxid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "legacy correction blocked behind composed refresh and GSAx source SHARE",
+      "backends": [
+        {
+          "pid": 72,
+          "wait_event_type": null,
+          "wait_event": null,
+          "blockers": [],
+          "locks": [
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_relname_nsp_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_tblspc_relfilenode_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_database_datname_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_database_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_authid_rolname_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_authid_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_authid",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_database",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_locks",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_stat_activity",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "virtualxid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            }
+          ]
+        },
+        {
+          "pid": 73,
+          "wait_event_type": "Client",
+          "wait_event": "ClientRead",
+          "blockers": [],
+          "locks": [
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "raw_shots_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "raw_shots_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "raw_nhl_data_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "player_shifts_official_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_shifts_official_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "shift_clock_repairs_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_onice_xg_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "shift_ingest_quality_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "strength_build_state_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "strength_build_state_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "nhl_game_arena_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_game_arena_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "player_xg_season_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class_oid_index",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "goalie_xg_season_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "goalie_xg_season_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "team_xg_season_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "goalie_gsax_primary_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "goalie_gsax_primary_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": "raw_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "raw_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "raw_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "raw_nhl_data",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "player_shifts_official",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_shifts_official",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "shift_clock_repairs",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareRowExclusiveLock",
+              "objid": null,
+              "table": "player_gar_components",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "player_gar_components",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "nhl_game_arena",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_game_arena",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareRowExclusiveLock",
+              "objid": null,
+              "table": "goalie_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": "goalie_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "goalie_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "goalie_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": "player_onice_xg",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_onice_xg",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": "player_toi_by_state",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_toi_by_state",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "shift_ingest_quality",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "strength_build_state",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "strength_build_state",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": "player_game_stats",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_game_stats",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": "player_penalty_events",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_penalty_events",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "xg_rebuild_audit",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareRowExclusiveLock",
+              "objid": null,
+              "table": "player_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "player_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareRowExclusiveLock",
+              "objid": null,
+              "table": "team_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "team_xg_season",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareRowExclusiveLock",
+              "objid": null,
+              "table": "goalie_gsax_primary",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "goalie_gsax_primary",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "goalie_gsax_primary",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_rink_cdf",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_rink_ref_knots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_gar_inputs_by_type",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "player_gar_inputs",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_class",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_namespace",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "pg_locks",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": "nhl_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "nhl_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_shots",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_xg_sql_cells_pkey",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_xg_sql_cells",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_shot_features",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_shot_fold",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": "nhl_xg_sql_keys",
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17267",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17246",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17268",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17245",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17254",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17257",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessShareLock",
+              "objid": "17070",
+              "table": null,
+              "classid": "2615",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17262",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "transactionid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "advisory",
+              "mode": "ExclusiveLock",
+              "objid": "54106",
+              "table": null,
+              "classid": "60906",
+              "granted": true,
+              "objsubid": 2
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17258",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17251",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17250",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17253",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "object",
+              "mode": "AccessExclusiveLock",
+              "objid": "17263",
+              "table": null,
+              "classid": "1247",
+              "granted": true,
+              "objsubid": 0
+            },
+            {
+              "kind": "virtualxid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "ShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            },
+            {
+              "kind": "relation",
+              "mode": "AccessShareLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            }
+          ]
+        },
+        {
+          "pid": 74,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            73
+          ],
+          "locks": [
+            {
+              "kind": "relation",
+              "mode": "RowExclusiveLock",
+              "objid": null,
+              "table": "nhl_shots",
+              "classid": null,
+              "granted": false,
+              "objsubid": null
+            },
+            {
+              "kind": "virtualxid",
+              "mode": "ExclusiveLock",
+              "objid": null,
+              "table": null,
+              "classid": null,
+              "granted": true,
+              "objsubid": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "options": {
+    "legacyRefresh": true,
+    "legacyCells": true
+  },
+  "counts": {
+    "game_strength_intervals": 72,
+    "player_toi_by_state": 224,
+    "player_onice_xg": 224,
+    "player_gar_components": 10,
+    "strength_build_state": 8,
+    "xg_rebuild_audit": 2,
+    "player_xg_season": 5,
+    "goalie_xg_season": 3,
+    "team_xg_season": 3,
+    "goalie_gsax_primary": 3
+  },
+  "full_nightly_acceptance": false,
+  "cleanup_objects_and_roles": 0
+}

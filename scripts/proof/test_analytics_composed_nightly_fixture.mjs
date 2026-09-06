@@ -2,10 +2,12 @@
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import assert from 'node:assert/strict';
+import {installCellScorer} from './test_analytics_composed_nightly_cells.mjs';
 const repo = new URL('../../',import.meta.url);
 const read = path => readFile(new URL(path,repo),'utf8');
 const md5 = value => createHash('md5').update(value).digest('hex');
-export async function install(db,{legacyRefresh=false}={}) {
+export async function install(db,{legacyRefresh=false,legacyCells=false}={}) {
+ if(legacyCells&&!legacyRefresh)throw new Error('Cell mode requires legacy refresh mode');
  const predecessors=JSON.parse(await read('supabase/migrations/captures/2026-09-06_analytics_writer_protocol_rollback.json'));
  const helpers=JSON.parse(await read('scripts/proof/captures/composed_helpers_20260906.json'));
  const views=JSON.parse(await read('scripts/proof/captures/composed_views_20260906.json'));
@@ -129,7 +131,9 @@ export async function install(db,{legacyRefresh=false}={}) {
  INSERT INTO nhl_rink_cdf VALUES('x',10,2025,70,.3005,2000),('y',10,2025,6,.4005,2000);
  INSERT INTO nhl_rink_ref_knots VALUES('x',300,69),('x',301,71),('y',400,5),('y',401,7);
  `);
- return {exact:exact.filter(r=>!stubs.includes(r.signature)),stubs,
+ const cellBoundary=legacyCells?await installCellScorer(db):null;
+ const remainingStubs=legacyCells?stubs.filter(s=>s!=='score_xg_sql_v2(integer)'):stubs;
+ return {exact:exact.filter(r=>!remainingStubs.includes(r.signature)),stubs:remainingStubs,cellBoundary,
   modelInference:'throw-on-use xg_v5; pre-scored synthetic raw rows; scorer zero eligible rows',
   rink:legacyRefresh?'exact interpolation with explicitly synthetic CDF/knots, not learned rink adjustment acceptance':'stubbed',
   source:'8 synthetic games, 3 regulation periods, 5v5/PP/PK segments; shift quality is a declared synthetic table input'};

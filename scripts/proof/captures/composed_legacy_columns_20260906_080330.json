@@ -1,0 +1,307 @@
+{
+  "project_id": "iezwazccqqrhrjupxzvf",
+  "read_only": true,
+  "objects": [
+    {
+      "observed_utc": "2026-09-06 08:03:30.556962",
+      "relation": "nhl_shot_fold",
+      "relkind": "v",
+      "columns": [
+        {
+          "name": "game_id",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "event_id",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "fold_id",
+          "type": "integer",
+          "not_null": false
+        }
+      ]
+    },
+    {
+      "observed_utc": "2026-09-06 08:03:30.557035",
+      "relation": "nhl_shots",
+      "relkind": "r",
+      "columns": [
+        {
+          "name": "game_id",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "event_id",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "season",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "game_date",
+          "type": "date",
+          "not_null": false
+        },
+        {
+          "name": "game_type",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "period",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "period_type",
+          "type": "text",
+          "not_null": false
+        },
+        {
+          "name": "seconds_elapsed",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "shooter_id",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "goalie_id",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "team_id",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "is_home",
+          "type": "boolean",
+          "not_null": false
+        },
+        {
+          "name": "x_raw",
+          "type": "numeric",
+          "not_null": false
+        },
+        {
+          "name": "y_raw",
+          "type": "numeric",
+          "not_null": false
+        },
+        {
+          "name": "x_norm",
+          "type": "numeric",
+          "not_null": false
+        },
+        {
+          "name": "y_norm",
+          "type": "numeric",
+          "not_null": false
+        },
+        {
+          "name": "distance",
+          "type": "numeric",
+          "not_null": false
+        },
+        {
+          "name": "angle",
+          "type": "numeric",
+          "not_null": false
+        },
+        {
+          "name": "shot_type",
+          "type": "text",
+          "not_null": false
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "is_goal",
+          "type": "boolean",
+          "not_null": true
+        },
+        {
+          "name": "own_skaters",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "opp_skaters",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "own_goalie",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "opp_goalie",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "strength_state",
+          "type": "text",
+          "not_null": false
+        },
+        {
+          "name": "is_power_play",
+          "type": "boolean",
+          "not_null": false
+        },
+        {
+          "name": "is_shorthanded",
+          "type": "boolean",
+          "not_null": false
+        },
+        {
+          "name": "is_empty_net",
+          "type": "boolean",
+          "not_null": false
+        },
+        {
+          "name": "score_diff",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "assist1_id",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "assist2_id",
+          "type": "integer",
+          "not_null": false
+        },
+        {
+          "name": "prev_event_type",
+          "type": "text",
+          "not_null": false
+        },
+        {
+          "name": "prev_x",
+          "type": "numeric",
+          "not_null": false
+        },
+        {
+          "name": "prev_y",
+          "type": "numeric",
+          "not_null": false
+        },
+        {
+          "name": "seconds_since_prev",
+          "type": "numeric",
+          "not_null": false
+        },
+        {
+          "name": "distance_from_prev",
+          "type": "numeric",
+          "not_null": false
+        },
+        {
+          "name": "is_rebound",
+          "type": "boolean",
+          "not_null": false
+        },
+        {
+          "name": "is_rush",
+          "type": "boolean",
+          "not_null": false
+        },
+        {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "not_null": true
+        },
+        {
+          "name": "x_adj",
+          "type": "double precision",
+          "not_null": false
+        },
+        {
+          "name": "y_adj",
+          "type": "double precision",
+          "not_null": false
+        },
+        {
+          "name": "distance_adj",
+          "type": "double precision",
+          "not_null": false
+        },
+        {
+          "name": "angle_adj",
+          "type": "double precision",
+          "not_null": false
+        },
+        {
+          "name": "xg_sql",
+          "type": "double precision",
+          "not_null": false
+        },
+        {
+          "name": "strength_source",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "is_penalty_shot",
+          "type": "boolean",
+          "not_null": true
+        }
+      ]
+    },
+    {
+      "observed_utc": "2026-09-06 08:03:30.557292",
+      "relation": "nhl_xg_sql_cells",
+      "relkind": "r",
+      "columns": [
+        {
+          "name": "fold",
+          "type": "smallint",
+          "not_null": true
+        },
+        {
+          "name": "lvl",
+          "type": "smallint",
+          "not_null": true
+        },
+        {
+          "name": "ckey",
+          "type": "text",
+          "not_null": true
+        },
+        {
+          "name": "n",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "k",
+          "type": "integer",
+          "not_null": true
+        },
+        {
+          "name": "rate",
+          "type": "double precision",
+          "not_null": true
+        }
+      ]
+    }
+  ]
+}

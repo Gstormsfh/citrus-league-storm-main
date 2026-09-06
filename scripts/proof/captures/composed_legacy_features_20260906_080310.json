@@ -1,0 +1,23 @@
+{
+  "project_id": "iezwazccqqrhrjupxzvf",
+  "read_only": true,
+  "objects": [
+    {
+      "observed_utc": "2026-09-06 08:03:10.323786",
+      "relation": "nhl_shot_features",
+      "relkind": "v",
+      "definition": " SELECT game_id,\n    event_id,\n    season,\n    game_date,\n    game_type,\n    shooter_id,\n    goalie_id,\n    team_id,\n    is_home,\n    is_goal,\n    COALESCE(distance_adj, distance::double precision) AS f_dist,\n    abs(COALESCE(angle_adj, angle::double precision)) AS f_ang,\n    x_adj AS f_x,\n    abs(y_adj) AS f_yabs,\n    x_adj > 89::double precision AS f_behind_net,\n        CASE\n            WHEN shot_type IS NULL THEN 'wrist'::text\n            WHEN shot_type = ANY (ARRAY['bat'::text, 'poke'::text, 'cradle'::text, 'between-legs'::text]) THEN 'tip-in'::text\n            ELSE shot_type\n        END AS f_type,\n        CASE\n            WHEN prev_event_type IS NULL OR (prev_event_type = ANY (ARRAY['stoppage'::text, 'period-end'::text, 'period-start'::text, 'game-end'::text, 'goal'::text])) THEN 'faceoff'::text\n            WHEN prev_event_type = 'delayed-penalty'::text THEN 'penalty'::text\n            ELSE prev_event_type\n        END AS f_prev,\n    LEAST(COALESCE(seconds_since_prev, 120::numeric), 120::numeric) AS f_sec_prev,\n    LEAST(COALESCE(distance_from_prev, 200::numeric), 200::numeric) AS f_dist_prev,\n    (prev_event_type = ANY (ARRAY['shot-on-goal'::text, 'missed-shot'::text, 'blocked-shot'::text])) AND seconds_since_prev <= 3::numeric AS f_rebound,\n    COALESCE(is_rush, false) AS f_rush,\n    COALESCE(seconds_since_prev <= 4::numeric AND prev_x IS NOT NULL AND x_raw IS NOT NULL AND y_raw IS NOT NULL AND sign(prev_x) = sign(NULLIF(x_raw, 0::numeric)) AND abs(prev_x) >= 25::numeric AND sign(prev_y) = (- sign(NULLIF(y_raw, 0::numeric))) AND abs(prev_y) >= 3::numeric AND abs(y_raw) >= 3::numeric, false) AS f_royal_road,\n    is_penalty_shot AS f_penalty_shot,\n    own_skaters,\n    opp_skaters,\n    own_goalie,\n    opp_goalie,\n    opp_goalie = 0 AS f_en_for,\n    own_goalie = 0 AND NOT is_penalty_shot AS f_en_against,\n        CASE\n            WHEN is_penalty_shot THEN 'PS'::text\n            WHEN opp_goalie = 0 THEN 'EN_for'::text\n            WHEN own_goalie = 0 THEN 'EN_against'::text\n            WHEN is_power_play THEN 'PP'::text\n            WHEN is_shorthanded THEN 'PK'::text\n            WHEN own_skaters = 3 THEN '3v3'::text\n            WHEN own_skaters = 4 THEN '4v4'::text\n            ELSE 'EV'::text\n        END AS f_strength,\n    strength_source,\n    GREATEST('-3'::integer, LEAST(3, score_diff)) AS f_score_diff,\n    LEAST(4, period) AS f_period,\n    seconds_elapsed AS f_sec_elapsed,\n    game_type = 'playoff'::text AS f_playoff\n   FROM nhl_shots s\n  WHERE distance IS NOT NULL AND angle IS NOT NULL AND strength_source <> 'phantom_pbp_goal_excluded'::text;",
+      "definition_md5": "360a55f19354d000e9bd4482e807ee0e",
+      "dependencies": [
+        {
+          "dependency": "nhl_shot_features",
+          "dependency_catalog": "pg_class"
+        },
+        {
+          "dependency": "nhl_shots",
+          "dependency_catalog": "pg_class"
+        }
+      ]
+    }
+  ]
+}
