@@ -118,6 +118,14 @@ schema is introduced; the existing unapplied publication SQL is used verbatim.
 membership, scope, original-preserving withholding, freshness and promotion
 rejection. This diagnostic is off the draft/request hot path; the fixture's
 bounded connection pool and paginated reads are not a draft-night load proof.
+The first launcher and failed `local-model-publication-20260906-1103` attempt
+remain unchanged: the legacy `--tmpfs` inspection shape stopped setup before
+model data or publication SQL ran, and owned infrastructure was removed.
+`scripts/proof/run_local_model_publication_v2.mjs` uses explicit `--mount`
+configuration and `local_tmpfs_contract.mjs` to require matching bounded config,
+inspection and live kernel mount evidence. Its nine Node tests reject persistent,
+missing, duplicate, unbounded and inconsistent mounts. The Python/reader proof
+is reused byte-for-byte; this is an infrastructure-only correction.
 
 Additive shape-calibration experiment (2026-09-06):
 `docs/analytics-calibration-shape-plan-20260906.json` predeclares four new
