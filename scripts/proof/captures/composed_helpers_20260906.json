@@ -1,0 +1,47 @@
+[
+  {
+    "signature": "citrus_game_type(bigint)",
+    "definition": "CREATE OR REPLACE FUNCTION public.citrus_game_type(p_game_id bigint)\n RETURNS smallint\n LANGUAGE sql\n IMMUTABLE PARALLEL SAFE\nAS $function$\n  select ((p_game_id / 10000) % 100)::smallint\n$function$\n",
+    "definition_md5": "466c9984bf5ad9731d4f3d7632ea7925"
+  },
+  {
+    "signature": "citrus_rebound_window(integer)",
+    "definition": "CREATE OR REPLACE FUNCTION public.citrus_rebound_window(p_season integer)\n RETURNS smallint\n LANGUAGE sql\n STABLE PARALLEL SAFE\n SET search_path TO 'public', 'pg_temp'\nAS $function$\n  select coalesce(\n    (select w.max_gap_s from public.rebound_window_era w\n      where w.season_from <= coalesce(p_season, 2025)\n      order by w.season_from desc limit 1),\n    3::smallint)\n$function$\n",
+    "definition_md5": "7bd514101ea644aa976a7c9f95fed7db"
+  },
+  {
+    "signature": "record_rebuild_audit(integer,text,bigint,bigint,text)",
+    "definition": "CREATE OR REPLACE FUNCTION public.record_rebuild_audit(p_season integer, p_gate_name text, p_expected bigint, p_actual bigint, p_note text DEFAULT NULL::text)\n RETURNS text\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\nDECLARE v_status text;\nBEGIN\n  v_status := CASE WHEN p_expected IS NULL THEN 'info'\n                   WHEN p_expected = p_actual THEN 'pass'\n                   ELSE 'fail' END;\n  INSERT INTO xg_rebuild_audit(season, layer, expected, actual, status, detail)\n  VALUES (p_season, p_gate_name, p_expected, p_actual, v_status, NULLIF(p_note, ''));\n  RETURN v_status;\nEND $function$\n",
+    "definition_md5": "85d4d2a036a0d914520f86d56627aca2"
+  },
+  {
+    "signature": "rink_cdf_season_for(integer,integer)",
+    "definition": "CREATE OR REPLACE FUNCTION public.rink_cdf_season_for(p_home_team integer, p_season integer)\n RETURNS integer\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\n  select coalesce(\n    (select c.season from nhl_rink_cdf c\n      where c.coord='x' and c.home_team=p_home_team and c.season=p_season and c.n_group>=1500 limit 1),\n    (select max(c.season) from nhl_rink_cdf c\n      where c.coord='x' and c.home_team=p_home_team and c.season<p_season and c.n_group>=1500)\n  );\n$function$\n",
+    "definition_md5": "865a4945371b35511fdded7db5282d69"
+  },
+  {
+    "signature": "xg_shot_empty_net(text,boolean)",
+    "definition": "CREATE OR REPLACE FUNCTION public.xg_shot_empty_net(p_situation_code text, p_is_home boolean)\n RETURNS boolean\n LANGUAGE sql\n IMMUTABLE PARALLEL SAFE\nAS $function$\n  select public.xg_shot_empty_net(p_situation_code, p_is_home, null)\n$function$\n",
+    "definition_md5": "8515c2375bac03ceeb428b49479eee7b"
+  },
+  {
+    "signature": "xg_shot_empty_net(text,boolean,boolean)",
+    "definition": "CREATE OR REPLACE FUNCTION public.xg_shot_empty_net(p_situation_code text, p_is_home boolean, p_flag boolean DEFAULT NULL::boolean)\n RETURNS boolean\n LANGUAGE sql\n IMMUTABLE PARALLEL SAFE\nAS $function$\n  select case\n    when p_situation_code ~ '^[0-9]{4}$'\n      then case when coalesce(p_is_home, true)\n                then substr(p_situation_code, 1, 1) = '0'\n                else substr(p_situation_code, 4, 1) = '0' end\n    else coalesce(p_flag, false)\n  end\n$function$\n",
+    "definition_md5": "00f6eee97a03d6178b6d372f186b2ae4"
+  },
+  {
+    "signature": "xg_v5(text,numeric,numeric,boolean,boolean,integer,integer,boolean,boolean,numeric,numeric)",
+    "definition": "CREATE OR REPLACE FUNCTION public.xg_v5(p_shot_type text, p_distance numeric, p_angle numeric, p_rebound boolean, p_is_home boolean, p_home_sk integer, p_away_sk integer, p_empty_net boolean, p_has_pass boolean, p_pass_quality numeric, p_goalie_move numeric)\n RETURNS numeric\n LANGUAGE sql\n STABLE PARALLEL SAFE\n SET search_path TO 'public', 'pg_temp'\nAS $function$\n  select public.xg_v5(p_shot_type, p_distance, p_angle, p_rebound, p_is_home,\n                      p_home_sk, p_away_sk, p_empty_net, p_has_pass,\n                      p_pass_quality, p_goalie_move, null::integer)\n$function$\n",
+    "definition_md5": "43dda239d2d907185b8bdb2ee5d78cfe"
+  },
+  {
+    "signature": "xg_v5(text,numeric,numeric,boolean,boolean,integer,integer,boolean,boolean,numeric,numeric,integer)",
+    "definition": "CREATE OR REPLACE FUNCTION public.xg_v5(p_shot_type text, p_distance numeric, p_angle numeric, p_rebound boolean, p_is_home boolean, p_home_sk integer, p_away_sk integer, p_empty_net boolean, p_has_pass boolean, p_pass_quality numeric, p_goalie_move numeric, p_season integer)\n RETURNS numeric\n LANGUAGE sql\n STABLE PARALLEL SAFE\n SET search_path TO 'public', 'pg_temp'\nAS $function$\n  select public.xg_v5(p_shot_type, p_distance, p_angle, p_rebound, p_is_home,\n                      p_home_sk, p_away_sk, p_empty_net, p_has_pass,\n                      p_pass_quality, p_goalie_move, p_season, 2::smallint)\n$function$\n",
+    "definition_md5": "71e2e9f896409184ba27138646143e14"
+  },
+  {
+    "signature": "xg_v5(text,numeric,numeric,boolean,boolean,integer,integer,boolean,boolean,numeric,numeric,integer,smallint)",
+    "definition": "CREATE OR REPLACE FUNCTION public.xg_v5(p_shot_type text, p_distance numeric, p_angle numeric, p_rebound boolean, p_is_home boolean, p_home_sk integer, p_away_sk integer, p_empty_net boolean, p_has_pass boolean, p_pass_quality numeric, p_goalie_move numeric, p_season integer, p_game_type smallint)\n RETURNS numeric\n LANGUAGE sql\n STABLE PARALLEL SAFE\n SET search_path TO 'public', 'pg_temp'\nAS $function$\n  with r as (\n    select round(\n      public.xg_v5_base(p_shot_type, p_distance, p_angle, p_rebound, p_is_home,\n                        p_home_sk, p_away_sk, p_empty_net)\n      * coalesce((select m.mult from public.xg_v5_moat m\n                   where m.bucket = public.xg_v5_moat_bucket(p_has_pass, p_pass_quality,\n                                                             p_goalie_move)),\n                 1.0), 8) as raw\n  )\n  select round(least(0.99, greatest(0.0005,\n    r.raw\n    * public.xg_v5_shape_mult(r.raw, p_empty_net)\n    * public.xg_v5_era_mult(p_season, p_rebound)\n    * public.xg_v5_playoff_mult(p_game_type))), 6)\n  from r\n$function$\n",
+    "definition_md5": "a0e8614a11935098e8f02942577b41b5"
+  }
+]
