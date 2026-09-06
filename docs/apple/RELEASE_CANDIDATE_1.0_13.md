@@ -11,7 +11,9 @@ Preparation only. The user is away from the computer for approximately four hour
 - Category/rotisserie player views keep raw stats without presenting a points-league total. Points leagues with enabled plus/minus disclose that this unprojected category is excluded. Plus/minus remains a model limitation, not a claimed supported projection.
 - Expanded advanced cards receive the same league-scored index as the parent player card.
 
-Validation: full web suite passed 4,506 tests before the final conditional plus/minus note; the final focused suite passes 91 tests, including that note, league switching, retry, past-season absence and genuine zero. Server suite passes 1,840 tests with six skipped; server build, web TypeScript and changed-file lint pass. Native build 13 sync succeeded; archive/simulator build and distribution verification are underway. Build 13 has not yet been recorded as uploaded or deployed.
+Validation: full web suite passed 4,506 tests before the final conditional plus/minus note; the final focused suite passes 91 tests, including that note, league switching, retry, past-season absence and genuine zero. Server suite passes 1,840 tests with six skipped; server build, web TypeScript and changed-file lint pass. Native build 13 sync, archive, simulator build, distribution export and strict IPA signature verification succeeded. The IPA identifies build 13, production APNs and get-task-allow=false. Xcode confirmed upload success at 21:42 UTC on September 6; App Store processing and attachment remain unverified. Source commit: 94ca4b08cd42c9b7a2437c8ca039ebf44b8ee4e0. PR: https://github.com/Gstormsfh/citrus-league-storm-main/pull/415. Production deployment is still pending.
+
+On the iPad simulator, build 13 loads the production reviewer roster and upcoming projections. Switching to completed-season history loads game rows and actual points while the unavailable SZN PROJ tile remains a dash. Physical-device and TestFlight testing remain outstanding.
 
 ## Existing live release and blocked steps
 
