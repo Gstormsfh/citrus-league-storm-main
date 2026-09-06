@@ -31,6 +31,7 @@ import sys
 from datetime import datetime, date, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 import logging
+import math
 
 # Monte Carlo uncertainty propagation (Citrus Projections 3.1)
 _unc_import_err_msg = None
@@ -1267,7 +1268,12 @@ def get_goalie_gsax(
         )
         
         if gsax_data and len(gsax_data) > 0:
-            gsax = float(gsax_data[0].get("regressed_gsax", 0))
+            value = gsax_data[0].get("regressed_gsax")
+            if value is None or isinstance(value, bool):
+                return None
+            gsax = float(value)
+            if not math.isfinite(gsax):
+                return None
             if debug:
                 logger.info(f"  [Goalie Projection] GSAx: {gsax:.2f}")
             return gsax

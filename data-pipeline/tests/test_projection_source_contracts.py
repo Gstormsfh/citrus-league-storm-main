@@ -31,6 +31,18 @@ def test_missing_same_season_does_not_substitute_legacy_or_prior_season():
     assert db.reads == ['goalie_gsax_primary']
 
 
+@pytest.mark.parametrize('value', [None, True, False, float('nan'), float('inf'), '-Infinity', 'invalid'])
+def test_invalid_same_season_gsax_remains_unavailable(value):
+    db = SourceDb({'goalie_gsax_primary': [
+        {'goalie_id': 1, 'season': 2025, 'regressed_gsax': value}]})
+    assert projections.get_goalie_gsax(db, 1, 2025) is None
+
+
+def test_missing_metric_field_is_not_a_verified_zero():
+    db = SourceDb({'goalie_gsax_primary': [{'goalie_id': 1, 'season': 2025}]})
+    assert projections.get_goalie_gsax(db, 1, 2025) is None
+
+
 def test_finishing_denominator_matches_regular_season_goal_numerator():
     projections._finishing_talent_cache.clear()
     db = SourceDb({'player_season_stats': [
