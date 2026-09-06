@@ -1,0 +1,380 @@
+{
+  "scope": "Disposable native concurrency proof for the local unapplied xG season refresh guard",
+  "status": "passed",
+  "fixtureImage": "postgres@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3",
+  "fixtureStorage": "tmpfs only, 256 MiB; no user volume",
+  "databaseMemoryLimitMiB": 512,
+  "hostBinding": "127.0.0.1, Docker-assigned temporary port",
+  "runs": [
+    {
+      "status": "passed",
+      "postgres": "17.6 (Debian 17.6-2.pgdg12+1)",
+      "independentConnections": 3,
+      "backendPids": [
+        82,
+        83,
+        81
+      ],
+      "lockWitnesses": [
+        {
+          "scenario": "source writer waits through refresh commit",
+          "blocker_pid": 83,
+          "pid": 81,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "nhl_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "refresh waits for correction commit",
+          "blocker_pid": 83,
+          "pid": 81,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "nhl_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "refresh sees preceding invalid source commit",
+          "blocker_pid": 83,
+          "pid": 81,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "nhl_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "refresh sees preceding source rollback",
+          "blocker_pid": 83,
+          "pid": 81,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "nhl_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "player_xg_season writer waits through refresh commit",
+          "blocker_pid": 83,
+          "pid": 81,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "player_xg_season"
+            }
+          ]
+        },
+        {
+          "scenario": "goalie_xg_season writer waits through refresh commit",
+          "blocker_pid": 83,
+          "pid": 81,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "goalie_xg_season"
+            }
+          ]
+        },
+        {
+          "scenario": "team_xg_season writer waits through refresh commit",
+          "blocker_pid": 83,
+          "pid": 81,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "team_xg_season"
+            }
+          ]
+        },
+        {
+          "scenario": "second refresh waits at first output lock",
+          "blocker_pid": 83,
+          "pid": 81,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareRowExclusiveLock",
+              "table": "goalie_xg_season"
+            }
+          ]
+        }
+      ],
+      "cases": [
+        "empty requested season preserves every prior output",
+        "post-refresh invalid source cannot damage published outputs",
+        "committed correction then replay restores baseline math within float-only tolerance",
+        "overlapping invalid source commit rejects without any output mutation",
+        "source rollback cannot leak uncommitted invalid input",
+        "all three output writers serialize after refresh",
+        "independent refresh replay preserves math and other-season exact rows"
+      ],
+      "mathEquivalence": {
+        "absoluteTolerance": 1e-12,
+        "observedMaxAbsoluteDrift": 2.220446049250313e-16,
+        "floatFields": [
+          "avg_dist",
+          "avg_shot_dist_faced",
+          "avg_xg_per_shot",
+          "finishing",
+          "gsax",
+          "xg",
+          "xg_against",
+          "xg_en",
+          "xg_ev",
+          "xg_faced",
+          "xg_faced_ev",
+          "xg_faced_pk",
+          "xg_for",
+          "xg_pk",
+          "xg_pp"
+        ],
+        "scope": "successful synthetic replay aggregates only; failure snapshots and other-season rows exact"
+      },
+      "migrationSha256": "9a1b0bf2b58212ebe286efc83dd119b7e970430cb5eb89b0fe9c61cbefa7c2c7",
+      "limitations": [
+        "synthetic recorded population only",
+        "not absent-game coverage, model lineage, or production load proof"
+      ],
+      "cleanup": "verified: zero public objects, fixture roles, or user schemas"
+    },
+    {
+      "status": "passed",
+      "postgres": "17.6 (Debian 17.6-2.pgdg12+1)",
+      "independentConnections": 3,
+      "backendPids": [
+        84,
+        85,
+        86
+      ],
+      "lockWitnesses": [
+        {
+          "scenario": "source writer waits through refresh commit",
+          "blocker_pid": 85,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            85
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "nhl_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "refresh waits for correction commit",
+          "blocker_pid": 85,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            85
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "nhl_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "refresh sees preceding invalid source commit",
+          "blocker_pid": 85,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            85
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "nhl_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "refresh sees preceding source rollback",
+          "blocker_pid": 85,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            85
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "nhl_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "player_xg_season writer waits through refresh commit",
+          "blocker_pid": 85,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            85
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "player_xg_season"
+            }
+          ]
+        },
+        {
+          "scenario": "goalie_xg_season writer waits through refresh commit",
+          "blocker_pid": 85,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            85
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "goalie_xg_season"
+            }
+          ]
+        },
+        {
+          "scenario": "team_xg_season writer waits through refresh commit",
+          "blocker_pid": 85,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            85
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "team_xg_season"
+            }
+          ]
+        },
+        {
+          "scenario": "second refresh waits at first output lock",
+          "blocker_pid": 85,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            85
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareRowExclusiveLock",
+              "table": "goalie_xg_season"
+            }
+          ]
+        }
+      ],
+      "cases": [
+        "empty requested season preserves every prior output",
+        "post-refresh invalid source cannot damage published outputs",
+        "committed correction then replay restores baseline math within float-only tolerance",
+        "overlapping invalid source commit rejects without any output mutation",
+        "source rollback cannot leak uncommitted invalid input",
+        "all three output writers serialize after refresh",
+        "independent refresh replay preserves math and other-season exact rows"
+      ],
+      "mathEquivalence": {
+        "absoluteTolerance": 1e-12,
+        "observedMaxAbsoluteDrift": 2.220446049250313e-16,
+        "floatFields": [
+          "avg_dist",
+          "avg_shot_dist_faced",
+          "avg_xg_per_shot",
+          "finishing",
+          "gsax",
+          "xg",
+          "xg_against",
+          "xg_en",
+          "xg_ev",
+          "xg_faced",
+          "xg_faced_ev",
+          "xg_faced_pk",
+          "xg_for",
+          "xg_pk",
+          "xg_pp"
+        ],
+        "scope": "successful synthetic replay aggregates only; failure snapshots and other-season rows exact"
+      },
+      "migrationSha256": "9a1b0bf2b58212ebe286efc83dd119b7e970430cb5eb89b0fe9c61cbefa7c2c7",
+      "limitations": [
+        "synthetic recorded population only",
+        "not absent-game coverage, model lineage, or production load proof"
+      ],
+      "cleanup": "verified: zero public objects, fixture roles, or user schemas"
+    }
+  ],
+  "cleanup": {
+    "fixtureObjectsAndRoles": "zero after each successful harness run",
+    "containersRemoved": [
+      "citrus-xg-refresh-races-20260906-0518",
+      "citrus-xg-refresh-races-20260906-0525"
+    ],
+    "matchingContainersRemaining": 0,
+    "imagesRetained": true,
+    "dockerDesktopRetained": true
+  },
+  "initialFailure": "An exact successful-replay float8 comparison exposed tuple-order roundoff after UPDATE (1.8 vs 1.7999999999999998). No migration change was made. The harness now isolates finite aggregate float fields with explicit absolute 1e-12 tolerance for this small fixture, records maximum drift, and keeps failure snapshots, other-season rows, identities, counts and nulls exact.",
+  "limitations": [
+    "Not proof of full source coverage, awarded-goal classification, fitted model lineage, hosted capacity or production deployment.",
+    "No production or staging database was written.",
+    "Temporary synthetic fixtures were deleted; harness can reconstruct them."
+  ]
+}

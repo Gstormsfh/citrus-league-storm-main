@@ -5,8 +5,8 @@ Status: foundation NOT accepted. Local work only; no production rollout authoriz
 
 | Gate | Source → writer → consumer | Acceptance evidence | Current state |
 |---|---|---|---|
-| Event identity | NHL/raw shots → scoring/season aggregates → player/goalie surfaces | Unique game/event plus shooter, period, outcome, population reconciliation; quarantine every conflict | BLOCKED: all 1394 stored games have current official receipts. NHL: 1362 matched / 32 quarantined; raw: 783 matched / 611 quarantined. Frozen non-shootout reconciliation has 814 cardinality and 226 semantic conflicts. The 32 goal/SOG cases require explicit statistical adjudication; awarded goals are not automatically another SOG. No silent repair |
-| TOI provenance | NHL summary/game log → game/season/talent writers → deployment metrics | Exact event sets and every TOI value; official GP; historical seasons; source timestamps; late corrections | PARTIAL: strict raw/derived receipt binding and complete official population replay pass: 940 expected, 939 available, 1 withheld for an extra stored appearance. All 953 frozen input hashes unchanged. No production correction or publication. Future export-manifest provenance is being tightened |
+| Event identity | NHL/raw shots → scoring/season aggregates → player/goalie surfaces | Unique game/event plus shooter, period, outcome, population reconciliation; quarantine every conflict | BLOCKED: independent 61-week official schedule receipts confirm 1312 regular + 82 playoff completed games, with no whole games absent from either source. All 1394 stored games have PBP receipts. NHL: 1362 matched / 32 quarantined; raw: 783 matched / 611 quarantined. Frozen reconciliation has 814 cardinality and 226 semantic conflicts. Goal/SOG exceptions need explicit statistical adjudication; no silent repair |
+| TOI provenance | NHL summary/game log → game/season/talent writers → deployment metrics | Exact event sets and every TOI value; official GP; historical seasons; source timestamps; late corrections | PARTIAL: strict raw/derived receipt replay passes: 940 expected, 939 available, 1 withheld; 953 frozen files unchanged. Future exports enforce explicit project/season/window and checksummed catalog or equal complete REST reads. Replay revalidates original catalog evidence or retains frozen REST provenance, without new online observations. Legacy evidence is not upgraded; no production correction/publication |
 | Season boundaries | NHL game identity → all writers | Explicit regular/playoff/shootout contract, ordered complete pagination | PARTIAL: rollup regular range + local guard; consumers already select variants; remaining writers unverified |
 | Traded players | Team stints → season aggregator → charts | Sum exposures/counts, recompute rates, no duplicate totals | PARTIAL: history and actual dashboard aggregation tested; unknown multi-stint distance denominator returns NULL. Live regular-season shot/xG totals agree for 937 players; remaining consumer/exposure coverage pending |
 | Availability/freshness | Field source → publication → consumers | Missing is unavailable; field-level age and reason, no stale row timestamp inference | LOCAL INTEGRATION COMPLETE: opt-in background reader feeds actual dashboard/detail/UI boundaries; refresh, revision, rollback, stale evidence and failed reads return verified values or explicit NULL. Flag remains OFF; hosted tables remain unapplied |
@@ -14,32 +14,65 @@ Status: foundation NOT accepted. Local work only; no production rollout authoriz
 | Version lineage | Features/model/calibrator → scores → aggregates | Same variant/version/population, immutable evidence, reversible serving selection | PARTIAL: new publication contract pins source/feature/model/code/variant and supports explicit rollback. Existing model families and stored-score lineage remain unverified |
 | Migration/security | Local migrations/live schema → readers/writers | Compare actual definitions/ledger; scoped RLS, staging, backup/rollback | PARTIAL: live definitions captured. Ordinary-user writes to global GSAx/projection tables confirmed; narrow restriction passes synthetic and actual staging rollback checks. Rollout unapplied. GSAx native races pass; hosted load, season-key redesign and broader writer lineage remain open |
 | Health | Source expectations → completed batches | Affirmative expected/actual/withheld; partial read failure cannot publish | PARTIAL: exact-page failure propagation, TOI withholding, landing/per-game caller failures and publication manifests tested. Official PBP collector preserves partial receipts and emits failed health on disk/import errors. Remaining jobs and operational coverage pending |
-| Chronological quality | Frozen earlier fit → later calibration → untouched test | Proper scores, reliability, game-cluster uncertainty, subgroups, fixed lineage | BLOCKED by foundation; stored-score replay is not independent evaluation |
+| Chronological quality | Frozen earlier fit → later calibration → untouched test | Proper scores, reliability, game-cluster uncertainty, subgroups, fixed lineage | BLOCKED by foundation, incomplete full historical source freeze and missing run/split/calibrator evidence. Official historical PBP was found; nine archived/current pairs pass, not the entire historical corpus. Prior random/mixed-season training does not establish an untouched chronological test. User approved retrospective evaluation plus a frozen prospective test and excluded MoneyPuck files from new training. No new training/evaluation completed |
 | Expected finishing/GAR/forecasts | Versioned history/context → persistent estimates | Observed G−xG distinct from persistent talent; exposure/units/opportunity/interval validation | Pending foundation and chronological evidence |
 | Fantasy and database integration | ScoringCalculator + feasible roster/waiver state → versioned outputs | League/horizon/eligibility, joint allocation, non-additive move value separate, RLS | Deferred until earlier gates pass |
 
 ## Current local verification (2026-09-06)
 
-Local commits through `1da74905` contain typed immutable publication, complete-
+The current local implementation contains typed immutable publication, complete-
 population TOI contracts and narrow writer handling, actual nullable consumer
 transitions, shared-output access restrictions, projection season/population
 fixes, strict corpus evidence, raw receipt binding and native race harnesses.
 All changes remain local; no push, merge, deployment or production data mutation.
 
 Full suites: web 4471 passed; server 1833 passed / 6 skipped; shared 244 passed;
-offline Python 574 passed / 16 network tests deselected. Web build and
+offline Python 890 passed / 16 network tests deselected (33 existing deprecation
+warnings). Web build and
 server/web/shared TypeScript pass; web lint has 9 existing warnings, 0 errors.
 A server freshness fixture initially failed at a millisecond boundary; it now
 uses one observation clock, and the entire server suite passed again. No
 freshness validation was relaxed. Isolated SQL: publication 25, canonical sealing
-22, shared-output security 25, legacy GSAx guard 14. Four unapplied migrations
-pass the static validator without errors or warnings.
+22, shared-output security 25, legacy GSAx guard 14, era/playoff exclusions 15,
+xG season-refresh guard 20. The validator now runs natively as ESM and recognizes
+only single explicitly `pg_temp`-qualified scratch drops; public/unqualified,
+multi-table and CASCADE drops remain errors. Fifteen dedicated validator checks
+pass. Six unapplied migrations pass without errors or warnings.
 
 Native PostgreSQL 17.6: publication/canonical 17 checks across 3 connections and
 6 witnessed lock waits, repeated successfully; GSAx guard 16 checks across 3
 connections and 5 witnessed lock waits, repeated successfully. Both harnesses
 verified zero remaining fixture objects/roles. This closes the native concurrency
 correctness gap, not hosted load or deployment-capacity acceptance.
+
+The new xG season-refresh guard additionally passes twice on native PostgreSQL
+17.6 with three independent backends and eight exact relation-lock witnesses per
+run. Source corrections, invalid commits, source rollback, each output writer and
+overlapping refreshes serialize. Rejection snapshots and other-season rows remain
+exact. Successful replay float8 sums varied by at most 2.220446049250313e-16 after
+tuple-order changes; an explicit 1e-12 tolerance applies only to the small
+fixture's finite aggregate float fields, never identities/counts/nulls or
+failure-preservation snapshots. The initial exact-float assertion failed; no
+migration was changed to make it pass. Both disposable test containers were
+removed, and successful runs verified zero fixture objects/roles. Evidence:
+`analytics-native-xg-refresh-races-20260906.json`.
+
+The full-system preservation map is `analytics-method-preservation-20260906.md`.
+It covers database, organization and all discovered model/research dimensions,
+including explicit distinctions between wired methods, optional/manual paths and
+specifications. The narrow rink-CDF callable bug is fixed without changing default
+behavior, empirical fitting logic or activating an unvalidated adjustment.
+
+Independent sequence/rebound mathematics and source-only full-stream extraction
+now have a shared nonpublishing shadow stage at both actual Python writer
+boundaries. Synthetic boundary tests preserve the complete existing column set,
+raw source bytes, context and existing attributes. Legacy callers without source/
+prediction evidence withhold diagnostics. Neither supplied attestation nor the
+green structural tests establish calibration. No model artifacts were loaded.
+The full schedule-bound source sequence audit yields 1362 verified / 32 retained
+quarantined games; it exits 2. Nine historical/current source pairs preserve both
+versions and original timestamps. `analytics-sequence-archive-proof-20260906.json`
+identifies their local retained archive; no full historical acceptance is claimed.
 
 The real Python publisher, PostgREST and actual TypeScript publication reader
 passed all four phases against 940 values: initial publication (939 available /
@@ -63,6 +96,9 @@ unchanged-input replay. Native concurrency and actual REST integration have
 separate `analytics-native-*-races-20260906.json` and
 `analytics-local-publication-e2e-20260906.json` proof files.
 `analytics-evidence-archive-20260906.json` identifies the retained local archive.
+`analytics-schedule-proof-20260906.json` records independent completed-game
+coverage and unchanged 61-receipt offline replay. The source window and byte
+hashes are preserved; schedule agreement does not clear event-level quarantine.
 
 `analytics-writer-lineage-audit-20260906.md` records captured live definitions,
 actual writer paths and permission proof. Legacy score and fit labels are not
