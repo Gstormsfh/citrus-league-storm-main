@@ -298,6 +298,15 @@ quarantines missing/duplicate/conflicting shot identities without rewriting
 probabilities. `docs/ANALYTICS_ACCEPTANCE.md` records live evidence separately
 from local tests and tracks the remaining foundation/metric gates.
 
+Unapplied migration `20260906005705_analytics_versioned_publication_contract.sql`
+defines service-only, RLS-enabled `analytics_source_snapshots`,
+`analytics_metric_batches`, `analytics_metric_values`, and
+`analytics_publications`. Payload hashes, exact version/population metadata,
+availability reasons, source observation/cutoff timestamps and immutable
+publication events preserve evidence separately from current serving tables.
+No reader switch is included. Test runner: `scripts/test_analytics_publication.mjs`
+(isolated PGlite, temporary dependency only; no application dependency added).
+
 **When adding a new data artifact, update this doc:**
 
 1. **New table** → add to §1.2 with row count + writer script + size

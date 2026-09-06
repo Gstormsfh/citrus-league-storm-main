@@ -39,6 +39,16 @@ withheld, and unavailable average TOI is explicitly NULL. Withheld rows make the
 job exit 2 after its health report. Existing stale season values remain untouched
 and are not yet furnished with field-level availability to consumers: this gate
 still requires versioned publication metadata before production acceptance.
+
+Publication schema milestone: migration 20260906005705 is still UNAPPLIED.
+Four service-only RLS tables hold immutable snapshots/batches/values/publication
+events. Publication serializes with row insertion and checks completeness,
+validation status and source observation cutoff. Local Postgres/WASM: 14 checks
+passed. Hosted staging rollback-only transaction: incomplete publication was
+rejected; complete fixture published once; ROLLBACK executed; follow-up query
+confirmed zero remaining test tables. Production untouched. Multi-connection
+race behavior and integration of field-level availability into consumers remain
+open gates; the single-connection local test cannot prove concurrency behavior.
 Source research: user-provided audit, next steps, calibration investigation and
 hockey blueprint dated 2026-09-05. Stored probabilities are retrospective until
 the complete fit/calibration lineage proves otherwise. No novelty or superiority
