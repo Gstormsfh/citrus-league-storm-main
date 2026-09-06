@@ -5,7 +5,7 @@ import { deriveFromSnapshot } from '../deriveDraftState';
 
 const snapshot: DraftSnapshot = {
   lobbyId: 'l1', format: 'auction',
-  stateSnapshot: { totalPicks: 28, picksMade: 1, draftStatus: 'paused', currentPickNumber: 2, currentRoundNumber: 1, onClockTeamId: 't2', currentPickDeadline: null },
+  stateSnapshot: { totalPicks: 28, picksMade: 1, draftStatus: 'in_progress', currentPickNumber: 2, currentRoundNumber: 1, onClockTeamId: 't2', currentPickDeadline: null },
   auctionState: { currentNomination: null, nominationsCompleted: 1, teamBudgets: { t1: 180 }, teamRosterSlotsRemaining: { t1: 13 } },
   recentEvents: [
     { kind: 'draft_started', seq: 1, timestamp: '', correlationId: '', startedAt: '', firstPickDeadline: '', totalRounds: 14, totalTeams: 2, pickTimeLimitSeconds: 30, draftFormat: 'auction' },
@@ -20,7 +20,7 @@ describe('returning to an auction', () => {
     expect(state.history[0]).toMatchObject({ playerId: '8478402', amount: 20, teamId: 't1' });
     expect(state.wonPlayerIds.has('8478402')).toBe(true);
     expect(state.budgets.get('t1')).toEqual({ remaining: 180, slotsRemaining: 13 });
-    expect(state.paused).toBe(true);
+    expect(state.paused).toBe(false);
     expect(foldAuctionEvents(state, snapshot.recentEvents)).toEqual(state);
   });
   it('reconstructs the saved pick when the start event survives the API snapshot', () => {
