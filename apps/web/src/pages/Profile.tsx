@@ -1066,7 +1066,8 @@ const Profile = () => {
     try {
       const result = await UserAccountService.deleteAccount();
       if (!result.success) throw new Error(result.error || 'Deletion failed');
-      await signOut();
+      // Commit the public destination before clearing auth. Otherwise the
+      // protected profile route can redirect to login and unmount this handler.
       navigate('/account-deleted', { replace: true, state: { deleted: true } });
     } catch (error: unknown) {
       logger.error('Account deletion error:', error);

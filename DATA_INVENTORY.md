@@ -306,4 +306,10 @@ These are the parts of the entropy that the audit surfaced. **They should NOT be
 - **Not the migration log** — `supabase/migrations/` is the source of truth for schema history
 - **Not the pipeline runbook** — see `data-pipeline/` and `OPERATIONS.md` / `ENGINEERING.md`
 
-Staging Apple-secret provisioning: `scripts/ops/configure-staging-apple-secrets.py` reads protected CI environment inputs and writes only the staging project’s Secret Manager. It refuses an unplanned encryption-key replacement. No secret values are logged.
+Staging Apple-secret provisioning: `scripts/ops/configure-staging-apple-secrets.py` reads protected operator environment inputs and writes only the staging project’s Secret Manager. It refuses an unplanned encryption-key replacement. No secret values are logged. The deployment account does not administer these secrets.
+
+Staging storage parity: `20260906165538_avatar_storage_policy_baseline.sql` adds missing avatar ownership policies, leaving existing named policies intact. Bucket provisioning uses the Storage API. `scripts/verification/apple-staging-e2e.mjs` creates disposable staging accounts and an owned league, tests the deployed API, then deletes only its fixtures. It refuses production Supabase configuration.
+
+Run the integration check through `python3 scripts/verification/run-apple-staging-e2e.py` with an authorized Google Cloud operator session. It reads only the three named staging Supabase secrets into the child process environment, without saving them to disk or logging them. The fixture script tests consent, moderation, avatar ownership, and member/commissioner deletion.
+
+Staging profile parity: `20260906171108_staging_profile_push_preference_parity.sql` restores the existing `push_notifications` preference column required by the shared profile projection. The column's absence caused the live staging profile API to return 400. Existing profile RLS governs it; no new data category or production change.

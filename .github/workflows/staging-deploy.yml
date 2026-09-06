@@ -6,11 +6,6 @@ on:
       - staging
       - staging-setup   # bootstrap: allow this branch until `staging` exists; remove after cutover
   workflow_dispatch:
-    inputs:
-      configure_apple_cleanup:
-        description: 'Provision staging Apple cleanup secrets before deployment'
-        type: boolean
-        default: false
 
 concurrency:
   group: staging-deploy
@@ -109,14 +104,9 @@ jobs:
         if: steps.check-gcp.outputs.has_creds == 'true'
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Configure Apple cleanup secrets (staging only)
-        if: github.event_name == 'workflow_dispatch' && inputs.configure_apple_cleanup
-        env:
-          APPLE_CLIENT_ID: ${{ secrets.STAGING_APPLE_CLIENT_ID }}
-          APPLE_CLIENT_SECRET: ${{ secrets.STAGING_APPLE_CLIENT_SECRET }}
-          APPLE_TOKEN_ENCRYPTION_KEY: ${{ secrets.STAGING_APPLE_TOKEN_ENCRYPTION_KEY }}
-        run: python3 scripts/ops/configure-staging-apple-secrets.py
-
+      # An authorized operator provisions Apple secrets separately using
+      # scripts/ops/configure-staging-apple-secrets.py. The deployment account
+      # deliberately has no permission to read or administer secret values.
       - name: Configure Docker for Artifact Registry
         if: steps.check-gcp.outputs.has_creds == 'true'
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
