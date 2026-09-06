@@ -1,3 +1,5 @@
+import { useLeague } from '@/contexts/LeagueContext';
+import { projectedSummary } from '@/components/player/projectionScoring';
 import { useGameLogIdentity } from '@/components/player/useGameLogIdentity';
 import { userMessage } from '@/lib/userMessage';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -204,7 +206,38 @@ function seasonWindow(season: number): { start: string; end: string } {
   return { start, end: `${season + 1}-06-30` };
 }
 
-const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = false, onPlayerDropped, action }: PlayerStatsModalProps) => {
+const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId, isOnRoster = false, onPlayerDropped, action }: PlayerStatsModalProps) => {
+  const { activeLeagueId } = useLeague();
+  const leagueId = suppliedLeagueId ?? activeLeagueId ?? undefined;
+  const [leagueScoring, setLeagueScoring] = useState<unknown>(null);
+  const [scoringReady, setScoringReady] = useState(!leagueId);
+  const [goalieRos, setGoalieRos] = useState<Record<string, unknown> | null>(null);
+  const [showProjectionBreakdown, setShowProjectionBreakdown] = useState(false);
+  const projectionPlayerId = player?.id;
+  const projectionGoalie = player?.position === 'G' || player?.position === 'Goalie';
+  useEffect(() => {
+    let cancelled = false;
+    setShowProjectionBreakdown(false);
+    setScoringReady(!leagueId);
+    setLeagueScoring(null);
+    setGoalieRos(null);
+    if (!isOpen) return;
+    void (async () => {
+      try {
+        const result = leagueId ? await LeagueService.getLeague(leagueId) : null;
+        if (result?.error || (leagueId && !result?.league)) throw new Error('League scoring unavailable');
+        if (cancelled) return;
+        setLeagueScoring(result?.league?.scoring_settings ?? null);
+        setScoringReady(true);
+        if (projectionGoalie && projectionPlayerId) {
+          const response = await playerApi.getRosProjectionForPlayer(Number(projectionPlayerId));
+          const rows = response.data as Record<string, unknown>[] | undefined;
+          if (!cancelled) setGoalieRos(rows?.[0] ?? null);
+        }
+      } catch (error) { logger.error('[PlayerStatsModal] League projection scoring unavailable:', error); }
+    })();
+    return () => { cancelled = true; };
+  }, [leagueId, isOpen, projectionPlayerId, projectionGoalie]);
   const { user } = useAuth();
   const { toast } = useToast();
   const [isDropping, setIsDropping] = useState(false);
@@ -554,6 +587,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
     };
   }, [isOpen, gameLogPlayer, logSeason]);
 
+  const leagueProjection = useMemo(() => projectedSummary(
+    projectionGoalie && goalieRos ? [goalieRos] : gameLog.filter(g => !g.isPast && g.projection).map(g => g.projection!),
+    leagueScoring, projectionGoalie,
+  ), [gameLog, leagueScoring, projectionGoalie, goalieRos]);
+
   // MUST sit above the `if (!player) return null` below — a hook called after
   // an early return runs conditionally, which breaks the Rules of Hooks and
   // desyncs every hook after it the moment `player` goes null on close.
@@ -698,10 +736,10 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   const futureGames = gameLog.filter(g => !g.isPast);
   const pastGames = gameLog.filter(g => g.isPast);
   const hasGame = gameLog.length > 0 || dailyProj != null;
-  const heroProjectedPts = futureGames.length > 0 ? totalProjected : (dailyProj?.total_projected_points || 0);
+  const heroProjectedPts = leagueProjection.points;
   const cardTiles: PressBoxStatTile[] = [
     { key: 'wk', label: 'L7 PTS', value: weekPoints != null ? weekPoints.toFixed(1) : '–', tone: weekPoints != null ? 'sage' : 'plain' },
-    { key: 'szn', label: 'SZN PROJ', value: hasGame && heroProjectedPts > 0 ? String(Math.round(heroProjectedPts)) : '–' },
+    { key: 'szn', label: 'SZN PROJ', value: scoringReady && hasGame ? String(Math.round(heroProjectedPts)) : '–', onClick: () => setShowProjectionBreakdown(v => !v) },
     { key: 'rank', label: 'POS RANK', value: positionRank ?? '–' },
     {
       key: 'xg',
@@ -891,6 +929,18 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 real name and shows a dash rather than a number it does not
                 have. */}
             {(cardTab === 'summary' || cardTab === 'log') && <PressBoxStatTiles className="mb-3" tiles={cardTiles} />}
+            {showProjectionBreakdown && (
+              <section className="mt-2 rounded-xl border border-white/10 bg-pressbox-tile p-3 text-pressbox-text" aria-label="Projection breakdown">
+                <div className="flex justify-between text-sm font-semibold"><span>Projected scoring breakdown</span><button type="button" onClick={() => setShowProjectionBreakdown(false)} aria-label="Close projection breakdown">Close</button></div>
+                {!scoringReady ? <p className="text-sm mt-2">League scoring is unavailable. Try reopening the player.</p> : <>
+                  <p className="text-xs text-pressbox-text/60 mt-1">{leagueId ? 'Using this league’s scoring settings.' : 'Using default scoring; no league selected.'}</p>
+                  <table className="w-full text-xs mt-2"><thead><tr><th className="text-left">Stat</th><th>Projected</th><th>Weight</th><th>Points</th></tr></thead><tbody>
+                    {Object.entries(leagueProjection.breakdown).filter(([, b]) => b.points !== 0).map(([stat, b]) => <tr key={stat}><td className="py-1">{stat}</td><td className="text-center">{b.count.toFixed(2)}</td><td className="text-center">{(b.points / b.count).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td><td className="text-right">{b.points.toFixed(1)}</td></tr>)}
+                  </tbody></table>
+                  <p className="text-right text-sm font-semibold mt-2">Total {leagueProjection.points.toFixed(1)} points</p>
+                </>}
+              </section>
+            )}
 
             {/* ─── Overview Tab ─── */}
             <TabsContent value="summary" className="mt-0 space-y-4">
@@ -1256,7 +1306,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                         <div className="font-plex font-semibold text-[17px] tabular-nums text-pressbox-text leading-tight">{totalActual.toFixed(1)}<span className="font-plex font-medium text-[9px] text-pressbox-text/45 uppercase ml-1">actual</span></div>
                       )}
                       {futureGames.length > 0 && (
-                        <div className="font-plex font-semibold text-[14px] tabular-nums text-pressbox-orange-soft leading-tight">{totalProjected.toFixed(1)}<span className="font-plex font-medium text-[9px] text-pressbox-text/45 uppercase ml-1">proj</span></div>
+                        <div className="font-plex font-semibold text-[14px] tabular-nums text-pressbox-orange-soft leading-tight">{leagueProjection.points.toFixed(1)}<span className="font-plex font-medium text-[9px] text-pressbox-text/45 uppercase ml-1">proj</span></div>
                       )}
                     </div>
                   </div>
@@ -1300,12 +1350,14 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                         action={
                           <span className="font-plex font-medium text-[10px] tabular-nums text-pressbox-text/45 whitespace-nowrap">
                             {futureGames.length} GAME{futureGames.length === 1 ? '' : 'S'}
-                            {totalProjected > 0 ? ` · ${totalProjected.toFixed(1)} PROJ` : ''}
+                            {leagueProjection.points > 0 ? ` · ${leagueProjection.points.toFixed(1)} PROJ` : ''}
                           </span>
                         }
                       />
                       <PressBoxUpcomingCards games={upcomingCards(gameLog)} />
                       <PressBoxGameLog
+                        showPoints={false}
+                        showTail={false}
                         pointsHeading="PROJ"
                         tail={{ heading: 'RANGE', width: 64 }}
                         statHeadings={isGoalie ? GOALIE_PROJ_HEADINGS : SKATER_PROJ_HEADINGS}
