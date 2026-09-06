@@ -134,6 +134,16 @@ verified loopback host ports (not an egress-firewall claim) and TCP readiness.
 `local_port_contract.mjs` and its eight Node tests reject missing, external,
 duplicate, unassigned or invalid host bindings. Both earlier launchers remain
 byte-pinned; the model, publisher, SQL and reader are unchanged.
+The v3 attempt `local-model-publication-20260906-1110` retains all four successful
+model/reader batches, withholding/rollback and database rejection phases. It
+failed its test's overly narrow HTTP-403 expectation: PostgREST returned the
+correct anonymous-role HTTP 401 / PostgreSQL 42501 table-permission denial.
+All owned fixtures were removed. The original Python and all three launchers
+remain unchanged. `local_model_publication_e2e_v2.py` and infrastructure v4 use
+`local_access_denial.py` to require the exact role/status/SQLSTATE/table/operation
+envelope; invalid JWT errors cannot count as access-denial proof. The versioned
+test correction leaves model/aggregation function bodies, SQL, clients and the
+actual TypeScript reader unchanged. New tests verify that boundary explicitly.
 
 Additive shape-calibration experiment (2026-09-06):
 `docs/analytics-calibration-shape-plan-20260906.json` predeclares four new
