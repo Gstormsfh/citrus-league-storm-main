@@ -1819,6 +1819,23 @@ def _save_shots_to_database(df_shots, db_client, game_id):
     """
     if df_shots.empty:
         return
+
+    def nullable_auxiliary(value, upper=None):
+        # Missing is not measured zero. These nullable numeric columns have
+        # zero defaults, so retain explicit None through the upsert payload.
+        # This checks representation/domain only: legacy heuristic values do
+        # not become verified publications by passing this check.
+        import math as auxiliary_math
+        from numbers import Number
+        if isinstance(value, bool) or not isinstance(value, Number):
+            return None
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if not auxiliary_math.isfinite(numeric) or numeric < 0:
+            return None
+        return numeric if upper is None or numeric <= upper else None
     
     try:
         # Prepare raw_shots records (same structure as scrape_pbp_and_process)
@@ -1875,11 +1892,12 @@ def _save_shots_to_database(df_shots, db_client, game_id):
                 'xg_value': float(row['xG_Value']),
                 'flurry_adjusted_xg': float(row.get('flurry_adjusted_xg', row['xG_Value'])),
                 'xa_value': float(row['xA_Value']) if pd.notna(row['xA_Value']) and row['xA_Value'] > 0 else None,
-                'expected_rebound_probability': float(row.get('expected_rebound_probability', 0.0)),
-                'expected_goals_of_expected_rebounds': float(row.get('expected_goals_of_expected_rebounds', 0.0)),
+                'expected_rebound_probability': nullable_auxiliary(row.get('expected_rebound_probability'), upper=1.0),
+                'expected_goals_of_expected_rebounds': nullable_auxiliary(row.get('expected_goals_of_expected_rebounds'), upper=1.0),
                 'shooting_talent_adjusted_xg': float(row.get('shooting_talent_adjusted_xg', row.get('flurry_adjusted_xg', row['xG_Value']))),
                 'shooting_talent_multiplier': float(row.get('shooting_talent_multiplier', 1.0)),
-                'created_expected_goals': float(row.get('created_expected_goals', row.get('xG_Value', 0.0))),
+                # Created xG is an additive credit, not a probability capped at 1.
+                'created_expected_goals': nullable_auxiliary(row.get('created_expected_goals')),
                 'shot_type_encoded': int(row['shot_type_encoded']),
                 'pass_zone_encoded': int(row['pass_zone_encoded']) if pd.notna(row['pass_zone_encoded']) else None,
                 'home_skaters_on_ice': int(row['home_skaters_on_ice']) if pd.notna(row.get('home_skaters_on_ice')) else None,
