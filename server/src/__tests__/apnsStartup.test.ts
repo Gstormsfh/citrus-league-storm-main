@@ -74,3 +74,15 @@ describe('draft engine APNs startup configuration', () => {
     expect(script).toContain('-e APNS_KEY_ID -e APNS_TEAM_ID -e APNS_PRIVATE_KEY');
   });
 });
+
+
+describe('production push deployment', () => {
+  it('deploys the checked build startup script and production APNs in the guarded metadata update', () => {
+    const workflow = readFileSync(resolve(import.meta.dirname, '../../../.github/workflows/deploy-engine.yml'), 'utf8');
+    expect(workflow).toContain('ref: ${{ needs.build.outputs.sha }}');
+    expect(workflow).toContain('--metadata-from-file startup-script=infra/gce/draft-engine-startup.sh');
+    expect(workflow).toContain('commit-sha=${SHA},apns-enabled=true,apns-production=true');
+    expect(workflow).toContain('needs: [build, preflight]');
+    expect(workflow).toContain('Confirm production-engine has a required reviewer');
+  });
+});

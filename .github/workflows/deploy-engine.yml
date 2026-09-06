@@ -543,6 +543,10 @@ jobs:
       # Trap 2 (LAUNCH_BUILD_2026-08-24.md §4): the engine's fingerprint
       # echoes these three metadata keys. Writing them in ONE call means the
       # next boot can only ever report all-new or all-old values.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.build.outputs.sha }}
+
       - name: Point the VM at the new image (ONE add-metadata call)
         env:
           TAG: ${{ needs.build.outputs.tag }}
@@ -556,7 +560,8 @@ jobs:
           fi
           gcloud compute instances add-metadata "$ENGINE_VM" \
             --project "$GCP_PROJECT" --zone "$GCP_ZONE" \
-            --metadata "image-tag=${TAG},image-sha=${DIGEST},commit-sha=${SHA}"
+            --metadata-from-file startup-script=infra/gce/draft-engine-startup.sh \
+            --metadata "image-tag=${TAG},image-sha=${DIGEST},commit-sha=${SHA},apns-enabled=true,apns-production=true"
           echo "metadata set: image-tag=${TAG} image-sha=${DIGEST} commit-sha=${SHA}"
 
       - name: Reset the VM (startup script pulls the new tag)
