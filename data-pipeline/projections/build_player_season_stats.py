@@ -130,9 +130,9 @@ def regular_appearance_rows(rows: List[dict], season: int) -> List[dict]:
 
 def add_official_toi(total: Optional[int], value) -> Optional[int]:
   """Unknown ice time poisons the total; measured zero remains a measurement."""
-  if total is None or value is None or int(value) < 0:
+  if total is None or type(value) is not int or value < 0:
     return None
-  return total + int(value)
+  return total + value
 
 
 def fetch_official_gp(player_id: int, season: int) -> Optional[int]:

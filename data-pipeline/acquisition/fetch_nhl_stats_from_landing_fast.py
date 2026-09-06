@@ -27,8 +27,9 @@ Fetch all official NHL.com statistics from landing endpoint (api-web.nhle.com).
 This endpoint works reliably and avoids DNS issues with statsapi.web.nhl.com.
 
 Fetches comprehensive stats in a single API call per player:
-- Skaters: Goals, Assists, Points, SOG, PIM, PPP, SHP, TOI, +/-
-- Goalies: Wins, Losses, OTL, Saves, Shots Faced, GA, GAA, SV%, Shutouts, TOI
+- Skaters: Goals, Assists, Points, SOG, PIM, PPP, SHP, +/-
+- Goalies: Wins, Losses, OTL, Saves, Shots Faced, GA, GAA, SV%, Shutouts
+- TOI is withheld: exact appearance receipts are required by its owning publication.
 - Note: Hits and blocks are NOT available from landing endpoint (need StatsAPI fallback)
 """
 
@@ -282,7 +283,7 @@ def extract_all_official_stats(landing_data: Dict, target_season: int, is_goalie
                         # Hits and blocks are NOT in landing endpoint - will need StatsAPI fallback
                         stats["nhl_hits"] = 0
                         stats["nhl_blocks"] = 0
-                        # TOI not directly in featuredStats, will get from seasonTotals
+                        # TOI is owned by the verified appearance publication.
                     else:
                         # Goalie stats from featuredStats (if available)
                         stats["nhl_wins"] = _safe_int(sub.get("wins", 0), 0)
@@ -293,7 +294,7 @@ def extract_all_official_stats(landing_data: Dict, target_season: int, is_goalie
                         stats["nhl_shutouts"] = _safe_int(sub.get("shutouts", 0), 0)
                         stats["goalie_gp"] = games_played
     
-    # Method 2: Fallback to seasonTotals if featuredStats didn't work or for TOI
+    # Method 2: Fallback to seasonTotals if featuredStats didn't work.
     if not stats or stats.get("games_played", 0) == 0:
         if "seasonTotals" in landing_data and isinstance(landing_data["seasonTotals"], list):
             season_totals = landing_data["seasonTotals"]
@@ -344,13 +345,8 @@ def extract_all_official_stats(landing_data: Dict, target_season: int, is_goalie
                             else:
                                 stats["nhl_saves"] = 0
                         
-                        # Extract TOI (goalies use timeOnIce, format: "HH:MM:SS")
-                        if "nhl_toi_seconds" not in stats:
-                            time_on_ice_str = current_season_data.get("timeOnIce")
-                            if time_on_ice_str:
-                                stats["nhl_toi_seconds"] = parse_time_to_seconds(time_on_ice_str)
-                            else:
-                                stats["nhl_toi_seconds"] = 0
+                        # TOI belongs to the verified appearance publication.
+                        # Landing averages/ambiguous time strings cannot prove total seconds.
                         
                         if "goalie_gp" not in stats:
                             stats["goalie_gp"] = games_played
@@ -374,14 +370,8 @@ def extract_all_official_stats(landing_data: Dict, target_season: int, is_goalie
                         if "nhl_shp" not in stats:
                             stats["nhl_shp"] = _safe_int(current_season_data.get("shorthandedPoints", 0), 0)
                         
-                        # Extract TOI (skaters use avgToi, format: "MM:SS")
-                        if "nhl_toi_seconds" not in stats:
-                            avg_toi_str = current_season_data.get("avgToi")
-                            if avg_toi_str and games_played > 0:
-                                avg_toi_seconds = parse_time_to_seconds(avg_toi_str)
-                                stats["nhl_toi_seconds"] = avg_toi_seconds * games_played
-                            else:
-                                stats["nhl_toi_seconds"] = 0
+                        # TOI belongs to the verified appearance publication.
+                        # Landing averages/ambiguous time strings cannot prove total seconds.
     
     # Final fallback - should not be needed
     if not stats or stats.get("games_played", 0) == 0:
@@ -531,8 +521,6 @@ def process_single_player(
                 updates["nhl_save_pct"] = stats.get("nhl_save_pct")
             if "nhl_gaa" in stats:
                 updates["nhl_gaa"] = stats.get("nhl_gaa")
-            if "nhl_toi_seconds" in stats and stats.get("nhl_toi_seconds", 0) > 0:
-                updates["nhl_toi_seconds"] = stats.get("nhl_toi_seconds", 0)
         else:
             # Skater stats - use .get() with defaults to avoid KeyError
             if "nhl_goals" in stats:
@@ -557,8 +545,6 @@ def process_single_player(
                 updates["nhl_hits"] = stats.get("nhl_hits", 0)
             if "nhl_blocks" in stats:
                 updates["nhl_blocks"] = stats.get("nhl_blocks", 0)
-            if "nhl_toi_seconds" in stats and stats.get("nhl_toi_seconds", 0) > 0:
-                updates["nhl_toi_seconds"] = stats.get("nhl_toi_seconds", 0)
         
         if updates:
             try:
@@ -863,8 +849,6 @@ def main() -> int:
                         updates["nhl_save_pct"] = stats.get("nhl_save_pct")
                     if "nhl_gaa" in stats:
                         updates["nhl_gaa"] = stats.get("nhl_gaa")
-                    if "nhl_toi_seconds" in stats and stats.get("nhl_toi_seconds", 0) > 0:
-                        updates["nhl_toi_seconds"] = stats.get("nhl_toi_seconds", 0)
                 else:
                     # Skater stats
                     if "nhl_goals" in stats:
@@ -887,8 +871,6 @@ def main() -> int:
                         updates["nhl_hits"] = stats.get("nhl_hits", 0)
                     if "nhl_blocks" in stats:
                         updates["nhl_blocks"] = stats.get("nhl_blocks", 0)
-                    if "nhl_toi_seconds" in stats and stats.get("nhl_toi_seconds", 0) > 0:
-                        updates["nhl_toi_seconds"] = stats.get("nhl_toi_seconds", 0)
                 
                 if updates:
                     try:
@@ -973,7 +955,8 @@ def main() -> int:
     logger.info(f"Total goalies updated: {total_goalies:,}")
     logger.info("")
     logger.info("Total stats updated:")
-    logger.info(f"  TOI: {updated_count['toi'] + retry_updated_count['toi']:,}")
+    logger.warning("[HEALTH] metric=nhl_toi_seconds expected=%s available=0 withheld=%s "
+                   "reason=landing_has_no_verified_appearance_receipts", len(players), len(players))
     logger.info(f"  Goals: {updated_count['goals'] + retry_updated_count['goals']:,}")
     logger.info(f"  Assists: {updated_count['assists'] + retry_updated_count['assists']:,}")
     logger.info(f"  Points: {updated_count['points'] + retry_updated_count['points']:,}")
@@ -1006,4 +989,3 @@ def main() -> int:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     raise SystemExit(main())
-

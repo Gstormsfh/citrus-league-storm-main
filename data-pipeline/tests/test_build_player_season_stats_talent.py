@@ -182,3 +182,10 @@ def test_xg_partial_page_failure_never_returns_partial_total():
             raise RuntimeError("incomplete second page")
     with pytest.raises(RuntimeError, match="incomplete second page"):
         try_fetch_xg_totals(Db(), 2025)
+
+
+def test_toi_accumulator_does_not_truncate_or_coerce_unverified_values():
+    from projections.build_player_season_stats import add_official_toi
+    for value in (True,600.9,'600',-1,None):
+        assert add_official_toi(100,value) is None
+    assert add_official_toi(100,0)==100

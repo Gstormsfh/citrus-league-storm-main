@@ -28,3 +28,12 @@ def test_missing_receipt_and_mixed_populations_refuse_candidate():
     rows[0]['game_id']=2025030001
     with pytest.raises(ValueError,match='populations'):
         build_candidate([1,2],rows,evidence,2025,'2026-09-05T00:00:01Z','0'*40)
+
+
+def test_fractional_receipt_seconds_are_compared_chronologically():
+    rows,evidence=fixture()
+    evidence[1]={**evidence[1],'observed_at':'2026-09-05T00:00:00.1Z'}
+    evidence[2]={**evidence[2],'observed_at':'2026-09-05T00:00:00Z'}
+    source,batch,_=build_candidate([1,2],rows,evidence,2025,'2026-09-05T00:00:01Z','0'*40)
+    assert source['observed_at']=='2026-09-05T00:00:00.100000+00:00'
+    assert batch['validation']['freshness_observed_at']=='2026-09-05T00:00:00+00:00'

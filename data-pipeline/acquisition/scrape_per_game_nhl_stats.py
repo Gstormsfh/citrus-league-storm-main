@@ -45,6 +45,7 @@ import _bootstrap  # noqa: F401
 
 from data_pipeline.utils.supabase_rest import SupabaseRest
 from data_pipeline.utils.citrus_request import citrus_request
+from data_pipeline.monitoring.appearance_contract import parse_toi
 import logging
 
 logger = logging.getLogger(__name__)
@@ -134,23 +135,9 @@ def _calculate_save_pct(saves: int, shots_faced: int) -> float:
     return round(saves / shots_faced, 3)
 
 
-def parse_time_to_seconds(time_str: str) -> int:
-    """
-    Parse time string from NHL API (format: "MM:SS" or "HH:MM:SS").
-    Returns total seconds.
-    """
-    if not time_str or not isinstance(time_str, str):
-        return 0
-    try:
-        parts = time_str.split(":")
-        if len(parts) == 3:  # HH:MM:SS
-            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-        elif len(parts) == 2:  # MM:SS
-            return int(parts[0]) * 60 + int(parts[1])
-        else:
-            return int(time_str) if time_str.isdigit() else 0
-    except Exception:
-        return 0
+def parse_time_to_seconds(time_str: str) -> Optional[int]:
+    """Official per-game MM:SS; explicit zero is measured, absent/invalid is not."""
+    return parse_toi(time_str)
 
 
 def fetch_game_boxscore(game_id: int, db: Optional[SupabaseRest] = None, force_api: bool = False) -> Optional[Dict]:
@@ -305,7 +292,7 @@ def extract_player_stats_from_boxscore(boxscore: Dict) -> Dict[int, Dict[str, An
                     "nhl_pim": _safe_int(player_stat.get("pim") or player_stat.get("penaltyMinutes", 0)),
                     "nhl_plus_minus": _safe_int(player_stat.get("plusMinus", 0)),
                     "nhl_toi_seconds": parse_time_to_seconds(
-                        player_stat.get("timeOnIce") or player_stat.get("toi") or "0:00"
+                        player_stat.get("timeOnIce") or player_stat.get("toi")
                     ),
                     
                     # ===================
@@ -600,16 +587,20 @@ def update_player_game_stats_nhl_columns(
     This ensures goalies and skaters both use official NHL boxscore data for
     public-facing stats (matchups, player cards, fantasy scoring).
     
-    Returns dict with counts: {updated, created, skipped}
+    Returns write counts plus affirmative TOI availability/withholding counts.
+    Missing TOI cannot be inserted into the legacy NOT NULL/default-zero schema.
+    Existing non-TOI fields may update without refreshing the preserved TOI.
     """
     updated_count = 0
     created_count = 0
     skipped_count = 0
+    toi_available = 0
+    toi_withheld = 0
     
     # Validate that we have stats to process
     if not player_stats:
         logger.warning(f"    [WARNING] No player stats extracted for game {game_id}")
-        return {"updated": 0, "created": 0, "skipped": 0}
+        return {"updated": 0, "created": 0, "skipped": 0, "toi_available": 0, "toi_withheld": 0}
     
     # Processing {len(player_stats)} players for game {game_id} (logging disabled for cleaner output)
 
@@ -618,7 +609,15 @@ def update_player_game_stats_nhl_columns(
         if not isinstance(stats, dict):
             logger.error(f"    [ERROR] Player {player_id} has invalid stats dict (type: {type(stats)})")
             skipped_count += 1
+            toi_withheld += 1
             continue
+
+        # Preserve the frozen extraction input and metadata across retries.
+        stats = dict(stats)
+        toi_valid = type(stats.get("nhl_toi_seconds")) is int and stats["nhl_toi_seconds"] >= 0
+        if not toi_valid:
+            stats.pop("nhl_toi_seconds", None)
+            toi_withheld += 1
         
         # Extract metadata (these are NOT stored as columns, just used for logic)
         is_goalie = stats.pop("_is_goalie", False)
@@ -636,6 +635,13 @@ def update_player_game_stats_nhl_columns(
             ],
             limit=1
         )
+
+        if not existing and not toi_valid:
+            # Omitting this field on INSERT would silently invoke DEFAULT 0.
+            skipped_count += 1
+            logger.warning("[TOI WITHHELD] game=%s player=%s action=insert_withheld "
+                           "reason=official_toi_missing_or_invalid", game_id, player_id)
+            continue
         
         if existing and len(existing) > 0:
             # =============================================
@@ -651,8 +657,14 @@ def update_player_game_stats_nhl_columns(
             update_data = {
                 **stats,
                 "position_code": position_code,  # Fix: was being popped but never included in updates
-                "updated_at": datetime.now().isoformat()
             }
+            if toi_valid:
+                update_data["updated_at"] = datetime.now().isoformat()
+            else:
+                # A row timestamp cannot represent per-field freshness. Until
+                # that schema is rolled out, do not refresh preserved old TOI.
+                logger.warning("[TOI WITHHELD] game=%s player=%s action=preserve_prior_toi "
+                               "reason=official_toi_missing_or_invalid", game_id, player_id)
             
             try:
                 db.update(
@@ -665,10 +677,12 @@ def update_player_game_stats_nhl_columns(
                     ]
                 )
                 updated_count += 1
+                toi_available += int(toi_valid)
                 # Verbose logging disabled for cleaner terminal output
             except Exception as e:
                 logger.error(f"    [ERROR] Failed to update player {player_id}: {e}")
                 skipped_count += 1
+                toi_withheld += int(toi_valid)
         
         elif is_goalie:
             # =============================================
@@ -731,10 +745,12 @@ def update_player_game_stats_nhl_columns(
             try:
                 db.upsert("player_game_stats", goalie_record, on_conflict="season,game_id,player_id")
                 created_count += 1
+                toi_available += 1
                 logger.info(f"    [OK] Created goalie record for player {player_id}: W={stats.get('nhl_wins', 0)}, " f"Saves={stats.get('nhl_saves', 0)}, GA={stats.get('nhl_goals_against', 0)}, " f"TOI={stats.get('nhl_toi_seconds', 0)}s")
             except Exception as e:
                 logger.error(f"    [ERROR] Failed to create goalie record for {player_id}: {e}")
                 skipped_count += 1
+                toi_withheld += 1
         
         else:
             # Skater without existing record - CREATE it for live games
@@ -773,19 +789,25 @@ def update_player_game_stats_nhl_columns(
             try:
                 db.upsert("player_game_stats", skater_record, on_conflict="season,game_id,player_id")
                 created_count += 1
+                toi_available += 1
                 # Verbose logging disabled for cleaner terminal output
             except Exception as e:
                 logger.error(f"    [ERROR] Failed to create skater record for {player_id}: {e}")
                 skipped_count += 1
+                toi_withheld += 1
     
     # Print clean summary instead of per-player logging
     if updated_count + created_count > 0:
         logger.info(f"    [✓] Game {game_id}: {updated_count} updated, {created_count} created, {skipped_count} skipped")
     
+    logger.info("[HEALTH] game=%s metric=nhl_toi_seconds expected=%s available=%s withheld=%s",
+                game_id, len(player_stats), toi_available, toi_withheld)
     return {
         "updated": updated_count,
         "created": created_count,
-        "skipped": skipped_count
+        "skipped": skipped_count,
+        "toi_available": toi_available,
+        "toi_withheld": toi_withheld,
     }
 
 
@@ -895,6 +917,7 @@ def main():
     total_created = 0
     total_skipped = 0
     total_players = 0
+    total_toi_withheld = 0
     errors = 0
     
     for idx, game in enumerate(games, 1):
@@ -924,6 +947,7 @@ def main():
         player_stats = extract_player_stats_from_boxscore(boxscore)
         if not player_stats:
             logger.warning(f"  [WARNING] No player stats found in boxscore")
+            errors += 1
             time.sleep(0.5)
             continue
         
@@ -946,6 +970,7 @@ def main():
         total_created += result["created"]
         total_skipped += result["skipped"]
         total_players += len(player_stats)
+        total_toi_withheld += result["toi_withheld"]
         
         # Detailed output per game
         parts = []
@@ -954,7 +979,7 @@ def main():
         if result["created"] > 0:
             parts.append(f"created {result['created']} goalies")
         if result["skipped"] > 0:
-            parts.append(f"skipped {result['skipped']} skaters (no base record)")
+            parts.append(f"withheld/failed {result['skipped']} player writes")
         
         logger.info(f"  -> {', '.join(parts) if parts else 'no changes'}")
         
@@ -971,7 +996,9 @@ def main():
     logger.info(f"Players found: {total_players}")
     logger.info(f"Players updated: {total_updated}")
     logger.info(f"Goalies created: {total_created}")
-    logger.info(f"Skaters skipped (no base record): {total_skipped}")
+    logger.info(f"Player writes withheld/failed: {total_skipped}")
+    logger.info("[HEALTH] expected_games=%s source_failures=%s expected_players=%s toi_withheld=%s",
+                len(games), errors, total_players, total_toi_withheld)
     logger.error(f"Errors: {errors}")
     logger.info("")
     logger.info("ARCHITECTURE:")
@@ -983,7 +1010,7 @@ def main():
     logger.info("  nhl_wins, nhl_saves, nhl_shots_faced, nhl_goals_against, nhl_shutouts, nhl_save_pct")
     logger.info("")
     
-    return 0
+    return 2 if errors or total_skipped or total_toi_withheld else 0
 
 
 if __name__ == "__main__":

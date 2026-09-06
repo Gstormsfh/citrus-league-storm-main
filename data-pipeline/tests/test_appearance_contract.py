@@ -30,3 +30,8 @@ def test_historical_gp_requires_unambiguous_official_total():
     assert official_gp_from_landing({"seasonTotals": [row]}, 2024) == 70
     assert official_gp_from_landing({"seasonTotals": [row, row]}, 2024) is None
     assert official_gp_from_landing({"seasonTotals": [row]}, 2025) is None
+
+
+def test_malformed_or_boolean_official_inputs_are_unavailable():
+    for log,gp in (({},1),([None],1),([],True),([],1.0)):
+        assert reconcile_appearances([],log,gp,2025)['reason']=='official_source_invalid'

@@ -130,9 +130,13 @@ def main():
                 created = result.get("created", 0)
                 updated = result.get("updated", 0)
                 skipped = result.get("skipped", 0)
-                print(f"  [WRITE] created={created} updated={updated} skipped={skipped}")
+                toi_withheld = result['toi_withheld']
+                print(f"  [WRITE] created={created} updated={updated} skipped={skipped} toi_withheld={toi_withheld}")
                 overall["rows_written"] += created + updated
-                overall["games_ok"] += 1
+                if skipped or toi_withheld:
+                    overall["games_failed"] += 1
+                else:
+                    overall["games_ok"] += 1
             except Exception as e:
                 print(f"  [ERROR] write failed: {e}")
                 overall["games_failed"] += 1

@@ -127,13 +127,17 @@ def process_game_data_citrus(game_id: int, boxscore: dict, pbp_data: Optional[di
 
     game_date = _resolve_game_date()
 
-    update_player_game_stats_nhl_columns(
+    result = update_player_game_stats_nhl_columns(
         db=db,
         game_id=game_id,
         game_date=game_date,
         player_stats=player_stats,
         season=DEFAULT_SEASON
     )
+    if result['skipped'] or result['toi_withheld']:
+        logger.warning("[HEALTH] game=%s player_stats_complete=false skipped=%s toi_withheld=%s",
+                       game_id, result['skipped'], result['toi_withheld'])
+        return False
     return True
 
 # --- HELPER FUNCTIONS ---
