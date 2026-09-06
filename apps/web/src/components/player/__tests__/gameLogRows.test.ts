@@ -143,8 +143,8 @@ describe('upcomingCards', () => {
       entry({ date: '2026-10-09', dayLabel: 'Fri', opponent: '@ EDM', projectedPoints: 6 }),
     ]);
     expect(cards).toHaveLength(3);
-    expect(cards[0]).toEqual({ key: '2026-10-03', when: 'SAT 10/3', opponent: '@ CGY', note: '7.1 PROJ ·', noteTail: 'B2B' });
-    expect(cards[1]).toEqual({ key: '2026-10-05', when: 'MON 10/5', opponent: 'vs SJS', note: '7.4 PROJ', noteTail: null });
+    expect(cards[0]).toEqual({ key: '2026-10-03', when: 'SAT 10/3', opponent: '@ CGY', note: null, noteTail: 'B2B' });
+    expect(cards[1]).toEqual({ key: '2026-10-05', when: 'MON 10/5', opponent: 'vs SJS', note: null, noteTail: null });
     expect(cards[2].note).toBeNull();
   });
 

@@ -22,3 +22,22 @@ describe('league-specific projected points', () => {
     expect(result.points).toBe(36);
   });
 });
+
+import { scoreGameLog } from '../projectionScoring';
+import type { GameLogEntry } from '../gameLogRows';
+
+describe('played game league scoring', () => {
+  const entry: GameLogEntry = { date: '2026-01-01', dayLabel: 'Thu', dateLabel: 'Jan 1', opponent: '@ PIT', projectedPoints: 0, projection: null, isToday: false, computedConfidence: 0, isPast: true, isGoalie: false, actualPoints: 999, actualStats: { goals: 2, assists: 1, sog: 4 } };
+  it('rescales the same cached raw game on a league switch and leaves its source unchanged', () => {
+    expect(scoreGameLog([entry], { skater: { goals: 1 } })[0].actualPoints).toBe(2);
+    expect(scoreGameLog([entry], { skater: { goals: 10, assists: 2 } })[0].actualPoints).toBe(22);
+    expect(entry.actualPoints).toBe(999);
+  });
+  it('preserves DNP as missing rather than inventing a zero from cached default points', () => {
+    expect(scoreGameLog([{ ...entry, actualStats: undefined }], null)[0].actualPoints).toBeUndefined();
+  });
+  it('retains negative goalie totals under league settings', () => {
+    const goalie = { ...entry, isGoalie: true, actualStats: { saves: 10, goals_against: 5 } };
+    expect(scoreGameLog([goalie], { goalie: { saves: 0.1, goals_against: -2 } })[0].actualPoints).toBe(-9);
+  });
+});

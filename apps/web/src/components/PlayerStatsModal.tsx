@@ -1,5 +1,5 @@
 import { useLeague } from '@/contexts/LeagueContext';
-import { projectedSummary } from '@/components/player/projectionScoring';
+import { projectedSummary, scoreGameLog } from '@/components/player/projectionScoring';
 import { useGameLogIdentity } from '@/components/player/useGameLogIdentity';
 import { userMessage } from '@/lib/userMessage';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -600,7 +600,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
   // the goalie flag off `player` directly because `isGoalie` is declared
   // below it.
   const logIsGoalie = player?.position === 'Goalie' || player?.position === 'G';
-  const playedLog = useMemo(() => playedRows(gameLog, logIsGoalie), [gameLog, logIsGoalie]);
+  const scoredGameLog = useMemo(() => scoreGameLog(gameLog, leagueScoring), [gameLog, leagueScoring]);
+  const leagueActualTotal = scoredGameLog.reduce((sum, entry) => sum + (entry.isPast ? entry.actualPoints ?? 0 : 0), 0);
+  const playedLog = useMemo(() => playedRows(scoredGameLog, logIsGoalie), [scoredGameLog, logIsGoalie]);
   const upcomingLog = useMemo(() => upcomingRows(gameLog, logIsGoalie), [gameLog, logIsGoalie]);
 
   // ── THE ARTBOARD'S TILES, WATCH AND SHARE (2026-09-05) ────────────────
@@ -663,9 +665,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
     const from = new Date(`${today}T00:00:00`);
     from.setDate(from.getDate() - 6);
     const fromStr = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`;
-    const played = gameLog.filter((e) => e.isPast && e.date >= fromStr && e.actualPoints != null);
+    const played = scoredGameLog.filter((e) => e.isPast && e.date >= fromStr && e.actualPoints != null);
     return played.length ? played.reduce((sum, e) => sum + (e.actualPoints ?? 0), 0) : null;
-  }, [gameLog]);
+  }, [scoredGameLog]);
   const [watched, setWatched] = useState(() => {
     const wl = LeagueService.getWatchlist() as unknown;
     const id = String(player?.id ?? '');
@@ -719,8 +721,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
       garPercentile: pct('gar_per_60'),
       cohortNoun: advanced?.cohortNoun ?? null,
       cohortSize: advanced?.cohortSize ?? null,
-      projFp: indexEntry?.proj_fantasy_points ?? null,
-      projGp: indexEntry?.proj_gp ?? null,
+      projFp: scoringReady && !gameLogLoading && gameLog.some(g => !g.isPast && g.projection) ? leagueProjection.points : null,
+      projGp: isGoalie ? goalieStartsRemaining : gameLog.filter(g => !g.isPast && g.projection).length || null,
       posRank: positionRank,
       projectionLabel: framing.beforeOpener ? `for ${framing.eyebrow.replace(' projection', '')}` : 'the rest of the way',
       career,
@@ -1302,8 +1304,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                       </span>
                     </div>
                     <div className="ml-auto text-right">
-                      {totalActual > 0 && (
-                        <div className="font-plex font-semibold text-[17px] tabular-nums text-pressbox-text leading-tight">{totalActual.toFixed(1)}<span className="font-plex font-medium text-[9px] text-pressbox-text/45 uppercase ml-1">actual</span></div>
+                      {scoringReady && scoredGameLog.some(g => g.isPast && g.actualPoints != null) && (
+                        <div className="font-plex font-semibold text-[17px] tabular-nums text-pressbox-text leading-tight">{leagueActualTotal.toFixed(1)}<span className="font-plex font-medium text-[9px] text-pressbox-text/45 uppercase ml-1">actual</span></div>
                       )}
                       {futureGames.length > 0 && (
                         <div className="font-plex font-semibold text-[14px] tabular-nums text-pressbox-orange-soft leading-tight">{leagueProjection.points.toFixed(1)}<span className="font-plex font-medium text-[9px] text-pressbox-text/45 uppercase ml-1">proj</span></div>
