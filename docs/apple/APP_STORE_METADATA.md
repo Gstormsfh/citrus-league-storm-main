@@ -1,96 +1,65 @@
-# App Store Connect — metadata draft (2026-08-15)
+# App Store Connect — release worksheet, September 6, 2026
 
-Fill-ins marked ⟨⟩. Everything else is submission-ready copy.
+This is prepared copy and a verification worksheet, not confirmation of App Store Connect completion. See [the readiness report](SUBMISSION_READINESS_2026-09-06.md) for actual tests and release gates.
 
 ## App information
-- **Name:** CitrusSports — Fantasy Hockey
-- **Subtitle** (30 chars max): `Fresh-squeezed fantasy hockey` (29 ✓)
-- **Category:** Sports  ·  Secondary: none
-- **Bundle ID:** com.citrussports.app
 
-## Promotional text (170 max, editable without review)
-> Season-long NHL fantasy with live snake drafts, real-time scoring, and an
-> xG-powered projection model. Draft night just got serious. (139 ✓)
+- Name: `CitrusSports — Fantasy Hockey`
+- Subtitle: `Fresh-squeezed fantasy hockey`
+- Primary category: Sports
+- Bundle ID: `com.citrussports.app`
+- Current candidate: version 1.0, build 4. Verify build-number availability in App Store Connect before upload.
 
-## Description
-CitrusSports is season-long NHL fantasy hockey built around the best part of
-fantasy: draft night.
+## Description draft
 
-LIVE DRAFT ROOM — Real-time snake drafts with a synced pick clock, a draft
-queue that autopicks for you if life pulls you away, and a board that never
-loses your place, even if your connection drops mid-round.
+CitrusSports brings season-long fantasy hockey to your phone. Create or join a league, draft your roster, manage your lineup, follow matchups and explore player statistics.
 
-SMARTER RANKINGS — Player projections built on expected-goals (xG) data, not
-just last year's box scores.
+Use Stormy for fantasy hockey questions with your league context. Before sending a question, Citrus explains what information will be shared with Anthropic and asks for your permission. Stormy has a weekly question limit.
 
-SET YOUR LINEUP — Drag-and-drop lineups, auto-lineup from projections, weekly
-matchups, live scoring.
+Citrus is not affiliated with or endorsed by the NHL or Apple.
 
-RUN YOUR LEAGUE — Commissioner tools, custom scoring, dynamic roster sizes and
-draft settings.
+Verify every advertised feature against the final device build. Do not advertise Draft Kit in mobile metadata or screenshots.
 
-Free to play. No entry fees, no prizes, no gambling. ⟨CONFIRM before submission
-— if ANY league supports real-money entry, this line and the review notes must
-change, and guideline 5.3 applies.⟩
+## Destinations
 
-## Keywords (100 chars max, comma-separated)
-`fantasy hockey,NHL,draft,fantasy sports,hockey stats,snake draft,fantasy league,xG,hockey pool` (97 ✓)
+- Support: https://citrusfantasysports.com/contact
+- Privacy: https://citrusfantasysports.com/privacy-policy.html
+- Terms: https://citrusfantasysports.com/terms-of-service.html
+- Support email: CitrusFantasySports@Gmail.com
 
-## URLs
-- Support: ⟨https://citrussports.app/support — must exist before review⟩
-- Marketing: ⟨optional⟩
-- Privacy policy: ⟨host docs/apple/PRIVACY_POLICY_DRAFT.md at a public URL —
-  required field, checked by review⟩
+All three HTTPS destinations returned 200 during this sweep. The revised policies are not live yet; publication is a release prerequisite. Email delivery was not tested.
 
-## Age rating questionnaire — expected answers
-- Gambling (simulated or real): **No** ⟨assumes free-to-play confirmed⟩
-- Contests: **Yes, infrequent/mild** (fantasy contests, no cash)
-- Everything else: No → lands at **4+** (12+ if you answer Contests
-  conservatively; either passes)
+## App Privacy worksheet
 
-## Privacy nutrition labels (App Privacy section)
-| Data | Collected? | Linked to identity | Tracking |
-|---|---|---|---|
-| Email address | Yes (account) | Yes | No |
-| Name / display name | Yes | Yes | No |
-| User ID | Yes | Yes | No |
-| Gameplay content (rosters, picks) | Yes | Yes | No |
-| Coarse location / precise location | No | — | — |
-| Usage data (product interaction) | Yes, **only with consent** | Yes | No |
-| Advertising data | No | — | — |
+Disclose collection by both Citrus and its service providers, including optional collection. Confirm these answers against the final archive's privacy report and deployed service settings.
 
-**Ads correction (2026-08-15 sweep):** the WEBSITE loads Google AdSense
-(apps/web/index.html). The NATIVE build strips it automatically
-(`scripts/build-native.mjs` asserts the strip), so the app itself ships ad-free
-and "Data Not Used to Track You" stands for the App Store labels. Do not
-answer the advertising questions based on the website.
-**Firebase Analytics — resolved (2026-08-18).** It IS wired
-(`services/AnalyticsService.ts` → `integrations/firebase/config.ts`) but it is
-**consent-gated**: `getAnalyticsInstance()` returns null unless
-`localStorage['citrus_analytics_consent'] === 'granted'`, so the default state
-for a fresh install is off until the user accepts the banner. It also calls
-`setUserId(session.user.id)` from AuthContext, so when consent IS granted the
-analytics data is **linked to identity**. That is already reflected in the
-User ID row above; add the Usage Data row below. It is first-party product
-analytics, not cross-app tracking — `NSPrivacyTracking` stays `false` and the
-tracking domains array stays empty, which matches PrivacyInfo.xcprivacy.
+| Data | Linked to account | Purpose / evidence |
+|---|---|---|
+| Email address, display name, user ID | Yes | Account functionality; signed-in Sentry identity |
+| Photos/videos | Yes | Optional profile-photo upload |
+| Other user content | Yes | League activity and questions sent to Stormy |
+| Device ID | Yes | Push registration / analytics identifiers |
+| Product interaction | Yes | Firebase Analytics, opt-in; user ID association |
+| Crash / other diagnostic data | Yes | Sentry error reports and context |
 
-**Data region — resolved (2026-08-18):** both Supabase projects are
-`ca-central-1` (Canada). Use that in the privacy policy's storage-location
-clause; `CitrusFantasySports` is prod, `citrus-staging` is staging — they are
-separate databases, not one shared instance.
+Native tracking flag is false; native build strips AdSense. No location permission is requested. Confirm whether configured analytics/providers retain IP-derived coarse location or additional performance data, and disclose them if collected. Do not copy web-ad answers into the native app questionnaire. User ID may also serve Analytics purpose; make the Connect worksheet reflect actual SDK behavior rather than treating the app manifest as the entire disclosure.
 
-## Review notes (draft)
-> CitrusSports is a free season-long fantasy hockey app. No real money: no
-> entry fees, no prizes, no wagering of any kind. Demo account:
-> ⟨reviewer@citrussports.app / password — CREATE THIS, place it in a league
-> with an active roster so every screen has data⟩. The draft room can be
-> explored via ⟨seed a completed demo draft so review sees a populated board⟩.
+## Age rating
 
-## Screenshots (required sets)
-6.9" (iPhone 16 Pro Max) and 6.5" — capture AFTER the Sunday test build:
-1. Draft room, mid-draft, clock running
-2. Roster with the dark tile view
-3. Player pool with queue stars
-4. Matchup / scoring screen
-5. League standings
+Complete the current questionnaire, including user-generated content, messaging and assistant capabilities actually present. Do not reuse the old blanket “everything else No / 4+” answer. The policy minimum age is 13; if Apple's calculated rating is lower, use the higher-age override to match the minimum. This is not a Kids Category app. Review contest classifications against actual app behavior; the current terms describe no entry fees or monetary prizes.
+
+[Apple age-rating instructions](https://developer.apple.com/help/app-store-connect/manage-app-information/set-an-app-age-rating/)
+
+## Review access
+
+Provide a working email/password reviewer account through App Store Connect's private review credentials fields. Verify login, accepted current policies, membership in a populated league, roster/matchup/player access and a usable draft walkthrough. No reviewer credentials were created or tested in this sweep. Do not paste credentials in this repository.
+
+Review notes should describe how to reach each feature and note that the NHL season state can affect available live games. Record the actual account/league setup, not invented demo data. Do not claim that this archive has passed device review until it has.
+
+## Screenshots
+
+Capture from the final device/simulator build. Current requirements allow 6.9-inch iPhone screenshots, with 6.5-inch required if the larger set is not supplied. A 13-inch iPad set is required because the project supports iPad (`TARGETED_DEVICE_FAMILY = 1,2`). Supply 1–10 images per required set, no alpha channel.
+
+Suggested real screens: league home, draft, roster, matchup, player statistics. Do not use mockups or desktop-only product screens as app screenshots.
+
+[Apple screenshot specifications](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/)

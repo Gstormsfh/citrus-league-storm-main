@@ -1,3 +1,4 @@
+import { DesktopProduct } from '@/components/DesktopProduct';
 import React, { Suspense, lazy, useEffect } from "react";
 import { CitrusToaster } from "@/components/notifications/CitrusToaster";
 import { logger } from '@/utils/logger';
@@ -77,7 +78,9 @@ const PlayoffBracket = lazyWithErrorHandling(() => import("./pages/PlayoffBracke
 const FreeAgents = lazyWithErrorHandling(() => import("./pages/FreeAgents"));
 const Players = lazyWithErrorHandling(() => import("./pages/Players"));
 const PlayerDashboard = lazyWithErrorHandling(() => import("./pages/PlayerDashboard"));
-const DraftKit = lazyWithErrorHandling(() => import("./pages/DraftKit"));
+const DraftKit = import.meta.env.VITE_NATIVE === '1'
+  ? () => null
+  : lazyWithErrorHandling(() => import("./pages/DraftKit"));
 const GMOffice = lazyWithErrorHandling(() => import("./pages/GMOffice"));
 const StormyAssistant = lazyWithErrorHandling(() => import("./pages/StormyAssistant"));
 const News = lazyWithErrorHandling(() => import("./pages/News"));
@@ -218,6 +221,7 @@ const App = () => {
                 <Route path="/roster" element={<ErrorBoundary><Roster /></ErrorBoundary>} />
                 <Route path="/standings" element={<ErrorBoundary><Standings /></ErrorBoundary>} />
                 <Route path="/contact" element={<Contact />} />
+                <Route path="/support" element={<Contact />} />
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/podcasts" element={<Podcasts />} />
                 <Route path="/guides" element={<Guides />} />
@@ -246,7 +250,7 @@ const App = () => {
                 {/* Draft Kit — paid analytics section. Authed because the
                     entitlement gate needs an identity to resolve; the free
                     tier still gets a real preview from the server. */}
-                <Route path="/draft-kit" element={<ProtectedRoute><ErrorBoundary><DraftKit /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/draft-kit/*" element={<DesktopProduct route><ProtectedRoute><ErrorBoundary><DraftKit /></ErrorBoundary></ProtectedRoute></DesktopProduct>} />
                 <Route path="/gm-office" element={<ProtectedRoute><ErrorBoundary><GMOffice /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/gm-office/stormy" element={<ProtectedRoute><ErrorBoundary><StormyAssistant /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/news" element={<News />} />

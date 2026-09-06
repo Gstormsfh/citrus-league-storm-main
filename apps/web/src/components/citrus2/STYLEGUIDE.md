@@ -54,7 +54,7 @@ We don't lie about features:
 - ❌ No fake testimonials, fake star ratings, fake user counts
 - ❌ No ties in fantasy league standings (use W-L not W-L-T)
 - ✅ NHL team records use W-L-OTL (real NHL format)
-- ✅ Free during launch · founders pricing locked in for early users (real plan to monetize later)
+- ✅ Free to play · no credit card required (no paid plans or upgrade offers)
 
 ## Component cookbook
 

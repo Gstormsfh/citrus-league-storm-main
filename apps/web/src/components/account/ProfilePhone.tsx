@@ -1,3 +1,4 @@
+import { AnalyticsPreference } from '@/components/AnalyticsPreference';
 /**
  * THE ACCOUNT SCREEN, THE PHONE (PR10p, 2026-09-04)
  *
@@ -531,6 +532,7 @@ export function ProfilePhone({ tab, onTabChange, hero, identity, stats, activity
             </PressBoxSettingGroup>
 
             <PressBoxSettingGroup label="LEGAL & DATA">
+              <AnalyticsPreference />
               <PressBoxSettingRow label="Terms of service" onPress={() => openPolicy('/terms-of-service.html')} value="Read" />
               <PressBoxSettingRow label="Privacy policy" onPress={() => openPolicy('/privacy-policy.html')} value="Read" />
               <PressBoxSettingRow

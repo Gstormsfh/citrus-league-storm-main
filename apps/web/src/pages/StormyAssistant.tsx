@@ -1,3 +1,4 @@
+import { confirmStormySharing } from '@/lib/stormySharing';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,7 +22,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Zap, MessageSquare, Clock, Shield, Settings, Crown, Send, Loader2 } from 'lucide-react';
+import { Zap, MessageSquare, Clock, Shield, Settings, Send, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -258,6 +259,7 @@ const StormyAssistant = () => {
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
     if (!text || isLoading) return;
+    if (!confirmStormySharing()) return;
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
@@ -578,10 +580,9 @@ const StormyAssistant = () => {
                             <span className="font-bold text-pastel-cream">Every 7 days</span>
                           </div>
 
-                          <Button className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
-                            <Crown className="h-5 w-5 mr-2" />
-                            Upgrade to Unlimited
-                          </Button>
+                          <p className="text-sm text-white/60">
+                            Stormy is free to use. Your question allowance resets every 7 days.
+                          </p>
                         </CardContent>
                       </Card>
 

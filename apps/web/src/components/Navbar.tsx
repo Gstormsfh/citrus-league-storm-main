@@ -1,3 +1,4 @@
+import { DesktopProduct } from '@/components/DesktopProduct';
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -350,7 +351,7 @@ const Navbar = () => {
                 row is a fixed six at lg and a seventh would push it past the
                 container at 1024px. */}
             <div className="ml-auto flex items-center gap-0">
-              <Link
+              <DesktopProduct><Link
                 to="/draft-kit"
                 className={cn(
                   "flex items-center gap-2 px-4 h-11 text-[13px] font-bold transition-all border-b-2 whitespace-nowrap",
@@ -361,7 +362,7 @@ const Navbar = () => {
               >
                 <ClipboardList className="h-4 w-4" />
                 Draft Kit
-              </Link>
+              </Link></DesktopProduct>
               <Link
                 to="/news"
                 className={cn(
@@ -559,10 +560,10 @@ const Navbar = () => {
                 <Radio className="h-4 w-4" />
                 <span className="text-[13px] font-bold">Scores</span>
               </Link>
-              <Link to="/draft-kit" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-md text-white/55 hover:text-pastel-cream hover:bg-white/5 transition-all">
+              <DesktopProduct><Link to="/draft-kit" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-md text-white/55 hover:text-pastel-cream hover:bg-white/5 transition-all">
                 <ClipboardList className="h-4 w-4" />
                 <span className="text-[13px] font-bold">Draft Kit</span>
-              </Link>
+              </Link></DesktopProduct>
               <Link to="/news" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-md text-white/55 hover:text-pastel-cream hover:bg-white/5 transition-all">
                 <Newspaper className="h-4 w-4" />
                 <span className="text-[13px] font-bold">News</span>

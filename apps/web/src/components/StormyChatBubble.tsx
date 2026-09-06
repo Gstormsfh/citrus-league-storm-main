@@ -1,3 +1,4 @@
+import { confirmStormySharing } from '@/lib/stormySharing';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -242,6 +243,7 @@ export const StormyChatBubble = () => {
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
     if (!text || isLoading) return;
+    if (!confirmStormySharing()) return;
 
     // Add user message to UI
     const userMsg: ChatMessage = {

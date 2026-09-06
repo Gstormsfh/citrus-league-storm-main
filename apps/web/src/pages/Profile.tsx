@@ -1,3 +1,5 @@
+import { interceptExternal } from '@/lib/openExternal';
+import { AnalyticsPreference } from '@/components/AnalyticsPreference';
 import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -2343,6 +2345,8 @@ const Profile = () => {
                     </CardContent>
                   </Card>
 
+                  <AnalyticsPreference />
+
                   {/* Legal & Privacy */}
                   <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
@@ -2355,6 +2359,7 @@ const Profile = () => {
                     <CardContent className="space-y-2">
                       <a
                         href="/privacy-policy.html"
+                        onClick={(e) => { if (interceptExternal('/privacy-policy.html')) e.preventDefault(); }}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center justify-between p-3 rounded-xl bg-white/5 ring-1 ring-white/10 hover:bg-white/[0.07] hover:ring-pastel-orange/30 transition-all group"
@@ -2364,6 +2369,7 @@ const Profile = () => {
                       </a>
                       <a
                         href="/terms-of-service.html"
+                        onClick={(e) => { if (interceptExternal('/terms-of-service.html')) e.preventDefault(); }}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center justify-between p-3 rounded-xl bg-white/5 ring-1 ring-white/10 hover:bg-white/[0.07] hover:ring-pastel-orange/30 transition-all group"
