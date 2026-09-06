@@ -20,6 +20,30 @@ Status: foundation NOT accepted. Local work only; no production rollout authoriz
 
 ## Current local verification (2026-09-06)
 
+### Saved model → native publication → actual reader
+
+The [local diagnostic checkpoint](analytics-model-publication-result-20260906.md)
+passes on two fresh disposable PostgreSQL/PostgREST fixtures. Every retained
+validation event is bound to its saved model/map; four complete season/type game
+diagnostics pass the actual Python publisher and TypeScript reader with exact
+values. Replay, withholding, rollback, stale NULLs, wrong scopes, damaged/failed
+pages and ordinary-role read/write denial pass. A separate review independently
+re-aggregates the retained predictions and rehashes 12,971 bound files. All three
+earlier failed harness attempts remain preserved, including the anonymous-role
+HTTP-status test correction. Only owned disposable fixtures were removed.
+
+This closes local **diagnostic transport**, not player actuals, model quality,
+serving, complete nightly coverage, hosted capacity or FPAR. The earlier
+calibration/subgroup weaknesses remain. Full offline Python: 1,742 passed,
+16 network tests deselected; seven reader, 17 infrastructure and 57 combined
+checkpoint tests pass. Server/proof type checking passes. All 51 separately
+indexed prior artifact/result/archive pins remain unchanged, including original
+future reservations. No production or hosted database change occurred.
+
+Next prioritize bounded canonical-event player/goalie attribution and exposure,
+then the unresolved complete nightly dependency path. Keep these local and
+non-serving; do not replace quality/forecast gates with transport success.
+
 ### Additive calibration-shape comparison
 
 The [shape checkpoint](analytics-calibration-shape-result-20260906.md) freezes
@@ -37,9 +61,10 @@ tolerance; it composes with the earlier tree proof, not a new PBP parser or
 hosted serving proof. The new module is not serving-exported. Before fitting,
 1,658 offline Python and 284 shared tests pass; shared type checking passes.
 Thirty archive/review tests pass. Prior evidence and production are unchanged.
-Next prioritize local model-to-publication-to-consumer lineage and rejection
-paths, not another unbounded search on these same validation outcomes. FPAR
-remains gated on the unresolved foundation and physical-forecast requirements.
+At this checkpoint the next lane was local model-to-publication-to-consumer
+lineage and rejection paths; its bounded diagnostic proof is recorded above.
+Do not start another unbounded search on these same validation outcomes. FPAR
+remains gated on unresolved foundation and physical-forecast requirements.
 
 ### Additive calibration refinement and cross-language inference
 

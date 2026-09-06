@@ -1,0 +1,28 @@
+{
+  "contract": "citrus-local-model-publication-result-index-v1",
+  "status": "local-diagnostic-transport-verified-foundation-not-accepted",
+  "publishable": false,
+  "proof_code_commit": "e7dcda14",
+  "review_code_commit": "342ab518",
+  "files": {
+    "scripts/proof/results/local-model-publication-20260906-1119/health.json": "2e25797a1a71c6943229a5b062ab6d4394b3bfb7c0626b0d848d85db1bfb699c",
+    "scripts/proof/results/local-model-publication-20260906-1122/health.json": "da492531a6238256eb146ad66f4327705a1b663c4d19fa0bd05dda906aa2d16a",
+    "scripts/proof/results/local-model-publication-review-20260906/review.json": "75b865c1e0e8ae77d678fcb6798f849ab2eda29ceb5cc4f5b4c5f8bc135d73be"
+  },
+  "bound_review_files": 12971,
+  "successful_native_runs": 2,
+  "preserved_failed_attempts": 3,
+  "independent_event_aggregation_exact": true,
+  "fresh_run_values_equal": true,
+  "production_changed": false,
+  "model_accepted": false,
+  "foundation_accepted": false,
+  "prior_evidence_removed_or_replaced": false,
+  "original_prospective_reservations_changed": false,
+  "remaining_gates": [
+    "calibration-and-subgroup-errors",
+    "player-goalie-attribution-and-exposure-validation",
+    "remaining-source-writer-nightly-and-operational-coverage",
+    "validated-physical-forecast-foundation-before-FPAR"
+  ]
+}
