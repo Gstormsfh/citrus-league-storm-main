@@ -933,7 +933,7 @@ export class LineupService {
     for (const pid of sortedIds) {
       const status = statusMap.get(pid);
       if (status === 'IR' || status === 'SUSP') {
-        if (irSlotIndex <= 3) {
+        if (irSlotIndex <= initCfg.irCount) {
           ir.push(pid);
           slotAssignments[pid] = `ir-slot-${irSlotIndex}`;
           irSlotIndex++;
@@ -975,13 +975,13 @@ export class LineupService {
     }
     // UTIL slot
     const assignedIds = new Set(Object.keys(slotAssignments));
-    const utilPlayer = starters.find(pid => {
+    const utilPlayers = starters.filter(pid => {
       const pos = getFantasyPosition(positionMap.get(pid) || 'UTIL');
       return !assignedIds.has(pid) && pos !== 'G';
     });
-    if (utilPlayer) {
-      slotAssignments[utilPlayer] = 'slot-UTIL';
-    }
+    utilPlayers.slice(0, initCfg.utilCount).forEach((pid, index) => {
+      slotAssignments[pid] = initCfg.utilCount === 1 ? 'slot-UTIL' : `slot-UTIL-${index + 1}`;
+    });
 
     const lineup = { starters, bench, ir, slot_assignments: slotAssignments };
 

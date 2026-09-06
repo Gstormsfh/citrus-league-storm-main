@@ -71,7 +71,7 @@ const Podcasts = () => {
             Nothing to listen to yet. <span className="text-pastel-orange">Plenty to play.</span>
           </>
         }
-        sub="Free during launch · Founders pricing locked in for early users"
+        sub="Free to play · No credit card required"
         ctaLabel="Create your league"
         ctaHref="/create-league"
       />

@@ -26,12 +26,20 @@ interface TeamInfo {
 
 const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) => {
   const { user } = useAuth();
+  return <LeagueNotificationsSession key={`${user?.id ?? "guest"}:${leagueId}`} leagueId={leagueId} />;
+};
+
+const LeagueNotificationsSession: React.FC<LeagueNotificationsProps> = ({ leagueId }) => {
+  const { user } = useAuth();
   const { data: profile } = useProfile();
   const navigate = useNavigate();
   const [chatMessage, setChatMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [safetyBusy, setSafetyBusy] = useState(false);
+  const [blockedHere, setBlockedHere] = useState<Set<string>>(new Set());
+  const [blockedUsers, setBlockedUsers] = useState<Array<{ blocked_id: string; created_at: string }> | null>(null);
   const [teamInfoMap, setTeamInfoMap] = useState<Map<string, TeamInfo>>(new Map());
-  
+
   const {
     notifications,
     unreadCounts,
@@ -52,13 +60,61 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
 
   // Separate CHAT notifications from other notifications
   const chatNotifications = useMemo(() => {
-    return leagueNotifications.filter(n => n.type === 'CHAT').sort((a, b) => 
+    return leagueNotifications.filter(n => n.type === 'CHAT' && !blockedHere.has(n.metadata?.sender_id)).sort((a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
-  }, [leagueNotifications]);
+  }, [leagueNotifications, blockedHere]);
+
+  const handleReport = async (notificationId: string) => {
+    const reason = window.prompt('Report this message to Citrus. What is the concern?');
+    if (!reason?.trim() || safetyBusy) return;
+    setSafetyBusy(true);
+    try {
+      await notificationApi.reportMessage(notificationId, reason.trim().slice(0, 1000));
+      toast({ title: 'Report submitted', description: 'Your report is available to Citrus support for review.' });
+    } catch (err) {
+      toast({ title: 'Report not submitted', description: userMessage(err, 'Please retry or contact Citrus support.'), variant: 'destructive' });
+    } finally { setSafetyBusy(false); }
+  };
+
+  const handleBlock = async (notificationId: string) => {
+    if (safetyBusy || !window.confirm('Block this user? Their league chat messages will be hidden and future chat messages between you will stop. You can unblock them from Blocked users.')) return;
+    setSafetyBusy(true);
+    try {
+      const response = await notificationApi.blockMessageSender(notificationId);
+      const blockedId = (response.data as { blockedId: string }).blockedId;
+      setBlockedHere((previous) => new Set([...previous, blockedId]));
+      if (user) await loadNotifications(leagueId, user.id);
+      toast({ title: 'User blocked' });
+    } catch (err) {
+      toast({ title: 'Could not block user', description: userMessage(err, 'Please retry.'), variant: 'destructive' });
+    } finally { setSafetyBusy(false); }
+  };
+
+  const loadBlockedUsers = async () => {
+    try {
+      const response = await notificationApi.getBlockedUsers();
+      setBlockedUsers(response.data as Array<{ blocked_id: string; created_at: string }>);
+    } catch (err) {
+      toast({ title: 'Blocked users unavailable', description: userMessage(err, 'Please retry.'), variant: 'destructive' });
+    }
+  };
+
+  const handleUnblock = async (blockedId: string) => {
+    if (safetyBusy) return;
+    setSafetyBusy(true);
+    try {
+      await notificationApi.unblockUser(blockedId);
+      setBlockedHere((previous) => new Set([...previous].filter((id) => id !== blockedId)));
+      await loadBlockedUsers();
+      if (user) await loadNotifications(leagueId, user.id);
+    } catch (err) {
+      toast({ title: 'Could not unblock user', description: userMessage(err, 'Please retry.'), variant: 'destructive' });
+    } finally { setSafetyBusy(false); }
+  };
 
   const otherNotifications = useMemo(() => {
-    return leagueNotifications.filter(n => n.type !== 'CHAT').sort((a, b) => 
+    return leagueNotifications.filter(n => n.type !== 'CHAT').sort((a, b) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   }, [leagueNotifications]);
@@ -156,7 +212,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
 
     // Route to relevant page based on notification type
     const metadata = notification.metadata || {};
-    
+
     switch (notification.type) {
       case 'ADD':
       case 'DROP':
@@ -220,7 +276,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
 
     const color = baseColors[type] || baseColors.SYSTEM;
     const opacity = isRead ? 'opacity-60' : '';
-    
+
     return `${color} ${opacity}`;
   };
 
@@ -269,7 +325,7 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
       {/* Decorative citrus leaves */}
       <CitrusLeaf className="absolute top-4 right-2 w-16 h-16 text-pastel-sage opacity-5 rotate-12 pointer-events-none" />
       <CitrusLeaf className="absolute bottom-20 left-2 w-12 h-12 text-pastel-cream opacity-5 -rotate-45 pointer-events-none" />
-      
+
       {/* Header */}
       <div className="px-4 py-3 border-b-4 border-white/10 bg-gradient-to-r from-pastel-sage/20 via-pastel-sage/10 to-pastel-sage/10 backdrop-blur-sm sticky top-0 z-sticky-base relative">
         <div className="flex items-center justify-between mb-1 relative z-10">
@@ -341,9 +397,15 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
                           {teamName}
                         </span>
                       </div>
-                      
+
                       {/* Message Bubble */}
                       <div className="flex flex-col gap-0.5 max-w-[75%]">
+                        {!isOwnMessage && senderId && (
+                          <div className="flex gap-3 text-xs">
+                            <button className="min-h-11 underline" disabled={safetyBusy} onClick={() => void handleReport(notification.id)}>Report</button>
+                            <button className="min-h-11 underline" disabled={safetyBusy} onClick={() => void handleBlock(notification.id)}>Block user</button>
+                          </div>
+                        )}
                         <div
                           className={`p-2.5 rounded-xl text-xs leading-snug shadow-sm font-display ${
                             isOwnMessage
@@ -411,6 +473,23 @@ const LeagueNotifications: React.FC<LeagueNotificationsProps> = ({ leagueId }) =
       </div>
 
       {/* Chat Input - Fixed at bottom */}
+      <div className="px-3 py-2 text-xs space-y-2">
+        <p>Keep league chat respectful. Report harmful content to Citrus support.</p>
+        <button className="min-h-11 underline" onClick={() => void loadBlockedUsers()}>Blocked users</button>
+        <a className="ml-4 underline" href="mailto:CitrusFantasySports@Gmail.com">Contact support</a>
+        {blockedUsers !== null && (
+          <div role="region" aria-label="Blocked users" className="space-y-2">
+            {blockedUsers.length === 0 && <p>No blocked users.</p>}
+            {blockedUsers.map((blocked, index) => (
+              <div key={blocked.blocked_id} className="flex items-center justify-between gap-2">
+                <span>{teamInfoMap.get(blocked.blocked_id)?.team_name || `Blocked user ${index + 1}`} · {new Date(blocked.created_at).toLocaleDateString()}</span>
+                <button className="min-h-11 underline" disabled={safetyBusy} onClick={() => void handleUnblock(blocked.blocked_id)}>Unblock</button>
+              </div>
+            ))}
+            <button className="min-h-11 underline" onClick={() => setBlockedUsers(null)}>Close blocked users</button>
+          </div>
+        )}
+      </div>
       <div className="px-3 py-2.5 border-t-4 border-white/10 bg-[#1A2A20] backdrop-blur-sm backdrop-blur-sm sticky bottom-0 shadow-[0_-4px_10px_rgba(27,48,34,0.1)]">
         <form onSubmit={handleSendChatMessage} className="flex items-center gap-2">
           <input

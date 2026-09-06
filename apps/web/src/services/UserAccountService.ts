@@ -87,8 +87,8 @@ export class UserAccountService {
     try {
       const response = await accountApi.deleteAccount();
       const result = response.data as Record<string, unknown>;
-      if (result && result.success === false) {
-        return { success: false, error: (result.error as string) || 'Deletion failed' };
+      if (!result || result.success !== true) {
+        return { success: false, error: (result?.error as string) || 'Deletion failed' };
       }
 
       return { success: true };

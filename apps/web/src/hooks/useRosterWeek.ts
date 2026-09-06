@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { matchupApi } from '@/api/matchups';
 import { playerApi } from '@/api/players';
-import { getCurrentSeason } from '@citrus/shared';
+import { getProjectionsSeason } from '@citrus/shared';
 import { getTodayMST } from '@/utils/timezoneUtils';
 import { logger } from '@/utils/logger';
 import { weekEntries, type ProjectionRowLite, type RosterWeekEntry, type RosterWeekPlayer } from '@/components/pressbox/rosterWeek';
@@ -55,7 +55,7 @@ export function useRosterWeek({ enabled, players, weekStart, weekEnd, scoring }:
             logger.warn('[useRosterWeek] week stats unavailable', err);
             return { data: null };
           }),
-          playerApi.getBatchProjections(ids.map(String), { startDate: weekStart, endDate: weekEnd, season: getCurrentSeason() }).catch((err: unknown) => {
+          playerApi.getBatchProjections(ids.map(String), { startDate: weekStart, endDate: weekEnd, season: getProjectionsSeason() }).catch((err: unknown) => {
             logger.warn('[useRosterWeek] week projections unavailable', err);
             return { data: null };
           }),
@@ -70,6 +70,9 @@ export function useRosterWeek({ enabled, players, weekStart, weekEnd, scoring }:
         const projections = (((projRes as { data?: unknown }).data ?? []) as ProjectionRowLite[]);
         setEntries(weekEntries(players, weekStats, projections, getTodayMST(), scoring));
         setReady(true);
+      } catch (error) {
+        logger.warn('[useRosterWeek] league-scored week unavailable', error);
+        if (!cancelled) { setEntries(EMPTY); setReady(false); }
       } finally {
         if (!cancelled) setLoading(false);
       }

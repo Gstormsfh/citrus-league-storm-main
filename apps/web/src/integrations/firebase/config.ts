@@ -3,7 +3,7 @@
 // All values come from VITE_FIREBASE_* environment variables (set in .env)
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAnalytics, Analytics, isSupported } from 'firebase/analytics';
+import { initializeAnalytics, Analytics, isSupported, setAnalyticsCollectionEnabled, setUserId } from 'firebase/analytics';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
@@ -39,6 +39,7 @@ if (hasValidConfig) {
 
 // Cookie consent key used by the consent banner
 const CONSENT_KEY = 'citrus_analytics_consent';
+export const ANALYTICS_CONSENT_EVENT = 'citrus:analytics-consent';
 
 function hasAnalyticsConsent(): boolean {
   try {
@@ -51,15 +52,19 @@ function hasAnalyticsConsent(): boolean {
 // Initialize Analytics (only after user consent)
 let analytics: Analytics | null = null;
 
-export const getAnalyticsInstance = (): Analytics | null => analytics;
+export const getAnalyticsInstance = (): Analytics | null => hasAnalyticsConsent() ? analytics : null;
 
 function initAnalytics() {
   if (typeof window === 'undefined' || !app || analytics) return;
   isSupported()
     .then((supported) => {
-      if (supported && app) {
+      if (supported && app && !analytics && hasAnalyticsConsent()) {
         try {
-          analytics = getAnalytics(app);
+          analytics = initializeAnalytics(app, { config: {
+            allow_google_signals: false,
+            allow_ad_personalization_signals: false,
+          } });
+          setAnalyticsCollectionEnabled(analytics, true);
         } catch {
           // Silently fail
         }
@@ -79,7 +84,9 @@ if (hasAnalyticsConsent()) {
  */
 export function grantAnalyticsConsent() {
   try { localStorage.setItem(CONSENT_KEY, 'granted'); } catch { /* noop */ }
-  initAnalytics();
+  if (analytics) setAnalyticsCollectionEnabled(analytics, true);
+  else initAnalytics();
+  window.dispatchEvent(new Event(ANALYTICS_CONSENT_EVENT));
 }
 
 /**
@@ -87,6 +94,11 @@ export function grantAnalyticsConsent() {
  */
 export function denyAnalyticsConsent() {
   try { localStorage.setItem(CONSENT_KEY, 'denied'); } catch { /* noop */ }
+  if (analytics) {
+    setAnalyticsCollectionEnabled(analytics, false);
+    setUserId(analytics, null);
+  }
+  window.dispatchEvent(new Event(ANALYTICS_CONSENT_EVENT));
 }
 
 /**

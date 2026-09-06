@@ -138,8 +138,7 @@ export default function Features() {
           </h1>
           <p className="text-[15px] md:text-[18px] leading-relaxed text-white/65 max-w-xl mx-auto mb-8 md:mb-10 px-4">
             Citrus is built for people who watch every game, refresh every box score, and care
-            about xGF%. Here's everything that ships in the platform. No upsells, and no premium
-            tier held back behind a paywall.
+            about xGF%. Explore the tools available in the fantasy hockey app.
           </p>
           <Link
             to="/create-league"
@@ -156,7 +155,7 @@ export default function Features() {
           <SectionHeader
             eyebrow="Core platform"
             title="The data that wins championships."
-            sub="Six pillars of the Citrus platform. All free during launch, founders pricing locked in for early users."
+            sub="Six pillars of the Citrus platform. Free to use, with no credit card required."
             align="center"
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -217,7 +216,7 @@ export default function Features() {
               Get on the ice <span className="text-pastel-orange">tonight</span>.
             </>
           }
-          sub="Free during launch · Founders pricing locked in for early users"
+          sub="Free to play · No credit card required"
           ctaLabel="Create your league"
           ctaHref="/create-league"
         />

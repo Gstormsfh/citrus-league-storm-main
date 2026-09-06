@@ -41,7 +41,7 @@ const DEFAULT_COLUMNS: FooterColumn[] = [
     links: [
       { label: 'About', to: '/about' },
       { label: 'Features', to: '/features' },
-      { label: 'Pricing', to: '/pricing' },
+      { label: 'Free to play', to: '/pricing' },
       { label: 'Blog', to: '/blog' },
       { label: 'Contact', to: '/contact' },
     ],

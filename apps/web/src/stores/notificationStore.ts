@@ -4,6 +4,11 @@ import { NotificationService, Notification } from '@/services/NotificationServic
 import { logger } from '@/utils/logger';
 
 interface NotificationState {
+  accountId: string | null;
+  generation: number;
+  loadVersions: Map<string, number>;
+  reset: () => void;
+  setAccount: (userId: string) => void;
   // State maps: leagueId -> data
   notifications: Map<string, Notification[]>;
   unreadCounts: Map<string, number>;
@@ -32,6 +37,21 @@ interface NotificationState {
 }
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
+  accountId: null,
+  generation: 0,
+  loadVersions: new Map(),
+  reset: () => {
+    const subscriptions = [...get().subscriptions.values()];
+    set((state) => ({ accountId: null, generation: state.generation + 1,
+      loadVersions: new Map(), notifications: new Map(), unreadCounts: new Map(), loading: new Map(),
+      errors: new Map(), subscriptions: new Map(), subscriberCounts: new Map() }));
+    subscriptions.forEach((close) => close());
+  },
+  setAccount: (userId) => {
+    if (get().accountId === userId) return;
+    get().reset();
+    set({ accountId: userId });
+  },
   // Initial state
   notifications: new Map(),
   unreadCounts: new Map(),
@@ -42,6 +62,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   // Load notifications for a league
   loadNotifications: async (leagueId: string, userId: string) => {
+    get().setAccount(userId);
+    const generation = get().generation;
+    const loadVersion = (get().loadVersions.get(leagueId) || 0) + 1;
+    set((state) => ({ loadVersions: new Map(state.loadVersions).set(leagueId, loadVersion) }));
     // Set loading state
     set((state) => {
       const newLoading = new Map(state.loading);
@@ -58,6 +82,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
     try {
       const { data, error } = await NotificationService.getNotifications(leagueId, userId);
+      if (get().generation !== generation || get().loadVersions.get(leagueId) !== loadVersion) return;
 
       if (error) {
         // NotificationService returns its error untyped; describe what we read.
@@ -93,6 +118,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       // Update unread count
       await get().updateUnreadCount(leagueId, userId);
     } catch (error: unknown) {
+      if (get().generation !== generation || get().loadVersions.get(leagueId) !== loadVersion) return;
       logger.error('[NotificationStore] Error loading notifications:', error);
       set((state) => {
         const newErrors = new Map(state.errors);
@@ -106,8 +132,11 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   // Mark a notification as read
   markAsRead: async (notificationId: string, userId: string) => {
+    get().setAccount(userId);
+    const generation = get().generation;
     try {
       const { error } = await NotificationService.markAsRead(notificationId, userId);
+      if (get().generation !== generation) return;
       
       if (error) {
         logger.error('[NotificationStore] Error marking notification as read:', error);
@@ -150,8 +179,11 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   // Mark all notifications as read for a league
   markAllAsRead: async (leagueId: string, userId: string) => {
+    get().setAccount(userId);
+    const generation = get().generation;
     try {
       const { data: count, error } = await NotificationService.markAllAsRead(leagueId, userId);
+      if (get().generation !== generation) return;
       
       if (error) {
         logger.error('[NotificationStore] Error marking all as read:', error);
@@ -181,8 +213,11 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   // Update unread count for a league
   updateUnreadCount: async (leagueId: string, userId: string) => {
+    get().setAccount(userId);
+    const generation = get().generation;
     try {
       const { data: count, error } = await NotificationService.getUnreadCount(leagueId, userId);
+      if (get().generation !== generation) return;
       
       if (error) {
         logger.error('[NotificationStore] Error updating unread count:', error);
@@ -201,6 +236,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   // Subscribe to real-time updates
   subscribe: (leagueId: string, userId: string) => {
+    get().setAccount(userId);
+    const generation = get().generation;
     // A second holder of a live channel shares it; only the first opens one.
     const holders = get().subscriberCounts.get(leagueId) || 0;
     set((state) => {
@@ -222,6 +259,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       leagueId,
       userId,
       (notification: Notification) => {
+        if (get().generation !== generation) return;
         // Update notifications in store
         set((state) => {
           const newNotifications = new Map(state.notifications);

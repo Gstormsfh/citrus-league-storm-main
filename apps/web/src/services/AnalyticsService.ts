@@ -38,7 +38,7 @@ class AnalyticsService {
    */
   setUserId(userId: string | null): void {
     const analytics = this.getAnalytics();
-    if (!analytics || !this.isEnabled() || !userId) return;
+    if (!analytics || !this.isEnabled()) return;
 
     try {
       setUserId(analytics, userId);

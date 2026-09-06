@@ -76,3 +76,12 @@ export function buildSlotConfig(
 }
 
 export default buildSlotConfig;
+
+/** Counts only starting slots, excluding bench and IR, using the render plan. */
+export function buildStarterSlotCounts(positionType: PositionType, rosterSlots?: Record<string, number>): Record<string, number> {
+  const counts: Record<string, number> = { UTIL: 0 };
+  for (const position of Object.values(buildSlotConfig(positionType, rosterSlots).labels)) {
+    counts[position] = (counts[position] ?? 0) + 1;
+  }
+  return counts;
+}

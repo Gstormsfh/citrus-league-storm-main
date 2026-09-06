@@ -96,10 +96,10 @@ describe('AnalyticsService', () => {
       expect(mockSetUserId).toHaveBeenCalledWith(fakeAnalytics, 'user-123');
     });
 
-    it('does nothing when userId is null', () => {
+    it('clears Firebase identity when the user signs out', () => {
       analyticsService.setUserId(null);
 
-      expect(mockSetUserId).not.toHaveBeenCalled();
+      expect(mockSetUserId).toHaveBeenCalledWith(fakeAnalytics, null);
     });
 
     it('does nothing when analytics is null', () => {

@@ -6,12 +6,46 @@ import { validateBody, schemas, getValidatedBody } from '../middleware/validate'
 import { createUserClient } from '../lib/supabase';
 import { NotificationService } from '../services/NotificationService';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
+import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
 
 const notificationRoutes = new Hono<Env>();
 
 notificationRoutes.use('*', authMiddleware);
+
+notificationRoutes.post('/report', validateBody(z.object({ notificationId: z.string().uuid(), reason: z.string().trim().min(1).max(1000) })), async (c) => {
+  const body = getValidatedBody<{ notificationId: string; reason: string }>(c);
+  const client = createUserClient(c.get('userToken'));
+  const result = await new NotificationService(client).reportMessage(c.get('userId'), body.notificationId, body.reason);
+  if (!result.success) return fail(c, AppError.badRequest(result.error!));
+  await new AuditService(client).log('SECURITY_VIOLATION', result.leagueId, { action: 'content_report', notificationId: body.notificationId }, 'WARN');
+  return ok(c, { success: true });
+});
+
+notificationRoutes.post('/block', validateBody(z.object({ notificationId: z.string().uuid() })), async (c) => {
+  const body = getValidatedBody<{ notificationId: string }>(c);
+  const client = createUserClient(c.get('userToken'));
+  const result = await new NotificationService(client).blockMessageSender(c.get('userId'), body.notificationId);
+  if (!result.success) return fail(c, AppError.badRequest(result.error!));
+  await new AuditService(client).log('ADMIN_ACTION', result.leagueId, { action: 'user_block' });
+  return ok(c, { success: true, blockedId: result.blockedId });
+});
+
+notificationRoutes.get('/blocks', async (c) => {
+  const result = await new NotificationService(createUserClient(c.get('userToken'))).getBlockedUsers(c.get('userId'));
+  if (result.error) return handleError(c, result.error, 'Could not load blocked users');
+  return ok(c, result.data);
+});
+
+notificationRoutes.delete('/blocks/:userId', async (c) => {
+  if (!z.string().uuid().safeParse(c.req.param('userId')).success) return fail(c, AppError.badRequest('Invalid user'));
+  const client = createUserClient(c.get('userToken'));
+  const result = await new NotificationService(client).unblockUser(c.get('userId'), c.req.param('userId'));
+  if (!result.success) return handleError(c, result.error, 'Could not unblock user');
+  await new AuditService(client).log('ADMIN_ACTION', null, { action: 'user_unblock' });
+  return ok(c, { success: true });
+});
 
 // PUT /api/notifications/read-all — Mark all notifications as read
 // IMPORTANT: This route MUST be defined before /:id to avoid param collision

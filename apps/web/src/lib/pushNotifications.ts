@@ -29,6 +29,23 @@ import { Capacitor } from '@capacitor/core';
 export type PushLogger = (message: string) => void;
 
 const noop = () => {};
+const DEVICE_TOKEN_KEY = 'citrus.push.device-token';
+let currentToken: string | null = null;
+// Serialize registration and sign-out so an in-flight upsert cannot restore
+// the departing user's token after cleanup has finished.
+let pushOperation: Promise<unknown> = Promise.resolve();
+function serializePush<T>(operation: () => Promise<T>): Promise<T> {
+  const result = pushOperation.then(operation, operation);
+  pushOperation = result.catch(noop);
+  return result;
+}
+function rememberToken(token: string): void {
+  currentToken = token;
+  try { localStorage.setItem(DEVICE_TOKEN_KEY, token); } catch { /* Memory fallback. */ }
+}
+function readToken(): string | null {
+  try { return currentToken ?? localStorage.getItem(DEVICE_TOKEN_KEY); } catch { return currentToken; }
+}
 
 export function isPushSupported(): boolean {
   return Capacitor.isNativePlatform();
@@ -42,7 +59,7 @@ export function isPushSupported(): boolean {
  * Returns false when push is unavailable or the user declined — callers should
  * treat that as normal, not as an error worth showing anyone.
  */
-export async function registerForPush(
+async function registerDeviceForPush(
   supabase: SupabaseClient,
   userId: string,
   onError: PushLogger = noop,
@@ -65,37 +82,37 @@ export async function registerForPush(
 
     // The token arrives asynchronously on the 'registration' event, never as a
     // return value, so the listener has to be attached before register() runs.
+    const handles: Array<{ remove(): Promise<void> }> = [];
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let settled = false;
+    let finish!: (token: string | null) => void;
     const registration = new Promise<string | null>((resolve) => {
-      let settled = false;
-      const timer = setTimeout(() => {
-        if (!settled) {
-          settled = true;
-          resolve(null);
-        }
-      }, 10_000);
-
-      void PushNotifications.addListener('registration', (token) => {
+      finish = (token) => {
         if (settled) return;
         settled = true;
-        clearTimeout(timer);
-        resolve(token.value);
-      });
-
-      void PushNotifications.addListener('registrationError', (err) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        onError(`APNs registration failed: ${JSON.stringify(err)}`);
-        resolve(null);
-      });
+        resolve(token);
+      };
     });
-
-    await PushNotifications.register();
-    const token = await registration;
+    let token: string | null;
+    try {
+      handles.push(await PushNotifications.addListener('registration', (result) => finish(result.value)));
+      handles.push(await PushNotifications.addListener('registrationError', () => {
+        onError('APNs registration failed');
+        finish(null);
+      }));
+      timer = setTimeout(() => finish(null), 10_000);
+      await PushNotifications.register();
+      token = await registration;
+    } finally {
+      settled = true;
+      clearTimeout(timer);
+      await Promise.allSettled(handles.map((handle) => handle.remove()));
+    }
     if (!token) {
       return false;
     }
 
+    rememberToken(token);
     const { error } = await supabase.from('device_tokens').upsert(
       {
         user_id: userId,
@@ -115,6 +132,14 @@ export async function registerForPush(
     onError(e instanceof Error ? e.message : 'push registration failed');
     return false;
   }
+}
+
+export function registerForPush(
+  supabase: SupabaseClient,
+  userId: string,
+  onError: PushLogger = noop,
+): Promise<boolean> {
+  return serializePush(() => registerDeviceForPush(supabase, userId, onError));
 }
 
 /**
@@ -180,7 +205,7 @@ export function registerPushTapListener(
  * Drop this device's token on sign-out, so the next person to use the phone
  * does not receive draft alerts for the previous user's leagues.
  */
-export async function unregisterDeviceToken(
+async function unregisterCurrentDeviceToken(
   supabase: SupabaseClient,
   userId: string,
   onError: PushLogger = noop,
@@ -190,15 +215,29 @@ export async function unregisterDeviceToken(
   }
   try {
     const { PushNotifications } = await import('@capacitor/push-notifications');
-    await PushNotifications.removeAllListeners();
-    // We do not hold the token in memory across a session, and RLS scopes
-    // device_tokens to the signed-in user, so clearing their rows is both
-    // sufficient and all we are permitted to do.
-    const { error } = await supabase.from('device_tokens').delete().eq('user_id', userId);
+    // Unregister delivery on this installation without removing the app-wide
+    // notification-tap listener, which must survive another sign-in.
+    try {
+      await PushNotifications.unregister();
+    } catch {
+      onError('could not unregister native push delivery');
+    }
+    const token = readToken();
+    if (!token) return;
+    const { error } = await supabase.from('device_tokens').delete()
+      .eq('user_id', userId).eq('token', token);
     if (error) {
       onError(`could not clear device token: ${error.message}`);
     }
   } catch (e) {
     onError(e instanceof Error ? e.message : 'push cleanup failed');
   }
+}
+
+export function unregisterDeviceToken(
+  supabase: SupabaseClient,
+  userId: string,
+  onError: PushLogger = noop,
+): Promise<void> {
+  return serializePush(() => unregisterCurrentDeviceToken(supabase, userId, onError));
 }

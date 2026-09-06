@@ -301,6 +301,9 @@ jobs:
             APNS_KEY_ID=${{ secrets.APNS_KEY_ID }}
             APNS_TEAM_ID=${{ secrets.APNS_TEAM_ID }}
             APNS_PRIVATE_KEY=${{ secrets.APNS_PRIVATE_KEY }}
+            APPLE_CLIENT_ID=${{ secrets.APPLE_CLIENT_ID }}
+            APPLE_CLIENT_SECRET=${{ secrets.APPLE_CLIENT_SECRET }}
+            APPLE_TOKEN_ENCRYPTION_KEY=${{ secrets.APPLE_TOKEN_ENCRYPTION_KEY }}
             APNS_PRODUCTION=true
             DRAFT_WS_HOST=draft.citrusfantasysports.com
             DRAFT_WS_PORT=443

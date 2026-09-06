@@ -1,3 +1,4 @@
+import { DesktopProduct } from '@/components/DesktopProduct';
 import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -2428,7 +2429,7 @@ const LeagueDashboard = () => {
                   <div className="space-y-1.5">
                     <Link to="/standings" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> Standings</Link>
                     {inOffseason ? (
-                      <Link to="/draft-kit" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> Draft Kit</Link>
+                      <DesktopProduct><Link to="/draft-kit" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> Draft Kit</Link></DesktopProduct>
                     ) : (
                       <Link to="/matchup" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> This week's matchup</Link>
                     )}

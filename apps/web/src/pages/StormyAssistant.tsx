@@ -1,3 +1,5 @@
+import { stormyStorageKey } from '@/lib/accountCleanup';
+import { confirmStormySharing } from '@/lib/stormySharing';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,7 +23,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Zap, MessageSquare, Clock, Shield, Settings, Crown, Send, Loader2 } from 'lucide-react';
+import { Zap, MessageSquare, Clock, Shield, Settings, Send, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -50,6 +52,11 @@ interface ChatMessage {
 const WEEKLY_LIMIT = 15;
 
 const StormyAssistant = () => {
+  const auth = useAuth();
+  return <StormyAssistantSession key={auth?.user?.id ?? 'guest'} />;
+};
+
+const StormyAssistantSession = () => {
   const { userLeagueState, activeLeagueId, activeLeague } = useLeague();
   const auth = useAuth();
   const { status: seasonStatus } = useSeasonStatus();
@@ -93,7 +100,7 @@ const StormyAssistant = () => {
   const greeting = inOffseason ? offseasonGreeting : defaultGreeting;
   const apiHistoryRef = useRef<StormyMessage[]>((() => {
     try {
-      const saved = localStorage.getItem('stormyApiHistory');
+      const saved = localStorage.getItem(stormyStorageKey(auth?.user?.id, 'stormyApiHistory'));
       if (saved) return JSON.parse(saved) as StormyMessage[];
     } catch { /* fall through */ }
     return [];
@@ -104,7 +111,7 @@ const StormyAssistant = () => {
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
-      const saved = localStorage.getItem('stormyMessages');
+      const saved = localStorage.getItem(stormyStorageKey(auth?.user?.id, 'stormyMessages'));
       if (saved) {
         const parsed = JSON.parse(saved) as ChatMessage[];
         if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(-50);
@@ -115,11 +122,11 @@ const StormyAssistant = () => {
 
   // Persist messages + API history to localStorage
   useEffect(() => {
-    try { localStorage.setItem('stormyMessages', JSON.stringify(messages.slice(-50))); } catch { /* quota */ }
-  }, [messages]);
+    try { localStorage.setItem(stormyStorageKey(auth?.user?.id, 'stormyMessages'), JSON.stringify(messages.slice(-50))); } catch { /* quota */ }
+  }, [messages, auth?.user?.id]);
 
   useEffect(() => {
-    try { localStorage.setItem('stormyApiHistory', JSON.stringify(apiHistoryRef.current.slice(-50))); } catch { /* quota */ }
+    try { localStorage.setItem(stormyStorageKey(auth?.user?.id, 'stormyApiHistory'), JSON.stringify(apiHistoryRef.current.slice(-50))); } catch { /* quota */ }
   });
 
   /**
@@ -143,7 +150,7 @@ const StormyAssistant = () => {
         ? [{ ...prev[0], text: greeting }]
         : prev,
     );
-  }, [greeting]);
+  }, [greeting, auth?.user?.id]);
 
   // Proactively warm the context as soon as the page loads so the user's
   // first message doesn't wait on a DB roundtrip.
@@ -190,11 +197,11 @@ const StormyAssistant = () => {
   const handleClearHistory = useCallback(() => {
     apiHistoryRef.current = [];
     try {
-      localStorage.removeItem('stormyMessages');
-      localStorage.removeItem('stormyApiHistory');
+      localStorage.removeItem(stormyStorageKey(auth?.user?.id, 'stormyMessages'));
+      localStorage.removeItem(stormyStorageKey(auth?.user?.id, 'stormyApiHistory'));
     } catch { /* storage unavailable */ }
     setMessages([{ id: '1', text: greeting, sender: 'stormy', timestamp: new Date() }]);
-  }, [greeting]);
+  }, [greeting, auth?.user?.id]);
 
   /** A starter chip is a promise that the question has an answer; see the chips note below. */
   const starters = inOffseason
@@ -258,6 +265,7 @@ const StormyAssistant = () => {
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
     if (!text || isLoading) return;
+    if (!confirmStormySharing()) return;
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
@@ -578,10 +586,9 @@ const StormyAssistant = () => {
                             <span className="font-bold text-pastel-cream">Every 7 days</span>
                           </div>
 
-                          <Button className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]">
-                            <Crown className="h-5 w-5 mr-2" />
-                            Upgrade to Unlimited
-                          </Button>
+                          <p className="text-sm text-white/60">
+                            Stormy is free to use. Your question allowance resets every 7 days.
+                          </p>
                         </CardContent>
                       </Card>
 

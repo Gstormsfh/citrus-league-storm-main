@@ -1,10 +1,11 @@
+import type { User } from '@supabase/supabase-js';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS, logger, wasMatchupPlayed } from '@citrus/shared';
 
 export class AccountService {
   private supabase: SupabaseClient;
 
-  constructor(supabase: SupabaseClient) {
+  constructor(supabase: SupabaseClient, private revokeApple?: (user: User) => Promise<string>) {
     this.supabase = supabase;
   }
 
@@ -32,11 +33,45 @@ export class AccountService {
   }
 
   async deleteAccount() {
+    const { data: auth, error: authError } = await this.supabase.auth.getUser();
+    if (authError || !auth.user) return { success: false, error: 'Not authenticated' };
+
+    // Use the departing user's RLS scope while it still exists. Deleting only
+    // storage.objects rows would leave the actual image bytes in object storage.
+    const bucket = this.supabase.storage.from('avatars');
+    const paths: string[] = [];
+    const pending = [auth.user.id];
+    while (pending.length) {
+      const prefix = pending.pop()!;
+      for (let offset = 0; ; offset += 100) {
+        const { data: entries, error } = await bucket.list(prefix, {
+          limit: 100, offset, sortBy: { column: 'name', order: 'asc' },
+        });
+        if (error || !entries) return { success: false, error: 'Could not remove account images. Please retry deletion.' };
+        for (const entry of entries) {
+          const path = `${prefix}/${entry.name}`;
+          if (entry.id) paths.push(path);
+          else pending.push(path);
+        }
+        if (entries.length < 100) break;
+      }
+    }
+    for (let start = 0; start < paths.length; start += 100) {
+      const { error } = await bucket.remove(paths.slice(start, start + 100));
+      if (error) return { success: false, error: 'Could not remove account images. Please retry deletion.' };
+    }
+
+    let appleRevocation = 'manual';
+    try {
+      if (this.revokeApple) appleRevocation = await this.revokeApple(auth.user);
+    } catch {
+      return { success: false, error: 'Could not complete Apple account cleanup. Please retry deletion.' };
+    }
     const { data, error } = await this.supabase.rpc('delete_user_account');
     if (error) return { success: false, error: error.message };
     const result = data as Record<string, unknown>;
-    if (result && result.success === false) return { success: false, error: (result.error as string) || 'Deletion failed' };
-    return { success: true };
+    if (!result || result.success !== true) return { success: false, error: (result?.error as string) || 'Deletion failed' };
+    return { success: true, appleRevocation };
   }
 
   /**
