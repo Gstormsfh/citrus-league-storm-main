@@ -41,10 +41,12 @@ _SCHUCKERS_LEAGUE_CDF = None
 def calculate_schuckers_adjusted_coordinates(x, y, shot_type, is_home_team, team_abbrev=None, 
                                              all_shots_df=None, rink_key=None):
     """
-    Calculate Schuckers/Curro adjusted coordinates using quantile matching.
-    
-    This implements the War On Ice methodology from Schuckers and Curro (Sloan Sports Conference).
-    The algorithm de-biases shot distances by normalizing distributions across rinks.
+    Calculate Citrus's radial-distance quantile-mapping adaptation.
+
+    Inspired by Schuckers/Curro rink correction, this is NOT an exact
+    reproduction of their coordinatewise method. Empirical fit population,
+    rink identification, normalization, and training/cutoff lineage require
+    separate validation before any claim of corrected arena measurements.
     
     Algorithm:
     1. Calculate raw distance from shot to goal (89, 0)
@@ -178,6 +180,11 @@ def build_schuckers_cdfs(df, shot_type_col='shot_type', is_home_col='is_home_tea
     
     print(f"Built Schuckers CDFs: {len(_SCHUCKERS_CDFS)} rink/shot_type combinations")
     print(f"League CDF: {len(_SCHUCKERS_LEAGUE_CDF)} away shots")
+
+
+# Preserve the public builder and the existing dataframe keyword independently:
+# that keyword is a boolean, not the callable to invoke when explicitly enabled.
+_build_requested_schuckers_cdfs = build_schuckers_cdfs
 
 
 def calculate_arena_adjusted_coordinates(x, y, team_abbrev=None, arena_id=None, 
@@ -387,7 +394,7 @@ def apply_calculated_features_to_dataframe(df, build_schuckers_cdfs=False):
     if build_schuckers_cdfs:
         required_cols = ['shot_x', 'shot_y', 'team_code', 'shot_type', 'is_home_team']
         if all(col in df.columns for col in required_cols):
-            build_schuckers_cdfs(df)
+            _build_requested_schuckers_cdfs(df)
         else:
             print("Warning: Missing columns for Schuckers CDF building")
     
@@ -860,4 +867,3 @@ def calculate_created_expected_goals(df_shots, xg_col='xG_Value', is_rebound_col
         pass
     
     return df
-
