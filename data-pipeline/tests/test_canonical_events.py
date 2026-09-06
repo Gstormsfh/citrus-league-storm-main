@@ -34,3 +34,13 @@ def test_shootouts_excluded_duplicates_quarantined_and_bad_ot_clock_refused():
     result=normalize_pbp(game(plays))
     assert not result['complete'] and len(result['quarantine'])==2
     assert result['excluded']['shootout']==1
+
+
+def test_regular_season_has_one_overtime_but_playoffs_can_have_more():
+    overtime = shot(periodDescriptor={'number': 5, 'periodType': 'OT'})
+    regular = normalize_pbp(game([overtime]))
+    assert regular['quarantine'][0]['reason'] == 'invalid_period'
+    assert not regular['complete']
+    playoff = game([overtime])
+    playoff.update(id=2025030001, gameType=3)
+    assert normalize_pbp(playoff)['complete']

@@ -57,6 +57,7 @@ def normalize_pbp(payload):
             continue
         seen.add(eid)
         if (type(period.get('number')) is not int or period['number']<1
+                or (gt == 2 and period['number'] > 4)
                 or period.get('periodType') != ('REG' if period['number']<=3 else 'OT')):
             quarantine.append({'event':play,'reason':'invalid_period'})
             continue

@@ -3,7 +3,7 @@ from monitoring.metric_identity import reconcile
 
 def rows():
     common = {"game_id": 2025020001, "event_id": 10, "season": 2025,
-              "period": 1, "is_goal": False,"shot_type":"wrist"}
+              "period": 1, "period_type": "REG", "is_goal": False,"shot_type":"wrist"}
     return {**common, "shooter_id": 7,"seconds_elapsed":60,"x_raw":-70,"y_raw":2}, {**common, "player_id": 7,"time_in_period":"01:00","shot_x":70,"shot_y":2}
 
 

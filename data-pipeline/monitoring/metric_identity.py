@@ -54,6 +54,7 @@ def reconcile(nhl, raw):
         differences = []
         for field, av, bv in (("shooter", a.get("shooter_id"), b.get("player_id")),
                               ("period", a.get("period"), b.get("period")),
+                              ("period_type", a.get("period_type"), b.get("period_type")),
                               ("outcome", a.get("is_goal"), b.get("is_goal"))):
             if av is None or bv is None or type(av) != type(bv) or av != bv:
                 differences.append(field)
@@ -73,7 +74,9 @@ def reconcile(nhl, raw):
                     differences.append(f'geometry_{axis}')
             except (KeyError,TypeError,ValueError):
                 differences.append(f'geometry_{axis}')
-        if not a.get('shot_type') or not b.get('shot_type') or a['shot_type'].lower()!=b['shot_type'].lower():
+        if (not isinstance(a.get('shot_type'), str) or not isinstance(b.get('shot_type'), str)
+                or not a['shot_type'].strip() or not b['shot_type'].strip()
+                or a['shot_type'].lower()!=b['shot_type'].lower()):
             differences.append('shot_type')
         if differences:
             quarantine.append({**record, "reason": "semantic_conflict", "fields": differences})
