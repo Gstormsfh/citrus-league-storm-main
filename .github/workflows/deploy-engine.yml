@@ -172,31 +172,38 @@ jobs:
       # Context is the repo root (the Dockerfile copies every workspace's
       # package.json). No npm ci here: the build machine does that, and a
       # bare checkout keeps the source upload small.
-      # `--suppress-logs` (2026-09-04). Without it `gcloud builds submit`
-      # tries to STREAM the build log, and streaming needs Viewer/Owner on the
-      # project — which the deploy service account does not have and should
-      # not need. Deploy Engine #3 failed this way: the build was created and
-      # running ("Created [.../builds/463451e7-...]"), gcloud could not tail it,
-      # and exited 1. A permission problem reading logs was indistinguishable
-      # from a failed build, and the job went red over a build that may well
-      # have succeeded.
-      #
-      # --suppress-logs does NOT make this fire-and-forget: gcloud still polls
-      # the build to completion and still exits non-zero if the BUILD fails.
-      # It only stops the tail. And the digest step below is the real gate
-      # either way (Trap 1) — the tag must resolve in Artifact Registry or
-      # nothing downstream runs. The build log stays readable in the Cloud
-      # Build console at the URL gcloud prints.
+      # Submit asynchronously and poll the build resource, not its log bucket.
+      # Even --suppress-logs can fail for the restricted CI identity while the
+      # build succeeds. Only a verified SUCCESS may reach digest/deploy gates.
       - name: Cloud Build
         env:
           IMAGE: ${{ steps.target.outputs.image }}
         run: |
           set -euo pipefail
-          gcloud builds submit . \
+          BUILD_ID="$(gcloud builds submit . \
             --project "$GCP_PROJECT" \
             --config infra/gce/cloudbuild-draft-engine.yaml \
             --substitutions "_IMAGE=${IMAGE}" \
-            --suppress-logs
+            --async --format='value(id)')"
+          if [[ ! "$BUILD_ID" =~ ^[0-9a-f-]{36}$ ]]; then
+            echo "::error::Cloud Build did not return a valid build ID."
+            exit 1
+          fi
+          echo "Cloud Build: ${BUILD_ID}"
+          DEADLINE=$((SECONDS + 2100))
+          while (( SECONDS < DEADLINE )); do
+            STATUS="$(gcloud builds describe "$BUILD_ID" \
+              --project "$GCP_PROJECT" --format='value(status)')"
+            case "$STATUS" in
+              SUCCESS) break ;;
+              QUEUED|PENDING|WORKING) sleep 15 ;;
+              *) echo "::error::Cloud Build ${BUILD_ID} ended with ${STATUS:-unknown}."; exit 1 ;;
+            esac
+          done
+          if [ "$STATUS" != SUCCESS ]; then
+            echo "::error::Cloud Build did not succeed within the polling deadline."
+            exit 1
+          fi
 
       # Trap 1 (LAUNCH_BUILD_2026-08-24.md §4): a build/push that did not
       # happen must not produce a green deploy. The tag has to resolve to
