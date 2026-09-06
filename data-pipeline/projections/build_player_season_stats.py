@@ -92,7 +92,7 @@ def fetch_all_player_game_stats(db: SupabaseRest, season: int) -> List[dict]:
   offset = 0
   page_size = 1000
   while True:
-    page = db.select("player_game_stats", select="*", filters=[("season", "eq", season)], limit=page_size, offset=offset)
+    page = db.select("player_game_stats", select="*", filters=regular_season_filters(season), limit=page_size, offset=offset)
     if not page:
       break
     all_rows.extend(page)
@@ -102,6 +102,69 @@ def fetch_all_player_game_stats(db: SupabaseRest, season: int) -> List[dict]:
     if offset % 5000 == 0:
       logger.info(f"[build_player_season_stats] Fetched {len(all_rows)} rows so far...")
   return all_rows
+
+
+def regular_season_filters(season: int) -> list:
+  return [("season", "eq", season), ("game_id", "gte", season * 1000000 + 20000),
+          ("game_id", "lt", season * 1000000 + 30000)]
+
+
+def regular_appearance_rows(rows: List[dict], season: int) -> List[dict]:
+  """Reject duplicate appearances; exclude preseason/playoffs before any sums."""
+  selected = []
+  seen = set()
+  for row in rows:
+    gid = int(row["game_id"])
+    if not season * 1000000 + 20000 <= gid < season * 1000000 + 30000:
+      continue
+    key = (gid, int(row["player_id"]))
+    if key in seen:
+      raise ValueError(f"Duplicate official appearance: {key}")
+    seen.add(key)
+    selected.append(row)
+  return selected
+
+
+def add_official_toi(total: Optional[int], value) -> Optional[int]:
+  """Unknown ice time poisons the total; measured zero remains a measurement."""
+  if total is None or value is None or int(value) < 0:
+    return None
+  return total + int(value)
+
+
+def fetch_official_gp(player_id: int, season: int) -> Optional[int]:
+  from data_pipeline.utils.citrus_request import citrus_request
+  try:
+    response = citrus_request(
+      f"https://api-web.nhle.com/v1/player/{player_id}/landing",
+      timeout=10, max_retries=2,
+    )
+    response.raise_for_status()
+    featured = response.json().get("featuredStats", {})
+    # Never accept an unspecified season or a career/playoff aggregate.
+    if featured.get("season") != season * 10000 + season + 1:
+      return None
+    gp = featured.get("regularSeason", {}).get("subSeason", {}).get("gamesPlayed")
+    return gp if isinstance(gp, int) and not isinstance(gp, bool) and gp >= 0 else None
+  except Exception as exc:
+    logger.warning(f"[TOI] Official GP unavailable for {player_id}: {type(exc).__name__}")
+    return None
+
+
+def fetch_verified_zero_games(player_id: int, season: int) -> set:
+  """Stored zero can also mean an old ingest default; require source evidence."""
+  from data_pipeline.utils.citrus_request import citrus_request
+  try:
+    response = citrus_request(
+      f"https://api-web.nhle.com/v1/player/{player_id}/game-log/{season}{season + 1}/2",
+      timeout=10, max_retries=2,
+    )
+    response.raise_for_status()
+    return {int(row["gameId"]) for row in response.json().get("gameLog", [])
+            if row.get("toi") in ("0:00", "00:00")}
+  except Exception as exc:
+    logger.warning(f"[TOI] Zero-minute provenance unavailable for {player_id}: {type(exc).__name__}")
+    return set()
 
 
 def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, float]]:
@@ -143,7 +206,7 @@ def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, fl
     # nhl_shots is multi-season, so filter by the caller-supplied season or the
     # totals would sum every season into one.
     # NOTE: nhl_shots keys the shooter as shooter_id; raw_shots used player_id.
-    season_filter = [("season", "eq", int(season))]
+    season_filter = regular_season_filters(int(season))
     select_cols = "shooter_id,xg_sql"
 
     while True:
@@ -196,10 +259,11 @@ def upsert_player_season_stats(db: SupabaseRest, season_rows: List[dict]) -> Non
     db.upsert("player_season_stats", season_rows[i:i + CHUNK], on_conflict="season,player_id")
 
 
-def build_talent_metrics_update(season_row: dict, season: int) -> Optional[dict]:
+def build_talent_metrics_update(season_row: dict, season: int, official_gp: Optional[int] = None) -> Optional[dict]:
   """Build only the talent fields owned by this rollup.
 
-  Average TOI uses the official season total divided by official appearances.
+  Average TOI uses complete regular-season game TOI divided by an appearance
+  count reconciled against the exact-season official NHL landing response.
   A zero-minute appearance therefore stays in the denominator; filtering to
   positive-TOI game rows would overstate deployment. Missing/no appearances
   remain unavailable rather than becoming a false zero.
@@ -211,19 +275,17 @@ def build_talent_metrics_update(season_row: dict, season: int) -> Optional[dict]
   if games_played <= 0:
     return None
 
-  if season_row.get("nhl_toi_seconds") is None:
-    return None
-  toi_seconds = float(season_row["nhl_toi_seconds"])
-  if toi_seconds < 0:
-    return None
+  toi = season_row.get("nhl_toi_seconds")
+  toi_seconds = float(toi) if toi is not None else None
+  verified = official_gp == games_played and toi_seconds is not None and toi_seconds >= 0
   payload = {
     "player_id": int(season_row["player_id"]),
     "season": season,
-    "avg_toi_per_game": round(toi_seconds / games_played / 60.0, 2),
+    "avg_toi_per_game": round(toi_seconds / official_gp / 60.0, 2) if verified else None,
   }
 
   x_goals_val = float(season_row.get("x_goals") or 0)
-  if x_goals_val > 0 and toi_seconds > 0:
+  if x_goals_val > 0 and toi_seconds is not None and toi_seconds > 0:
     xg_per_60_val = round((x_goals_val * 3600) / toi_seconds, 2)
     if xg_per_60_val >= 1.2:
       rating = "Elite"
@@ -276,7 +338,7 @@ def main() -> int:
   season = DEFAULT_SEASON
 
   logger.info("[build_player_season_stats] Fetching player_game_stats...")
-  rows = fetch_all_player_game_stats(db, season)
+  rows = regular_appearance_rows(fetch_all_player_game_stats(db, season), season)
   if not rows:
     logger.info("[build_player_season_stats] No player_game_stats rows found.")
     return 0
@@ -286,6 +348,7 @@ def main() -> int:
 
   # Pure-Python rollup (no pandas) for Windows friendliness
   acc: Dict[tuple, dict] = {}
+  zero_games = {}
   last_progress_time = time.time()
 
   for idx, r in enumerate(rows, 1):
@@ -363,7 +426,13 @@ def main() -> int:
     out["games_played"] += 1
 
     out["icetime_seconds"] += int(r.get("icetime_seconds") or 0)
-    out["nhl_toi_seconds"] += int(r.get("nhl_toi_seconds") or 0)
+    toi = r.get("nhl_toi_seconds")
+    if toi == 0 and not out["is_goalie"]:
+      if pid not in zero_games:
+        zero_games[pid] = fetch_verified_zero_games(pid, season)
+      if int(r["game_id"]) not in zero_games[pid]:
+        toi = None
+    out["nhl_toi_seconds"] = add_official_toi(out["nhl_toi_seconds"], toi)
     out["goals"] += int(r.get("goals") or 0)
     out["primary_assists"] += int(r.get("primary_assists") or 0)
     out["secondary_assists"] += int(r.get("secondary_assists") or 0)
@@ -452,17 +521,23 @@ def main() -> int:
   # The payload deliberately omits every unrelated talent column.
   logger.info("")
   logger.info("[build_player_season_stats] Writing talent xG/60 and average TOI...")
-  talent_updates = [
-    update for out in acc.values()
-    if (update := build_talent_metrics_update(out, season)) is not None
-  ]
+  talent_updates = []
+  for out in acc.values():
+    if _shutdown_requested:
+      return 1
+    if out["is_goalie"]:
+      continue
+    official_gp = fetch_official_gp(int(out["player_id"]), season)
+    update = build_talent_metrics_update(out, season, official_gp)
+    if update is not None:
+      talent_updates.append(update)
   upsert_talent_metrics(db, talent_updates)
   avg_toi_count = sum(1 for row in talent_updates if row.get("avg_toi_per_game") is not None)
   xg_per_60_count = sum(1 for row in talent_updates if row.get("xg_per_60") is not None)
   logger.info(
     "[build_player_season_stats] [HEALTH] talent metrics "
     f"expected={len(talent_updates)} written={len(talent_updates)} "
-    f"avg_toi={avg_toi_count} xg_per_60={xg_per_60_count}"
+    f"avg_toi={avg_toi_count} withheld={len(talent_updates) - avg_toi_count} xg_per_60={xg_per_60_count}"
   )
 
   # Plus/minus computation (integrated)
@@ -505,6 +580,10 @@ def main() -> int:
   # 
   # CRITICAL: Remove nhl_ppp and nhl_shp from upsert - let landing endpoint populate them
   for row in season_rows:
+    # Existing schema declares this column NOT NULL. Do not turn an unknown
+    # total back into zero or overwrite a prior official total with a partial sum.
+    if row["nhl_toi_seconds"] is None:
+      del row["nhl_toi_seconds"]
     if "nhl_ppp" in row:
       del row["nhl_ppp"]
     if "nhl_shp" in row:

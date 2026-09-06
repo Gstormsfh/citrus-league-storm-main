@@ -79,12 +79,18 @@ The section READS existing tables and adds none of its own data:
 fantasy points), and `goalie_xg_season` (GSAx). Percentiles are computed
 server-side inside F / D / G cohorts and are not stored.
 
-`supabase/migrations/20260906002239_backfill_avg_toi_from_official_appearances.sql`
-is an unapplied, season-2025-only backfill for
-`player_talent_metrics.avg_toi_per_game`. Its durable writer is
-`data-pipeline/projections/build_player_season_stats.py`; both use official
-season TOI divided by official appearances, including zero-minute appearances
-in the denominator. The migration updates no unrelated talent fields.
+`player_talent_metrics.avg_toi_per_game` is written by
+`data-pipeline/projections/build_player_season_stats.py` from regular-season
+appearances only. Every TOI measurement must be present; stored zero requires
+confirmation as `0:00` or `00:00` in the NHL regular-season game log. The
+distinct appearance count must match NHL landing featuredStats for the exact
+season and regularSeason.subSeason.gamesPlayed. Missing or mismatched evidence
+writes NULL and is counted as withheld in the health log. Official lookups use
+one landing request per skater plus a cached game-log request for each skater
+with stored zeros, with bounded retries; historical/non-featured seasons
+are withheld. The previously unapplied `20260906002239` backfill was withdrawn:
+season totals alone do not establish input completeness. Any future backfill
+requires a verified source snapshot, staging proof, backup and rollback.
 
 ---
 
