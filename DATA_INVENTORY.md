@@ -84,11 +84,15 @@ server-side inside F / D / G cohorts and are not stored.
 appearances only. Every TOI measurement must be present; stored zero requires
 confirmation as `0:00` or `00:00` in the NHL regular-season game log. The
 distinct appearance count must match NHL landing featuredStats for the exact
-season and regularSeason.subSeason.gamesPlayed. Missing or mismatched evidence
+season and regularSeason.subSeason.gamesPlayed (or an unambiguous historical
+single-team NHL season total). `monitoring/appearance_contract.py` also compares
+the exact game set and every stored TOI measurement with the complete official
+game log. Missing or mismatched evidence
 writes NULL and is counted as withheld in the health log. Official lookups use
-one landing request per skater plus a cached game-log request for each skater
-with stored zeros, with bounded retries; historical/non-featured seasons
-are withheld. The previously unapplied `20260906002239` backfill was withdrawn:
+one landing and one game-log request per skater, with bounded retries;
+ambiguous historical totals are withheld. Invalid skater season rows and new
+xG rates are withheld; the job reports counts and exits 2 on incompleteness.
+The previously unapplied `20260906002239` backfill was withdrawn:
 season totals alone do not establish input completeness. Any future backfill
 requires a verified source snapshot, staging proof, backup and rollback.
 

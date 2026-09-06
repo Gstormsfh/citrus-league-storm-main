@@ -45,6 +45,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import _bootstrap  # noqa: F401
 
 from data_pipeline.utils.supabase_rest import SupabaseRest
+from data_pipeline.monitoring.appearance_contract import (
+  official_gp_from_landing, reconcile_appearances, parse_toi,
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -140,12 +143,7 @@ def fetch_official_gp(player_id: int, season: int) -> Optional[int]:
       timeout=10, max_retries=2,
     )
     response.raise_for_status()
-    featured = response.json().get("featuredStats", {})
-    # Never accept an unspecified season or a career/playoff aggregate.
-    if featured.get("season") != season * 10000 + season + 1:
-      return None
-    gp = featured.get("regularSeason", {}).get("subSeason", {}).get("gamesPlayed")
-    return gp if isinstance(gp, int) and not isinstance(gp, bool) and gp >= 0 else None
+    return official_gp_from_landing(response.json(), season)
   except Exception as exc:
     logger.warning(f"[TOI] Official GP unavailable for {player_id}: {type(exc).__name__}")
     return None
@@ -165,6 +163,21 @@ def fetch_verified_zero_games(player_id: int, season: int) -> set:
   except Exception as exc:
     logger.warning(f"[TOI] Zero-minute provenance unavailable for {player_id}: {type(exc).__name__}")
     return set()
+
+
+def fetch_official_game_log(player_id: int, season: int) -> Optional[list]:
+  from data_pipeline.utils.citrus_request import citrus_request
+  try:
+    response = citrus_request(
+      f"https://api-web.nhle.com/v1/player/{player_id}/game-log/{season}{season + 1}/2",
+      timeout=10, max_retries=2,
+    )
+    response.raise_for_status()
+    log = response.json().get("gameLog")
+    return log if isinstance(log, list) else None
+  except Exception as exc:
+    logger.warning(f"[TOI] Official game log unavailable for {player_id}: {type(exc).__name__}")
+    return None
 
 
 def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, float]]:
@@ -348,12 +361,18 @@ def main() -> int:
 
   # Pure-Python rollup (no pandas) for Windows friendliness
   acc: Dict[tuple, dict] = {}
-  zero_games = {}
+  official_logs = {}
+  appearance_inputs = {}
   last_progress_time = time.time()
 
   for idx, r in enumerate(rows, 1):
     pid = int(r.get("player_id"))
     key = (season, pid)
+    appearance_inputs.setdefault(pid, []).append(r)
+    if not r.get("is_goalie") and pid not in official_logs:
+      if _shutdown_requested:
+        return 1
+      official_logs[pid] = fetch_official_game_log(pid, season)
 
     if key not in acc:
       acc[key] = {
@@ -428,9 +447,8 @@ def main() -> int:
     out["icetime_seconds"] += int(r.get("icetime_seconds") or 0)
     toi = r.get("nhl_toi_seconds")
     if toi == 0 and not out["is_goalie"]:
-      if pid not in zero_games:
-        zero_games[pid] = fetch_verified_zero_games(pid, season)
-      if int(r["game_id"]) not in zero_games[pid]:
+      confirmed = {g.get("gameId") for g in (official_logs.get(pid) or []) if parse_toi(g.get("toi")) == 0}
+      if int(r["game_id"]) not in confirmed:
         toi = None
     out["nhl_toi_seconds"] = add_official_toi(out["nhl_toi_seconds"], toi)
     out["goals"] += int(r.get("goals") or 0)
@@ -522,14 +540,24 @@ def main() -> int:
   logger.info("")
   logger.info("[build_player_season_stats] Writing talent xG/60 and average TOI...")
   talent_updates = []
+  withheld_season_players = set()
   for out in acc.values():
     if _shutdown_requested:
       return 1
     if out["is_goalie"]:
       continue
     official_gp = fetch_official_gp(int(out["player_id"]), season)
+    proof = reconcile_appearances(appearance_inputs[out["player_id"]],
+                                 official_logs.get(out["player_id"]), official_gp, season)
+    if not proof["available"]:
+      official_gp = None
+      withheld_season_players.add(out["player_id"])
+      logger.warning(f"[TOI] player={out['player_id']} withheld reason={proof['reason']}")
     update = build_talent_metrics_update(out, season, official_gp)
     if update is not None:
+      if not proof["available"]:
+        update.pop("xg_per_60", None)
+        update.pop("xg_rating", None)
       talent_updates.append(update)
   upsert_talent_metrics(db, talent_updates)
   avg_toi_count = sum(1 for row in talent_updates if row.get("avg_toi_per_game") is not None)
@@ -570,7 +598,8 @@ def main() -> int:
   logger.info("")
   logger.info("[build_player_season_stats] Upserting to player_season_stats...")
   logger.info("[build_player_season_stats] Aggregating all nhl_* stats from per-game boxscore data")
-  season_rows = list(acc.values())
+  season_rows = [out for out in acc.values() if out["player_id"] not in withheld_season_players]
+  logger.info(f"[HEALTH] season rows expected={len(acc)} publishable={len(season_rows)} withheld={len(withheld_season_players)}")
   
   # NOTE: nhl_hits, nhl_blocks are AGGREGATED from player_game_stats boxscore data
   # HOWEVER: nhl_ppp and nhl_shp should NOT be aggregated from per-game stats!
@@ -595,7 +624,7 @@ def main() -> int:
   logger.info("=" * 80)
   logger.info(f"[build_player_season_stats] [OK] COMPLETE: upserted {len(season_rows)} player_season_stats rows for season {season}")
   logger.info("=" * 80)
-  return 0
+  return 2 if withheld_season_players else 0
 
 
 if __name__ == "__main__":

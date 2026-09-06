@@ -29,6 +29,16 @@ Implemented next: snapshot shot identity/quarantine CLI with deterministic sourc
 hashes; rollup page reads now require exact counts and stable game/player or
 game/event ordering. A failed xG page raises before publishing partial totals.
 Local evidence: 27 tests pass across identity, rollup, exact reads and key groups.
+
+TOI follow-up: the publication path now compares exact official game identities
+and every per-game TOI value, including positive values. Equal counts with a
+different event fail; late corrections fail. Historical single-team NHL season
+GP is supported via exact seasonTotals; ambiguous multi-team historical rows
+remain unavailable. Invalid skater season rows are not published, new xG/60 is
+withheld, and unavailable average TOI is explicitly NULL. Withheld rows make the
+job exit 2 after its health report. Existing stale season values remain untouched
+and are not yet furnished with field-level availability to consumers: this gate
+still requires versioned publication metadata before production acceptance.
 Source research: user-provided audit, next steps, calibration investigation and
 hockey blueprint dated 2026-09-05. Stored probabilities are retrospective until
 the complete fit/calibration lineage proves otherwise. No novelty or superiority

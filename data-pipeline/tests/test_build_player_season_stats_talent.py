@@ -108,11 +108,13 @@ def test_main_reconciles_inputs_before_writing(monkeypatch, caplog):
     monkeypatch.setattr(rollup, "DEFAULT_SEASON", 2025)
     monkeypatch.setattr(rollup, "try_fetch_xg_totals", lambda *args: {})
     monkeypatch.setattr(rollup, "fetch_official_gp", lambda pid, season: {1: 2, 2: 2, 3: 2, 4: None, 5: 1}[pid])
-    monkeypatch.setattr(rollup, "fetch_verified_zero_games", lambda pid, season: {2025020002} if pid == 1 else set())
+    monkeypatch.setattr(rollup, "fetch_official_game_log", lambda pid, season:
+                        [{"gameId": 2025020001, "toi": "10:00"}, {"gameId": 2025020002, "toi": "00:00"}]
+                        if pid == 1 else None)
     monkeypatch.setitem(sys.modules, "compute_player_season_plus_minus",
                         types.SimpleNamespace(compute_plus_minus=lambda *args: {}))
     with caplog.at_level(logging.INFO):
-        assert rollup.main() == 0
+        assert rollup.main() == 2
     talent = {r["player_id"]: r for t, values in calls if t == "player_talent_metrics" for r in values}
     assert talent[1]["avg_toi_per_game"] == 5
     assert all(talent[pid]["avg_toi_per_game"] is None for pid in (2, 3, 4, 5))
@@ -120,7 +122,7 @@ def test_main_reconciles_inputs_before_writing(monkeypatch, caplog):
     seasons = {r["player_id"]: r for t, values in calls if t == "player_season_stats" for r in values}
     assert seasons[1]["games_played"] == 2
     assert seasons[1]["nhl_toi_seconds"] == 600
-    assert "nhl_toi_seconds" not in seasons[2]
+    assert set(seasons) == {1}
     assert ("game_id", "gte", 2025020000) in filters[0]
     assert ("game_id", "lt", 2025030000) in filters[0]
     assert "avg_toi=1 withheld=4" in caplog.text
