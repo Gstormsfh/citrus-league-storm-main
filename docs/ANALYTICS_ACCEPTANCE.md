@@ -20,6 +20,18 @@ Status: foundation NOT accepted. Local work only; no production rollout authoriz
 
 ## Current local verification (2026-09-06)
 
+### Overnight handoff
+
+The [final handoff](analytics-overnight-handoff-20260906.md) records the ordered
+remaining gates and preserves the broader research scope. The final read-only
+integrity pass verifies all 62 named prior/result/archive pins, including 17
+legacy files hashed without deserialization. No model, feature, source receipt,
+prospective reservation or original result changed in this closing pass.
+Primary recaps confirm shootouts in the three unpaired overtime cases' games,
+but do not adjudicate those exact attempts. Their state and exclusions remain
+unchanged. Foundation, quality and FPAR stay NOT accepted; production and hosted
+databases remain unchanged.
+
 ### Source → saved model → player/goalie accounting
 
 The [actor checkpoint](analytics-actor-attribution-result-20260906.md) replays

@@ -1,0 +1,31 @@
+{
+  "contract": "citrus-overnight-final-integrity-v1",
+  "checked_at": "2026-09-06T13:52:43.418Z",
+  "source_commit_before_handoff": "91fc0a8c",
+  "checked_pins": 62,
+  "legacy_files_hashed_only": 17,
+  "archive_files": 12,
+  "status": "all-pins-match",
+  "failed": [],
+  "inputs": [
+    {
+      "path": "scripts/proof/results/actor-attribution-verification-20260906/prior-file-hashes.json",
+      "sha256": "acd538ffef2d3870f1b7fd19c9486ff9c4aea4ad376e02ff26230b45aaa497c5"
+    },
+    {
+      "path": "docs/analytics-actor-attribution-result-index-20260906.json",
+      "sha256": "f94f99a4d0c3505655923ba62a4f0f1cbce3ebed12db3b0f94fade28b69bb316"
+    },
+    {
+      "path": "docs/analytics-actor-checkpoint-archive-20260906.json",
+      "sha256": "f48c2b192ebf528a3c38e92765954ae52eaec81c29f29dcf3a8dfd0bfd1b79c6"
+    }
+  ],
+  "method": "Read pinned files as bytes, compute SHA-256, compare against the union of prior.files, actor_index.files and actor_archive.archives; no deserialization or extraction.",
+  "scope_limit": "Rechecks 62 named pins, not an independent rerun of every nested evidence review or a runtime reproduction.",
+  "legacy_deserialized": false,
+  "production_changed": false,
+  "model_accepted": false,
+  "foundation_accepted": false,
+  "fpar_accepted": false
+}

@@ -98,6 +98,14 @@ requires a verified source snapshot, staging proof, backup and rollback.
 
 ### 1.4 Versioned analytics foundation (local, unapplied)
 
+Overnight handoff (2026-09-06):
+`docs/analytics-overnight-handoff-20260906.md` links verified local results,
+preserved research and the remaining ordered source/calibration/forecast gates.
+`docs/analytics-overnight-integrity-20260906.json` records a final read-only
+SHA-256 comparison of 62 named prior/result/archive pins and binds its three
+input manifests. It is not a new experiment, nested-review rerun, runtime bundle
+or model/FPAR acceptance. No original evidence was rewritten.
+
 Additive actor/exposure diagnostics (2026-09-06):
 `data-pipeline/projections/player_goalie_attribution.py` preserves exact selected
 event/model membership, game-roster team identity and separate shooter/defending-
