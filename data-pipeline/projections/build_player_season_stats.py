@@ -211,7 +211,11 @@ def build_talent_metrics_update(season_row: dict, season: int) -> Optional[dict]
   if games_played <= 0:
     return None
 
-  toi_seconds = float(season_row.get("nhl_toi_seconds") or 0)
+  if season_row.get("nhl_toi_seconds") is None:
+    return None
+  toi_seconds = float(season_row["nhl_toi_seconds"])
+  if toi_seconds < 0:
+    return None
   payload = {
     "player_id": int(season_row["player_id"]),
     "season": season,
@@ -518,4 +522,3 @@ def main() -> int:
 if __name__ == "__main__":
   logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
   raise SystemExit(main())
-

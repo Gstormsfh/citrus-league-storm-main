@@ -63,3 +63,14 @@ def test_talent_writer_preserves_unrelated_columns_by_using_narrow_payloads():
 
     assert db.calls == [("player_talent_metrics", updates, "player_id,season")]
     assert set(db.calls[0][1][0]) == {"player_id", "season", "avg_toi_per_game"}
+
+
+def test_unknown_or_invalid_toi_is_unavailable_but_measured_zero_is_valid():
+    for toi in (None, -1):
+        assert build_talent_metrics_update(
+            {"player_id": 1, "games_played": 2, "nhl_toi_seconds": toi}, 2025
+        ) is None
+    update = build_talent_metrics_update(
+        {"player_id": 1, "games_played": 2, "nhl_toi_seconds": 0}, 2025
+    )
+    assert update["avg_toi_per_game"] == 0
