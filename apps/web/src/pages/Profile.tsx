@@ -2495,7 +2495,7 @@ const Profile = () => {
                         Delete Account
                       </CardTitle>
                       <CardDescription className="text-red-300/80">
-                        Permanently delete your account and all associated data
+                        Permanently delete your account and remove your personal data
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -2507,9 +2507,9 @@ const Profile = () => {
                         <h4 className="font-bold text-pastel-cream mb-2">This action cannot be undone</h4>
                         <ul className="text-sm space-y-1 ml-4 list-disc marker:text-pastel-orange/60 leading-relaxed">
                           <li>Your account and authentication credentials will be permanently deleted</li>
-                          <li>All your fantasy teams and league data will be removed</li>
-                          <li>If you're a league commissioner, your leagues may be orphaned</li>
-                          <li>Your draft history and transactions will be anonymized</li>
+                          <li>Your fantasy teams will be removed</li>
+                          <li>Shared leagues pass to another manager; leagues with no managers are deleted</li>
+                          <li>Your identity is removed from shared draft history</li>
                         </ul>
                       </DestructiveConsequence>
 
@@ -2525,7 +2525,8 @@ const Profile = () => {
                             <AlertDialogTitle className="font-calistoga text-pastel-cream">Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription className="space-y-4 text-white/70">
                               <p>
-                                This will permanently delete your account and all associated data.
+                                This permanently deletes your account and teams. Shared leagues pass to another manager,
+                                or are deleted if no managers remain. Your identity is removed from shared draft history.
                                 This action cannot be undone.
                               </p>
                               <div>

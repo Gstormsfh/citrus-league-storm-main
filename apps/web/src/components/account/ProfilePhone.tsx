@@ -572,8 +572,8 @@ export function ProfilePhone({ tab, onTabChange, hero, identity, stats, activity
               <div className="px-3.5 pt-3 pb-[max(env(safe-area-inset-bottom),22px)]" data-testid="delete-account-sheet">
                 <p className="font-condensed font-bold text-[18px] uppercase tracking-[0.02em]">Delete your account?</p>
                 <p className="mt-1.5 font-barlow text-[13px] leading-[1.45] text-pressbox-text/70">
-                  Your account and sign-in are deleted for good. Your teams and league data go with them; leagues you commission
-                  may be left without one; your draft history and transactions are anonymized. This cannot be undone.
+                  Your account, sign-in and teams are deleted. Shared leagues pass to another manager; leagues with no managers
+                  are deleted. Your identity is removed from shared draft history. This cannot be undone.
                 </p>
                 <label className="block mt-4">
                   <span className="font-plex font-semibold text-[9px] tracking-[0.14em] text-pressbox-text/45">
