@@ -38,6 +38,33 @@ remains an invalid general-purpose classifier. The source-specific combination
 of event descriptions, official explanations and statistical reconciliation is
 not a universal rule for future goals.
 
+### Additive approval of the newly captured HTTP revisions
+
+After the complete historical capture, root independently compared all 32 new
+2025-season revisions with the original approved cases. Every semantic payload,
+reviewed event and original final-game gate matched. Original old HTTP bodies
+were not retained, so this is explicitly semantic equality to old observations,
+not an invented old/new wire-byte comparison. The new HTTP body and receipt
+bytes are retained and individually pinned.
+
+Root then explicitly approved those exact new revisions through the separate
+[HTTP approval manifest](analytics-goal-sog-http-adjudications-20260906-v1.json),
+SHA256 `733e340e77a69f35a017cbb719f9fc1bb2b158a8c2648c961eef16ce2aa81478`.
+The bounded comparison receipt SHA256 is
+`413272be05c454d683a06c4fa75b9354c0ec116d42c6108d4f2235a54c911234`.
+Old approval artifacts and runtime pins are unchanged.
+
+Root independently replayed all new pairs through
+`acquisition/frozen_http_goal_sog_adjudication.py`; all 32 passed, with ordered
+result-set SHA256
+`1055fdbab9a8012d1c477aa6d8111139c200abd77f2c91d7136aebd4576b4184`.
+The adapter attaches exact original bytes, the unchanged prepared observation
+and a separate statistical overlay. Ten focused tests pass, including rejection
+of formatting-only changes, new timestamps, changed events and invalid source
+evidence. There is no model deserialization, probability assignment, hosted write
+or feature-export activation. The first neutral experiment retains its declared
+quarantine exclusions; these approvals cannot silently change its cohort.
+
 ## Preserved initial investigation
 
 The initial 498-game conflict-enriched frozen sample contains 32 games where

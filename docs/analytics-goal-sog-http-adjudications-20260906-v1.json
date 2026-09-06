@@ -1,0 +1,1389 @@
+{
+  "approval_scope": "Explicit local approval of these exact new HTTP revisions; additive to original approvals; no production activation",
+  "base_shot_model_attempt_eligible": false,
+  "contract": "citrus-approved-frozen-http-goal-sog-manifest-v1",
+  "goal_credit": 1,
+  "no_probability_assigned": true,
+  "prior_bundle_sha256": "43a7d5c2c17782ee5e4fe65dcf8512a46fef1248a337080f14aeeb93ea0bc864",
+  "prior_manifest_sha256": "e193ab68d55ae1f43c423df8dc07022aef4f264865af64e19c0e4a7eacc8c5a9",
+  "recorded_sog_contribution": 0,
+  "records": [
+    {
+      "approved_old_event_sha256": "dd1c6df192c6fbb33719acab94f26985b9b919bfb3a2131b6b9c2609be5a76cf",
+      "approved_old_payload_sha256": "ef716d7eca6e2217480c1e5879ffe33ff9981e22be0709d8cfd678bdfbd76ccb",
+      "approved_old_source_snapshot_id": "78842774-ee9b-5d50-862e-23a6ed86d313",
+      "event_id": 104,
+      "game_id": 2025020184,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020184.body.json",
+      "new_http_body_sha256": "05c8b075b0e2d1e5f39cdefd250ac00d30f503b9446cb5666d2971404cb9c561",
+      "new_observed_at": "2026-09-06T06:24:13.799287+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 39,
+            "reported": 38,
+            "team_id": 21
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "21": 0,
+          "28": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "21": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 39
+          },
+          "28": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 23
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "fd076b45a4c294f4256c2397a2d19172550b81466c96d01f3a3b5074910fc3ae",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020184.receipt.json",
+      "new_source_event_sha256": "dd1c6df192c6fbb33719acab94f26985b9b919bfb3a2131b6b9c2609be5a76cf",
+      "new_source_payload_sha256": "ef716d7eca6e2217480c1e5879ffe33ff9981e22be0709d8cfd678bdfbd76ccb",
+      "new_source_snapshot_id": "31e1fcc3-dd3b-5c4b-9d53-fa61a0e9c0d8"
+    },
+    {
+      "approved_old_event_sha256": "69a89fe4a70b8216d2b198dc3924144456bcb7bcdc4d2bd9e94f2d18802e255c",
+      "approved_old_payload_sha256": "ad3dabac0eda9e8c105459505af6c1e4f4259ff80922ee8de0014e35f728392c",
+      "approved_old_source_snapshot_id": "205ae370-a846-5a11-b0b2-e160b96b3965",
+      "event_id": 1052,
+      "game_id": 2025020208,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020208.body.json",
+      "new_http_body_sha256": "5de57c31580028fc7a0f636f45b826cd1c58a964780c0468232405ab3e653bb8",
+      "new_observed_at": "2026-09-06T06:24:20.745507+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 25,
+            "reported": 24,
+            "team_id": 30
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "18": 0,
+          "30": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "18": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 34
+          },
+          "30": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 25
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "ce1e6a0c9036099ab7e3abe5562f130c49144b45af0cb0bfc313e7b557e431f6",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020208.receipt.json",
+      "new_source_event_sha256": "69a89fe4a70b8216d2b198dc3924144456bcb7bcdc4d2bd9e94f2d18802e255c",
+      "new_source_payload_sha256": "ad3dabac0eda9e8c105459505af6c1e4f4259ff80922ee8de0014e35f728392c",
+      "new_source_snapshot_id": "cae7d426-6b03-5b3d-ab68-369b62a6da26"
+    },
+    {
+      "approved_old_event_sha256": "313142cc598fc6d9ad2855bf91488efb7a09478e4ae6edbaec5e3aa0dbb28538",
+      "approved_old_payload_sha256": "786ee63a9a993cfd60bbd4f9fd42701142d871c64c95091a2df2ee32d606823d",
+      "approved_old_source_snapshot_id": "737fe585-db90-52e6-8eb1-02ef35611196",
+      "event_id": 804,
+      "game_id": 2025020236,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020236.body.json",
+      "new_http_body_sha256": "7487ff4b2491cca0dac1404e9a625d905b0fbe84fb24dc101c8eca31610df843",
+      "new_observed_at": "2026-09-06T06:24:28.767927+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 31,
+            "reported": 30,
+            "team_id": 15
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "14": 0,
+          "15": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "14": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 20
+          },
+          "15": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 31
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "5df30fcb22395a2d8169a026e110938f296791bf9d5fe4cdd886edbd3b2e0fa6",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020236.receipt.json",
+      "new_source_event_sha256": "313142cc598fc6d9ad2855bf91488efb7a09478e4ae6edbaec5e3aa0dbb28538",
+      "new_source_payload_sha256": "786ee63a9a993cfd60bbd4f9fd42701142d871c64c95091a2df2ee32d606823d",
+      "new_source_snapshot_id": "e311c7e8-779e-59f8-a70c-71664f9e2e1e"
+    },
+    {
+      "approved_old_event_sha256": "8a870770c7245a83b555eb2a848cbb640e493916b33ff5d20f54df58505127fc",
+      "approved_old_payload_sha256": "b69a44757863762b4feec6815b6a8f5c87223987e48a2cc3233c1e1595900029",
+      "approved_old_source_snapshot_id": "a27259bf-d46d-56e9-a45d-c8368e4613ef",
+      "event_id": 162,
+      "game_id": 2025020282,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020282.body.json",
+      "new_http_body_sha256": "714ae128eddd0e2b432b0f110c7cc88b42b2b611b802665c91f969dff01faca8",
+      "new_observed_at": "2026-09-06T06:24:41.991737+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 22,
+            "reported": 21,
+            "team_id": 2
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "2": 0,
+          "68": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "2": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 22
+          },
+          "68": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 30
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "cfecb5e940141cbfb30e2340ae684e632fcf383a2f82aa74bccd086ca990c49b",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020282.receipt.json",
+      "new_source_event_sha256": "8a870770c7245a83b555eb2a848cbb640e493916b33ff5d20f54df58505127fc",
+      "new_source_payload_sha256": "b69a44757863762b4feec6815b6a8f5c87223987e48a2cc3233c1e1595900029",
+      "new_source_snapshot_id": "cf70a9e1-a33d-5930-9928-2e2b8b4e27fa"
+    },
+    {
+      "approved_old_event_sha256": "40877612f0dbaec7a47f713a94f1e465751c9a857e43967607c37d17bc140f3d",
+      "approved_old_payload_sha256": "9d959301a16b95650404914ce979e9242f63182fd2a32ed532d082674d9f9c86",
+      "approved_old_source_snapshot_id": "1c4cd1fa-0704-5a0a-8491-e440f2a342b2",
+      "event_id": 74,
+      "game_id": 2025020307,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020307.body.json",
+      "new_http_body_sha256": "be2500f2bfce080573c31903e1ce0431fdfcdfb6ff90c5bd3df2a4956795ad11",
+      "new_observed_at": "2026-09-06T06:24:49.251284+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 30,
+            "reported": 29,
+            "team_id": 19
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "10": 0,
+          "19": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "10": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 29
+          },
+          "19": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 30
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "efb1da1ac2ee20a1d281969aa198f31568b6d6e865ced536bce8079ae6555355",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020307.receipt.json",
+      "new_source_event_sha256": "40877612f0dbaec7a47f713a94f1e465751c9a857e43967607c37d17bc140f3d",
+      "new_source_payload_sha256": "9d959301a16b95650404914ce979e9242f63182fd2a32ed532d082674d9f9c86",
+      "new_source_snapshot_id": "7c3a0b04-008d-5624-821c-644085d4a69c"
+    },
+    {
+      "approved_old_event_sha256": "52b9f813eefc76d60e005118eba765ba5946e8bcfbaf40b33ffb67489ec8a5ac",
+      "approved_old_payload_sha256": "cff081243c8e7e04461e795708b8fde2a3506bbadf5587c451de94a5c1f39abb",
+      "approved_old_source_snapshot_id": "a724d5e5-3920-5ff5-9596-3cb5fcf48213",
+      "event_id": 304,
+      "game_id": 2025020395,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020395.body.json",
+      "new_http_body_sha256": "dd2cc1d8aa552dab6b65465cfc40e5f50c93fdf97f68e1f96ebe8f1a582ed882",
+      "new_observed_at": "2026-09-06T06:25:14.463357+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 32,
+            "reported": 31,
+            "team_id": 4
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "1": 0,
+          "4": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "1": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 32
+          },
+          "4": {
+            "goals": 5,
+            "shootout_goals": 0,
+            "sog": 32
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "c343737ca9e13a3576e3e21ef30e581287d299f5f233e0ec8dd674206ee7b263",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020395.receipt.json",
+      "new_source_event_sha256": "52b9f813eefc76d60e005118eba765ba5946e8bcfbaf40b33ffb67489ec8a5ac",
+      "new_source_payload_sha256": "cff081243c8e7e04461e795708b8fde2a3506bbadf5587c451de94a5c1f39abb",
+      "new_source_snapshot_id": "48d9fbc2-1b07-5cc9-8316-e1564263e22c"
+    },
+    {
+      "approved_old_event_sha256": "688648eaa48a33c55ccccd3eff89cfb611c58014b92afd80faf361e3cc196441",
+      "approved_old_payload_sha256": "3cff7fc4ccdf29ae12b3278145dd43a23709d58dba5f32f00b69cda26653f933",
+      "approved_old_source_snapshot_id": "8fa8d90f-8ab2-5af0-97e3-6342a3814507",
+      "event_id": 406,
+      "game_id": 2025020470,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020470.body.json",
+      "new_http_body_sha256": "1ae865ce5234bdc251cbaf74fc9735915162559193faca271a148b482e0490fa",
+      "new_observed_at": "2026-09-06T06:25:36.658537+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 29,
+            "reported": 28,
+            "team_id": 24
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "24": 1,
+          "5": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "24": {
+            "goals": 3,
+            "shootout_goals": 1,
+            "sog": 29
+          },
+          "5": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 47
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "449b7d76bd85c429f4b512a9164d3eceb1eed00c9e767f01491aab6e96c060be",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020470.receipt.json",
+      "new_source_event_sha256": "688648eaa48a33c55ccccd3eff89cfb611c58014b92afd80faf361e3cc196441",
+      "new_source_payload_sha256": "3cff7fc4ccdf29ae12b3278145dd43a23709d58dba5f32f00b69cda26653f933",
+      "new_source_snapshot_id": "1a642627-6f23-5736-8cef-2d896e89fcf6"
+    },
+    {
+      "approved_old_event_sha256": "ff677cceaa8ecb4c2ed6451fa89eccd55fd7c42e5250dcf6414957b6966fc01d",
+      "approved_old_payload_sha256": "235baedffc754f56c1a52a522d3c2b59ebb2be691a7a3011acb0eaaa5dbebd84",
+      "approved_old_source_snapshot_id": "c299542c-5fac-5f8f-9d66-c2fe1e1409ca",
+      "event_id": 106,
+      "game_id": 2025020499,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020499.body.json",
+      "new_http_body_sha256": "4b99e8a1b73059cf855a601abcbb123a25f354195dd8f145f32f58ecdf533b47",
+      "new_observed_at": "2026-09-06T06:25:44.864489+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 38,
+            "reported": 37,
+            "team_id": 22
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "10": 0,
+          "22": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "10": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 28
+          },
+          "22": {
+            "goals": 6,
+            "shootout_goals": 0,
+            "sog": 38
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "8e7c95f6e189b870c8b8f1c1db3462e4d9a420bf62a6d4b57a4600d97e9cebec",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020499.receipt.json",
+      "new_source_event_sha256": "ff677cceaa8ecb4c2ed6451fa89eccd55fd7c42e5250dcf6414957b6966fc01d",
+      "new_source_payload_sha256": "235baedffc754f56c1a52a522d3c2b59ebb2be691a7a3011acb0eaaa5dbebd84",
+      "new_source_snapshot_id": "402871ee-ed59-5087-aa95-c4ded9a79feb"
+    },
+    {
+      "approved_old_event_sha256": "f0555840d9b1b4b2b1c56eb318106af5ced42d3ba80f58a5f42a5906a57e0e78",
+      "approved_old_payload_sha256": "6fdcedeb30e21b76f4678bb36c057ee7d2d697a38b8b05b683ec296169c7f6a6",
+      "approved_old_source_snapshot_id": "dde09347-54fe-5771-98ad-0412dbacbf07",
+      "event_id": 110,
+      "game_id": 2025020561,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020561.body.json",
+      "new_http_body_sha256": "fb656ccb32c340a2aecf9989b1b925a999da2feeeebc578aec50c10563323112",
+      "new_observed_at": "2026-09-06T06:26:03.521040+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 37,
+            "reported": 36,
+            "team_id": 28
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "28": 0,
+          "55": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "28": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 37
+          },
+          "55": {
+            "goals": 4,
+            "shootout_goals": 0,
+            "sog": 32
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "e2b70558f8835a74bf834d151ae5a22d4bb470a88c590dfeb666703d28fd9b56",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020561.receipt.json",
+      "new_source_event_sha256": "f0555840d9b1b4b2b1c56eb318106af5ced42d3ba80f58a5f42a5906a57e0e78",
+      "new_source_payload_sha256": "6fdcedeb30e21b76f4678bb36c057ee7d2d697a38b8b05b683ec296169c7f6a6",
+      "new_source_snapshot_id": "07b33ebf-a4e8-5ce8-a6ba-c592f25ed36f"
+    },
+    {
+      "approved_old_event_sha256": "6bdc909cd6ec3980e76e5af9677942e9e6a4d4c5fe9243d23abf409501754aa7",
+      "approved_old_payload_sha256": "f74963e019ee4e406fd5bc52b287c53b924739417c60caee62e2e23feea3cdfd",
+      "approved_old_source_snapshot_id": "a2d07dbc-e1cd-5bef-9205-ce56fa6bfccf",
+      "event_id": 252,
+      "game_id": 2025020599,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020599.body.json",
+      "new_http_body_sha256": "61211994b2c1a894c1af4e49b958adfe753e90ac98dc217fade2ff7650705001",
+      "new_observed_at": "2026-09-06T06:26:14.543373+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 38,
+            "reported": 37,
+            "team_id": 28
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "23": 0,
+          "28": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "23": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 27
+          },
+          "28": {
+            "goals": 6,
+            "shootout_goals": 0,
+            "sog": 38
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "77d216bb55d43a58d6f032c4b160a90074ec7c50fc0073c03cbce063c9cfd01d",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020599.receipt.json",
+      "new_source_event_sha256": "6bdc909cd6ec3980e76e5af9677942e9e6a4d4c5fe9243d23abf409501754aa7",
+      "new_source_payload_sha256": "f74963e019ee4e406fd5bc52b287c53b924739417c60caee62e2e23feea3cdfd",
+      "new_source_snapshot_id": "425ae5cd-df8b-5ae1-aeba-397fec23baa2"
+    },
+    {
+      "approved_old_event_sha256": "61056c2d1e02f504dd20ea33e149390ba7351abe56056ec5a8820e4343e9d021",
+      "approved_old_payload_sha256": "3b30e8746fc222d5a47cf0c920522c45608037f57d303ca11900e92bd9cd2908",
+      "approved_old_source_snapshot_id": "52e7e3b5-8bcc-5dbb-9fd4-d3ab75652e4e",
+      "event_id": 210,
+      "game_id": 2025020613,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020613.body.json",
+      "new_http_body_sha256": "a3649278ac5f03a7c4304472e970fcb09a70fd0c0ac3ab509b7eadce93d62302",
+      "new_observed_at": "2026-09-06T06:26:18.843883+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 21,
+            "reported": 20,
+            "team_id": 20
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "20": 0,
+          "6": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "20": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 21
+          },
+          "6": {
+            "goals": 1,
+            "shootout_goals": 0,
+            "sog": 26
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "16a5ac7f613354c1a1215c7e048abffe726675b2f0d31b27af49986e6dd3141e",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020613.receipt.json",
+      "new_source_event_sha256": "61056c2d1e02f504dd20ea33e149390ba7351abe56056ec5a8820e4343e9d021",
+      "new_source_payload_sha256": "3b30e8746fc222d5a47cf0c920522c45608037f57d303ca11900e92bd9cd2908",
+      "new_source_snapshot_id": "e3aedd43-6f1b-5c14-a842-d57cdd8a69cd"
+    },
+    {
+      "approved_old_event_sha256": "3b8d31b678455718b258d309bdf7f80f5552fc256eb73b504ffda540035896cc",
+      "approved_old_payload_sha256": "04873a2e164c5a17f317c8672683a0145efe8e11450b558f5a5d72ae428e5d90",
+      "approved_old_source_snapshot_id": "17da8cec-82ed-5882-a825-14f1ddfcb106",
+      "event_id": 603,
+      "game_id": 2025020630,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020630.body.json",
+      "new_http_body_sha256": "b069176ecdc2e4bf5ece077b0c56ffa6b5d8e1a95b75dbaa7111890126324a5e",
+      "new_observed_at": "2026-09-06T06:26:23.684628+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 27,
+            "reported": 26,
+            "team_id": 4
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "20": 0,
+          "4": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "20": {
+            "goals": 5,
+            "shootout_goals": 0,
+            "sog": 26
+          },
+          "4": {
+            "goals": 1,
+            "shootout_goals": 0,
+            "sog": 27
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "ce16522e89534d806260cb94c58383ca6f8b689080b484b0bd8f94698395f214",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020630.receipt.json",
+      "new_source_event_sha256": "3b8d31b678455718b258d309bdf7f80f5552fc256eb73b504ffda540035896cc",
+      "new_source_payload_sha256": "04873a2e164c5a17f317c8672683a0145efe8e11450b558f5a5d72ae428e5d90",
+      "new_source_snapshot_id": "f198bcda-718a-51bb-b92d-c3e5d0eb7bdf"
+    },
+    {
+      "approved_old_event_sha256": "ac1117a9f846830fa937ab460da64f24620e432b31fb8c157211cbb3215e13fc",
+      "approved_old_payload_sha256": "0a854bc3f43db41a368f52686844121128e46000c3387585d7b7fce8ae364a4f",
+      "approved_old_source_snapshot_id": "0d29f155-c2b9-5f8b-b6ff-49f29f0a9dee",
+      "event_id": 472,
+      "game_id": 2025020653,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020653.body.json",
+      "new_http_body_sha256": "64fe81b39e4a574ddd6fba24e34f179cea4391d72706d9707814b87df3155602",
+      "new_observed_at": "2026-09-06T06:26:30.462076+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 35,
+            "reported": 34,
+            "team_id": 21
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "12": 0,
+          "21": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "12": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 28
+          },
+          "21": {
+            "goals": 5,
+            "shootout_goals": 0,
+            "sog": 35
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "f218d717fbe90a5c261b9667e29dfd04cd2410aa3151d740b4649136b0e273d8",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020653.receipt.json",
+      "new_source_event_sha256": "ac1117a9f846830fa937ab460da64f24620e432b31fb8c157211cbb3215e13fc",
+      "new_source_payload_sha256": "0a854bc3f43db41a368f52686844121128e46000c3387585d7b7fce8ae364a4f",
+      "new_source_snapshot_id": "13591350-fa3e-5a48-919b-60f9b6436891"
+    },
+    {
+      "approved_old_event_sha256": "af1aca417b9deff2138bd7663efa541c84deb3acb3316d926e22317fd42390e4",
+      "approved_old_payload_sha256": "00d29dae18a5e96195590d54317703c58668211d37ecde73c329290a2db354f6",
+      "approved_old_source_snapshot_id": "16217138-cfb2-5a51-9f78-db53e3810d55",
+      "event_id": 15,
+      "game_id": 2025020655,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020655.body.json",
+      "new_http_body_sha256": "ffb28650247e828f5acda7647b07ac0a55a46265c811b5c2d022b43e9ca13d57",
+      "new_observed_at": "2026-09-06T06:26:31.160552+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 39,
+            "reported": 38,
+            "team_id": 26
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "26": 1,
+          "30": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "26": {
+            "goals": 4,
+            "shootout_goals": 2,
+            "sog": 39
+          },
+          "30": {
+            "goals": 4,
+            "shootout_goals": 1,
+            "sog": 28
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "66e01574d97b003f4b864e87f4d6714f9fa9839b212e666b4abe7a90c4de01fb",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020655.receipt.json",
+      "new_source_event_sha256": "af1aca417b9deff2138bd7663efa541c84deb3acb3316d926e22317fd42390e4",
+      "new_source_payload_sha256": "00d29dae18a5e96195590d54317703c58668211d37ecde73c329290a2db354f6",
+      "new_source_snapshot_id": "b350eb05-f67d-56c9-95ef-c465dfa44cbb"
+    },
+    {
+      "approved_old_event_sha256": "a0bea929762a90eddf57e130e309cf211300b2b662561239ba9953386a56d7b7",
+      "approved_old_payload_sha256": "597690d15ae8af3f7b008884035e6a15e4c21880d356fbe5d9ecd84a0df97f64",
+      "approved_old_source_snapshot_id": "6c385ceb-795e-5f4d-b674-16b04201ac0b",
+      "event_id": 101,
+      "game_id": 2025020660,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020660.body.json",
+      "new_http_body_sha256": "e355d13dd0f045ed501cb9b54ef274442d0e6c8e4ab043fdd64341954a7115f2",
+      "new_observed_at": "2026-09-06T06:26:32.760584+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 30,
+            "reported": 29,
+            "team_id": 12
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "1": 0,
+          "12": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "1": {
+            "goals": 1,
+            "shootout_goals": 0,
+            "sog": 29
+          },
+          "12": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 30
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "47be7acb88825eb8771c61683797d98c7ff789736b9bf8ef1d1520e76c5cbfc6",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020660.receipt.json",
+      "new_source_event_sha256": "a0bea929762a90eddf57e130e309cf211300b2b662561239ba9953386a56d7b7",
+      "new_source_payload_sha256": "597690d15ae8af3f7b008884035e6a15e4c21880d356fbe5d9ecd84a0df97f64",
+      "new_source_snapshot_id": "f7d08f40-87ae-5aff-969e-1d3436388f74"
+    },
+    {
+      "approved_old_event_sha256": "24982e2f27c0361c9b1b0d2b1cd28d916e3eb2839c7c2156548130776c072522",
+      "approved_old_payload_sha256": "9fc826d37d269d7afc4b41646e56718d337ebd59132fed7c5ed6792559c6758a",
+      "approved_old_source_snapshot_id": "a1cb7642-d304-55e7-bf77-124912f6e98c",
+      "event_id": 285,
+      "game_id": 2025020671,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020671.body.json",
+      "new_http_body_sha256": "b0de17762449b1ec690e0dfd0c277fc779fa51121058928592f475bc7af572d1",
+      "new_observed_at": "2026-09-06T06:26:35.952302+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 24,
+            "reported": 23,
+            "team_id": 25
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "12": 0,
+          "25": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "12": {
+            "goals": 6,
+            "shootout_goals": 0,
+            "sog": 33
+          },
+          "25": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 24
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "2a4144724c898bafc8a5d0e8c9d462d6fa252052e38f5aea4c0b1295e9340448",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020671.receipt.json",
+      "new_source_event_sha256": "24982e2f27c0361c9b1b0d2b1cd28d916e3eb2839c7c2156548130776c072522",
+      "new_source_payload_sha256": "9fc826d37d269d7afc4b41646e56718d337ebd59132fed7c5ed6792559c6758a",
+      "new_source_snapshot_id": "dfd34e18-33f6-5d23-9efb-ccc310edb923"
+    },
+    {
+      "approved_old_event_sha256": "c58fcd21a587bde606e09463ac1a9d3888c1abf7a0de8142e48a4aae83389cbf",
+      "approved_old_payload_sha256": "5e71e1f70b8209152452d3a0e3ffae46f234464290a7faa434ed6ea0575308ae",
+      "approved_old_source_snapshot_id": "dd016e18-4f90-5da7-b6e1-caf9bcb99543",
+      "event_id": 1021,
+      "game_id": 2025020683,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020683.body.json",
+      "new_http_body_sha256": "6332e6b7c585aeb0680ae93dde37483ebde2f3239771709c10ef232efb25aff0",
+      "new_observed_at": "2026-09-06T06:26:39.621949+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 20,
+            "reported": 19,
+            "team_id": 8
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "13": 0,
+          "8": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "13": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 27
+          },
+          "8": {
+            "goals": 6,
+            "shootout_goals": 0,
+            "sog": 20
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "9169c826f9f2fea7d3a9357ef8bb16684c2680a114b98fa8b6d6a9a81956f02d",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020683.receipt.json",
+      "new_source_event_sha256": "c58fcd21a587bde606e09463ac1a9d3888c1abf7a0de8142e48a4aae83389cbf",
+      "new_source_payload_sha256": "5e71e1f70b8209152452d3a0e3ffae46f234464290a7faa434ed6ea0575308ae",
+      "new_source_snapshot_id": "cafdf574-21ba-5c74-88ad-d14c4f95f0a7"
+    },
+    {
+      "approved_old_event_sha256": "7313740bc8afb3f431a11953c79ccfdc5bd8f51938441d7a5b7223c118945a79",
+      "approved_old_payload_sha256": "fe3996cc0f23fe2a97004714f87a58fc3a61f1530b35d14174cbb40cc7403e79",
+      "approved_old_source_snapshot_id": "5d6e8c05-4568-5aae-ada3-a57047d2ddb8",
+      "event_id": 210,
+      "game_id": 2025020708,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020708.body.json",
+      "new_http_body_sha256": "0f7baabe8511ed4735e02e1120573f2b38a9b3a886e91b14551a0f7719654fc8",
+      "new_observed_at": "2026-09-06T06:26:46.971347+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 28,
+            "reported": 27,
+            "team_id": 2
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "2": 0,
+          "30": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "2": {
+            "goals": 4,
+            "shootout_goals": 0,
+            "sog": 28
+          },
+          "30": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 36
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "88a988b7f4ef8348936a4bfcfd4713b0a1712b76fb50b8672692b4c2dc47e7af",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020708.receipt.json",
+      "new_source_event_sha256": "7313740bc8afb3f431a11953c79ccfdc5bd8f51938441d7a5b7223c118945a79",
+      "new_source_payload_sha256": "fe3996cc0f23fe2a97004714f87a58fc3a61f1530b35d14174cbb40cc7403e79",
+      "new_source_snapshot_id": "b2eb142d-7d82-517a-a2ff-ffe9db544f4c"
+    },
+    {
+      "approved_old_event_sha256": "10d5ab2549f11ce2e4afdc0209c33ac6389c432d9ab6476f2e11fb1377204402",
+      "approved_old_payload_sha256": "52cb3286e4def9a226857793cf96f3ab8cf2360f10b45936afdd1310f3ad6777",
+      "approved_old_source_snapshot_id": "10e1b515-998e-501b-8dcc-c590f324ee65",
+      "event_id": 301,
+      "game_id": 2025020723,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020723.body.json",
+      "new_http_body_sha256": "e33bfdc15c175a318c322b22d012e7c5a239f9d64804f7ee5b62f2d032cba875",
+      "new_observed_at": "2026-09-06T06:26:51.698725+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 32,
+            "reported": 31,
+            "team_id": 10
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "10": 0,
+          "21": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "10": {
+            "goals": 4,
+            "shootout_goals": 0,
+            "sog": 32
+          },
+          "21": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 34
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "371ca42d9f880ae930a1a641e0e185e8c33450f9d25a2cb6b4a3b271290623ce",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020723.receipt.json",
+      "new_source_event_sha256": "10d5ab2549f11ce2e4afdc0209c33ac6389c432d9ab6476f2e11fb1377204402",
+      "new_source_payload_sha256": "52cb3286e4def9a226857793cf96f3ab8cf2360f10b45936afdd1310f3ad6777",
+      "new_source_snapshot_id": "290dc66b-0009-5f88-a1f1-b0f311570bec"
+    },
+    {
+      "approved_old_event_sha256": "0741fd38f07c33ebc9ae6417a1c9503024f98c01199952183e9d1c8d2391ea90",
+      "approved_old_payload_sha256": "e7497f136abfc68407c1ea990bd966a1a02e1910f6c495ce9c0abf892938f67f",
+      "approved_old_source_snapshot_id": "269f7ab9-34e8-5a5b-ac56-b5f16708ef09",
+      "event_id": 404,
+      "game_id": 2025020811,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020811.body.json",
+      "new_http_body_sha256": "c8e2de7e51175120a16708f22fc8b49316e869cb8ddb102e4c27f777297430b9",
+      "new_observed_at": "2026-09-06T06:27:17.634332+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 31,
+            "reported": 30,
+            "team_id": 68
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "18": 0,
+          "68": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "18": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 29
+          },
+          "68": {
+            "goals": 5,
+            "shootout_goals": 0,
+            "sog": 31
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "a1672bfc8864b713f7d6b93d7f12cc2720ff994fdead785688897568bd539c85",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020811.receipt.json",
+      "new_source_event_sha256": "0741fd38f07c33ebc9ae6417a1c9503024f98c01199952183e9d1c8d2391ea90",
+      "new_source_payload_sha256": "e7497f136abfc68407c1ea990bd966a1a02e1910f6c495ce9c0abf892938f67f",
+      "new_source_snapshot_id": "dfafea43-51e5-542b-b911-2ddf33606481"
+    },
+    {
+      "approved_old_event_sha256": "dc1594517a776e4709d4a412004d7ab5ddb7ce1f0ef670a68dd0df6e5c30a048",
+      "approved_old_payload_sha256": "9a37406683770aeacbc41cf587073ab39657571d99483356ffd5d2d5fac7fa52",
+      "approved_old_source_snapshot_id": "a2713dcb-625f-566d-bd96-2d272af1c28d",
+      "event_id": 309,
+      "game_id": 2025020887,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020887.body.json",
+      "new_http_body_sha256": "2b05e45e85105ecb1f08e4f24cd75ea7a9ad154716b271abe9528ae73dde70da",
+      "new_observed_at": "2026-09-06T06:27:39.763247+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 26,
+            "reported": 25,
+            "team_id": 29
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "1": 0,
+          "29": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "1": {
+            "goals": 0,
+            "shootout_goals": 0,
+            "sog": 24
+          },
+          "29": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 26
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "98df5fc4b27779c48c63b7ee912444a4738baba25236478ff1c734768665733f",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020887.receipt.json",
+      "new_source_event_sha256": "dc1594517a776e4709d4a412004d7ab5ddb7ce1f0ef670a68dd0df6e5c30a048",
+      "new_source_payload_sha256": "9a37406683770aeacbc41cf587073ab39657571d99483356ffd5d2d5fac7fa52",
+      "new_source_snapshot_id": "391d7286-32d8-59b2-82cf-eeea2f181f6c"
+    },
+    {
+      "approved_old_event_sha256": "2d5284e901947a022496f8a74e9a8e95c272be42321eb1f36d3ed5b6645fc3b0",
+      "approved_old_payload_sha256": "34e805af30365d52042b720bd891ed1cc36f81fec9a9b7decf4ffca02ade68d9",
+      "approved_old_source_snapshot_id": "bffa1a87-d1bf-5834-b5f7-7a92ee4ae108",
+      "event_id": 1169,
+      "game_id": 2025020930,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020930.body.json",
+      "new_http_body_sha256": "2fddfb0cdf4921bbc25ba58202ba1891eae197958959c86d62dde91155f81bd1",
+      "new_observed_at": "2026-09-06T06:27:52.270375+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 30,
+            "reported": 29,
+            "team_id": 13
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "13": 0,
+          "7": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "13": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 30
+          },
+          "7": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 39
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "2683e18da6ecc0382f2e50dc190e26aafd4647ba92cc9d27bc4398bed3b65a75",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025020930.receipt.json",
+      "new_source_event_sha256": "2d5284e901947a022496f8a74e9a8e95c272be42321eb1f36d3ed5b6645fc3b0",
+      "new_source_payload_sha256": "34e805af30365d52042b720bd891ed1cc36f81fec9a9b7decf4ffca02ade68d9",
+      "new_source_snapshot_id": "b2e9e3d2-d74e-5f6e-a067-72a903b27de2"
+    },
+    {
+      "approved_old_event_sha256": "71e014e4e99fbef82029f76cec2d2e41f2bfbf7aec6c78e7ffe538277e0a0fb3",
+      "approved_old_payload_sha256": "21f4442baef7baf2fe5162a87a9ccecf173a6c06d449b0a32ac943be62ac0293",
+      "approved_old_source_snapshot_id": "6904e22a-5fea-52b5-9cd8-0514d90726b5",
+      "event_id": 803,
+      "game_id": 2025021003,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021003.body.json",
+      "new_http_body_sha256": "dace509d99036970499bcfd43ea40d39db12f476c792a4ead9c8bcf2ea7d2d2a",
+      "new_observed_at": "2026-09-06T06:28:14.088015+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 29,
+            "reported": 28,
+            "team_id": 14
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "14": 0,
+          "7": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "14": {
+            "goals": 7,
+            "shootout_goals": 0,
+            "sog": 29
+          },
+          "7": {
+            "goals": 8,
+            "shootout_goals": 0,
+            "sog": 42
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "a6a82410282de2193ad6d53a5b11f54f733ca4094a520482d9ebf21d59bf36b5",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021003.receipt.json",
+      "new_source_event_sha256": "71e014e4e99fbef82029f76cec2d2e41f2bfbf7aec6c78e7ffe538277e0a0fb3",
+      "new_source_payload_sha256": "21f4442baef7baf2fe5162a87a9ccecf173a6c06d449b0a32ac943be62ac0293",
+      "new_source_snapshot_id": "3e73ead9-0c0e-5c67-a060-59117648d3b8"
+    },
+    {
+      "approved_old_event_sha256": "1cc940673b4ec1d20e992067d4773d209bfe5c7ddc5ce070bd828f99976f3d0c",
+      "approved_old_payload_sha256": "81dbad1ba01c91174100011827bcdf8b060d2f9fc028a114e1f6cf94333444a3",
+      "approved_old_source_snapshot_id": "481af07b-d91f-5be1-a082-edc1153f312c",
+      "event_id": 704,
+      "game_id": 2025021019,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021019.body.json",
+      "new_http_body_sha256": "e66849b3d85fee8f32436cbc54140ddce51eb75f0cf3477b9ee47f1d7ae25842",
+      "new_observed_at": "2026-09-06T06:28:18.638610+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 50,
+            "reported": 49,
+            "team_id": 2
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "19": 0,
+          "2": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "19": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 23
+          },
+          "2": {
+            "goals": 4,
+            "shootout_goals": 0,
+            "sog": 50
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "8138883df6be06396181663cdaf41c797ed415fd1ab6341eb340291b84ad6ece",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021019.receipt.json",
+      "new_source_event_sha256": "1cc940673b4ec1d20e992067d4773d209bfe5c7ddc5ce070bd828f99976f3d0c",
+      "new_source_payload_sha256": "81dbad1ba01c91174100011827bcdf8b060d2f9fc028a114e1f6cf94333444a3",
+      "new_source_snapshot_id": "6281f825-a160-5be6-abf0-156d160e5449"
+    },
+    {
+      "approved_old_event_sha256": "8f1887bcb3896d2d0faf2abc776bb03c5c142f18488e4b7575426bf57aadb27a",
+      "approved_old_payload_sha256": "29a436c1b1c1006169817eaf05bd19ca882856c3df0c3658d68798e8ce289794",
+      "approved_old_source_snapshot_id": "f61b8c6b-5d07-532f-9684-88d635164132",
+      "event_id": 169,
+      "game_id": 2025021058,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021058.body.json",
+      "new_http_body_sha256": "e91596630185a46d938f927d78b3e9ca21282d3ff70101ac9ec6c066a45386be",
+      "new_observed_at": "2026-09-06T06:28:30.224871+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 25,
+            "reported": 24,
+            "team_id": 9
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "28": 0,
+          "9": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "28": {
+            "goals": 4,
+            "shootout_goals": 0,
+            "sog": 23
+          },
+          "9": {
+            "goals": 7,
+            "shootout_goals": 0,
+            "sog": 25
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "7eb378c4a2e89b147f4e072f99528ed2adb14dd13b3ab0936139ee97c3cbc2e1",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021058.receipt.json",
+      "new_source_event_sha256": "8f1887bcb3896d2d0faf2abc776bb03c5c142f18488e4b7575426bf57aadb27a",
+      "new_source_payload_sha256": "29a436c1b1c1006169817eaf05bd19ca882856c3df0c3658d68798e8ce289794",
+      "new_source_snapshot_id": "97452233-68b1-58c1-b505-ba87c04754d3"
+    },
+    {
+      "approved_old_event_sha256": "67e36be41f23e46ec6b41a4249c3e128b5cbecfe10d09427ca519ac15c30c3dd",
+      "approved_old_payload_sha256": "b46e3506d5018cda2fe7d143e9d367dea9791bb219f2b5ae72b5b41a18908f25",
+      "approved_old_source_snapshot_id": "b4533a15-225d-5d92-b106-1ca557fc2f3d",
+      "event_id": 863,
+      "game_id": 2025021102,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021102.body.json",
+      "new_http_body_sha256": "ef44f05c3e8e73c5585733d642a3855c7745143bcfc0b3596299a6c8d0941ab7",
+      "new_observed_at": "2026-09-06T06:28:43.443842+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 34,
+            "reported": 33,
+            "team_id": 7
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "26": 0,
+          "7": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "26": {
+            "goals": 1,
+            "shootout_goals": 0,
+            "sog": 27
+          },
+          "7": {
+            "goals": 4,
+            "shootout_goals": 0,
+            "sog": 34
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "0136c8ee937da7e4dd7a1fec5c4e6a41cc36a7e8716b699233c79e1c80f5b59e",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021102.receipt.json",
+      "new_source_event_sha256": "67e36be41f23e46ec6b41a4249c3e128b5cbecfe10d09427ca519ac15c30c3dd",
+      "new_source_payload_sha256": "b46e3506d5018cda2fe7d143e9d367dea9791bb219f2b5ae72b5b41a18908f25",
+      "new_source_snapshot_id": "fa4f472c-ddaf-5de7-bd3d-04f4465f3c6a"
+    },
+    {
+      "approved_old_event_sha256": "6406bb1583811dd200f2962090070c9918e8ac74efbc6b50b4a599dc2e66e4e2",
+      "approved_old_payload_sha256": "2d90db44f8c1ed2c91d65f578fef1e5f1dcccfea80011eabfc7d893ebbfee598",
+      "approved_old_source_snapshot_id": "772485a5-65e0-53fc-9de9-7358f84c2d4a",
+      "event_id": 552,
+      "game_id": 2025021109,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021109.body.json",
+      "new_http_body_sha256": "3b6b8226196292c701a6eae8b411ce91afbc30ffe232a68763fe4ff7ed560e51",
+      "new_observed_at": "2026-09-06T06:28:45.240675+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 28,
+            "reported": 27,
+            "team_id": 22
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "14": 0,
+          "22": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "14": {
+            "goals": 5,
+            "shootout_goals": 0,
+            "sog": 28
+          },
+          "22": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 28
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "ea142b2287ef25d7e9fac02d99bca39aef71695321c8ae6b686c70f360b17b7e",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021109.receipt.json",
+      "new_source_event_sha256": "6406bb1583811dd200f2962090070c9918e8ac74efbc6b50b4a599dc2e66e4e2",
+      "new_source_payload_sha256": "2d90db44f8c1ed2c91d65f578fef1e5f1dcccfea80011eabfc7d893ebbfee598",
+      "new_source_snapshot_id": "eaed04f9-1d61-53a5-8135-90e9623d68dc"
+    },
+    {
+      "approved_old_event_sha256": "f2f667b4b34bb725bed98008ac79ae5343d7a3265c269bc3d9160c90b04abaf0",
+      "approved_old_payload_sha256": "7c5a850cd55ce10c9c380fb062d6eddc3f67a5377e09af3760ea60968da67159",
+      "approved_old_source_snapshot_id": "8c116c05-e9ef-5df7-acdc-64c54e0f0115",
+      "event_id": 959,
+      "game_id": 2025021123,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021123.body.json",
+      "new_http_body_sha256": "b2a9b679b981b9216a3d0d8efcab91921051890e45abd1ed1535fe27d4ca294c",
+      "new_observed_at": "2026-09-06T06:28:49.572682+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 25,
+            "reported": 24,
+            "team_id": 13
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "13": 1,
+          "55": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "13": {
+            "goals": 4,
+            "shootout_goals": 1,
+            "sog": 25
+          },
+          "55": {
+            "goals": 4,
+            "shootout_goals": 0,
+            "sog": 27
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "4580fb23b08cea7a4fdb5f240b9d2151b2374b7250f6750372627819ae9f4a4f",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021123.receipt.json",
+      "new_source_event_sha256": "f2f667b4b34bb725bed98008ac79ae5343d7a3265c269bc3d9160c90b04abaf0",
+      "new_source_payload_sha256": "7c5a850cd55ce10c9c380fb062d6eddc3f67a5377e09af3760ea60968da67159",
+      "new_source_snapshot_id": "4281ac56-2cc4-5c5e-b33d-bb4365e1e7ce"
+    },
+    {
+      "approved_old_event_sha256": "945cc40342a99760cef6a4585d465672f835ce235da6fc1d52e66de1e4325e0c",
+      "approved_old_payload_sha256": "b462e44ec3a9e77c0ae1a7d869c740fe843a287e99da27480a18b5d43a7cc4dc",
+      "approved_old_source_snapshot_id": "2493e111-bc80-5060-accc-7b780ffec808",
+      "event_id": 202,
+      "game_id": 2025021127,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021127.body.json",
+      "new_http_body_sha256": "a858b28e1fa5c0a594bbac02591ce1784b071312e68cb895b6c59df162fafa5b",
+      "new_observed_at": "2026-09-06T06:28:50.778346+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 26,
+            "reported": 25,
+            "team_id": 14
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "14": 0,
+          "30": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "14": {
+            "goals": 6,
+            "shootout_goals": 0,
+            "sog": 26
+          },
+          "30": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 24
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "ac03088f2fc56a60d64f0b0616dd53d6e040dac233da16c1e06f7e7a47e49280",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021127.receipt.json",
+      "new_source_event_sha256": "945cc40342a99760cef6a4585d465672f835ce235da6fc1d52e66de1e4325e0c",
+      "new_source_payload_sha256": "b462e44ec3a9e77c0ae1a7d869c740fe843a287e99da27480a18b5d43a7cc4dc",
+      "new_source_snapshot_id": "f70f21ec-1694-58ca-b901-96da95729cd5"
+    },
+    {
+      "approved_old_event_sha256": "aaf6be0416fd5f5eb7434af87eafcf19e8713c04de8ce63a1193cbecf1f51177",
+      "approved_old_payload_sha256": "69010309d542d7ae4940a9c5608c2da37cbd31f29afff9deec4a3b57a0f2e7e7",
+      "approved_old_source_snapshot_id": "df7089df-5083-557f-ba63-985f1971b7d6",
+      "event_id": 886,
+      "game_id": 2025021285,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021285.body.json",
+      "new_http_body_sha256": "da62829589bf760f06c8f6f920c1b7f95ed4d897f275155d2d6db4d3f7f5c930",
+      "new_observed_at": "2026-09-06T06:29:37.165069+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 33,
+            "reported": 32,
+            "team_id": 25
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "10": 0,
+          "25": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "10": {
+            "goals": 5,
+            "shootout_goals": 0,
+            "sog": 27
+          },
+          "25": {
+            "goals": 6,
+            "shootout_goals": 0,
+            "sog": 33
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "9b4ae5f1686ab33862b28469826e409f1d85ce3294059aa42a47c658969bc33a",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025021285.receipt.json",
+      "new_source_event_sha256": "aaf6be0416fd5f5eb7434af87eafcf19e8713c04de8ce63a1193cbecf1f51177",
+      "new_source_payload_sha256": "69010309d542d7ae4940a9c5608c2da37cbd31f29afff9deec4a3b57a0f2e7e7",
+      "new_source_snapshot_id": "2f027c9e-20b1-553a-b70d-fd3e961e2519"
+    },
+    {
+      "approved_old_event_sha256": "02e646afcc7c556be7d37f01ce8ae9a4029c974f7bca31745b2e67bfd1ade02a",
+      "approved_old_payload_sha256": "ec2692404fae096252720186ac988d3e430ec7202b9d84d3e6bdeab08b113cbb",
+      "approved_old_source_snapshot_id": "1c9f8a51-c8b0-5897-825c-b3a5212e9343",
+      "event_id": 450,
+      "game_id": 2025030172,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025030172.body.json",
+      "new_http_body_sha256": "0c49dd38ed59ff749a63dfea1891487331161fb25de12e473aa3c6fc47882666",
+      "new_observed_at": "2026-09-06T06:29:55.530986+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 30,
+            "reported": 29,
+            "team_id": 68
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "54": 0,
+          "68": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "54": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 21
+          },
+          "68": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 30
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "4388111b5153870fa6d58395e279bd40440c9f967ee49b362ed730be2b8785ba",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025030172.receipt.json",
+      "new_source_event_sha256": "02e646afcc7c556be7d37f01ce8ae9a4029c974f7bca31745b2e67bfd1ade02a",
+      "new_source_payload_sha256": "ec2692404fae096252720186ac988d3e430ec7202b9d84d3e6bdeab08b113cbb",
+      "new_source_snapshot_id": "3111265a-2aaf-5e8e-8a1a-2c36a4f19dc1"
+    },
+    {
+      "approved_old_event_sha256": "045cc208d3d701fc76ca0b2ebdb9a5de7c5e9c56276b2bb15ed0b748ccd89de2",
+      "approved_old_payload_sha256": "daad2d053a2c6622aaa5cf01e13c3de137da3b2f431219be57cf69bddf63ec6c",
+      "approved_old_source_snapshot_id": "304ec8da-48eb-5cbc-a2ef-08acca2f569a",
+      "event_id": 208,
+      "game_id": 2025030213,
+      "new_body_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025030213.body.json",
+      "new_http_body_sha256": "c53bb86dd54f13cf1e4335467209a65c5a44251c20fdacf4edbd8e0705681e21",
+      "new_observed_at": "2026-09-06T06:29:59.387945+00:00",
+      "new_original_final_gate": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 37,
+            "reported": 36,
+            "team_id": 8
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "7": 0,
+          "8": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "7": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 28
+          },
+          "8": {
+            "goals": 6,
+            "shootout_goals": 0,
+            "sog": 37
+          }
+        }
+      },
+      "new_receipt_bytes_sha256": "d00610f799fcf6b2ef20c6e60f1f27266c89f87c9fac995734c994b318d4c5d6",
+      "new_receipt_path": "scripts/proof/results/historical-official-freeze-20260906/2025/pbp/2025030213.receipt.json",
+      "new_source_event_sha256": "045cc208d3d701fc76ca0b2ebdb9a5de7c5e9c56276b2bb15ed0b748ccd89de2",
+      "new_source_payload_sha256": "daad2d053a2c6622aaa5cf01e13c3de137da3b2f431219be57cf69bddf63ec6c",
+      "new_source_snapshot_id": "ac035916-6fdc-5ae5-afbb-b99ba55f4987"
+    }
+  ],
+  "revision_review_sha256": "413272be05c454d683a06c4fa75b9354c0ec116d42c6108d4f2235a54c911234"
+}

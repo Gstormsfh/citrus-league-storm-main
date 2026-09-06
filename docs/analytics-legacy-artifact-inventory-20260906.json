@@ -1,0 +1,114 @@
+{
+  "contract": "citrus-preserved-legacy-artifact-bytes-v1",
+  "observation_window_start": "2026-09-06T06:27:32Z",
+  "observation_window_end": "2026-09-06T06:28:59Z",
+  "timing_semantics": "bounded_local_hashing_window_not_per_file_timestamp",
+  "scope": "The 17 tracked joblib files discovered in data-pipeline/models, not a claim to inventory every possible external model.",
+  "method": "Read-only SHA256 byte hashing; no joblib/pickle deserialization, feature extraction, inference or training.",
+  "rights_or_fit_lineage_verified": false,
+  "preservation": "Retain all original files unchanged. This is an integrity inventory, not authorization to reuse restricted data or parameters.",
+  "artifacts": [
+    {
+      "path": "data-pipeline/models/last_event_category_encoder.joblib",
+      "sha256": "35b309597642a8ccd7e3ae0211a04d58e4bd86340c522eadf6f4504cac8dd081",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/last_event_category_encoder_v2.joblib",
+      "sha256": "0ee53196f8241432de8af134e2dcc148142068b9a9fce08dbe70fe5c6d2a8d38",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/model_features.joblib",
+      "sha256": "fde21f6b26b78dadd64d263f17789cb26ed0d6ba83387d28e1b4fc873736b02a",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/model_features_moneypuck.joblib",
+      "sha256": "d079238cd1c3d56a9d038b087067d94881cfce5f70d8c00a4579edd59639a39d",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/model_features_moneypuck_v2.joblib",
+      "sha256": "b90d40e543b703853643ed2dbc90c43663c505df15c4362b2f1a660c24812c45",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/moneypuck_xg_features.joblib",
+      "sha256": "5a5d2a12cecc20bc74f239196c6d8b9997bd9c651fb86e3475e51aa72341c843",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/pass_zone_encoder.joblib",
+      "sha256": "06aa707edbe5c02b20a57bb05464d8b3d72f7f1e7ebf9d44e15a85335463165c",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/player_shooting_talent.joblib",
+      "sha256": "1b665b42694736489088607d83db5a928b288e379831f692152ad6f592f64bff",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/rebound_model.joblib",
+      "sha256": "7d1ea2de82d633f2597f94169f9fcbb3088586a9f5e083ff0e018fb8028233d7",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/rebound_model_features.joblib",
+      "sha256": "f032a1581b01069aa9a5b1f7becd961679ef780e070f65cc681a4e48379cb06b",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/shot_type_encoder.joblib",
+      "sha256": "4af2b23249cfd2f564d2f1faacbe81ce8ea0a751285504c2dc7be0aada1555c3",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/xa_model.joblib",
+      "sha256": "4f5a4247b535f612fefc158f275c126f2f8393c4fdc0a9a896dc2cb71e2f89b7",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/xa_model_features.joblib",
+      "sha256": "84dc8c7953b713217e4a9d93b8b11bc06d75102ee2209e54eaadb405d4af3a27",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/xg_model.joblib",
+      "sha256": "08b74b36a3b4d21e72aff18fa377feb69731f7c94025e56bdc4240ca801e99db",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/xg_model_moneypuck.joblib",
+      "sha256": "6c4cce447cb14b877d8245bc3ba690b8165758434698ca2aebaf65bf5bb9c9cd",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/xg_model_moneypuck_v2.joblib",
+      "sha256": "b1f3d1941b04021604c6c87e0a360f3af1b29dbf2300576e667b18d6816765cf",
+      "deserialized": false,
+      "new_training_input": false
+    },
+    {
+      "path": "data-pipeline/models/xg_shot_type_calibration.joblib",
+      "sha256": "ab87a3d247b08df2c25e8aeff610651a950c158ce1bd6c9b195e2f0351df9e8e",
+      "deserialized": false,
+      "new_training_input": false
+    }
+  ]
+}
