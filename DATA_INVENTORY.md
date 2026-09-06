@@ -198,6 +198,34 @@ definitions and confirmed shared-output permission risks. The unapplied
 writes to global GSAx and projections while preserving reads/service writes;
 actual staging rollback proof is recorded there. No production data was changed.
 
+### 1.5 Current isolated analytics evidence and model experiments
+
+All paths below are additive. Ignored `scripts/proof/results/` evidence is local,
+not a remote backup; manifests and proof summaries are tracked in `docs/`.
+Earlier source files, actuals, old models and prior reservations are not replaced.
+
+| Evidence / implementation | Location and role |
+|---|---|
+| Frozen official historical sources | `scripts/proof/results/historical-official-freeze-20260906/`: original PBP bodies, receipts, schedule and quarantine inventory |
+| First neutral export and actual retrospective fit | `official-neutral-features-20260906/` and `official-neutral-experiment-20260906/` under results; `projections/compact_feature_export.py`, `verified_export_experiment.py`, `chronological_fit.py`, `chronological_experiment.py`, `probability_scorecard.py`; result and proof in `docs/analytics-first-neutral-experiment-*-20260906.*` |
+| First experiment coverage and future reservation | `official-neutral-coverage-20260906.json`, `official-neutral-prospective-reservation-20260906/`; `projections/prospective_reservation.py`. A reservation is not an observed future result or automatic acceptance |
+| Completed experiment preservation archive | `docs/analytics-completed-experiment-archive-20260906.json` binds the local source/evidence archive and independently checked membership; originals remain in place |
+| Goal/SOG statistical exceptions | `docs/analytics-goal-sog-http-adjudications-20260906-v1.json`, `projections/frozen_http_goal_sog_adjudication.py`: exact reviewed source overlays, not changes to old frozen cohorts |
+| Retained historical report representations | `scripts/proof/results/historical-feature-reports-20260906/` and `historical-report-v2-replay-20260906.json`; `projections/report_feature_source_v2.py`, `scripts/proof/replay_report_v2.py`, `docs/analytics-report-v2-review-20260906.md`. Explicit historical aliases and terminal-marker interpretation preserve all raw rows; correspondence is not training approval |
+| Earlier-development model variant | `projections/development_feature_export.py`, `development_experiment.py`, `development_replay.py`; `docs/analytics-development-ablation-plan-20260906.json` and `analytics-development-methods-20260906.md`. Source-replayed earlier chronological feature/calibration experiment, not a replacement production model |
+| Composed database pipeline fixture | `scripts/proof/test_analytics_composed_nightly_{fixture,isolated,native}.mjs`, `scripts/proof/captures/composed_{helpers,views}_20260906.json`; `docs/analytics-native-composed-nightly-20260906.json` and `analytics-composed-nightly-20260906.md`. Actual captured dependency execution with explicit remaining boundaries, disposable only |
+
+The enhanced feature output is `scripts/proof/results/official-development-features-20260906/`.
+The expanded native database run additionally has
+`docs/analytics-native-composed-expanded-20260906.json`; neither replaces the
+earlier narrower proof or claims model-inference acceptance.
+
+Each new Python module has an adjacent `data-pipeline/tests/test_*.py` contract
+suite. Full foundation/consumer/model acceptance still lives in
+`docs/ANALYTICS_ACCEPTANCE.md`; partial source or concurrency success does not
+override those gates. The preservation map and causal feature plan retain every
+reviewed research/input family, including currently unavailable ones.
+
 ---
 
 ## 2. Historical data archives
@@ -229,6 +257,11 @@ provenance. Existing artifacts are preserved; no new quality claim follows.
 ### 2.2 Trained model artifacts
 
 **Canonical models live at:** `data-pipeline/models/` (committed to git)
+
+The following table preserves historical labels and claims, not newly verified
+training lineage or quality. Byte-preservation and current provenance limits are
+recorded in `docs/analytics-training-lineage-20260906.md`; new first-party
+experiments are indexed separately in §1.5 and never overwrite these artifacts.
 
 | File | Size | Purpose | Trained on |
 |---|---|---|---|

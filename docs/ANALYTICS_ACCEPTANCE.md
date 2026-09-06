@@ -20,6 +20,42 @@ Status: foundation NOT accepted. Local work only; no production rollout authoriz
 
 ## Current local verification (2026-09-06)
 
+### Additive earlier development and composed database work
+
+The [earlier-development declaration](analytics-development-ablation-plan-20260906.json)
+was frozen before a new real export or fit. Its additive exporter completed
+6,365 selected games, retained 93 source-quarantined games and emitted 541,067
+geometry-eligible attempts without narrowing the old training population.
+One additional geometry-ineligible candidate remains in its audit. The manifest
+semantic SHA is `2f657b06a5b715b305fbdef0977dd0e371e5ab55cee2cc4a982aa0f45e70421b`.
+The source-replayed two-fold fit and declared shortlist are not yet completed.
+They use only event files before July 2024; the old observed historical test and
+all existing prospective reservations remain unchanged.
+
+Root independently passed the full offline Python suite: 1,389 tests, 16 network
+tests deselected, 34 warnings in 8.72 seconds. Subsequent additive wrapper work
+needs its own final suite verification; this count does not assert model quality.
+
+The [expanded composed-native proof](analytics-native-composed-expanded-20260906.json)
+executes actual clock repair, strength/TOI, guarded on-ice/GAR, rink interpolation,
+season refresh and GSAx reconciliation. Two disposable PostgreSQL 17.6 runs passed
+with four independent lock witnesses, invalid-source atomicity, correction/replay
+and unchanged older-season sentinels. Fixture cleanup verified zero objects and
+roles; root stopped only its ownership-verified containers. The legacy cell
+scorer remains explicitly stubbed, v5 inference is throw-on-use with no eligible
+inference rows, and synthetic rink knots prove plumbing rather than learned
+correction. This is not full nightly/load/hosted acceptance. The earlier narrower
+[composed proof](analytics-native-composed-nightly-20260906.json) is preserved.
+
+The [versioned report replay](analytics-report-v2-review-20260906.md) resolves only
+reviewed historical team aliases and the supported terminal administrative
+marker. Of the unchanged 2,713 source/report pairs, 2,668 parse and pass original
+source gates; 45 remain unavailable. Complete attempt correspondence holds for
+2,336, and 1,918 also have matching gameplay-type counts. These are source-review
+counts, not training approval. Root independently rehashed 10,867 source/code
+files and passed the 54 combined parser/review tests. Old source files, v1 logic,
+quarantines and model cohorts remain unchanged.
+
 ### Real measurement checkpoint
 
 The [first real experiment result](analytics-first-neutral-experiment-result-20260906.md)
@@ -62,7 +98,7 @@ full nightly dependency integration and hosted blocking/load remain unverified.
 See `analytics-nightly-lock-audit-20260906.md`. No global arbitrary-SQL
 deadlock-freedom claim is made.
 
-The current root-run full offline Python suite passed 1321 tests, with 16 network
+The earlier root-run full offline Python suite passed 1321 tests, with 16 network
 tests deselected and 34 warnings in 7.21 seconds. Warnings comprise 33 existing
 datetime deprecations and one physical-core detection fallback; actual model
 fit/predict/scoring pools are fixed to one thread. The suite count is not

@@ -1,0 +1,262 @@
+{
+  "contract": "citrus-earlier-development-ablation-plan-v1",
+  "declared_at": "2026-09-06T07:38:23Z",
+  "status": "declared_before_real_development_export_and_fit",
+  "publishable": false,
+  "evidence_claim": "retrospective_current_source_revisions",
+  "historical_as_of_verified": false,
+  "untouched_test_claim": false,
+  "source": "newly_frozen_official_nhl_gamecenter_play_by_play",
+  "source_schedule_sha256": "17e23b533a25b3ffce7460f54643600bbec67538e157db0eeb5a93c61dcc2a50",
+  "source_seasons": [
+    2019,
+    2020,
+    2021,
+    2022,
+    2023
+  ],
+  "folds": {
+    "fold1": {
+      "train": {
+        "start": "2019-07-01",
+        "end": "2021-06-30"
+      },
+      "calibration": {
+        "start": "2021-07-01",
+        "end": "2022-06-30"
+      },
+      "validation": {
+        "start": "2022-07-01",
+        "end": "2023-06-30"
+      }
+    },
+    "fold2": {
+      "train": {
+        "start": "2019-07-01",
+        "end": "2022-06-30"
+      },
+      "calibration": {
+        "start": "2022-07-01",
+        "end": "2023-06-30"
+      },
+      "validation": {
+        "start": "2023-07-01",
+        "end": "2024-06-30"
+      }
+    }
+  },
+  "schema": {
+    "version": "official-neutral-prefix-categorical-v2",
+    "names": [
+      "distance_to_goal_ft",
+      "signed_angle_deg",
+      "shooting_skaters",
+      "defending_skaters",
+      "shooting_empty_net",
+      "defending_empty_net",
+      "skater_advantage",
+      "score_differential_pre_shot",
+      "seconds_since_immediate_event",
+      "distance_from_immediate_event_ft",
+      "event_location_change_ft_per_second",
+      "x_attacking",
+      "y_attacking",
+      "previous_x_in_shooting_frame_ft",
+      "previous_y_in_shooting_frame_ft",
+      "immediate_previous_event_same_team",
+      "immediate_previous_sog_same_team",
+      "prior_sog_angle_change_deg",
+      "prior_sog_angular_rate_deg_per_second",
+      "seconds_since_recorded_faceoff",
+      "shooting_is_home",
+      "period_number",
+      "seconds_into_period"
+    ],
+    "categorical_names": [
+      "shot_type",
+      "previous_event_type"
+    ]
+  },
+  "config": {
+    "seed": 60906,
+    "threads": 1,
+    "logistic": {
+      "C": 1,
+      "solver": "lbfgs",
+      "max_iter": 2000,
+      "tol": 1e-8
+    },
+    "context": {
+      "max_iter": 200,
+      "learning_rate": 0.05,
+      "max_leaf_nodes": 15,
+      "min_samples_leaf": 100,
+      "l2_regularization": 10,
+      "early_stopping": false
+    },
+    "sigmoid": {
+      "C": 1,
+      "epsilon": 0.000001
+    },
+    "views": {
+      "base_numeric_names": [
+        "distance_to_goal_ft",
+        "signed_angle_deg",
+        "shooting_skaters",
+        "defending_skaters",
+        "shooting_empty_net",
+        "defending_empty_net",
+        "skater_advantage",
+        "score_differential_pre_shot",
+        "seconds_since_immediate_event",
+        "distance_from_immediate_event_ft",
+        "event_location_change_ft_per_second"
+      ],
+      "enhanced_numeric_names": [
+        "distance_to_goal_ft",
+        "signed_angle_deg",
+        "shooting_skaters",
+        "defending_skaters",
+        "shooting_empty_net",
+        "defending_empty_net",
+        "skater_advantage",
+        "score_differential_pre_shot",
+        "seconds_since_immediate_event",
+        "distance_from_immediate_event_ft",
+        "event_location_change_ft_per_second",
+        "x_attacking",
+        "y_attacking",
+        "previous_x_in_shooting_frame_ft",
+        "previous_y_in_shooting_frame_ft",
+        "immediate_previous_event_same_team",
+        "immediate_previous_sog_same_team",
+        "prior_sog_angle_change_deg",
+        "prior_sog_angular_rate_deg_per_second",
+        "seconds_since_recorded_faceoff",
+        "shooting_is_home",
+        "period_number",
+        "seconds_into_period"
+      ],
+      "enhanced_categorical_names": [
+        "shot_type",
+        "previous_event_type"
+      ]
+    },
+    "scorecard": {
+      "bin_edges": [
+        0,
+        0.01,
+        0.025,
+        0.05,
+        0.1,
+        0.2,
+        0.35,
+        0.5,
+        0.75,
+        1
+      ],
+      "log_loss_epsilon": 1e-12,
+      "resamples": 256,
+      "seed": 60906,
+      "confidence": 0.95,
+      "min_games": 30,
+      "min_events": 100,
+      "min_valid_fraction": 0.9
+    }
+  },
+  "population": {
+    "base": "strict-official-unblocked-geometry-matched-v1",
+    "cohort": "exact_same_geometry_eligible_events_for_all_predictors",
+    "source_exceptions": "retain_original_whole_game_quarantines",
+    "missing_numeric": "train_only_medians_plus_fixed_missingness_flags",
+    "categorical": "train_only_one_hot_vocabulary_plus_explicit_missing_and_unknown",
+    "blocked_and_shootout": "retain_excluded_full_source_inventory",
+    "later_period_event_files": "no_2024_or_2025_event_files_opened"
+  },
+  "predictors": [
+    "prevalence_raw",
+    "prevalence_calibrated",
+    "geometry_raw",
+    "geometry_sigmoid",
+    "geometry_isotonic",
+    "base_context_raw",
+    "base_context_sigmoid",
+    "base_context_isotonic",
+    "enhanced_context_raw",
+    "enhanced_context_sigmoid",
+    "enhanced_context_isotonic"
+  ],
+  "calibration": {
+    "fit_window": "separate_later_calibration_only",
+    "raw": "no_recalibration",
+    "sigmoid": "L2_logistic_on_clipped_raw_logit",
+    "isotonic": "increasing_piecewise_linear_with_boundary_clip",
+    "hyperparameter_search": false
+  },
+  "selection": {
+    "version": "equal_fold_probability_shortlist-v1",
+    "purpose": "development_shortlist_only_not_serving_or_prospective_acceptance",
+    "eligible_families": [
+      "geometry",
+      "base_context",
+      "enhanced_context"
+    ],
+    "guard": "Brier_and_log_loss_no_worse_than_geometry_raw_in_each_fold",
+    "guard_tolerance": 1e-12,
+    "ranking": [
+      "mean_fold_log_loss_equal_fold_weight",
+      "mean_fold_Brier_equal_fold_weight",
+      "fixed_complexity_tie_order"
+    ],
+    "tie_order": [
+      "geometry_raw",
+      "geometry_sigmoid",
+      "geometry_isotonic",
+      "base_context_raw",
+      "base_context_sigmoid",
+      "base_context_isotonic",
+      "enhanced_context_raw",
+      "enhanced_context_sigmoid",
+      "enhanced_context_isotonic"
+    ],
+    "uncertainty": "paired_whole_game_bootstrap_intervals_conditional_on_fixed_candidates_not_multiplicity_adjusted",
+    "subgroup_review": "retain_all_declared_groups_and_reliability_bins; aggregate_shortlist_is_not_subgroup_acceptance",
+    "later_2025_observed_test_used_for_ranking": false,
+    "automatic_acceptance_or_serving_promotion": false
+  },
+  "operational_limits": {
+    "max_numeric_features": 64,
+    "max_categorical_features": 8,
+    "max_rows_per_fold": 1000000,
+    "max_categories_per_field": 256,
+    "max_design_cells_per_fold": 100000000,
+    "policy": "reject_before_dense_design_no_truncation_or_category_merging",
+    "cpu_threads": 1
+  },
+  "groups": [
+    "shot_type",
+    "strength",
+    "defending_empty_net",
+    "season",
+    "rink_home_id",
+    "game_type",
+    "previous_event_type",
+    "prior_sog_same_team"
+  ],
+  "preservation": {
+    "all_original_inputs_and_actuals": "retain_unchanged",
+    "prior_models": "no_legacy_deserialization_or_overwrite",
+    "all_method_families": "docs/analytics-method-preservation-20260906.md",
+    "existing_six_future_reservations": "unchanged; new complete candidate requires new timestamped reservation",
+    "MoneyPuck": "public_methodology_only; no_files_predictions_or_fitted_constants"
+  },
+  "limitations": [
+    "Current-revision earlier development comparison, not new untouched test evidence.",
+    "Recorded event location/time is a proxy, not actual puck speed, pass observation or goalie tracking.",
+    "Immediate same-team previous SOG is not a confirmed rebound label; angular motion is undefined for same-clock division.",
+    "Time since recorded faceoff is elapsed same-period time, not uninterrupted play, power-play age or fatigue.",
+    "Neutral shot probability remains separate from shooting talent, goalie effects, rebound/created/flurry accounting, xA, GAR and fantasy forecasts.",
+    "New features are tested as a declared bundle; results do not isolate each added feature individually.",
+    "No external head-to-head quality or world-class ranking is asserted."
+  ]
+}
