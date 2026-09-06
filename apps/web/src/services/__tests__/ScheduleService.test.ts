@@ -154,6 +154,13 @@ describe('ScheduleService', () => {
   // getGamesForTeam
   // ---------------------------------------------------------------------------
   describe('getGamesForTeam', () => {
+    it('retries a failed schedule immediately, then caches the successful result', async () => {
+      mockGetGames.mockRejectedValueOnce(new Error('Offline')).mockResolvedValue({ data: [createGame()] });
+      expect((await ScheduleService.getGamesForTeam('EDM')).error).toBeTruthy();
+      expect((await ScheduleService.getGamesForTeam('EDM')).games).toHaveLength(1);
+      expect((await ScheduleService.getGamesForTeam('EDM')).games).toHaveLength(1);
+      expect(mockGetGames).toHaveBeenCalledTimes(2);
+    });
     it('returns games for a specific team', async () => {
       const games = [createGame()];
       mockGetGames.mockResolvedValue({ data: games });

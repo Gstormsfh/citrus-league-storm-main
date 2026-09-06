@@ -64,7 +64,18 @@ function getCachedOrFetch<T>(cacheKey: string, fetcher: () => Promise<T>): Promi
   if (existing && Date.now() - existing.timestamp < CACHE_TTL_MS) {
     return existing.promise as Promise<T>;
   }
-  const promise = fetcher().finally(() => {
+  const evict = () => {
+    if (requestCache.get(cacheKey)?.promise === promise) requestCache.delete(cacheKey);
+  };
+  const promise = fetcher().then(result => {
+    // Service methods return errors as data. Never pin a failed request in
+    // the success cache: a user's Retry must be able to reach the network.
+    if (result && typeof result === 'object' && 'error' in result && result.error) evict();
+    return result;
+  }, error => {
+    evict();
+    throw error;
+  }).finally(() => {
     // Remove stale entries after TTL
     setTimeout(() => {
       const entry = requestCache.get(cacheKey);

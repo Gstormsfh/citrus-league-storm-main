@@ -35,6 +35,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const apiGet = vi.fn();
+vi.mock('@/contexts/LeagueContext', () => ({ useLeague: () => ({ activeLeagueId: null, activeLeague: null }) }));
 
 vi.mock('@/api/client', () => ({
   API_BASE_URL: '',

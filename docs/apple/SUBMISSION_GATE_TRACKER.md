@@ -1,6 +1,6 @@
 # Submission gate tracker — September 6, 2026
 
-**Latest consolidated status:** [Release candidate 1.0 (12)](RELEASE_CANDIDATE_1.0_12.md). The entries below preserve earlier test history; use the consolidated status for current deployment and device state.
+**Latest consolidated status:** [Release candidate 1.0 (13)](RELEASE_CANDIDATE_1.0_13.md). The entries below preserve earlier test history; use the consolidated status for current deployment and device state.
 
 Preparation and testing against production are authorized. The user explicitly redirected final device validation to production on September 6. The user subsequently authorized completing all remaining gates, including production updates, while explicitly withholding final App Store submission. Deployment preflight and verification still apply. Passing tests do not guarantee Apple approval.
 

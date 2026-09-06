@@ -107,7 +107,7 @@ describe('the reader can pick the season, and lands on the right one', () => {
     // The identity key carries the season; without it the ref short-circuits
     // and the picker moves the highlight and nothing else.
     expect(MODAL).toMatch(/const playerKey = `\$\{gameLogPlayer\.id\}-\$\{gameLogPlayer\.team\}-\$\{logSeason\}`/);
-    expect(MODAL).toMatch(/\}, \[isOpen, gameLogPlayer, logSeason\]\)/);
+    expect(MODAL).toMatch(/\}, \[isOpen, gameLogPlayer, logSeason, gameLogAttempt\]\)/);
   });
 
   it('bounds the window at both ends', () => {

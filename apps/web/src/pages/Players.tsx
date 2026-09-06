@@ -36,6 +36,8 @@ import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { PlayersBrowsePhone } from '@/components/players/PlayersBrowsePhone';
 import { dashboardEntryToHockeyPlayer, type GoalieSortKey, type SkaterSortKey } from '@/components/players/playersBrowse';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useLeague } from '@/contexts/LeagueContext';
+import { hasUnprojectedPlusMinus, leagueDashboardProjection, usesFantasyPoints } from '@/components/player/leagueDashboardProjection';
 import type { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -368,7 +370,14 @@ const Players = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   // The shared, once-per-session payload. Identical loading/error semantics
   // to the effect this replaced; `reload` is what Retry calls.
-  const { players, loading, error: loadError, reload } = usePlayerDashboardIndex();
+  const { players: rawPlayers, loading, error: loadError, reload } = usePlayerDashboardIndex();
+  const { activeLeagueId, activeLeague, activeLeagueFormat } = useLeague();
+  const scoringReady = !activeLeagueId || activeLeague?.id === activeLeagueId;
+  const pointsFormat = usesFantasyPoints(activeLeagueFormat?.scoringFormat);
+  const players = useMemo(() => leagueDashboardProjection(rawPlayers, activeLeague?.scoring_settings, scoringReady && pointsFormat),
+    [rawPlayers, activeLeague?.scoring_settings, scoringReady, pointsFormat]);
+  const scoringLabel = (!scoringReady ? 'Loading league scoring…' : !pointsFormat ? 'Category scoring · compare projected stats' : activeLeagueId ? 'Projections use this league’s scoring' : 'Projections use default scoring')
+    + (scoringReady && pointsFormat && hasUnprojectedPlusMinus(activeLeague?.scoring_settings) ? ' · Totals exclude unprojected plus/minus' : '');
 
   const [search, setSearch] = useState('');
   const [team, setTeam] = useState<string>('ALL');
@@ -465,6 +474,7 @@ const Players = () => {
           onSearch={() => setPhoneSearchOpen((o) => !o)}
           onNotifications={() => navigate('/profile')}
         />
+        <p className="px-4 pt-2 text-xs text-pressbox-text/60">{scoringLabel}</p>
         <PlayersBrowsePhone
           className="mt-1"
           rows={sorted}
@@ -497,6 +507,7 @@ const Players = () => {
       <main className="hidden lg:block container mx-auto px-4 pb-16 pt-6">
         <div className="mb-5">
           <h1 className="text-2xl font-bold">Players</h1>
+          <p className="text-sm text-muted-foreground">{scoringLabel}</p>
           <p className="text-sm text-muted-foreground">
             Season actuals, xG shot quality, GAR/60 impact, and rolled-forward projections. Every team, every player.
           </p>
