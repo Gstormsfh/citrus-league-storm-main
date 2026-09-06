@@ -20,6 +20,27 @@ Status: foundation NOT accepted. Local work only; no production rollout authoriz
 
 ## Current local verification (2026-09-06)
 
+### Additive calibration-shape comparison
+
+The [shape checkpoint](analytics-calibration-shape-result-20260906.md) freezes
+four new calibration-period-only maps against the retained sigmoid/group-beta
+references. Full source replay and reused JSON raw models reproduce all pinned
+raw vectors exactly. Context-aware monotone piecewise logit improves both losses
+in both earlier-development folds against context-aware beta; the other new
+candidates fail the fixed guard. Mid/high-bin bias and subgroup regressions
+remain. This is adaptive already-inspected development, **not acceptance**.
+
+All six-candidate scorecards, every bin/pair and all 77 subgroups in each fold
+are preserved. The separate review rehashes 12,848 bound files. Independent
+TypeScript map inference passes every validation row within the declared
+tolerance; it composes with the earlier tree proof, not a new PBP parser or
+hosted serving proof. The new module is not serving-exported. Before fitting,
+1,658 offline Python and 284 shared tests pass; shared type checking passes.
+Thirty archive/review tests pass. Prior evidence and production are unchanged.
+Next prioritize local model-to-publication-to-consumer lineage and rejection
+paths, not another unbounded search on these same validation outcomes. FPAR
+remains gated on the unresolved foundation and physical-forecast requirements.
+
 ### Additive calibration refinement and cross-language inference
 
 The [new checkpoint](analytics-calibration-result-20260906.md) and

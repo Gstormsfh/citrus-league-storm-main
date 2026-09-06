@@ -1,0 +1,20 @@
+{
+  "contract": "citrus-calibration-shape-checkpoint-index-v1",
+  "status": "development-improved-foundation-not-accepted",
+  "publishable": false,
+  "experiment_code_commit": "7841a4ac",
+  "review_code_commit": "5b684767",
+  "files": {
+    "scripts/proof/results/official-calibration-shape-experiment-20260906/health.json": "8115eaab1f053610da6669a4a75b427bf19c17abf8b50fd736c8dc6d26b75cf8",
+    "scripts/proof/results/official-calibration-shape-experiment-20260906/result.json": "c47a3dbe2a83bab1f7d92e8bcf1251b7ab4bdd8e030cf327d98d766cb394b451",
+    "scripts/proof/results/official-calibration-shape-review-20260906/review.json": "eef47805687e40df9b92c02947672c71a5ec4d4701b3d9b776c77de316b88c3c"
+  },
+  "selected_for_further_development": "monotone_logit_group",
+  "comparison_baseline": "reference_beta_group",
+  "production_changed": false,
+  "prior_evidence_removed_or_replaced": false,
+  "original_prospective_reservations_changed": false,
+  "historical_as_of_verified": false,
+  "untouched_test_claim": false,
+  "remaining_gates": ["calibration-and-subgroup-errors", "model-publication-consumer-validation", "remaining-foundation-source-writer-and-operational-coverage", "validated-forecast-foundation-before-FPAR"]
+}

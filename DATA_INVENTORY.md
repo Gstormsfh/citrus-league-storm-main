@@ -121,6 +121,10 @@ and independently checks every member of new local source/evidence archives
 under `analytics-calibration-shape-checkpoint-*`. Its matching proof tests cover
 candidate/bin/pair/subgroup completeness and create-only failure behavior.
 No archived source or prior review generator is modified.
+The completed shape comparison is documented in
+`docs/analytics-calibration-shape-result-20260906.md` and its compact result index.
+The full generated review stays with local evidence rather than tracked docs;
+all candidates remain available and foundation acceptance remains withheld.
 
 Additive calibration refinement (2026-09-06):
 `docs/analytics-calibration-plan-20260906.json` fixes a five-calibrator budget
