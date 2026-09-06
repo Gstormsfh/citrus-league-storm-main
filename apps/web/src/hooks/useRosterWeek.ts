@@ -70,6 +70,9 @@ export function useRosterWeek({ enabled, players, weekStart, weekEnd, scoring }:
         const projections = (((projRes as { data?: unknown }).data ?? []) as ProjectionRowLite[]);
         setEntries(weekEntries(players, weekStats, projections, getTodayMST(), scoring));
         setReady(true);
+      } catch (error) {
+        logger.warn('[useRosterWeek] league-scored week unavailable', error);
+        if (!cancelled) { setEntries(EMPTY); setReady(false); }
       } finally {
         if (!cancelled) setLoading(false);
       }

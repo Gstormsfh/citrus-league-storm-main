@@ -65,3 +65,16 @@ describe('sideOutlook', () => {
     expect(sideOutlook(['3', 'nope'], entries)).toEqual({ expectedFinal: 9, gamesLeft: 1, banked: 0 });
   });
 });
+
+
+describe('week projections honor league scoring', () => {
+  it('uses raw goals and ignores the stored default total', () => {
+    const rows = [{ player_id: 97, projection_date: TODAY, total_projected_points: 999, projected_goals: 2, projected_assists: 3 }];
+    const players = [{ id: 97, isGoalie: false }];
+    expect(weekEntries(players, {}, rows, TODAY, { skater: { goals: 1 } }).get('97')?.weekPoints).toBe(2);
+    expect(weekEntries(players, {}, rows, TODAY, { skater: { goals: 10 } }).get('97')?.weekPoints).toBe(20);
+  });
+  it('does not present default totals as custom-league totals when raw stats are missing', () => {
+    expect(() => weekEntries([{ id: 97, isGoalie: false }], {}, [proj(97, TODAY, 999)], TODAY, { skater: { goals: 10 } })).toThrow('Raw projections');
+  });
+});
