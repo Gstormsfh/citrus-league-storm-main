@@ -80,15 +80,7 @@ def verify(receipts, season, start, end, stored=None):
             raise ValueError('Schedule response requires every day, including empty dates')
         regular_start = payload.get('regularSeasonStartDate')
         playoff_end = payload.get('playoffEndDate')
-        if (isinstance(regular_start, str) and isinstance(playoff_end, str)
-                and parse_date(regular_start).year == season):
-            boundaries = {'regular_season_start': regular_start, 'playoff_end': playoff_end}
-            if parse_date(playoff_end) <= parse_date(regular_start):
-                raise ValueError('Invalid schedule season boundaries')
-            # A changed reported boundary is a source revision, not a silent merge.
-            if boundary_evidence is not None and boundary_evidence != boundaries:
-                raise ValueError('Schedule season boundaries changed during collection')
-            boundary_evidence = boundaries
+        week_has_target_season = False
         total = 0
         for offset, entry in enumerate(week):
             expected_day = (parse_date(day) + timedelta(days=offset)).isoformat()
@@ -107,6 +99,7 @@ def verify(receipts, season, start, end, stored=None):
                     raise ValueError('Schedule game identity is inconsistent')
                 if row['season'] != season * 10000 + season + 1 or game_type not in (2, 3):
                     continue
+                week_has_target_season = True
                 if expected_day > end:
                     outside_window.append(gid)
                     continue
@@ -123,6 +116,16 @@ def verify(receipts, season, start, end, stored=None):
                               'game_state': row['gameState'], 'schedule_state': row['gameScheduleState']}
         if type(payload.get('numberOfGames')) is not int or payload['numberOfGames'] != total:
             raise ValueError('Schedule week count disagrees with daily counts')
+        if (week_has_target_season and isinstance(regular_start, str) and isinstance(playoff_end, str)
+                and parse_date(regular_start).year in (season, season + 1)):
+            # Bind metadata to an observed target-season week. The 2020 season
+            # actually began in January 2021; start-year equality loses it.
+            boundaries = {'regular_season_start': regular_start, 'playoff_end': playoff_end}
+            if parse_date(playoff_end) <= parse_date(regular_start):
+                raise ValueError('Invalid schedule season boundaries')
+            if boundary_evidence is not None and boundary_evidence != boundaries:
+                raise ValueError('Schedule season boundaries changed during collection')
+            boundary_evidence = boundaries
     terminal = sorted(gid for gid, row in games.items()
                       if row['game_state'] in ('OFF', 'FINAL') and row['schedule_state'] == 'OK')
     unresolved = sorted(set(games) - set(terminal))

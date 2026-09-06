@@ -102,6 +102,29 @@ def test_full_report_keeps_original_observation_age_and_raw_digests():
     assert report['raw_response_sha256'] == {'2025-10-07': item['raw_sha256']}
 
 
+def test_january_starting_season_uses_observed_season_identity_not_start_year():
+    item = receipt()
+    payload = json.loads(item['raw_utf8'])
+    item['url'] = BASE + '2021-01-13'
+    for offset, day in enumerate(payload['gameWeek']):
+        day['date'] = (date(2021, 1, 13) + timedelta(days=offset)).isoformat()
+    payload['gameWeek'][0]['games'][0].update(id=2020020001, season=20202021)
+    payload.update(regularSeasonStartDate='2021-01-13', playoffEndDate='2021-07-07')
+    result = verify([bind(item, payload)], 2020, '2021-01-13', '2021-01-19')
+    assert result['season_boundary_evidence'] == {
+        'regular_season_start': '2021-01-13', 'playoff_end': '2021-07-07'}
+    assert result['terminal_game_ids'] == [2020020001]
+    assert result['reported_season_within_window'] is False
+
+
+def test_unrelated_season_week_cannot_supply_target_season_boundaries():
+    item = receipt()
+    payload = json.loads(item['raw_utf8'])
+    payload['gameWeek'][0]['games'][0].update(id=2024020001, season=20242025)
+    result = check(bind(item, payload))
+    assert result['season_boundary_evidence'] is None
+
+
 def test_failed_validation_keeps_health_without_exception_secrets(tmp_path, monkeypatch):
     from monitoring import schedule_coverage
     def fail(*args):
