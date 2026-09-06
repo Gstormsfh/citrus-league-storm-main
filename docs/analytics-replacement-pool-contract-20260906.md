@@ -1,0 +1,11 @@
+# Replacement pool contract — offline and nonpublishing
+
+`data-pipeline/projections/replacement_pool_contract.py` validates a declared complete one-position player pool before choosing the candidate immediately after the explicit roster demand. It does not compute fantasy scores, convert GAR, optimize multi-position slots, model waiver availability, or claim FPAR.
+
+Inputs require league ID, scoring fingerprint, requested season, common dated projection horizon and aware as-of, complete expected player IDs, position, nonnegative roster demand, and upstream league/horizon/scoring receipt hashes. Each expected player needs exactly one row with matching scope, finite projected points, complete coverage, explicit Boolean eligibility and explicit `active`/`ir` status. IR and ineligible rows remain in evidence with exclusion reasons. Missing, duplicated, stale, mixed, partial or unknown rows withhold the baseline (`None`), rather than producing zero. A genuinely measured zero remains valid.
+
+Ranking uses the entire validated included pool, descending points with ascending player-ID ties. A reordered complete pool yields the same ranked-pool hash, although its original-input receipt retains the supplied order. All candidate decisions and original inputs are preserved; nonfinite numeric evidence is explicitly tagged for strict JSON hashing. Receipt presence proves consistency only: authenticating the league settings, forecast provenance, source coverage, horizon and candidate inventory remains an upstream requirement.
+
+Focused tests cover measured zero versus unavailable, repeated horizons, missing players, unknown IR/eligibility, explicit exclusions, stale/mixed inputs, invalid values and a complete pool larger than an earlier batch boundary whose best candidates arrive last. No database or model artifacts are accessed.
+
+The legacy `calculate_dynamic_replacement_level` remains unchanged. It can return zero for missing league context, omit season/horizon filters, and stop before later ID batches after filling a shared quota. Its callers must not treat this new offline contract as an integrated fix. Runtime integration needs an explicit consumer decision on common horizon, league scoring and complete candidate ownership first.

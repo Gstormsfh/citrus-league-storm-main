@@ -220,6 +220,15 @@ The expanded native database run additionally has
 `docs/analytics-native-composed-expanded-20260906.json`; neither replaces the
 earlier narrower proof or claims model-inference acceptance.
 
+`projections/development_shortlist.py` applies only the frozen earlier-fold
+selection rule to caller-verified completed scorecards. Its manifest pin is the
+export manifest, not the source schedule; the two are deliberately distinct.
+`projections/replacement_pool_contract.py` and its adjacent tests validate a
+complete one-position, common-horizon fantasy-points pool without scoring or
+database access. `docs/analytics-replacement-pool-contract-20260906.md` records
+its limits and the still-unintegrated legacy replacement-ranking defects.
+Neither module is FPAR, a roster optimizer, or serving acceptance.
+
 Each new Python module has an adjacent `data-pipeline/tests/test_*.py` contract
 suite. Full foundation/consumer/model acceptance still lives in
 `docs/ANALYTICS_ACCEPTANCE.md`; partial source or concurrency success does not
