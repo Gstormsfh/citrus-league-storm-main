@@ -67,7 +67,7 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
 import { getTodayMST, getTodayMSTDate, formatWaiverProcessTime, formatMoment, computeNextWaiverProcessMoment } from '@/utils/timezoneUtils';
-import { getCurrentSeason } from '@/utils/seasonConstants';
+import { getCurrentSeason, getProjectionsSeason } from '@/utils/seasonConstants';
 import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate, clampToSeasonStart } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
 import { logger } from '@/utils/logger';
@@ -2311,7 +2311,7 @@ const Roster = () => {
                 // Fetch all future projections for these players (all 8 stat categories to match matchup system)
                 const projResponse = await playerApi.getBatchProjections(
                   allPlayerIds.map(String),
-                  { startDate: todayStr, season: getCurrentSeason() }
+                  { startDate: todayStr, season: getProjectionsSeason() }
                 );
                 const projectionsData = projResponse.data as any[] | null;
 

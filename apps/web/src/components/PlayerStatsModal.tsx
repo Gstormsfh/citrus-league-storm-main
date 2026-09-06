@@ -1,3 +1,4 @@
+import { useGameLogIdentity } from '@/components/player/useGameLogIdentity';
 import { userMessage } from '@/lib/userMessage';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
@@ -273,9 +274,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
     });
   }, [gameLog, gameLogLoading]);
 
+  const gameLogPlayer = useGameLogIdentity(player);
+
   // Fetch full season game log when modal opens (actuals for played games + projections for future)
   useEffect(() => {
-    if (!isOpen || !player) {
+    if (!isOpen || !gameLogPlayer) {
       if (!isOpen) {
         setGameLog([]);
         setTotalProjected(0);
@@ -289,7 +292,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
       return;
     }
 
-    const playerKey = `${player.id}-${player.team}-${logSeason}`;
+    const playerKey = `${gameLogPlayer.id}-${gameLogPlayer.team}-${logSeason}`;
     if (fetchedForPlayerRef.current === playerKey) return;
     fetchedForPlayerRef.current = playerKey;
 
@@ -326,7 +329,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
     let cancelled = false;
 
     const fetchGameLog = async () => {
-      const teamAbbrev = player.teamAbbreviation || player.team || '';
+      const teamAbbrev = gameLogPlayer.team || '';
       if (!teamAbbrev) {
         setGameLogLoading(false);
         return;
@@ -344,8 +347,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
       try {
         const todayStr = getTodayMST();
-        const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-        const playerIsGoalie = player.position === 'Goalie' || player.position === 'G';
+        const playerId = typeof gameLogPlayer.id === 'string' ? parseInt(gameLogPlayer.id, 10) : gameLogPlayer.id;
+        const playerIsGoalie = gameLogPlayer.position === 'Goalie' || gameLogPlayer.position === 'G';
 
         // WHICH SEASON'S GAMES (2026-09-04). Reported: "schedule in the game
         // log is still showing 2025 - we need to have it show THIS year, and
@@ -547,8 +550,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
     return () => {
       cancelled = true;
+      if (fetchedForPlayerRef.current === playerKey) fetchedForPlayerRef.current = null;
     };
-  }, [isOpen, player, logSeason]);
+  }, [isOpen, gameLogPlayer, logSeason]);
 
   // MUST sit above the `if (!player) return null` below — a hook called after
   // an early return runs conditionally, which breaks the Rules of Hooks and
