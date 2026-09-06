@@ -98,6 +98,24 @@ requires a verified source snapshot, staging proof, backup and rollback.
 
 ### 1.4 Versioned analytics foundation (local, unapplied)
 
+Additive shape-calibration experiment (2026-09-06):
+`docs/analytics-calibration-shape-plan-20260906.json` predeclares four new
+calibration-period-only mappings against the preserved sigmoid/group-beta
+references. `data-pipeline/projections/calibration_shape.py` implements clipped
+isotonic, plateau-midpoint PCHIP and regularized monotone piecewise-logit maps,
+with/without the existing pre-outcome context dimensions. Its
+`calibration_shape_experiment.py` runner replays the unchanged source export,
+reuses pinned JSON raw models, verifies every calibration/validation reference,
+then writes all six-candidate scorecards and create-only evidence under
+`scripts/proof/results/official-calibration-shape-experiment-20260906/`.
+`packages/shared/src/utils/calibrationShape.ts` is an offline-only independent
+scorer (not serving-exported); `scripts/proof/score_calibration_shape.mjs`
+bridges bounded JSON input/output for full-validation Python/TypeScript parity.
+Matching Python tests are `test_calibration_shape.py`,
+`test_calibration_shape_typescript.py` and `test_calibration_shape_experiment.py`.
+This is adaptive already-inspected development, not a new untouched test or
+acceptance. All preceding model/code/evidence files and reservations remain intact.
+
 Additive calibration refinement (2026-09-06):
 `docs/analytics-calibration-plan-20260906.json` fixes a five-calibrator budget
 on the already-inspected earlier-development folds. New
