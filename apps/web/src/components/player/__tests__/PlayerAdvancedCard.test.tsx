@@ -323,9 +323,15 @@ describe('PlayerAdvancedCard — skater', () => {
   });
 
   it('omits the finishing band entirely when the player has no xG', () => {
-    const unmodelled = entry({ id: 6060, x_goals: 0, goals: 11 });
+    const unmodelled = entry({ id: 6060, x_goals: null, goals: 11 });
     renderCard({ playerId: 6060, indexOverride: [...index, unmodelled] });
     expect(screen.queryByTestId('advanced-card-finishing')).not.toBeInTheDocument();
+  });
+
+  it('retains the finishing band when available xG is explicitly zero', () => {
+    const measured = entry({ id: 6060, x_goals: 0, goals: 11 });
+    renderCard({ playerId: 6060, indexOverride: [...index, measured] });
+    expect(screen.getByTestId('advanced-card-finishing')).toHaveTextContent('+11.0');
   });
 });
 

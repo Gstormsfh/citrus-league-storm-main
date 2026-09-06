@@ -213,15 +213,24 @@ describe('finishing (G − xG)', () => {
   });
 
   it('is null when we have no xG for the player', () => {
-    // PlayerDashboardService coalesces a missing stats row to x_goals: 0, so
-    // this guard is the difference between "no data" and a card announcing
-    // "+20.0 goals over expected" about a player nothing was modelled for.
-    expect(finishing(entry({ goals: 20, x_goals: 0 }))).toBeNull();
+    expect(finishing(entry({ goals: 20, x_goals: null }))).toBeNull();
     expect(finishing(entry({ goals: 20, x_goals: NaN }))).toBeNull();
+    expect(finishing(entry({ goals: 20, x_goals: Infinity }))).toBeNull();
+    expect(finishing(entry({ goals: 20, x_goals: -1 }))).toBeNull();
+  });
+
+  it('retains measured zero xG and does not mutate actual goals', () => {
+    const player = entry({ goals: 20, x_goals: 0 });
+    expect(finishing(player)).toBe(20);
+    expect(player.goals).toBe(20);
   });
 
   it('is null for goalies', () => {
     expect(finishing(goalie())).toBeNull();
+  });
+
+  it.each([0, -1, NaN, Infinity])('requires a finite positive appearance count: %s', (gp) => {
+    expect(finishing(entry({ gp, goals: 20, x_goals: 0 }))).toBeNull();
   });
 });
 
@@ -347,10 +356,16 @@ describe('buildAdvancedCardData', () => {
   });
 
   it('excludes un-modelled players from the finishing distribution', () => {
-    const withGhost = [...league, entry({ position: 'C', goals: 30, x_goals: 0 })];
+    const withGhost = [...league, entry({ position: 'C', goals: 30, x_goals: null })];
     const data = buildAdvancedCardData(league[3], withGhost);
     // The ghost's +30 must not have become the finishing ceiling.
     expect(data.finishing?.percentile).toBe(100);
+  });
+
+  it('includes measured zero xG in the same finishing distribution', () => {
+    const measured = entry({ position: 'C', goals: 30, x_goals: 0 });
+    const data = buildAdvancedCardData(league[3], [...league, measured]);
+    expect(data.finishing!.percentile).toBeLessThan(100);
   });
 
   it('flags a thin sample without refusing to place the player', () => {

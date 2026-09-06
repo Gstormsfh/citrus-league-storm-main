@@ -63,7 +63,7 @@ interface StatsRow {
   nhl_shp: number;
   nhl_plus_minus: number;
   nhl_toi_seconds: number | null;
-  x_goals: number;
+  x_goals: number | string | null;
   goalie_gp: number;
   nhl_wins: number;
   nhl_losses: number;
@@ -736,6 +736,14 @@ function num(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Do not turn absent or malformed model evidence into a measured zero. */
+function seasonXg(v: unknown): number | null {
+  if (typeof v !== 'number' && typeof v !== 'string') return null;
+  if (typeof v === 'string' && !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(v.trim())) return null;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 export class PlayerDashboardService {
   /**
    * @param supabase   The caller's RLS-scoped client. Everything reads
@@ -875,7 +883,7 @@ export class PlayerDashboardService {
         blocks: s?.nhl_blocks ?? 0,
         ppp: s?.nhl_ppp ?? 0,
         plus_minus: s?.nhl_plus_minus ?? 0,
-        x_goals: s?.x_goals ?? 0,
+        x_goals: seasonXg(s?.x_goals),
         // Selected since the index shipped, dropped here until 2026-09-05.
         pim: s?.nhl_pim ?? 0,
         shp: s?.nhl_shp ?? 0,

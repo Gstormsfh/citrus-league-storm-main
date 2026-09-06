@@ -382,7 +382,7 @@ export class DraftKitService {
       const ppdPool = poolOf((e) => e.gar_ppd);
       const penPool = poolOf((e) => e.gar_pen);
       const xgPool = poolOf((e) => e.xg_per_60);
-      const finishingPool = poolOf((e) => (e.gp > 0 ? e.goals - e.x_goals : null));
+      const finishingPool = poolOf(seasonFinishing);
       const gsaxPool = poolOf((e) => goalieGsax.get(e.id)?.gsax ?? null);
       const svPool = poolOf((e) => (e.gp > 0 && e.save_pct > 0 ? e.save_pct : null));
       const winPool = poolOf((e) => (e.gp > 0 ? e.wins : null));
@@ -663,6 +663,13 @@ export class DraftKitService {
 
 type PctFn = (pool: number[], v: number | null | undefined) => number | null;
 
+/** One rule for both a card's value and its comparable percentile population. */
+function seasonFinishing(e: DashboardIndexEntry): number | null {
+  if (!Number.isFinite(e.gp) || e.gp <= 0 || !Number.isFinite(e.goals) || e.x_goals == null
+      || !Number.isFinite(e.x_goals) || e.x_goals < 0) return null;
+  return e.goals - e.x_goals;
+}
+
 /**
  * Skater rows. Every `source` string below names a real column; if a metric
  * cannot name one it does not belong on the card.
@@ -685,7 +692,7 @@ function skaterMetrics(
   },
   pct: PctFn,
 ): CardMetric[] {
-  const finishing = e.gp > 0 ? e.goals - e.x_goals : null;
+  const finishing = seasonFinishing(e);
   return [
     {
       key: 'gar60',

@@ -68,7 +68,8 @@ export interface DashboardIndexEntry {
   blocks: number;
   ppp: number;
   plus_minus: number;
-  x_goals: number;
+  /** Modelled season xG: null is unavailable; a measured zero stays zero. */
+  x_goals: number | null;
   /**
    * PIM, SHP and ice time (2026-09-05). The service SELECTed nhl_pim and
    * nhl_toi_seconds from the day the index shipped and dropped both in the

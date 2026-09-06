@@ -181,6 +181,15 @@ describe('browseStatLine', () => {
 });
 
 describe('dashboardEntryToHockeyPlayer', () => {
+  it('keeps missing xG unavailable while retaining a provided zero and actual goals', () => {
+    const missing = dashboardEntryToHockeyPlayer(entry(7, { x_goals: null }));
+    const zero = dashboardEntryToHockeyPlayer(entry(7, { x_goals: 0 }));
+    expect(missing.stats.xGoals).toBeUndefined();
+    expect(zero.stats.xGoals).toBe(0);
+    expect(missing.stats.goals).toBe(7);
+    expect(zero.stats.goals).toBe(7);
+  });
+
   it('uses verified publication values and never falls back when the contract says unavailable', () => {
     const source = entry(7, { toi_seconds: 11_220, avg_toi_per_game: 99 });
     const publication: NonNullable<typeof source.toi_publication> = {

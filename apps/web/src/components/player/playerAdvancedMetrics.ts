@@ -348,18 +348,13 @@ export function metricsFor(cohort: PlayerCohort): MetricSpec[] {
 // ── Finishing: G − xG ───────────────────────────────────────────────
 
 /**
- * Goals minus expected goals. The most Citrus-specific number on the card:
- * it only exists because we scored every shot ourselves.
- *
- * GUARDED ON `x_goals > 0`, not on `gp > 0`. `PlayerDashboardService`
- * coalesces a missing stats row to `x_goals: 0`, so a player with games but
- * no xG data would compute `goals - 0` and the card would announce
- * "+11.0 goals over expected" about a player we have modelled nothing for.
- * No xG, no finishing number.
+ * Goals minus available expected goals. Missing/invalid xG is unavailable;
+ * an explicitly measured zero is valid and must not be treated as missing.
  */
 export function finishing(p: CardEntry): number | null {
   if (p.is_goalie) return null;
-  if (!Number.isFinite(p.x_goals) || p.x_goals <= 0) return null;
+  if (!Number.isFinite(p.gp) || p.gp <= 0) return null;
+  if (p.x_goals == null || !Number.isFinite(p.x_goals) || p.x_goals < 0) return null;
   if (!Number.isFinite(p.goals)) return null;
   return p.goals - p.x_goals;
 }
@@ -416,11 +411,8 @@ export function buildAdvancedCardData(
 
   const fin = finishing(player);
   const finScale = scaleFrom(
-    // Only players we actually modelled belong on the finishing scale, for
-    // the same reason `finishing()` guards: a coalesced 0 xG is not a 0
-    // finishing differential.
-    members.filter((m) => Number.isFinite(m.x_goals) && m.x_goals > 0),
-    (m) => m.goals - m.x_goals,
+    members,
+    finishing,
     'higher',
   );
   const finPercentile = percentileOnScale(finScale, fin);

@@ -120,7 +120,7 @@ export function dashboardEntryToHockeyPlayer(p: DashboardIndexEntry): HockeyPlay
           shortHandedPoints: p.shp,
           pim: p.pim,
           plusMinus: p.plus_minus,
-          xGoals: p.x_goals,
+          xGoals: p.x_goals ?? undefined,
           // The card prints TOI per game as mm:ss; the index carries the season total.
           toi: p.toi_publication
             ? p.toi_publication.availability === 'available' && p.toi_publication.value != null

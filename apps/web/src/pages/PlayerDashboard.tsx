@@ -927,11 +927,13 @@ export default function PlayerDashboard() {
             Neither is. Say so, and only when the gap is actually visible —
             a permanent caveat is noise, and noise is how a real caveat gets
             ignored. */}
-        {xgRow && indexEntry && Math.abs((indexEntry.x_goals ?? 0) - xgRow.xg) >= 0.5 && (
+        {xgRow && indexEntry && indexEntry.x_goals != null && Number.isFinite(indexEntry.x_goals)
+          && indexEntry.x_goals >= 0 && Number.isFinite(xgRow.xg) && xgRow.xg >= 0
+          && Math.abs(indexEntry.x_goals - xgRow.xg) >= 0.5 && (
           <p className="mt-3 max-w-[70ch] text-[11px] leading-snug text-white/70">
             Expected goals here are summed over this season&apos;s scored shot events (
             {xgRow.xg.toFixed(2)}). The card at the top of the page reads the season-stats rollup (
-            {(indexEntry.x_goals ?? 0).toFixed(2)}): a separate pipeline over the same shots, so
+            {indexEntry.x_goals.toFixed(2)}): a separate pipeline over the same shots, so
             the two finishing figures do not match. Both are our model; neither is a measurement,
             and the shot-summed figure is the one the map above is drawn from.
           </p>

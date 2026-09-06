@@ -191,6 +191,25 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     expect((await service.getDashboardIndex()).players[0].toi_seconds).toBe(expected);
   });
 
+  it.each([null, undefined, NaN, Infinity, -1, '', ' ', true, false, 'invalid', '0x10', 0, '0', '29.49'])
+    ('does not fabricate season xG from missing or invalid values: %s', async (value) => {
+      mockTables(mockSupabase, { player_season_stats: {
+        data: STATS.map(s => ({ ...s, x_goals: value })), error: null,
+      } });
+      const expected = value === 0 || value === '0' ? 0 : value === '29.49' ? 29.49 : null;
+      for (let read = 0; read < 2; read++) {
+        const player = (await service.getDashboardIndex()).players[0];
+        expect(player.x_goals).toBe(expected);
+        expect(player.goals).toBe(27);
+        expect(player.points).toBe(53);
+      }
+    });
+
+  it('leaves xG unavailable when no season-stat row exists', async () => {
+    mockTables(mockSupabase, { player_season_stats: { data: [], error: null } });
+    expect((await service.getDashboardIndex()).players[0].x_goals).toBeNull();
+  });
+
   // REGRESSION (2026-09-02, draft-room decision support). `ROS_COLS` has
   // always SELECTed projected_hits and projected_blocks and the mapper
   // dropped both, so no consumer could score a rest-of-season projection

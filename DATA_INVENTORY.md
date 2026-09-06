@@ -220,6 +220,23 @@ The expanded native database run additionally has
 `docs/analytics-native-composed-expanded-20260906.json`; neither replaces the
 earlier narrower proof or claims model-inference acceptance.
 
+The exact legacy cell dependency extension adds
+`scripts/proof/test_analytics_composed_nightly_cells.mjs` and three append-only
+`scripts/proof/captures/composed_legacy_{features,columns,keys_fold}_20260906_*.json`
+catalog captures. `docs/analytics-native-composed-cells-20260906.json` records
+native execution with no successful tail stubs but explicitly synthetic fitted
+cells/rink knots and unexecuted v5 inference. No hosted data was changed.
+
+`docs/analytics-nullable-xg-consumers-20260906.md` records the corrected nullable
+dashboard season-xG contract and its draft-kit/card/browse consumers. Official
+actuals are unchanged; upstream model/coverage acceptance is not inferred.
+
+`projections/development_result.py` and `tests/test_development_result.py` add a
+create-only result wrapper that replays frozen source membership again, binds
+all completed artifacts, predictions and calibrator lineage, and applies the
+declared shortlist without fitting or deserializing a model. Result evidence is
+separate at `scripts/proof/results/official-development-result-20260906/`.
+
 `projections/development_shortlist.py` applies only the frozen earlier-fold
 selection rule to caller-verified completed scorecards. Its manifest pin is the
 export manifest, not the source schedule; the two are deliberately distinct.

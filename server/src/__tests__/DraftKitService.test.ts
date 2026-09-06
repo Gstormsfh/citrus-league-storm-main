@@ -172,7 +172,7 @@ const BLURBS = [
  * Steps 2 and 3 are array elements of one Promise.all, which evaluates left to
  * right, so the sequence holds.
  */
-function mockTables(entitlements: unknown[]) {
+function mockTables(entitlements: unknown[], stats: unknown[] = STATS) {
   const dirCalls = { n: 0 };
   const supabase = createMockSupabase();
   supabase.from = vi.fn((table: string) => {
@@ -183,7 +183,7 @@ function mockTables(entitlements: unknown[]) {
         return createChain({ data: rows, error: null });
       }
       case 'player_season_stats':
-        return createChain({ data: STATS, error: null });
+        return createChain({ data: stats, error: null });
       case 'player_gar_components':
         return createChain({ data: GAR, error: null });
       case 'player_talent_metrics':
@@ -269,6 +269,19 @@ describe('tierAtLeast', () => {
 // ── The cohort rule ──────────────────────────────────────────────────
 
 describe('DraftKitService.getBoard — percentiles stay inside the position cohort', () => {
+  it('withholds missing xG finishing and ranks a genuine zero on the complete measured pool', async () => {
+    const stats = STATS.map(s => ({ ...s, x_goals: s.player_id === 1 ? null : s.player_id === 2 ? 0 : 25 }));
+    const { board, error } = await new DraftKitService(mockTables(ENTITLED, stats)).getBoard();
+    expect(error).toBeNull();
+    const metric = (id: number) => board!.cards.find(c => c.playerId === id)!.metrics.find(m => m.key === 'finishing')!;
+    expect(metric(1).value).toBeNull();
+    expect(metric(1).percentile).toBeNull();
+    expect(metric(2).value).toBe(30);
+    expect(metric(2).percentile).toBe(100);
+    expect(metric(3).value).toBe(5);
+    expect(metric(3).percentile).toBe(50);
+  });
+
   it('ranks the top defenceman against defencemen, not against forwards', async () => {
     const service = new DraftKitService(mockTables(ENTITLED));
     const { board, error } = await service.getBoard();

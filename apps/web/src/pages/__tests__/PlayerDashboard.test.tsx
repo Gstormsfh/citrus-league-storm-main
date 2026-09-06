@@ -233,6 +233,19 @@ beforeEach(() => {
 });
 
 describe('PlayerDashboard — the shipped page', () => {
+  it.each([null, NaN, Infinity, -1])('does not invent a rollup discrepancy from unavailable xG: %s', async (x_goals) => {
+    serve(payload(), LEAGUE.map(p => p.id === MCDAVID ? { ...p, x_goals } : p));
+    renderAt(MCDAVID);
+    await screen.findByLabelText(/shot heatmap for connor mcdavid/i);
+    expect(screen.queryByText(/Expected goals here are summed/)).toBeNull();
+  });
+
+  it('retains a provided zero when comparing available xG populations', async () => {
+    serve(payload(), LEAGUE.map(p => p.id === MCDAVID ? { ...p, x_goals: 0 } : p));
+    renderAt(MCDAVID);
+    expect(await screen.findByText(/Expected goals here are summed/)).toHaveTextContent('0.00');
+  });
+
   it('shows a skeleton while the payload is in flight, not a spinner', async () => {
     // Never resolves: the page is held in its loading state.
     apiGet.mockImplementation(() => new Promise(() => {}));
