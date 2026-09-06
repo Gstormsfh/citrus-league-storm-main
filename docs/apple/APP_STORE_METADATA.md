@@ -1,6 +1,6 @@
 # App Store Connect — release worksheet, September 6, 2026
 
-The fields below have been prepared; the current saved draft state and outstanding items are recorded in [the resumed verification report](READINESS_CLOSEOUT_2026-09-06.md). Nothing has been submitted. See [the readiness report](SUBMISSION_READINESS_2026-09-06.md) for actual tests and release gates.
+The fields below record preparation and saved Connect values. Use [the current gate tracker](SUBMISSION_GATE_TRACKER.md) for the latest candidate and outstanding verification. Nothing has been submitted for App Review.
 
 ## App information
 
@@ -8,7 +8,10 @@ The fields below have been prepared; the current saved draft state and outstandi
 - Subtitle: `Fresh-squeezed fantasy hockey`
 - Primary category: Sports
 - Bundle ID: `com.citrussports.app`
-- Current candidate: version 1.0, build 5. Verify build-number availability in App Store Connect before upload.
+- Version: 1.0. Build 12 uploaded successfully; build 13 is being prepared. Use the gate tracker for final candidate status.
+- Price: free ($0 USD), saved.
+- Availability: Canada and United States only, saved.
+- Release: manual, saved. Mac and Vision Pro availability disabled.
 
 ## Description draft
 
@@ -27,13 +30,13 @@ Verify every advertised feature against the final device build. Do not advertise
 - Terms: https://citrusfantasysports.com/terms-of-service.html
 - Support email: CitrusFantasySports@Gmail.com
 
-All three HTTPS destinations returned 200 during this sweep. The revised policies are not live yet; publication is a release prerequisite. Email delivery was not tested.
+All three HTTPS destinations returned 200. Revised policies are live and the required consent versions are active; production consent/deletion/moderation integration checks pass. Email delivery was not tested.
 
 ## App Privacy worksheet
 
 Disclose collection by both Citrus and its service providers, including optional collection. Confirm these answers against the final archive's privacy report and deployed service settings.
 
-| Data | Linked | Purposes saved in draft |
+| Data | Linked | Published purposes |
 |---|---|---|
 | Name, email, phone | Yes | App functionality |
 | Coarse location | Yes | App functionality, analytics |
@@ -44,7 +47,7 @@ Disclose collection by both Citrus and its service providers, including optional
 | Product interaction | Yes | Analytics |
 | Crash data, other diagnostic data | Yes | App functionality |
 
-All 14 types are configured and saved, not published. No tracking is selected. The native build strips AdSense and disables Google signals/ad personalization. Location includes optional profile location and provider-derived coarse location; no device location permission is requested. Recheck actual deployed provider settings before publication.
+All 14 types are configured and published in App Store Connect. No tracking is selected. The native build strips AdSense and disables Google signals/ad personalization. Location includes optional profile location and provider-derived coarse location; no device location permission is requested. Recheck disclosures if the final content or provider configuration changes.
 
 ## Age rating
 
@@ -54,7 +57,7 @@ Complete the current questionnaire, including user-generated content, messaging 
 
 ## Review access
 
-Provide a working email/password reviewer account through App Store Connect's private review credentials fields. Verify login, accepted current policies, membership in a populated league, roster/matchup/player access and a usable draft walkthrough. No reviewer credentials were created or tested in this sweep. Do not paste credentials in this repository.
+Provide a working email/password reviewer account through App Store Connect's private review credentials fields. Verify login, accepted current policies, membership in a populated league, roster/matchup/player access and a usable draft walkthrough. A private production reviewer identity and populated Citrus Review League are prepared. Native iPhone/iPad email login and league/player access were tested. Entry into Connect’s private credentials fields is still pending Chrome sign-in; the live draft walkthrough remains pending engine deployment. Do not paste credentials in this repository.
 
 Review notes should describe how to reach each feature and note that the NHL season state can affect available live games. Record the actual account/league setup, not invented demo data. Do not claim that this archive has passed device review until it has.
 

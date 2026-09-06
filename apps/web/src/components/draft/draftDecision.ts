@@ -39,6 +39,7 @@
  *    definition is conservative wherever it could be flattering.
  */
 import { DEFAULT_SCORING, ScoringCalculator, type ScoringSettings } from '@citrus/shared';
+import { projectionSettings } from '@/components/player/projectionScoring';
 import type { DashboardIndexEntry } from '@/hooks/usePlayerDashboardIndex';
 import {
   buildMetricScale,
@@ -82,25 +83,8 @@ export function normalizeDraftPosition(raw: string | null | undefined): DraftPos
   return '';
 }
 
-/**
- * Goals against, projected — the one goalie category the payload does not
- * carry and the one the default scoring set weights most heavily (-3).
- *
- * `player_ros_projections` projects wins, saves and shutouts for a goalie and
- * stops there. Scoring a goalie on those three alone under DEFAULT scoring
- * inflates him by roughly forty per cent (780 saves x 0.6 + 20 wins x 5 +
- * 2 SO x 5 = 578 points, with the ~-255 of goals against simply missing), and
- * a draft room that systematically overrates goalies is worse than one that
- * shows nothing.
- *
- * So it is DERIVED, from two numbers on the same payload: a goalie who stops
- * `saves` pucks at a rate of `savePct` faced `saves / savePct` of them, and
- * the rest went in. Both inputs are the goalie's own; the arithmetic is one
- * line and it is unit-tested.
- *
- * Returns null when `savePct` is missing, zero, or not a rate — in which case
- * the caller declines to print a projection at all rather than printing an
- * inflated one.
+/** Fallback for older index payloads without projected goals against.
+ * Uses the goalie's own saves and save percentage; missing inputs yield null.
  */
 export function projectedGoalsAgainst(
   projSaves: number | null | undefined,
@@ -112,30 +96,11 @@ export function projectedGoalsAgainst(
   return projSaves / rate - projSaves;
 }
 
-/**
- * One player's rest-of-season projection, scored through THIS league's
- * categories.
- *
- * WHICH CATEGORIES ARE COVERED, precisely, because a projection that
- * silently omits a scored category is a wrong number wearing a right one's
- * clothes:
- *
- *   skaters  goals, assists, PPP, SOG, blocks, hits — every one of them a
- *            column on `player_ros_projections`.
- *   goalies  wins, saves, shutouts from the payload; goals against derived
- *            as above.
- *
- * NOT projected anywhere in the pipeline, and therefore scored as zero:
- * short-handed points, penalty minutes and plus/minus. All three default to
- * 0 in `DEFAULT_SCORING` — plus/minus explicitly because "the projection
- * engine cannot model plus/minus" (see `packages/shared/src/utils/
- * scoring.ts`) — so a default league loses nothing. A league that has opted
- * into SHP or PIM gets a projection that is short by those categories, and
- * that is a pipeline gap, not something to paper over here.
- *
- * Returns null when the player has no projection row at all (`proj_gp` null
- * or zero), which is how a rookie with no NHL history, a player the pipeline
- * has not scored, and a guest's empty payload all render as nothing.
+/** Score the raw projected categories under the supplied league settings.
+ * Skaters include goals, assists, PPP, SHP, SOG, blocks, hits and PIM.
+ * Goalies use projected wins, saves, shutouts and goals against, with a
+ * historical-rate fallback only for older responses missing the GA field.
+ * Plus/minus has no projection. Missing projection rows return null.
  */
 export function projectionFor(
   entry: DashboardIndexEntry | null | undefined,
@@ -166,7 +131,9 @@ export function projectionFor(
     // lose a goalie's projection because his save percentage is missing.
     let goalsAgainst = 0;
     if (typeof gaWeight === 'number' && gaWeight !== 0) {
-      const derived = projectedGoalsAgainst(entry.proj_saves, entry.save_pct);
+      const derived = entry.proj_goals_against != null && Number.isFinite(entry.proj_goals_against)
+        ? entry.proj_goals_against
+        : projectedGoalsAgainst(entry.proj_saves, entry.save_pct);
       if (derived === null) return null;
       goalsAgainst = derived;
     }
@@ -190,6 +157,8 @@ export function projectionFor(
       sog: entry.proj_sog ?? 0,
       blocks: entry.proj_blocks ?? 0,
       hits: entry.proj_hits ?? 0,
+      pim: entry.proj_pim ?? 0,
+      shp: entry.proj_shp ?? 0,
     },
     false,
   );
@@ -209,10 +178,11 @@ export function buildDraftProjectionMap(
   entries: readonly DashboardIndexEntry[],
   settings: ScoringSettings | null | undefined,
 ): Map<string, DraftProjection> {
-  const scorer = new ScoringCalculator(settings ?? undefined);
+  const normalized = projectionSettings(settings);
+  const scorer = new ScoringCalculator(normalized);
   const out = new Map<string, DraftProjection>();
   for (const e of entries) {
-    const p = projectionFor(e, scorer, settings ?? undefined);
+    const p = projectionFor(e, scorer, normalized);
     if (p) out.set(String(e.id), p);
   }
   return out;
