@@ -1,0 +1,1335 @@
+{
+  "status": "passed_local_cooperating_protocol_not_full_pipeline_or_capacity",
+  "runs": [
+    {
+      "status": "passed",
+      "postgres": "17.6 (Debian 17.6-2.pgdg12+1)",
+      "independentConnections": 3,
+      "backendPids": [
+        77,
+        76,
+        78
+      ],
+      "lockWitnesses": [
+        {
+          "scenario": "first nightly holds protocol before scorer/barrier",
+          "left": {
+            "pid": 76,
+            "state": "active",
+            "wait_event_type": "Lock",
+            "wait_event": "advisory",
+            "blockers": [
+              77
+            ],
+            "locks": [
+              {
+                "mode": "RowExclusiveLock",
+                "type": "relation",
+                "objid": null,
+                "table": "raw_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "raw_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "nhl_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_relname_nsp_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_tblspc_relfilenode_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_nspname_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_locks",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "advisory",
+                "objid": "54106",
+                "table": null,
+                "classid": "60906",
+                "granted": true,
+                "objsubid": 2
+              },
+              {
+                "mode": "ShareLock",
+                "type": "advisory",
+                "objid": "1",
+                "table": null,
+                "classid": "60906",
+                "granted": false,
+                "objsubid": 2
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "virtualxid",
+                "objid": null,
+                "table": null,
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              }
+            ]
+          },
+          "right": {
+            "pid": 78,
+            "state": "idle",
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "blockers": [],
+            "locks": []
+          }
+        },
+        {
+          "scenario": "second nightly blocked before source writer",
+          "left": {
+            "pid": 76,
+            "state": "active",
+            "wait_event_type": "Lock",
+            "wait_event": "advisory",
+            "blockers": [
+              77
+            ],
+            "locks": [
+              {
+                "mode": "RowExclusiveLock",
+                "type": "relation",
+                "objid": null,
+                "table": "raw_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "raw_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "nhl_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_relname_nsp_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_tblspc_relfilenode_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_nspname_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_locks",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "advisory",
+                "objid": "54106",
+                "table": null,
+                "classid": "60906",
+                "granted": true,
+                "objsubid": 2
+              },
+              {
+                "mode": "ShareLock",
+                "type": "advisory",
+                "objid": "1",
+                "table": null,
+                "classid": "60906",
+                "granted": false,
+                "objsubid": 2
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "virtualxid",
+                "objid": null,
+                "table": null,
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              }
+            ]
+          },
+          "right": {
+            "pid": 78,
+            "state": "active",
+            "wait_event_type": "Lock",
+            "wait_event": "advisory",
+            "blockers": [
+              76
+            ],
+            "locks": [
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_relname_nsp_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_tblspc_relfilenode_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_nspname_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_locks",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "advisory",
+                "objid": "54106",
+                "table": null,
+                "classid": "60906",
+                "granted": false,
+                "objsubid": 2
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "virtualxid",
+                "objid": null,
+                "table": null,
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              }
+            ]
+          }
+        },
+        {
+          "scenario": "direct scorer composition serializes independent direct builder",
+          "left": {
+            "pid": 76,
+            "state": "idle in transaction",
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "blockers": [],
+            "locks": [
+              {
+                "mode": "RowExclusiveLock",
+                "type": "relation",
+                "objid": null,
+                "table": "raw_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "raw_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_relname_nsp_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_tblspc_relfilenode_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_nspname_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_locks",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "advisory",
+                "objid": "54106",
+                "table": null,
+                "classid": "60906",
+                "granted": true,
+                "objsubid": 2
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "virtualxid",
+                "objid": null,
+                "table": null,
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              }
+            ]
+          },
+          "right": {
+            "pid": 78,
+            "state": "active",
+            "wait_event_type": "Lock",
+            "wait_event": "advisory",
+            "blockers": [
+              76
+            ],
+            "locks": [
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_relname_nsp_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_tblspc_relfilenode_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_nspname_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_locks",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "advisory",
+                "objid": "54106",
+                "table": null,
+                "classid": "60906",
+                "granted": false,
+                "objsubid": 2
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "virtualxid",
+                "objid": null,
+                "table": null,
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              }
+            ]
+          }
+        }
+      ],
+      "cases": [
+        "all sixteen exact entry definitions instrumented; ACL/security preserved; migration replay succeeds",
+        "two composed nightly calls serialize without upgrade deadlock",
+        "manual scorer then builder shares transaction gate; competing direct builder waits",
+        "prior source/output row/write/strong locks reject before waiting for occupied gate",
+        "supported explicit protocol then DML then nested builder succeeds",
+        "failed composed source guard preserves prior outputs and markers"
+      ],
+      "outcomes": [
+        {
+          "status": "success",
+          "rows": [
+            {
+              "result": "season=2025 v5_scored=0 v5_left=0 strength=0 toi=0 onice=1 gar=0 arena=1 adjusted=0 legacy_scored=0 gsax=0 legacy_unscored=0"
+            }
+          ]
+        },
+        {
+          "status": "success",
+          "rows": [
+            {
+              "result": "season=2025 v5_scored=0 v5_left=0 strength=0 toi=0 onice=0 gar=0 arena=1 adjusted=0 legacy_scored=0 gsax=0 legacy_unscored=0"
+            }
+          ]
+        }
+      ],
+      "protocolMigrationSha256": "854cac2491cc340691c69f28bf18a4e2e1ccc96de7ba86facc772309e752c3b6",
+      "exactRuntimeFunctions": [
+        "protocol nightly",
+        "protocol official scorer",
+        "protocol onice batch",
+        "protocol guarded onice"
+      ],
+      "limitations": [
+        "cooperating protocol only; arbitrary SQL can acquire advisory key",
+        "other runtime dependencies are explicitly synthetic",
+        "all16 definition/ACL instrumentation verified separately; not full model integration",
+        "global serialization may block long batch work"
+      ],
+      "cleanup": "verified: zero public objects, fixture roles, or user schemas"
+    },
+    {
+      "status": "passed",
+      "postgres": "17.6 (Debian 17.6-2.pgdg12+1)",
+      "independentConnections": 3,
+      "backendPids": [
+        81,
+        80,
+        82
+      ],
+      "lockWitnesses": [
+        {
+          "scenario": "first nightly holds protocol before scorer/barrier",
+          "left": {
+            "pid": 80,
+            "state": "active",
+            "wait_event_type": "Lock",
+            "wait_event": "advisory",
+            "blockers": [
+              81
+            ],
+            "locks": [
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_relname_nsp_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_tblspc_relfilenode_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_nspname_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "RowExclusiveLock",
+                "type": "relation",
+                "objid": null,
+                "table": "raw_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "raw_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_locks",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "nhl_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "ShareLock",
+                "type": "advisory",
+                "objid": "1",
+                "table": null,
+                "classid": "60906",
+                "granted": false,
+                "objsubid": 2
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "advisory",
+                "objid": "54106",
+                "table": null,
+                "classid": "60906",
+                "granted": true,
+                "objsubid": 2
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "virtualxid",
+                "objid": null,
+                "table": null,
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              }
+            ]
+          },
+          "right": {
+            "pid": 82,
+            "state": "idle",
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "blockers": [],
+            "locks": []
+          }
+        },
+        {
+          "scenario": "second nightly blocked before source writer",
+          "left": {
+            "pid": 80,
+            "state": "active",
+            "wait_event_type": "Lock",
+            "wait_event": "advisory",
+            "blockers": [
+              81
+            ],
+            "locks": [
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_relname_nsp_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_tblspc_relfilenode_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_nspname_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "RowExclusiveLock",
+                "type": "relation",
+                "objid": null,
+                "table": "raw_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "raw_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_locks",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "nhl_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "ShareLock",
+                "type": "advisory",
+                "objid": "1",
+                "table": null,
+                "classid": "60906",
+                "granted": false,
+                "objsubid": 2
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "advisory",
+                "objid": "54106",
+                "table": null,
+                "classid": "60906",
+                "granted": true,
+                "objsubid": 2
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "virtualxid",
+                "objid": null,
+                "table": null,
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              }
+            ]
+          },
+          "right": {
+            "pid": 82,
+            "state": "active",
+            "wait_event_type": "Lock",
+            "wait_event": "advisory",
+            "blockers": [
+              80
+            ],
+            "locks": [
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_relname_nsp_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_tblspc_relfilenode_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_nspname_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_locks",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "advisory",
+                "objid": "54106",
+                "table": null,
+                "classid": "60906",
+                "granted": false,
+                "objsubid": 2
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "virtualxid",
+                "objid": null,
+                "table": null,
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              }
+            ]
+          }
+        },
+        {
+          "scenario": "direct scorer composition serializes independent direct builder",
+          "left": {
+            "pid": 80,
+            "state": "idle in transaction",
+            "wait_event_type": "Client",
+            "wait_event": "ClientRead",
+            "blockers": [],
+            "locks": [
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_relname_nsp_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_tblspc_relfilenode_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_nspname_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "RowExclusiveLock",
+                "type": "relation",
+                "objid": null,
+                "table": "raw_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "raw_shots",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_locks",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "advisory",
+                "objid": "54106",
+                "table": null,
+                "classid": "60906",
+                "granted": true,
+                "objsubid": 2
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "virtualxid",
+                "objid": null,
+                "table": null,
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              }
+            ]
+          },
+          "right": {
+            "pid": 82,
+            "state": "active",
+            "wait_event_type": "Lock",
+            "wait_event": "advisory",
+            "blockers": [
+              80
+            ],
+            "locks": [
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_relname_nsp_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class_tblspc_relfilenode_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_nspname_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace_oid_index",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_class",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_namespace",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "AccessShareLock",
+                "type": "relation",
+                "objid": null,
+                "table": "pg_locks",
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "advisory",
+                "objid": "54106",
+                "table": null,
+                "classid": "60906",
+                "granted": false,
+                "objsubid": 2
+              },
+              {
+                "mode": "ExclusiveLock",
+                "type": "virtualxid",
+                "objid": null,
+                "table": null,
+                "classid": null,
+                "granted": true,
+                "objsubid": null
+              }
+            ]
+          }
+        }
+      ],
+      "cases": [
+        "all sixteen exact entry definitions instrumented; ACL/security preserved; migration replay succeeds",
+        "two composed nightly calls serialize without upgrade deadlock",
+        "manual scorer then builder shares transaction gate; competing direct builder waits",
+        "prior source/output row/write/strong locks reject before waiting for occupied gate",
+        "supported explicit protocol then DML then nested builder succeeds",
+        "failed composed source guard preserves prior outputs and markers"
+      ],
+      "outcomes": [
+        {
+          "status": "success",
+          "rows": [
+            {
+              "result": "season=2025 v5_scored=0 v5_left=0 strength=0 toi=0 onice=1 gar=0 arena=1 adjusted=0 legacy_scored=0 gsax=0 legacy_unscored=0"
+            }
+          ]
+        },
+        {
+          "status": "success",
+          "rows": [
+            {
+              "result": "season=2025 v5_scored=0 v5_left=0 strength=0 toi=0 onice=0 gar=0 arena=1 adjusted=0 legacy_scored=0 gsax=0 legacy_unscored=0"
+            }
+          ]
+        }
+      ],
+      "protocolMigrationSha256": "854cac2491cc340691c69f28bf18a4e2e1ccc96de7ba86facc772309e752c3b6",
+      "exactRuntimeFunctions": [
+        "protocol nightly",
+        "protocol official scorer",
+        "protocol onice batch",
+        "protocol guarded onice"
+      ],
+      "limitations": [
+        "cooperating protocol only; arbitrary SQL can acquire advisory key",
+        "other runtime dependencies are explicitly synthetic",
+        "all16 definition/ACL instrumentation verified separately; not full model integration",
+        "global serialization may block long batch work"
+      ],
+      "cleanup": "verified: zero public objects, fixture roles, or user schemas"
+    }
+  ],
+  "container": "citrus-writer-protocol-20260906-0601",
+  "cleanup": "SQL fixtures verified empty after each run; root removes exact task container separately",
+  "setup_failures_preserved": [
+    "Initial protocol fixture could not replace named input parameter p_tolerance with unnamed stub; partial SQL cleanup then encountered absent signature. Exact disposable container removed.",
+    "Fixture smoke caught default-argument GSAx overload ambiguity; stub signature corrected before successful runs. Protocol migration was not changed to accommodate either fixture defect."
+  ]
+}

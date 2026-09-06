@@ -1,0 +1,200 @@
+{
+  "observed_at": "2026-09-06T05:41:06Z",
+  "status": "verified_local_deadlock_reproduction_not_remediation",
+  "repeat_run": {
+    "status": "passed_expected_deadlock_reproduction",
+    "postgres": "17.6 (Debian 17.6-2.pgdg12+1)",
+    "independentConnections": 3,
+    "backendPids": [
+      86,
+      84,
+      85
+    ],
+    "lockIdentity": {
+      "relation_oid": 16467,
+      "database_oid": 5
+    },
+    "lockWitnesses": [
+      {
+        "scenario": "both exact nightly/scorer prefixes hold source RowExclusive before guard",
+        "left": {
+          "pid": 84,
+          "state": "active",
+          "wait_event_type": "Lock",
+          "wait_event": "advisory",
+          "blockers": [
+            86
+          ],
+          "relation_locks": [
+            {
+              "mode": "AccessShareLock",
+              "table": "raw_shots",
+              "granted": true
+            },
+            {
+              "mode": "RowExclusiveLock",
+              "table": "raw_shots",
+              "granted": true
+            },
+            {
+              "mode": "AccessShareLock",
+              "table": "nhl_shots",
+              "granted": true
+            }
+          ]
+        },
+        "right": {
+          "pid": 85,
+          "state": "active",
+          "wait_event_type": "Lock",
+          "wait_event": "advisory",
+          "blockers": [
+            86
+          ],
+          "relation_locks": [
+            {
+              "mode": "AccessShareLock",
+              "table": "raw_shots",
+              "granted": true
+            },
+            {
+              "mode": "RowExclusiveLock",
+              "table": "raw_shots",
+              "granted": true
+            },
+            {
+              "mode": "AccessShareLock",
+              "table": "nhl_shots",
+              "granted": true
+            }
+          ]
+        }
+      },
+      {
+        "scenario": "first source SHARE upgrade waits on second prefix RowExclusive",
+        "left": {
+          "pid": 84,
+          "state": "active",
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            85
+          ],
+          "relation_locks": [
+            {
+              "mode": "AccessShareLock",
+              "table": "shift_ingest_quality",
+              "granted": true
+            },
+            {
+              "mode": "AccessShareLock",
+              "table": "strength_build_state",
+              "granted": true
+            },
+            {
+              "mode": "AccessShareLock",
+              "table": "raw_shots",
+              "granted": true
+            },
+            {
+              "mode": "RowExclusiveLock",
+              "table": "raw_shots",
+              "granted": true
+            },
+            {
+              "mode": "ShareLock",
+              "table": "raw_shots",
+              "granted": false
+            },
+            {
+              "mode": "AccessShareLock",
+              "table": "nhl_shots",
+              "granted": true
+            }
+          ]
+        },
+        "right": {
+          "pid": 85,
+          "state": "active",
+          "wait_event_type": "Lock",
+          "wait_event": "advisory",
+          "blockers": [
+            86
+          ],
+          "relation_locks": [
+            {
+              "mode": "AccessShareLock",
+              "table": "raw_shots",
+              "granted": true
+            },
+            {
+              "mode": "RowExclusiveLock",
+              "table": "raw_shots",
+              "granted": true
+            },
+            {
+              "mode": "AccessShareLock",
+              "table": "nhl_shots",
+              "granted": true
+            }
+          ]
+        }
+      },
+      {
+        "scenario": "server-confirmed exact two-way SHARE upgrade cycle",
+        "relation_oid": 16467,
+        "database_oid": 5,
+        "detail": "Process 85 waits for ShareLock on relation 16467 of database 5; blocked by process 84.\nProcess 84 waits for ShareLock on relation 16467 of database 5; blocked by process 85.",
+        "where": "SQL statement \"LOCK TABLE public.raw_shots IN SHARE MODE\"\nPL/pgSQL function rebuild_onice_xg(integer[]) line 13 at SQL statement\nSQL statement \"SELECT public.rebuild_onice_xg(games)\"\nPL/pgSQL function citrus_build_onice_batch(integer) line 20 at PERFORM\nSQL statement \"select processed        from public.citrus_build_onice_batch(400)\"\nPL/pgSQL function nightly_xg_pipeline() line 40 at SQL statement"
+      }
+    ],
+    "cases": [
+      "observed deadlock: exactly one 40P01 victim and one committed complete candidate",
+      "unguarded exception propagation preserves prior output and completion marker exactly"
+    ],
+    "outcomes": [
+      {
+        "status": "success",
+        "result": "season=2025 v5_scored=0 v5_left=0 strength=0 toi=0 onice=1 gar=0 arena=1 adjusted=0 legacy_scored=0 gsax=0 legacy_unscored=0"
+      },
+      {
+        "status": "error",
+        "code": "40P01",
+        "message": "deadlock detected",
+        "detail": "Process 85 waits for ShareLock on relation 16467 of database 5; blocked by process 84.\nProcess 84 waits for ShareLock on relation 16467 of database 5; blocked by process 85.",
+        "where": "SQL statement \"LOCK TABLE public.raw_shots IN SHARE MODE\"\nPL/pgSQL function rebuild_onice_xg(integer[]) line 13 at SQL statement\nSQL statement \"SELECT public.rebuild_onice_xg(games)\"\nPL/pgSQL function citrus_build_onice_batch(integer) line 20 at PERFORM\nSQL statement \"select processed        from public.citrus_build_onice_batch(400)\"\nPL/pgSQL function nightly_xg_pipeline() line 40 at SQL statement"
+      }
+    ],
+    "exactFunctions": [
+      "nightly_xg_pipeline()",
+      "citrus_score_v5_batch(integer)",
+      "citrus_build_onice_batch(integer)",
+      "guarded rebuild_onice_xg(integer[])"
+    ],
+    "syntheticDependencies": [
+      "repair function advisory barrier",
+      "strength/TOI/GAR/legacy refresh/GSAx/audit no-op dependencies",
+      "scorer expression helpers raise if evaluated; scorer intentionally has no eligible rows"
+    ],
+    "migrationSha256": "55239b47d521b277e8ad5e2d84fc0fa9527ab866b1bca19766ad20bf546635fb",
+    "limitations": [
+      "NOT full nightly pipeline integration",
+      "does not certify model calculations, corpus coverage or a remediation"
+    ],
+    "cleanup": "verified: zero public objects, fixture roles, or user schemas"
+  },
+  "first_successful_run": {
+    "backendPids": [
+      80,
+      82,
+      81
+    ],
+    "raw_shots_relation_oid": 16391,
+    "database_oid": 5,
+    "same_harness_passed": true,
+    "cleanup": "zero fixture objects"
+  },
+  "previous_attempts": "Two early runs missed a fleeting simultaneous wait; diagnostic output confirmed 40P01. Revised harness requires two observable predecessor lock states plus the server's exact two-way PID/relation graph.",
+  "container": "citrus-nightly-locks-20260906-0620",
+  "container_cleanup": "root stop confirmed separately"
+}
