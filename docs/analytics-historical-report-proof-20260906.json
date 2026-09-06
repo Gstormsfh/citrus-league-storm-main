@@ -1,0 +1,48 @@
+{
+  "contract": "citrus-completed-historical-report-review-proof-v1",
+  "verified_at": "2026-09-06T07:09:55.337Z",
+  "source_capture": {
+    "health_file": "scripts/proof/results/historical-feature-reports-20260906/health.json",
+    "health_sha256": "add657fdf0ec07415c4a82699fcdb2ccb5a57927b7dcd231237b119d9477c8b5",
+    "status": "incomplete",
+    "started_at": "2026-09-06T06:06:35.713193+00:00",
+    "completed_at": "2026-09-06T06:55:02.625002+00:00",
+    "selected_games": 2713,
+    "retained_bodies": 2713,
+    "http_status_counts": {
+      "200": 2713
+    },
+    "truncated_at_limit": 0,
+    "source_and_code_drift_check": "passed"
+  },
+  "offline_review": {
+    "file": "scripts/proof/results/historical-report-terminal-review-completed-20260906.json",
+    "sha256": "28016129fae3ecfd4d5932d7cf8781e077d6fd7694268970c5b5d15f8d5df75b",
+    "snapshot_at": "2026-09-06T06:58:18.825036+00:00",
+    "status_counts": {
+      "eligible_terminal_v2_review": 69,
+      "passes_existing_v1": 1956,
+      "unresolved": 688
+    },
+    "reason_counts": {
+      "Incomplete report stream": 74,
+      "Invalid report clock": 2,
+      "Report header identity/date/team/final conflict": 681,
+      "v1_pass": 1956
+    },
+    "root_rehashed_all_exact_receipts_and_bodies": true,
+    "root_matched_completed_capture_inventory": true,
+    "review_code_sha256": "76c2c94e70b4792a563aa8518fc1edbd2485939636c3a92b186221701e0a873c"
+  },
+  "training_ready": false,
+  "publishable": false,
+  "active_parser_changed": false,
+  "limitations": [
+    "All 2713 HTTP-200 bodies were retained, but only 1956 pass the existing parser.",
+    "69 exact PEND/GEND/GOFF terminal triples are review candidates only, not active parser acceptance.",
+    "The remaining 688 cases contain 681 header/identity/date/team/final conflicts, five other incomplete endings and two invalid clocks.",
+    "Historical punctuated team abbreviations require explicit identity-backed treatment; no arbitrary punctuation stripping or clock reordering.",
+    "2017/2018 reports were not added to this first model fit. Source and code bytes remain unchanged.",
+    "Local evidence, not an off-machine backup or proof of historical-as-of availability."
+  ]
+}

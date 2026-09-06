@@ -1,0 +1,73 @@
+{
+  "contract": "citrus-completed-historical-capture-and-feature-export-proof-v1",
+  "source_manifest": {
+    "path": "scripts/proof/results/historical-official-freeze-20260906/manifest.json",
+    "sha256": "2dd3b6851e75fe004d47ea0a10f7a98cf13a46776729f00ab6f14a881ce154a9",
+    "status": "captured_requires_validation",
+    "completed_at": "2026-09-06T06:30:10.310548+00:00",
+    "captured_games": 11870,
+    "expected_games": 11870,
+    "quarantined_games": 182,
+    "unavailable_games": 0,
+    "complete_schedule_windows": true
+  },
+  "schedule_manifest": {
+    "path": "scripts/proof/results/historical-official-freeze-20260906/schedule-manifest.json",
+    "sha256": "17e23b533a25b3ffce7460f54643600bbec67538e157db0eeb5a93c61dcc2a50",
+    "by_season": {
+      "2017": 1355,
+      "2018": 1358,
+      "2019": 1212,
+      "2020": 952,
+      "2021": 1401,
+      "2022": 1400,
+      "2023": 1400,
+      "2024": 1398,
+      "2025": 1394
+    }
+  },
+  "feature_export": {
+    "path": "scripts/proof/results/official-neutral-features-20260906/export-manifest.json",
+    "sha256": "5e3c4d3796cd8e41427ab4564567807394963f31cdb48e6839853ece1ed107ff",
+    "manifest_content_sha256": "48eeeacb7772b23d96cad08ecf5009f8ca99aa00e31ee1fcf01219a652b07100",
+    "status": "export_complete_not_fit_accepted",
+    "counts": {
+      "candidate_rows": 775460,
+      "full_context_matched_rows": 762657,
+      "games": 9157,
+      "geometry_baseline_rows": 775457,
+      "source_excluded_games": 149
+    },
+    "by_split": {
+      "calibration": {
+        "candidate_rows": 117886,
+        "full_context_matched_rows": 115964,
+        "games": 1398,
+        "geometry_baseline_rows": 117884
+      },
+      "test": {
+        "candidate_rows": 116506,
+        "full_context_matched_rows": 114680,
+        "games": 1394,
+        "geometry_baseline_rows": 116506
+      },
+      "train": {
+        "candidate_rows": 541068,
+        "full_context_matched_rows": 532013,
+        "games": 6365,
+        "geometry_baseline_rows": 541067
+      }
+    },
+    "source_and_code_drift_check": "passed"
+  },
+  "model_result": "not_asserted_by_this_capture_and_export_proof",
+  "historical_as_of_verified": false,
+  "publishable": false,
+  "limitations": [
+    "Current corrected historical source observations, not historical delivery time or untouched data.",
+    "Every quarantine remains retained; capture completion is not universal source/feature acceptance.",
+    "Feature cohorts are explicitly declared and no model quality is inferred from their sizes.",
+    "Local retained files are not an external backup or proof of data-use rights.",
+    "First neutral experiment excludes source-quarantined games even where separately approved overlays exist."
+  ]
+}

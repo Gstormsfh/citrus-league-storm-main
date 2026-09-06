@@ -4,6 +4,13 @@ Status: executable offline measurement machinery, not a trained model or a
 predictive-quality result. No artifact was loaded, no live rows changed, and no
 serving selection was promoted. Existing model families remain preserved.
 
+Subsequent execution: the [first real result](analytics-first-neutral-experiment-result-20260906.md)
+now records a completed source-replayed fit, later calibration and retrospective
+measurement with this scorecard. The implementation checkpoint below remains
+historical; its "next required result" is now completed. Calibration weakness,
+source exclusions and separate future reservations are explicit in that result;
+no serving or world-class acceptance is implied.
+
 `data-pipeline/projections/probability_scorecard.py` measures exactly matched
 event-level neutral-goal probabilities. Every model must supply a finite
 probability for every event; missing peer rows fail rather than silently select

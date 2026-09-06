@@ -1,0 +1,655 @@
+{
+  "contract": "citrus-real-retrospective-neutral-experiment-proof-v1",
+  "verified_at": "2026-09-06T07:06:06.619Z",
+  "status": "completed-source-replayed-retrospective-not-publishable",
+  "publishable": false,
+  "historical_as_of_verified": false,
+  "untouched_history_claim": false,
+  "external_peer_superiority_claim": false,
+  "evidence_files": {
+    "scripts/proof/results/official-neutral-experiment-20260906/health.json": "dcc703d4f38dbf5d05c649ecd22a811ba86d1d970d27e046dd2b47cbc4d2270b",
+    "scripts/proof/results/official-neutral-experiment-20260906/source-replay-receipt.json": "404449e946b39e400287e7e25cce13983b6d3b92932cec0d5f9bade46e1f0040",
+    "scripts/proof/results/official-neutral-experiment-20260906/experiment/health.json": "b87ab55bf33a6e9652c0b5347286938391f63c6b2d13aa4efeb45aa4788da038",
+    "scripts/proof/results/official-neutral-experiment-20260906/experiment/scorecard.json": "0411972d8e2d26ecbaf0f5d49655da77bd7e06b4d76a85470f1e1b1d328bb93f",
+    "scripts/proof/results/official-neutral-experiment-20260906/experiment/fit-receipt.json": "9014d79fdd687a8e43a828ad6df9d10c52b738ca35b1b95419b07c517fd99436",
+    "scripts/proof/results/official-neutral-experiment-20260906/experiment/pipeline-receipt.json": "085968f368816164681721f069ad3b74ec30bac42622a868b8e913a87bcec62d",
+    "scripts/proof/results/official-neutral-experiment-20260906/experiment/context-calibrator.json": "0a0cb0b3ab7918f30a5fc0babb814812dd1faae8f160da848d0747443085d8c1",
+    "scripts/proof/results/official-neutral-experiment-20260906/experiment/context.pickle": "d68ebe48c415996c371d66e41e305e84d43850b70d67959c52869ba249ba0fa9",
+    "scripts/proof/results/official-neutral-experiment-20260906/experiment/geometry-calibrator.json": "8f62023388b1d128c74bd8419f2dc7261fa554a9fff6c8f61b30c28745a67fd0",
+    "scripts/proof/results/official-neutral-experiment-20260906/experiment/geometry.pickle": "980bb6888fab514f50254145194553b79437e6ee0cc94f1604be64ebd97c51be",
+    "scripts/proof/results/official-neutral-experiment-20260906/experiment/predictions.json": "fcaa4c9a3eb962ad4b8f4e2b0198e6bbbfd15dd2efb69df002bc335751176abb",
+    "scripts/proof/results/official-neutral-experiment-20260906/experiment/prevalence-calibrator.json": "7c93b7282f9bc2acf03fd4ad1ff431a7818cbf21d5479eae5d7d2202fc71137c",
+    "scripts/proof/results/official-neutral-experiment-20260906/experiment/prevalence.pickle": "c584be9b74a8af43bd0cb1910b77f83d66912338e6ef261a9312ae30fb8ce63e",
+    "scripts/proof/results/official-neutral-experiment-20260906/experiment/test-receipt.json": "8e69d5935a8bbefd6cc284d99bd9f6f449e5a32c7096c7204f92221ae1937705",
+    "scripts/proof/results/official-neutral-coverage-20260906.json": "1060bb8679fac0f51275c6f6dd009ad5e8d700bf2089b7d2bd4cb42c1418be40",
+    "scripts/proof/results/official-neutral-prospective-reservation-20260906/health.json": "9cf66c03de028c732353ed651ef1c8e07d3262b8adaaeae8ba2513b673b1a972",
+    "scripts/proof/results/official-neutral-prospective-reservation-20260906/reservation.json": "be0529c504d6588dbb14473a82c4c999010b7d908d8b28c4751112d25abf98c5",
+    "docs/analytics-legacy-artifact-inventory-20260906.json": "b1fe49903afc9929a5fe06ba9e7bcb52f6b40b681b50fdfcf99fc7985e203e76"
+  },
+  "pipeline_sha256": "af5a21eaf28787ab81813ee434cbb86c46a1bafce808152915fec7544c8a0d92",
+  "scorecard_semantic_sha256": "0efb012e0583cd79cc197932fa69799f6846910f422ca8d5d47f3ca64fac8c14",
+  "schema_sha256": "0824183ca84592bf0901b5c32e4b604d4b6bd0bb6ddbe5a719f9de6c3e6de726",
+  "windows": {
+    "train": {
+      "end": "2024-06-30",
+      "start": "2019-07-01"
+    },
+    "calibration": {
+      "end": "2025-06-30",
+      "start": "2024-07-01"
+    },
+    "test": {
+      "end": "2026-08-31",
+      "start": "2025-07-01"
+    }
+  },
+  "coverage": {
+    "train": {
+      "all_raw_events": 1993697,
+      "candidate_rows": 541068,
+      "nonshootout_unblocked_attempts": 549273,
+      "raw_recorded_goal_events": 38751,
+      "raw_recorded_nongoal_attempts": 510522,
+      "scheduled_games": 6365,
+      "shootout_events": 4860,
+      "source_excluded_games": 93,
+      "source_withheld_attempts": 8205,
+      "geometry_eligible": 541067,
+      "geometry_excluded": 1,
+      "eligible_goals": 38132,
+      "missing_features": {
+        "defending_empty_net": 210,
+        "defending_skaters": 210,
+        "distance_from_immediate_event_ft": 2901,
+        "distance_to_goal_ft": 0,
+        "event_location_change_ft_per_second": 8884,
+        "score_differential_pre_shot": 167,
+        "seconds_since_immediate_event": 2901,
+        "shooting_empty_net": 210,
+        "shooting_skaters": 210,
+        "signed_angle_deg": 1,
+        "skater_advantage": 210
+      }
+    },
+    "calibration": {
+      "all_raw_events": 451857,
+      "candidate_rows": 117886,
+      "nonshootout_unblocked_attempts": 119954,
+      "raw_recorded_goal_events": 8435,
+      "raw_recorded_nongoal_attempts": 111519,
+      "scheduled_games": 1398,
+      "shootout_events": 822,
+      "source_excluded_games": 24,
+      "source_withheld_attempts": 2068,
+      "geometry_eligible": 117884,
+      "geometry_excluded": 2,
+      "eligible_goals": 8276,
+      "missing_features": {
+        "defending_empty_net": 30,
+        "defending_skaters": 30,
+        "distance_from_immediate_event_ft": 643,
+        "distance_to_goal_ft": 0,
+        "event_location_change_ft_per_second": 1814,
+        "score_differential_pre_shot": 109,
+        "seconds_since_immediate_event": 643,
+        "shooting_empty_net": 30,
+        "shooting_skaters": 30,
+        "signed_angle_deg": 2,
+        "skater_advantage": 30
+      }
+    },
+    "test": {
+      "all_raw_events": 443569,
+      "candidate_rows": 116506,
+      "nonshootout_unblocked_attempts": 119357,
+      "raw_recorded_goal_events": 8572,
+      "raw_recorded_nongoal_attempts": 110785,
+      "scheduled_games": 1394,
+      "shootout_events": 1288,
+      "source_excluded_games": 32,
+      "source_withheld_attempts": 2851,
+      "geometry_eligible": 116506,
+      "geometry_excluded": 0,
+      "eligible_goals": 8348,
+      "missing_features": {
+        "defending_empty_net": 38,
+        "defending_skaters": 38,
+        "distance_from_immediate_event_ft": 735,
+        "distance_to_goal_ft": 0,
+        "event_location_change_ft_per_second": 1826,
+        "score_differential_pre_shot": 0,
+        "seconds_since_immediate_event": 735,
+        "shooting_empty_net": 38,
+        "shooting_skaters": 38,
+        "signed_angle_deg": 0,
+        "skater_advantage": 38
+      }
+    }
+  },
+  "measurement": {
+    "events": 116506,
+    "games": 1362,
+    "goals": 8348,
+    "config": {
+      "bin_edges": [
+        0,
+        0.01,
+        0.025,
+        0.05,
+        0.1,
+        0.2,
+        0.35,
+        0.5,
+        0.75,
+        1
+      ],
+      "confidence": 0.95,
+      "log_loss_epsilon": 1e-12,
+      "min_events": 100,
+      "min_games": 30,
+      "min_valid_fraction": 0.9,
+      "resamples": 256,
+      "seed": 60906
+    },
+    "models": {
+      "context_calibrated": {
+        "brier": {
+          "value": 0.06175288261008271,
+          "interval_95": [
+            0.06067696762410513,
+            0.06287580478442821
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "log_loss_clipped": {
+          "value": 0.22923935376046278,
+          "interval_95": [
+            0.22578361597464325,
+            0.23242726327903998
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "roc_auc": {
+          "value": 0.7410764100431858,
+          "interval_95": [
+            0.7357091102213493,
+            0.7468310589245661
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "average_precision": {
+          "value": 0.21663915230688993,
+          "interval_95": [
+            0.20976809887803746,
+            0.22403634069793393
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "expected_goals": 8673.429114327162
+      },
+      "context_raw": {
+        "brier": {
+          "value": 0.06183017208766936,
+          "interval_95": [
+            0.06075382597117434,
+            0.06295679906414264
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "log_loss_clipped": {
+          "value": 0.22945143792497458,
+          "interval_95": [
+            0.22598042369769125,
+            0.23265113350639213
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "roc_auc": {
+          "value": 0.7410764100431858,
+          "interval_95": [
+            0.7357091102213493,
+            0.7468310589245661
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "average_precision": {
+          "value": 0.21663915230688993,
+          "interval_95": [
+            0.20976809887803746,
+            0.22403634069793393
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "expected_goals": 8709.491255019915
+      },
+      "geometry_calibrated": {
+        "brier": {
+          "value": 0.0645539762271982,
+          "interval_95": [
+            0.06344233347606616,
+            0.06569198325121245
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "log_loss_clipped": {
+          "value": 0.2425196896785434,
+          "interval_95": [
+            0.23932513647210593,
+            0.24578927016572974
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "roc_auc": {
+          "value": 0.6950678069749296,
+          "interval_95": [
+            0.6889907723509199,
+            0.7006617055258457
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "average_precision": {
+          "value": 0.13849873113079478,
+          "interval_95": [
+            0.1337155658092327,
+            0.14362677095685863
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "expected_goals": 8583.440240393164
+      },
+      "geometry_raw": {
+        "brier": {
+          "value": 0.0645969157695478,
+          "interval_95": [
+            0.06348925629410189,
+            0.06573722162422077
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "log_loss_clipped": {
+          "value": 0.24270289087356212,
+          "interval_95": [
+            0.23947540600678607,
+            0.24599819244858706
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "roc_auc": {
+          "value": 0.6950678069749296,
+          "interval_95": [
+            0.6889907723509199,
+            0.7006617055258457
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "average_precision": {
+          "value": 0.13849873113079478,
+          "interval_95": [
+            0.1337155658092327,
+            0.14362677095685863
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "expected_goals": 8422.934361941496
+      },
+      "prevalence_calibrated": {
+        "brier": {
+          "value": 0.06652091283421709,
+          "interval_95": [
+            0.06529235292622337,
+            0.06777771007049767
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "log_loss_clipped": {
+          "value": 0.2579097790622605,
+          "interval_95": [
+            0.2542172700778272,
+            0.26168715699521694
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "roc_auc": {
+          "value": 0.5,
+          "interval_95": [
+            0.5,
+            0.5
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "average_precision": {
+          "value": 0.07165296207920623,
+          "interval_95": [
+            0.0702237239688511,
+            0.0731150499230965
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "expected_goals": 8179.258050286729
+      },
+      "prevalence_raw": {
+        "brier": {
+          "value": 0.0665202013793661,
+          "interval_95": [
+            0.06529241598235223,
+            0.06777620630316476
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "log_loss_clipped": {
+          "value": 0.2579043388292672,
+          "interval_95": [
+            0.2542177518820215,
+            0.2616756586128599
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "roc_auc": {
+          "value": 0.5,
+          "interval_95": [
+            0.5,
+            0.5
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "average_precision": {
+          "value": 0.07165296207920623,
+          "interval_95": [
+            0.0702237239688511,
+            0.0731150499230965
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "expected_goals": 8210.825631576123
+      }
+    },
+    "context_calibrated_minus_geometry_calibrated": {
+      "brier": {
+        "value": -0.002801093617115495,
+        "interval_95": [
+          -0.003064015882956064,
+          -0.002539597963333324
+        ],
+        "interval_status": "estimated",
+        "valid_resamples": 256
+      },
+      "log_loss_clipped": {
+        "value": -0.013280335918080616,
+        "interval_95": [
+          -0.014296050655643915,
+          -0.012216763237092903
+        ],
+        "interval_status": "estimated",
+        "valid_resamples": 256
+      },
+      "roc_auc": {
+        "value": 0.04600860306825616,
+        "interval_95": [
+          0.041439308579390294,
+          0.049997036382402896
+        ],
+        "interval_status": "estimated",
+        "valid_resamples": 256
+      },
+      "average_precision": {
+        "value": 0.07814042117609515,
+        "interval_95": [
+          0.07127311575871423,
+          0.08457705208392784
+        ],
+        "interval_status": "estimated",
+        "valid_resamples": 256
+      }
+    },
+    "context_calibration": {
+      "observed_minus_expected_rate": {
+        "value": -0.002793239097790279,
+        "interval_95": [
+          -0.00433463089718898,
+          -0.0014801105683732232
+        ],
+        "interval_status": "estimated",
+        "valid_resamples": 256
+      },
+      "diagnostic": {
+        "intercept": -0.16997325680643324,
+        "purpose": "retrospective_diagnostic_not_calibrator",
+        "reason": null,
+        "slope": 0.9426507618969343,
+        "status": "estimated",
+        "uncertainty": "not_computed"
+      },
+      "calibrator": {
+        "calibration_feature_sha256": "ccd2a0a850323afc593e0cbc314182866876720b2ae58abb647728e6ebd8d261",
+        "calibration_membership_sha256": "7db886b12882c302647a2db1b6f1edc636aed0ae0554aa17282aaaab2f026ca8",
+        "calibration_source_sha256": "e655079e28c6a3d713f91376bf181d855251867e9c4ac0a1e64949f22393beca",
+        "intercept": -0.10362963080551452,
+        "kind": "later-window-logit-sigmoid-l2-v1",
+        "logit_epsilon": 0.000001,
+        "raw_model_sha256": "d68ebe48c415996c371d66e41e305e84d43850b70d67959c52869ba249ba0fa9",
+        "schema_sha256": "0824183ca84592bf0901b5c32e4b604d4b6bd0bb6ddbe5a719f9de6c3e6de726",
+        "slope": 0.9542330975245072,
+        "solver_parameters": {
+          "C": 1,
+          "max_iter": 2000,
+          "random_state": 60906,
+          "solver": "lbfgs",
+          "tol": 1e-8
+        }
+      }
+    }
+  },
+  "empty_net_context_calibrated": [
+    {
+      "group": null,
+      "events": 38,
+      "games": 38,
+      "goals": 6,
+      "expected_goals": 10.35504337756662,
+      "metrics": {
+        "brier": {
+          "value": 0.15182024033337296,
+          "interval_95": [
+            null,
+            null
+          ],
+          "interval_status": "insufficient_evidence",
+          "valid_resamples": 0
+        },
+        "log_loss_clipped": {
+          "value": 0.4841666571138738,
+          "interval_95": [
+            null,
+            null
+          ],
+          "interval_status": "insufficient_evidence",
+          "valid_resamples": 0
+        },
+        "roc_auc": {
+          "value": 0.46875,
+          "interval_95": [
+            null,
+            null
+          ],
+          "interval_status": "insufficient_evidence",
+          "valid_resamples": 0
+        },
+        "average_precision": {
+          "value": 0.16066176470588237,
+          "interval_95": [
+            null,
+            null
+          ],
+          "interval_status": "insufficient_evidence",
+          "valid_resamples": 0
+        }
+      }
+    },
+    {
+      "group": "empty_net",
+      "events": 1048,
+      "games": 662,
+      "goals": 533,
+      "expected_goals": 567.6308256821563,
+      "metrics": {
+        "brier": {
+          "value": 0.21756116340643042,
+          "interval_95": [
+            0.21167843484006474,
+            0.22404084399825008
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "log_loss_clipped": {
+          "value": 0.619562948093724,
+          "interval_95": [
+            0.6067215706932347,
+            0.6340222771107522
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "roc_auc": {
+          "value": 0.6758957358057524,
+          "interval_95": [
+            0.6438811455904908,
+            0.7023092586307955
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "average_precision": {
+          "value": 0.7421988720691011,
+          "interval_95": [
+            0.7109557585540441,
+            0.7713969047088763
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        }
+      }
+    },
+    {
+      "group": "goalie_present",
+      "events": 115420,
+      "games": 1362,
+      "goals": 7809,
+      "expected_goals": 8095.44324526744,
+      "metrics": {
+        "brier": {
+          "value": 0.06030850868989518,
+          "interval_95": [
+            0.05916318349010945,
+            0.06143740986144583
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "log_loss_clipped": {
+          "value": 0.22561133119601398,
+          "interval_95": [
+            0.2220203278220406,
+            0.2287771428433465
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "roc_auc": {
+          "value": 0.7269757794332277,
+          "interval_95": [
+            0.7212444304284193,
+            0.7329591321900663
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        },
+        "average_precision": {
+          "value": 0.1595988541124165,
+          "interval_95": [
+            0.15324663754184584,
+            0.16673820996140437
+          ],
+          "interval_status": "estimated",
+          "valid_resamples": 256
+        }
+      }
+    }
+  ],
+  "prospective": {
+    "status": "completed-reservation-not-evaluated-not-accepted",
+    "reserved_at": "2026-09-06T07:03:25.300853+00:00",
+    "clock_semantics": "local-system-UTC",
+    "window": {
+      "end": "2027-08-31",
+      "start": "2026-09-15"
+    },
+    "pipeline_count": 6,
+    "reservation_sha256": "2c1f293808213b8293ec9024cc057e4ac69e655ca47a6f0b2377e35bd82e4d16",
+    "automatic_acceptance": false,
+    "first_attempt": "Failed before output creation: fixture used count0 but real source_failure_games is an empty list. Validator and regressions corrected; export unchanged."
+  },
+  "root_checks": {
+    "coverage_evidence_and_code_files_rehashed": 9186,
+    "coverage_relative_path_base": "data-pipeline (original CLI working directory)",
+    "coverage_bytes_match": true,
+    "inner_artifact_files_rehashed": 11,
+    "reservation_health_and_no_failure": true,
+    "legacy_artifacts_rehashed_unchanged": 17,
+    "legacy_deserialized": false,
+    "new_training_used_legacy": false,
+    "offline_python": {
+      "passed": 1321,
+      "network_deselected": 16,
+      "warnings": 34,
+      "seconds": 7.21,
+      "argv": [
+        "-m",
+        "pytest",
+        "-p",
+        "no:cacheprovider",
+        "-m",
+        "not network",
+        "tests",
+        "-q"
+      ],
+      "runtime": "/Users/gstorms/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+      "pythonpath": "/private/tmp/citrus-py312-deps",
+      "working_directory": "data-pipeline",
+      "warning_details": "33 existing datetime deprecations; one loky physical-core fallback. Fit/predict/scoring thread pools fixed to one."
+    }
+  },
+  "limitations": [
+    "Local byte rechecks bind retained evidence, not independent source authentication or an unforgeable timestamp.",
+    "Calibration bias remains; no model or full-foundation acceptance.",
+    "Fixed-pipeline whole-game percentile intervals are not training uncertainty, multiplicity correction or proof of future quality.",
+    "Home-team rink proxy and skater-count strength are not verified arena or penalty-state measurements.",
+    "The method catalog is retained and all 17 inventoried tracked legacy artifacts are unchanged; this does not audit every external artifact or fit every model family.",
+    "Large ignored artifacts remain local, not an off-machine backup.",
+    "No production data write, hosted DDL, deployment, push or serving promotion."
+  ]
+}

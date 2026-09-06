@@ -5,7 +5,7 @@ Status: foundation NOT accepted. Local work only; no production rollout authoriz
 
 | Gate | Source → writer → consumer | Acceptance evidence | Current state |
 |---|---|---|---|
-| Event identity | NHL/raw shots → scoring/season aggregates → player/goalie surfaces | Unique game/event plus shooter, period, outcome, population reconciliation; quarantine every conflict | PARTIAL: independent schedule covers all 1394 stored 2025-season games. Original NHL gate remains 1362 matched / 32 quarantined; all 32 now have separately reviewed exact-snapshot goal/SOG overlays, not silent source repair or new-revision approval. Raw remains 783 matched / 611 quarantined, with 814 cardinality and 226 semantic conflicts retained. Hosted reconciliation/publication remains blocked |
+| Event identity | NHL/raw shots → scoring/season aggregates → player/goalie surfaces | Unique game/event plus shooter, period, outcome, population reconciliation; quarantine every conflict | PARTIAL: independent schedule covers all 1394 stored 2025-season games. Original NHL gate remains 1362 matched / 32 quarantined. Separate goal/SOG overlays cover original receipts and explicitly reviewed new HTTP revisions; neither changes the original gates or activates training. Raw remains 783 matched / 611 quarantined, with 814 cardinality and 226 semantic conflicts retained. Hosted reconciliation/publication remains blocked |
 | TOI provenance | NHL summary/game log → game/season/talent writers → deployment metrics | Exact event sets and every TOI value; official GP; historical seasons; source timestamps; late corrections | PARTIAL: strict raw/derived receipt replay passes: 940 expected, 939 available, 1 withheld; 953 frozen files unchanged. Future exports enforce explicit project/season/window and checksummed catalog or equal complete REST reads. Replay revalidates original catalog evidence or retains frozen REST provenance, without new online observations. Legacy evidence is not upgraded; no production correction/publication |
 | Season boundaries | NHL game identity → all writers | Explicit regular/playoff/shootout contract, ordered complete pagination | PARTIAL: rollup regular range + local guard; consumers already select variants; remaining writers unverified |
 | Traded players | Team stints → season aggregator → charts | Sum exposures/counts, recompute rates, no duplicate totals | PARTIAL: history and actual dashboard aggregation tested; unknown multi-stint distance denominator returns NULL. Live regular-season shot/xG totals agree for 937 players; remaining consumer/exposure coverage pending |
@@ -14,18 +14,36 @@ Status: foundation NOT accepted. Local work only; no production rollout authoriz
 | Version lineage | Features/model/calibrator → scores → aggregates | Same variant/version/population, immutable evidence, reversible serving selection | PARTIAL: new publication contract pins source/feature/model/code/variant and supports explicit rollback. Existing model families and stored-score lineage remain unverified |
 | Migration/security | Local migrations/live schema → readers/writers | Compare actual definitions/ledger; scoped RLS, staging, backup/rollback | PARTIAL: live definitions captured. Ordinary-user writes to global GSAx/projection tables confirmed; narrow restriction passes synthetic and actual staging rollback checks. Rollout unapplied. GSAx native races pass; hosted load, season-key redesign and broader writer lineage remain open |
 | Health | Source expectations → completed batches | Affirmative expected/actual/withheld; partial read failure cannot publish | PARTIAL: exact-page failure propagation, TOI withholding, landing/per-game caller failures and publication manifests tested. Official PBP collector preserves partial receipts and emits failed health on disk/import errors. Remaining jobs and operational coverage pending |
-| Chronological quality | Frozen earlier fit → later calibration → declared retrospective test; separately reserved prospective test | Proper scores, reliability, game-cluster uncertainty, subgroups, fixed lineage | IN PROGRESS: independently scheduled historical source freeze and first-party causal feature export are underway. Fixed chronological fit/calibration stages and matched probability scorecard are being validated. No real fit/evaluation result yet. Current historical revisions are retrospective, never historical-as-of or untouched evidence. Future prospective acceptance requires a complete genuinely frozen pipeline. MoneyPuck files remain excluded from new training |
+| Chronological quality | Frozen earlier fit → later calibration → declared retrospective test; separately reserved prospective test | Proper scores, reliability, game-cluster uncertainty, subgroups, fixed lineage | MEASURED, NOT ACCEPTED: source-replayed first-party fit/calibration/test completed; all six variants share 116506 test attempts in 1362 eligible games. Calibrated context Brier 0.061753 / AUC 0.741076 improves on geometry but overpredicts 325.43 goals. Coverage/exclusions retained. All six pipelines reserved before the 2026-09-15–2027-08-31 future window; no future result or automatic acceptance. Historical revisions remain retrospective, not historical-as-of or untouched. MoneyPuck files excluded |
 | Expected finishing/GAR/forecasts | Versioned history/context → persistent estimates | Observed G−xG distinct from persistent talent; exposure/units/opportunity/interval validation | Pending foundation and chronological evidence |
 | Fantasy and database integration | ScoringCalculator + feasible roster/waiver state → versioned outputs | League/horizon/eligibility, joint allocation, non-additive move value separate, RLS | Deferred until earlier gates pass |
 
 ## Current local verification (2026-09-06)
 
-### Continuing implementation checkpoint
+### Real measurement checkpoint
+
+The [first real experiment result](analytics-first-neutral-experiment-result-20260906.md)
+and [machine proof](analytics-first-neutral-experiment-proof-20260906.json) record
+actual source-replayed fitting and evaluation. Training, later calibration and
+retrospective test use 541067 / 117884 / 116506 eligible attempts; 93 / 24 / 32
+source-quarantined games remain excluded. All six raw/calibrated prevalence,
+geometry and context variants are retained on identical event membership.
+Calibrated context expects 8673.43 goals against 8348 observed; calibration remains
+unaccepted. Historical test data are now explicitly inspected and cannot be reused
+as untouched evidence.
+
+Complete pipelines were separately reserved at 2026-09-06 07:03:25 UTC for
+2026-09-15–2027-08-31. No future observations were supplied and no winner or serving
+promotion was selected. Local clock/hash closure is not an independent timestamp
+or proof of future quality. The original pre-fit declaration remains unchanged;
+this checkpoint supersedes its historical execution status.
 
 The original 32 goal/SOG conflicts now have source-specific statistical evidence
 and a separately pinned local overlay. Root replayed every exact original receipt;
 the source bytes and goal credit remain unchanged. Newly observed revisions do
-not inherit approval. See `analytics-goal-sog-adjudication-20260906.md`.
+not inherit approval: all 32 new HTTP revisions required an additional explicit
+review and separate pinned manifest. Neither overlay is silently activated in
+this experiment. See `analytics-goal-sog-adjudication-20260906.md`.
 
 Whole-transaction testing reproduced a real two-writer source-lock upgrade
 deadlock that individual function tests could not expose. A tenth unapplied
@@ -37,21 +55,32 @@ full nightly dependency integration and hosted blocking/load remain unverified.
 See `analytics-nightly-lock-audit-20260906.md`. No global arbitrary-SQL
 deadlock-freedom claim is made.
 
-The last root-run full offline Python suite at this checkpoint passed 1133 tests,
-with 16 network tests deselected and 33 existing warnings. Later focused root
-runs passed 35 probability-scorecard tests, 31 report-source/collector tests and
-28 goal/SOG overlay/collection tests; these overlapping counts must not be added
-to infer a new full-suite total. Further fit/export code is still under review.
-The earlier complete-system suite counts below remain historical checkpoints.
+The current root-run full offline Python suite passed 1321 tests, with 16 network
+tests deselected and 34 warnings in 7.21 seconds. Warnings comprise 33 existing
+datetime deprecations and one physical-core detection fallback; actual model
+fit/predict/scoring pools are fixed to one thread. The suite count is not
+predictive-quality evidence. Root independently rehashed 9186 coverage evidence/code
+files, all eleven inner experiment files and all 17 inventoried tracked legacy
+joblib artifacts. Those legacy bytes are unchanged and were never deserialized by
+the new path. Earlier complete-system suite counts remain historical checkpoints.
 
 The historical collector preserves each scheduled game's exact response bytes,
 receipt, final-game evidence and every quarantine, with end-of-run source/code
 drift checks. A separate bounded collection retains 2017/2018 official reports
 because their JSON event order/orientation is not silently repaired. Report
 parse failures retain the complete available response for offline review. These
-collections are not yet complete and are not model acceptance. Public research
-families and prior model artifacts remain preserved; no unknown pickle/joblib
-artifact or MoneyPuck file is loaded by the new path.
+collections now retain all 11870 scheduled official PBP responses across season
+IDs 2017–2025, including 182 quarantines and no unavailable captures. The separate
+2017/2018 report collection retained 2713 HTTP-200 bodies; 1956 passed its existing
+header/stream validator and 757 remained unavailable to that validator. It exits
+incomplete and is not training-ready. Completed capture is not validation or model
+acceptance. Public research families and prior model artifacts remain preserved;
+no unknown pickle/joblib artifact or MoneyPuck file is loaded by the new path.
+
+The completed [older-report review](analytics-historical-report-proof-20260906.json)
+rehashed all 2713 receipt/body pairs against the finished capture inventory. Its
+69 exact PEND/GEND/GOFF candidates remain review-only; 688 other cases remain
+unresolved. No terminal rows, punctuation or clocks were silently repaired.
 
 ### Earlier complete-system verification
 
@@ -164,9 +193,10 @@ hashes are preserved; schedule agreement does not clear event-level quarantine.
 
 `analytics-writer-lineage-audit-20260906.md` records captured live definitions,
 actual writer paths and permission proof. Legacy score and fit labels are not
-immutable lineage. Chronological quality remains blocked by unresolved source
-conflicts and missing historical as-of source/model evidence. Tests of structural
-contracts do not establish predictive quality.
+immutable lineage. Historical-as-of claims remain blocked by missing as-of
+source/model evidence. The newer result above establishes a limited current-revision
+retrospective baseline with explicit source exclusions, not full predictive-quality
+acceptance. Tests of structural contracts alone do not establish predictive quality.
 
 ## Earlier implementation log
 
