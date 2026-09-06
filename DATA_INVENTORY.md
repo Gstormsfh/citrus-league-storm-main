@@ -236,6 +236,10 @@ create-only result wrapper that replays frozen source membership again, binds
 all completed artifacts, predictions and calibrator lineage, and applies the
 declared shortlist without fitting or deserializing a model. Result evidence is
 separate at `scripts/proof/results/official-development-result-20260906/`.
+The actual result and complete selected-model subgroup/reliability review are
+tracked in `docs/analytics-development-result-20260906.md` and
+`docs/analytics-development-result-proof-20260906.json`. Selection is not serving
+acceptance; all complete predictor scorecards remain in the original experiment.
 `scripts/proof/archive_development_checkpoint.py` creates an additive scoped
 source/evidence duplicate and streams every archive member through independent
 hash and membership verification without extraction or model loading. Its

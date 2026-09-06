@@ -28,24 +28,43 @@ was frozen before a new real export or fit. Its additive exporter completed
 geometry-eligible attempts without narrowing the old training population.
 One additional geometry-ineligible candidate remains in its audit. The manifest
 semantic SHA is `2f657b06a5b715b305fbdef0977dd0e371e5ab55cee2cc4a982aa0f45e70421b`.
-The source-replayed two-fold fit and declared shortlist are not yet completed.
-They use only event files before July 2024; the old observed historical test and
-all existing prospective reservations remain unchanged.
+The source-replayed two-fold fit and declared shortlist are complete. The
+[result and calibration limits](analytics-development-result-20260906.md) and
+[bound machine review](analytics-development-result-proof-20260906.json) record
+enhanced-context sigmoid as the declared development shortlist, not an accepted
+or serving model. Both earlier validation folds improve probability losses over
+base-context sigmoid; calibration and subgroup problems remain visible. The
+create-only result wrapper replayed source membership again and verified 12,785
+source/export/code/artifact files. Only event files before July 2024 were used;
+the old observed historical test and all existing prospective reservations
+remain unchanged.
 
-Root independently passed the full offline Python suite: 1,389 tests, 16 network
-tests deselected, 34 warnings in 8.72 seconds. Subsequent additive wrapper work
-needs its own final suite verification; this count does not assert model quality.
+Root independently passed the updated full offline Python suite: 1,515 tests,
+16 network tests deselected, 33 existing datetime-deprecation warnings in
+27.78 seconds. This includes result replay/lineage and archive adversarial
+regressions; a test count does not assert model quality.
 
 The [expanded composed-native proof](analytics-native-composed-expanded-20260906.json)
 executes actual clock repair, strength/TOI, guarded on-ice/GAR, rink interpolation,
 season refresh and GSAx reconciliation. Two disposable PostgreSQL 17.6 runs passed
 with four independent lock witnesses, invalid-source atomicity, correction/replay
 and unchanged older-season sentinels. Fixture cleanup verified zero objects and
-roles; root stopped only its ownership-verified containers. The legacy cell
-scorer remains explicitly stubbed, v5 inference is throw-on-use with no eligible
-inference rows, and synthetic rink knots prove plumbing rather than learned
-correction. This is not full nightly/load/hosted acceptance. The earlier narrower
+roles; root stopped only its ownership-verified containers. A subsequent
+[cell-mode proof](analytics-native-composed-cells-20260906.json) passed two native
+runs using exact feature/fold/key views and the actual legacy cell scorer; no
+successful tail stubs remain in that opt-in mode. v5 inference is still
+throw-on-use with no eligible rows, and synthetic cell/rink parameters prove
+plumbing rather than fitted validity. This is not full nightly/load/hosted
+acceptance. The earlier narrower
 [composed proof](analytics-native-composed-nightly-20260906.json) is preserved.
+
+The [nullable-xG consumer correction](analytics-nullable-xg-consumers-20260906.md)
+preserves absent versus supplied-zero season xG through the actual index,
+draft-kit, player card, browse adapter and discrepancy note. Official actuals,
+queries, entitlement and season filters are unchanged. Full web/server/shared
+suites pass (4,484 / 1,849 / 244; six server tests skipped), all three type checks
+pass, and web build passes. Full web lint has zero errors and nine warnings.
+No hosted writes or model-serving promotion were performed.
 
 The [versioned report replay](analytics-report-v2-review-20260906.md) resolves only
 reviewed historical team aliases and the supported terminal administrative
