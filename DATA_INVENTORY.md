@@ -111,6 +111,11 @@ original body/receipts through unchanged source gates/features and pinned JSON
 model/map inference before actor accounting. New create-only evidence lives in
 `scripts/proof/results/official-actor-attribution-*/`; failed runs retain partial
 files and an affirmative failure marker. No database or serving adapter is used.
+`scripts/proof/review_actor_attribution.py` independently joins the diagnostic
+receipts back to raw source actors and game rosters, rebuilds actor/team-stint
+ledgers and NULL availability, and retains goalie-state accounting partitions.
+Its review and verified local archive are create-only; they do not refit models
+or promote the diagnostic to official actuals, TOI, forecasts or FPAR.
 
 Additive model/publication diagnostic proof (2026-09-06):
 `scripts/local_model_publication_e2e.py` binds the complete shape checkpoint,
