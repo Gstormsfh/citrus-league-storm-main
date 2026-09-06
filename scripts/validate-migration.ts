@@ -18,6 +18,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'node:url';
 
 interface ValidationResult {
   file: string;
@@ -41,6 +42,9 @@ const DANGEROUS_PATTERNS = [
   },
   {
     pattern: /DROP\s+TABLE\s+(?!IF\s+EXISTS.*_backup)/gi,
+    // Only a single explicitly session-local scratch relation is exempt.
+    // Unqualified/public drops, multiple targets and CASCADE remain errors.
+    safeStatement: /^DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?pg_temp\.[A-Za-z_][A-Za-z0-9_]*\s*(?:RESTRICT\s*)?;$/i,
     severity: 'error',
     message: 'DROP TABLE without backup detected',
     suggestion: 'Create backup table first: CREATE TABLE table_backup AS SELECT * FROM table'
@@ -91,9 +95,13 @@ function validateMigrationFile(filePath: string): ValidationResult {
 
     // Check for dangerous patterns
     for (const check of DANGEROUS_PATTERNS) {
-      const matches = content.match(check.pattern);
-      if (matches) {
-        const message = `${check.message}\n  Found: ${matches[0]}\n  Suggestion: ${check.suggestion}`;
+      const matches = [...content.matchAll(check.pattern)].filter(match => {
+        if (!('safeStatement' in check) || !check.safeStatement) return true;
+        const statement = content.slice(match.index).match(/^[^;]*;/)?.[0];
+        return !statement || !check.safeStatement.test(statement);
+      });
+      if (matches.length) {
+        const message = `${check.message}\n  Found: ${matches[0][0]}\n  Suggestion: ${check.suggestion}`;
         
         if (check.severity === 'error') {
           result.errors.push(message);
@@ -195,12 +203,13 @@ function printResults(results: ValidationResult[]): void {
 }
 
 // CLI
-if (require.main === module) {
+const modulePath = fileURLToPath(import.meta.url);
+if (process.argv[1] && path.resolve(process.argv[1]) === modulePath) {
   const args = process.argv.slice(2);
   
   if (args.length === 0) {
     // Validate all migrations
-    const migrationsDir = path.join(__dirname, '..', 'supabase', 'migrations');
+    const migrationsDir = path.join(path.dirname(modulePath), '..', 'supabase', 'migrations');
     const results = validateAllMigrations(migrationsDir);
     printResults(results);
   } else {
