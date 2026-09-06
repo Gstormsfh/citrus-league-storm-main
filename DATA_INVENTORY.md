@@ -245,6 +245,11 @@ source/evidence duplicate and streams every archive member through independent
 hash and membership verification without extraction or model loading. Its
 regressions are `data-pipeline/tests/test_development_archive.py`; prior archives
 remain separately retained. A local duplicate is not a remote backup.
+The completed checkpoint is bound by
+`docs/analytics-development-checkpoint-archive-20260906.json`: selected source
+at commit `359414341d96108cc459a0a1efd80a34976c0d79` plus the four new evidence
+roots, every member checked without extraction. Originals and prior archives
+remain unchanged; the archive receipt itself necessarily postdates its archive.
 
 `projections/development_shortlist.py` applies only the frozen earlier-fold
 selection rule to caller-verified completed scorecards. Its manifest pin is the

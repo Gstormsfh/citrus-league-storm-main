@@ -1,0 +1,67 @@
+{
+  "archives": [
+    {
+      "bytes": 15295869,
+      "complete_membership_verified": true,
+      "every_member_matches_retained_source": true,
+      "extracted_to_filesystem": false,
+      "member_inventory_sha256": "7de72e58cd627608dd6384ef3c799470186af920deb6ee82b1385a02f6f99e24",
+      "path": "scripts/proof/results/analytics-development-checkpoint-20260906-0830/source-head.tar.gz",
+      "regular_bytes": 44719423,
+      "regular_files": 2082,
+      "sha256": "e076cb35d9dca2d0bde0a6350a1934ea536b1ee686e29826f8b70d25e1bb8a38"
+    },
+    {
+      "bytes": 265341442,
+      "complete_membership_verified": true,
+      "every_member_matches_retained_source": true,
+      "extracted_to_filesystem": false,
+      "member_inventory_sha256": "f81d60b34f9a30dd88ff7a4c1834d343666b5661c33b52bfe067fbd8d61661d5",
+      "path": "scripts/proof/results/analytics-development-checkpoint-20260906-0830/evidence.tar.gz",
+      "regular_bytes": 2075264414,
+      "regular_files": 37,
+      "sha256": "930b8e7449d124675f621027edcb864262111cd892bdee26537a9b3b41707f36"
+    }
+  ],
+  "contract": "citrus-local-development-checkpoint-v1",
+  "evidence_roots": [
+    "scripts/proof/results/official-development-features-20260906",
+    "scripts/proof/results/official-development-experiment-20260906",
+    "scripts/proof/results/official-development-result-20260906",
+    "scripts/proof/results/historical-report-v2-replay-20260906.json"
+  ],
+  "limitations": [
+    "Local duplicate only, not an off-machine backup.",
+    "Only explicitly listed scopes; original source archives and prospective reservations remain separately preserved.",
+    "Archive creation does not establish model quality, data rights, or serving acceptance."
+  ],
+  "originals_removed": false,
+  "prior_archive_receipt": "docs/analytics-completed-experiment-archive-20260906.json",
+  "publishable": false,
+  "source_commit": "359414341d96108cc459a0a1efd80a34976c0d79",
+  "source_roots": [
+    "data-pipeline/projections",
+    "data-pipeline/acquisition",
+    "data-pipeline/monitoring",
+    "data-pipeline/models",
+    "data-pipeline/tests",
+    "supabase/migrations",
+    "scripts/proof",
+    "docs",
+    "server/src",
+    "packages/shared/src",
+    "apps/web/src",
+    "DATA_INVENTORY.md"
+  ],
+  "status": "complete-verified-local-duplicate",
+  "verified_at": "2026-09-06T08:30:37.088207+00:00",
+  "receipt_file_sha256": "4637ea10a0c111dbee8fec8b3a190df03dd427a09c151bf4c2a49e84f834454c",
+  "closing_root_checks": {
+    "archive_hashes_and_sizes_rechecked": 2,
+    "previous_archives_rehashed_unchanged": 2,
+    "original_experiment_evidence_files_rehashed_unchanged": 18,
+    "legacy_model_artifacts_rehashed_unchanged": 17,
+    "models_deserialized": false
+  },
+  "receipt_cannot_be_in_its_own_archive": true
+}

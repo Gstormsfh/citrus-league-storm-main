@@ -66,6 +66,14 @@ suites pass (4,484 / 1,849 / 244; six server tests skipped), all three type chec
 pass, and web build passes. Full web lint has zero errors and nine warnings.
 No hosted writes or model-serving promotion were performed.
 
+The [new checkpoint archive](analytics-development-checkpoint-archive-20260906.json)
+preserves selected source and the new development/report evidence separately
+from the earlier archives. Every member and complete selected membership was
+checked without extraction; root then independently rechecked both compressed
+archive hashes and sizes. Both old archives, all 18 original experiment proof
+files and all 17 inventoried legacy artifacts still match their prior hashes.
+This is a local duplicate, not a remote backup or quality acceptance.
+
 The [versioned report replay](analytics-report-v2-review-20260906.md) resolves only
 reviewed historical team aliases and the supported terminal administrative
 marker. Of the unchanged 2,713 source/report pairs, 2,668 parse and pass original
