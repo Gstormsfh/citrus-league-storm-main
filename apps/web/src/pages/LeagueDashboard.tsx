@@ -1087,13 +1087,13 @@ const LeagueDashboard = () => {
       )}
       <main className="hidden lg:block w-full lg:pt-24 lg:pb-8">
         <div className="w-full m-0 p-0">
-          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[200px_minmax(0,1fr)_260px] xl:grid-cols-[220px_minmax(0,1fr)_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2 pt-3 sm:pt-0">
 
               {/* Header */}
           <div className="mb-5 sm:mb-8">
-            <div className="flex items-center justify-between mb-4 gap-3">
-              <div className="min-w-0">
+            <div className="flex flex-col items-start 2xl:flex-row 2xl:justify-between mb-4 gap-3">
+              <div className="min-w-0 w-full 2xl:w-auto 2xl:flex-1">
                 <div className="hidden sm:flex font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5 items-center gap-2">
                   <CupIcon className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
                   ✦ League HQ
@@ -1135,7 +1135,7 @@ const LeagueDashboard = () => {
               {/* INVITE REACH (2026-09-01): inviting was buried inside the
                   settings dialog's rosters tab. Every member now gets the
                   share-sheet-first invite affordance at the top of HQ. */}
-              <div className="flex gap-2 items-start">
+              <div className="flex flex-wrap gap-2 items-start shrink-0 max-w-full">
                 {league.join_code && (
                   <InvitePlayersButton joinCode={league.join_code} leagueName={league.name} />
                 )}
