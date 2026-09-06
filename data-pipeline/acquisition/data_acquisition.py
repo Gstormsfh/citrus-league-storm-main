@@ -2176,7 +2176,7 @@ def _save_shots_to_database(df_shots, db_client, game_id):
         raise
 
 
-def process_game_from_raw_data(game_id, raw_data, db_client):
+def process_game_from_raw_data(game_id, raw_data, db_client, *, sequence_shadow_context=None):
     """
     Extract shots, score xG/xA, and save from a pre-fetched raw PBP payload.
 
@@ -2296,6 +2296,9 @@ def process_game_from_raw_data(game_id, raw_data, db_client):
         df_shots['xG_Value'] = df_shots['xG_Value'].clip(upper=0.50)
         SCALE_FACTOR = 0.19
         df_shots['xG_Value'] = df_shots['xG_Value'] * SCALE_FACTOR
+
+    from projections.sequence_shadow import apply_sequence_shadow
+    apply_sequence_shadow(df_shots, raw_data, game_id, context=sequence_shadow_context)
 
     df_shots['xA_Value'] = 0.0
     if XA_MODEL and XA_MODEL_FEATURES:

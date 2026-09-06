@@ -109,6 +109,11 @@ checksummed export parts and compares exact source revisions;
 Frozen proof summaries live in `docs/analytics-corpus-full-proof-20260906.json`
 (all 1394 stored games) and the earlier conflict-enriched sample. Matching here
 means identity/totals checks, not model-ready source or feature acceptance.
+The independent schedule collector `monitoring/schedule_coverage.py` separately
+captures every week in an explicit date window, validates daily/week totals and
+compares terminal game identities with both stored sources. Its 61-receipt frozen
+replay confirms no whole games missing for the captured season; see
+`docs/analytics-schedule-proof-20260906.json`. This does not clear event conflicts.
 
 `monitoring/collect_toi_receipts.py` collects a complete official skater summary
 population plus raw player game-log receipts and frozen stored-game rows.
@@ -134,6 +139,34 @@ change. The large raw-evidence payload failed at a 512 MiB database memory limit
 and passed at 2 GiB; hosted capacity remains an explicit rollout gate.
 `docs/analytics-evidence-archive-20260906.json` identifies the ignored local archive
 of frozen source receipts, scoped exports and replay/integration artifacts.
+Future TOI collection defaults to strict catalog provenance (explicit project,
+season, observation window, matching row digests and per-part byte hashes), or
+two identical complete ordered REST reads. Provenance-bearing offline replay
+requires original catalog evidence or retains a validated frozen REST receipt;
+it never claims a new online read. Legacy inputs remain explicitly non-catalog.
+Local era/playoff exclusion and xG refresh safeguards have exact rollback
+captures, isolated SQL checks and narrow input/population rejection. None of the
+new migrations has been rolled out.
+
+The complete methods/input preservation map is
+`docs/analytics-method-preservation-20260906.md`: database, organization and the
+whole model pipeline remain in scope, not just flurry. Full raw observations and
+prior artifacts are retained. `acquisition/observed_sequences.py` extracts strict
+source-bound consecutive-attempt chains; `monitoring/sequence_coverage.py`
+audits the complete scheduled population offline. `projections/sequence_value.py`
+implements independently authored conditioned sequence/rebound mathematics;
+`sequence_shadow.py` is shared by both actual Python processing paths but only
+attaches nonpublishable diagnostics and never replaces existing live columns.
+`docs/analytics-sequence-methods-20260906.md` records definitions and limitations.
+
+Historical official PBP also exists in `raw_nhl_data` (distinct from the historical
+bulk-import derived shots). `monitoring/archive_source_receipt.py` checks exact
+official URL, original fetch time and legacy semantic JSON hashes;
+`archive_revision_comparison.py` compares preserved old/new source revisions.
+A nine-game sample passed, not a full historical corpus. Source/raw byte archives
+and the complete season sequence report are identified in
+`docs/analytics-sequence-archive-proof-20260906.json`. Full corpus freeze, source
+rights, feature/cutoff lineage and chronological acceptance remain separate gates.
 
 `docs/analytics-writer-lineage-audit-20260906.md` holds exact live SQL writer
 definitions and confirmed shared-output permission risks. The unapplied
@@ -146,6 +179,14 @@ actual staging rollback proof is recorded there. No production data was changed.
 ## 2. Historical data archives
 
 ### 2.1 MoneyPuck multi-season shot data — the xG training corpus
+
+2026-09-06 audit caveat: the historical and working CSVs documented below are
+absent from the checked Mac locations. Older sizes, row counts and quality labels
+below are historical documentation, not revalidated evidence. The user excluded
+MoneyPuck files from new training; published ideas may inform independently
+implemented Citrus methods. `docs/analytics-training-lineage-20260906.md` records
+current byte hashes, source discovery and missing split/calibrator/source
+provenance. Existing artifacts are preserved; no new quality claim follows.
 
 **Canonical copy** (referenced by `data/TRAINING_DATA_MANIFEST.md`):
 - `C:\Users\garre\Downloads\shots_2018-2024.csv` — 447 MB, 786,244 rows, NHL seasons 2018-19 through 2024-25

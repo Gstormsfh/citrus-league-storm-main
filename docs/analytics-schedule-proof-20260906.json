@@ -1,0 +1,38 @@
+{
+  "contract": "citrus-independent-schedule-proof-v1",
+  "validator_commit": "6ddf051bc62a30ea52704b8dd85301a98e7ed615",
+  "season": 2025,
+  "from_date": "2025-07-01",
+  "through_date": "2026-08-31",
+  "observed_from": "2026-09-06T03:48:55.217579+00:00",
+  "observed_to": "2026-09-06T03:49:43.032511+00:00",
+  "receipt_weeks": 61,
+  "unchanged_receipts_in_offline_replay": 61,
+  "reported_season_within_window": true,
+  "reported_regular_start": "2025-10-07",
+  "reported_playoff_end": "2026-06-15",
+  "terminal_games": 1394,
+  "regular_games": 1312,
+  "playoff_games": 82,
+  "unresolved_game_ids": [],
+  "stored_source_coverage": {
+    "nhl": {"stored_games": 1394, "missing_terminal_games": [], "stored_not_terminal_in_window": []},
+    "raw": {"stored_games": 1394, "missing_terminal_games": [], "stored_not_terminal_in_window": []}
+  },
+  "report_sha256": "8799dfa1f4b28aa4e25c86610d43bd98dcf72139213a75ae9be03cd24244ef0d",
+  "stored_export_manifest_sha256": "4e311715f208baddbd6acf7b459b89317b5da11e37f73366b1e48fbd499d7afb",
+  "archive": {
+    "path_relative_to_repository": "scripts/proof/results/analytics-schedule-evidence-20260906.tar.gz",
+    "bytes": 676860,
+    "sha256": "cca03f5bd1faead9da964fad1f3d00bc4a612256d7b69800be86281981b4b60b",
+    "gzip_integrity_verified": true,
+    "git_tracking": "Ignored local artifact, not an external backup"
+  },
+  "production_modified": false,
+  "limitations": [
+    "Current corrected schedule is not historical as-of evidence.",
+    "Completeness refers to the explicit date window and reported source boundaries.",
+    "A stored game identity does not prove complete events, features or scores.",
+    "Event-level corpus quarantine remains unresolved; schedule agreement does not clear it."
+  ]
+}

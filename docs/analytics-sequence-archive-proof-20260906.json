@@ -1,0 +1,153 @@
+{
+  "scope": "Local preserved source evidence; not model quality or production acceptance",
+  "archive": {
+    "path": "scripts/proof/results/analytics-sequence-archive-evidence-20260906.tar.gz",
+    "bytes": 682518,
+    "sha256": "639167f395a443f35919502f37ad9265f0e8dab3f01bf57bbcf4ce5655ec5bfc",
+    "gzipVerified": true,
+    "externalBackup": false
+  },
+  "sequence": {
+    "reportMember": "citrus-sequence-source-coverage-20260906-revalidated.json",
+    "reportSha256": "3312d54ba54810c032d51f09532d7264eba86aabaddec5ee08001e105825b8a1",
+    "season": 2025,
+    "expectedGames": 1394,
+    "verifiedGames": 1362,
+    "quarantinedGames": 32,
+    "quarantineReason": "final_attempt_totals_mismatch",
+    "explicitDescriptiveGapSeconds": 3,
+    "chains": 107107,
+    "multipleAttemptChains": 8183,
+    "includedAttempts": 116506,
+    "exitCode": 2,
+    "scheduleReportSha256": "8799dfa1f4b28aa4e25c86610d43bd98dcf72139213a75ae9be03cd24244ef0d",
+    "sourceReceiptsArchive": "docs/analytics-evidence-archive-20260906.json",
+    "scheduleArchive": "docs/analytics-schedule-proof-20260906.json"
+  },
+  "historicalSample": {
+    "comparisonMember": "nhl-archive-provenance-sample-20260906/comparison.json",
+    "comparisonSha256": "9e2bf0c75795c2290025833ab93bdb27872cb8d32c0f1fdf945f3a093b33a779",
+    "games": 9,
+    "provenanceVerified": 9,
+    "normalizationComplete": 9,
+    "finalGameVerified": 9,
+    "payloadsEqual": 6,
+    "payloadsChanged": 3,
+    "normalizedEvents": 807,
+    "normalizedEventMapsEqual": 9,
+    "changedFields": 8,
+    "changeScope": "zoneCode on excluded hit/blocked-shot/giveaway events, not normalized unblocked attempts",
+    "historicalAsOfVerified": false,
+    "fullHistoricalCoverageVerified": false,
+    "gamesCompared": [
+      {
+        "gameId": 2017020001,
+        "archiveFetchedAt": "2026-08-11 01:54:45+00",
+        "currentObservedAt": "2026-09-06T04:12:59.843061+00:00",
+        "archivePayloadSha256": "e33db808c675e7c06a0d632705c2639f8f168f5f6684ff809a75bf2a8729c2d1",
+        "currentPayloadSha256": "e33db808c675e7c06a0d632705c2639f8f168f5f6684ff809a75bf2a8729c2d1",
+        "changedPaths": [],
+        "normalizedEventMapSha256": "3d07894ff7aed2ddbd22dcdf0da16bbfc6eebb84a5decac283ec7430c9b7ecfd"
+      },
+      {
+        "gameId": 2018020001,
+        "archiveFetchedAt": "2026-08-11 01:44:01+00",
+        "currentObservedAt": "2026-09-06T04:13:00.550724+00:00",
+        "archivePayloadSha256": "72cf6822b45cf627bbe591a1f3c9971f0f0f86ec48942dff258f42dea83c2034",
+        "currentPayloadSha256": "72cf6822b45cf627bbe591a1f3c9971f0f0f86ec48942dff258f42dea83c2034",
+        "changedPaths": [],
+        "normalizedEventMapSha256": "9dfc0868d3e4eec5cab8e28ab20112509fa49dcd26250d7fde8e96916ea7b8b2"
+      },
+      {
+        "gameId": 2019020001,
+        "archiveFetchedAt": "2026-08-11 01:50:10+00",
+        "currentObservedAt": "2026-09-06T04:13:01.075681+00:00",
+        "archivePayloadSha256": "499e197a4638db2b749b2974eb033347351ce4ad9235446307fec78500f69ae0",
+        "currentPayloadSha256": "8e947ac0b53f1a769290eff18c57379166ebfcb793a9d63b3ddc0d54164126ce",
+        "changedPaths": [
+          "/plays/326/details/zoneCode"
+        ],
+        "normalizedEventMapSha256": "20721355664a0d07d317c2f0587f262a07f4be09ce2dd9506c56c96e2fc4c73c"
+      },
+      {
+        "gameId": 2020020001,
+        "archiveFetchedAt": "2026-08-11 01:42:13+00",
+        "currentObservedAt": "2026-09-06T04:13:01.600268+00:00",
+        "archivePayloadSha256": "9c05e963c52fdfa2ccbce7572c9af66f6031044a12a8ece4e631f9d670348c14",
+        "currentPayloadSha256": "9c05e963c52fdfa2ccbce7572c9af66f6031044a12a8ece4e631f9d670348c14",
+        "changedPaths": [],
+        "normalizedEventMapSha256": "c6ffd27d2a4ba5a6801f3f7b77521340286b111682fc54d2ea18d25b813e7c4e"
+      },
+      {
+        "gameId": 2021020001,
+        "archiveFetchedAt": "2026-08-11 01:53:26+00",
+        "currentObservedAt": "2026-09-06T04:13:02.124401+00:00",
+        "archivePayloadSha256": "ed9872aa54bc406cde8db58daca0a129238c7bf987806eb863238b76e0efa368",
+        "currentPayloadSha256": "ed9872aa54bc406cde8db58daca0a129238c7bf987806eb863238b76e0efa368",
+        "changedPaths": [],
+        "normalizedEventMapSha256": "3c54395112e5b2b8168a030f1e1bd87ac2b3341211acd8b7d6db531bb630aa04"
+      },
+      {
+        "gameId": 2022020001,
+        "archiveFetchedAt": "2026-08-11 01:49:21+00",
+        "currentObservedAt": "2026-09-06T04:13:02.649630+00:00",
+        "archivePayloadSha256": "cb30bd303093f6b48d6ea6614577e354b18611071102959dc4fa42314579ca9a",
+        "currentPayloadSha256": "cb30bd303093f6b48d6ea6614577e354b18611071102959dc4fa42314579ca9a",
+        "changedPaths": [],
+        "normalizedEventMapSha256": "a01d78b307ab32679f0c9bcfd76ae10b867a73c446e8ad0d5258cb7fb7d5e35a"
+      },
+      {
+        "gameId": 2023020001,
+        "archiveFetchedAt": "2026-08-11 03:31:31+00",
+        "currentObservedAt": "2026-09-06T04:13:03.173300+00:00",
+        "archivePayloadSha256": "07a03cc31393fa7952ddf149cfcc0212ed874bbe017cc31aac7dd16c805a98b5",
+        "currentPayloadSha256": "07a03cc31393fa7952ddf149cfcc0212ed874bbe017cc31aac7dd16c805a98b5",
+        "changedPaths": [],
+        "normalizedEventMapSha256": "6c7e8bb1d4c60b4126a952e7f06a6740ca1a1d18d9bc14099090365698981ac6"
+      },
+      {
+        "gameId": 2024020001,
+        "archiveFetchedAt": "2026-08-11 01:31:27+00",
+        "currentObservedAt": "2026-09-06T04:13:03.709803+00:00",
+        "archivePayloadSha256": "b4d9c5615852fdfedf2713481db735b3980789e82bb97dc790e50b3e8e467a78",
+        "currentPayloadSha256": "d32d1b7967956020151fdb8520e33fee9858a5b0a64a255149379c3860d4f345",
+        "changedPaths": [
+          "/plays/203/details/zoneCode"
+        ],
+        "normalizedEventMapSha256": "292cac777d494897c9b84cb28deba7a43f6a266c0fe8830936a14537b4f7ae7c"
+      },
+      {
+        "gameId": 2025020001,
+        "archiveFetchedAt": "2026-08-11 01:37:56+00",
+        "currentObservedAt": "2026-09-06T04:13:04.224768+00:00",
+        "archivePayloadSha256": "c58712545abf7207b5453377cb0a87f927a35383e71986da2ad645513b36852e",
+        "currentPayloadSha256": "ff2d02ec1fdfabcf8a1657f75cc01c78b46a87a056d5cf8aed87b498fe5c072a",
+        "changedPaths": [
+          "/plays/117/details/zoneCode",
+          "/plays/120/details/zoneCode",
+          "/plays/127/details/zoneCode",
+          "/plays/194/details/zoneCode",
+          "/plays/214/details/zoneCode",
+          "/plays/223/details/zoneCode"
+        ],
+        "normalizedEventMapSha256": "8142fe4c44d51034ede6d8e1084e3a28b38ab98062cee68163e49e631f919025"
+      }
+    ]
+  },
+  "preservation": {
+    "originalInputFilesUnchanged": true,
+    "fullOldAndNewPayloadsRetained": true,
+    "quarantinedInputsRetained": true,
+    "modelArtifactsDeserialized": false,
+    "moneyPuckFilesUsed": false,
+    "databaseModified": false,
+    "productionPublished": false
+  },
+  "limits": [
+    "Legacy archive hash is Python sorted-key semantic JSON, not HTTP bytes or authenticated provenance.",
+    "Nine samples do not establish full historical coverage or historical-as-of availability.",
+    "Complete source sequence membership is not inferred possession or calibrated probability.",
+    "Three-second gap is a declared descriptive threshold, not a learned hyperparameter.",
+    "Local archive is retained in ignored workspace results, not an external durable backup."
+  ]
+}

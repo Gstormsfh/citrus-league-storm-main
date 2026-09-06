@@ -198,7 +198,7 @@ def count_unprocessed_games():
         return 0
 
 
-def process_single_game_json(raw_json, game_id):
+def process_single_game_json(raw_json, game_id, *, sequence_shadow_context=None):
     """
     Process a single game's JSON data: extract shots, calculate features, apply models.
     
@@ -374,6 +374,9 @@ def process_single_game_json(raw_json, game_id):
             SCALE_FACTOR = 0.19
             df_shots['xG_Value'] = df_shots['xG_Value'] * SCALE_FACTOR
         
+        from projections.sequence_shadow import apply_sequence_shadow
+        apply_sequence_shadow(df_shots, raw_json, game_id, context=sequence_shadow_context)
+
         # 7. Predict xA (if model available)
         df_shots['xA_Value'] = 0.0
         if XA_MODEL and XA_MODEL_FEATURES:
@@ -635,4 +638,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
