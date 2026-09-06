@@ -1,6 +1,6 @@
 # Citrus Apple readiness — resumed code verification
 
-Preparation only. No submission, release, production deployment, or migration application is authorized by this report. Content is still in progress. Apple approval is not guaranteed by local test results. This document supersedes the earlier report's statements about missing code and untouched App Store Connect fields; the earlier report remains historical evidence.
+The user authorized staging deployment and integrated testing after the local preparation pass. App Store submission, release, and production deployment remain on hold. Content is still in progress. Apple approval is not guaranteed by local test results. This document supersedes the earlier report's statements about missing code and untouched App Store Connect fields; the earlier report remains historical evidence.
 
 ## Changes prepared
 
@@ -36,7 +36,7 @@ No build attached/uploaded, screenshots uploaded, or reviewer credentials entere
 
 ## Runtime activation and testing still required
 
-1. Apply the two pending migrations through the normal controlled release workflow, then deploy the matching API before the client. The migration files have been tested only inside rolled-back transactions.
+1. Deploy the matching staging API before the client. Staging migration versions are `20260906164419` and `20260906164444`, matching the renamed repository files. Apply these to production only during its separately approved release. Both migrations are now applied to staging and the authenticated-role moderation probe passed again against the deployed schema. Production remains unchanged.
 2. Configure `APPLE_CLIENT_ID`, `APPLE_CLIENT_SECRET`, and `APPLE_TOKEN_ENCRYPTION_KEY` on the API server only. The client ID must match the Supabase Apple web OAuth client; the encryption key is 32 random bytes encoded as 64 hex characters. Store these in the server's secret manager, never Vite variables or source control. The existing `scripts/ops/generate-apple-client-secret.mjs` prepares Apple client secrets. Rotate the signing secret before expiry; rotating the encryption key requires re-encrypting retained rows with the old key first.
 3. With an actual disposable Apple account, complete OAuth, verify an encrypted row exists without printing it, delete through the UI, verify Apple authorization is revoked, storage/account rows are gone, the client is signed out, and reauthorization works. Repeat after a simulated transient Apple failure. Mock tests are not proof of production Apple integration. Token-retention errors currently emit an explicit server/client failure; monitor `Apple account cleanup token was not retained` and the capture endpoint's failure rate.
 4. Publish the exact policies and activate the corresponding existing policy-version rows together. Current production policy versions were still January 13 when inspected. Never manufacture user acceptance. Verify old users see the new consent gate and successful consent reloads as current.
@@ -66,3 +66,13 @@ References: [Apple account deletion](https://developer.apple.com/support/offerin
 Simulator startup reached the sign-in UI on iPhone 17 Pro Max and iPad Pro 13-inch. The iPad status-bar overlap was reproduced, fixed and visually rechecked. Evidence: `/tmp/citrus-apple-iphone-startup.png` and `/tmp/citrus-apple-ipad-startup-fixed.png`. These are startup QA evidence, not final marketing screenshots or proof of authenticated journeys.
 
 The existing Apple key was found locally. A newly signed client secret and encryption key were prepared in an owner-only file outside the repository; nothing was deployed. An intentional invalid-refresh-token probe returned Apple's `invalid_grant` response rather than `invalid_client`. This is a limited configuration probe, not proof of successful OAuth, token retention or revocation for a real account.
+
+## Staging activation progress
+
+The staging-only migrations are applied. Their generated migration-history versions were preserved in the repository filenames to prevent duplicate application later. Post-application rollback fixtures verified the same access controls without retaining test accounts.
+
+Google Cloud CLI authentication expired and requires an interactive password prompt. The existing GitHub staging workflow has its own configured service-account credential, so deployment is being prepared through that workflow. Protected staging environment inputs now contain the prepared Apple configuration. The provisioning script targets only `citrus-fantasy-staging`, sends secret values through stdin, grants the runtime access per secret, and refuses an unplanned encryption-key replacement. Three operator-script tests passed.
+
+The staging workflow now stops on type-check, missing Firebase credentials, and health-check failures. Apple secrets are bound to the staging API. Production configuration is unchanged.
+
+Advisors: new credential/suspension tables intentionally have RLS with no client policies ([explanation](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy)). The chat and moderation functions intentionally use authenticated SECURITY DEFINER entry points with explicit membership/admin authorization and a fixed search path; direct access denial was tested ([advisor rationale](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable)). New index “unused” notices reflect their new deployment. Existing project-wide advisories remain outside this scoped migration review.
