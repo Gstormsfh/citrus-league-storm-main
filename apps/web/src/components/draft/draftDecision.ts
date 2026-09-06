@@ -456,7 +456,8 @@ export function buildQualityScales(players: readonly DashboardIndexEntry[]): Qua
 /**
  * ONE number, chosen because it is the one that changes a pick.
  *
- * For a skater that is xG/60: shot quality independent of whether the pucks
+ * For a skater that is xG/60: expected-goal rate, combining opportunity and
+ * chance quality, independent of whether the pucks
  * went in, off the model that scored 1,026,149 shots from 2017 to 2025. GAR/60
  * is the fallback when the talent table has no xG row for him, because total
  * impact is the next-best single read.

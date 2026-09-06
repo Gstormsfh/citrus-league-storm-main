@@ -375,7 +375,7 @@ describe('verdicts — assembled from measured values, never generated', () => {
       raw_gsax: 7.4,
       regressed_gsax: 4.9,
     })!;
-    expect(v).toContain('1,204 primary shots');
+    expect(v).toContain('1,204 eligible attempts');
     expect(v).toContain('expected goals against were 96.4');
     expect(v).toContain('he allowed 89');
     expect(v).toContain('7.4 goals better than expectation');

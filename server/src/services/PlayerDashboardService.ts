@@ -305,7 +305,7 @@ export function clearDashboardIndexCache(): void {
 //
 // The other three tables need no escalation and get none:
 //   player_xg_season       — `read player_xg_season` FOR SELECT TO authenticated
-//   goalie_gsax_primary    — "Public can view goalie primary shots GSAx"
+//   goalie_gsax_primary    — legacy table name; current rows include rebounds
 //   player_talent_metrics  — "Allow authenticated users to read talent metrics"
 //
 // ─────────────────────────────────────────────────────────────────────
@@ -397,7 +397,7 @@ export interface DashboardSeasonRow {
   rush_shots: number;
 }
 
-/** `goalie_gsax_primary` — primary shots only, rebounds excluded. */
+/** `goalie_gsax_primary` — regular-season non-empty-net attempts, rebounds included. */
 export interface DashboardGsax {
   season: number | null;
   shots_faced: number;

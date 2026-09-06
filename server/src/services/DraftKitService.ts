@@ -267,6 +267,7 @@ async function selectSeasonPaged<T>(
 
 interface GoalieXgRow {
   goalie_id: number;
+  game_type: string;
   gsax: number | null;
   xg_faced: number | null;
   shots_faced: number | null;
@@ -490,7 +491,7 @@ export class DraftKitService {
       selectSeasonPaged<GoalieXgRow>(
         this.supabase,
         'goalie_xg_season',
-        'goalie_id, gsax, xg_faced, shots_faced, goals_allowed',
+        'goalie_id, game_type, gsax, xg_faced, shots_faced, goals_allowed',
         metricsSeason,
         'goalie_id',
       ),
@@ -516,12 +517,10 @@ export class DraftKitService {
 
     const goalieGsax = new Map<number, GoalieXgRow>();
     for (const g of goalieRes.data) {
-      // goalie_xg_season carries a 'regular' and a 'playoff' row per goalie per
-      // season. The kit reports regular season, and the column list above does
-      // not include game_type, so filter by taking the larger shots_faced row
-      // per goalie — the regular-season row, by an order of magnitude.
-      const prior = goalieGsax.get(g.goalie_id);
-      if (!prior || (g.shots_faced ?? 0) > (prior.shots_faced ?? 0)) goalieGsax.set(g.goalie_id, g);
+      // The kit's metrics season is explicitly regular season. Never infer it
+      // from workload: unusual participation must not put a playoff value
+      // under a regular-season label.
+      if (g.game_type === 'regular') goalieGsax.set(g.goalie_id, g);
     }
 
     const clubs = new Map<number, { current: string | null; previous: string | null }>();
@@ -736,7 +735,7 @@ function skaterMetrics(
     },
     {
       key: 'pen',
-      label: 'Penalty differential',
+      label: 'Penalty differential per 60',
       source: 'player_gar_components.penalty_gar_per_60',
       value: e.gar_pen,
       percentile: pct(pools.penPool, e.gar_pen),
@@ -744,7 +743,7 @@ function skaterMetrics(
     },
     {
       key: 'xg60',
-      label: 'Shot quality',
+      label: 'xG per 60',
       source: 'player_talent_metrics.xg_per_60',
       value: e.xg_per_60,
       percentile: pct(pools.xgPool, e.xg_per_60),
@@ -752,7 +751,7 @@ function skaterMetrics(
     },
     {
       key: 'finishing',
-      label: 'Finishing',
+      label: 'Goals above expected',
       // Goals minus expected goals for the same season, both from
       // player_season_stats. Positive = scored more than the shots implied.
       source: 'player_season_stats.nhl_goals - player_season_stats.x_goals',

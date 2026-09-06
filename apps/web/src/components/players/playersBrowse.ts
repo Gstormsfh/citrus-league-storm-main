@@ -38,7 +38,7 @@ export const SKATER_SORTS: SortOption<SkaterSortKey>[] = [
   { key: 'goals', label: 'G', help: 'Goals', figure: (p) => int(p.goals) },
   { key: 'assists', label: 'A', help: 'Assists', figure: (p) => int(p.assists) },
   { key: 'sog', label: 'SOG', help: 'Shots on goal', figure: (p) => int(p.sog) },
-  { key: 'xg_per_60', label: 'xG/60', help: 'Expected goals per 60 minutes. Shot quality', figure: (p) => f2(p.xg_per_60) },
+  { key: 'xg_per_60', label: 'xG/60', help: 'Expected goals per 60 minutes; opportunity rate and chance quality combined', figure: (p) => f2(p.xg_per_60) },
   { key: 'gar_per_60', label: 'GAR/60', help: 'Goals above replacement per 60 minutes. Total impact', figure: (p) => f2(p.gar_per_60) },
   { key: 'proj_fantasy_points', label: 'PROJ', help: 'Rolled-forward fantasy points, rest of season', figure: (p) => f1(p.proj_fantasy_points), tone: 'orange' },
 ];

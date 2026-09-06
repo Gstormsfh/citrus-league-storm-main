@@ -224,7 +224,7 @@ describe("Stormy's prompt: what it asks for", () => {
       '3GP/wk[Mon,Wed,Sat]',
       'wkProj:8.4',
       'ROS:412.5pts 61GR',
-      'GSAx:+8.2[primary shots:1204 xGA:92.4 GA:84]',
+      'GSAx:+8.2[eligible attempts:1204 xGA:92.4 GA:84]',
       'Projected this week',
       'Gap line',
     ]) {

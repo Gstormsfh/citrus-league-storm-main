@@ -278,7 +278,7 @@ class StormyServiceImpl {
   }
 
   /**
-   * ` GSAx:+8.2[primary shots:1204 xGA:92.4 GA:84]`. The bracket is the
+   * ` GSAx:+8.2[eligible attempts:1204 xGA:92.4 GA:84]`. The bracket is the
    * sample the regressed number was shrunk from, and it is written only
    * when the row carries all three parts; a bare ` GSAx:+8.2` otherwise,
    * which is the shape this file always wrote.
@@ -287,7 +287,7 @@ class StormyServiceImpl {
     if (!row || row.regressed_gsax == null) return '';
     let token = ` GSAx:${signed(Number(row.regressed_gsax))}`;
     if (row.total_shots_faced != null && row.total_xga != null && row.total_ga != null) {
-      token += `[primary shots:${row.total_shots_faced} xGA:${Number(row.total_xga).toFixed(1)} GA:${row.total_ga}]`;
+      token += `[eligible attempts:${row.total_shots_faced} xGA:${Number(row.total_xga).toFixed(1)} GA:${row.total_ga}]`;
     }
     return token;
   }

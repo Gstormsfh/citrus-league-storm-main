@@ -492,7 +492,7 @@ const SKATER_METRICS: MetricSpec[] = [
   { key: 'evo', label: 'EV offence', context: 'GAR/60', category: 'offense', direction: 'higher', select: (p) => p.gar_evo, format: (v) => v.toFixed(3) },
   { key: 'evd', label: 'EV defence', context: 'GAR/60', category: 'defense', direction: 'higher', select: (p) => p.gar_evd, format: (v) => v.toFixed(3) },
   { key: 'ppo', label: 'PP offence', context: 'GAR/60', category: 'special', direction: 'higher', select: (p) => p.gar_ppo, format: (v) => v.toFixed(3) },
-  { key: 'pen', label: 'Penalties', context: 'GAR/60', category: 'special', direction: 'higher', select: (p) => p.gar_pen, format: (v) => v.toFixed(3) },
+  { key: 'pen', label: 'Penalty differential', context: 'per 60', category: 'special', direction: 'higher', select: (p) => p.gar_pen, format: (v) => v.toFixed(3) },
   { key: 'pts', label: 'Points', context: 'season', category: 'offense', direction: 'higher', select: (p) => p.points, format: (v) => String(Math.round(v)) },
   { key: 'sog', label: 'Shots', context: 'season', category: 'offense', direction: 'higher', select: (p) => p.sog, format: (v) => String(Math.round(v)) },
 ];
@@ -832,7 +832,7 @@ export default function PlayerDashboard() {
             headline={
               isGoalie && payload.gsax ? signed(payload.gsax.raw_gsax, 1) : undefined
             }
-            headlineLabel={isGoalie && payload.gsax ? 'GSAx · primary shots' : undefined}
+            headlineLabel={isGoalie && payload.gsax ? 'Raw GSAx · eligible attempts' : undefined}
             headlineSub={
               isGoalie && payload.gsax
                 ? `${payload.gsax.shots_faced.toLocaleString()} shots faced · ${payload.gsax.xga.toFixed(1)} expected against`
@@ -974,7 +974,7 @@ export default function PlayerDashboard() {
                   <StatCell
                     label="Shots faced"
                     value={payload.gsax.shots_faced.toLocaleString()}
-                    sub="primary only"
+                    sub="eligible attempts"
                   />
                   <StatCell label="Goals allowed" value={String(payload.gsax.ga)} sub="measured" />
                   <StatCell
@@ -1030,7 +1030,7 @@ export default function PlayerDashboard() {
                 accent="orange"
                 eyebrow={
                   isGoalie
-                    ? `Read from ${payload.gsax?.shots_faced.toLocaleString() ?? 0} primary shots`
+                    ? `Read from ${payload.gsax?.shots_faced.toLocaleString() ?? 0} eligible attempts`
                     : `Read from ${summary.plotted} placed attempts`
                 }
                 body={(isGoalie ? goalieVerdict : shotVerdict) ?? ''}

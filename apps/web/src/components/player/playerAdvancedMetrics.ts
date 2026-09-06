@@ -198,7 +198,7 @@ export const SKATER_METRICS: MetricSpec[] = [
   {
     key: 'xg_per_60',
     label: 'xG/60',
-    context: 'shot quality',
+    context: 'expected goals per 60',
     category: 'offense',
     direction: 'higher',
     select: (p) => p.xg_per_60,
@@ -259,8 +259,8 @@ export const SKATER_METRICS: MetricSpec[] = [
   },
   {
     key: 'gar_pen',
-    label: 'Penalty',
-    context: 'GAR/60',
+    label: 'Penalty differential',
+    context: 'per 60',
     category: 'neutral',
     direction: 'higher',
     select: (p) => p.gar_pen,
@@ -498,7 +498,7 @@ export function deriveVerdict(
   if (cohort === 'G') {
     // GSAx first (2026-09-03): it is the goalie read only Citrus can make,
     // so it outranks a save rate every site prints. The sentence carries
-    // the sample (primary shots faced) because a goals-saved total with no
+    // the sample (eligible attempts faced) because a goals-saved total with no
     // denominator is a number a reader cannot weigh, and it prints the
     // same regressed value the bullet does, so the card cannot disagree
     // with itself. Falls through to save rate when the join is empty.
@@ -512,7 +512,7 @@ export function deriveVerdict(
           : v > 0
             ? `stopping ${fmt1(v)} goals more than expected`
             : `conceding ${fmt1(-v)} goals more than expected`;
-      const tail = `${read.charAt(0).toUpperCase()}${read.slice(1)} on ${fmtInt(shots)} primary shots, ${ordinal(gsax.percentile)} among ${noun}.`;
+      const tail = `${read.charAt(0).toUpperCase()}${read.slice(1)} on ${fmtInt(shots)} eligible attempts, ${ordinal(gsax.percentile)} among ${noun}.`;
       if (gsax.percentile >= 75) return `Stopping more than his share. ${tail}`;
       if (gsax.percentile <= 25) return `Leaking more than he should. ${tail}`;
       return tail;

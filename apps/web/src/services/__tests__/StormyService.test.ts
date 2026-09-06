@@ -453,7 +453,7 @@ describe('StormyService', () => {
     it('gsaxToken keeps the bare shape and adds the sample only when the row carries it', () => {
       expect(
         Impl.gsaxToken({ goalie_id: 1, regressed_gsax: 8.2, total_shots_faced: 1204, total_xga: 92.4, total_ga: 84 }),
-      ).toBe(' GSAx:+8.2[primary shots:1204 xGA:92.4 GA:84]');
+      ).toBe(' GSAx:+8.2[eligible attempts:1204 xGA:92.4 GA:84]');
       expect(
         Impl.gsaxToken({ goalie_id: 1, regressed_gsax: -4.8, total_shots_faced: null, total_xga: null, total_ga: null }),
       ).toBe(' GSAx:-4.8');
@@ -567,7 +567,7 @@ describe('StormyService', () => {
         'START C Marchetti (NJD) 62GP 30G 40A 70PTS 1.1PPG 20PPP 210SOG 15HIT 20BLK 12PIM xG:21.4 G-xG:+8.6 TOI/GP:18.4 xG/60:1.42[Elite] 3GP/wk[Mon,Wed,Sat] wkProj:8.4 ROS:412.5pts 61GR',
       );
       expect(ctx.rosterSummary).toContain(
-        'START G Brannigan (NJD) 41GP 20W 1100SV 98GA 2SO 0.912SV% GSAx:-4.8[primary shots:1204 xGA:92.4 GA:98] 3GP/wk[Mon,Wed,Sat] wkProj:4.2',
+        'START G Brannigan (NJD) 41GP 20W 1100SV 98GA 2SO 0.912SV% GSAx:-4.8[eligible attempts:1204 xGA:92.4 GA:98] 3GP/wk[Mon,Wed,Sat] wkProj:4.2',
       );
       // No xG, no ice time, no talent row, no ROS row: the tokens are absent,
       // not zero. The NHL roster status still lands as a tag.

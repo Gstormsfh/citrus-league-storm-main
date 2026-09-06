@@ -499,16 +499,16 @@ describe('deriveVerdict — derived, or nothing', () => {
 
     const hi = deriveVerdict(tendy, 'G', g(8.2, 88), null, null)!;
     expect(hi).toBe(
-      'Stopping more than his share. Stopping 8.2 goals more than expected on 1,204 primary shots, 88th among goalies.',
+      'Stopping more than his share. Stopping 8.2 goals more than expected on 1,204 eligible attempts, 88th among goalies.',
     );
 
     const lo = deriveVerdict(goalie({ gp: 40, gsax_shots_faced: 640 }), 'G', g(-4.2, 12), null, null)!;
     expect(lo).toBe(
-      'Leaking more than he should. Conceding 4.2 goals more than expected on 640 primary shots, 12th among goalies.',
+      'Leaking more than he should. Conceding 4.2 goals more than expected on 640 eligible attempts, 12th among goalies.',
     );
 
     const mid = deriveVerdict(goalie({ gp: 40, gsax_shots_faced: 900 }), 'G', g(1.2, 54), null, null)!;
-    expect(mid).toBe('Stopping 1.2 goals more than expected on 900 primary shots, 54th among goalies.');
+    expect(mid).toBe('Stopping 1.2 goals more than expected on 900 eligible attempts, 54th among goalies.');
 
     const level = deriveVerdict(goalie({ gp: 40, gsax_shots_faced: 900 }), 'G', g(0.02, 50), null, null)!;
     expect(level).toMatch(/level with expected/i);
@@ -536,7 +536,7 @@ describe('deriveVerdict — derived, or nothing', () => {
       { spec: GSAX_SPEC, value: 12.3, display: '+12.3', percentile: 100, cohortSize: 60, lowSample: false },
     ];
     const v = deriveVerdict(goalie({ gp: 60, gsax_shots_faced: 2515 }), 'G', m, null, null)!;
-    expect(v).toContain('2,515 primary shots');
+    expect(v).toContain('2,515 eligible attempts');
     expect(v.length).toBeLessThanOrEqual(VERDICT_MAX_CHARS);
     const neg = deriveVerdict(
       goalie({ gp: 60, gsax_shots_faced: 2515 }),

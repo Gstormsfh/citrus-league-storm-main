@@ -265,11 +265,11 @@ describe('PlayerAdvancedCard — skater', () => {
   it('shows four metric rows compact and the whole decomposition expanded', () => {
     const { unmount } = renderCard({ playerId: 8478402, indexOverride: index, variant: 'compact' });
     expect(screen.queryByText('PP Offense')).not.toBeInTheDocument();
-    expect(screen.queryByText('Penalty')).not.toBeInTheDocument();
+    expect(screen.queryByText('Penalty differential')).not.toBeInTheDocument();
     unmount();
 
     renderCard({ playerId: 8478402, indexOverride: index, variant: 'expanded' });
-    for (const label of ['xG/60', 'Total GAR/60', 'EV Offense', 'EV Defense', 'PP Offense', 'PP Defense', 'Penalty']) {
+    for (const label of ['xG/60', 'Total GAR/60', 'EV Offense', 'EV Defense', 'PP Offense', 'PP Defense', 'Penalty differential']) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
   });
@@ -385,7 +385,7 @@ describe('PlayerAdvancedCard — goalie', () => {
     renderCard({ playerId: 8476883, indexOverride: [...league(), vasy] });
     const verdict = screen.getByTestId('advanced-card-verdict');
     expect(verdict).toHaveTextContent('goals more than expected');
-    expect(verdict).toHaveTextContent('1,204 primary shots');
+    expect(verdict).toHaveTextContent('1,204 eligible attempts');
     expect(verdict).toHaveTextContent('among goalies');
   });
 

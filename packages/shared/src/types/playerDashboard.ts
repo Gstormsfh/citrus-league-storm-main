@@ -105,9 +105,9 @@ export interface DashboardIndexEntry {
   vopa_score: number | null;
   /**
    * GOALIE GSAx (2026-09-03), from `goalie_gsax_primary`: goals saved above
-   * expected over PRIMARY shots (rebounds excluded), our own xG model's
-   * expected goals against minus the goals actually allowed. Keyed on the
-   * same NHL id as the directory (`goalie_id`), season-filtered like every
+   * expected over regular-season non-empty-net attempts (rebounds included),
+   * our own xG model's expected goals against minus the goals actually allowed.
+   * Keyed on the same NHL id as the directory (`goalie_id`), season-filtered like every
    * other table in the index. Null for every skater and for a goalie the
    * table does not hold.
    *

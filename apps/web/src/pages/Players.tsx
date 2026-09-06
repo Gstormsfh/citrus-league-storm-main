@@ -498,7 +498,7 @@ const Players = () => {
         <div className="mb-5">
           <h1 className="text-2xl font-bold">Players</h1>
           <p className="text-sm text-muted-foreground">
-            Season actuals, xG shot quality, GAR/60 impact, and rolled-forward projections. Every team, every player.
+            Season actuals, xG rates, GAR/60 impact, and rolled-forward projections. Every team, every player.
           </p>
         </div>
 

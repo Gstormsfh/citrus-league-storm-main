@@ -118,10 +118,10 @@ function rosRow(id: number, pts: number) {
 const ROS = [rosRow(1, 900), rosRow(2, 800), rosRow(3, 500), rosRow(4, 700), rosRow(5, 400), rosRow(6, 600)];
 
 const GOALIE_XG = [
-  { goalie_id: 6, gsax: 14.2, xg_faced: 160.4, shots_faced: 1800, goals_allowed: 146 },
-  // The playoff row for the same goalie. It must not win over the regular
-  // season row — fewer shots faced is the discriminator the service uses.
-  { goalie_id: 6, gsax: 2.1, xg_faced: 20.5, shots_faced: 220, goals_allowed: 18 },
+  { goalie_id: 6, game_type: 'regular', gsax: 14.2, xg_faced: 160.4, shots_faced: 1800, goals_allowed: 146 },
+  // Deliberately larger: explicit game_type selection, not workload, must
+  // keep this playoff row out of the regular-season Draft Kit.
+  { goalie_id: 6, game_type: 'playoff', gsax: 22.1, xg_faced: 220.5, shots_faced: 2200, goals_allowed: 198 },
 ];
 
 // The directory as of the season being PROJECTED. Forward Two is on COL here.
@@ -340,6 +340,17 @@ describe('DraftKitService.getBoard — goalies get their own metric set', () => 
     const { board } = await service.getBoard();
     const g = board!.cards.find((c) => c.playerId === 6)!;
     expect(g.metrics.find((m) => m.key === 'gsax')!.value).toBe(14.2);
+  });
+
+  it('labels metric units and observed goals above expected explicitly', async () => {
+    const service = new DraftKitService(mockTables(ENTITLED));
+    const { board } = await service.getBoard();
+    const skater = board!.cards.find((c) => c.playerId === 1)!;
+    const labels = new Map(skater.metrics.map((m) => [m.key, m.label]));
+
+    expect(labels.get('xg60')).toBe('xG per 60');
+    expect(labels.get('finishing')).toBe('Goals above expected');
+    expect(labels.get('pen')).toBe('Penalty differential per 60');
   });
 
   it('names a real source column for every metric it renders', async () => {

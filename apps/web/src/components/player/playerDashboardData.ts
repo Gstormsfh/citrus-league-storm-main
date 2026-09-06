@@ -438,8 +438,8 @@ export function deriveShotVerdict(
 /**
  * The goalie's floating verdict. Same rule: every clause is a stored number.
  * Citrus GSAx is our model's expected goals against minus the goals he
- * actually allowed, over primary (non-rebound) shots only, which is what
- * `goalie_gsax_primary` holds and why the sentence says so.
+ * actually allowed, over regular-season non-empty-net attempts. Despite its
+ * legacy table name, the current writer includes rebounds.
  */
 export function deriveGoalieVerdict(gsax: {
   shots_faced: number;
@@ -454,5 +454,5 @@ export function deriveGoalieVerdict(gsax: {
     gsax.raw_gsax >= 0
       ? `${magnitude} goals better than expectation`
       : `${magnitude} goals worse than expectation`;
-  return `On ${gsax.shots_faced.toLocaleString()} primary shots the expected goals against were ${gsax.xga.toFixed(1)}; he allowed ${gsax.ga}. That is ${verdict}, ${signed(gsax.regressed_gsax, 1)} once regressed for workload.`;
+  return `On ${gsax.shots_faced.toLocaleString()} eligible attempts the expected goals against were ${gsax.xga.toFixed(1)}; he allowed ${gsax.ga}. That is ${verdict}, ${signed(gsax.regressed_gsax, 1)} once regressed for workload.`;
 }

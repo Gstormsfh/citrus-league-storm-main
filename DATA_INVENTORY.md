@@ -1,6 +1,6 @@
 # Citrus Data Inventory
 
-**Last updated:** 2026-05-05 (post-R6 reorganization) · **Status:** Stable canonical structure
+**Last updated:** 2026-09-06 · **Status:** Stable canonical structure
 **Maintainer protocol:** When adding any new data artifact (table, file, model, script), update this doc inline. The companion `apps/web/docs/DATA_ORGANIZATION_AUDIT.md` holds the full audit + reorganization history (phases R1-R6 complete); this file is the day-to-day "where does data live?" reference.
 
 **Reorganization complete:** see [`apps/web/docs/DATA_ORGANIZATION_AUDIT.md`](./apps/web/docs/DATA_ORGANIZATION_AUDIT.md) §§7-8 for R5 dispositions + Investigation 1 model-lineage findings. R6 archived the Dec 2024 pre-monorepo repo to `~/Documents/_archive/citrus-pre-monorepo/` — see `README_ARCHIVED.md` at that location for the full lineage map.
@@ -38,7 +38,7 @@ trigger rules. Verification procedure:
 | `staging_2024_skaters` / `staging_2025_skaters` | 4,600 / 3,945 | ~3 MB each | **RLS disabled**, source unclear (legacy staging?) |
 | `nhl_games` | 1,385 | 1.3 MB | `data-pipeline/acquisition/ingest_nhl_playoff_bracket.py` + schedule ingestor |
 | `raw_nhl_data` | 1,350 | 41 MB (JSONB) | `data-pipeline/acquisition/ingest_raw_nhl.py` |
-| `player_directory` / `player_season_stats` / `player_talent_metrics` / `player_gar_components` / `player_ros_projections` | 938 / 1066 / 1012 / 935 / 926 | <1 MB each | various scripts/utilities |
+| `player_directory` / `player_season_stats` / `player_talent_metrics` / `player_gar_components` / `player_ros_projections` | 938 / 1066 / 1012 / 935 / 926 | <1 MB each | `build_player_season_stats.py` owns season stats plus talent xG/60 and official-appearance average TOI; other fields have separate writers |
 | `goalie_*` family | 82-197 | <200 KB each | `scripts/utilities/calculate_goalie_*.py` |
 | `ops_ci_runs` | 0 at creation (2026-09-01); ~20 rows per CI run | grows ~1 MB/month | `.github/actions/report-run` (every job in `ci.yml`, `production-deploy.yml`, `main.yml`, `data-invariants.yml`, `schema-snapshot.yml`) over PostgREST with the service-role key. Service-role only (RLS on, no policies). Read by Claude via MCP — `docs/RUNBOOKS/CI_TELEMETRY.md` |
 | `draft_kit_entitlements` / `draft_kit_blurbs` | 0 / 0 | negligible | **Migration written, NOT applied** (`supabase/migrations/20260902090000_draft_kit_entitlements_and_blurbs.sql`). Draft Kit paid section: who is entitled, and the human-written copy. Both service-role write only; see §1.3 |
@@ -78,6 +78,13 @@ The section READS existing tables and adds none of its own data:
 `player_talent_metrics.xg_per_60`, `player_ros_projections` (projected
 fantasy points), and `goalie_xg_season` (GSAx). Percentiles are computed
 server-side inside F / D / G cohorts and are not stored.
+
+`supabase/migrations/20260906002239_backfill_avg_toi_from_official_appearances.sql`
+is an unapplied, season-2025-only backfill for
+`player_talent_metrics.avg_toi_per_game`. Its durable writer is
+`data-pipeline/projections/build_player_season_stats.py`; both use official
+season TOI divided by official appearances, including zero-minute appearances
+in the denominator. The migration updates no unrelated talent fields.
 
 ---
 

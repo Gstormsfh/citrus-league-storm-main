@@ -39,7 +39,7 @@ import os
 import signal
 import sys
 import datetime as dt
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import _bootstrap  # noqa: F401
@@ -194,6 +194,58 @@ def upsert_player_season_stats(db: SupabaseRest, season_rows: List[dict]) -> Non
   CHUNK = 500
   for i in range(0, len(season_rows), CHUNK):
     db.upsert("player_season_stats", season_rows[i:i + CHUNK], on_conflict="season,player_id")
+
+
+def build_talent_metrics_update(season_row: dict, season: int) -> Optional[dict]:
+  """Build only the talent fields owned by this rollup.
+
+  Average TOI uses the official season total divided by official appearances.
+  A zero-minute appearance therefore stays in the denominator; filtering to
+  positive-TOI game rows would overstate deployment. Missing/no appearances
+  remain unavailable rather than becoming a false zero.
+  """
+  if bool(season_row.get("is_goalie")):
+    return None
+
+  games_played = int(season_row.get("games_played") or 0)
+  if games_played <= 0:
+    return None
+
+  toi_seconds = float(season_row.get("nhl_toi_seconds") or 0)
+  payload = {
+    "player_id": int(season_row["player_id"]),
+    "season": season,
+    "avg_toi_per_game": round(toi_seconds / games_played / 60.0, 2),
+  }
+
+  x_goals_val = float(season_row.get("x_goals") or 0)
+  if x_goals_val > 0 and toi_seconds > 0:
+    xg_per_60_val = round((x_goals_val * 3600) / toi_seconds, 2)
+    if xg_per_60_val >= 1.2:
+      rating = "Elite"
+    elif xg_per_60_val >= 0.9:
+      rating = "Above Avg"
+    elif xg_per_60_val >= 0.6:
+      rating = "Average"
+    elif xg_per_60_val >= 0.3:
+      rating = "Below Avg"
+    else:
+      rating = "Low"
+    payload["xg_per_60"] = xg_per_60_val
+    payload["xg_rating"] = rating
+
+  return payload
+
+
+def upsert_talent_metrics(db: SupabaseRest, updates: List[dict]) -> None:
+  """Batch the narrow updates; omitted columns are preserved by PostgREST."""
+  chunk = 500
+  for i in range(0, len(updates), chunk):
+    db.upsert(
+      "player_talent_metrics",
+      updates[i:i + chunk],
+      on_conflict="player_id,season",
+    )
 
 
 def main() -> int:
@@ -392,38 +444,22 @@ def main() -> int:
   else:
     logger.info("[build_player_season_stats] No xG/xA data available (will use 0.0)")
 
-  # Compute xg_per_60 and xg_rating for player_talent_metrics
+  # Write xG/60 and official-appearance average TOI to player_talent_metrics.
+  # The payload deliberately omits every unrelated talent column.
   logger.info("")
-  logger.info("[build_player_season_stats] Computing xg_per_60 for player_talent_metrics...")
-  xg_per_60_count = 0
-  for out in acc.values():
-    x_goals_val = float(out.get("x_goals") or 0)
-    toi_seconds = float(out.get("nhl_toi_seconds") or 0)
-    if x_goals_val > 0 and toi_seconds > 0:
-      xg_per_60_val = round((x_goals_val * 3600) / toi_seconds, 2)
-      rating = "N/A"
-      if xg_per_60_val >= 1.2:
-        rating = "Elite"
-      elif xg_per_60_val >= 0.9:
-        rating = "Above Avg"
-      elif xg_per_60_val >= 0.6:
-        rating = "Average"
-      elif xg_per_60_val >= 0.3:
-        rating = "Below Avg"
-      else:
-        rating = "Low"
-      pid = int(out["player_id"])
-      try:
-        db.upsert("player_talent_metrics", {
-          "player_id": pid,
-          "season": season,
-          "xg_per_60": xg_per_60_val,
-          "xg_rating": rating,
-        }, on_conflict="player_id,season")
-        xg_per_60_count += 1
-      except Exception as e:
-        logger.warning(f"[build_player_season_stats] Failed to update xg_per_60 for player {pid}: {e}")
-  logger.info(f"[build_player_season_stats] Updated xg_per_60 for {xg_per_60_count} players")
+  logger.info("[build_player_season_stats] Writing talent xG/60 and average TOI...")
+  talent_updates = [
+    update for out in acc.values()
+    if (update := build_talent_metrics_update(out, season)) is not None
+  ]
+  upsert_talent_metrics(db, talent_updates)
+  avg_toi_count = sum(1 for row in talent_updates if row.get("avg_toi_per_game") is not None)
+  xg_per_60_count = sum(1 for row in talent_updates if row.get("xg_per_60") is not None)
+  logger.info(
+    "[build_player_season_stats] [HEALTH] talent metrics "
+    f"expected={len(talent_updates)} written={len(talent_updates)} "
+    f"avg_toi={avg_toi_count} xg_per_60={xg_per_60_count}"
+  )
 
   # Plus/minus computation (integrated)
   logger.info("")
@@ -482,5 +518,4 @@ def main() -> int:
 if __name__ == "__main__":
   logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
   raise SystemExit(main())
-
 

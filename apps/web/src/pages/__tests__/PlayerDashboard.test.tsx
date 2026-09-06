@@ -348,12 +348,12 @@ describe('PlayerDashboard — the shipped page', () => {
     );
     renderAt(GOALIE);
 
-    expect(await screen.findByText(/gsax · primary shots/i)).toBeInTheDocument();
+    expect(await screen.findByText(/raw gsax · eligible attempts/i)).toBeInTheDocument();
     expect(screen.getByText('+7.4')).toBeInTheDocument();
     expect(screen.getByText(/a goalie has no shot map of his own attempts/i)).toBeInTheDocument();
     expect(screen.queryByLabelText(/shot heatmap/i)).toBeNull();
     // The verdict states shots faced, expected against and allowed.
-    expect(screen.getAllByText(/1,204 primary shots/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/1,204 eligible attempts/).length).toBeGreaterThan(0);
   });
 
   it('a player with no shots says so, and does not draw an empty rink', async () => {
