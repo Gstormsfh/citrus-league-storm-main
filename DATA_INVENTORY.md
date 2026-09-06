@@ -98,6 +98,27 @@ requires a verified source snapshot, staging proof, backup and rollback.
 
 ### 1.4 Versioned analytics foundation (local, unapplied)
 
+Additive model/publication diagnostic proof (2026-09-06):
+`scripts/local_model_publication_e2e.py` binds the complete shape checkpoint,
+re-evaluates its selected JSON probability map on every validation event, and
+forms complete game-level diagnostics separated by season and game type.
+Its only admitted metric is `disposable_local_development_game_xg_diagnostic`:
+transport validation is not model/foundation acceptance, a player metric,
+official actuals, serving promotion or fantasy scoring.
+`scripts/proof/run_local_model_publication.mjs` provisions only new ownership-
+labeled tmpfs PostgreSQL/PostgREST containers and a loopback gateway, then removes
+only those owned fixtures. It retains attempts, worker logs, synthetic local
+tokens, source hashes, diagnostic candidates, rejected copies, result/health and
+cleanup under a new `scripts/proof/results/local-model-publication-*/` directory.
+`scripts/proof/read_model_publication.ts` exercises the actual unchanged
+TypeScript reader, exact value roundtrip, stale NULLs, scope isolation and
+controlled faults on real local responses. No new serving export or hosted
+schema is introduced; the existing unapplied publication SQL is used verbatim.
+`data-pipeline/tests/test_local_model_publication.py` covers exact event
+membership, scope, original-preserving withholding, freshness and promotion
+rejection. This diagnostic is off the draft/request hot path; the fixture's
+bounded connection pool and paginated reads are not a draft-night load proof.
+
 Additive shape-calibration experiment (2026-09-06):
 `docs/analytics-calibration-shape-plan-20260906.json` predeclares four new
 calibration-period-only mappings against the preserved sigmoid/group-beta
