@@ -246,9 +246,9 @@ class TestCacheVersion:
         """CACHE_VERSION should be a string for Supabase text column compatibility."""
         assert isinstance(CACHE_VERSION, str)
 
-    def test_cache_version_is_4_0(self):
-        """Current cache version should be 4.0 (industry-standard scoring era)."""
-        assert CACHE_VERSION == "4.0"
+    def test_cache_version_is_4_1(self):
+        """Source population/season fixes invalidate prior cached projections."""
+        assert CACHE_VERSION == "4.1"
 
 
 if __name__ == "__main__":

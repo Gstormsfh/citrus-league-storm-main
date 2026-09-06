@@ -113,7 +113,8 @@ DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON")) if os.getenv("CITRUS_DE
 # 4.0 (2026-09-01): INDUSTRY-STANDARD DEFAULT SCORING — Yahoo-aligned point
 # values (G6 A4 PPP2 SOG0.9 BLK1 / W5 SO5 SV0.6 GA-3; SHP/hits/PIM opt-in at
 # 0). Every cached projection scored under the old defaults is stale.
-CACHE_VERSION = "4.0"
+# 4.1: align finishing xG to regular-season goals and require same-season GSAx.
+CACHE_VERSION = "4.1"
 
 
 def supabase_client() -> SupabaseRest:
@@ -703,7 +704,8 @@ def calculate_finishing_talent(db: SupabaseRest, player_id: int, season: int) ->
         shots = db.select(
             "nhl_shots",
             select="xg_sql",
-            filters=[("shooter_id", "eq", player_id), ("season", "eq", season)],
+            filters=[("shooter_id", "eq", player_id), ("season", "eq", season),
+                     ("game_type", "eq", "regular")],
             limit=10000  # Large limit to get all shots
         )
         
@@ -1245,6 +1247,7 @@ def get_vegas_win_probability(
 def get_goalie_gsax(
     db: SupabaseRest,
     player_id: int,
+    season: int,
     debug: bool = False
 ) -> Optional[float]:
     """
@@ -1259,7 +1262,7 @@ def get_goalie_gsax(
         gsax_data = db.select(
             "goalie_gsax_primary",
             select="regressed_gsax",
-            filters=[("goalie_id", "eq", player_id)],
+            filters=[("goalie_id", "eq", player_id), ("season", "eq", season)],
             limit=1
         )
         
@@ -1269,20 +1272,8 @@ def get_goalie_gsax(
                 logger.info(f"  [Goalie Projection] GSAx: {gsax:.2f}")
             return gsax
         
-        # Fallback to goalie_gsax if primary not available
-        gsax_data = db.select(
-            "goalie_gsax",
-            select="regressed_gsax",
-            filters=[("goalie_id", "eq", player_id)],
-            limit=1
-        )
-        
-        if gsax_data and len(gsax_data) > 0:
-            gsax = float(gsax_data[0].get("regressed_gsax", 0))
-            if debug:
-                logger.info(f"  [Goalie Projection] GSAx (from goalie_gsax): {gsax:.2f}")
-            return gsax
-        
+        # Missing same-season evidence remains unavailable; the legacy table
+        # does not supply the required season/source contract.
         if debug:
             logger.info(f"  [Goalie Projection] No GSAx data found for goalie {player_id}")
         return None
@@ -1940,7 +1931,7 @@ def calculate_goalie_projection(
             logger.info(f"  [Goalie Projection] Projected Wins: {projected_wins:.3f} (win probability)")
         
         # 3. Projected Shutouts (Ceiling Variable)
-        goalie_gsax = get_goalie_gsax(db, player_id, debug=debug)
+        goalie_gsax = get_goalie_gsax(db, player_id, season, debug=debug)
         if not goalie_gsax:
             goalie_gsax = 0.0  # League average
         
@@ -2369,7 +2360,7 @@ def calculate_goalie_physical_projection(
     goalie_sv_pct = float(goalie_stats[0].get("nhl_save_pct") or 0.91) if goalie_stats else 0.91
     
     # Get goalie's GSAx factor (simplified - can use actual GSAx from goalie_gsax table)
-    goalie_gsax = get_goalie_gsax(db, player_id, debug=False)
+    goalie_gsax = get_goalie_gsax(db, player_id, season, debug=False)
     goalie_gsax_factor = 1.0 + (goalie_gsax / 100.0) if goalie_gsax else 1.0  # Normalize GSAx
     
     # Project saves = Opponent_Shots_For_Per_60 × (1 - goalie_sv_pct_trend) × GSAx_factor
