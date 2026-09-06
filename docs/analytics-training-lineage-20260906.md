@@ -84,6 +84,24 @@ boundaries. Train, calibration and test must have disjoint game/event identities
 and strictly ordered date windows; no missing-date inference is permitted.
 Existing artifacts cannot retrospectively supply that evidence.
 
+The pure `projections/chronological_split.py` planner now enforces this manifest
+contract: canonical regular/playoff identities, explicit season-consistent game
+dates, timezone-qualified observations, whole-game chronological assignment and
+complete source-event membership including reasoned exclusions. All supplied
+actual game dates must be no later than the UTC observation/current dates; this
+is basic calendar consistency, not proof of the exact game time or availability.
+Malformed windows, overlapping dates, unbound feature/source hashes and omitted
+events fail before producing a plan. Sixty-nine synthetic tests pass.
+
+An empty future test reservation additionally binds the complete source/event
+manifest, feature/population definitions, window specification, and supplied
+pipeline/acceptance-criteria digests. Altering earlier training/calibration
+membership, observations or feature rows invalidates the declaration. Its output
+is explicitly `manifest-consistency-only` / `reserved-not-evaluated`: supplied
+hashes and freeze timestamps are not authentication, proof of an actual fitted
+pipeline freeze, or an executed evaluation. No real historical split, fit,
+calibrator or prospective declaration was run by these tests.
+
 Historical evaluation will be labeled retrospective unless an actually unused
 period can be established. The user approved the defensible path: freeze the
 complete pipeline and reserve a new prospective test window with predeclared

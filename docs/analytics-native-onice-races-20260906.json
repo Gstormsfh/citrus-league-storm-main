@@ -1,0 +1,386 @@
+{
+  "date": "2026-09-06",
+  "scope": "Disposable local synthetic PostgreSQL only; migration unapplied",
+  "image": "postgres@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3",
+  "container": {
+    "name": "citrus-onice-races-20260906-0456",
+    "memory": "512 MiB",
+    "storage": "256 MiB tmpfs; no volumes",
+    "network": "dynamic localhost port",
+    "cleanup": "exact owned --rm container stopped; matching container count zero"
+  },
+  "runs": [
+    {
+      "status": "passed",
+      "postgres": "17.6 (Debian 17.6-2.pgdg12+1)",
+      "independentConnections": 3,
+      "backendPids": [
+        89,
+        87,
+        88
+      ],
+      "lockWitnesses": [
+        {
+          "scenario": "raw_shots source writer waits for rebuild commit",
+          "blocker_pid": 87,
+          "pid": 88,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            87
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "raw_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "player_shifts_official source writer waits for rebuild commit",
+          "blocker_pid": 87,
+          "pid": 88,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            87
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "player_shifts_official"
+            }
+          ]
+        },
+        {
+          "scenario": "game_teams source writer waits for rebuild commit",
+          "blocker_pid": 87,
+          "pid": 88,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            87
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "game_teams"
+            }
+          ]
+        },
+        {
+          "scenario": "game_strength_intervals source writer waits for rebuild commit",
+          "blocker_pid": 87,
+          "pid": 88,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            87
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "game_strength_intervals"
+            }
+          ]
+        },
+        {
+          "scenario": "rebound_window_era source writer waits for rebuild commit",
+          "blocker_pid": 87,
+          "pid": 88,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            87
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "rebound_window_era"
+            }
+          ]
+        },
+        {
+          "scenario": "batch observes preceding invalid source commit",
+          "blocker_pid": 87,
+          "pid": 88,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            87
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "raw_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "batch observes preceding correction commit",
+          "blocker_pid": 87,
+          "pid": 88,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            87
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "raw_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "builder observes source rollback",
+          "blocker_pid": 87,
+          "pid": 88,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            87
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "raw_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "output writer waits for builder commit",
+          "blocker_pid": 87,
+          "pid": 88,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            87
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "player_onice_xg"
+            }
+          ]
+        },
+        {
+          "scenario": "second builder waits for first commit",
+          "blocker_pid": 87,
+          "pid": 88,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            87
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareRowExclusiveLock",
+              "table": "player_onice_xg"
+            }
+          ]
+        }
+      ],
+      "cases": [
+        "all five source writers serialized until builder commit",
+        "invalid source commit leaves prior outputs and completion markers exact",
+        "correction commit enables exact-math replay and completion",
+        "rolled-back invalid source cannot leak into candidate",
+        "independent output writer serializes",
+        "two builders serialize and preserve other-game exact rows"
+      ],
+      "migrationSha256": "55239b47d521b277e8ad5e2d84fc0fa9527ab866b1bca19766ad20bf546635fb",
+      "limitations": [
+        "synthetic basic both-team attribution only",
+        "not full shift coverage or unreviewed-writer deadlock proof"
+      ],
+      "cleanup": "verified: zero public objects, fixture roles, or user schemas"
+    },
+    {
+      "status": "passed",
+      "postgres": "17.6 (Debian 17.6-2.pgdg12+1)",
+      "independentConnections": 3,
+      "backendPids": [
+        90,
+        92,
+        91
+      ],
+      "lockWitnesses": [
+        {
+          "scenario": "raw_shots source writer waits for rebuild commit",
+          "blocker_pid": 92,
+          "pid": 91,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            92
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "raw_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "player_shifts_official source writer waits for rebuild commit",
+          "blocker_pid": 92,
+          "pid": 91,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            92
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "player_shifts_official"
+            }
+          ]
+        },
+        {
+          "scenario": "game_teams source writer waits for rebuild commit",
+          "blocker_pid": 92,
+          "pid": 91,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            92
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "game_teams"
+            }
+          ]
+        },
+        {
+          "scenario": "game_strength_intervals source writer waits for rebuild commit",
+          "blocker_pid": 92,
+          "pid": 91,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            92
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "game_strength_intervals"
+            }
+          ]
+        },
+        {
+          "scenario": "rebound_window_era source writer waits for rebuild commit",
+          "blocker_pid": 92,
+          "pid": 91,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            92
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "rebound_window_era"
+            }
+          ]
+        },
+        {
+          "scenario": "batch observes preceding invalid source commit",
+          "blocker_pid": 92,
+          "pid": 91,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            92
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "raw_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "batch observes preceding correction commit",
+          "blocker_pid": 92,
+          "pid": 91,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            92
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "raw_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "builder observes source rollback",
+          "blocker_pid": 92,
+          "pid": 91,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            92
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "raw_shots"
+            }
+          ]
+        },
+        {
+          "scenario": "output writer waits for builder commit",
+          "blocker_pid": 92,
+          "pid": 91,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            92
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "player_onice_xg"
+            }
+          ]
+        },
+        {
+          "scenario": "second builder waits for first commit",
+          "blocker_pid": 92,
+          "pid": 91,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            92
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareRowExclusiveLock",
+              "table": "player_onice_xg"
+            }
+          ]
+        }
+      ],
+      "cases": [
+        "all five source writers serialized until builder commit",
+        "invalid source commit leaves prior outputs and completion markers exact",
+        "correction commit enables exact-math replay and completion",
+        "rolled-back invalid source cannot leak into candidate",
+        "independent output writer serializes",
+        "two builders serialize and preserve other-game exact rows"
+      ],
+      "migrationSha256": "55239b47d521b277e8ad5e2d84fc0fa9527ab866b1bca19766ad20bf546635fb",
+      "limitations": [
+        "synthetic basic both-team attribution only",
+        "not full shift coverage or unreviewed-writer deadlock proof"
+      ],
+      "cleanup": "verified: zero public objects, fixture roles, or user schemas"
+    }
+  ]
+}
