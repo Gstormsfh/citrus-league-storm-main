@@ -168,6 +168,30 @@ and the complete season sequence report are identified in
 `docs/analytics-sequence-archive-proof-20260906.json`. Full corpus freeze, source
 rights, feature/cutoff lineage and chronological acceptance remain separate gates.
 
+`projections/chronological_split.py` is a pure manifest planner, not a trainer.
+It pins exact source/event/feature membership, explicit calendar boundaries and
+reasoned exclusions. A prospective reservation additionally pins its prior data
+manifest and caller-supplied frozen pipeline/criteria digests; it cannot certify
+historical availability, untouched history or model quality. Tests are synthetic.
+
+The legacy `scripts/nhl_archive/fetch_pbp.py` writer now checks exact requested
+games and structural PBP/boxscore pairing. It refuses corrected existing actuals
+until versioned storage can retain both revisions, and preserves the original
+PBP fetch timestamp when filling NULL boxscore evidence through the new service-
+only `citrus_fill_archive_boxscore` RPC. Its migration `20260906050736` remains
+unapplied; absent RPCs fail closed without an unguarded update fallback. This legacy table
+does not supply independent boxscore observation times. Health is not full
+official-stat adjudication; source revisions and all existing artifacts remain.
+`docs/analytics-archive-writer-proof-20260906.md` records the actual large-payload
+REST test, exact conditional-update semantics and deployment ordering.
+
+The local on-ice and GAR replacement guards (`20260906044353` and
+`20260906044310`) retain captured legacy formulas while refusing invalid/empty
+replacement candidates. Native concurrent-source/output tests and exact rollback
+captures are documented in their `docs/analytics-*-guard-proof-20260906.md`
+records. Their locks and guard coverage are not hosted-load or model-quality
+acceptance; both migrations are unapplied.
+
 `docs/analytics-writer-lineage-audit-20260906.md` holds exact live SQL writer
 definitions and confirmed shared-output permission risks. The unapplied
 `20260906022414_restrict_shared_analytics_writes.sql` removes ordinary-account

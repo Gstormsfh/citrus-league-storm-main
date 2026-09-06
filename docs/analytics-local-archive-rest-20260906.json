@@ -1,0 +1,106 @@
+{
+  "date": "2026-09-06",
+  "scope": "Actual Python writer and REST transport on disposable local synthetic data",
+  "hostedModified": false,
+  "limits": {
+    "postgresMemoryMiB": 512,
+    "postgresStorage": "256 MiB tmpfs",
+    "postgrestMemoryMiB": 256
+  },
+  "supersededFailures": [
+    "internal Docker bridge did not publish localhost port; owned fixture removed",
+    "Unix-socket readiness initially observed temporary initdb server; owned fixture removed",
+    "version command omitted image executable; successful test output not counted as final proof",
+    "full-PBP query-string conditional update failed; replaced by exact SQL comparison via POST-body service RPC"
+  ],
+  "runs": [
+    {
+      "status": "passed",
+      "phases": [
+        "new_insert",
+        "unchanged_replay_exact_row_preserved",
+        "missing_box_jsonb_compare_and_set_preserves_other_fields",
+        "large_payload_missing_box_jsonb_cas_preserves_other_fields",
+        "concurrent_pbp_correction_cas_noop_preserves_concurrent_row",
+        "duplicate_insert_conflict_preserves_concurrent_row",
+        "existing_correction_withheld_old_row_preserved"
+      ],
+      "synthetic_fixture": true,
+      "hosted_access": false,
+      "nhl_network_used": false,
+      "scope": "structural_pair_integrity_not_official_stat_adjudication",
+      "migrationSha256": "300892d2f135c41a4bdb35ff960efc72ff784896eb457735059fbacb03ae4e90",
+      "fixtureSemantics": "synthetic rows with captured production column identities/types; no actual NHL source or hosted credential",
+      "postgres": "17.6 (Debian 17.6-2.pgdg12+1)",
+      "postgrest": "PostgREST 14.12",
+      "images": {
+        "postgres": "postgres@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3",
+        "postgrest": "postgrest/postgrest@sha256:54000f24847d01a2c2302e0041cf0618b875c57fb48507d743cfa9aaa50bf43c"
+      },
+      "finalCounts": {
+        "raw_rows": 5,
+        "audit_rows": 21
+      },
+      "sanitizedLog": [
+        "[error] game 2024020003 write: ValueError",
+        "[error] game 2024020004 write: RuntimeError",
+        "[withheld] game 2024020001: correction_requires_versioned_storage"
+      ],
+      "cleanup": {
+        "sqlObjectsAndRoles": 0,
+        "remainingContainersAndNetworks": 0,
+        "removedContainers": [
+          "citrus-archive-proof-e03667d76114-rest",
+          "citrus-archive-proof-e03667d76114-pg"
+        ],
+        "gatewayStopped": true,
+        "syntheticTokenRemoved": true,
+        "dockerDesktopAndImagesRetained": true
+      }
+    },
+    {
+      "status": "passed",
+      "phases": [
+        "new_insert",
+        "unchanged_replay_exact_row_preserved",
+        "missing_box_jsonb_compare_and_set_preserves_other_fields",
+        "large_payload_missing_box_jsonb_cas_preserves_other_fields",
+        "concurrent_pbp_correction_cas_noop_preserves_concurrent_row",
+        "duplicate_insert_conflict_preserves_concurrent_row",
+        "existing_correction_withheld_old_row_preserved"
+      ],
+      "synthetic_fixture": true,
+      "hosted_access": false,
+      "nhl_network_used": false,
+      "scope": "structural_pair_integrity_not_official_stat_adjudication",
+      "migrationSha256": "300892d2f135c41a4bdb35ff960efc72ff784896eb457735059fbacb03ae4e90",
+      "fixtureSemantics": "synthetic rows with captured production column identities/types; no actual NHL source or hosted credential",
+      "postgres": "17.6 (Debian 17.6-2.pgdg12+1)",
+      "postgrest": "PostgREST 14.12",
+      "images": {
+        "postgres": "postgres@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3",
+        "postgrest": "postgrest/postgrest@sha256:54000f24847d01a2c2302e0041cf0618b875c57fb48507d743cfa9aaa50bf43c"
+      },
+      "finalCounts": {
+        "raw_rows": 5,
+        "audit_rows": 21
+      },
+      "sanitizedLog": [
+        "[error] game 2024020003 write: ValueError",
+        "[error] game 2024020004 write: RuntimeError",
+        "[withheld] game 2024020001: correction_requires_versioned_storage"
+      ],
+      "cleanup": {
+        "sqlObjectsAndRoles": 0,
+        "remainingContainersAndNetworks": 0,
+        "removedContainers": [
+          "citrus-archive-proof-537c237e4cca-rest",
+          "citrus-archive-proof-537c237e4cca-pg"
+        ],
+        "gatewayStopped": true,
+        "syntheticTokenRemoved": true,
+        "dockerDesktopAndImagesRetained": true
+      }
+    }
+  ]
+}

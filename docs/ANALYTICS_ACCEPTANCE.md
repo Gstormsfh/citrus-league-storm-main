@@ -27,17 +27,18 @@ fixes, strict corpus evidence, raw receipt binding and native race harnesses.
 All changes remain local; no push, merge, deployment or production data mutation.
 
 Full suites: web 4471 passed; server 1833 passed / 6 skipped; shared 244 passed;
-offline Python 890 passed / 16 network tests deselected (33 existing deprecation
+offline Python 1015 passed / 16 network tests deselected (33 existing deprecation
 warnings). Web build and
 server/web/shared TypeScript pass; web lint has 9 existing warnings, 0 errors.
 A server freshness fixture initially failed at a millisecond boundary; it now
 uses one observation clock, and the entire server suite passed again. No
 freshness validation was relaxed. Isolated SQL: publication 25, canonical sealing
 22, shared-output security 25, legacy GSAx guard 14, era/playoff exclusions 15,
-xG season-refresh guard 20. The validator now runs natively as ESM and recognizes
+xG season-refresh guard 20, on-ice guard 46, GAR candidate guard 66, archive
+boxscore fill 65. The validator now runs natively as ESM and recognizes
 only single explicitly `pg_temp`-qualified scratch drops; public/unqualified,
 multi-table and CASCADE drops remain errors. Fifteen dedicated validator checks
-pass. Six unapplied migrations pass without errors or warnings.
+pass. Nine unapplied migrations pass without errors or warnings.
 
 Native PostgreSQL 17.6: publication/canonical 17 checks across 3 connections and
 6 witnessed lock waits, repeated successfully; GSAx guard 16 checks across 3
@@ -56,6 +57,32 @@ failure-preservation snapshots. The initial exact-float assertion failed; no
 migration was changed to make it pass. Both disposable test containers were
 removed, and successful runs verified zero fixture objects/roles. Evidence:
 `analytics-native-xg-refresh-races-20260906.json`.
+
+On-ice and GAR guards each passed twice on native PostgreSQL 17.6 with three
+independent backends: ten and twelve exact relation-lock witnesses per run,
+respectively. Invalid source commits preserve prior outputs (including on-ice
+completion markers); successful rebuilds preserve unrelated games/seasons.
+Both guards retain captured eligible formulas and reject caller temp-table
+collisions. GAR no longer recomputes unrelated seasons implicitly. Exact
+limitations and cleanup are in their native proof/guard records; broad outer-
+transaction locks still need whole-pipeline and hosted-load validation.
+
+The legacy archive writer now requires exact requested identities, paired final
+responses and original source provenance. It retains old actuals and refuses
+corrections. Testing an entire PBP document in a conditional-update URL exposed a
+real transport failure; a new unapplied service-only RPC now performs that exact
+comparison using POST body arguments and fills only SQL NULL boxscores. Real
+Python/REST/PG tests cover full-sized synthetic PBP, replay and interleaved source
+correction/insertion conflicts. They are not overlapping lock-wait tests or
+official-stat adjudication. Missing RPC deployment fails closed. See
+`analytics-archive-writer-proof-20260906.md` and its retained REST proof.
+
+The chronological manifest planner has 69 synthetic tests. It binds source and
+feature receipts, every source-event membership/exclusion, canonical game dates
+and strictly ordered whole-game windows. Future reservations pin the previous
+data manifest and caller-supplied pipeline/criteria digests. It cannot certify
+source authenticity, historical availability, actual fitted-pipeline freezing,
+untouched history or predictive quality. No real split/evaluation was run.
 
 The full-system preservation map is `analytics-method-preservation-20260906.md`.
 It covers database, organization and all discovered model/research dimensions,

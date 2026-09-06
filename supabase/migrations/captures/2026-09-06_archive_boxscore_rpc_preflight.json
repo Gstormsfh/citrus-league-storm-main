@@ -1,0 +1,86 @@
+{
+  "mode": "production read-only",
+  "date": "2026-09-06",
+  "project": "iezwazccqqrhrjupxzvf",
+  "noninternal_triggers": [],
+  "rows": [
+    {
+      "capture": {
+        "rls": true,
+        "columns": [
+          {
+            "name": "id",
+            "type": "bigint",
+            "notnull": true
+          },
+          {
+            "name": "game_id",
+            "type": "integer",
+            "notnull": true
+          },
+          {
+            "name": "game_date",
+            "type": "date",
+            "notnull": true
+          },
+          {
+            "name": "raw_json",
+            "type": "jsonb",
+            "notnull": true
+          },
+          {
+            "name": "scraped_at",
+            "type": "timestamp with time zone",
+            "notnull": false
+          },
+          {
+            "name": "processed",
+            "type": "boolean",
+            "notnull": false
+          },
+          {
+            "name": "created_at",
+            "type": "timestamp with time zone",
+            "notnull": false
+          },
+          {
+            "name": "stats_extracted",
+            "type": "boolean",
+            "notnull": false
+          },
+          {
+            "name": "stats_extracted_at",
+            "type": "timestamp with time zone",
+            "notnull": false
+          },
+          {
+            "name": "boxscore_json",
+            "type": "jsonb",
+            "notnull": false
+          },
+          {
+            "name": "source_url",
+            "type": "text",
+            "notnull": false
+          },
+          {
+            "name": "content_sha256",
+            "type": "text",
+            "notnull": false
+          },
+          {
+            "name": "fetched_at",
+            "type": "timestamp with time zone",
+            "notnull": false
+          }
+        ],
+        "relation": "raw_nhl_data",
+        "constraints": [
+          "UNIQUE (game_id)",
+          "PRIMARY KEY (id)"
+        ],
+        "existing_rpc": null
+      }
+    }
+  ]
+}
