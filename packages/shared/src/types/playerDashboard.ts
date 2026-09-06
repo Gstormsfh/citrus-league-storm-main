@@ -26,13 +26,30 @@
  */
 
 /**
- * One row of `GET /api/players/dashboard-index`: a directory player for the
- * current season with his season actuals, GAR split, xG talent row, goalie
- * GSAx and rolled-forward projection merged in. Season-scoped by the
- * server; the client never sees a season column because every row is the
- * same season.
+ * Verified TOI identity and availability. Absent means a legacy payload.
  */
+export interface ToiPublication {
+  availability: 'available' | 'unavailable';
+  value: number | null;
+  reason: string;
+  feature_version: 'official-appearance-v2';
+  variant: 'official-reconciled';
+  unit: 'minutes_per_appearance';
+  batch_id: string | null;
+  source_observed_at: string | null;
+  code_revision: string | null;
+  metric: 'avg_toi_per_game';
+  model_version: 'none';
+  season: number;
+  game_type: 'regular' | 'playoff';
+  population: 'skaters';
+  source_snapshot_id: string | null;
+  data_cutoff: string | null;
+}
+
 export interface DashboardIndexEntry {
+  /** Present when the verified publication contract governs TOI; never fall back. */
+  toi_publication?: ToiPublication;
   id: number;
   name: string;
   team: string;

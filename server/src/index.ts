@@ -42,10 +42,12 @@ if (proxyUrl) {
 
 import { serve } from '@hono/node-server';
 import { app } from './app';
+import { startAnalyticsReadModel } from './services/AnalyticsReadModelService';
 import { logger, createConsoleLogger } from '@citrus/shared';
 
 // Enable real console logging on the server (default logger is silent)
 Object.assign(logger, createConsoleLogger());
+const stopAnalyticsReadModel = startAnalyticsReadModel();
 
 const port = parseInt(process.env.PORT || '3001', 10);
 
@@ -58,6 +60,7 @@ const server = serve({
 
 // ── Graceful shutdown ────────────────────────────────────────────────
 function shutdown(signal: string) {
+  stopAnalyticsReadModel();
   logger.info(`[${signal}] Shutting down gracefully...`);
   server.close(() => {
     logger.info('Server closed. Goodbye.');

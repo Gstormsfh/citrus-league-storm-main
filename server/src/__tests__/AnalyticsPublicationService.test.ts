@@ -5,7 +5,8 @@ import { createChain, createMockSupabase } from './helpers';
 const selector: MetricSelector = {metric:'avg_toi_per_game',variant:'official-reconciled',unit:'minutes_per_appearance',
   season:2025,game_type:'regular',population:'skaters',feature_version:'v2',model_version:'none'};
 const batch = {...selector,id:'batch',source_snapshot_id:'source',data_cutoff:'2026-09-05T00:00:00Z',
-  expected_entities:2,validation:{status:'passed',entity_ids:[1,2],freshness_observed_at:'2026-09-05T00:00:00Z'},code_revision:'0'.repeat(40)};
+  expected_entities:2,validation:{status:'passed',entity_ids:[1,2],freshness_observed_at:'2026-09-05T00:00:00Z',
+    gate_version:'official-appearance-v2',evidence_sha256:'a'.repeat(64)},code_revision:'0'.repeat(40)};
 const rows = [{entity_id:1,value:0,availability:'available',reason:'verified'},
   {entity_id:2,value:null,availability:'unavailable',reason:'source_mismatch'}];
 function service(values = rows, count = 2, metadata = batch) {
@@ -14,6 +15,11 @@ function service(values = rows, count = 2, metadata = batch) {
   return new AnalyticsPublicationService(db,()=>Date.parse('2026-09-05T01:00:00Z'));
 }
 describe('published metric availability',()=>{
+  it('rejects missing gate identity and malformed evidence fingerprints',async()=>{
+    for (const validation of [{...batch.validation,gate_version:''},{...batch.validation,evidence_sha256:'invalid'}]) {
+      await expect(service(rows,2,{...batch,validation}).readLatest(selector,7200000)).rejects.toThrow('evidence');
+    }
+  });
   it('keeps measured zero and unavailable values distinct',async()=>{
     const result=await service().readLatest(selector,7200000);
     expect(result?.values[0]).toEqual({entityId:1,value:0,availability:'available',reason:'verified'});

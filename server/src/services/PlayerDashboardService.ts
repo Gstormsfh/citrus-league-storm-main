@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { analyticsReadModel, type AnalyticsReadModelService } from './AnalyticsReadModelService';
 import {
   getCurrentSeason,
   getProjectionsSeason,
@@ -6,6 +7,7 @@ import {
   type DashboardIndexEntry,
   type PlayerXgHistoryPayload,
   type XgHistoryPoint,
+  type ToiPublication,
 } from '@citrus/shared';
 
 /**
@@ -452,6 +454,7 @@ export interface DashboardIdentity {
 }
 
 export interface PlayerDashboardPayload {
+  toi_publication?: ToiPublication;
   player_id: number;
   season: number;
   game_type: DashboardGameType;
@@ -746,6 +749,7 @@ export class PlayerDashboardService {
   constructor(
     private supabase: SupabaseClient,
     private elevated?: SupabaseClient,
+    private publications: Pick<AnalyticsReadModelService, 'read'> = analyticsReadModel,
   ) {}
 
   /**
@@ -755,6 +759,14 @@ export class PlayerDashboardService {
    * curated directory, ~1–2k rows, and cached).
    */
   async getDashboardIndex(): Promise<{ players: DashboardIndexEntry[]; error: Error | null }> {
+    const result = await this.getLegacyDashboardIndex();
+    return { ...result, players: result.players.map(player => {
+      const publication = this.publications.read(player.id, getCurrentSeason());
+      return publication ? { ...player, toi_publication: publication, avg_toi_per_game: publication.value } : player;
+    }) };
+  }
+
+  private async getLegacyDashboardIndex(): Promise<{ players: DashboardIndexEntry[]; error: Error | null }> {
     const season = getCurrentSeason();
 
     if (indexCache && indexCache.season === season && Date.now() - indexCache.timestamp < CACHE_TTL_MS) {
@@ -933,6 +945,16 @@ export class PlayerDashboardService {
    * a chart of nine seasons is the point; the client picks what to plot.
    */
   async getPlayerDashboard(
+    request: PlayerDashboardRequest,
+  ): Promise<{ payload: PlayerDashboardPayload | null; error: Error | null }> {
+    const result = await this.getLegacyPlayerDashboard(request);
+    const publication = this.publications.read(request.playerId, request.season, request.gameType);
+    if (!result.payload || !publication) return result;
+    return { ...result, payload: { ...result.payload, toi_publication: publication,
+      talent: result.payload.talent ? { ...result.payload.talent, avg_toi_per_game: publication.value } : null } };
+  }
+
+  private async getLegacyPlayerDashboard(
     request: PlayerDashboardRequest,
   ): Promise<{ payload: PlayerDashboardPayload | null; error: Error | null }> {
     const { playerId, season, gameType } = request;

@@ -111,6 +111,7 @@ export interface DashboardIdentity {
 }
 
 export interface PlayerDashboardPayload {
+  toi_publication?: import('@citrus/shared').ToiPublication;
   player_id: number;
   season: number;
   game_type: string;
@@ -160,6 +161,18 @@ export function usePlayerDashboard(
 
   const [nonce, setNonce] = useState(0);
   const reload = useCallback(() => setNonce((n) => n + 1), []);
+
+  useEffect(() => {
+    if (!enabled || state.status !== 'ready' || !state.data?.toi_publication) return;
+    const timer = setTimeout(() => {
+      setState(previous => previous.data?.toi_publication ? { ...previous, data: { ...previous.data,
+        talent: previous.data.talent ? { ...previous.data.talent, avg_toi_per_game: null } : null,
+        toi_publication: { ...previous.data.toi_publication, availability: 'unavailable', value: null, reason: 'refresh_pending' },
+      } } : previous);
+      reload();
+    }, 60_000);
+    return () => clearTimeout(timer);
+  }, [enabled, state.data, state.status, reload]);
 
   // A season/gameType change mid-flight must not let the OLD response win.
   // Every request carries a token; only the newest one is allowed to write.

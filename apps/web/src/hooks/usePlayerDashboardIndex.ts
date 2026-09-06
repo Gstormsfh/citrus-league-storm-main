@@ -2,7 +2,10 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { logger } from '@/utils/logger';
 
 /**
- * ONE FETCH OF `/api/players/dashboard-index`, SHARED BY EVERY SURFACE.
+ * ONE SHARED FETCH OF `/api/players/dashboard-index` FOR EVERY SURFACE.
+ * Legacy payloads remain session-cached. Versioned TOI payloads refresh
+ * once a minute while in use, so publication revisions and rollbacks reach
+ * already-open cards; pending refreshes hide the preceding TOI value.
  *
  * The endpoint returns the whole league in one array — directory + season
  * actuals + GAR components + xG talent + rolled-forward projections, merged
@@ -96,6 +99,27 @@ const EMPTY: readonly DashboardIndexEntry[] = Object.freeze([]);
  * a sign-in mid-session still recovers without a reload.
  */
 const RETRY_AFTER_FAILURE_MS = 60_000;
+// Versioned publications may be revised or rolled back during a session.
+// One timer per store, only while an enabled consumer is mounted.
+const PUBLICATION_REFRESH_MS = 60_000;
+let publicationTimer: ReturnType<typeof setTimeout> | null = null;
+let loadedAt = 0;
+let activeConsumers = 0;
+
+function schedulePublicationRefresh(): void {
+  if (publicationTimer) clearTimeout(publicationTimer);
+  publicationTimer = null;
+  if (!activeConsumers || !state.players.some(player => player.toi_publication)) return;
+  publicationTimer = setTimeout(() => {
+    publicationTimer = null;
+    // A slow or failed request cannot leave an old publication displayed.
+    setState({ ...state, players: state.players.map(player => player.toi_publication ? {
+      ...player, avg_toi_per_game: null,
+      toi_publication: { ...player.toi_publication, value: null, availability: 'unavailable', reason: 'refresh_pending' },
+    } : player) });
+    void ensureLoaded(true, true);
+  }, Math.max(0, loadedAt + PUBLICATION_REFRESH_MS - Date.now()));
+}
 
 let state: PlayerDashboardIndexState = {
   players: EMPTY,
@@ -136,7 +160,7 @@ function getSnapshot(): PlayerDashboardIndexState {
  * would take down every test that so much as imports a component in this
  * chain.
  */
-function ensureLoaded(force = false): Promise<void> {
+function ensureLoaded(force = false, background = false): Promise<void> {
   if (inFlight) return inFlight;
   if (!force) {
     if (state.status === 'ready') return Promise.resolve();
@@ -145,7 +169,7 @@ function ensureLoaded(force = false): Promise<void> {
     }
   }
 
-  setState({ players: state.players, status: 'loading', loading: true, error: null });
+  if (!background) setState({ players: state.players, status: 'loading', loading: true, error: null });
 
   inFlight = import('@/api/client')
     .then(({ apiClient }) => apiClient.get<DashboardIndexEntry[]>('/api/players/dashboard-index'))
@@ -155,12 +179,14 @@ function ensureLoaded(force = false): Promise<void> {
       // `pages/Players.tsx` has carried it since the page shipped, and the
       // card must not be the one consumer that breaks if the envelope moves.
       const list = (response?.data ?? (response as unknown as DashboardIndexEntry[])) as DashboardIndexEntry[];
+      loadedAt = Date.now();
       setState({
         players: Array.isArray(list) ? list : [],
         status: 'ready',
         loading: false,
         error: null,
       });
+      schedulePublicationRefresh();
     })
     .catch((err: unknown) => {
       failedAt = Date.now();
@@ -195,6 +221,9 @@ export function reloadPlayerDashboardIndex(): Promise<void> {
  * Mirrors `clearDashboardIndexCache()` on the server service.
  */
 export function resetPlayerDashboardIndex(): void {
+  if (publicationTimer) clearTimeout(publicationTimer);
+  publicationTimer = null;
+  loadedAt = 0;
   inFlight = null;
   failedAt = 0;
   state = { players: EMPTY, status: 'idle', loading: true, error: null };
@@ -231,7 +260,16 @@ export function usePlayerDashboardIndex(
 
   useEffect(() => {
     if (!enabled) return;
+    activeConsumers++;
     void ensureLoaded();
+    schedulePublicationRefresh();
+    return () => {
+      activeConsumers--;
+      if (!activeConsumers && publicationTimer) {
+        clearTimeout(publicationTimer);
+        publicationTimer = null;
+      }
+    };
   }, [enabled]);
 
   return { ...snapshot, reload: reloadPlayerDashboardIndex };

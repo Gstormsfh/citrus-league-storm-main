@@ -482,6 +482,28 @@ describe('PlayerAdvancedCard: freshness badge', () => {
 });
 
 describe('PlayerAdvancedCard: the sample behind the rates', () => {
+  it('renders publication revisions and removes an unavailable value despite a stale talent value', () => {
+    const publication: NonNullable<CardEntry['toi_publication']> = {
+      availability: 'available', value: 20, reason: 'verified', feature_version: 'official-appearance-v2',
+      variant: 'official-reconciled', unit: 'minutes_per_appearance', batch_id: 'one',
+      source_observed_at: '2026-09-05T00:00:00Z', code_revision: 'a'.repeat(40),
+      metric: 'avg_toi_per_game', model_version: 'none', season: 2025, game_type: 'regular',
+      population: 'skaters', source_snapshot_id: 'receipt', data_cutoff: '2026-09-05T00:00:00Z',
+    };
+    for (const [value, batch, expected] of [[20, 'one', '20.0'], [21, 'two', '21.0'], [20, 'one', '20.0'],
+      [null, 'one', null]] as const) {
+      const player = entry({ id: 5151, gp: 82, avg_toi_per_game: 99, toi_publication: { ...publication,
+        value, batch_id: batch, availability: value === null ? 'unavailable' : 'available',
+        reason: value === null ? 'stale_source' : 'verified' } });
+      const { unmount } = renderCard({ playerId: 5151, indexOverride: [...league(), player] });
+      const line = screen.getByTestId('advanced-card-deployment');
+      expect(line).not.toHaveTextContent('99.0');
+      if (expected) expect(line).toHaveTextContent(`${expected} min/appearance`);
+      else expect(line).not.toHaveTextContent('min/appearance');
+      unmount();
+    }
+  });
+
   it('prints games and the minutes the per-60 rows are divided by', () => {
     const mcdavid = entry({ id: 8478402, gp: 82, toi_total_minutes: 1884.8 });
     renderCard({ playerId: 8478402, indexOverride: [...league(), mcdavid] });

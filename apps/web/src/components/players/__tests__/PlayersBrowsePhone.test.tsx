@@ -181,6 +181,25 @@ describe('browseStatLine', () => {
 });
 
 describe('dashboardEntryToHockeyPlayer', () => {
+  it('uses verified publication values and never falls back when the contract says unavailable', () => {
+    const source = entry(7, { toi_seconds: 11_220, avg_toi_per_game: 99 });
+    const publication: NonNullable<typeof source.toi_publication> = {
+      availability: 'available', value: 21.5, reason: 'verified', feature_version: 'official-appearance-v2',
+      variant: 'official-reconciled', unit: 'minutes_per_appearance', batch_id: 'one',
+      source_observed_at: '2026-09-05T00:00:00Z', code_revision: 'a'.repeat(40),
+      metric: 'avg_toi_per_game', model_version: 'none', season: 2025, game_type: 'regular',
+      population: 'skaters', source_snapshot_id: 'receipt', data_cutoff: '2026-09-05T00:00:00Z',
+    };
+    expect(dashboardEntryToHockeyPlayer({ ...source, toi_publication: publication }).stats.toi).toBe('21:30');
+    expect(dashboardEntryToHockeyPlayer({ ...source, toi_publication: { ...publication, value: 0 } }).stats.toi).toBe('0:00');
+    for (const reason of ['publication_missing', 'stale_source', 'stale_read_model', 'publication_read_failed']) {
+      expect(dashboardEntryToHockeyPlayer({ ...source, toi_publication: {
+        ...publication, availability: 'unavailable', value: null, reason,
+      } }).stats.toi).toBeUndefined();
+    }
+    expect(dashboardEntryToHockeyPlayer(source).stats.toi).toBe('18:42');
+  });
+
   it('carries the season line the index holds, PIM, SHP and TOI per game included', () => {
     // 2026-09-05: the card printed PIM 0, SHP 0 and TOI/G "-" for every
     // skater. The index SELECTed pim and toi and dropped them; shp was never

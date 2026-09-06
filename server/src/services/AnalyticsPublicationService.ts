@@ -21,7 +21,7 @@ function record(value: unknown): value is Record<string, unknown> {
 }
 
 /** Background read-model adapter. Requires service-role access to evidence.
- * Not wired into existing readers until the schema/serving rollout is approved.
+ * Used by the opt-in background AnalyticsReadModelService, never request clients.
  * Exact variant/version selection prevents substituting a different xG family.
  */
 export class AnalyticsPublicationService {
@@ -46,6 +46,8 @@ export class AnalyticsPublicationService {
         typeof batch.source_snapshot_id !== 'string' || typeof batch.code_revision !== 'string' ||
         !/^[a-f0-9]{40}$/.test(batch.code_revision) ||
         !record(batch.validation) || batch.validation.status !== 'passed' ||
+        typeof batch.validation.gate_version !== 'string' || !batch.validation.gate_version.trim() ||
+        typeof batch.validation.evidence_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(batch.validation.evidence_sha256) ||
         !Array.isArray(batch.validation.entity_ids)) throw new Error('Missing publication evidence');
     const expected = batch.validation.entity_ids;
     if (!expected.length || !expected.every(Number.isSafeInteger) ||
@@ -56,7 +58,7 @@ export class AnalyticsPublicationService {
     const now = this.now();
     if (!Number.isFinite(cutoff) || cutoff > now) throw new Error('Invalid source cutoff');
     const freshness = batch.validation.freshness_observed_at;
-    const observed = typeof freshness === 'string' ? Date.parse(freshness) : NaN;
+    const observed = typeof freshness === 'string' && /(?:Z|[+-]\d{2}:\d{2})$/.test(freshness) ? Date.parse(freshness) : NaN;
     if (!Number.isFinite(observed) || observed > cutoff) throw new Error('Missing or invalid source freshness evidence');
     const stale = now - observed > maxSourceAgeMs;
     const rows: PublishedMetricValue[] = [];

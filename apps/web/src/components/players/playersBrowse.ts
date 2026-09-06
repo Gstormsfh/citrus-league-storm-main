@@ -121,7 +121,10 @@ export function dashboardEntryToHockeyPlayer(p: DashboardIndexEntry): HockeyPlay
           plusMinus: p.plus_minus,
           xGoals: p.x_goals,
           // The card prints TOI per game as mm:ss; the index carries the season total.
-          toi: p.gp > 0 && p.toi_seconds > 0 ? toiPerGame(p.toi_seconds, p.gp) : undefined,
+          toi: p.toi_publication
+            ? p.toi_publication.availability === 'available' && p.toi_publication.value != null
+              ? toiPerGame(p.toi_publication.value * 60, 1) : undefined
+            : p.gp > 0 && p.toi_seconds > 0 ? toiPerGame(p.toi_seconds, p.gp) : undefined,
         },
   };
 }

@@ -101,9 +101,37 @@ beforeEach(() => {
 
 afterEach(() => {
   resetPlayerDashboardIndex();
+  vi.useRealTimers();
 });
 
 describe('usePlayerDashboardIndex', () => {
+  it('refreshes versioned publications once for all consumers and invalidates slow refresh values', async () => {
+    vi.useFakeTimers();
+    const player = row(1, 'A');
+    player.toi_publication = { availability: 'available', value: 20, reason: 'verified',
+      feature_version: 'official-appearance-v2', variant: 'official-reconciled', unit: 'minutes_per_appearance',
+      batch_id: 'one', source_observed_at: new Date().toISOString(), code_revision: 'a'.repeat(40),
+      metric: 'avg_toi_per_game', model_version: 'none', season: 2025, game_type: 'regular',
+      population: 'skaters', source_snapshot_id: 'receipt', data_cutoff: new Date().toISOString() };
+    getMock.mockResolvedValueOnce({ data: [player] });
+    const mounted = render(<><Probe label="a" /><Probe label="b" /></>);
+    await act(async () => { await reloadPlayerDashboardIndex(); });
+    expect(getMock).toHaveBeenCalledTimes(1);
+    let resolve!: (response: unknown) => void;
+    getMock.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(getMock).toHaveBeenCalledTimes(2);
+    expect(peekPlayerDashboardIndex().players[0].toi_publication).toMatchObject({ value: null, reason: 'refresh_pending' });
+    await act(async () => {
+      resolve({ data: [{ ...player, toi_publication: { ...player.toi_publication, value: 21, batch_id: 'two' } }] });
+      await Promise.resolve();
+    });
+    expect(peekPlayerDashboardIndex().players[0].toi_publication).toMatchObject({ value: 21, batch_id: 'two' });
+    mounted.unmount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+    expect(getMock).toHaveBeenCalledTimes(2);
+  });
+
   it('fetches once and hands the array to every consumer', async () => {
     getMock.mockResolvedValue({ data: [row(1, 'A'), row(2, 'B')] });
 

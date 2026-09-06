@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import { createChain, createMockSupabase } from './helpers';
 import { clearPlayerDashboardCache, clearPlayerXgHistoryCache } from '../services/PlayerDashboardService';
+import { analyticsReadModel, toiSelector } from '../services/AnalyticsReadModelService';
+import { getCurrentSeason } from '@citrus/shared';
 
 /**
  * GET /api/players/:playerId/dashboard — COMPONENT 6.5.
@@ -58,6 +60,7 @@ beforeAll(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.clearAllMocks();
   adminThrows = false;
   clearPlayerDashboardCache();
@@ -146,6 +149,34 @@ function get(app: any, path: string) {
 }
 
 describe('GET /api/players/:playerId/dashboard', () => {
+  it('serves background publication transitions through the real route and cached service', async () => {
+    await wire();
+    vi.stubEnv('ANALYTICS_TOI_PUBLICATIONS_ENABLED', 'true');
+    const { app } = await import('../app');
+    const season = getCurrentSeason();
+    const path = `/api/players/${MCDAVID}/dashboard?season=${season}&gameType=regular`;
+    const batch = { ...toiSelector(season), id: 'published', source_snapshot_id: 'source',
+      code_revision: 'a'.repeat(40), data_cutoff: new Date().toISOString(), expected_entities: 1,
+      validation: { status: 'passed', entity_ids: [MCDAVID], freshness_observed_at: new Date().toISOString(),
+        gate_version: 'official-appearance-v2', evidence_sha256: 'a'.repeat(64) } };
+    let missing = false;
+    adminFrom.mockImplementation((table: string) => {
+      if (table === 'analytics_publications') return createChain({ data: missing ? null : { batch }, error: null });
+      if (table === 'analytics_metric_values') return createChain({ data: [{ entity_id: MCDAVID,
+        value: 21.5, availability: 'available', reason: 'verified' }], count: 1, error: null });
+      return createChain({ data: [SHOT_ROW], error: null });
+    });
+    await analyticsReadModel.refresh();
+    const first = await (await get(app, path)).json();
+    expect(first.data.toi_publication).toMatchObject({ availability: 'available', value: 21.5, batch_id: 'published' });
+    missing = true;
+    await analyticsReadModel.refresh();
+    adminFrom.mockClear();
+    const second = await (await get(app, path)).json();
+    expect(second.data.toi_publication).toMatchObject({ availability: 'unavailable', value: null, reason: 'publication_missing' });
+    expect(adminFrom).not.toHaveBeenCalled();
+  });
+
   it('returns the whole dashboard payload in one response', async () => {
     const user = await wire();
     const { app } = await import('../app');

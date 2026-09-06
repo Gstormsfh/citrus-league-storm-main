@@ -658,6 +658,19 @@ describe('deploymentParts', () => {
     ).toEqual(['82 GP', '1,885 min', '23.0 min/GP', 'VOPA +3.11']);
     expect(deploymentParts(entry({ gp: 12, vopa_score: -0.42 }))).toEqual(['12 GP', 'VOPA -0.42']);
   });
+  it('honors publication availability over stale talent fields', () => {
+    const player = entry({ gp: 10, avg_toi_per_game: 99 });
+    const publication: NonNullable<typeof player.toi_publication> = {
+      availability: 'available', value: 20, reason: 'verified', feature_version: 'official-appearance-v2',
+      variant: 'official-reconciled', unit: 'minutes_per_appearance', batch_id: 'one',
+      source_observed_at: '2026-09-05T00:00:00Z', code_revision: 'a'.repeat(40),
+      metric: 'avg_toi_per_game', model_version: 'none', season: 2025, game_type: 'regular',
+      population: 'skaters', source_snapshot_id: 'receipt', data_cutoff: '2026-09-05T00:00:00Z',
+    };
+    expect(deploymentParts({ ...player, toi_publication: publication })).toEqual(['10 GP', '20.0 min/appearance']);
+    expect(deploymentParts({ ...player, toi_publication: { ...publication, availability: 'unavailable', value: null,
+      reason: 'stale_source' } })).toEqual(['10 GP']);
+  });
 });
 
 // ── Lookup ──────────────────────────────────────────────────────────

@@ -690,8 +690,12 @@ export function deploymentParts(p: CardEntry): string[] {
   if (Number.isFinite(p.gp) && p.gp > 0) parts.push(`${p.gp} GP`);
   const toi = p.toi_total_minutes ?? null;
   if (toi != null && Number.isFinite(toi) && toi > 0) parts.push(`${fmtInt(toi)} min`);
-  const perGame = p.avg_toi_per_game ?? null;
-  if (perGame != null && Number.isFinite(perGame) && perGame > 0) parts.push(`${fmt1(perGame)} min/GP`);
+  const perGame = p.toi_publication
+    ? p.toi_publication.availability === 'available' ? p.toi_publication.value : null
+    : p.avg_toi_per_game ?? null;
+  if (perGame != null && Number.isFinite(perGame) && (p.toi_publication ? perGame >= 0 : perGame > 0)) {
+    parts.push(`${fmt1(perGame)} min/${p.toi_publication ? 'appearance' : 'GP'}`);
+  }
   const vopa = p.vopa_score ?? null;
   if (vopa != null && Number.isFinite(vopa)) parts.push(`VOPA ${fmtSigned2(vopa)}`);
   return parts;
