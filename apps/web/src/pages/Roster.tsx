@@ -284,7 +284,7 @@ const ROSTER_VIEW_TAB =
   'flex-1 min-w-0 px-1 whitespace-nowrap uppercase transition-colors focus-citrus ' +
   'h-[30px] rounded-[6px] font-plex font-semibold text-[9px] sm:text-[10px] tracking-[0.04em] sm:tracking-[0.14em] text-pressbox-text/60 ' +
   'data-[state=active]:bg-pressbox-text data-[state=active]:text-pressbox-surface data-[state=active]:shadow-none ' +
-  'lg:h-[34px] lg:rounded-none lg:font-condensed lg:font-bold lg:text-[13px] lg:text-pressbox-text/45 ' +
+  'lg:flex-none lg:px-3 lg:h-[34px] lg:rounded-none lg:font-condensed lg:font-bold lg:text-[13px] lg:text-pressbox-text/45 ' +
   'lg:data-[state=active]:bg-transparent lg:data-[state=active]:text-pressbox-text lg:data-[state=active]:border-b-2 lg:data-[state=active]:border-pressbox-sage lg:hover:text-pressbox-text';
 
 const Roster = () => {
@@ -3285,17 +3285,10 @@ const Roster = () => {
   };
 
   // All known starter slot IDs for tap-to-swap eligibility calculation (dynamic based on position type)
-  const ALL_STARTER_SLOT_IDS = useMemo(() => {
-    const slots: string[] = [];
-    const posKeys = leaguePositionType === 'forward'
-      ? [{ pos: 'F', count: 6 }, { pos: 'D', count: 4 }, { pos: 'G', count: 2 }]
-      : [{ pos: 'C', count: 2 }, { pos: 'LW', count: 2 }, { pos: 'RW', count: 2 }, { pos: 'D', count: 4 }, { pos: 'G', count: 2 }];
-    for (const { pos, count } of posKeys) {
-      for (let i = 1; i <= count; i++) slots.push(`slot-${pos}-${i}`);
-    }
-    slots.push('slot-UTIL');
-    return slots;
-  }, [leaguePositionType]);
+  const ALL_STARTER_SLOT_IDS = useMemo(
+    () => buildSlotConfig(leaguePositionType, leagueRosterSlots).allSlots,
+    [leaguePositionType, leagueRosterSlots],
+  );
 
   // Compute which slots the tap-selected player can move to
   const tapEligibleSlots = useMemo(() => {
@@ -3524,8 +3517,8 @@ const Roster = () => {
           <div className={cn(
             "flex flex-col lg:grid lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2",
             userLeagueState === 'active-user' && userTeam?.league_id
-              ? "lg:grid-cols-[260px_1fr_260px] xl:grid-cols-[280px_1fr_280px]"
-              : "lg:grid-cols-[260px_1fr] xl:grid-cols-[280px_1fr]"
+              ? "lg:grid-cols-[200px_minmax(0,1fr)_240px] xl:grid-cols-[240px_minmax(0,1fr)_260px]"
+              : "lg:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)]"
           )}>
             {/* Main Content - MOBILE: Full width / DESKTOP: Scrollable panel */}
             <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-3 lg:px-0 order-1 lg:order-2">
@@ -3690,7 +3683,7 @@ const Roster = () => {
                 {/* PHONE (2026-09-05): the artboard has no view switcher
                     under the team card; LOG opens Transactions and the
                     other two views are the desktop's. Hidden below lg. */}
-                <TabsList className="max-lg:hidden w-full grid grid-cols-4 gap-0.5 p-0.5 h-auto rounded-[8px] bg-pressbox-tile mx-3 max-lg:w-[calc(100%-24px)] mt-2 lg:mx-0 lg:mt-0 lg:w-full lg:p-0 lg:gap-0 lg:h-[34px] lg:rounded-none lg:bg-transparent lg:border-b lg:border-white/[0.08]">
+                <TabsList className="max-lg:hidden w-full grid grid-cols-4 gap-0.5 p-0.5 h-auto rounded-[8px] bg-pressbox-tile mx-3 max-lg:w-[calc(100%-24px)] mt-2 lg:mx-0 lg:mt-0 lg:w-full lg:grid-cols-2 2xl:grid-cols-4 lg:p-0 lg:gap-0 lg:h-auto lg:rounded-none lg:bg-transparent lg:border-b lg:border-white/[0.08]">
                 <TabsTrigger
                   value="roster"
                   className={ROSTER_VIEW_TAB}
@@ -4106,6 +4099,7 @@ const Roster = () => {
                       />
 
                       <IRSlot
+                        irSlotCount={irSlotCount}
                         players={displayRoster.ir}
                         slotAssignments={displayRoster.slotAssignments}
                         onPlayerClick={handlePlayerClick}
