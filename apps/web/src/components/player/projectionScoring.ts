@@ -1,3 +1,4 @@
+import type { GameLogEntry } from './gameLogRows';
 import { ScoringCalculator, DEFAULT_SCORING, type ScoringSettings } from '@/utils/scoringUtils';
 
 export function projectionStats(row: Record<string, unknown>): Record<string, number> {
@@ -31,4 +32,15 @@ export function projectedSummary(rows: Record<string, unknown>[], scoring: unkno
   for (const row of rows) for (const [key, value] of Object.entries(projectionStats(row))) stats[key] = (stats[key] ?? 0) + value;
   const scorer = new ScoringCalculator(projectionSettings(scoring));
   return { stats, points: scorer.calculatePoints(stats, goalie), breakdown: scorer.getStatBreakdown(stats, goalie) };
+}
+
+/** Keep cached raw games reusable when the manager switches league weights. */
+export function scoreGameLog(entries: GameLogEntry[], scoring: unknown): GameLogEntry[] {
+  const scorer = new ScoringCalculator(projectionSettings(scoring));
+  return entries.map(entry => ({
+    ...entry,
+    actualPoints: entry.actualStats
+      ? scorer.calculatePoints(entry.actualStats as Record<string, number>, entry.isGoalie)
+      : undefined,
+  }));
 }
