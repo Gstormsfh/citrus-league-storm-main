@@ -1,6 +1,6 @@
 # Submission gate tracker — September 6, 2026
 
-Preparation and testing against production are authorized. The user explicitly redirected final device validation to production on September 6. App Store submission remains held; testing authorization alone does not activate the pending backend migrations and release deployment. Passing tests do not guarantee Apple approval.
+Preparation and testing against production are authorized. The user explicitly redirected final device validation to production on September 6. The user subsequently authorized completing all remaining gates, including production updates, while explicitly withholding final App Store submission. Deployment preflight and verification still apply. Passing tests do not guarantee Apple approval.
 
 | Gate | Current evidence | Required closure |
 |---|---|---|
@@ -70,3 +70,9 @@ App-wide parity remains open: roster week totals and generic player dashboard ra
 The user confirmed the production data and repaired game log, and accepted the build 8 projection presentation. That does not establish app-wide dynamic scoring. Weekly roster projections now use raw stats and the league calculator in the candidate; regression tests verify goals at 1 vs 10 and refusal to substitute stored default totals when raw stats are missing. The matching batch endpoint now includes PPP, SHP and shutouts and defaults to the projection season. These changes are not installed or deployed yet. Generic player dashboard scoring/rankings and category formats remain to review.
 
 Remaining submission gates: deploy/verify the auction and roster backend corrections; production APNs activation and distribution-build delivery; real Apple OAuth/revocation with a disposable identity; production policy/privacy alignment and moderation operations; populated reviewer access; final screenshots/content/availability/business declarations and distribution build validation/attachment; final integrated iPhone/iPad testing. Content-rights basis remains unverified. Apple guidelines were checked again on September 6 at https://developer.apple.com/app-store/review/guidelines/ — sections 2.1, 1.2, 4.2, 5.1 and 5.2 remain relevant. No submission performed.
+
+## September 6 follow-through validation
+
+Full current-candidate suites passed: 4,479 web, 1,828 server (6 pre-existing skips), and 244 shared. The production draft-freeze RPC returned no blockers at 19:33 UTC. This is a preflight observation, not permission to skip rechecking before deployment.
+
+A further push lifecycle defect was found: sign-out deleted every device token for the account and removed the global notification-tap listener. The fix scopes deletion to this installation, preserves tap handling, cleans temporary registration listeners, and serializes registration with sign-out to prevent a late token write. Regression coverage includes other-device preservation, account switching, reload, registration failure/timeout, native unregister failure, and an in-flight save. Production device-token RLS was inspected and restricts reads/writes to auth.uid(). This fix still needs native build verification.
