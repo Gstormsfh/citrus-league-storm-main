@@ -98,6 +98,20 @@ requires a verified source snapshot, staging proof, backup and rollback.
 
 ### 1.4 Versioned analytics foundation (local, unapplied)
 
+Additive actor/exposure diagnostics (2026-09-06):
+`data-pipeline/projections/player_goalie_attribution.py` preserves exact selected
+event/model membership, game-roster team identity and separate shooter/defending-
+goalie accounting. Goalies taking shots remain shooters; empty net is not a
+goalie actor; unknown presence and contradictions stay unavailable. Aggregation
+retains season/type/role and team stints, marks incomplete totals NULL and labels
+known subtotals. Eligible attempts and roster listing never become GP, TOI or
+per-60 exposure. No official actual or fantasy scoring is changed.
+`scripts/proof/run_actor_attribution.py` and its fixed diagnostic plan replay
+original body/receipts through unchanged source gates/features and pinned JSON
+model/map inference before actor accounting. New create-only evidence lives in
+`scripts/proof/results/official-actor-attribution-*/`; failed runs retain partial
+files and an affirmative failure marker. No database or serving adapter is used.
+
 Additive model/publication diagnostic proof (2026-09-06):
 `scripts/local_model_publication_e2e.py` binds the complete shape checkpoint,
 re-evaluates its selected JSON probability map on every validation event, and

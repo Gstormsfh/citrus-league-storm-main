@@ -1,0 +1,21 @@
+{
+  "contract": "citrus-source-replayed-actor-attribution-v1:plan",
+  "publishable": false,
+  "refit": false,
+  "historical_as_of_verified": false,
+  "untouched_test_claim": false,
+  "prior_shape_review_sha256": "eef47805687e40df9b92c02947672c71a5ec4d4701b3d9b776c77de316b88c3c",
+  "selected_saved_map": "monotone_logit_group",
+  "source_scope": "exact prior fold1/fold2 validation membership; unchanged frozen source gates and geometry cohort",
+  "replay": "raw body and receipt -> unchanged development features -> pinned JSON raw tree and probability map -> actor diagnostics",
+  "probability_abs_tolerance": 1e-12,
+  "actor_policy": "exact game roster and event team; goalies may also be shooters; no current-team lookup",
+  "goalie_policy": "valid explicit goalie presence plus opposing-team roster goalie; empty net not applicable; contradictions and unknown presence unavailable",
+  "partial_policy": "unresolved actor withholds applicable event-team roster actors for that game; unknown roster withholds aggregate totals",
+  "exposure_policy": "eligible unblocked event count only; roster listing is not GP or TOI; no per-60 rates",
+  "aggregation_policy": "season/game-type/role/player scope; separate team stints; exact complete event membership; labeled partial subtotals; NULL unavailable totals",
+  "history": "A read-only, hash-checked source-field audit preceded this declaration. This is inspected retrospective diagnostic development, not untouched evaluation.",
+  "preservation": "additive files only; all original source, actuals, methods, model evidence and prospective reservations unchanged",
+  "research": [{"url": "https://www.moneypuck.com/glossary.htm", "use": "methodological distinction between unblocked-attempt xG against and ice-time exposure only; no files, predictions or fitted values used"}],
+  "acceptance": "diagnostic completion does not pass model quality, foundation, serving, nightly, forecast or FPAR gates"
+}
