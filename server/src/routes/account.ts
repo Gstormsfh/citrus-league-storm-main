@@ -3,7 +3,8 @@ import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
-import { createUserClient } from '../lib/supabase';
+import { AppleAccountService } from '../services/AppleAccountService';
+import { createUserClient, getSupabaseAdmin } from '../lib/supabase';
 import { AccountService } from '../services/AccountService';
 import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
@@ -38,18 +39,34 @@ accountRoutes.post('/export', async (c) => {
   return ok(c, result.data);
 });
 
+// Provider credentials are validated against a fresh Supabase identity before
+// the internal credential service can use its privileged storage client.
+accountRoutes.post('/apple-token', validateBody(z.object({ refreshToken: z.string().min(1).max(8192) })), async (c) => {
+  const client = createUserClient(c.get('userToken'));
+  const { data: { user }, error } = await client.auth.getUser();
+  if (error || !user) return fail(c, AppError.badRequest('Authentication required'));
+  try {
+    const body = getValidatedBody<{ refreshToken: string }>(c);
+    await new AppleAccountService(getSupabaseAdmin()).storeToken(user, body.refreshToken);
+    await new AuditService(client).log('ADMIN_ACTION', null, { action: 'apple_cleanup_token_retained' });
+    return ok(c, { success: true });
+  } catch {
+    return fail(c, AppError.internal('Apple account cleanup could not be configured. Please retry.'));
+  }
+});
+
 // POST /api/account/delete
 accountRoutes.post('/delete', async (c) => {
   const supabase = createUserClient(c.get('userToken'));
-  const service = new AccountService(supabase);
-
-  // Audit BEFORE deletion since user context will be lost after
-  const audit = new AuditService(supabase);
-  audit.log('ADMIN_ACTION', null, { action: 'account_delete' }, 'WARN');
-
+  const service = new AccountService(supabase, async (user) => {
+    if (!user.identities?.some((identity) => identity.provider === 'apple')) return 'not_applicable';
+    return new AppleAccountService(getSupabaseAdmin()).revoke(user);
+  });
+  // Await the audit before erasing its actor context.
+  await new AuditService(supabase).log('ADMIN_ACTION', null, { action: 'account_delete' }, 'WARN');
   const result = await service.deleteAccount();
   if (!result.success) return fail(c, AppError.badRequest(result.error || 'Deletion failed'));
-  return ok(c, { success: true });
+  return ok(c, { success: true, appleRevocation: result.appleRevocation });
 });
 
 // POST /api/account/consent

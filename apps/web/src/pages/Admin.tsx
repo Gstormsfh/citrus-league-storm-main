@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { ContentReports } from '@/components/admin/ContentReports';
 import Navbar from '@/components/Navbar';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -212,8 +213,10 @@ const Admin = () => {
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="leagues">Leagues</TabsTrigger>
             <TabsTrigger value="audit">Audit Log</TabsTrigger>
+            <TabsTrigger value="reports">Content Reports</TabsTrigger>
           </TabsList>
 
+          <TabsContent value="reports"><ContentReports /></TabsContent>
           <TabsContent value="users" className="space-y-4">
             <div className="flex gap-2">
               <Input placeholder="Search users..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { setUserPage(1); loadUsers(); } }} className="max-w-sm" />

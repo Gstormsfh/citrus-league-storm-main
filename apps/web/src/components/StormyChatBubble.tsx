@@ -1,3 +1,4 @@
+import { stormyStorageKey } from '@/lib/accountCleanup';
 import { confirmStormySharing } from '@/lib/stormySharing';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -144,6 +145,11 @@ function useTextFieldFocused(): boolean {
 }
 
 export const StormyChatBubble = () => {
+  const auth = useAuth();
+  return <StormyChatBubbleSession key={auth?.user?.id ?? 'guest'} />;
+};
+
+const StormyChatBubbleSession = () => {
   const location = useLocation();
   const isMobile = useIsMobile();
   // Only consulted for the closed FAB below. The open chat card must never
@@ -159,7 +165,7 @@ export const StormyChatBubble = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
-      const saved = localStorage.getItem('stormyMessages');
+      const saved = localStorage.getItem(stormyStorageKey(auth?.user?.id, 'stormyMessages'));
       if (saved) {
         const parsed = JSON.parse(saved) as ChatMessage[];
         if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(-50);
@@ -170,7 +176,7 @@ export const StormyChatBubble = () => {
   // Conversation history for the API (excludes the initial greeting)
   const apiHistoryRef = useRef<StormyMessage[]>((() => {
     try {
-      const saved = localStorage.getItem('stormyApiHistory');
+      const saved = localStorage.getItem(stormyStorageKey(auth?.user?.id, 'stormyApiHistory'));
       if (saved) return JSON.parse(saved) as StormyMessage[];
     } catch { /* fall through */ }
     return [];
@@ -184,13 +190,13 @@ export const StormyChatBubble = () => {
   // Persist messages + API history to localStorage on change
   useEffect(() => {
     try {
-      localStorage.setItem('stormyMessages', JSON.stringify(messages.slice(-50)));
+      localStorage.setItem(stormyStorageKey(auth?.user?.id, 'stormyMessages'), JSON.stringify(messages.slice(-50)));
     } catch { /* quota exceeded — silently drop */ }
-  }, [messages]);
+  }, [messages, auth?.user?.id]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('stormyApiHistory', JSON.stringify(apiHistoryRef.current.slice(-50)));
+      localStorage.setItem(stormyStorageKey(auth?.user?.id, 'stormyApiHistory'), JSON.stringify(apiHistoryRef.current.slice(-50)));
     } catch { /* quota exceeded */ }
   });
 

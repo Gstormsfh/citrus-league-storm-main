@@ -1,3 +1,4 @@
+import { stormyStorageKey } from '@/lib/accountCleanup';
 import { confirmStormySharing } from '@/lib/stormySharing';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -51,6 +52,11 @@ interface ChatMessage {
 const WEEKLY_LIMIT = 15;
 
 const StormyAssistant = () => {
+  const auth = useAuth();
+  return <StormyAssistantSession key={auth?.user?.id ?? 'guest'} />;
+};
+
+const StormyAssistantSession = () => {
   const { userLeagueState, activeLeagueId, activeLeague } = useLeague();
   const auth = useAuth();
   const { status: seasonStatus } = useSeasonStatus();
@@ -94,7 +100,7 @@ const StormyAssistant = () => {
   const greeting = inOffseason ? offseasonGreeting : defaultGreeting;
   const apiHistoryRef = useRef<StormyMessage[]>((() => {
     try {
-      const saved = localStorage.getItem('stormyApiHistory');
+      const saved = localStorage.getItem(stormyStorageKey(auth?.user?.id, 'stormyApiHistory'));
       if (saved) return JSON.parse(saved) as StormyMessage[];
     } catch { /* fall through */ }
     return [];
@@ -105,7 +111,7 @@ const StormyAssistant = () => {
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
-      const saved = localStorage.getItem('stormyMessages');
+      const saved = localStorage.getItem(stormyStorageKey(auth?.user?.id, 'stormyMessages'));
       if (saved) {
         const parsed = JSON.parse(saved) as ChatMessage[];
         if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(-50);
@@ -116,11 +122,11 @@ const StormyAssistant = () => {
 
   // Persist messages + API history to localStorage
   useEffect(() => {
-    try { localStorage.setItem('stormyMessages', JSON.stringify(messages.slice(-50))); } catch { /* quota */ }
-  }, [messages]);
+    try { localStorage.setItem(stormyStorageKey(auth?.user?.id, 'stormyMessages'), JSON.stringify(messages.slice(-50))); } catch { /* quota */ }
+  }, [messages, auth?.user?.id]);
 
   useEffect(() => {
-    try { localStorage.setItem('stormyApiHistory', JSON.stringify(apiHistoryRef.current.slice(-50))); } catch { /* quota */ }
+    try { localStorage.setItem(stormyStorageKey(auth?.user?.id, 'stormyApiHistory'), JSON.stringify(apiHistoryRef.current.slice(-50))); } catch { /* quota */ }
   });
 
   /**
@@ -144,7 +150,7 @@ const StormyAssistant = () => {
         ? [{ ...prev[0], text: greeting }]
         : prev,
     );
-  }, [greeting]);
+  }, [greeting, auth?.user?.id]);
 
   // Proactively warm the context as soon as the page loads so the user's
   // first message doesn't wait on a DB roundtrip.
@@ -191,11 +197,11 @@ const StormyAssistant = () => {
   const handleClearHistory = useCallback(() => {
     apiHistoryRef.current = [];
     try {
-      localStorage.removeItem('stormyMessages');
-      localStorage.removeItem('stormyApiHistory');
+      localStorage.removeItem(stormyStorageKey(auth?.user?.id, 'stormyMessages'));
+      localStorage.removeItem(stormyStorageKey(auth?.user?.id, 'stormyApiHistory'));
     } catch { /* storage unavailable */ }
     setMessages([{ id: '1', text: greeting, sender: 'stormy', timestamp: new Date() }]);
-  }, [greeting]);
+  }, [greeting, auth?.user?.id]);
 
   /** A starter chip is a promise that the question has an answer; see the chips note below. */
   const starters = inOffseason

@@ -1,5 +1,7 @@
 # Citrus Apple submission readiness — September 6, 2026
 
+> Historical first pass. See [the resumed verification report](READINESS_CLOSEOUT_2026-09-06.md) for the latest code, draft configuration, and remaining gates.
+
 **Status: candidate prepared and locally validated; not all submission gates are closed.** No deployment, upload or Apple submission was performed. This audit cannot guarantee approval or absence of every possible defect.
 
 ## Scope and separation

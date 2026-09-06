@@ -22,6 +22,12 @@ see [`docs/RECOVERY_STRATEGY.md`](docs/RECOVERY_STRATEGY.md) for the
 trigger rules. Verification procedure:
 [`docs/RUNBOOKS/BACKUP_RESTORE_VERIFICATION.md`](docs/RUNBOOKS/BACKUP_RESTORE_VERIFICATION.md).
 
+### Pending account safety data (September 6, 2026)
+
+Not deployed: `20260906082847_apple_review_ugc_controls.sql` adds `user_blocks` (owner-managed), `content_reports` (owner-submitted, admin-moderated), and `chat_suspensions` (server/admin only). All have RLS and explicit grants; account deletion cascades their user references. The moderation RPC logs decisions and removes reported message copies. `scripts/verification/apple-ugc-rollback.sql` exercises the migration under authenticated RLS inside a rolled-back staging transaction.
+
+Not deployed: `20260906162453_apple_provider_token_cleanup.sql` adds `apple_provider_tokens`, readable/writable only by the API service role, with AES-256-GCM application encryption and a separate server-held key. `AppleAccountService` validates ownership with Apple's token endpoint before retention. The row cascades on account deletion. No raw provider credentials belong in exports, logs, or this inventory. See `docs/apple/READINESS_CLOSEOUT_2026-09-06.md` for configuration and remaining release gates.
+
 ### 1.2 What lives in prod (Supabase, by storage size)
 
 | Table | Rows | Size | Owner / writer |

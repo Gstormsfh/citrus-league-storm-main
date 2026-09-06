@@ -5,6 +5,18 @@
 import { apiClient } from './client';
 
 export const notificationApi = {
+  reportMessage(notificationId: string, reason: string) {
+    return apiClient.post('/api/notifications/report', { notificationId, reason });
+  },
+  blockMessageSender(notificationId: string) {
+    return apiClient.post('/api/notifications/block', { notificationId });
+  },
+  getBlockedUsers() {
+    return apiClient.get('/api/notifications/blocks');
+  },
+  unblockUser(userId: string) {
+    return apiClient.delete(`/api/notifications/blocks/${encodeURIComponent(userId)}`);
+  },
   /** Get notifications for the authenticated user, scoped to a league */
   getNotifications(params?: { leagueId?: string; limit?: number; unread?: boolean }) {
     const query = new URLSearchParams();

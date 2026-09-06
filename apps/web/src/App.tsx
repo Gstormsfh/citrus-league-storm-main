@@ -92,6 +92,7 @@ const DraftRoom = lazyWithErrorHandling(() => import("./pages/DraftRoom"));
 // migrated. League-by-league rollout via the v2 URL.
 const DraftRoomV2 = lazyWithErrorHandling(() => import("./pages/DraftRoomV2"));
 const Profile = lazyWithErrorHandling(() => import("./pages/Profile"));
+const AccountDeleted = lazyWithErrorHandling(() => import("./pages/AccountDeleted"));
 const TeamAnalytics = lazyWithErrorHandling(() => import("./pages/TeamAnalytics"));
 const WaiverWire = lazyWithErrorHandling(() => import("./pages/WaiverWire"));
 const ScheduleManager = lazyWithErrorHandling(() => import("./pages/ScheduleManager"));
@@ -214,6 +215,7 @@ const App = () => {
                   <Routes>
                     <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/account-deleted" element={<AccountDeleted />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/profile-setup" element={<ProfileSetup />} />
                 <Route path="/reset-password" element={<ResetPassword />} />

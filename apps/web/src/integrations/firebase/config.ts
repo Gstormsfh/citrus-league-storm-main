@@ -3,7 +3,7 @@
 // All values come from VITE_FIREBASE_* environment variables (set in .env)
 
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAnalytics, Analytics, isSupported, setAnalyticsCollectionEnabled } from 'firebase/analytics';
+import { initializeAnalytics, Analytics, isSupported, setAnalyticsCollectionEnabled, setUserId } from 'firebase/analytics';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
@@ -58,9 +58,12 @@ function initAnalytics() {
   if (typeof window === 'undefined' || !app || analytics) return;
   isSupported()
     .then((supported) => {
-      if (supported && app && hasAnalyticsConsent()) {
+      if (supported && app && !analytics && hasAnalyticsConsent()) {
         try {
-          analytics = getAnalytics(app);
+          analytics = initializeAnalytics(app, { config: {
+            allow_google_signals: false,
+            allow_ad_personalization_signals: false,
+          } });
           setAnalyticsCollectionEnabled(analytics, true);
         } catch {
           // Silently fail
@@ -91,7 +94,10 @@ export function grantAnalyticsConsent() {
  */
 export function denyAnalyticsConsent() {
   try { localStorage.setItem(CONSENT_KEY, 'denied'); } catch { /* noop */ }
-  if (analytics) setAnalyticsCollectionEnabled(analytics, false);
+  if (analytics) {
+    setAnalyticsCollectionEnabled(analytics, false);
+    setUserId(analytics, null);
+  }
   window.dispatchEvent(new Event(ANALYTICS_CONSENT_EVENT));
 }
 

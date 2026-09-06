@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ supported: vi.fn(), get: vi.fn(), enabled: vi.fn() }));
 vi.mock('firebase/app', () => ({ initializeApp: () => ({}), getApps: () => [] }));
-vi.mock('firebase/analytics', () => ({ isSupported: mocks.supported, getAnalytics: mocks.get, setAnalyticsCollectionEnabled: mocks.enabled }));
+vi.mock('firebase/analytics', () => ({ isSupported: mocks.supported, initializeAnalytics: mocks.get, setAnalyticsCollectionEnabled: mocks.enabled, setUserId: vi.fn() }));
 beforeEach(() => {
   vi.resetModules(); vi.clearAllMocks(); localStorage.clear();
   vi.stubEnv('VITE_FIREBASE_API_KEY', 'AIzaSy-test-key-long-enough-for-config');
@@ -15,6 +15,9 @@ describe('optional analytics consent', () => {
     expect(mocks.get).not.toHaveBeenCalled();
     config.grantAnalyticsConsent();
     await vi.waitFor(() => expect(mocks.enabled).toHaveBeenCalledWith({ name: 'analytics' }, true));
+    expect(mocks.get).toHaveBeenCalledWith(expect.anything(), { config: {
+      allow_google_signals: false, allow_ad_personalization_signals: false,
+    } });
     config.denyAnalyticsConsent();
     expect(mocks.enabled).toHaveBeenLastCalledWith({ name: 'analytics' }, false);
     expect(config.getAnalyticsInstance()).toBeNull();

@@ -1,18 +1,18 @@
 # App Store Connect — release worksheet, September 6, 2026
 
-This is prepared copy and a verification worksheet, not confirmation of App Store Connect completion. See [the readiness report](SUBMISSION_READINESS_2026-09-06.md) for actual tests and release gates.
+The fields below have been prepared; the current saved draft state and outstanding items are recorded in [the resumed verification report](READINESS_CLOSEOUT_2026-09-06.md). Nothing has been submitted. See [the readiness report](SUBMISSION_READINESS_2026-09-06.md) for actual tests and release gates.
 
 ## App information
 
-- Name: `CitrusSports — Fantasy Hockey`
+- Name: `Citrus Fantasy Sports`
 - Subtitle: `Fresh-squeezed fantasy hockey`
 - Primary category: Sports
 - Bundle ID: `com.citrussports.app`
-- Current candidate: version 1.0, build 4. Verify build-number availability in App Store Connect before upload.
+- Current candidate: version 1.0, build 5. Verify build-number availability in App Store Connect before upload.
 
 ## Description draft
 
-CitrusSports brings season-long fantasy hockey to your phone. Create or join a league, draft your roster, manage your lineup, follow matchups and explore player statistics.
+Citrus Fantasy Sports brings season-long fantasy hockey to your phone. Create or join a league, draft your roster, manage your lineup, follow matchups and explore player statistics.
 
 Use Stormy for fantasy hockey questions with your league context. Before sending a question, Citrus explains what information will be shared with Anthropic and asks for your permission. Stormy has a weekly question limit.
 
@@ -33,16 +33,18 @@ All three HTTPS destinations returned 200 during this sweep. The revised policie
 
 Disclose collection by both Citrus and its service providers, including optional collection. Confirm these answers against the final archive's privacy report and deployed service settings.
 
-| Data | Linked to account | Purpose / evidence |
+| Data | Linked | Purposes saved in draft |
 |---|---|---|
-| Email address, display name, user ID | Yes | Account functionality; signed-in Sentry identity |
-| Photos/videos | Yes | Optional profile-photo upload |
-| Other user content | Yes | League activity and questions sent to Stormy |
-| Device ID | Yes | Push registration / analytics identifiers |
-| Product interaction | Yes | Firebase Analytics, opt-in; user ID association |
-| Crash / other diagnostic data | Yes | Sentry error reports and context |
+| Name, email, phone | Yes | App functionality |
+| Coarse location | Yes | App functionality, analytics |
+| Emails/text messages, photos/videos, customer support | Yes | App functionality |
+| Gameplay content, other user content | Yes | App functionality, product personalization |
+| User ID | Yes | App functionality, analytics, product personalization |
+| Device ID | Yes | App functionality, analytics |
+| Product interaction | Yes | Analytics |
+| Crash data, other diagnostic data | Yes | App functionality |
 
-Native tracking flag is false; native build strips AdSense. No location permission is requested. Confirm whether configured analytics/providers retain IP-derived coarse location or additional performance data, and disclose them if collected. Do not copy web-ad answers into the native app questionnaire. User ID may also serve Analytics purpose; make the Connect worksheet reflect actual SDK behavior rather than treating the app manifest as the entire disclosure.
+All 14 types are configured and saved, not published. No tracking is selected. The native build strips AdSense and disables Google signals/ad personalization. Location includes optional profile location and provider-derived coarse location; no device location permission is requested. Recheck actual deployed provider settings before publication.
 
 ## Age rating
 

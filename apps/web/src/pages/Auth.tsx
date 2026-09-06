@@ -381,7 +381,7 @@ const Auth = () => {
         className="fixed inset-0 pointer-events-none z-page-backdrop"
         style={{ background: 'radial-gradient(ellipse 50% 40% at 80% 15%, rgba(255,107,26,0.08) 0%, transparent 60%)' }}
       />
-      <main className="pb-type-phone relative z-10 flex items-center justify-center px-4 pt-[calc(2.5rem+env(safe-area-inset-top))] pb-12 lg:pt-28 lg:pb-20 min-h-[calc(100vh-92px)] max-lg:min-h-screen max-lg:bg-pressbox-surface max-lg:text-pressbox-text max-lg:px-5">
+      <main className="pb-type-phone relative z-10 flex items-center justify-center px-4 pt-[calc(2.5rem+env(safe-area-inset-top))] pb-12 lg:pt-[calc(7rem+env(safe-area-inset-top))] lg:pb-20 min-h-[calc(100vh-92px)] max-lg:min-h-screen max-lg:bg-pressbox-surface max-lg:text-pressbox-text max-lg:px-5">
         <div className="w-full max-w-[440px]">
           <div className="flex flex-col items-center mb-6">
             <CitrusLogo className="w-14 h-14 mb-4 lg:w-10 lg:h-10 lg:mb-3" variant="on-dark" />

@@ -1067,7 +1067,7 @@ const Profile = () => {
       const result = await UserAccountService.deleteAccount();
       if (!result.success) throw new Error(result.error || 'Deletion failed');
       await signOut();
-      navigate('/auth', { replace: true });
+      navigate('/account-deleted', { replace: true, state: { deleted: true } });
     } catch (error: unknown) {
       logger.error('Account deletion error:', error);
       setSettingsMessage({
