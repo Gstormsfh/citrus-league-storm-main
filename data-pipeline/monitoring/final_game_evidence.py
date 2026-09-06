@@ -3,6 +3,10 @@
 Shootout goals do not enter skater statistics. A final SO scoreboard includes one
 winner goal, whose team must be established by the captured shootout attempts.
 This gate never supplies missing team identities, scores, or source events.
+Awarded goals can carry goal credit without another SOG. The JSON observation
+has no affirmative awarded-goal marker, so an unresolved totals mismatch is
+quarantined pending independent statistical evidence, not proof of a bad feed.
+In particular, missing shotType alone must never trigger a SOG exclusion.
 """
 def verify_final_game(payload):
     if payload.get('gameState') not in ('OFF', 'FINAL'):

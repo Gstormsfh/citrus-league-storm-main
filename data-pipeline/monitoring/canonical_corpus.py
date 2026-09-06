@@ -205,7 +205,8 @@ def main():
     source.add_argument('--env-file',type=Path)
     source.add_argument('--export-manifest',type=Path)
     parser.add_argument('--project-ref', required=True)
-    parser.add_argument('--receipts',type=Path,required=True)
+    parser.add_argument('--receipts',type=Path,required=True,action='append',
+                        help='Frozen receipt directory; repeat for disjoint game sets')
     parser.add_argument('--output',type=Path,required=True)
     args=parser.parse_args()
     args.output.mkdir(parents=True,exist_ok=False)
@@ -231,7 +232,8 @@ def main():
     (args.output/'stored-snapshot.json').write_text(json.dumps(snapshot,sort_keys=True,allow_nan=False))
     baseline=reconcile(second['nhl'],[r for r in second['raw'] if r.get('period_type')!='SO'])
     (args.output/'stored-identity-quarantine.json').write_text(json.dumps(baseline,sort_keys=True))
-    receipts=[json.loads(path.read_text()) for path in sorted(args.receipts.glob('*.json')) if path.name!='health.json']
+    receipts=[json.loads(path.read_text()) for directory in args.receipts
+              for path in sorted(directory.glob('*.json')) if path.name!='health.json']
     official=compare_official(second,receipts)
     (args.output/'official-reconciliation.json').write_text(json.dumps(official,sort_keys=True))
     health={'event':'canonical_corpus.health','source_hashes':baseline['source_sha256'],
