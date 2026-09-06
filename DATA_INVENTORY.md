@@ -126,6 +126,14 @@ configuration and `local_tmpfs_contract.mjs` to require matching bounded config,
 inspection and live kernel mount evidence. Its nine Node tests reject persistent,
 missing, duplicate, unbounded and inconsistent mounts. The Python/reader proof
 is reused byte-for-byte; this is an infrastructure-only correction.
+The v2 attempt `local-model-publication-20260906-1107` retains successful live
+tmpfs verification but no usable published host port on the internal network;
+it also stops before model/database setup and preserves cleanup evidence.
+`run_local_model_publication_v3.mjs` uses a task-owned bridge with explicit,
+verified loopback host ports (not an egress-firewall claim) and TCP readiness.
+`local_port_contract.mjs` and its eight Node tests reject missing, external,
+duplicate, unassigned or invalid host bindings. Both earlier launchers remain
+byte-pinned; the model, publisher, SQL and reader are unchanged.
 
 Additive shape-calibration experiment (2026-09-06):
 `docs/analytics-calibration-shape-plan-20260906.json` predeclares four new
