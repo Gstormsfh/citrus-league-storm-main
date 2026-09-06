@@ -101,9 +101,16 @@ not claim an independent statistical recomputation. Twenty-two experiment files
 (including health) and the full review remain in their create-only result roots.
 
 The [compact index](analytics-calibration-shape-result-index-20260906.json)
-pins health, result and the 31,005,803-byte full review. The separate local
-archive receipt records exact member and hash verification. No originals were
+pins health, result and the 31,005,803-byte full review. The separate
+[local archive receipt](analytics-calibration-shape-checkpoint-archive-20260906.json)
+records exact member and hash verification. No originals were
 removed. Local duplication is not off-machine disaster recovery.
+
+The archive binds source commit `406c10b3`, all 23 new evidence files and 2,111
+tracked source members. Closing independent checks matched both new compressed
+archive hashes and all three indexed result/review hashes. A separate check
+also matched the 46 prior legacy/first-experiment/archive/result-index hashes,
+including all 17 inventoried legacy artifacts and the original reservation.
 
 Before fitting: 1,658 offline Python tests passed, 16 network tests deselected,
 with 33 existing datetime warnings. Shared TypeScript type checking and all

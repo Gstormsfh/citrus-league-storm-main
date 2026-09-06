@@ -1,0 +1,56 @@
+{
+  "archives": [
+    {
+      "bytes": 15358197,
+      "complete_membership_verified": true,
+      "every_member_matches_retained_source": true,
+      "extracted_to_filesystem": false,
+      "member_inventory_sha256": "3a892ef0d020be4084b8144cf618e72432c392466d0928d55c91da59c338d69f",
+      "path": "scripts/proof/results/analytics-calibration-shape-checkpoint-20260906-1014/source-head.tar.gz",
+      "regular_bytes": 44934068,
+      "regular_files": 2111,
+      "sha256": "d8422fe9e74ceb79ea680b1c5a85f05a2f04949e8b698794a1c118b7862008cd"
+    },
+    {
+      "bytes": 32426753,
+      "complete_membership_verified": true,
+      "every_member_matches_retained_source": true,
+      "extracted_to_filesystem": false,
+      "member_inventory_sha256": "12efd93b6b9bd943074e24b50e06cfe80d87bd4d4613aae2d4e19c947f60e252",
+      "path": "scripts/proof/results/analytics-calibration-shape-checkpoint-20260906-1014/evidence.tar.gz",
+      "regular_bytes": 263989770,
+      "regular_files": 23,
+      "sha256": "a465538ec1063548a9e6f14c3523093afb017918baf232ee74a640fa252ff900"
+    }
+  ],
+  "contract": "citrus-local-calibration-shape-checkpoint-v1",
+  "evidence_roots": [
+    "scripts/proof/results/official-calibration-shape-experiment-20260906",
+    "scripts/proof/results/official-calibration-shape-review-20260906"
+  ],
+  "experiment_health_sha256": "8115eaab1f053610da6669a4a75b427bf19c17abf8b50fd736c8dc6d26b75cf8",
+  "limitations": [
+    "Local duplicate only, not off-machine backup or acceptance.",
+    "Prior archives and reservations remain separately preserved."
+  ],
+  "originals_removed": false,
+  "publishable": false,
+  "review_sha256": "eef47805687e40df9b92c02947672c71a5ec4d4701b3d9b776c77de316b88c3c",
+  "source_commit": "406c10b39201e3b63f211ec46274a4c645c0d627",
+  "source_roots": [
+    "data-pipeline/projections",
+    "data-pipeline/acquisition",
+    "data-pipeline/monitoring",
+    "data-pipeline/models",
+    "data-pipeline/tests",
+    "supabase/migrations",
+    "scripts/proof",
+    "docs",
+    "server/src",
+    "packages/shared/src",
+    "apps/web/src",
+    "DATA_INVENTORY.md"
+  ],
+  "status": "complete-verified-local-duplicate",
+  "verified_at": "2026-09-06T10:14:10.321923+00:00"
+}
