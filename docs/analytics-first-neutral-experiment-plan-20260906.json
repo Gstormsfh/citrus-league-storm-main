@@ -12,6 +12,7 @@
     "test": {"start": "2025-07-01", "end": "2026-08-31"}
   },
   "source": "newly_frozen_official_nhl_gamecenter_play_by_play",
+  "source_seasons": [2019, 2020, 2021, 2022, 2023, 2024, 2025],
   "source_files_excluded_from_training": ["MoneyPuck", "legacy_unverified_bulk_import", "unknown_joblib_or_pickle_artifacts"],
   "preservation": {
     "all_original_source_receipts_and_conflicts": "retain_unchanged",
