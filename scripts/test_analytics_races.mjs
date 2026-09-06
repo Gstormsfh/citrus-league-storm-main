@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 
 const port = Number(process.env.ANALYTICS_TEST_PG_PORT);
-if (!Number.isInteger(port) || port < 1024) throw new Error('Explicit disposable local PG port required');
+if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Explicit disposable local PG port required');
 const clients = await Promise.all(Array.from({length:3}, async()=>{
   const client=new Client({host:'127.0.0.1',port,user:'postgres',database:'postgres',connectionTimeoutMillis:3000});
   await client.connect();
@@ -16,6 +16,7 @@ const clients = await Promise.all(Array.from({length:3}, async()=>{
 }));
 const [admin,a,b]=clients;
 let checks=0;
+const lockWitnesses=[];
 try {
   const {rows:[existing]}=await admin.query("SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public'");
   if(existing.n) throw new Error('Refusing nonempty database');
@@ -25,11 +26,15 @@ try {
   }
   await a.query('SET ROLE service_role'); await b.query('SET ROLE service_role');
   const pid=(await b.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+  const blockerPid=(await a.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+  assert.notEqual(pid,blockerPid);
   async function blocked() {
     const until=Date.now()+2500;
     while(Date.now()<until) {
-      const {rows:[state]}=await admin.query('SELECT wait_event_type FROM pg_stat_activity WHERE pid=$1',[pid]);
-      if(state.wait_event_type==='Lock') {checks++;return;}
+      const {rows:[state]}=await admin.query('SELECT pid,wait_event_type,wait_event,pg_blocking_pids(pid) AS blockers FROM pg_stat_activity WHERE pid=$1',[pid]);
+      if(state.wait_event_type==='Lock' && state.blockers.includes(blockerPid)) {
+        lockWitnesses.push(state);checks++;return;
+      }
       await new Promise(resolve=>setTimeout(resolve,20));
     }
     throw new Error('Expected independent connection to block on row lock');
@@ -38,7 +43,9 @@ try {
     const sid=randomUUID(),bid=randomUUID();
     await admin.query("INSERT INTO analytics_source_snapshots(id,source,observed_at,payload) VALUES($1,'race',now()-interval '1 day','{}')",[sid]);
     await admin.query(`INSERT INTO analytics_metric_batches(id,source_snapshot_id,metric,variant,unit,season,game_type,population,feature_version,model_version,code_revision,data_cutoff,expected_entities,validation)
-      VALUES($1,$2,'fixture','v1','unit',2025,'regular','skaters','v1','none',$3,now(),1,'{"status":"passed","entity_ids":[1]}')`,[bid,sid,'0'.repeat(40)]);
+      VALUES($1,$2,'fixture','v1','unit',2025,'regular','skaters','v1','none',$3,now(),1,
+      jsonb_build_object('status','passed','entity_ids',jsonb_build_array(1),'gate_version','fixture-v1',
+      'evidence_sha256',repeat('a',64),'freshness_observed_at','2020-01-01T00:00:00Z'))`,[bid,sid,'0'.repeat(40)]);
     return bid;
   }
   const value=(client,id,entity=1)=>client.query("INSERT INTO analytics_metric_values VALUES($1,$2,1,'available','verified',NULL)",[id,entity]);
@@ -64,6 +71,9 @@ try {
   await b.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
   await assert.rejects(value(b,second,3),/READ COMMITTED/);checks++;
   await b.query('ROLLBACK');
+  await b.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
+  await assert.rejects(publish(b,second),/READ COMMITTED/);checks++;
+  await b.query('ROLLBACK');
 
   const [snapshot,events,manifest]=JSON.parse(execFileSync('python3',['-c',`
 import json
@@ -79,15 +89,26 @@ print(json.dumps(prepare_observation(game([shot()]),'2026-01-01T00:00:00Z')))
   await a.query('BEGIN');await insert(a,'analytics_event_observations',events[0]);
   const seal=insert(b,'analytics_event_observation_sets',manifest).then(()=>null,error=>error);
   await blocked();await a.query('COMMIT');assert.equal(await seal,null);checks++;
+  const sealingId=randomUUID();
+  await insert(a,'analytics_source_snapshots',{...snapshot,id:sealingId,observed_at:'2026-01-02T00:00:00Z'});
+  await insert(a,'analytics_event_observations',{...events[0],snapshot_id:sealingId});
   await a.query('BEGIN');
-  await a.query('SELECT id FROM analytics_source_snapshots WHERE id=$1 FOR UPDATE',[snapshot.id]);
-  const append=insert(b,'analytics_event_observations',{...events[0],event_id:2}).then(()=>null,error=>error);
+  await insert(a,'analytics_event_observation_sets',{...manifest,snapshot_id:sealingId});
+  const append=insert(b,'analytics_event_observations',{...events[0],snapshot_id:sealingId,event_id:2}).then(()=>null,error=>error);
   await blocked();await a.query('COMMIT');assert.match((await append)?.message ?? '',/sealed/);checks++;
+  // A's uncommitted final observation disappears; B must reject its seal.
+  const rollbackId=randomUUID();
+  await insert(a,'analytics_source_snapshots',{...snapshot,id:rollbackId,observed_at:'2026-01-03T00:00:00Z'});
+  await a.query('BEGIN');
+  await insert(a,'analytics_event_observations',{...events[0],snapshot_id:rollbackId});
+  const rollbackSeal=insert(b,'analytics_event_observation_sets',{...manifest,snapshot_id:rollbackId}).then(()=>null,error=>error);
+  await blocked();await a.query('ROLLBACK');
+  assert.match((await rollbackSeal)?.message ?? '',/Incomplete or conflicting/);checks++;
   await b.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
   await assert.rejects(insert(b,'analytics_event_observations',{...events[0],event_id:3}),/READ COMMITTED/);checks++;
   await b.query('ROLLBACK');
   const {rows:[version]}=await admin.query('SHOW server_version');
-  console.log(JSON.stringify({checks,postgres:version.server_version,independentConnections:3,status:'passed'}));
+  console.log(JSON.stringify({checks,postgres:version.server_version,independentConnections:3,lockWitnesses,status:'passed'}));
 } finally {
   for(const client of clients) {await client.query('ROLLBACK').catch(()=>{});await client.end();}
 }

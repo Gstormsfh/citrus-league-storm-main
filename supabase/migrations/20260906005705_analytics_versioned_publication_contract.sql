@@ -15,6 +15,8 @@ CREATE TABLE public.analytics_source_snapshots (
   payload jsonb NOT NULL,
   payload_sha256 text NOT NULL,
   recorded_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (isfinite(observed_at) AND isfinite(recorded_at)),
+  CHECK (source_published_at IS NULL OR isfinite(source_published_at)),
   CHECK (observed_at <= recorded_at),
   UNIQUE(source, observed_at, payload_sha256)
 );
@@ -35,6 +37,7 @@ CREATE TABLE public.analytics_metric_batches (
   computed_at timestamptz NOT NULL DEFAULT now(),
   expected_entities integer NOT NULL CHECK (expected_entities>0),
   validation jsonb NOT NULL CHECK (jsonb_typeof(validation)='object'),
+  CHECK (isfinite(data_cutoff) AND isfinite(computed_at)),
   CHECK (data_cutoff <= computed_at)
 );
 CREATE INDEX analytics_batches_source_idx ON public.analytics_metric_batches(source_snapshot_id);
@@ -72,6 +75,8 @@ END $$;
 CREATE FUNCTION public.analytics_hash_snapshot() RETURNS trigger
 LANGUAGE plpgsql SET search_path=public AS $$
 BEGIN
+  -- Receipt time is assigned by the database, never supplied by an uploader.
+  NEW.recorded_at := clock_timestamp();
   NEW.payload_sha256 := encode(sha256(convert_to(NEW.payload::text,'UTF8')),'hex');
   RETURN NEW;
 END $$;
@@ -95,7 +100,7 @@ END $$;
 CREATE FUNCTION public.analytics_guard_publication() RETURNS trigger
 LANGUAGE plpgsql SET search_path=public AS $$
 DECLARE b public.analytics_metric_batches; actual bigint; observed timestamptz;
-  expected_ids bigint[]; actual_ids bigint[];
+  expected_ids bigint[]; actual_ids bigint[]; freshness timestamptz;
 BEGIN
   IF current_setting('transaction_isolation')<>'read committed' THEN
     RAISE EXCEPTION 'Analytics writes require READ COMMITTED isolation';
@@ -108,8 +113,24 @@ BEGIN
   IF b.validation->>'status' IS DISTINCT FROM 'passed' THEN
     RAISE EXCEPTION 'Analytics foundation validation has not passed';
   END IF;
+  IF jsonb_typeof(b.validation->'gate_version') IS DISTINCT FROM 'string'
+    OR length(btrim(b.validation->>'gate_version'))=0
+    OR jsonb_typeof(b.validation->'evidence_sha256') IS DISTINCT FROM 'string'
+    OR NOT (b.validation->>'evidence_sha256' ~ '^[0-9a-f]{64}$')
+    OR jsonb_typeof(b.validation->'freshness_observed_at') IS DISTINCT FROM 'string'
+    OR NOT (b.validation->>'freshness_observed_at' ~ '(Z|[+-][0-9]{2}:[0-9]{2})$') THEN
+    RAISE EXCEPTION 'Explicit typed foundation receipt is required';
+  END IF;
+  freshness := (b.validation->>'freshness_observed_at')::timestamptz;
+  IF NOT isfinite(freshness) THEN
+    RAISE EXCEPTION 'Finite freshness observation is required';
+  END IF;
   IF jsonb_typeof(b.validation->'entity_ids') IS DISTINCT FROM 'array' THEN
     RAISE EXCEPTION 'Explicit expected entity identities are required';
+  END IF;
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(b.validation->'entity_ids') AS x(v)
+    WHERE jsonb_typeof(v)<>'number' OR v::text !~ '^-?[0-9]+$') THEN
+    RAISE EXCEPTION 'Expected entity identities must be JSON integers';
   END IF;
   SELECT array_agg(v::bigint ORDER BY v::bigint) INTO expected_ids
     FROM jsonb_array_elements_text(b.validation->'entity_ids') AS x(v);
@@ -119,8 +140,14 @@ BEGIN
     RAISE EXCEPTION 'Analytics entity identities do not match the expected manifest';
   END IF;
   SELECT observed_at INTO observed FROM public.analytics_source_snapshots WHERE id=b.source_snapshot_id;
+  IF b.data_cutoff>clock_timestamp() THEN
+    RAISE EXCEPTION 'Data cutoff cannot be in the future';
+  END IF;
   IF observed>b.data_cutoff THEN
     RAISE EXCEPTION 'Source was observed after the claimed cutoff';
+  END IF;
+  IF freshness>observed THEN
+    RAISE EXCEPTION 'Freshness cannot be newer than source observation';
   END IF;
   NEW.published_at := clock_timestamp();
   RETURN NEW;

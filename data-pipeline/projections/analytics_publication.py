@@ -9,10 +9,12 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import math
+import re
 import uuid
 
 
 def fingerprint(value):
+    """Python identity/evidence digest, NOT the DB's jsonb-text payload digest."""
     return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',', ':'),allow_nan=False).encode()).hexdigest()
 
 
@@ -28,8 +30,11 @@ def stable_id(kind, value):
 
 
 def prepare(source, observed_at, payload, metadata, values, validation):
-    if (validation.get('status') != 'passed' or not validation.get('gate_version')
-            or len(validation.get('evidence_sha256','')) != 64):
+    if (validation.get('status') != 'passed'
+            or not isinstance(validation.get('gate_version'),str)
+            or not validation['gate_version'].strip()
+            or not isinstance(validation.get('evidence_sha256'),str)
+            or re.fullmatch('[0-9a-f]{64}',validation['evidence_sha256']) is None):
         raise ValueError('Explicit passed foundation evidence is required')
     required = {'metric','variant','unit','season','game_type','population',
                 'feature_version','model_version','code_revision','data_cutoff'}
@@ -43,6 +48,10 @@ def prepare(source, observed_at, payload, metadata, values, validation):
         if set(row) != {'entity_id','value','availability','reason','exposure'}:
             raise ValueError('Metric row must carry availability, reason and exposure')
         v = row['value']
+        exposure = row['exposure']
+        if exposure is not None and (type(exposure) not in (int,float)
+                or not math.isfinite(exposure) or exposure < 0):
+            raise ValueError('Exposure requires finite nonnegative data or NULL')
         if row['availability']=='available':
             if row['reason']!='verified' or type(v) not in (int,float) or not math.isfinite(v):
                 raise ValueError('Available values require finite verified data')

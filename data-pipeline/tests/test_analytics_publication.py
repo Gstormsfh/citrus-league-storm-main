@@ -3,12 +3,13 @@ import pytest
 from projections.analytics_publication import prepare, AnalyticsPublisher
 
 
-def prepared(value=5):
+def prepared(value=5,exposure=2,validation=None):
     return prepare('NHL fixtures','2026-09-05T00:00:00Z',{'gameLog':[]},
       {'metric':'avg_toi','variant':'official','unit':'minutes','season':2025,
        'game_type':'regular','population':'skaters','feature_version':'v1',
        'model_version':'none','code_revision':'0'*40,'data_cutoff':'2026-09-05T00:00:00Z'},
-      [{'entity_id':1,'value':value,'availability':'available','reason':'verified','exposure':2}],
+      [{'entity_id':1,'value':value,'availability':'available','reason':'verified','exposure':exposure}],
+      validation if validation is not None else
       {'status':'passed','gate_version':'fixture-v1','evidence_sha256':'a'*64})
 
 
@@ -63,3 +64,34 @@ def test_conflicting_stored_value_is_not_overwritten():
 def test_nonfinite_values_rejected_before_database_work():
     with pytest.raises(ValueError,match='finite'):
         prepared(float('nan'))
+
+
+@pytest.mark.parametrize('exposure',[-1,float('inf'),float('nan'),True,'2'])
+def test_invalid_exposure_rejected_before_database_work(exposure):
+    with pytest.raises(ValueError,match='Exposure'):
+        prepared(exposure=exposure)
+
+
+@pytest.mark.parametrize('overrides',[
+    {'gate_version':True},{'gate_version':' '},{'evidence_sha256':'g'*64},
+    {'evidence_sha256':None},{'freshness_observed_at':'2026-09-06T00:00:00Z'},
+    {'freshness_observed_at':'2026-09-05T00:00:00'},
+])
+def test_invalid_receipt_rejected_before_database_work(overrides):
+    with pytest.raises(ValueError):
+        prepared(validation={'status':'passed','gate_version':'fixture-v1',
+                             'evidence_sha256':'a'*64,**overrides})
+
+
+def test_retry_after_lost_publication_response_reuses_committed_evidence():
+    class LostResponseDb(Db):
+        def insert(self,table,rows):
+            super().insert(table,rows)
+            if table=='analytics_publications':
+                raise RuntimeError('response lost after commit')
+    db=LostResponseDb()
+    publisher=AnalyticsPublisher(db)
+    with pytest.raises(RuntimeError,match='response lost'):
+        publisher.publish(prepared())
+    assert publisher.publish(prepared())['replayed']
+    assert len(db.tables['analytics_publications'])==1

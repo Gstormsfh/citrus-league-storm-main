@@ -86,6 +86,21 @@ BEGIN
   END IF;
   SELECT payload->'normalization' INTO evidence FROM public.analytics_source_snapshots
     WHERE id=NEW.snapshot_id AND source='NHL official play-by-play' FOR UPDATE;
+  IF jsonb_typeof(evidence) IS DISTINCT FROM 'object'
+    OR jsonb_typeof(evidence->'game_id') IS DISTINCT FROM 'number'
+    OR jsonb_typeof(evidence->'input_events') IS DISTINCT FROM 'number'
+    OR jsonb_typeof(evidence->'complete') IS DISTINCT FROM 'boolean'
+    OR jsonb_typeof(evidence->'events') IS DISTINCT FROM 'array'
+    OR jsonb_typeof(evidence->'quarantine') IS DISTINCT FROM 'array'
+    OR jsonb_typeof(evidence->'excluded') IS DISTINCT FROM 'object' THEN
+    RAISE EXCEPTION 'Observation manifest requires typed source evidence';
+  END IF;
+  IF (evidence->>'game_id') !~ '^[0-9]+$'
+    OR (evidence->>'input_events') !~ '^[0-9]+$'
+    OR EXISTS (SELECT 1 FROM jsonb_each(evidence->'excluded') AS x(key,value)
+      WHERE jsonb_typeof(value)<>'number' OR value::text !~ '^[0-9]+$') THEN
+    RAISE EXCEPTION 'Observation manifest counts must be nonnegative JSON integers';
+  END IF;
   IF evidence IS NULL OR evidence->>'contract' IS DISTINCT FROM NEW.contract
     OR (evidence->>'game_id')::integer IS DISTINCT FROM NEW.game_id
     OR jsonb_array_length(evidence->'events') IS DISTINCT FROM NEW.expected_events
@@ -94,6 +109,10 @@ BEGIN
     OR evidence->>'complete' IS DISTINCT FROM (NEW.status='complete')::text
     OR (evidence->>'input_events')::integer IS DISTINCT FROM NEW.expected_events+NEW.quarantined_events+NEW.excluded_events THEN
     RAISE EXCEPTION 'Observation manifest does not match source evidence';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.analytics_event_observations
+    WHERE snapshot_id=NEW.snapshot_id AND game_id<>NEW.game_id) THEN
+    RAISE EXCEPTION 'Observation game does not match source manifest';
   END IF;
   SELECT coalesce(jsonb_agg(to_jsonb(e)-'snapshot_id' ORDER BY event_id),'[]') INTO actual
     FROM public.analytics_event_observations e WHERE snapshot_id=NEW.snapshot_id;

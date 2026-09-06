@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 
 const { PGlite } = await import(pathToFileURL(process.env.PGLITE_MODULE));
 const db = new PGlite();
@@ -38,6 +39,26 @@ for (const [snapshot, events, manifest] of fixtures) {
 }
 const {rows} = await db.query('SELECT status,count(*)::integer AS n FROM analytics_event_observation_sets GROUP BY status ORDER BY status');
 assert.deepEqual(rows, [{status:'complete',n:2},{status:'quarantined',n:1}]); checks++;
+for (const change of [
+  evidence=>{evidence.complete='true';},
+  evidence=>{evidence.game_id=String(evidence.game_id);},
+  evidence=>{evidence.excluded={malformed:-1};},
+  evidence=>{evidence.excluded={malformed:'0'};},
+  evidence=>{evidence.events=null;},
+]) {
+  const [snapshot,,manifest]=structuredClone(fixtures[0]);
+  snapshot.id=randomUUID(); change(snapshot.payload.normalization);
+  await insert('analytics_source_snapshots',snapshot);
+  await rejected(()=>insert('analytics_event_observation_sets',{...manifest,snapshot_id:snapshot.id}),/typed source evidence|nonnegative JSON integers/);
+}
+// A self-consistent event manifest may still belong to the wrong game.
+const [otherSource,otherEvents,otherManifest]=structuredClone(fixtures[0]);
+otherSource.id=randomUUID();
+otherSource.payload.normalization.events[0].game_id+=1;
+otherEvents[0].game_id+=1; otherEvents[0].snapshot_id=otherSource.id;
+await insert('analytics_source_snapshots',otherSource);
+await insert('analytics_event_observations',otherEvents[0]);
+await rejected(()=>insert('analytics_event_observation_sets',{...otherManifest,snapshot_id:otherSource.id}),/game does not match/);
 await db.exec('RESET ROLE');
 await rejected(()=>db.query('UPDATE analytics_event_observations SET x_raw=1'), /immutable/);
 await rejected(()=>db.query('DELETE FROM analytics_event_observation_sets'), /immutable/);
