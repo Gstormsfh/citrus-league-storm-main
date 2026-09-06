@@ -29,7 +29,7 @@
 //     the room continues to render with `#<id>` fallbacks.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CURRENT_SEASON } from '@citrus/shared';
+import { CURRENT_SEASON, normalizeToiSeconds } from '@citrus/shared';
 import { logger } from '@/utils/logger';
 import type { Player } from '@/services/PlayerService';
 
@@ -160,7 +160,7 @@ function applySeasonStats(p: Player, s: SeasonStatsRow): void {
   p.ppp = n(s.nhl_ppp);
   p.shp = n(s.nhl_shp);
   p.plus_minus = n(s.nhl_plus_minus);
-  p.icetime_seconds = n(s.nhl_toi_seconds);
+  p.icetime_seconds = normalizeToiSeconds(s.nhl_toi_seconds);
   // xG (2026-08-13) — see SeasonStatsRow.x_goals. Skaters only in
   // practice; goalie rows carry 0 here and their xG-flavoured stat is
   // goals-saved-above-expected, which lives in raw_player_stats and is

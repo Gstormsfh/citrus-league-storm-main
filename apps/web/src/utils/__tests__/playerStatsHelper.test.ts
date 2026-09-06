@@ -113,6 +113,12 @@ describe('getPlayerWithSeasonStats', () => {
     expect(result!.stats.xGoals).toBe(22.5);
   });
 
+  it.each([null, undefined, NaN, Infinity, -1, 0])('formats unavailable versus measured zero TOI: %s', async (toi) => {
+    mockGetPlayersByIds.mockResolvedValue([makePlayer({ icetime_seconds: toi, games_played: 40 })]);
+    const result = await getPlayerWithSeasonStats('8478402');
+    expect(result!.stats.toi).toBe(toi === 0 ? '0:00' : undefined);
+  });
+
   it('formats TOI per game correctly', async () => {
     // 50400 seconds / 40 games = 1260 sec/game = 21:00
     const player = makePlayer({ icetime_seconds: 50400, games_played: 40 });

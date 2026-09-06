@@ -1,3 +1,4 @@
+import { normalizeToiSeconds } from '@citrus/shared';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS, getCurrentSeason, parseEligiblePositions, type EligiblePositionsRaw } from '@citrus/shared';
 import { readAllPaged } from '../lib/pagedRead';
@@ -36,7 +37,7 @@ interface PlayerStatsRow {
   nhl_ppp: number;
   nhl_shp: number;
   nhl_plus_minus: number;
-  nhl_toi_seconds: number;
+  nhl_toi_seconds: number | null;
   goalie_gp: number;
   nhl_wins: number;
   nhl_losses: number;
@@ -93,7 +94,7 @@ interface NormalizedPlayer {
   ppp: number;
   shp: number;
   plus_minus: number;
-  icetime_seconds: number;
+  icetime_seconds: number | null;
   x_goals: number;
   goalie_gp: number;
   wins: number;
@@ -195,7 +196,7 @@ function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talen
     ppp: stat.nhl_ppp || 0,
     shp: stat.nhl_shp || 0,
     plus_minus: stat.nhl_plus_minus || 0,
-    icetime_seconds: stat.nhl_toi_seconds || 0,
+    icetime_seconds: normalizeToiSeconds(stat.nhl_toi_seconds),
     x_goals: stat.x_goals || 0,
     goalie_gp: stat.goalie_gp || 0,
     wins: stat.nhl_wins || 0,

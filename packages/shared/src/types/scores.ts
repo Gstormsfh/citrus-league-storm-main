@@ -139,7 +139,8 @@ export interface ScoresPlayerActuals {
   blocks: number;
   hits: number;
   ppp: number;
-  toiSeconds: number;
+  /** Official game seconds; null means missing/invalid, while 0 is measured. */
+  toiSeconds: number | null;
   /** Goalie-only. Null on skaters. */
   saves: number | null;
   goalsAgainst: number | null;

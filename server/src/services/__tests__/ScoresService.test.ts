@@ -364,7 +364,7 @@ describe('ScoresService.getDay', () => {
     expect(result!.games[0].citrus!.hasActuals).toBe(false);
   });
 
-  it('scores real actuals through ScoringCalculator under default settings', async () => {
+  it.each([null, undefined, NaN, Infinity, -1, 0, 1140])('scores actuals without fabricating TOI: %s', async (toi) => {
     const svc = new ScoresService(
       makeSupabase({
         nhl_games: [FINAL_GAME],
@@ -378,7 +378,7 @@ describe('ScoresService.getDay', () => {
             is_goalie: false,
             nhl_goals: 1, nhl_assists: 1, nhl_points: 2, nhl_shots_on_goal: 4,
             nhl_blocks: 1, nhl_hits: 3, nhl_ppp: 1, nhl_shp: 0, nhl_pim: 2,
-            nhl_plus_minus: 1, nhl_toi_seconds: 1140, nhl_saves: 0,
+            nhl_plus_minus: 1, nhl_toi_seconds: toi, nhl_saves: 0,
             nhl_goals_against: 0, nhl_wins: 0, nhl_shutouts: 0,
           },
         ],
@@ -390,6 +390,7 @@ describe('ScoresService.getDay', () => {
     // G 6 + A 4 + PPP 2 + SOG 4x0.9 + BLK 1 = 16.6. Hits and PIM score 0.
     expect(line.actualPoints).toBeCloseTo(16.6, 5);
     expect(line.actuals).toMatchObject({ goals: 1, assists: 1, shotsOnGoal: 4, hits: 3 });
+    expect(line.actuals!.toiSeconds).toBe(toi === 0 || toi === 1140 ? toi : null);
     expect(result!.games[0].citrus!.hasActuals).toBe(true);
   });
 

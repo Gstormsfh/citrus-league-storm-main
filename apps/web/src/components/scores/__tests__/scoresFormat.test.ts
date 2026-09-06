@@ -137,6 +137,11 @@ describe('numbers', () => {
     expect(formatToi(65)).toBe('1:05');
     expect(formatToi(0)).toBe('0:00');
     expect(formatToi(null)).toBe('.');
+    expect(formatToi(undefined)).toBe('.');
+    expect(formatToi(-1)).toBe('.');
+    expect(formatToi(Infinity)).toBe('.');
+    expect(formatToi(NaN)).toBe('.');
+    expect(formatToi(59.9)).toBe('1:00');
   });
 });
 

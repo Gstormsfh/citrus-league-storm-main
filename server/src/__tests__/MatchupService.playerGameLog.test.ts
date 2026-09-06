@@ -48,6 +48,12 @@ function serviceWith(gameRows: unknown[], projRows: unknown[]) {
 beforeEach(() => vi.clearAllMocks());
 
 describe('MatchupService.getPlayerGameLog', () => {
+  it.each([null, undefined, NaN, Infinity, -1, 0, 1200])('preserves TOI availability for %s', async (value) => {
+    const { service } = serviceWith([{ ...GAME_ROWS[0], nhl_toi_seconds: value }], []);
+    const { games } = await service.getPlayerGameLog(8476883, '2025-10-01', '2026-06-30');
+    expect(games[0].toi_seconds).toBe(value === 0 || value === 1200 ? value : null);
+    expect(games[0].saves).toBe(31);
+  });
   it('reads the whole season in ONE query, not one per date', async () => {
     const { service, supabase } = serviceWith(GAME_ROWS, []);
     await service.getPlayerGameLog(8476883, '2025-10-01', '2026-06-30');

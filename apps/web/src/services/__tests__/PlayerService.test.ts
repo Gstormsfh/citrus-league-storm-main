@@ -444,6 +444,11 @@ describe('PlayerService', () => {
   // ===========================================================================
 
   describe('searchPlayers', () => {
+    it.each([null, undefined, NaN, Infinity, -1, 0, 1200])('preserves API TOI availability: %s', async (toi) => {
+      mockSearchPlayers.mockResolvedValueOnce({ data: [{ ...makeServerPlayer({ full_name: 'Test' }), icetime_seconds: toi }] });
+      const results = await PlayerService.searchPlayers('test');
+      expect(results[0].icetime_seconds).toBe(toi === 0 || toi === 1200 ? toi : null);
+    });
     it('finds players by case-insensitive partial name match', async () => {
       const mcd = makeServerPlayer({ id: 1, full_name: 'Connor McDavid', points: 55 });
       const drai = makeServerPlayer({ id: 2, full_name: 'Leon Draisaitl', points: 50 });

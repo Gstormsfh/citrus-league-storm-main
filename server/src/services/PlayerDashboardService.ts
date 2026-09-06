@@ -1,3 +1,4 @@
+import { normalizeToiSeconds } from '@citrus/shared';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { analyticsReadModel, type AnalyticsReadModelService } from './AnalyticsReadModelService';
 import {
@@ -61,7 +62,7 @@ interface StatsRow {
   nhl_ppp: number;
   nhl_shp: number;
   nhl_plus_minus: number;
-  nhl_toi_seconds: number;
+  nhl_toi_seconds: number | null;
   x_goals: number;
   goalie_gp: number;
   nhl_wins: number;
@@ -878,7 +879,7 @@ export class PlayerDashboardService {
         // Selected since the index shipped, dropped here until 2026-09-05.
         pim: s?.nhl_pim ?? 0,
         shp: s?.nhl_shp ?? 0,
-        toi_seconds: s?.nhl_toi_seconds ?? 0,
+        toi_seconds: normalizeToiSeconds(s?.nhl_toi_seconds),
         wins: s?.nhl_wins ?? 0,
         losses: s?.nhl_losses ?? 0,
         ot_losses: s?.nhl_ot_losses ?? 0,

@@ -1,3 +1,4 @@
+import { normalizeToiSeconds } from '@citrus/shared';
 /**
  * ScoresService — the day's NHL scoreboard, with Citrus projections attached.
  *
@@ -150,7 +151,7 @@ interface ActualRow {
   nhl_shp: number;
   nhl_pim: number;
   nhl_plus_minus: number;
-  nhl_toi_seconds: number;
+  nhl_toi_seconds: number | null;
   nhl_saves: number;
   nhl_goals_against: number;
   nhl_wins: number;
@@ -288,7 +289,7 @@ function toActuals(row: ActualRow): ScoresPlayerActuals {
     blocks: row.nhl_blocks ?? 0,
     hits: row.nhl_hits ?? 0,
     ppp: row.nhl_ppp ?? 0,
-    toiSeconds: row.nhl_toi_seconds ?? 0,
+    toiSeconds: normalizeToiSeconds(row.nhl_toi_seconds),
     saves: row.is_goalie ? (row.nhl_saves ?? 0) : null,
     goalsAgainst: row.is_goalie ? (row.nhl_goals_against ?? 0) : null,
     wins: row.is_goalie ? (row.nhl_wins ?? 0) : null,

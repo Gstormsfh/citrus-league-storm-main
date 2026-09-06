@@ -1,3 +1,4 @@
+import { normalizeToiSeconds } from '@citrus/shared';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { ScoringCalculator } from '@/utils/scoringUtils';
@@ -69,8 +70,8 @@ export function servicePlayerToHockeyPlayer(player: Player): HockeyPlayer {
         // used to read '0:00', and the writeup took it as a real zero ("0
         // minutes a night", LIMITED ICE TIME on Ovechkin). Undefined renders
         // as '-' and says nothing.
-        toi: player.icetime_seconds
-          ? formatTOIPerGame(player.icetime_seconds, player.games_played || 1)
+        toi: normalizeToiSeconds(player.icetime_seconds) !== null && player.games_played > 0
+          ? formatTOIPerGame(player.icetime_seconds!, player.games_played)
           : undefined,
         // Goalie stats
         wins: player.wins || 0,
@@ -125,4 +126,3 @@ export async function getPlayerWithSeasonStats(
     return null;
   }
 }
-

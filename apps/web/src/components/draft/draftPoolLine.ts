@@ -1,3 +1,4 @@
+import { normalizeToiSeconds } from '@citrus/shared';
 /**
  * THE ROW'S SECOND LINE AND ITS POSITION RANK (2026-09-05, artboard 4a).
  *
@@ -12,9 +13,10 @@
 import type { Player } from '@/services/PlayerService';
 import { positionChipKey } from '@/components/roster/positionChip';
 
-const toi = (seconds: number, games: number): string | null => {
-  if (!(seconds > 0) || !(games > 0)) return null;
-  const perGame = seconds / games;
+const toi = (seconds: unknown, games: number): string | null => {
+  const valid = normalizeToiSeconds(seconds);
+  if (valid === null || !(games > 0)) return null;
+  const perGame = Math.round(valid / games);
   const m = Math.floor(perGame / 60);
   const s = Math.round(perGame - m * 60);
   return `${m}:${String(s).padStart(2, '0')}`;
@@ -34,7 +36,7 @@ export function draftPoolSeasonLine(p: Player): string | null {
   }
   const parts: string[] = [];
   if (typeof p.points === 'number') parts.push(`${p.points} PTS`);
-  const t = toi(Number(p.icetime_seconds ?? 0), gp);
+  const t = toi(p.icetime_seconds, gp);
   if (t) parts.push(t);
   return parts.length ? parts.join(' · ') : null;
 }

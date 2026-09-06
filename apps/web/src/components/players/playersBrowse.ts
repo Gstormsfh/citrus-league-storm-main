@@ -1,3 +1,4 @@
+import { normalizeToiSeconds } from '@citrus/shared';
 /**
  * THE PLAYERS TAB, AS DATA (2026-09-04).
  *
@@ -124,7 +125,7 @@ export function dashboardEntryToHockeyPlayer(p: DashboardIndexEntry): HockeyPlay
           toi: p.toi_publication
             ? p.toi_publication.availability === 'available' && p.toi_publication.value != null
               ? toiPerGame(p.toi_publication.value * 60, 1) : undefined
-            : p.gp > 0 && p.toi_seconds > 0 ? toiPerGame(p.toi_seconds, p.gp) : undefined,
+            : p.gp > 0 && normalizeToiSeconds(p.toi_seconds) !== null ? toiPerGame(p.toi_seconds!, p.gp) : undefined,
         },
   };
 }

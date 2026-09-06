@@ -184,6 +184,13 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     expect(am.proj_gp).toBe(63);
   });
 
+  it.each([null, undefined, NaN, Infinity, -1, 0, 1200])('retains nullable season TOI through index cache: %s', async (value) => {
+    mockTables(mockSupabase, { player_season_stats: { data: STATS.map(s => ({ ...s, nhl_toi_seconds: value })), error: null } });
+    const expected = value === 0 || value === 1200 ? value : null;
+    expect((await service.getDashboardIndex()).players[0].toi_seconds).toBe(expected);
+    expect((await service.getDashboardIndex()).players[0].toi_seconds).toBe(expected);
+  });
+
   // REGRESSION (2026-09-02, draft-room decision support). `ROS_COLS` has
   // always SELECTed projected_hits and projected_blocks and the mapper
   // dropped both, so no consumer could score a rest-of-season projection

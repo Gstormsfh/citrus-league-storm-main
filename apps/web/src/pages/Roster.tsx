@@ -1,3 +1,4 @@
+import { normalizeToiSeconds } from '@citrus/shared';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useSearchParams, useLocation, Navigate, Link } from 'react-router-dom';
@@ -4640,7 +4641,9 @@ const Roster = () => {
                   powerPlayPoints: (p as any).ppp || 0,
                   shortHandedPoints: (p as any).shp || 0,
                   toi: (() => {
-                    const secs = Number((p as any).icetime_seconds || 0) / Math.max(1, Number(p.games_played || 0));
+                    const total = normalizeToiSeconds(p.icetime_seconds);
+                    if (total === null || !(p.games_played > 0)) return undefined;
+                    const secs = total / p.games_played;
                     const mins = Math.floor(secs / 60);
                     const remainingSecs = Math.floor(secs % 60);
                     return `${mins}:${remainingSecs.toString().padStart(2, '0')}`;

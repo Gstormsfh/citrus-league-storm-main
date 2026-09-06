@@ -1,3 +1,4 @@
+import { normalizeToiSeconds } from '@citrus/shared';
 /**
  * THE GAME LOG, in the artboard's rows (2026-09-04).
  *
@@ -82,8 +83,9 @@ export function shortDate(iso: string): string {
 
 /** Seconds → `mm:ss`; nothing for a row with no ice time recorded. */
 export function toiLabel(seconds: unknown): string | null {
-  const s = Number(seconds);
-  if (!Number.isFinite(s) || s <= 0) return null;
+  const value = normalizeToiSeconds(seconds);
+  if (value === null) return null;
+  const s = Math.round(value);
   const m = Math.floor(s / 60);
   const r = Math.round(s % 60);
   return `${m}:${String(r).padStart(2, '0')}`;
@@ -106,6 +108,7 @@ export function playedRows(entries: GameLogEntry[], isGoalie: boolean): LogRow[]
   const sums = isGoalie ? [0, 0, 0, 0] : [0, 0, 0, 0, 0, 0];
   let pointsSum = 0;
   let toiSum = 0;
+  let toiCount = 0;
   let gp = 0;
   let latestMarked = false;
 
@@ -131,7 +134,11 @@ export function playedRows(entries: GameLogEntry[], isGoalie: boolean): LogRow[]
       : [num(s.goals), num(s.assists), num(s.shots_on_goal), num(s.plus_minus), num(s.ppp), num(s.hits)];
     raw.forEach((v, i) => (sums[i] += v));
     pointsSum += e.actualPoints ?? 0;
-    toiSum += num(s.toi_seconds);
+    const validToi = normalizeToiSeconds(s.toi_seconds);
+    if (validToi !== null) {
+      toiSum += validToi;
+      toiCount += 1;
+    }
     gp += 1;
     rows.push({
       key: e.date,
@@ -152,7 +159,7 @@ export function playedRows(entries: GameLogEntry[], isGoalie: boolean): LogRow[]
       opponent: `${gp} GP`,
       points: pointsSum / gp,
       cells: sums.map((v, i) => avgLabel(v / gp, !isGoalie && i === 3)),
-      toi: toiSum > 0 ? toiLabel(toiSum / gp) : null,
+      toi: toiCount === gp ? toiLabel(toiSum / gp) : null,
       summary: true,
     });
   }

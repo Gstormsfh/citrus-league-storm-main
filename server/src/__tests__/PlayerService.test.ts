@@ -13,6 +13,14 @@ describe('PlayerService', () => {
   });
 
   describe('getAllPlayers', () => {
+    it.each([null, undefined, NaN, Infinity, -1, 0, 1200])('keeps unavailable TOI distinct from zero: %s', async (value) => {
+      mockSupabase.from = vi.fn((table: string) => createChain({ data:
+        table === 'player_directory' ? [{ player_id: 1, full_name: 'Test', position_code: 'C', team_abbrev: 'EDM' }] :
+        table === 'player_season_stats' ? [{ player_id: 1, games_played: 1, nhl_goals: 2, nhl_toi_seconds: value }] : [], error: null }));
+      const { players } = await service.getAllPlayers();
+      expect(players[0].icetime_seconds).toBe(value === 0 || value === 1200 ? value : null);
+      expect(players[0].goals).toBe(2);
+    });
     it('fetches and merges player data from multiple tables', async () => {
       const directory = [
         { player_id: 1, full_name: 'Connor McDavid', position_code: 'C', team_abbrev: 'EDM', jersey_number: '97', headshot_url: '' },

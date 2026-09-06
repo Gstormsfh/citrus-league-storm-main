@@ -155,9 +155,10 @@ describe('GET /api/players/:playerId/dashboard', () => {
     const { app } = await import('../app');
     const season = getCurrentSeason();
     const path = `/api/players/${MCDAVID}/dashboard?season=${season}&gameType=regular`;
+    const observedAt = new Date().toISOString();
     const batch = { ...toiSelector(season), id: 'published', source_snapshot_id: 'source',
-      code_revision: 'a'.repeat(40), data_cutoff: new Date().toISOString(), expected_entities: 1,
-      validation: { status: 'passed', entity_ids: [MCDAVID], freshness_observed_at: new Date().toISOString(),
+      code_revision: 'a'.repeat(40), data_cutoff: observedAt, expected_entities: 1,
+      validation: { status: 'passed', entity_ids: [MCDAVID], freshness_observed_at: observedAt,
         gate_version: 'official-appearance-v2', evidence_sha256: 'a'.repeat(64) } };
     let missing = false;
     adminFrom.mockImplementation((table: string) => {

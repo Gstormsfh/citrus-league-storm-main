@@ -34,6 +34,21 @@ const played = (date: string, opponent: string, pts: number, s: Record<string, u
   entry({ date, opponent, isPast: true, actualPoints: pts, actualStats: s });
 
 describe('playedRows', () => {
+  it.each([null, undefined, NaN, Infinity, -1])('does not average unavailable TOI as zero: %s', (value) => {
+    const rows = playedRows([
+      played('2026-09-28', 'vs CGY', 2, { toi_seconds: 1200 }),
+      played('2026-09-30', '@ VAN', 4, { toi_seconds: value }),
+    ], false);
+    expect(rows[0].toi).toBeNull();
+    expect(rows[1].toi).toBe('20:00');
+    expect(rows[2].toi).toBeNull();
+    expect(rows[2].points).toBe(3);
+  });
+
+  it('preserves measured zero in both game and average rows', () => {
+    const rows = playedRows([played('2026-09-28', 'vs CGY', 0, { toi_seconds: 0 })], false);
+    expect(rows.map(r => r.toi)).toEqual(['0:00', '0:00']);
+  });
   it('lists newest first, marks the latest, and closes with the AVG footer', () => {
     const rows = playedRows(
       [
@@ -157,7 +172,7 @@ describe('labels', () => {
   it('shortDate and toiLabel', () => {
     expect(shortDate('2026-10-01')).toBe('10/1');
     expect(toiLabel(1218)).toBe('20:18');
-    expect(toiLabel(0)).toBeNull();
+    expect(toiLabel(0)).toBe('0:00');
     expect(toiLabel(undefined)).toBeNull();
   });
 });

@@ -19,7 +19,8 @@ describe('draftPoolSeasonLine', () => {
     expect(draftPoolSeasonLine(skater({ games_played: 0 }))).toBeNull();
   });
   it('points alone when there is no ice time', () => {
-    expect(draftPoolSeasonLine(skater({ icetime_seconds: 0 }))).toBe('90 PTS');
+    expect(draftPoolSeasonLine(skater({ icetime_seconds: null }))).toBe('90 PTS');
+    expect(draftPoolSeasonLine(skater({ icetime_seconds: 0 }))).toBe('90 PTS · 0:00');
   });
 });
 

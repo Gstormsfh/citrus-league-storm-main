@@ -1,3 +1,4 @@
+import { normalizeToiSeconds } from '@citrus/shared';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { resolveSlotConfig } from '../lib/leagueRules';
 import {
@@ -1424,7 +1425,7 @@ export class MatchupService {
       blocks: n(r.nhl_blocks),
       pim: n(r.nhl_pim),
       plus_minus: n(r.nhl_plus_minus),
-      toi_seconds: n(r.nhl_toi_seconds),
+      toi_seconds: normalizeToiSeconds(r.nhl_toi_seconds),
       ppp: n(r.nhl_ppp),
       shp: n(r.nhl_shp),
       wins: n(r.nhl_wins),

@@ -80,7 +80,8 @@ export interface DashboardIndexEntry {
    */
   pim: number;
   shp: number;
-  toi_seconds: number;
+  /** Official season seconds; null means missing/invalid, while 0 is measured. */
+  toi_seconds: number | null;
   // goalie actuals
   wins: number;
   losses: number;

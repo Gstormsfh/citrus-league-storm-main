@@ -45,6 +45,17 @@ const baseProps = {
 afterEach(cleanup);
 
 describe('PlayerPool — per-row card button (V2-PARITY)', () => {
+  it.each([null, undefined, NaN, Infinity, -1])('does not display an invented zero TOI for %s', (toi) => {
+    render(<PlayerPool {...baseProps} availablePlayers={[{ ...mkPlayer('101', 'Nathan MacKinnon'), icetime_seconds: toi }]} />);
+    expect(screen.queryByText('0:00')).toBeNull();
+    expect(screen.queryByText(/100 PTS · 0:00/)).toBeNull();
+  });
+
+  it('renders a genuinely measured zero TOI in the table and phone season line', () => {
+    render(<PlayerPool {...baseProps} availablePlayers={[{ ...mkPlayer('101', 'Nathan MacKinnon'), icetime_seconds: 0 }]} />);
+    expect(screen.getByText('0:00')).toBeInTheDocument();
+    expect(screen.getByText('100 PTS · 0:00')).toBeInTheDocument();
+  });
   it('renders an info button per row and reports the clicked row player', () => {
     const onShowCard = vi.fn();
     const onPlayerSelect = vi.fn();

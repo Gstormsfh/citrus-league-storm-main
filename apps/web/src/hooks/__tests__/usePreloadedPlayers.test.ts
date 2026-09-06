@@ -365,6 +365,14 @@ describe('usePreloadedPlayers — season-stats merge', () => {
     expect(p?.games_played).toBe(82);
   });
 
+  it.each([null, undefined, NaN, Infinity, -1, 0, 1200])('keeps preload TOI unavailable instead of zero: %s', async (toi) => {
+    terminalResult.data = [mkRow(8478402, 'Connor McDavid')];
+    statsResult.data = [mkStats(8478402, { nhl_toi_seconds: toi })];
+    const { result } = renderHook(() => usePreloadedPlayers());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.playersById.get('8478402')?.icetime_seconds).toBe(toi === 0 || toi === 1200 ? toi : null);
+  });
+
   it('queries player_season_stats as a separate table', async () => {
     terminalResult.data = [mkRow(8478402, 'Connor McDavid')];
     statsResult.data = [mkStats(8478402)];

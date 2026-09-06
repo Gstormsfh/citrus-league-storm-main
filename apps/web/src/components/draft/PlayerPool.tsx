@@ -1,3 +1,4 @@
+import { normalizeToiSeconds } from '@citrus/shared';
 import { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -490,7 +491,7 @@ export const PlayerPool = memo(({
             <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.hits}</td>
             <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.blocks}</td>
             <td className="px-2 py-1.5 text-xs text-center text-pastel-cream">{player.pim || 0}</td>
-            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream/70">{player.icetime_seconds && player.games_played ? (() => { const totalSec = Math.round(player.icetime_seconds / player.games_played); const m = Math.floor(totalSec / 60); const s = totalSec % 60; return `${m}:${s < 10 ? '0' : ''}${s}`; })() : '-'}</td>
+            <td className="px-2 py-1.5 text-xs text-center text-pastel-cream/70">{normalizeToiSeconds(player.icetime_seconds) !== null && player.games_played > 0 ? (() => { const totalSec = Math.round(player.icetime_seconds! / player.games_played); const m = Math.floor(totalSec / 60); const s = totalSec % 60; return `${m}:${s < 10 ? '0' : ''}${s}`; })() : '-'}</td>
             <td className="px-2 py-1.5 text-xs text-center text-pastel-cream/70">{player.xGoals.toFixed(2)}</td>
           </>
         )}

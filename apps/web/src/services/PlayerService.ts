@@ -1,3 +1,4 @@
+import { normalizeToiSeconds } from '@citrus/shared';
 import { getHeadshotUrl } from "@/utils/seasonConstants";
 import { logger } from '@/utils/logger';
 import { playerApi } from '@/api/players';
@@ -49,7 +50,7 @@ export interface Player {
   pim?: number;
   ppp?: number;
   shp?: number;
-  icetime_seconds?: number;
+  icetime_seconds?: number | null;
 
   // Advanced stats (new)
   xGoals: number;
@@ -97,7 +98,7 @@ interface ServerPlayer {
   ppp: number;
   shp: number;
   plus_minus: number;
-  icetime_seconds: number;
+  icetime_seconds: number | null;
   x_goals: number;
   goalie_gp: number;
   wins: number;
@@ -146,7 +147,7 @@ function mapServerPlayer(sp: ServerPlayer): Player {
     pim: sp.pim || 0,
     ppp: sp.ppp || 0,
     shp: sp.shp || 0,
-    icetime_seconds: sp.icetime_seconds || 0,
+    icetime_seconds: normalizeToiSeconds(sp.icetime_seconds),
     xGoals: sp.x_goals || 0,
     wins: isGoalie ? (sp.wins || 0) : null,
     losses: isGoalie ? (sp.losses || 0) : null,

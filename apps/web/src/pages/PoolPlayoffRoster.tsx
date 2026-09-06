@@ -1,3 +1,4 @@
+import { normalizeToiSeconds } from '@citrus/shared';
 /**
  * Playoff Roster Pool — Player Selection Page.
  *
@@ -68,7 +69,7 @@ interface PoolPlayer {
   plus_minus?: number;
   xGoals?: number;
   x_goals?: number;
-  icetime_seconds?: number;
+  icetime_seconds?: number | null;
   wins?: number;
   saves?: number;
   shots_faced?: number;
@@ -1245,8 +1246,8 @@ export default function PoolPlayoffRosterEntry() {
                                 })()}
                               </td>
                               <td className="px-2 py-1.5 text-center text-xs text-pastel-cream/75 max-lg:text-pressbox-text/75">
-                                {player.icetime_seconds && player.games_played ? (() => {
-                                  const totalSec = Math.round(player.icetime_seconds / player.games_played);
+                                {normalizeToiSeconds(player.icetime_seconds) !== null && player.games_played > 0 ? (() => {
+                                  const totalSec = Math.round(player.icetime_seconds! / player.games_played);
                                   const m = Math.floor(totalSec / 60);
                                   const s = totalSec % 60;
                                   return `${m}:${s < 10 ? '0' : ''}${s}`;
@@ -1445,10 +1446,10 @@ export default function PoolPlayoffRosterEntry() {
       player={statsModalPlayer ? (() => {
         const p = statsModalPlayer;
         const isGoalie = normalizePos(p.position) === 'G';
-        const toiPerGame = p.icetime_seconds && p.games_played
-          ? Math.round(p.icetime_seconds / p.games_played)
-          : 0;
-        const toiStr = toiPerGame > 0
+        const toiPerGame = normalizeToiSeconds(p.icetime_seconds) !== null && p.games_played > 0
+          ? Math.round(p.icetime_seconds! / p.games_played)
+          : null;
+        const toiStr = toiPerGame !== null
           ? `${Math.floor(toiPerGame / 60)}:${String(toiPerGame % 60).padStart(2, '0')}`
           : undefined;
         const savePctNum = Number(p.save_pct ?? p.save_percentage ?? 0);

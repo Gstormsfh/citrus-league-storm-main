@@ -1,3 +1,4 @@
+import { normalizeToiSeconds } from '@citrus/shared';
 /**
  * Formatting for the scores screen. Pure functions, no React, so the rules
  * that decide what a row is allowed to SAY are unit-testable on their own.
@@ -84,9 +85,11 @@ export function teamFullName(team: { abbrev: string; city: string | null; name: 
 
 /** Ice time as M:SS. Zero seconds reads as "0:00", which is a real value. */
 export function formatToi(seconds: number | null | undefined): string {
-  if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return '.';
-  const m = Math.floor(seconds / 60);
-  const s = Math.abs(Math.round(seconds % 60));
+  const valid = normalizeToiSeconds(seconds);
+  if (valid === null) return '.';
+  const rounded = Math.round(valid);
+  const m = Math.floor(rounded / 60);
+  const s = rounded % 60;
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 

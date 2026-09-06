@@ -1,3 +1,4 @@
+import { normalizeToiSeconds } from '@citrus/shared';
 import { userMessage } from '@/lib/userMessage';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate, Navigate, Link } from "react-router-dom";
@@ -86,7 +87,7 @@ interface DailyPlayerStats {
   // Additional fields from get_daily_game_stats RPC
   sog?: number;
   plus_minus?: number;
-  toi_seconds?: number;
+  toi_seconds?: number | null;
   faceoff_wins?: number;
   faceoff_losses?: number;
   faceoff_taken?: number;
@@ -1131,7 +1132,7 @@ const Matchup = () => {
         powerPlayPoints: powerPlayPoints,
         shortHandedPoints: shortHandedPoints,
         pim: stats.pim ?? 0,
-        toi: stats.toi ?? (stats.icetime_seconds && (stats.gamesPlayed ?? stats.games_played) ? formatTOIPerGame(stats.icetime_seconds, stats.gamesPlayed ?? stats.games_played ?? 1) : (stats.icetime_seconds ? formatTOI(stats.icetime_seconds) : '0:00'))
+        toi: stats.toi ?? (normalizeToiSeconds(stats.icetime_seconds) !== null && (stats.gamesPlayed ?? stats.games_played) > 0 ? formatTOIPerGame(stats.icetime_seconds, stats.gamesPlayed ?? stats.games_played) : undefined)
       },
       team: p.team,
       teamAbbreviation: p.team,
@@ -1702,7 +1703,7 @@ const Matchup = () => {
             sog: row.shots_on_goal || 0,
             pim: row.pim || 0,
             plus_minus: row.plus_minus || 0,
-            toi_seconds: row.toi_seconds || 0,
+            toi_seconds: normalizeToiSeconds(row.toi_seconds),
             
             // Physical stats
             hits: row.hits || 0,
@@ -2541,7 +2542,7 @@ const Matchup = () => {
           ppp: seasonPlayer.ppp ?? 0,
           shp: seasonPlayer.shp ?? 0,
           pim: seasonPlayer.pim ?? 0,
-          icetime_seconds: seasonPlayer.icetime_seconds ?? 0,
+          icetime_seconds: normalizeToiSeconds(seasonPlayer.icetime_seconds),
           wins: seasonPlayer.wins ?? 0,
           saves: seasonPlayer.saves ?? 0,
           shots_faced: seasonPlayer.shots_faced ?? 0,
@@ -2578,7 +2579,7 @@ const Matchup = () => {
             powerPlayPoints: Number(statsData.nhl_ppp ?? 0),
             shortHandedPoints: Number(statsData.nhl_shp ?? 0),
             pim: Number(statsData.nhl_pim ?? 0),
-            icetime_seconds: Number(statsData.nhl_toi_seconds ?? 0),
+            icetime_seconds: normalizeToiSeconds(statsData.nhl_toi_seconds),
             wins: Number(statsData.nhl_wins ?? 0),
             saves: Number(statsData.nhl_saves ?? 0),
             shots_faced: Number(statsData.nhl_shots_faced ?? 0),
