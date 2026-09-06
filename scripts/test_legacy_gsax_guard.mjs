@@ -1,0 +1,62 @@
+// Synthetic SQL behavior only; does not claim native multi-connection proof.
+import {readFile} from 'node:fs/promises';
+import {pathToFileURL} from 'node:url';
+import {createHash} from 'node:crypto';
+import assert from 'node:assert/strict';
+const {PGlite}=await import(pathToFileURL(process.env.PGLITE_MODULE));
+const db=new PGlite();
+let checks=0;
+const capture=await readFile(new URL('../supabase/migrations/captures/2026-09-06_pre_guard_legacy_gsax_season_rebuild.sql',import.meta.url),'utf8');
+assert.equal(createHash('md5').update(capture).digest('hex'),'fcedc5b3881858ba74b3113b064058f4');checks++;
+await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
+ CREATE TABLE nhl_shots(season int,game_type text,goalie_id int,event_type text,is_goal boolean,is_empty_net boolean,xg_sql float8);
+ CREATE TABLE goalie_xg_season(season int,game_type text,goalie_id int,team_id int,shots_faced int,sog_faced int,goals_allowed int,xg_faced float8,gsax float8,PRIMARY KEY(season,game_type,goalie_id,team_id));
+ CREATE TABLE goalie_gsax_primary(goalie_id int PRIMARY KEY,total_shots_faced int,total_xga numeric,total_ga int,raw_gsax numeric,regressed_gsax numeric,league_sv_pct numeric,calculated_at timestamptz,updated_at timestamptz,season int);
+ ALTER TABLE nhl_shots ENABLE ROW LEVEL SECURITY; ALTER TABLE goalie_xg_season ENABLE ROW LEVEL SECURITY; ALTER TABLE goalie_gsax_primary ENABLE ROW LEVEL SECURITY;
+ GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated;
+ ${capture};
+ REVOKE ALL ON FUNCTION rebuild_goalie_gsax_primary(integer) FROM PUBLIC;
+ GRANT EXECUTE ON FUNCTION rebuild_goalie_gsax_primary(integer) TO service_role;`);
+await db.exec(await readFile(new URL('../supabase/migrations/20260906024510_guard_legacy_gsax_season_rebuild.sql',import.meta.url),'utf8'));
+async function fail(sql,pattern) {
+ const before=(await db.query('SELECT to_jsonb(p) AS row FROM goalie_gsax_primary p ORDER BY goalie_id')).rows;
+ await assert.rejects(db.exec(sql),pattern);
+ assert.deepEqual((await db.query('SELECT to_jsonb(p) AS row FROM goalie_gsax_primary p ORDER BY goalie_id')).rows,before);checks++;
+}
+await db.exec(`INSERT INTO goalie_gsax_primary(goalie_id,season,total_shots_faced) VALUES(99,2024,70);
+ INSERT INTO nhl_shots VALUES(2025,'regular',1,'goal',true,false,.5),(2025,'regular',1,'missed-shot',false,false,.25);
+ INSERT INTO goalie_xg_season VALUES(2025,'regular',1,10,2,1,1,.75,-.25);`);
+await fail('SELECT * FROM rebuild_goalie_gsax_primary(2026)',/empty/);
+await db.exec('SET ROLE authenticated');
+await assert.rejects(db.exec('SELECT * FROM rebuild_goalie_gsax_primary(2025)'),/permission denied/);checks++;
+await db.exec('RESET ROLE; SET ROLE service_role');
+const receipt=(await db.query('SELECT * FROM rebuild_goalie_gsax_primary(2025)')).rows;
+assert.equal(receipt.find(r=>r.o_metric==='goalies_written').o_count,1);checks++;
+await db.exec('RESET ROLE');
+const written=(await db.query('SELECT goalie_id,season,total_xga::text,raw_gsax::text,regressed_gsax::text FROM goalie_gsax_primary ORDER BY goalie_id')).rows;
+assert.deepEqual(written,[{goalie_id:1,season:2025,total_xga:'0.7500',raw_gsax:'-0.2500',regressed_gsax:'-0.0010'},
+ {goalie_id:99,season:2024,total_xga:null,raw_gsax:null,regressed_gsax:null}]);checks++;
+await db.exec(`INSERT INTO nhl_shots VALUES(2025,'regular',2,'shot-on-goal',false,false,.2)`);
+await fail('SELECT * FROM rebuild_goalie_gsax_primary(2025)',/incomplete or inconsistent/);
+await db.exec('DELETE FROM nhl_shots WHERE goalie_id=2');
+await db.exec('UPDATE nhl_shots SET xg_sql=NULL WHERE event_type=\'goal\'');
+await fail('SELECT * FROM rebuild_goalie_gsax_primary(2025)',/unresolved or unscored/);
+await db.exec("UPDATE nhl_shots SET xg_sql=.5 WHERE event_type='goal'; UPDATE goalie_xg_season SET gsax=9 WHERE goalie_id=1");
+await fail('SELECT * FROM rebuild_goalie_gsax_primary(2025)',/incomplete or inconsistent/);
+await db.exec('UPDATE goalie_xg_season SET gsax=-.25 WHERE goalie_id=1');
+await db.exec("INSERT INTO nhl_shots VALUES(2026,'regular',1,'shot-on-goal',false,false,.2)");
+await fail('SELECT * FROM rebuild_goalie_gsax_primary()',/latest source season/);
+await db.exec('DELETE FROM nhl_shots WHERE season=2026; UPDATE nhl_shots SET is_empty_net=NULL');
+await fail('SELECT * FROM rebuild_goalie_gsax_primary(2025)',/unresolved or unscored/);
+await db.exec("UPDATE nhl_shots SET is_empty_net=false,is_goal=false,event_type='missed-shot'; UPDATE goalie_xg_season SET sog_faced=0,goals_allowed=0,gsax=.75");
+await fail('SELECT * FROM rebuild_goalie_gsax_primary(2025)',/no shots-on-goal exposure/);
+await db.exec("UPDATE nhl_shots SET is_goal=true,event_type='goal' WHERE xg_sql=.5; UPDATE goalie_xg_season SET sog_faced=1,goals_allowed=1,gsax=-.25; UPDATE goalie_gsax_primary SET season=2023 WHERE goalie_id=1");
+await fail('SELECT * FROM rebuild_goalie_gsax_primary(2025)',/cross-season key collision/);
+await db.exec('BEGIN ISOLATION LEVEL REPEATABLE READ');
+await assert.rejects(db.exec('SELECT * FROM rebuild_goalie_gsax_primary(2025)'),/READ COMMITTED/);checks++;
+await db.exec('ROLLBACK');
+// Definition restoration uses the exact original body and retains execution ACL.
+await db.exec(capture+';');
+assert.equal((await db.query("SELECT md5(pg_get_functiondef('rebuild_goalie_gsax_primary(integer)'::regprocedure)) AS hash")).rows[0].hash,'fcedc5b3881858ba74b3113b064058f4');checks++;
+await db.close();
+console.log(`legacy GSAx guard: ${checks} checks passed (isolated PGlite)`);
