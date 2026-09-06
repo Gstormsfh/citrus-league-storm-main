@@ -1,0 +1,54 @@
+{
+  "contract": "citrus-calibration-refinement-plan-v1",
+  "declared_at": "2026-09-06T08:52:00Z",
+  "publishable": false,
+  "historical_as_of_verified": false,
+  "untouched_test_claim": false,
+  "evidence_claim": "retrospective_current_source_revisions_already_inspected_development",
+  "prior_plan_sha256": "f2ea437a51bd316f9b45ff8ba69dbc77fa7cc7bdb5845528d05a27fb267bc3a2",
+  "prior_result_sha256": "510f96a7cb48c68baf4250ae0bf5e4902aae2a5309f41b5d829990619b33776e",
+  "source_scope": "exact_prior_development_replay_before_2024-07-01",
+  "raw_family": "enhanced_context",
+  "raw_model_policy": "fresh_in_memory_refit_exact_prior_config_train_medians_vocabulary_and_validation_predictions",
+  "calibrators": ["raw", "logit_sigmoid", "isotonic", "beta", "beta_group"],
+  "calibration_policy": "fit_only_disjoint_calibration_partition_never_validation_labels",
+  "context_fields": ["shot_type", "prior_sog_same_team", "strength"],
+  "settings": {
+    "epsilon": 0.000001,
+    "shape_ridge": 1.0,
+    "group_ridge": 100.0,
+    "optimizer": "L-BFGS-B",
+    "maxiter": 2000,
+    "ftol": 1e-12,
+    "gtol": 1e-8,
+    "max_rows": 1000000,
+    "max_categories_per_field": 64,
+    "max_context_cells": 32000000,
+    "unknown_group_policy": "zero_offset_with_explicit_context_receipt",
+    "seed": 60906
+  },
+  "beta_group_scope": "nonnegative_beta_shape_plus_regularized_additive_pre_outcome_context_offsets_not_rank_preserving_across_groups",
+  "scorecard": "unchanged_prior_config_all_eight_group_dimensions_all_five_candidates",
+  "parity": {
+    "absolute_tolerance": 1e-12,
+    "reference": "fresh_sklearn_1.5.2_binary_numeric_hgb",
+    "scope": "all_calibration_and_validation_rows_independent_python_json_design_and_inference",
+    "prior_validation_vectors": ["enhanced_context_raw", "enhanced_context_sigmoid", "enhanced_context_isotonic"],
+    "pickle_or_joblib_deserialization": false
+  },
+  "selection": {
+    "guard": "no_worse_brier_and_log_loss_than_prior_selected_sigmoid_in_each_fold",
+    "ranking": ["equal_fold_mean_log_loss", "equal_fold_mean_brier", "declared_calibrator_order"],
+    "automatic_acceptance_or_promotion": false,
+    "later_observed_test_used": false,
+    "prospective_reservations_changed": false
+  },
+  "limitations": [
+    "Same previously inspected development folds; this is an adaptive development experiment, not an independent confirmation.",
+    "Five declared calibrators, fixed penalties, no parameter search or post-result threshold changes.",
+    "Whole-game bootstrap intervals condition on fitted candidates; no refit or selection uncertainty and no multiple-comparison adjustment.",
+    "The context proxy is a recorded prior same-team SOG, not an observed rebound or possession boundary.",
+    "No MoneyPuck data, predictions, parameters, or files; public beta-calibration methodology is independently implemented with Citrus-specific regularization.",
+    "Python portable parity is one foundation gate, not hosted writer/consumer, TypeScript parity, full model acceptance, or FPAR acceptance."
+  ]
+}

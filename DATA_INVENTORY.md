@@ -98,6 +98,24 @@ requires a verified source snapshot, staging proof, backup and rollback.
 
 ### 1.4 Versioned analytics foundation (local, unapplied)
 
+Additive calibration refinement (2026-09-06):
+`docs/analytics-calibration-plan-20260906.json` fixes a five-calibrator budget
+on the already-inspected earlier-development folds. New
+`data-pipeline/projections/calibration_candidate.py` fits calibration-period-only
+raw/logit-sigmoid/isotonic/beta/context-offset beta maps with JSON inference;
+missing versus unseen context is retained explicitly.
+`portable_context_model.py` exports freshly fitted numeric binary trees and
+independently reconstructs the feature design and predictions without loading
+pickle/joblib. `calibration_experiment.py` source-replays the unchanged export,
+checks the prior model's train statistics and prediction vectors, and writes
+create-only JSON model/calibrator/parity/scorecard evidence. Their matching
+`tests/test_calibration_candidate.py`, `tests/test_portable_context_model.py`,
+and `tests/test_calibration_experiment.py` are synthetic contract regressions.
+New experiment output belongs under a separate
+`scripts/proof/results/official-calibration-experiment-20260906/` directory;
+completion requires its affirmative health receipt. No serving integration,
+existing evidence replacement, later-period test reuse, or FPAR acceptance.
+
 Current acceptance is tracked in `docs/ANALYTICS_ACCEPTANCE.md`; legacy row
 counts and model labels elsewhere in this inventory are not revalidated by this
 implementation. The new service-only publication/canonical migrations remain
