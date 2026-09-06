@@ -620,6 +620,24 @@ function elevatedClient(rows: unknown[] = SHOTS, error: unknown = null) {
 
 const REQ = { playerId: MCDAVID, season: 2025, gameType: 'regular' as const };
 
+describe('dashboard traded-player aggregation boundary', () => {
+  it('returns one season row, recomputes rates, and keeps playoffs separate', async () => {
+    clearPlayerDashboardCache();
+    const source = [
+      {...XG_SEASONS[0],season:2025,game_type:'regular',shots:100,goals:10,xg:8,avg_dist:20},
+      {...XG_SEASONS[0],season:2025,game_type:'regular',shots:10,goals:2,xg:3,avg_dist:40},
+      {...XG_SEASONS[0],season:2025,game_type:'playoff',shots:5,goals:1,xg:0.5},
+    ];
+    const svc = new PlayerDashboardService(userClient({player_xg_season:{data:source,error:null}}),elevatedClient());
+    const result = await svc.getPlayerDashboard(REQ);
+    expect(result.error).toBeNull();
+    expect(result.payload?.seasons).toHaveLength(2);
+    const regular = result.payload?.seasons.find(s => s.game_type==='regular');
+    expect(regular).toMatchObject({shots:110,goals:12,xg:11,finishing:1,avg_xg_per_shot:0.1,avg_dist:null});
+    expect(result.payload?.seasons.find(s => s.game_type==='playoff')?.xg).toBe(0.5);
+  });
+});
+
 describe('parsePlayerDashboardRequest', () => {
   it('accepts a bare player id and defaults season + gameType', () => {
     const { value, message } = parsePlayerDashboardRequest('8478402', undefined, undefined, 2025);

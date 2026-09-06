@@ -397,6 +397,28 @@ export interface DashboardSeasonRow {
   rush_shots: number;
 }
 
+/** Team stints become one player/season/game-type row for every dashboard consumer. */
+export function aggregateDashboardSeasons(stints: readonly DashboardSeasonRow[]): DashboardSeasonRow[] {
+  const additive = ['shots','sog','goals','xg','shots_ev','shots_pp','shots_pk',
+    'goals_ev','goals_pp','goals_sh','xg_ev','xg_pp','xg_pk','goals_en','xg_en',
+    'rebounds_shot','rush_shots'] as const;
+  const grouped = new Map<string, DashboardSeasonRow>();
+  for (const row of stints) {
+    const key = `${row.season}:${row.game_type}`;
+    const prior = grouped.get(key);
+    if (!prior) grouped.set(key, { ...row });
+    else {
+      for (const field of additive) prior[field] += row[field];
+      // Per-stint distance means omit unknown coordinates. Their actual sample
+      // counts are not on this table; weighting by total shots would invent them.
+      prior.avg_dist = null;
+    }
+  }
+  return [...grouped.values()].map(row => ({...row, finishing: row.goals-row.xg,
+    avg_xg_per_shot: row.shots > 0 ? row.xg/row.shots : null}))
+    .sort((a,b) => a.season-b.season || (a.game_type===b.game_type ? 0 : a.game_type==='regular' ? -1 : 1));
+}
+
 /** `goalie_gsax_primary` — regular-season non-empty-net attempts, rebounds included. */
 export interface DashboardGsax {
   season: number | null;
@@ -460,7 +482,7 @@ export interface PlayerDashboardPayload {
 const SHOT_COLS =
   'game_id, event_id, game_date, x_norm, y_norm, x_adj, y_adj, distance, angle, distance_adj, angle_adj, xg_sql, is_goal, shot_type, event_type, is_rush, is_rebound, is_power_play, is_shorthanded, is_empty_net, strength_state, created_at';
 const XG_SEASON_COLS =
-  'season, game_type, player_id, shots, sog, goals, xg, finishing, shots_ev, shots_pp, shots_pk, goals_ev, goals_pp, goals_sh, xg_ev, xg_pp, xg_pk, goals_en, xg_en, avg_dist, avg_xg_per_shot, rebounds_shot, rush_shots, updated_at';
+  'season, game_type, player_id, team_id, shots, sog, goals, xg, finishing, shots_ev, shots_pp, shots_pk, goals_ev, goals_pp, goals_sh, xg_ev, xg_pp, xg_pk, goals_en, xg_en, avg_dist, avg_xg_per_shot, rebounds_shot, rush_shots, updated_at';
 const GSAX_COLS =
   'goalie_id, season, total_shots_faced, total_xga, total_ga, raw_gsax, regressed_gsax, league_sv_pct, updated_at';
 const TALENT_DETAIL_COLS =
@@ -951,9 +973,8 @@ export class PlayerDashboardService {
         table: 'player_xg_season',
         columns: XG_SEASON_COLS,
         filters: [['player_id', playerId]],
-        // (season, game_type, player_id) is this table's key; with player_id
-        // pinned, (season, game_type) is unique per row.
-        orderBy: ['season', 'game_type'],
+        // Team is part of the key: keep pagination stable across traded stints.
+        orderBy: ['season', 'game_type', 'team_id'],
       }),
       pagedSelect<Record<string, unknown>>(this.supabase, {
         table: 'goalie_gsax_primary',
@@ -1027,7 +1048,7 @@ export class PlayerDashboardService {
       strength_state: s.strength_state,
     }));
 
-    const seasons: DashboardSeasonRow[] = (seasonsRes.data ?? []).map((r) => ({
+    const seasonStints: DashboardSeasonRow[] = (seasonsRes.data ?? []).map((r) => ({
       season: Number(r.season),
       game_type: String(r.game_type),
       shots: Number(r.shots ?? 0),
@@ -1051,6 +1072,7 @@ export class PlayerDashboardService {
       rebounds_shot: Number(r.rebounds_shot ?? 0),
       rush_shots: Number(r.rush_shots ?? 0),
     }));
+    const seasons = aggregateDashboardSeasons(seasonStints);
 
     const gsaxRow = gsaxRes.error ? undefined : gsaxRes.data[0];
     const gsax: DashboardGsax | null = gsaxRow

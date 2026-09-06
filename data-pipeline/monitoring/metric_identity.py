@@ -11,6 +11,8 @@ import argparse
 from collections import Counter, defaultdict
 import hashlib
 import json
+import math
+import re
 from pathlib import Path
 
 
@@ -55,12 +57,30 @@ def reconcile(nhl, raw):
                               ("outcome", a.get("is_goal"), b.get("is_goal"))):
             if av is None or bv is None or type(av) != type(bv) or av != bv:
                 differences.append(field)
+        raw_clock = b.get('time_in_period')
+        elapsed = None
+        if isinstance(raw_clock,str) and re.fullmatch(r'\d{1,2}:[0-5]\d',raw_clock) and type(b.get('period')) is int:
+            minute,second=map(int,raw_clock.split(':'))
+            elapsed=(b['period']-1)*1200+minute*60+second
+        if elapsed is None or a.get('seconds_elapsed') != elapsed:
+            differences.append('event_clock')
+        # Coordinates in these sources have different net-side conventions.
+        # Absolute geometry is a consistency check, not feature equivalence.
+        for axis in ('x','y'):
+            try:
+                av,bv=float(a[f'{axis}_raw']),float(b[f'shot_{axis}'])
+                if not math.isfinite(av) or not math.isfinite(bv) or abs(av)!=abs(bv):
+                    differences.append(f'geometry_{axis}')
+            except (KeyError,TypeError,ValueError):
+                differences.append(f'geometry_{axis}')
+        if not a.get('shot_type') or not b.get('shot_type') or a['shot_type'].lower()!=b['shot_type'].lower():
+            differences.append('shot_type')
         if differences:
             quarantine.append({**record, "reason": "semantic_conflict", "fields": differences})
         else:
             matched.append(record)
     return {
-        "contract": "metric-event-identity-v1",
+        "contract": "metric-event-identity-v2",
         "source_sha256": {name: digest(rows) for name, rows in sources.items()},
         "input_rows": {name: len(rows) for name, rows in sources.items()},
         "accepted": bool(matched) and not quarantine,
@@ -68,7 +88,8 @@ def reconcile(nhl, raw):
         "quarantine_counts": dict(Counter(r["reason"] for r in quarantine)),
         "quarantine": quarantine,
         "limitations": ["No feature/model version equivalence is inferred.",
-                        "Shot type/time/coordinates require source-specific normalization before promotion."],
+                        "Absolute geometry does not establish orientation/feature equivalence.",
+                        "Unknown or differently coded shot types remain quarantined; no imputation."],
     }
 
 

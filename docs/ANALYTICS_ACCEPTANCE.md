@@ -72,6 +72,26 @@ Read-only ledger capture: `analytics-migration-drift-20260906.json`: 450 prod
 versions, 405 tracked local versions at capture, 41 overlap. No history repair
 was attempted. RLS is enabled on inspected raw/NHL shots, game/season/talent
 stats and goalie season tables; policy semantics still need separate review.
+
+Extended identity check: among 118746 unique season-2025 pairs, current live
+queries found 43 clock disagreements, 76 absolute-geometry disagreements and
+150 missing/different shot types (categories overlap). Identity v2 now quarantines
+these cases as well. Absolute geometry is only a source consistency check; it
+does not establish equal orientation or feature transformations.
+
+Live regular-season NHL-shot → player_xg_season reconciliation: 937 players,
+zero missing players and zero shot-count/xG-total mismatches at 1e-5 tolerance.
+Consumer inspection found the prior traded-player fix covered the separate
+history endpoint but NOT the dashboard payload. Dashboard now sums stints,
+recomputes G−xG and xG/attempt, and orders pagination by team as well as season
+and game type. Multi-stint average distance is unavailable because the source
+does not provide per-stint non-null distance sample counts. Actual dashboard
+service regression verifies one season row and separate playoff output.
+
+Inspected legacy policies admit public/authenticated reads of hockey stats and
+restrict mutations to service_role (some use legacy auth.role expressions).
+No unconditional anonymous-write policy was found in these six tables. This
+does not certify other tables or SECURITY DEFINER functions.
 Source research: user-provided audit, next steps, calibration investigation and
 hockey blueprint dated 2026-09-05. Stored probabilities are retrospective until
 the complete fit/calibration lineage proves otherwise. No novelty or superiority
