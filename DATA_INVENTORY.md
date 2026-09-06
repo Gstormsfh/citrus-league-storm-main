@@ -116,6 +116,11 @@ receipts back to raw source actors and game rosters, rebuilds actor/team-stint
 ledgers and NULL availability, and retains goalie-state accounting partitions.
 Its review and verified local archive are create-only; they do not refit models
 or promote the diagnostic to official actuals, TOI, forecasts or FPAR.
+`scripts/proof/inspect_actor_goalie_gaps.py` additively inventories the original
+withheld events and same-clock penalty-shot markers. Missing versus different
+drawn-player IDs remain distinct. Raw event/context hashes and unpaired special
+codes are retained; this inspection does not reinterpret frozen features,
+reassign goalies, change probabilities or resolve the original unavailable rows.
 
 Additive model/publication diagnostic proof (2026-09-06):
 `scripts/local_model_publication_e2e.py` binds the complete shape checkpoint,
