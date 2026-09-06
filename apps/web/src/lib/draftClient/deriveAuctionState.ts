@@ -86,7 +86,7 @@ export function seedAuctionState(snapshot: DraftSnapshot): DerivedAuctionState |
   const seedSeq = snapshot.recentEvents.length
     ? snapshot.recentEvents[snapshot.recentEvents.length - 1].seq
     : 0;
-  return {
+  const state: DerivedAuctionState = {
     currentNomination: aux.currentNomination
       ? {
           nominationId: aux.currentNomination.nominationId,
@@ -101,12 +101,18 @@ export function seedAuctionState(snapshot: DraftSnapshot): DerivedAuctionState |
       : null,
     budgets,
     nominationsCompleted: Number(aux.nominationsCompleted ?? 0),
-    paused: false,
+    paused: snapshot.stateSnapshot.draftStatus === 'paused',
     history: [],
     foldedThroughSeq: seedSeq,
     playerNames: new Map(),
     wonPlayerIds: new Set(),
   };
+  // Restore the display feed and sold-player filter without charging the
+  // already authoritative snapshot budgets a second time.
+  const replay = foldAuctionEvents({ ...state, foldedThroughSeq: 0 }, snapshot.recentEvents);
+  return { ...state, history: replay.history, playerNames: replay.playerNames,
+    wonPlayerIds: replay.wonPlayerIds };
+
 }
 
 /**

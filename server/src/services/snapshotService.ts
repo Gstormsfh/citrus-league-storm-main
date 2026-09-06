@@ -79,7 +79,7 @@ export async function buildSnapshot(
   // Step 1: read league config — format, status, pick deadline.
   const { data: leagueRow, error: leagueErr } = await supabase
     .from('leagues')
-    .select('id, settings, draft_state, pick_deadline')
+    .select('id, settings, draft_state, pick_deadline, draft_rounds, roster_size')
     .eq('id', leagueId)
     .maybeSingle();
   if (leagueErr) {
@@ -99,6 +99,10 @@ export async function buildSnapshot(
     draftRounds?: number;
     rosterSize?: number;
   };
+  // Match engine configuration: existing leagues store rounds in columns.
+  if (!(Number(settings.draftRounds ?? settings.rosterSize) > 0)) {
+    settings.draftRounds = leagueRow.draft_rounds ?? leagueRow.roster_size ?? 0;
+  }
   const draftType = settings.draftType;
   if (
     draftType !== 'snake' &&
@@ -459,6 +463,22 @@ function translateEventRow(row: {
   const seq = row.seq;
 
   switch (row.event_type) {
+    case 'draft_started':
+      return {
+        kind: 'draft_started', seq, timestamp, correlationId,
+        startedAt: String(payload.started_at ?? timestamp),
+        firstPickDeadline: String(payload.first_pick_deadline ?? ''),
+        totalRounds: Number(payload.total_rounds ?? 0),
+        totalTeams: Number(payload.total_teams ?? 0),
+        pickTimeLimitSeconds: Number(payload.pick_time_limit_seconds ?? 0),
+        draftFormat: (payload.draft_format ?? 'snake') as DraftFormat,
+      };
+    case 'draft_completed':
+      return {
+        kind: 'draft_completed', seq, timestamp, correlationId,
+        completedAt: String(payload.completed_at ?? timestamp),
+        totalPicks: Number(payload.total_picks ?? 0),
+      };
     case 'pick':
       return {
         kind: 'pick_submitted',
