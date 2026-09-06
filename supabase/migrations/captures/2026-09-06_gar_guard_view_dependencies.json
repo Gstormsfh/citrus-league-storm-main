@@ -1,0 +1,32 @@
+[
+  {
+    "relation": "player_gar_inputs",
+    "relkind": "v",
+    "relrowsecurity": false,
+    "definition": " SELECT player_id,\n    season,\n    games,\n    toi_5v5_minutes,\n    toi_pp_minutes,\n    toi_pk_minutes,\n    toi_total_minutes,\n    evo_xgf60,\n    evd_xga60,\n    ppo_xgf60,\n    ppd_xga60,\n    pen_net60,\n    minors_drawn,\n    minors_taken,\n    evo_xgf60_unadj,\n    evd_xga60_unadj,\n    gf_5v5,\n    ga_5v5\n   FROM player_gar_inputs_by_type\n  WHERE game_type = 2;"
+  },
+  {
+    "relation": "player_gar_inputs_by_type",
+    "relkind": "v",
+    "relrowsecurity": false,
+    "definition": " WITH toi AS (\n         SELECT player_toi_by_state.player_id,\n            player_toi_by_state.season,\n            citrus_game_type(player_toi_by_state.game_id::bigint) AS game_type,\n            sum(player_toi_by_state.toi_seconds) FILTER (WHERE player_toi_by_state.state = '5v5'::text) AS s_5v5,\n            sum(player_toi_by_state.toi_seconds) FILTER (WHERE player_toi_by_state.state = 'PP'::text) AS s_pp,\n            sum(player_toi_by_state.toi_seconds) FILTER (WHERE player_toi_by_state.state = 'PK'::text) AS s_pk,\n            sum(player_toi_by_state.toi_seconds) AS s_all,\n            count(DISTINCT player_toi_by_state.game_id) AS games\n           FROM player_toi_by_state\n          GROUP BY player_toi_by_state.player_id, player_toi_by_state.season, (citrus_game_type(player_toi_by_state.game_id::bigint))\n        ), onice AS (\n         SELECT player_onice_xg.player_id,\n            player_onice_xg.season,\n            citrus_game_type(player_onice_xg.game_id::bigint) AS game_type,\n            sum(player_onice_xg.xgf_flurry) FILTER (WHERE player_onice_xg.state = '5v5'::text) AS xgf_5v5,\n            sum(player_onice_xg.xga_flurry) FILTER (WHERE player_onice_xg.state = '5v5'::text) AS xga_5v5,\n            sum(player_onice_xg.xgf_flurry) FILTER (WHERE player_onice_xg.state = 'PP'::text) AS xgf_pp,\n            sum(player_onice_xg.xga_flurry) FILTER (WHERE player_onice_xg.state = 'PK'::text) AS xga_pk,\n            sum(player_onice_xg.xgf) FILTER (WHERE player_onice_xg.state = '5v5'::text) AS xgf_5v5_unadj,\n            sum(player_onice_xg.xga) FILTER (WHERE player_onice_xg.state = '5v5'::text) AS xga_5v5_unadj,\n            sum(player_onice_xg.gf) FILTER (WHERE player_onice_xg.state = '5v5'::text) AS gf_5v5,\n            sum(player_onice_xg.ga) FILTER (WHERE player_onice_xg.state = '5v5'::text) AS ga_5v5\n           FROM player_onice_xg\n          GROUP BY player_onice_xg.player_id, player_onice_xg.season, (citrus_game_type(player_onice_xg.game_id::bigint))\n        ), pen AS (\n         SELECT z.player_id,\n            z.season,\n            z.game_type,\n            sum(z.taken) AS taken,\n            sum(z.drawn) AS drawn\n           FROM ( SELECT player_penalty_events.committed_by AS player_id,\n                    player_penalty_events.season,\n                    citrus_game_type(player_penalty_events.game_id::bigint) AS game_type,\n                    1 AS taken,\n                    0 AS drawn\n                   FROM player_penalty_events\n                  WHERE player_penalty_events.duration_min = 2 AND player_penalty_events.committed_by IS NOT NULL\n                UNION ALL\n                 SELECT player_penalty_events.drawn_by,\n                    player_penalty_events.season,\n                    citrus_game_type(player_penalty_events.game_id::bigint) AS citrus_game_type,\n                    0,\n                    1\n                   FROM player_penalty_events\n                  WHERE player_penalty_events.duration_min = 2 AND player_penalty_events.drawn_by IS NOT NULL) z\n          GROUP BY z.player_id, z.season, z.game_type\n        )\n SELECT t.player_id,\n    t.season,\n    t.game_type,\n    t.games,\n    round(t.s_5v5::numeric / 60.0, 2) AS toi_5v5_minutes,\n    round(COALESCE(t.s_pp, 0::bigint)::numeric / 60.0, 2) AS toi_pp_minutes,\n    round(COALESCE(t.s_pk, 0::bigint)::numeric / 60.0, 2) AS toi_pk_minutes,\n    round(t.s_all::numeric / 60.0, 2) AS toi_total_minutes,\n    round(o.xgf_5v5 * 3600.0 / NULLIF(t.s_5v5, 0)::numeric, 4) AS evo_xgf60,\n    round(o.xga_5v5 * 3600.0 / NULLIF(t.s_5v5, 0)::numeric, 4) AS evd_xga60,\n    round(o.xgf_pp * 3600.0 / NULLIF(t.s_pp, 0)::numeric, 4) AS ppo_xgf60,\n    round(o.xga_pk * 3600.0 / NULLIF(t.s_pk, 0)::numeric, 4) AS ppd_xga60,\n    round((COALESCE(p.drawn, 0::bigint) - COALESCE(p.taken, 0::bigint))::numeric * 3600.0 / NULLIF(t.s_all, 0)::numeric, 4) AS pen_net60,\n    COALESCE(p.drawn, 0::bigint) AS minors_drawn,\n    COALESCE(p.taken, 0::bigint) AS minors_taken,\n    round(o.xgf_5v5_unadj * 3600.0 / NULLIF(t.s_5v5, 0)::numeric, 4) AS evo_xgf60_unadj,\n    round(o.xga_5v5_unadj * 3600.0 / NULLIF(t.s_5v5, 0)::numeric, 4) AS evd_xga60_unadj,\n    o.gf_5v5,\n    o.ga_5v5\n   FROM toi t\n     LEFT JOIN onice o USING (player_id, season, game_type)\n     LEFT JOIN pen p USING (player_id, season, game_type)\n  WHERE t.s_5v5 > 0;"
+  },
+  {
+    "relation": "player_onice_xg",
+    "relkind": "r",
+    "relrowsecurity": true,
+    "definition": null
+  },
+  {
+    "relation": "player_penalty_events",
+    "relkind": "r",
+    "relrowsecurity": true,
+    "definition": null
+  },
+  {
+    "relation": "player_toi_by_state",
+    "relkind": "r",
+    "relrowsecurity": true,
+    "definition": null
+  }
+]

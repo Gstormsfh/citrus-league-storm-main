@@ -1,0 +1,12 @@
+[
+  {
+    "kind": "function",
+    "name": "citrus_goals_per_minor",
+    "definition": "CREATE OR REPLACE FUNCTION public.citrus_goals_per_minor()\n RETURNS numeric\n LANGUAGE sql\n STABLE\n SET search_path TO 'public', 'pg_temp'\nAS $function$\n  with t as (\n    select state, sum(toi_seconds)/3600.0 as player_hours\n    from public.player_toi_by_state where state in ('5v5','PP') group by 1\n  ),\n  x as (\n    select state, sum(xgf) xgf, sum(xga) xga, sum(gf) gf\n    from public.player_onice_xg where state in ('5v5','PP') group by 1\n  ),\n  r as (\n    -- player-hours divided by the six slots on the ice gives team-hours; the\n    -- per-team rate is then the summed value over those team-hours\n    select x.state,\n           x.xgf / nullif(t.player_hours, 0) as team_xgf60,\n           x.xga / nullif(t.player_hours, 0) as team_xga60,\n           x.gf  / nullif(t.player_hours, 0) as team_gf60\n    from x join t using (state)\n  )\n  select round(\n    ( (select team_xgf60 - team_xga60 from r where state = 'PP')\n    - (select team_xgf60 - team_xga60 from r where state = '5v5') )\n    -- effective length of a minor: two minutes, less the share that end early\n    -- on a power-play goal, which on average arrives about halfway through\n    * greatest(0.5, 2.0 - (select team_gf60 from r where state = 'PP') * 2.0/60.0 * 1.0)\n    / 60.0, 5)\n$function$\n"
+  },
+  {
+    "kind": "view",
+    "name": "player_gar_inputs",
+    "definition": " SELECT player_id,\n    season,\n    games,\n    toi_5v5_minutes,\n    toi_pp_minutes,\n    toi_pk_minutes,\n    toi_total_minutes,\n    evo_xgf60,\n    evd_xga60,\n    ppo_xgf60,\n    ppd_xga60,\n    pen_net60,\n    minors_drawn,\n    minors_taken,\n    evo_xgf60_unadj,\n    evd_xga60_unadj,\n    gf_5v5,\n    ga_5v5\n   FROM player_gar_inputs_by_type\n  WHERE game_type = 2;"
+  }
+]

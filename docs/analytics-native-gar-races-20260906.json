@@ -1,0 +1,484 @@
+{
+  "date": "2026-09-06",
+  "scope": "Disposable local synthetic PostgreSQL only; migration unapplied",
+  "image": "postgres@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3",
+  "container": {
+    "name": "citrus-gar-races-20260906-0500",
+    "memory": "512 MiB",
+    "storage": "256 MiB tmpfs; no volumes",
+    "network": "dynamic localhost port",
+    "cleanup": "exact owned --rm container stopped; matching container count zero"
+  },
+  "runs": [
+    {
+      "status": "passed",
+      "postgres": "17.6 (Debian 17.6-2.pgdg12+1)",
+      "independentConnections": 3,
+      "backendPids": [
+        81,
+        83,
+        82
+      ],
+      "lockWitnesses": [
+        {
+          "scenario": "raw_shots: correction commit",
+          "blocker_pid": 83,
+          "pid": 82,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "raw_shots",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "raw_shots: invalid commit",
+          "blocker_pid": 83,
+          "pid": 82,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "raw_shots",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "raw_shots: source rollback",
+          "blocker_pid": 83,
+          "pid": 82,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "raw_shots",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "raw_shots: writer waits behind rebuild",
+          "blocker_pid": 83,
+          "pid": 82,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "raw_shots",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "player_toi_by_state: correction commit",
+          "blocker_pid": 83,
+          "pid": 82,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "player_toi_by_state",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "player_toi_by_state: invalid commit",
+          "blocker_pid": 83,
+          "pid": 82,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "player_toi_by_state",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "player_toi_by_state: source rollback",
+          "blocker_pid": 83,
+          "pid": 82,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "player_toi_by_state",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "player_toi_by_state: writer waits behind rebuild",
+          "blocker_pid": 83,
+          "pid": 82,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "player_toi_by_state",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "output writer waits behind rebuild",
+          "blocker_pid": 83,
+          "pid": 82,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "player_gar_components",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "second rebuild waits behind first",
+          "blocker_pid": 83,
+          "pid": 82,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareRowExclusiveLock",
+              "table": "player_gar_components",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "rebuild waits behind standalone totals",
+          "blocker_pid": 83,
+          "pid": 82,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareRowExclusiveLock",
+              "table": "player_gar_components",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "standalone totals waits behind rebuild",
+          "blocker_pid": 83,
+          "pid": 82,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            83
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareRowExclusiveLock",
+              "table": "player_gar_components",
+              "schema": "public"
+            }
+          ]
+        }
+      ],
+      "cases": [
+        "raw_shots correction commit is reflected without stale-snapshot rejection",
+        "raw_shots invalid commit rejects with exact output/timestamp preservation",
+        "raw_shots rollback retains valid prior math",
+        "player_toi_by_state correction commit is reflected without stale-snapshot rejection",
+        "player_toi_by_state invalid commit rejects with exact output/timestamp preservation",
+        "player_toi_by_state rollback retains valid prior math",
+        "output writer serialized",
+        "second rebuild serialized; nonselected season rows and timestamps exact",
+        "standalone totals serialized in both directions"
+      ],
+      "migrationSha256": "105e398628f7735ebc7bfc05f39790e49d8c189c98f2a05c9bca797f23e6790a",
+      "mathEquivalence": "exact JSON numeric values excluding successful-run timestamps; all failure/nonselected snapshots exact",
+      "limitations": [
+        "synthetic recorded inputs only",
+        "not source completeness/model calibration/production load proof",
+        "native races cover five-argument builder and standalone totals; four-argument formula/guards covered in isolated harness"
+      ],
+      "cleanup": "verified: zero public objects, fixture roles, or user schemas"
+    },
+    {
+      "status": "passed",
+      "postgres": "17.6 (Debian 17.6-2.pgdg12+1)",
+      "independentConnections": 3,
+      "backendPids": [
+        85,
+        84,
+        86
+      ],
+      "lockWitnesses": [
+        {
+          "scenario": "raw_shots: correction commit",
+          "blocker_pid": 84,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            84
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "raw_shots",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "raw_shots: invalid commit",
+          "blocker_pid": 84,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            84
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "raw_shots",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "raw_shots: source rollback",
+          "blocker_pid": 84,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            84
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "raw_shots",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "raw_shots: writer waits behind rebuild",
+          "blocker_pid": 84,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            84
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "raw_shots",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "player_toi_by_state: correction commit",
+          "blocker_pid": 84,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            84
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "player_toi_by_state",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "player_toi_by_state: invalid commit",
+          "blocker_pid": 84,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            84
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "player_toi_by_state",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "player_toi_by_state: source rollback",
+          "blocker_pid": 84,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            84
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareLock",
+              "table": "player_toi_by_state",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "player_toi_by_state: writer waits behind rebuild",
+          "blocker_pid": 84,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            84
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "player_toi_by_state",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "output writer waits behind rebuild",
+          "blocker_pid": 84,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            84
+          ],
+          "waiting_locks": [
+            {
+              "mode": "RowExclusiveLock",
+              "table": "player_gar_components",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "second rebuild waits behind first",
+          "blocker_pid": 84,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            84
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareRowExclusiveLock",
+              "table": "player_gar_components",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "rebuild waits behind standalone totals",
+          "blocker_pid": 84,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            84
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareRowExclusiveLock",
+              "table": "player_gar_components",
+              "schema": "public"
+            }
+          ]
+        },
+        {
+          "scenario": "standalone totals waits behind rebuild",
+          "blocker_pid": 84,
+          "pid": 86,
+          "wait_event_type": "Lock",
+          "wait_event": "relation",
+          "blockers": [
+            84
+          ],
+          "waiting_locks": [
+            {
+              "mode": "ShareRowExclusiveLock",
+              "table": "player_gar_components",
+              "schema": "public"
+            }
+          ]
+        }
+      ],
+      "cases": [
+        "raw_shots correction commit is reflected without stale-snapshot rejection",
+        "raw_shots invalid commit rejects with exact output/timestamp preservation",
+        "raw_shots rollback retains valid prior math",
+        "player_toi_by_state correction commit is reflected without stale-snapshot rejection",
+        "player_toi_by_state invalid commit rejects with exact output/timestamp preservation",
+        "player_toi_by_state rollback retains valid prior math",
+        "output writer serialized",
+        "second rebuild serialized; nonselected season rows and timestamps exact",
+        "standalone totals serialized in both directions"
+      ],
+      "migrationSha256": "105e398628f7735ebc7bfc05f39790e49d8c189c98f2a05c9bca797f23e6790a",
+      "mathEquivalence": "exact JSON numeric values excluding successful-run timestamps; all failure/nonselected snapshots exact",
+      "limitations": [
+        "synthetic recorded inputs only",
+        "not source completeness/model calibration/production load proof",
+        "native races cover five-argument builder and standalone totals; four-argument formula/guards covered in isolated harness"
+      ],
+      "cleanup": "verified: zero public objects, fixture roles, or user schemas"
+    }
+  ]
+}
