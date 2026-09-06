@@ -97,7 +97,7 @@ def test_main_reconciles_inputs_before_writing(monkeypatch, caplog):
     filters = []
 
     class Db:
-        def select(self, table, **kwargs):
+        def select_exact(self, table, **kwargs):
             filters.append(kwargs["filters"])
             return rows  # deliberately ignores filters: local boundary also guards
 
@@ -166,3 +166,17 @@ def test_zero_confirmation_requires_explicit_game_log_measurement(monkeypatch):
                         types.SimpleNamespace(citrus_request=request))
     assert fetch_verified_zero_games(1, 2025) == {2025020001, 2025020002}
     assert urls == ["https://api-web.nhle.com/v1/player/1/game-log/20252026/2"]
+
+
+def test_xg_partial_page_failure_never_returns_partial_total():
+    import pytest
+    from projections.build_player_season_stats import try_fetch_xg_totals
+    class Db:
+        def select_exact(self, table, **kwargs):
+            assert kwargs["order"] == "game_id.asc,event_id.asc"
+            assert ("game_id", "lt", 2025030000) in kwargs["filters"]
+            if kwargs["offset"] == 0:
+                return [{"shooter_id": 1, "xg_sql": 0.1}] * 1000
+            raise RuntimeError("incomplete second page")
+    with pytest.raises(RuntimeError, match="incomplete second page"):
+        try_fetch_xg_totals(Db(), 2025)

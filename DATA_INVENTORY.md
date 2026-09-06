@@ -288,6 +288,12 @@ These are the parts of the entropy that the audit surfaced. **They should NOT be
 
 ## 6. Update protocol
 
+Foundation tools (2026-09-06): `data-pipeline/monitoring/metric_identity.py`
+is a read-only JSON snapshot reconciler. It fingerprints both inputs and
+quarantines missing/duplicate/conflicting shot identities without rewriting
+probabilities. `docs/ANALYTICS_ACCEPTANCE.md` records live evidence separately
+from local tests and tracks the remaining foundation/metric gates.
+
 **When adding a new data artifact, update this doc:**
 
 1. **New table** → add to §1.2 with row count + writer script + size

@@ -92,7 +92,7 @@ def fetch_all_player_game_stats(db: SupabaseRest, season: int) -> List[dict]:
   offset = 0
   page_size = 1000
   while True:
-    page = db.select("player_game_stats", select="*", filters=regular_season_filters(season), limit=page_size, offset=offset)
+    page = db.select_exact("player_game_stats", select="*", filters=regular_season_filters(season), order="game_id.asc,player_id.asc", limit=page_size, offset=offset)
     if not page:
       break
     all_rows.extend(page)
@@ -211,11 +211,11 @@ def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, fl
 
     while True:
       try:
-        rows = db.select("nhl_shots", select=select_cols, filters=season_filter,
-                         limit=batch_size, offset=offset)
+        rows = db.select_exact("nhl_shots", select=select_cols, filters=season_filter,
+                         order="game_id.asc,event_id.asc", limit=batch_size, offset=offset)
       except Exception as e:
         logger.warning(f"[build_player_season_stats] Warning: could not fetch xG batch at offset {offset}: {e}")
-        break
+        raise
 
       if not rows:
         break
@@ -249,7 +249,7 @@ def try_fetch_xg_totals(db: SupabaseRest, season: int) -> Dict[int, Dict[str, fl
     logger.error(f"[build_player_season_stats] Warning: error enriching xG: {e}")
     import traceback
     traceback.print_exc()
-    return {}
+    raise
 
 def upsert_player_season_stats(db: SupabaseRest, season_rows: List[dict]) -> None:
   if not season_rows:
