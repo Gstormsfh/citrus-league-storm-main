@@ -109,6 +109,12 @@ review and verification records. It checks every archive member against its
 original without extraction. This remains a local duplicate, not off-machine
 backup, an inventory of every external input, or quality acceptance.
 
+The [completed archive receipt](analytics-model-publication-checkpoint-archive-20260906.json)
+records 2,139 selected tracked source files and 113 new evidence files. Every
+member matches its retained original; compressed file hashes and sizes were
+also independently rechecked. Runtime installations and dependency caches are
+not bundled, so this archive is not a self-contained executable environment.
+
 ## Next foundation work
 
 This closes the bounded local diagnostic publication lane. It does not resolve

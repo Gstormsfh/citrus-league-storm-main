@@ -1,0 +1,71 @@
+{
+  "archives": [
+    {
+      "bytes": 15415034,
+      "complete_membership_verified": true,
+      "every_member_matches_retained_source": true,
+      "extracted_to_filesystem": false,
+      "member_inventory_sha256": "47d20e04279652507484b98cd5cd2bdf689eb5a79557d579ad973bcefbc63677",
+      "path": "scripts/proof/results/analytics-model-publication-checkpoint-20260906-1128/source-head.tar.gz",
+      "regular_bytes": 45165351,
+      "regular_files": 2139,
+      "sha256": "f3947642fc67b0bfd0879d24966acba1b0c17c7bf23d4279e70f76ae566d8737"
+    },
+    {
+      "bytes": 2707139,
+      "complete_membership_verified": true,
+      "every_member_matches_retained_source": true,
+      "extracted_to_filesystem": false,
+      "member_inventory_sha256": "0f547e024856d022f4ead4a464e278faae7a01a78a6e386e80864e40356cdb71",
+      "path": "scripts/proof/results/analytics-model-publication-checkpoint-20260906-1128/evidence.tar.gz",
+      "regular_bytes": 13750474,
+      "regular_files": 113,
+      "sha256": "bd04457eec444e1eabf5e6279d04c413158e3ffe29b113cfc003813a01f9aa26"
+    }
+  ],
+  "contract": "citrus-local-model-publication-checkpoint-v1",
+  "evidence_roots": [
+    "scripts/proof/results/local-model-publication-20260906-1103",
+    "scripts/proof/results/local-model-publication-20260906-1107",
+    "scripts/proof/results/local-model-publication-20260906-1110",
+    "scripts/proof/results/local-model-publication-20260906-1119",
+    "scripts/proof/results/local-model-publication-20260906-1122",
+    "scripts/proof/results/local-model-publication-review-20260906",
+    "scripts/proof/results/local-model-publication-verification-20260906"
+  ],
+  "limitations": [
+    "Local duplicate only, not off-machine backup or acceptance.",
+    "Failed runs and fixture-only synthetic tokens retained; no hosted credentials are used.",
+    "Prior model/source archives and reservations remain separately preserved."
+  ],
+  "originals_removed": false,
+  "production_changed": false,
+  "publishable": false,
+  "review_sha256": "75b865c1e0e8ae77d678fcb6798f849ab2eda29ceb5cc4f5b4c5f8bc135d73be",
+  "source_commit": "83ccafa381b4997e2d08354d9a242cbde533a101",
+  "source_roots": [
+    "data-pipeline/projections",
+    "data-pipeline/acquisition",
+    "data-pipeline/monitoring",
+    "data-pipeline/models",
+    "data-pipeline/tests",
+    "supabase/migrations",
+    "scripts/proof",
+    "docs",
+    "server/src",
+    "packages/shared/src",
+    "apps/web/src",
+    "DATA_INVENTORY.md",
+    "data-pipeline/utils",
+    "scripts/local_analytics_publication_e2e.py",
+    "scripts/local_model_publication_e2e.py",
+    "scripts/local_model_publication_e2e_v2.py",
+    "scripts/start_analytics_rest_fixture.mjs"
+  ],
+  "status": "complete-verified-local-duplicate",
+  "success_health_sha256": {
+    "scripts/proof/results/local-model-publication-20260906-1119": "2e25797a1a71c6943229a5b062ab6d4394b3bfb7c0626b0d848d85db1bfb699c",
+    "scripts/proof/results/local-model-publication-20260906-1122": "da492531a6238256eb146ad66f4327705a1b663c4d19fa0bd05dda906aa2d16a"
+  },
+  "verified_at": "2026-09-06T11:27:32.807172+00:00"
+}

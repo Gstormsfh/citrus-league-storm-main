@@ -40,6 +40,12 @@ checkpoint tests pass. Server/proof type checking passes. All 51 separately
 indexed prior artifact/result/archive pins remain unchanged, including original
 future reservations. No production or hosted database change occurred.
 
+The [verified local archive](analytics-model-publication-checkpoint-archive-20260906.json)
+preserves 2,139 selected tracked source files and 113 new evidence files, including
+both successes and all failures. Every member matches its retained original;
+root separately rechecked compressed hashes and sizes. This is a local duplicate,
+not off-machine backup, full runtime reproduction or acceptance.
+
 Next prioritize bounded canonical-event player/goalie attribution and exposure,
 then the unresolved complete nightly dependency path. Keep these local and
 non-serving; do not replace quality/forecast gates with transport success.
