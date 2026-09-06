@@ -20,6 +20,31 @@ Status: foundation NOT accepted. Local work only; no production rollout authoriz
 
 ## Current local verification (2026-09-06)
 
+### Additive calibration refinement and cross-language inference
+
+The [new checkpoint](analytics-calibration-result-20260906.md) and
+[bound evidence index](analytics-calibration-result-index-20260906.json) record
+a completed, source-replayed calibration experiment under a separately frozen
+plan. Context-aware beta improves Brier and log loss in both already-inspected
+development folds versus the retained enhanced sigmoid. Ordinary beta does not.
+All candidates, reliability bins, paired comparisons and subgroups remain
+preserved. Mid/high-probability overprediction and subgroup regressions remain;
+fold 1 aggregate goal bias is slightly worse. Calibration is **not accepted**.
+
+Fresh refits reproduce the prior raw/sigmoid/isotonic validation vectors exactly.
+Independent JSON Python design/inference passes every calibration/validation row;
+the full-cohort TypeScript proof passes calibration raw and all five validation
+probability maps within the declared tolerance. It retains missing and unseen
+context explicitly. This proves portability of source-validated feature rows,
+not TypeScript PBP parsing, hosted publication, full serving acceptance or FPAR.
+The new TypeScript scorer is not connected to serving. Old experiments,
+reservations and archives remain unchanged; no hosted operations occurred.
+
+Local verification: 1,611 offline Python tests pass, 16 network tests excluded;
+284 shared TypeScript tests and its type check pass; the standalone cross-language
+proof harness passes 8 tests. See the checkpoint for calibration limits and
+the next bounded overnight work. Overall foundation status remains NOT accepted.
+
 ### Additive earlier development and composed database work
 
 The [earlier-development declaration](analytics-development-ablation-plan-20260906.json)

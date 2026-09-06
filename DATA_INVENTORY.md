@@ -129,6 +129,18 @@ prospective quality or FPAR acceptance.
 `scripts/proof/verify_portable_xg.test.mjs` exercises the independent proof's
 complete synthetic population, pinned evidence, altered predictions/membership,
 failure markers and create-only output behavior.
+Both real runs completed; `docs/analytics-calibration-result-20260906.md` records
+the measured improvement and remaining failures, and
+`docs/analytics-calibration-result-index-20260906.json` pins their receipts.
+The complete large machine review lives byte-preserved with local artifacts at
+`scripts/proof/results/official-calibration-review-20260906/review.json`.
+`scripts/proof/record_calibration_checkpoint.py` generates that bound review and
+archives only the three new evidence roots plus committed source using the
+unchanged prior archive-verification helpers; its matching
+`scripts/proof/test_record_calibration_checkpoint.py` covers scope/failure retention.
+New local archive output uses
+`scripts/proof/results/analytics-calibration-checkpoint-20260906-*/` with a
+tracked `docs/analytics-calibration-checkpoint-archive-20260906.json` receipt.
 
 Current acceptance is tracked in `docs/ANALYTICS_ACCEPTANCE.md`; legacy row
 counts and model labels elsewhere in this inventory are not revalidated by this

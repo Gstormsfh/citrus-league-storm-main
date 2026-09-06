@@ -1,0 +1,21 @@
+{
+  "contract": "citrus-calibration-checkpoint-index-v1",
+  "status": "development-improved-portability-verified-foundation-not-accepted",
+  "publishable": false,
+  "calibration_code_commit": "c886f3d6",
+  "typescript_code_commit": "98562dff",
+  "files": {
+    "scripts/proof/results/official-calibration-experiment-20260906/health.json": "9e16e047848ade1d02611312be285f14fec48d5de9dadae7afd2dab36d895642",
+    "scripts/proof/results/official-calibration-experiment-20260906/result.json": "f079a45c2d709809566388c8619ec44bf83f994626c00a96496fe53015506694",
+    "scripts/proof/results/official-calibration-typescript-parity-20260906/health.json": "87ca44d99785b58ebac45aef36ef1bf427fa57def3b2aa210e6b45a31a00144c",
+    "scripts/proof/results/official-calibration-typescript-parity-20260906/result.json": "573222039935acbfb303ef37cd1208b47da0cc1b6038605bdaf93c6dadcfc7e3",
+    "scripts/proof/results/official-calibration-review-20260906/review.json": "85bac1fb93cd85a8595cd299dbbfe813dd953cc364f8ad2c524e4a5fc9dc3386"
+  },
+  "selected_for_further_development": "beta_group",
+  "remaining_gates": ["calibration-shape-and-subgroup-errors", "new-final-fit-and-prospective-reservation", "full-foundation-writer-consumer-and-operational-validation", "validated-fantasy-forecast-foundation-before-FPAR"],
+  "production_changed": false,
+  "existing_evidence_removed_or_replaced": false,
+  "existing_prospective_reservations_changed": false,
+  "historical_as_of_verified": false,
+  "untouched_test_claim": false
+}
