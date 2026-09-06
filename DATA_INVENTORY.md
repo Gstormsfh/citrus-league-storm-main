@@ -115,6 +115,12 @@ Matching Python tests are `test_calibration_shape.py`,
 `test_calibration_shape_typescript.py` and `test_calibration_shape_experiment.py`.
 This is adaptive already-inspected development, not a new untouched test or
 acceptance. All preceding model/code/evidence files and reservations remain intact.
+The additive `scripts/proof/record_calibration_shape_checkpoint.py` preserves a
+complete health-pinned review under `official-calibration-shape-review-20260906/`
+and independently checks every member of new local source/evidence archives
+under `analytics-calibration-shape-checkpoint-*`. Its matching proof tests cover
+candidate/bin/pair/subgroup completeness and create-only failure behavior.
+No archived source or prior review generator is modified.
 
 Additive calibration refinement (2026-09-06):
 `docs/analytics-calibration-plan-20260906.json` fixes a five-calibrator budget
