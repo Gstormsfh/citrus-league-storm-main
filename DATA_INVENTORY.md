@@ -116,6 +116,20 @@ New experiment output belongs under a separate
 completion requires its affirmative health receipt. No serving integration,
 existing evidence replacement, later-period test reuse, or FPAR acceptance.
 
+`packages/shared/src/utils/portableXg.ts` is an offline-only TypeScript JSON
+scorer, deliberately absent from the shared serving barrel; its tests cover
+thresholds, unknown/missing indicators, nonpublishing contracts and malformed
+artifacts. `scripts/proof/verify_portable_xg.mjs` independently checks the full
+calibration raw and validation five-calibrator populations against a pinned
+completed Python experiment health receipt, directly streaming the unchanged
+feature export. It writes create-only proof artifacts under
+`scripts/proof/results/official-calibration-typescript-parity-20260906/`.
+This validates model portability, not TypeScript PBP parsing, hosted serving,
+prospective quality or FPAR acceptance.
+`scripts/proof/verify_portable_xg.test.mjs` exercises the independent proof's
+complete synthetic population, pinned evidence, altered predictions/membership,
+failure markers and create-only output behavior.
+
 Current acceptance is tracked in `docs/ANALYTICS_ACCEPTANCE.md`; legacy row
 counts and model labels elsewhere in this inventory are not revalidated by this
 implementation. The new service-only publication/canonical migrations remain
