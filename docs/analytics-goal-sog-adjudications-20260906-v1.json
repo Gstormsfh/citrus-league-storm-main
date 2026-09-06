@@ -1,0 +1,2224 @@
+{
+  "approval_scope": "Reviewed exact frozen events only; local source-specific statistical overlay, no production activation",
+  "approved_bundle_sha256": "43a7d5c2c17782ee5e4fe65dcf8512a46fef1248a337080f14aeeb93ea0bc864",
+  "base_shot_model_attempt_eligible": false,
+  "contract": "citrus-exact-goal-sog-adjudication-manifest-v1",
+  "goal_credit": 1,
+  "not_a_probability_zero": true,
+  "reason": "credited_goal_without_additional_recorded_shot",
+  "recorded_sog_contribution": 0,
+  "records": [
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "09:10",
+      "event_id": 104,
+      "game_id": 2025020184,
+      "goal_credit": 1,
+      "mechanism": "official_article_awarded_goal",
+      "official_award_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020184-78842774-ee9b-5d50-862e-23a6ed86d313-3.body",
+          "paragraph_index": 17,
+          "paragraph_text_sha256": "4c71aa99b2bc1a7620817200aa63cb80823f7695c400098997da4e009eef995c",
+          "raw_body_sha256": "2d7a595bd6d66f7ec739a9382c57c4a08a56a284b784071efe881b6dd722152d",
+          "receipt_bytes_sha256": "cd66aae5fdf2da686d6d106264763373c7395307bf7f593ce30ca2a6420dc6a0",
+          "receipt_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020184-78842774-ee9b-5d50-862e-23a6ed86d313-3.receipt.json",
+          "retrieved_at": "2026-09-06T05:23:13.007183+00:00",
+          "url": "https://www.nhl.com/news/colorado-avalanche-san-jose-sharks-game-recap-november-1-2025"
+        }
+      ],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020184-78842774-ee9b-5d50-862e-23a6ed86d313-1.body",
+          "explicit_own_goal_label": false,
+          "raw_body_sha256": "0ee79cf0fd357da2fd32b5e46f05ed9b7df7dbbfdce51b3a5fdeac2b9485be5e",
+          "receipt_bytes_sha256": "88708699f3f94ce15d448c42857787408356d94f5c83dc7ab12a8c4f866a3e9a",
+          "report_clock": "9:10",
+          "report_description": "COL #29 MACKINNON(10) , Off. Zone, 4 ft. Assists: #62 LEHKONEN(8); #13 NICHUSHKIN(4)",
+          "report_period": 2,
+          "report_row_id": "PL-162",
+          "retrieved_at": "2026-09-06T05:23:10.935515+00:00",
+          "row_prefix_utf8_sha256": "5aa0907b9b4165b667b1eeee2912069ef62d50626d8948af50ab7f3714da1015",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020184.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:11:27.042162+00:00",
+      "original_receipt_bytes_sha256": "6e838b3c7bb4e6ae67f6f0ea9343abbf14fec2f5c808b858dd9d283e509e016d",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 2,
+        "periodType": "REG"
+      },
+      "player_id": 8477492,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 39,
+            "reported": 38,
+            "team_id": 21
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "21": 0,
+          "28": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "21": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 39
+          },
+          "28": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 23
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 387,
+      "source_event_sha256": "dd1c6df192c6fbb33719acab94f26985b9b919bfb3a2131b6b9c2609be5a76cf",
+      "source_payload_sha256": "ef716d7eca6e2217480c1e5879ffe33ff9981e22be0709d8cfd678bdfbd76ccb",
+      "source_snapshot_id": "78842774-ee9b-5d50-862e-23a6ed86d313",
+      "team_id": 21
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "03:38",
+      "event_id": 1052,
+      "game_id": 2025020208,
+      "goal_credit": 1,
+      "mechanism": "official_article_awarded_goal",
+      "official_award_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020208-205ae370-a846-5a11-b0b2-e160b96b3965-3.body",
+          "paragraph_index": 2,
+          "paragraph_text_sha256": "3464ae439357fe14b8e8bfcb5fdc3ae967098b0cb99790e4f2b3132ff10f803e",
+          "raw_body_sha256": "3b8409a2300d92694995eb1fa943265fa5acffa00957decaa9cdd26078d456c0",
+          "receipt_bytes_sha256": "084c7af360358db1241734a3fad5dfb6dc5f271f06c869582b00ae3dad7ca4c1",
+          "receipt_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020208-205ae370-a846-5a11-b0b2-e160b96b3965-3.receipt.json",
+          "retrieved_at": "2026-09-06T05:23:17.618034+00:00",
+          "url": "https://www.nhl.com/news/nashville-predators-minnesota-wild-game-recap-november-4-2025"
+        }
+      ],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020208-205ae370-a846-5a11-b0b2-e160b96b3965-1.body",
+          "explicit_own_goal_label": false,
+          "raw_body_sha256": "c4ff7d22fb1c8e27ff5f9c415294bbd91568de400d505e750ed85956d0c84f59",
+          "receipt_bytes_sha256": "b3515f19c3e021f12c88cbf085ae02f98b3225f612c0b248d8bec72f18009e63",
+          "report_clock": "3:38",
+          "report_description": "MIN #90 JOHANSSON(6) , Off. Zone, 6 ft. Assists: #97 KAPRIZOV(10); #7 FABER(6)",
+          "report_period": 4,
+          "report_row_id": "PL-320",
+          "retrieved_at": "2026-09-06T05:23:15.731631+00:00",
+          "row_prefix_utf8_sha256": "f980b97190e988c6959a7dfb42d69f7800180c45f91b5089e90bc5df9e1608f0",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020208.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:11:30.345221+00:00",
+      "original_receipt_bytes_sha256": "a2aaf408298cac496707c9d8d9fde5291c0402939f804994b2b763e55dfab08c",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 4,
+        "periodType": "OT"
+      },
+      "player_id": 8475149,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 25,
+            "reported": 24,
+            "team_id": 30
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "18": 0,
+          "30": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "18": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 34
+          },
+          "30": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 25
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 803,
+      "source_event_sha256": "69a89fe4a70b8216d2b198dc3924144456bcb7bcdc4d2bd9e94f2d18802e255c",
+      "source_payload_sha256": "ad3dabac0eda9e8c105459505af6c1e4f4259ff80922ee8de0014e35f728392c",
+      "source_snapshot_id": "205ae370-a846-5a11-b0b2-e160b96b3965",
+      "team_id": 30
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "17:08",
+      "event_id": 804,
+      "game_id": 2025020236,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020236-737fe585-db90-52e6-8eb1-02ef35611196-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "e3c672810bec5013c93b006631f29b7d485e05eeaa6c7b471a8faea1222353c8",
+          "receipt_bytes_sha256": "93a6b4e3db2038eb149002c6c694a22dd8d6a4c0f2d9aa3be958a6e49ff5ab53",
+          "report_clock": "17:08",
+          "report_description": "WSH #74 CARLSON(4) , Off. Zone, Own Goal, 54 ft.",
+          "report_period": 2,
+          "report_row_id": "PL-189",
+          "retrieved_at": "2026-09-06T05:23:19.299607+00:00",
+          "row_prefix_utf8_sha256": "b698a011390115f2ea236a8b4c8ac84788c042e5abcf486177c8e2bcd3ff16c8",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020236.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:11:32.966693+00:00",
+      "original_receipt_bytes_sha256": "7a7b8d9f866ada21da7e3bc86b5e5611cb6c180b9ed727bfb27392b2a50d8eb2",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 2,
+        "periodType": "REG"
+      },
+      "player_id": 8474590,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 31,
+            "reported": 30,
+            "team_id": 15
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "14": 0,
+          "15": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "14": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 20
+          },
+          "15": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 31
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 494,
+      "source_event_sha256": "313142cc598fc6d9ad2855bf91488efb7a09478e4ae6edbaec5e3aa0dbb28538",
+      "source_payload_sha256": "786ee63a9a993cfd60bbd4f9fd42701142d871c64c95091a2df2ee32d606823d",
+      "source_snapshot_id": "737fe585-db90-52e6-8eb1-02ef35611196",
+      "team_id": 15
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "13:44",
+      "event_id": 162,
+      "game_id": 2025020282,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020282-a27259bf-d46d-56e9-a45d-c8368e4613ef-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "912113258c6dcd3e0ddde30b7a6493dfb07c719c243504bd54e1811de26164fb",
+          "receipt_bytes_sha256": "7cb740ab8ccac68600856f3f1e0a9cc2cbb8f41cafd745047b2aafc295f50c8a",
+          "report_clock": "13:44",
+          "report_description": "NYI #29 DROUIN(3) , Off. Zone, Own Goal, 6 ft.",
+          "report_period": 3,
+          "report_row_id": "PL-286",
+          "retrieved_at": "2026-09-06T05:23:23.063602+00:00",
+          "row_prefix_utf8_sha256": "e20e3793b36c5bdeb8aa1368e23e3f3ffc402073797a1660558ed8a6a1b6db00",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020282.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:11:40.555912+00:00",
+      "original_receipt_bytes_sha256": "07242a880ae3cf16ddea5a208c33526cca188774ea85bb5d4c467c0cbadf36c1",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8477494,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 22,
+            "reported": 21,
+            "team_id": 2
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "2": 0,
+          "68": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "2": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 22
+          },
+          "68": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 30
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 741,
+      "source_event_sha256": "8a870770c7245a83b555eb2a848cbb640e493916b33ff5d20f54df58505127fc",
+      "source_payload_sha256": "b69a44757863762b4feec6815b6a8f5c87223987e48a2cc3233c1e1595900029",
+      "source_snapshot_id": "a27259bf-d46d-56e9-a45d-c8368e4613ef",
+      "team_id": 2
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "01:50",
+      "event_id": 74,
+      "game_id": 2025020307,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020307-1c4cd1fa-0704-5a0a-8491-e440f2a342b2-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "53e8925caf1fe9c4f5be1389acaa4110dbd40f7f40bd7f045ff69bde0e0315af",
+          "receipt_bytes_sha256": "fe5abd4a94c5a9b130bc12b11b38f0bc1e221f36bcc63a3e6aac67249f68a6eb",
+          "report_clock": "1:50",
+          "report_description": "STL #26 WALKER(3) , Off. Zone, Own Goal, 10 ft.",
+          "report_period": 1,
+          "report_row_id": "PL-18",
+          "retrieved_at": "2026-09-06T05:23:26.236282+00:00",
+          "row_prefix_utf8_sha256": "cc9694f1cf09a03856f913e369d1bc120ae2aea35720dfac7acfc071318802e0",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020307.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:11:43.451996+00:00",
+      "original_receipt_bytes_sha256": "d2ad11b0b1e27e1460650e0ba90b8310f3e41f23d640b642a5d0b4a1baea0b55",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 1,
+        "periodType": "REG"
+      },
+      "player_id": 8477573,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 30,
+            "reported": 29,
+            "team_id": 19
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "10": 0,
+          "19": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "10": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 29
+          },
+          "19": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 30
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 34,
+      "source_event_sha256": "40877612f0dbaec7a47f713a94f1e465751c9a857e43967607c37d17bc140f3d",
+      "source_payload_sha256": "9d959301a16b95650404914ce979e9242f63182fd2a32ed532d082674d9f9c86",
+      "source_snapshot_id": "1c4cd1fa-0704-5a0a-8491-e440f2a342b2",
+      "team_id": 19
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "19:11",
+      "event_id": 304,
+      "game_id": 2025020395,
+      "goal_credit": 1,
+      "mechanism": "official_article_awarded_goal",
+      "official_award_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020395-a724d5e5-3920-5ff5-9596-3cb5fcf48213-3.body",
+          "paragraph_index": 19,
+          "paragraph_text_sha256": "75ed513a474d1f56d0c36042f665ebe176052566252317c6fa0c9faa81e562a7",
+          "raw_body_sha256": "234c5e71ac5bf1b66451d64c279959758c73fcc53c8685ab9c97e66fb25b9775",
+          "receipt_bytes_sha256": "7bbf02eda4a69ff18bf11adf1ba5852493763485032834ef1fa6a627715a86d4",
+          "receipt_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020395-a724d5e5-3920-5ff5-9596-3cb5fcf48213-3.receipt.json",
+          "retrieved_at": "2026-09-06T05:23:31.983767+00:00",
+          "url": "https://www.nhl.com/news/philadelphia-flyers-new-jersey-devils-game-recap-november-29-2025"
+        }
+      ],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020395-a724d5e5-3920-5ff5-9596-3cb5fcf48213-1.body",
+          "explicit_own_goal_label": false,
+          "raw_body_sha256": "c253af89f5c22c8960abd505f1054605e15935c65f26c85d29d4d90a05922962",
+          "receipt_bytes_sha256": "f136a0b4087c7faa8e8355f53ebd8a3d527603d299d51ce473ff6209f57aae5f",
+          "report_clock": "19:11",
+          "report_description": "PHI #74 TIPPETT(8) , Neu. Zone, 72 ft.",
+          "report_period": 3,
+          "report_row_id": "PL-329",
+          "retrieved_at": "2026-09-06T05:23:29.968952+00:00",
+          "row_prefix_utf8_sha256": "a94e76fc33d4cf447892609650513ea982d7dea4a5a9322ec286f9ab888d2a45",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020395.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:11:51.340643+00:00",
+      "original_receipt_bytes_sha256": "5ea784dc6da50fc9d56451678d470333fb8388e2884a029229a8b6d043e891bd",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8480015,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 32,
+            "reported": 31,
+            "team_id": 4
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "1": 0,
+          "4": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "1": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 32
+          },
+          "4": {
+            "goals": 5,
+            "shootout_goals": 0,
+            "sog": 32
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 796,
+      "source_event_sha256": "52b9f813eefc76d60e005118eba765ba5946e8bcfbaf40b33ffb67489ec8a5ac",
+      "source_payload_sha256": "cff081243c8e7e04461e795708b8fde2a3506bbadf5587c451de94a5c1f39abb",
+      "source_snapshot_id": "a724d5e5-3920-5ff5-9596-3cb5fcf48213",
+      "team_id": 4
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "19:59",
+      "event_id": 406,
+      "game_id": 2025020470,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020470-8fa8d90f-8ab2-5af0-97e3-6342a3814507-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "18c90d4bdd133b90de22396a1f6acb7e4d11212d9639e44777cca7fb79f12896",
+          "receipt_bytes_sha256": "1b775eb10c493de2855cfdd4402f745effda6e2956b6dfe4aa6bc1468869f9b1",
+          "report_clock": "19:59",
+          "report_description": "ANA #45 SENNECKE(10) , Off. Zone, Own Goal, 13 ft.",
+          "report_period": 3,
+          "report_row_id": "PL-324",
+          "retrieved_at": "2026-09-06T05:23:33.626142+00:00",
+          "row_prefix_utf8_sha256": "8db8bdaec128ac6e14161ce2b1966b218f8d6c1ff25b30629b5432f22f3015e0",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020470.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:12:02.353172+00:00",
+      "original_receipt_bytes_sha256": "dd4e266fa01a60700528845d8a8bfe573df6e7670659d26b18e9d0b179fd3423",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8484762,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 29,
+            "reported": 28,
+            "team_id": 24
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "24": 1,
+          "5": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "24": {
+            "goals": 3,
+            "shootout_goals": 1,
+            "sog": 29
+          },
+          "5": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 47
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 775,
+      "source_event_sha256": "688648eaa48a33c55ccccd3eff89cfb611c58014b92afd80faf361e3cc196441",
+      "source_payload_sha256": "3cff7fc4ccdf29ae12b3278145dd43a23709d58dba5f32f00b69cda26653f933",
+      "source_snapshot_id": "8fa8d90f-8ab2-5af0-97e3-6342a3814507",
+      "team_id": 24
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "10:29",
+      "event_id": 106,
+      "game_id": 2025020499,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020499-c299542c-5fac-5f8f-9d66-c2fe1e1409ca-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "d7145770191ea0cced207c85081738f54add6a69a3500cfae7dbb3da6967d8a7",
+          "receipt_bytes_sha256": "8dfd83d4f58733ae8023db455871432d68944bf29b3a62fb8a2dc96406112223",
+          "report_clock": "10:29",
+          "report_description": "EDM #97 MCDAVID(18) , Off. Zone, Own Goal, 7 ft.",
+          "report_period": 2,
+          "report_row_id": "PL-165",
+          "retrieved_at": "2026-09-06T05:23:37.561591+00:00",
+          "row_prefix_utf8_sha256": "1427d93a7cf297e4d4378e31c70ece897ff10d6712694780f8515e5a1fe10cf9",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020499.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:12:07.364941+00:00",
+      "original_receipt_bytes_sha256": "3f222644f66440469974a507db857f84e938c3b6a3c1692f25025c52658b3d05",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 2,
+        "periodType": "REG"
+      },
+      "player_id": 8478402,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 38,
+            "reported": 37,
+            "team_id": 22
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "10": 0,
+          "22": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "10": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 28
+          },
+          "22": {
+            "goals": 6,
+            "shootout_goals": 0,
+            "sog": 38
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 439,
+      "source_event_sha256": "ff677cceaa8ecb4c2ed6451fa89eccd55fd7c42e5250dcf6414957b6966fc01d",
+      "source_payload_sha256": "235baedffc754f56c1a52a522d3c2b59ebb2be691a7a3011acb0eaaa5dbebd84",
+      "source_snapshot_id": "c299542c-5fac-5f8f-9d66-c2fe1e1409ca",
+      "team_id": 22
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "00:36",
+      "event_id": 110,
+      "game_id": 2025020561,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020561-dde09347-54fe-5771-98ad-0412dbacbf07-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "2fe0e6859043bcea86af2de65f5ebe8f4d7b80e51152cab820506668fd2b36b1",
+          "receipt_bytes_sha256": "1f57c23998d0397025ddb2ccd21ead5c996da3bc9999f88a4110e532c63c4989",
+          "report_clock": "0:36",
+          "report_description": "SJS #51 GRAF(9) , Off. Zone, Own Goal, 5 ft.",
+          "report_period": 3,
+          "report_row_id": "PL-223",
+          "retrieved_at": "2026-09-06T05:23:41.128279+00:00",
+          "row_prefix_utf8_sha256": "c4153e07200b6b73a7f46b4b1015a3f31d9a47e62d22bcf54f8b93196fafeef5",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020561.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:12:22.371717+00:00",
+      "original_receipt_bytes_sha256": "7387c0305b9bba3dd87b2948c5130130ca6cd2faaf11195e20e7dfe670e58426",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8484911,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 37,
+            "reported": 36,
+            "team_id": 28
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "28": 0,
+          "55": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "28": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 37
+          },
+          "55": {
+            "goals": 4,
+            "shootout_goals": 0,
+            "sog": 32
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 527,
+      "source_event_sha256": "f0555840d9b1b4b2b1c56eb318106af5ced42d3ba80f58a5f42a5906a57e0e78",
+      "source_payload_sha256": "6fdcedeb30e21b76f4678bb36c057ee7d2d697a38b8b05b683ec296169c7f6a6",
+      "source_snapshot_id": "dde09347-54fe-5771-98ad-0412dbacbf07",
+      "team_id": 28
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "12:38",
+      "event_id": 252,
+      "game_id": 2025020599,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020599-a2d07dbc-e1cd-5bef-9205-ce56fa6bfccf-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "7e4bae66c47f6b35be82fb70321c48dfd1ff7dcedb45a7ea8d91c3046df4b11c",
+          "receipt_bytes_sha256": "e5af7d5d25369f8b43a7987d4f627a0bcf4654827de7b4d04d61f7476a86d5d4",
+          "report_clock": "12:38",
+          "report_description": "SJS #72 EKLUND(9) , Off. Zone, Own Goal, 9 ft.",
+          "report_period": 2,
+          "report_row_id": "PL-194",
+          "retrieved_at": "2026-09-06T05:23:44.896974+00:00",
+          "row_prefix_utf8_sha256": "651eb2e2ceb22429f866955289c6e62853c1d08d9de3e635b4e58cfefc5424f4",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020599.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:12:35.452994+00:00",
+      "original_receipt_bytes_sha256": "ceaa82082d9edde8499f7f5915a00cc0e3ea664a2f7eed896aad9eda1ece0c06",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 2,
+        "periodType": "REG"
+      },
+      "player_id": 8482667,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 38,
+            "reported": 37,
+            "team_id": 28
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "23": 0,
+          "28": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "23": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 27
+          },
+          "28": {
+            "goals": 6,
+            "shootout_goals": 0,
+            "sog": 38
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 445,
+      "source_event_sha256": "6bdc909cd6ec3980e76e5af9677942e9e6a4d4c5fe9243d23abf409501754aa7",
+      "source_payload_sha256": "f74963e019ee4e406fd5bc52b287c53b924739417c60caee62e2e23feea3cdfd",
+      "source_snapshot_id": "a2d07dbc-e1cd-5bef-9205-ce56fa6bfccf",
+      "team_id": 28
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "01:53",
+      "event_id": 210,
+      "game_id": 2025020613,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020613-52e7e3b5-8bcc-5dbb-9fd4-d3ab75652e4e-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "e24a8a99b5d87cfdcc68cd1ea265e8f174dd18e5f66fd6b892ef47436d4b3598",
+          "receipt_bytes_sha256": "6d115bd6ce0cff94a4becb524e8405fd2ec449876506ccec7af9394767fd760b",
+          "report_clock": "1:53",
+          "report_description": "CGY #47 ZARY(5) , Off. Zone, Own Goal, 6 ft.",
+          "report_period": 4,
+          "report_row_id": "PL-290",
+          "retrieved_at": "2026-09-06T05:23:48.659259+00:00",
+          "row_prefix_utf8_sha256": "17d7fdefb84ea124c1b96468a483f326d36baafae7ca600c47f58bc2beb885be",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020613.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:12:38.141533+00:00",
+      "original_receipt_bytes_sha256": "d1cc27b876698acd4d16820923356bd1ed2ea9532c6aa01f5ed7f448b8ef3d97",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 4,
+        "periodType": "OT"
+      },
+      "player_id": 8482074,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 21,
+            "reported": 20,
+            "team_id": 20
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "20": 0,
+          "6": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "20": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 21
+          },
+          "6": {
+            "goals": 1,
+            "shootout_goals": 0,
+            "sog": 26
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 854,
+      "source_event_sha256": "61056c2d1e02f504dd20ea33e149390ba7351abe56056ec5a8820e4343e9d021",
+      "source_payload_sha256": "3b30e8746fc222d5a47cf0c920522c45608037f57d303ca11900e92bd9cd2908",
+      "source_snapshot_id": "52e7e3b5-8bcc-5dbb-9fd4-d3ab75652e4e",
+      "team_id": 20
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "08:49",
+      "event_id": 603,
+      "game_id": 2025020630,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020630-17da8cec-82ed-5882-a825-14f1ddfcb106-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "65df874bd31d204e4c346242de87069da115eedfff617db463bc79b12d175ef5",
+          "receipt_bytes_sha256": "c97a4102ed26156cd783285ce41b0e58ff2f0d5035c1442304313ce38260461b",
+          "report_clock": "8:49",
+          "report_description": "PHI #11 KONECNY(13) , Off. Zone, Own Goal, 42 ft.",
+          "report_period": 2,
+          "report_row_id": "PL-157",
+          "retrieved_at": "2026-09-06T05:23:52.425975+00:00",
+          "row_prefix_utf8_sha256": "c23c704a5d4979fdddf3768690800a9a583efc2f7040da4283cb4d529dff570b",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020630.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:12:41.976713+00:00",
+      "original_receipt_bytes_sha256": "6502ddfd37d2efdf9766bd7d5a2fb20e2e8e1826dbfa158a78af538eb902e8c6",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 2,
+        "periodType": "REG"
+      },
+      "player_id": 8478439,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 27,
+            "reported": 26,
+            "team_id": 4
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "20": 0,
+          "4": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "20": {
+            "goals": 5,
+            "shootout_goals": 0,
+            "sog": 26
+          },
+          "4": {
+            "goals": 1,
+            "shootout_goals": 0,
+            "sog": 27
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 415,
+      "source_event_sha256": "3b8d31b678455718b258d309bdf7f80f5552fc256eb73b504ffda540035896cc",
+      "source_payload_sha256": "04873a2e164c5a17f317c8672683a0145efe8e11450b558f5a5d72ae428e5d90",
+      "source_snapshot_id": "17da8cec-82ed-5882-a825-14f1ddfcb106",
+      "team_id": 4
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "19:42",
+      "event_id": 472,
+      "game_id": 2025020653,
+      "goal_credit": 1,
+      "mechanism": "official_article_awarded_goal",
+      "official_award_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020653-0d29f155-c2b9-5f8b-b6ff-49f29f0a9dee-3.body",
+          "paragraph_index": 22,
+          "paragraph_text_sha256": "51c71e4d3aa06eee51ac7f33df8662145f9ab95c4534f3c4635accbc824a994c",
+          "raw_body_sha256": "6b751e10f4344f245141c772db07075e46d9f37f41016cd74aae1cd03c5cad20",
+          "receipt_bytes_sha256": "88885621637a1ca3a4350380ece2e3be9c865d45e4bd6fb6774fa3c5ffd122e0",
+          "receipt_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020653-0d29f155-c2b9-5f8b-b6ff-49f29f0a9dee-3.receipt.json",
+          "retrieved_at": "2026-09-06T05:23:58.125850+00:00",
+          "url": "https://www.nhl.com/news/colorado-avalanche-carolina-hurricanes-game-recap-january-3-2026"
+        }
+      ],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020653-0d29f155-c2b9-5f8b-b6ff-49f29f0a9dee-1.body",
+          "explicit_own_goal_label": false,
+          "raw_body_sha256": "b571d1fd20dc60723156b943e7a08fb3a2cc2260d830743b5e4d308456ef7b46",
+          "receipt_bytes_sha256": "822a56d542d509b86fde88996cef5d1e948398d41ea90a8c948fbcfdccaa3984",
+          "report_clock": "19:42",
+          "report_description": "COL #29 MACKINNON(35) , Off. Zone, 12 ft. Assists: #88 NECAS(34); #62 LEHKONEN(19)",
+          "report_period": 3,
+          "report_row_id": "PL-326",
+          "retrieved_at": "2026-09-06T05:23:56.089759+00:00",
+          "row_prefix_utf8_sha256": "3dc7c921b7d868b20acdbc24a586c8b879155a0e3d745b53727c9b20a2fa42ec",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020653.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:12:45.219660+00:00",
+      "original_receipt_bytes_sha256": "10756c801904a7c3dfca90a459714c7898e96995c676d1e1c62d0a4bfa9f3e00",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8477492,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 35,
+            "reported": 34,
+            "team_id": 21
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "12": 0,
+          "21": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "12": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 28
+          },
+          "21": {
+            "goals": 5,
+            "shootout_goals": 0,
+            "sog": 35
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 800,
+      "source_event_sha256": "ac1117a9f846830fa937ab460da64f24620e432b31fb8c157211cbb3215e13fc",
+      "source_payload_sha256": "0a854bc3f43db41a368f52686844121128e46000c3387585d7b7fce8ae364a4f",
+      "source_snapshot_id": "0d29f155-c2b9-5f8b-b6ff-49f29f0a9dee",
+      "team_id": 21
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "04:54",
+      "event_id": 15,
+      "game_id": 2025020655,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020655-16217138-cfb2-5a51-9f78-db53e3810d55-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "7d6311c4b19e76b0d46cf2b4c3f004c673d0b805ac55d91963ee3a8fdc0404f4",
+          "receipt_bytes_sha256": "86b9c2dcc3d8f1d6ff16a93619d807a2927d63a36e674f7959979a4310919f3a",
+          "report_clock": "4:54",
+          "report_description": "LAK #55 BYFIELD(6) , Off. Zone, Own Goal, 7 ft.",
+          "report_period": 3,
+          "report_row_id": "PL-241",
+          "retrieved_at": "2026-09-06T05:23:59.732090+00:00",
+          "row_prefix_utf8_sha256": "6d1cee07b58ee908bd7ba2eac88ec481f33777f5df489b5ecd7583bab4a070cb",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020655.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:12:45.726721+00:00",
+      "original_receipt_bytes_sha256": "d6ccba62048298df7486c9ec437ec184fff7f4ef8397252bda04f052778b2b18",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8482124,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 39,
+            "reported": 38,
+            "team_id": 26
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "26": 1,
+          "30": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "26": {
+            "goals": 4,
+            "shootout_goals": 2,
+            "sog": 39
+          },
+          "30": {
+            "goals": 4,
+            "shootout_goals": 1,
+            "sog": 28
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 572,
+      "source_event_sha256": "af1aca417b9deff2138bd7663efa541c84deb3acb3316d926e22317fd42390e4",
+      "source_payload_sha256": "00d29dae18a5e96195590d54317703c58668211d37ecde73c329290a2db354f6",
+      "source_snapshot_id": "16217138-cfb2-5a51-9f78-db53e3810d55",
+      "team_id": 26
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "00:51",
+      "event_id": 101,
+      "game_id": 2025020660,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020660-6c385ceb-795e-5f4d-b674-16b04201ac0b-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "f9f9cb0e527a0ceea37bc26a7fc9a4fd3f4aa586158b97a761515654825137dc",
+          "receipt_bytes_sha256": "bb2643f72a6010cfc025906b79bed3282901152d27b440d5676e75c9eded32c2",
+          "report_clock": "0:51",
+          "report_description": "CAR #27 EHLERS(11) , Off. Zone, Own Goal, 7 ft.",
+          "report_period": 1,
+          "report_row_id": "PL-10",
+          "retrieved_at": "2026-09-06T05:24:03.385150+00:00",
+          "row_prefix_utf8_sha256": "396f08cb93fa34feee723221ca7ad7612006b8141ef47496811b62e1701093ba",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020660.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:12:46.742255+00:00",
+      "original_receipt_bytes_sha256": "d7532589213ab9e10f0133077ff32df1d485fd0b037caa06ca049da15d912a94",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 1,
+        "periodType": "REG"
+      },
+      "player_id": 8477940,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 30,
+            "reported": 29,
+            "team_id": 12
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "1": 0,
+          "12": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "1": {
+            "goals": 1,
+            "shootout_goals": 0,
+            "sog": 29
+          },
+          "12": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 30
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 25,
+      "source_event_sha256": "a0bea929762a90eddf57e130e309cf211300b2b662561239ba9953386a56d7b7",
+      "source_payload_sha256": "597690d15ae8af3f7b008884035e6a15e4c21880d356fbe5d9ecd84a0df97f64",
+      "source_snapshot_id": "6c385ceb-795e-5f4d-b674-16b04201ac0b",
+      "team_id": 12
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "11:53",
+      "event_id": 285,
+      "game_id": 2025020671,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020671-a1cb7642-d304-55e7-bf77-124912f6e98c-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "a9411770b0fa3a89fa796566bb6f973aa8caebd1d2692b073d042355c45ce2fd",
+          "receipt_bytes_sha256": "0797a32a9f4591835d02b667f888804c2b3369c1bb599f8c8bcb7038fdfb4fe0",
+          "report_clock": "11:53",
+          "report_description": "DAL #21 ROBERTSON(25) , Off. Zone, Own Goal, 20 ft.",
+          "report_period": 1,
+          "report_row_id": "PL-87",
+          "retrieved_at": "2026-09-06T05:24:07.047828+00:00",
+          "row_prefix_utf8_sha256": "f944bf39d52ed3aa2ff8f338b5b881073a5f5d920209d6e26806e9050921d897",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020671.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:12:48.463679+00:00",
+      "original_receipt_bytes_sha256": "35b46483dac8d6fb198b6f39901165f158377e8a4ce97eadc19092cfa0b70b79",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 1,
+        "periodType": "REG"
+      },
+      "player_id": 8480027,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 24,
+            "reported": 23,
+            "team_id": 25
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "12": 0,
+          "25": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "12": {
+            "goals": 6,
+            "shootout_goals": 0,
+            "sog": 33
+          },
+          "25": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 24
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 179,
+      "source_event_sha256": "24982e2f27c0361c9b1b0d2b1cd28d916e3eb2839c7c2156548130776c072522",
+      "source_payload_sha256": "9fc826d37d269d7afc4b41646e56718d337ebd59132fed7c5ed6792559c6758a",
+      "source_snapshot_id": "a1cb7642-d304-55e7-bf77-124912f6e98c",
+      "team_id": 25
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "17:59",
+      "event_id": 1021,
+      "game_id": 2025020683,
+      "goal_credit": 1,
+      "mechanism": "official_article_awarded_goal",
+      "official_award_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020683-dd016e18-4f90-5da7-b6e1-caf9bcb99543-3.body",
+          "paragraph_index": 20,
+          "paragraph_text_sha256": "7268ba6cec931a2fb19135ca00202f7b7675e34fd700dedb72adf174601837a4",
+          "raw_body_sha256": "eaeda1c21938723822bf69b1544b27792a3de713794aa8087fa70f752a02c254",
+          "receipt_bytes_sha256": "f6ac376058100bfbac0d88cf3e8619c919f87db447580cf2e8218779b8e715af",
+          "receipt_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020683-dd016e18-4f90-5da7-b6e1-caf9bcb99543-3.receipt.json",
+          "retrieved_at": "2026-09-06T05:24:12.862279+00:00",
+          "url": "https://www.nhl.com/news/florida-panthers-montreal-canadiens-game-recap-january-8-2026"
+        }
+      ],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020683-dd016e18-4f90-5da7-b6e1-caf9bcb99543-1.body",
+          "explicit_own_goal_label": false,
+          "raw_body_sha256": "0a37124e35fd13111e16fc695dee20e5e3b4bf16baf645eede9c7d4d17a7bd1b",
+          "receipt_bytes_sha256": "fcd8141a295f0f16da1efb9496c12d75a393a40a0089be4bc328ff7c0e212257",
+          "report_clock": "17:59",
+          "report_description": "MTL #20 SLAFKOVSK\u00dd(16) , Off. Zone, 16 ft. Assists: #91 KAPANEN(11); #48 HUTSON(36)",
+          "report_period": 3,
+          "report_row_id": "PL-296",
+          "retrieved_at": "2026-09-06T05:24:10.707301+00:00",
+          "row_prefix_utf8_sha256": "d21965e0c65a7bffc4a9cbd7e808a0308b2957bb92951bcae5762631b4a93101",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020683.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:12:50.635940+00:00",
+      "original_receipt_bytes_sha256": "8a84a4068c572c0e3b139d83b4da458220f572a1257f9798289acb37caf37ae5",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8483515,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 20,
+            "reported": 19,
+            "team_id": 8
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "13": 0,
+          "8": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "13": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 27
+          },
+          "8": {
+            "goals": 6,
+            "shootout_goals": 0,
+            "sog": 20
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 769,
+      "source_event_sha256": "c58fcd21a587bde606e09463ac1a9d3888c1abf7a0de8142e48a4aae83389cbf",
+      "source_payload_sha256": "5e71e1f70b8209152452d3a0e3ffae46f234464290a7faa434ed6ea0575308ae",
+      "source_snapshot_id": "dd016e18-4f90-5da7-b6e1-caf9bcb99543",
+      "team_id": 8
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "04:18",
+      "event_id": 210,
+      "game_id": 2025020708,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020708-5d6e8c05-4568-5aae-ada3-a57047d2ddb8-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "1f75996c053f9ac01eef803216371ea297fca50fdc1e45c01c8468d71876367a",
+          "receipt_bytes_sha256": "4920cbe8ff8d0df2f6598bc1b6006378ef54e046c053be4a7fd1a3d518f028f6",
+          "report_clock": "4:18",
+          "report_description": "NYI #44 PAGEAU(7) , Off. Zone, Own Goal, 5 ft.",
+          "report_period": 1,
+          "report_row_id": "PL-24",
+          "retrieved_at": "2026-09-06T05:24:14.484842+00:00",
+          "row_prefix_utf8_sha256": "1a786bcff90f4eb2b51f34dde639feb48fe02b760ab835e7d3ba280893089144",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020708.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:12:55.866114+00:00",
+      "original_receipt_bytes_sha256": "d487894dbf4ebebc79bbcbbcc0a6ebe9fb07848ba1c303a2ae267b6a6b1592dc",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 1,
+        "periodType": "REG"
+      },
+      "player_id": 8476419,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 28,
+            "reported": 27,
+            "team_id": 2
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "2": 0,
+          "30": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "2": {
+            "goals": 4,
+            "shootout_goals": 0,
+            "sog": 28
+          },
+          "30": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 36
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 62,
+      "source_event_sha256": "7313740bc8afb3f431a11953c79ccfdc5bd8f51938441d7a5b7223c118945a79",
+      "source_payload_sha256": "fe3996cc0f23fe2a97004714f87a58fc3a61f1530b35d14174cbb40cc7403e79",
+      "source_snapshot_id": "5d6e8c05-4568-5aae-ada3-a57047d2ddb8",
+      "team_id": 2
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "11:15",
+      "event_id": 301,
+      "game_id": 2025020723,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020723-10e1b515-998e-501b-8dcc-c590f324ee65-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "26fb8c0c4266b30ff856fb4af2e3f4d125d1b774c65750696e79c669320f29ee",
+          "receipt_bytes_sha256": "8e8c3ebd4c94196d3e6957b2ba1123dbd32722a5b933785667efa4ba6152b42a",
+          "report_clock": "11:15",
+          "report_description": "TOR #53 COWAN(7) , Off. Zone, Own Goal, 37 ft.",
+          "report_period": 1,
+          "report_row_id": "PL-74",
+          "retrieved_at": "2026-09-06T05:24:18.133622+00:00",
+          "row_prefix_utf8_sha256": "98d83ec4b22e6496dc777d148f090b2b49a77a3fd0a414cd2d52b571858c8f84",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020723.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:13:00.522212+00:00",
+      "original_receipt_bytes_sha256": "6dd0ab878a960ad7b8f608eb03cb4d2dedfa63197eb945125209676551ba95a2",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 1,
+        "periodType": "REG"
+      },
+      "player_id": 8484158,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 32,
+            "reported": 31,
+            "team_id": 10
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "10": 0,
+          "21": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "10": {
+            "goals": 4,
+            "shootout_goals": 0,
+            "sog": 32
+          },
+          "21": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 34
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 180,
+      "source_event_sha256": "10d5ab2549f11ce2e4afdc0209c33ac6389c432d9ab6476f2e11fb1377204402",
+      "source_payload_sha256": "52cb3286e4def9a226857793cf96f3ab8cf2360f10b45936afdd1310f3ad6777",
+      "source_snapshot_id": "10e1b515-998e-501b-8dcc-c590f324ee65",
+      "team_id": 10
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "18:28",
+      "event_id": 404,
+      "game_id": 2025020811,
+      "goal_credit": 1,
+      "mechanism": "official_article_awarded_goal",
+      "official_award_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020811-269f7ab9-34e8-5a5b-ac56-b5f16708ef09-3.body",
+          "paragraph_index": 19,
+          "paragraph_text_sha256": "4ae8be60ac1df5b9b832b693a3840d7f1e24fff51bef33fc1b3a618c8522ec2c",
+          "raw_body_sha256": "11f7a6ccabbc19a56433ec21d3843742bda39cba8cf6e051e4df8dd01a7f86d4",
+          "receipt_bytes_sha256": "c6d16f475ad9d0370eef0b7fa192bf250390bb4135ab8eec7c6c55c1d8b94845",
+          "receipt_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020811-269f7ab9-34e8-5a5b-ac56-b5f16708ef09-3.receipt.json",
+          "retrieved_at": "2026-09-06T05:24:23.762568+00:00",
+          "url": "https://www.nhl.com/news/utah-mammoth-nashville-predators-game-recap-january-24-2026"
+        }
+      ],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020811-269f7ab9-34e8-5a5b-ac56-b5f16708ef09-1.body",
+          "explicit_own_goal_label": false,
+          "raw_body_sha256": "79ecf028174b71d36700cf45168e34e3c017cf54ddd9f044cf13e34321e55481",
+          "receipt_bytes_sha256": "78d602f3c71ce85429314283bc291301611be96ec6ad4a250bf361b430c2d1c1",
+          "report_clock": "18:28",
+          "report_description": "UTA #77 PETERKA(18) , Off. Zone, 19 ft. Assists: #11 GUENTHER(21); #27 HAYTON(10)",
+          "report_period": 3,
+          "report_row_id": "PL-305",
+          "retrieved_at": "2026-09-06T05:24:21.830156+00:00",
+          "row_prefix_utf8_sha256": "8dc8325e0224a8f012cf096d0af434dcdc0f9028f8042b378bd1e0cff3fad9f4",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020811.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:13:17.298506+00:00",
+      "original_receipt_bytes_sha256": "1f2a6c372c28a6a2670f6df76653e0e06f33a82690ebc99233c060bc57e77ce9",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8482175,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 31,
+            "reported": 30,
+            "team_id": 68
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "18": 0,
+          "68": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "18": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 29
+          },
+          "68": {
+            "goals": 5,
+            "shootout_goals": 0,
+            "sog": 31
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 808,
+      "source_event_sha256": "0741fd38f07c33ebc9ae6417a1c9503024f98c01199952183e9d1c8d2391ea90",
+      "source_payload_sha256": "e7497f136abfc68407c1ea990bd966a1a02e1910f6c495ce9c0abf892938f67f",
+      "source_snapshot_id": "269f7ab9-34e8-5a5b-ac56-b5f16708ef09",
+      "team_id": 68
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "16:00",
+      "event_id": 309,
+      "game_id": 2025020887,
+      "goal_credit": 1,
+      "mechanism": "official_article_awarded_goal",
+      "official_award_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020887-a2713dcb-625f-566d-bd96-2d272af1c28d-3.body",
+          "paragraph_index": 16,
+          "paragraph_text_sha256": "54dd18cbe2a5b916024463d825f4295469c32f4a12193fce2634e00fe97fb544",
+          "raw_body_sha256": "0c2fd7f3b6578957984ea785c55c9a897e600c78148d9833317f308594a77b0d",
+          "receipt_bytes_sha256": "9ac5c8efe385d687ce453d43596d73b367cc7188b8a00a2860f3f928ac20348e",
+          "receipt_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020887-a2713dcb-625f-566d-bd96-2d272af1c28d-3.receipt.json",
+          "retrieved_at": "2026-09-06T05:24:27.462624+00:00",
+          "url": "https://www.nhl.com/news/columbus-blue-jackets-new-jersey-devils-game-recap-february-3-2026"
+        }
+      ],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020887-a2713dcb-625f-566d-bd96-2d272af1c28d-1.body",
+          "explicit_own_goal_label": false,
+          "raw_body_sha256": "f6aa6e563e6fcf4ce90be39cde93a39b5db34e72b02dfc9cf3be8a460f3d4de5",
+          "receipt_bytes_sha256": "b39a88f087ce64473c252699bf095f8c719adafecef7bfafd9d0cd0cb576bcb1",
+          "report_clock": "16:00",
+          "report_description": "CBJ #24 OLIVIER(8) , Off. Zone, 28 ft. Assists: #3 COYLE(25); #8 WERENSKI(42)",
+          "report_period": 3,
+          "report_row_id": "PL-273",
+          "retrieved_at": "2026-09-06T05:24:25.401152+00:00",
+          "row_prefix_utf8_sha256": "94f811618df1e9c67857a6016457124091aa2d134953b5c61cb7ca87a4f75494",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020887.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:13:32.543565+00:00",
+      "original_receipt_bytes_sha256": "c9ea3bd03dd68b2bbfd6c6dd56d334307db6a2c209d38b83492a5d09d0696e8a",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8479671,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 26,
+            "reported": 25,
+            "team_id": 29
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "1": 0,
+          "29": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "1": {
+            "goals": 0,
+            "shootout_goals": 0,
+            "sog": 24
+          },
+          "29": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 26
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 696,
+      "source_event_sha256": "dc1594517a776e4709d4a412004d7ab5ddb7ce1f0ef670a68dd0df6e5c30a048",
+      "source_payload_sha256": "9a37406683770aeacbc41cf587073ab39657571d99483356ffd5d2d5fac7fa52",
+      "source_snapshot_id": "a2713dcb-625f-566d-bd96-2d272af1c28d",
+      "team_id": 29
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "19:25",
+      "event_id": 1169,
+      "game_id": 2025020930,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025020930-bffa1a87-d1bf-5834-b5f7-7a92ee4ae108-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "72c4295993e56106884dffff3a78287c6a43a73cda70ca53783742d7a6cc803a",
+          "receipt_bytes_sha256": "e027f7412691425811479dd93333c67df374fbd1e55160cd5b68c69b83d8957f",
+          "report_clock": "19:25",
+          "report_description": "FLA #9 BENNETT(20) , Off. Zone, Own Goal, 36 ft.",
+          "report_period": 3,
+          "report_row_id": "PL-351",
+          "retrieved_at": "2026-09-06T05:24:29.213395+00:00",
+          "row_prefix_utf8_sha256": "56d666b5f1254e98604e3c0cfa29dbd9321598acbfb3c98c149e764235903ce4",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL020930.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:13:45.365283+00:00",
+      "original_receipt_bytes_sha256": "1ab0633e11aaf24c903d4f18f769a68d5fdc3ea2409e7e0b7a06b8b20f531274",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8477935,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 30,
+            "reported": 29,
+            "team_id": 13
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "13": 0,
+          "7": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "13": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 30
+          },
+          "7": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 39
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 794,
+      "source_event_sha256": "2d5284e901947a022496f8a74e9a8e95c272be42321eb1f36d3ed5b6645fc3b0",
+      "source_payload_sha256": "34e805af30365d52042b720bd891ed1cc36f81fec9a9b7decf4ffca02ade68d9",
+      "source_snapshot_id": "bffa1a87-d1bf-5834-b5f7-7a92ee4ae108",
+      "team_id": 13
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "05:46",
+      "event_id": 803,
+      "game_id": 2025021003,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025021003-6904e22a-5fea-52b5-9cd8-0514d90726b5-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "89b55d53e027fc05d4035c17a204b3db3b0d03822a08c00b8cdd7409cdc78fef",
+          "receipt_bytes_sha256": "e31b49ee094ac5d39a6bc25e015ad51c38ffbe26040c96b1ffadb4e05bae06ae",
+          "report_clock": "5:46",
+          "report_description": "TBL #21 POINT(16) , Off. Zone, Own Goal, 8 ft.",
+          "report_period": 3,
+          "report_row_id": "PL-285",
+          "retrieved_at": "2026-09-06T05:24:32.814533+00:00",
+          "row_prefix_utf8_sha256": "c8f290e582e4220375bf8a728070441a4f4115ea1e54dd01f811ef6262cb16e9",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL021003.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:14:02.695004+00:00",
+      "original_receipt_bytes_sha256": "0db6b6703f8a92b1b507708708974bf68c53821e26050960b35f635538ea6663",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8478010,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 29,
+            "reported": 28,
+            "team_id": 14
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "14": 0,
+          "7": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "14": {
+            "goals": 7,
+            "shootout_goals": 0,
+            "sog": 29
+          },
+          "7": {
+            "goals": 8,
+            "shootout_goals": 0,
+            "sog": 42
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 696,
+      "source_event_sha256": "71e014e4e99fbef82029f76cec2d2e41f2bfbf7aec6c78e7ffe538277e0a0fb3",
+      "source_payload_sha256": "21f4442baef7baf2fe5162a87a9ccecf173a6c06d449b0a32ac943be62ac0293",
+      "source_snapshot_id": "6904e22a-5fea-52b5-9cd8-0514d90726b5",
+      "team_id": 14
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "05:52",
+      "event_id": 704,
+      "game_id": 2025021019,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025021019-481af07b-d91f-5be1-a082-edc1153f312c-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "0874136fbe399f92d19cb55c9a4760d550ed97d38fe269130ce57ec7051e04f2",
+          "receipt_bytes_sha256": "9396821245c40d59efcf9eb9bf4efb80b94b6cedcb21cd611c102ff693e17c40",
+          "report_clock": "5:52",
+          "report_description": "NYI #64 RITCHIE(8) , Off. Zone, Own Goal, 5 ft.",
+          "report_period": 3,
+          "report_row_id": "PL-216",
+          "retrieved_at": "2026-09-06T05:24:36.486460+00:00",
+          "row_prefix_utf8_sha256": "a95b7a7814d4b342b0908ad1aadfa3daf2d5eff6e7c5474d48b6bbac6a13e33c",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL021019.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:14:06.291949+00:00",
+      "original_receipt_bytes_sha256": "f984149b56c14709816f85dc91906e6854ba9b990fb23e0d5583df46e0048ea3",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8484221,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 50,
+            "reported": 49,
+            "team_id": 2
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "19": 0,
+          "2": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "19": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 23
+          },
+          "2": {
+            "goals": 4,
+            "shootout_goals": 0,
+            "sog": 50
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 638,
+      "source_event_sha256": "1cc940673b4ec1d20e992067d4773d209bfe5c7ddc5ce070bd828f99976f3d0c",
+      "source_payload_sha256": "81dbad1ba01c91174100011827bcdf8b060d2f9fc028a114e1f6cf94333444a3",
+      "source_snapshot_id": "481af07b-d91f-5be1-a082-edc1153f312c",
+      "team_id": 2
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "07:33",
+      "event_id": 169,
+      "game_id": 2025021058,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025021058-f61b8c6b-5d07-532f-9684-88d635164132-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "cbb29da2a5408f117c933b684467f76de857bc17e65a41003c4e11d60eda4294",
+          "receipt_bytes_sha256": "631b76b6f0f09f1279ab1877906c25785a7a63ac8514ae91757c9a53741e297e",
+          "report_clock": "7:33",
+          "report_description": "OTT #19 BATHERSON(26) , Off. Zone, Own Goal, 10 ft.",
+          "report_period": 1,
+          "report_row_id": "PL-38",
+          "retrieved_at": "2026-09-06T05:24:40.038567+00:00",
+          "row_prefix_utf8_sha256": "b3537b93918abdbcb31f02038a13ed0a9add0908a4f3c15d754bb06f7faf8d33",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL021058.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:14:17.838486+00:00",
+      "original_receipt_bytes_sha256": "899ef19af9f1f9fff1cd68fa258cbd61e3ef85d32f57e71b2fdfebc2fec367d6",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 1,
+        "periodType": "REG"
+      },
+      "player_id": 8480208,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 25,
+            "reported": 24,
+            "team_id": 9
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "28": 0,
+          "9": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "28": {
+            "goals": 4,
+            "shootout_goals": 0,
+            "sog": 23
+          },
+          "9": {
+            "goals": 7,
+            "shootout_goals": 0,
+            "sog": 25
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 90,
+      "source_event_sha256": "8f1887bcb3896d2d0faf2abc776bb03c5c142f18488e4b7575426bf57aadb27a",
+      "source_payload_sha256": "29a436c1b1c1006169817eaf05bd19ca882856c3df0c3658d68798e8ce289794",
+      "source_snapshot_id": "f61b8c6b-5d07-532f-9684-88d635164132",
+      "team_id": 9
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "12:11",
+      "event_id": 863,
+      "game_id": 2025021102,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025021102-b4533a15-225d-5d92-b106-1ca557fc2f3d-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "a70c63d129be2db6df6479dd4cbce28a6a496190141e2e62ff0800dbf8eafb30",
+          "receipt_bytes_sha256": "99386626f8169862a5f8599e185e86e1da3180d49999d42646cf1404879242ce",
+          "report_clock": "12:11",
+          "report_description": "BUF #26 DAHLIN(15) , Off. Zone, Own Goal, 35 ft.",
+          "report_period": 3,
+          "report_row_id": "PL-274",
+          "retrieved_at": "2026-09-06T05:24:43.638524+00:00",
+          "row_prefix_utf8_sha256": "e9aa38695a39e16dab4f297775d04611416ba66569656940be44cdfa119c2f4f",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL021102.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:14:29.713748+00:00",
+      "original_receipt_bytes_sha256": "f682f6bbea480cf1a49e7084ced53e5a24df2a71997dfcf6a4aeb75cbf514983",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8480839,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 34,
+            "reported": 33,
+            "team_id": 7
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "26": 0,
+          "7": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "26": {
+            "goals": 1,
+            "shootout_goals": 0,
+            "sog": 27
+          },
+          "7": {
+            "goals": 4,
+            "shootout_goals": 0,
+            "sog": 34
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 662,
+      "source_event_sha256": "67e36be41f23e46ec6b41a4249c3e128b5cbecfe10d09427ca519ac15c30c3dd",
+      "source_payload_sha256": "b46e3506d5018cda2fe7d143e9d367dea9791bb219f2b5ae72b5b41a18908f25",
+      "source_snapshot_id": "b4533a15-225d-5d92-b106-1ca557fc2f3d",
+      "team_id": 7
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "07:16",
+      "event_id": 552,
+      "game_id": 2025021109,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025021109-772485a5-65e0-53fc-9de9-7358f84c2d4a-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "4ce059d9e6044b6feb593efe0529183f2b133330494f3e3a4d3670f5c44d287f",
+          "receipt_bytes_sha256": "3064aeb60175c92c30042affcfd4e68d8ce8066e6197199286ed154985bfc76f",
+          "report_clock": "7:16",
+          "report_description": "EDM #81 SAMANSKI(1) , Off. Zone, Own Goal, 43 ft.",
+          "report_period": 3,
+          "report_row_id": "PL-243",
+          "retrieved_at": "2026-09-06T05:24:47.494986+00:00",
+          "row_prefix_utf8_sha256": "be357eec900ab14d097f4b8d2532d03030d784a383ad27d5c7f8f85f175f8a58",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL021109.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:14:30.742094+00:00",
+      "original_receipt_bytes_sha256": "e6a8e694ba707083f1b39fa8435cf086e6ec9dfee7b08a7bf59a03d8fa83b472",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8484509,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 28,
+            "reported": 27,
+            "team_id": 22
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "14": 0,
+          "22": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "14": {
+            "goals": 5,
+            "shootout_goals": 0,
+            "sog": 28
+          },
+          "22": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 28
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 646,
+      "source_event_sha256": "6406bb1583811dd200f2962090070c9918e8ac74efbc6b50b4a599dc2e66e4e2",
+      "source_payload_sha256": "2d90db44f8c1ed2c91d65f578fef1e5f1dcccfea80011eabfc7d893ebbfee598",
+      "source_snapshot_id": "772485a5-65e0-53fc-9de9-7358f84c2d4a",
+      "team_id": 22
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "12:21",
+      "event_id": 959,
+      "game_id": 2025021123,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025021123-8c116c05-e9ef-5df7-acdc-64c54e0f0115-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "f70ac8c2ea88a0c2a5119f8cdc2d03ef4dc40a8c0aeb26369a8954cefb9eaff0",
+          "receipt_bytes_sha256": "a39af9aca19b4d217a6b39e53d61626aa6687425732caaa715d1b94456803167",
+          "report_clock": "12:21",
+          "report_description": "FLA #18 GREGOR(2) , Off. Zone, Own Goal, 36 ft.",
+          "report_period": 3,
+          "report_row_id": "PL-264",
+          "retrieved_at": "2026-09-06T05:24:51.270105+00:00",
+          "row_prefix_utf8_sha256": "b512947a906e30a678ecbf4c5d6546390aecce9b68416648edbd2db2d6909f80",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL021123.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:14:35.176091+00:00",
+      "original_receipt_bytes_sha256": "53136f2ae70a435c58e187c17eab9802421878e09c0c5465e97904bb7bc3b17b",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8479393,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 25,
+            "reported": 24,
+            "team_id": 13
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "13": 1,
+          "55": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "13": {
+            "goals": 4,
+            "shootout_goals": 1,
+            "sog": 25
+          },
+          "55": {
+            "goals": 4,
+            "shootout_goals": 0,
+            "sog": 27
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 683,
+      "source_event_sha256": "f2f667b4b34bb725bed98008ac79ae5343d7a3265c269bc3d9160c90b04abaf0",
+      "source_payload_sha256": "7c5a850cd55ce10c9c380fb062d6eddc3f67a5377e09af3760ea60968da67159",
+      "source_snapshot_id": "8c116c05-e9ef-5df7-acdc-64c54e0f0115",
+      "team_id": 13
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "19:36",
+      "event_id": 202,
+      "game_id": 2025021127,
+      "goal_credit": 1,
+      "mechanism": "official_article_awarded_goal",
+      "official_award_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025021127-2493e111-bc80-5060-accc-7b780ffec808-3.body",
+          "paragraph_index": 11,
+          "paragraph_text_sha256": "2fa44af1aa335e130e0393433092086eeff4dfda3577b872deae5b0f3aba501c",
+          "raw_body_sha256": "9dc7f5ca815accab09d2f986d89c1fb3f11df6bbcfc5d21bc74c667440c08c28",
+          "receipt_bytes_sha256": "26662ea909e4a2b00d339b0da93ca25dce8d059555d55c32776e7372bf7ac58f",
+          "receipt_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025021127-2493e111-bc80-5060-accc-7b780ffec808-3.receipt.json",
+          "retrieved_at": "2026-09-06T05:24:56.932112+00:00",
+          "url": "https://www.nhl.com/news/minnesota-wild-tampa-bay-lightning-game-recap-march-24-2026"
+        }
+      ],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025021127-2493e111-bc80-5060-accc-7b780ffec808-1.body",
+          "explicit_own_goal_label": false,
+          "raw_body_sha256": "6845c38500f47e5631d0e8c9039555cf8724ebae2b1166b7c930fedb546cb96d",
+          "receipt_bytes_sha256": "d07a09809a5873f3aa05a1e492d7da2f4991b348f56dadda46fd8d655ea80570",
+          "report_clock": "19:36",
+          "report_description": "TBL #29 HOLMBERG(11) , Off. Zone, 50 ft. Assist: #27 MCDONAGH(9)",
+          "report_period": 3,
+          "report_row_id": "PL-328",
+          "retrieved_at": "2026-09-06T05:24:54.947654+00:00",
+          "row_prefix_utf8_sha256": "3b4fb8be1f71ee41e6a71c05f4864f98872ecc55c476ac2615176502419a8a92",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL021127.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:14:36.738077+00:00",
+      "original_receipt_bytes_sha256": "58c4b11022fa293b8c3257b959113d2439ffbc5593f3ea8774b3c1627e2eaa02",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8480995,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 26,
+            "reported": 25,
+            "team_id": 14
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "14": 0,
+          "30": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "14": {
+            "goals": 6,
+            "shootout_goals": 0,
+            "sog": 26
+          },
+          "30": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 24
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 816,
+      "source_event_sha256": "945cc40342a99760cef6a4585d465672f835ce235da6fc1d52e66de1e4325e0c",
+      "source_payload_sha256": "b462e44ec3a9e77c0ae1a7d869c740fe843a287e99da27480a18b5d43a7cc4dc",
+      "source_snapshot_id": "2493e111-bc80-5060-accc-7b780ffec808",
+      "team_id": 14
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "09:38",
+      "event_id": 886,
+      "game_id": 2025021285,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025021285-df7089df-5083-557f-ba63-985f1971b7d6-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "6458fd54b6d5f8e8952682d6a3b496af893f4dc1a331a3cb4e91cc9449fb96ad",
+          "receipt_bytes_sha256": "a503082764d8dd92d51f121335c0e2b51ebbdd57014457947399b5d287fefe18",
+          "report_clock": "9:38",
+          "report_description": "DAL #25 HYRY(3) , Off. Zone, Own Goal, 14 ft.",
+          "report_period": 3,
+          "report_row_id": "PL-240",
+          "retrieved_at": "2026-09-06T05:24:58.555079+00:00",
+          "row_prefix_utf8_sha256": "9dff68d990ad236d5d94aa671b0c4bae8d791fd686b0287b9b947ef44edb9203",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL021285.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:15:05.091071+00:00",
+      "original_receipt_bytes_sha256": "cee7adde6719e2e2549e868a2aac2840ee272f4858171c740452168331e9c27f",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8484938,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 33,
+            "reported": 32,
+            "team_id": 25
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "10": 0,
+          "25": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "10": {
+            "goals": 5,
+            "shootout_goals": 0,
+            "sog": 27
+          },
+          "25": {
+            "goals": 6,
+            "shootout_goals": 0,
+            "sog": 33
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 621,
+      "source_event_sha256": "aaf6be0416fd5f5eb7434af87eafcf19e8713c04de8ce63a1193cbecf1f51177",
+      "source_payload_sha256": "69010309d542d7ae4940a9c5608c2da37cbd31f29afff9deec4a3b57a0f2e7e7",
+      "source_snapshot_id": "df7089df-5083-557f-ba63-985f1971b7d6",
+      "team_id": 25
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "16:59",
+      "event_id": 450,
+      "game_id": 2025030172,
+      "goal_credit": 1,
+      "mechanism": "official_report_own_goal",
+      "official_award_evidence": [],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025030172-1c9f8a51-c8b0-5897-825c-b3a5212e9343-1.body",
+          "explicit_own_goal_label": true,
+          "raw_body_sha256": "4d084496ed9bd4f43de7ade612c1469475c93411ee8eed968d0c19433b1dd5c7",
+          "receipt_bytes_sha256": "2732f40ab2267bceaffc8ac38add35604552e7e65b6ba6b9e36357ba565dacd9",
+          "report_clock": "16:59",
+          "report_description": "UTA #52 WEEGAR(1) , Off. Zone, Own Goal, 56 ft.",
+          "report_period": 1,
+          "report_row_id": "PL-124",
+          "retrieved_at": "2026-09-06T05:25:02.173756+00:00",
+          "row_prefix_utf8_sha256": "1f0866bd5c70a890c47d3823b84a9572be8cc14608dd970646a80a7bfc2aacee",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL030172.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:15:18.430417+00:00",
+      "original_receipt_bytes_sha256": "9d1a837c1c816cd6445f5773e4640e6ac75e86f774ca69680be20644be8e5161",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 1,
+        "periodType": "REG"
+      },
+      "player_id": 8477346,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 30,
+            "reported": 29,
+            "team_id": 68
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "54": 0,
+          "68": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "54": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 21
+          },
+          "68": {
+            "goals": 3,
+            "shootout_goals": 0,
+            "sog": 30
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 283,
+      "source_event_sha256": "02e646afcc7c556be7d37f01ce8ae9a4029c974f7bca31745b2e67bfd1ade02a",
+      "source_payload_sha256": "ec2692404fae096252720186ac988d3e430ec7202b9d84d3e6bdeab08b113cbb",
+      "source_snapshot_id": "1c9f8a51-c8b0-5897-825c-b3a5212e9343",
+      "team_id": 68
+    },
+    {
+      "base_shot_model_attempt_eligible": false,
+      "clock": "15:14",
+      "event_id": 208,
+      "game_id": 2025030213,
+      "goal_credit": 1,
+      "mechanism": "official_article_awarded_goal",
+      "official_award_evidence": [
+        {
+          "body_file": "/Users/gstorms/.codex/worktrees/be8b/citrus/scripts/proof/results/goal-sog-supplement-20260906/3.body",
+          "paragraph_index": 22,
+          "paragraph_text_sha256": "9eba31761ee1ebab58d79a9d2752e33b887d9cef34cc96fb1a9fdd7491109892",
+          "raw_body_sha256": "7ad3eb1fbc2464cb6c74fc344452cecf0e95a854eebe01fecf16aaeea247629b",
+          "receipt_bytes_sha256": "6f0ccc89b9908377cbb4a71258c2cec6715024f397bf5b8e0358dfb8bd6f4f64",
+          "receipt_file": "/Users/gstorms/.codex/worktrees/be8b/citrus/scripts/proof/results/goal-sog-supplement-20260906/3.receipt.json",
+          "retrieved_at": "2026-09-06T05:29:17.622922+00:00",
+          "url": "https://www.nhl.com/news/topic/playoffs/buffalo-sabres-montreal-canadiens-game-3-recap-may-10-2026"
+        }
+      ],
+      "official_event_evidence": [
+        {
+          "body_file": "/private/tmp/citrus-goal-sog-sources-20260906-0530/2025030213-304ec8da-48eb-5cbc-a2ef-08acca2f569a-1.body",
+          "explicit_own_goal_label": false,
+          "raw_body_sha256": "cc4c52829f9aeebe592d160b8354489686eb7e032d7588a9424b052b799e887b",
+          "receipt_bytes_sha256": "53c6dbbb8510eb27ff16bd5003f4191daac878d99873de05b578c5f30cb2d7a1",
+          "report_clock": "15:14",
+          "report_description": "MTL #15 NEWHOOK(5) , Off. Zone, 5 ft. Assists: #14 SUZUKI(6); #71 EVANS(4)",
+          "report_period": 3,
+          "report_row_id": "PL-318",
+          "retrieved_at": "2026-09-06T05:25:05.400711+00:00",
+          "row_prefix_utf8_sha256": "ce71734e97903123a8dcda6f305741e1c246351ddf991211398f562988e0859c",
+          "url": "https://www.nhl.com/scores/htmlreports/20252026/PL030213.HTM"
+        }
+      ],
+      "original_observed_at": "2026-09-06T02:15:23.776605+00:00",
+      "original_receipt_bytes_sha256": "d2a96cbb10c7d99d502a6e47e17fc5b103f65b220b61c1254171d3b8c81aee33",
+      "period": {
+        "maxRegulationPeriods": 3,
+        "number": 3,
+        "periodType": "REG"
+      },
+      "player_id": 8481618,
+      "prior_final_game_evidence": {
+        "differences": [
+          {
+            "field": "sog",
+            "observed": 37,
+            "reported": 36,
+            "team_id": 8
+          }
+        ],
+        "reason": "final_attempt_totals_mismatch",
+        "shootout_score_bonus": {
+          "7": 0,
+          "8": 0
+        },
+        "status": "quarantined",
+        "team_counts": {
+          "7": {
+            "goals": 2,
+            "shootout_goals": 0,
+            "sog": 28
+          },
+          "8": {
+            "goals": 6,
+            "shootout_goals": 0,
+            "sog": 37
+          }
+        }
+      },
+      "recorded_sog_contribution": 0,
+      "sort_order": 716,
+      "source_event_sha256": "045cc208d3d701fc76ca0b2ebdb9a5de7c5e9c56276b2bb15ed0b748ccd89de2",
+      "source_payload_sha256": "daad2d053a2c6622aaa5cf01e13c3de137da3b2f431219be57cf69bddf63ec6c",
+      "source_snapshot_id": "304ec8da-48eb-5cbc-a2ef-08acca2f569a",
+      "team_id": 8
+    }
+  ],
+  "source_authentication_claim": false
+}
