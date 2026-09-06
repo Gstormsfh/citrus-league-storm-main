@@ -1,0 +1,90 @@
+{
+  "contract": "citrus-native-gsax-race-proof-v1",
+  "captured_at": "2026-09-06 03:24:45 UTC",
+  "scope": "Disposable local Docker PostgreSQL; no hosted database access",
+  "image": "postgres@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3",
+  "result": {
+    "checks": 16,
+    "postgres": "17.6 (Debian 17.6-2.pgdg12+1)",
+    "independentConnections": 3,
+    "lockWitnesses": [
+      {
+        "scenario": "recorded shot writer waits for rebuild commit",
+        "pid": 105,
+        "wait_event_type": "Lock",
+        "wait_event": "relation",
+        "blockers": [
+          103
+        ],
+        "waiting_locks": [
+          {
+            "mode": "RowExclusiveLock",
+            "table": "nhl_shots"
+          }
+        ]
+      },
+      {
+        "scenario": "aggregate writer waits for rebuild commit",
+        "pid": 105,
+        "wait_event_type": "Lock",
+        "wait_event": "relation",
+        "blockers": [
+          103
+        ],
+        "waiting_locks": [
+          {
+            "mode": "RowExclusiveLock",
+            "table": "goalie_xg_season"
+          }
+        ]
+      },
+      {
+        "scenario": "rebuild sees preceding source commit",
+        "pid": 105,
+        "wait_event_type": "Lock",
+        "wait_event": "relation",
+        "blockers": [
+          103
+        ],
+        "waiting_locks": [
+          {
+            "mode": "ShareLock",
+            "table": "nhl_shots"
+          }
+        ]
+      },
+      {
+        "scenario": "rebuild sees preceding source rollback",
+        "pid": 105,
+        "wait_event_type": "Lock",
+        "wait_event": "relation",
+        "blockers": [
+          103
+        ],
+        "waiting_locks": [
+          {
+            "mode": "ShareLock",
+            "table": "nhl_shots"
+          }
+        ]
+      },
+      {
+        "scenario": "output writer waits for rebuild commit",
+        "pid": 105,
+        "wait_event_type": "Lock",
+        "wait_event": "relation",
+        "blockers": [
+          103
+        ],
+        "waiting_locks": [
+          {
+            "mode": "RowExclusiveLock",
+            "table": "goalie_gsax_primary"
+          }
+        ]
+      }
+    ],
+    "status": "passed",
+    "cleanup": "verified: zero fixture objects/roles"
+  }
+}

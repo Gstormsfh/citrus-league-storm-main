@@ -1,0 +1,90 @@
+{
+  "endpoint": "http://127.0.0.1:63393",
+  "synthetic_fixture": true,
+  "phases": [
+    {
+      "phase": "original",
+      "reader": {
+        "batch_id": "75552be6-7346-5ea6-93ee-1b7b97075b54",
+        "values": 940,
+        "available": 939,
+        "withheld": 1,
+        "stale_policy_verified": true,
+        "actual_reader": "AnalyticsPublicationService"
+      }
+    },
+    {
+      "phase": "idempotent_replay",
+      "reader": {
+        "batch_id": "75552be6-7346-5ea6-93ee-1b7b97075b54",
+        "values": 940,
+        "available": 939,
+        "withheld": 1,
+        "stale_policy_verified": true,
+        "actual_reader": "AnalyticsPublicationService"
+      }
+    },
+    {
+      "phase": "new_correction_batch",
+      "reader": {
+        "batch_id": "1fc9a792-7eec-5845-ad90-74a317950557",
+        "values": 940,
+        "available": 940,
+        "withheld": 0,
+        "stale_policy_verified": true,
+        "actual_reader": "AnalyticsPublicationService"
+      }
+    },
+    {
+      "phase": "explicit_rollback",
+      "reader": {
+        "batch_id": "75552be6-7346-5ea6-93ee-1b7b97075b54",
+        "values": 940,
+        "available": 939,
+        "withheld": 1,
+        "stale_policy_verified": true,
+        "actual_reader": "AnalyticsPublicationService"
+      }
+    }
+  ],
+  "original_batch_id": "75552be6-7346-5ea6-93ee-1b7b97075b54",
+  "correction_batch_id": "1fc9a792-7eec-5845-ad90-74a317950557",
+  "original_database_evidence_sha256": "86677afd5232cf4a81fda9de40f728e7d81504ad8a15049494a0c36b55b155a5",
+  "corrected_database_evidence_sha256": "c78926d7c30370d9d19d878f1f8cf1b95c0b14aad22d4c03cf44a36bfd8d728c",
+  "publication_events": 3,
+  "old_evidence_unchanged": true,
+  "passed": true,
+  "report_sha256": "da9a2b85c2c7c35f8aa7ac3344e594782230dcdd290d83ff7b3d12ce4ada7325",
+  "candidate_file_bytes": 43076354,
+  "snapshot_compact_json_bytes": 42905547,
+  "database_memory_bytes": 2147483648,
+  "postgrest_memory_bytes": 1073741824,
+  "initial_512m_test": {
+    "passed": false,
+    "backend_oom": true,
+    "http_status": 503,
+    "post_failure_table_counts": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "postgres_image": "postgres@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3",
+  "postgrest_image": "postgrest/postgrest@sha256:54000f24847d01a2c2302e0041cf0618b875c57fb48507d743cfa9aaa50bf43c",
+  "production_modified": false,
+  "limitations": [
+    "Local correction uses a clearly labeled disposable copy; no live appearance is deleted.",
+    "512 MiB failure and 2 GiB success do not establish the minimum memory requirement or hosted deployment capacity.",
+    "Large raw JSON evidence payloads need explicit sizing or bounded artifact storage before rollout."
+  ],
+  "cleanup": {
+    "final_table_counts": {"sources": 2, "batches": 2, "values": 1880, "publication_events": 3},
+    "gateway_stopped": true,
+    "disposable_containers_removed": true,
+    "task_network_removed": true,
+    "remaining_task_containers_and_networks": 0,
+    "docker_desktop_and_images_retained": true,
+    "fixtures_reconstructible_from_scripts_and_frozen_evidence": true
+  }
+}

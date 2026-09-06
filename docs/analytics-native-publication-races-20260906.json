@@ -1,0 +1,140 @@
+{
+  "contract": "citrus-native-publication-race-proof-v1",
+  "captured_at": "2026-09-06 03:20:52 UTC",
+  "image": "postgres@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3",
+  "scope": "Disposable local Docker PostgreSQL; no hosted database access",
+  "code_and_migration_hashes": [
+    "ca32ce7b0fbd4b59465e74b19473c1dbb91f4ed8",
+    "49484d678517c0da6ce852373bc64f09faa773000e5f84bc639e99506537ae2c  scripts/test_analytics_races.mjs",
+    "955818fd5e65a46a34b235125c8e39601ecf6f1832a12b8514db93c5b43ffd3d  supabase/migrations/20260906005705_analytics_versioned_publication_contract.sql",
+    "fc405833f1ce4d1ddbf73c3a0785888d38c6d4b7d1f6b736698f4b7ef2fbda10  supabase/migrations/20260906013428_analytics_canonical_event_observations.sql"
+  ],
+  "runs": [
+    {
+      "checks": 17,
+      "postgres": "17.6 (Debian 17.6-2.pgdg12+1)",
+      "independentConnections": 3,
+      "lockWitnesses": [
+        {
+          "scenario": "publish waits for final value commit",
+          "pid": 87,
+          "wait_event_type": "Lock",
+          "wait_event": "transactionid",
+          "blockers": [
+            86
+          ]
+        },
+        {
+          "scenario": "value append waits for publication commit",
+          "pid": 87,
+          "wait_event_type": "Lock",
+          "wait_event": "transactionid",
+          "blockers": [
+            86
+          ]
+        },
+        {
+          "scenario": "publish waits for final value rollback",
+          "pid": 87,
+          "wait_event_type": "Lock",
+          "wait_event": "transactionid",
+          "blockers": [
+            86
+          ]
+        },
+        {
+          "scenario": "seal waits for final observation commit",
+          "pid": 87,
+          "wait_event_type": "Lock",
+          "wait_event": "transactionid",
+          "blockers": [
+            86
+          ]
+        },
+        {
+          "scenario": "observation append waits for seal commit",
+          "pid": 87,
+          "wait_event_type": "Lock",
+          "wait_event": "transactionid",
+          "blockers": [
+            86
+          ]
+        },
+        {
+          "scenario": "seal waits for final observation rollback",
+          "pid": 87,
+          "wait_event_type": "Lock",
+          "wait_event": "transactionid",
+          "blockers": [
+            86
+          ]
+        }
+      ],
+      "status": "passed",
+      "cleanup": "verified: zero fixture objects/roles"
+    },
+    {
+      "checks": 17,
+      "postgres": "17.6 (Debian 17.6-2.pgdg12+1)",
+      "independentConnections": 3,
+      "lockWitnesses": [
+        {
+          "scenario": "publish waits for final value commit",
+          "pid": 89,
+          "wait_event_type": "Lock",
+          "wait_event": "transactionid",
+          "blockers": [
+            91
+          ]
+        },
+        {
+          "scenario": "value append waits for publication commit",
+          "pid": 89,
+          "wait_event_type": "Lock",
+          "wait_event": "transactionid",
+          "blockers": [
+            91
+          ]
+        },
+        {
+          "scenario": "publish waits for final value rollback",
+          "pid": 89,
+          "wait_event_type": "Lock",
+          "wait_event": "transactionid",
+          "blockers": [
+            91
+          ]
+        },
+        {
+          "scenario": "seal waits for final observation commit",
+          "pid": 89,
+          "wait_event_type": "Lock",
+          "wait_event": "transactionid",
+          "blockers": [
+            91
+          ]
+        },
+        {
+          "scenario": "observation append waits for seal commit",
+          "pid": 89,
+          "wait_event_type": "Lock",
+          "wait_event": "transactionid",
+          "blockers": [
+            91
+          ]
+        },
+        {
+          "scenario": "seal waits for final observation rollback",
+          "pid": 89,
+          "wait_event_type": "Lock",
+          "wait_event": "transactionid",
+          "blockers": [
+            91
+          ]
+        }
+      ],
+      "status": "passed",
+      "cleanup": "verified: zero fixture objects/roles"
+    }
+  ]
+}

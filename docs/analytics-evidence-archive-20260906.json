@@ -1,0 +1,26 @@
+{
+  "contract": "citrus-local-evidence-archive-v1",
+  "path_relative_to_repository": "scripts/proof/results/analytics-evidence-20260906.tar.gz",
+  "bytes": 51813078,
+  "sha256": "539c0d23ba355f39efc76a7f428d497d10c05e2cfd1f3c64905af32b12c01a25",
+  "gzip_integrity_verified": true,
+  "tar_members": 2426,
+  "contents": [
+    "citrus-official-observations-20260906-0211",
+    "citrus-official-observations-20260906-0251",
+    "citrus-toi-receipts-20260906-0233",
+    "citrus-toi-revalidated-20260906-0312",
+    "citrus-canonical-reconciliation-20260906-full-0258",
+    "citrus-toi-postgrest-integration-20260906-2g",
+    "canonical-corpus-20260906",
+    "toi-stored-20260906"
+  ],
+  "contains_service_token_or_env_files": false,
+  "git_tracking": "Ignored local artifact; this manifest and concise proof summaries are committed",
+  "limitations": [
+    "The archive is retained in this worktree only; it is not an external backup or a committed binary.",
+    "Public current sports observations are not historical as-of evidence.",
+    "The original TOI catalog export did not have capture-time per-part hashes; later archive and replay hashes do not retroactively supply that evidence.",
+    "The integration correction candidate is a clearly labeled disposable fixture, not a production correction."
+  ]
+}

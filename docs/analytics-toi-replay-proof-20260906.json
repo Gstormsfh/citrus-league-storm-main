@@ -1,0 +1,38 @@
+{
+  "available": 939,
+  "batch_id": "75552be6-7346-5ea6-93ee-1b7b97075b54",
+  "code_revision": "76bcf08866f90514aeae0b4e8a3f8a86d7041d3a",
+  "database_modified": false,
+  "expected": 940,
+  "network_used": false,
+  "official_players": 940,
+  "official_population_complete": true,
+  "reason_counts": {
+    "event_set_mismatch": 1,
+    "verified": 939
+  },
+  "receipts": 940,
+  "replay_of_batch_id": "8a9b96bd-44dd-5b52-bd5b-503e6732d437",
+  "replayed_at": "2026-09-06T03:20:14.158876+00:00",
+  "snapshot_complete": true,
+  "source_sha256": "ab5b82f7c699dd28c4916c902d844e66e48e44c9deaac2cba22f2020267a669a",
+  "withheld": 1,
+  "cutoff": "2026-09-06T02:55:39.453783+00:00",
+  "freshness": "2026-09-06T02:32:26.330000+00:00",
+  "source_observed_at": "2026-09-06T02:55:39.452587+00:00",
+  "withheld_rows": [
+    {
+      "availability": "unavailable",
+      "batch_id": "75552be6-7346-5ea6-93ee-1b7b97075b54",
+      "entity_id": 8476453,
+      "exposure": null,
+      "reason": "event_set_mismatch",
+      "value": null
+    }
+  ],
+  "input_file_count": 953,
+  "candidate_sha256": "80429b0dd54323457c5ea45a02a3654b265ec8fb9f6c610211f8fe992002a1b5",
+  "health_sha256": "66b611240f7720619dab63acfd6fb014e01feb299fa772b1bedb468567078b18",
+  "scope": "Frozen official current observations; not historical availability",
+  "production_modified": false
+}

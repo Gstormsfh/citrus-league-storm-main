@@ -1,0 +1,49 @@
+{
+  "contract": "citrus-corpus-proof-summary-v1",
+  "season": 2025,
+  "project_ref": "iezwazccqqrhrjupxzvf",
+  "source_rows": {
+    "nhl": 119357,
+    "raw": 118975
+  },
+  "source_rows_scope": "Reconciler input: raw shootout rows excluded",
+  "export_rows_including_shootouts": {
+    "nhl": 119357,
+    "raw": 119766
+  },
+  "source_sha256": {
+    "nhl": "65ee2c04ef7246792cce841f1a378f775d6cb93d81538cb9f1c5181d28757f16",
+    "raw": "163204bf2177496eb5e1a7c1fd6bc9930e1ee8b1b360d03ad588fb5c314d2aac"
+  },
+  "stored_quarantine": {
+    "cardinality": 814,
+    "semantic_conflict": 226
+  },
+  "receipt_games": 1394,
+  "stored_games": 1394,
+  "unobserved_games": 0,
+  "source_statuses": {
+    "nhl:matched": 1362,
+    "raw:quarantined": 611,
+    "nhl:quarantined": 32,
+    "raw:matched": 783
+  },
+  "quarantine_reasons": {
+    "raw:cardinality": 814,
+    "nhl:semantic_conflict": 32,
+    "nhl:final_attempt_totals_mismatch": 32,
+    "raw:semantic_conflict": 226,
+    "raw:final_attempt_totals_mismatch": 32,
+    "raw:attempt_outcome_type": 200
+  },
+  "report_sha256": "d78f0f7ce29cc54b06dff5ff53b34b9b61c87d8636a8cd31c521e1bc62109059",
+  "limitations": [
+    "Current corrected observations are not historical as-of evidence.",
+    "Final score/SOG totals do not independently prove missed-shot coverage.",
+    "No source orientation, feature lineage or model probabilities validated.",
+    "Goal credit is not invariably another SOG; 32 totals mismatches require explicit independent adjudication, not a missing-shotType heuristic.",
+    "Matched source-game rows are strict identity/totals checks, not model-ready feature or probability acceptance."
+  ],
+  "accepted": false,
+  "production_modified": false
+}

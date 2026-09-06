@@ -96,6 +96,51 @@ The previously unapplied `20260906002239` backfill was withdrawn:
 season totals alone do not establish input completeness. Any future backfill
 requires a verified source snapshot, staging proof, backup and rollback.
 
+### 1.4 Versioned analytics foundation (local, unapplied)
+
+Current acceptance is tracked in `docs/ANALYTICS_ACCEPTANCE.md`; legacy row
+counts and model labels elsewhere in this inventory are not revalidated by this
+implementation. The new service-only publication/canonical migrations remain
+unapplied. `acquisition/canonical_events.py`, `event_observation_service.py` and
+`collect_observations.py` capture immutable official PBP observations without
+rewriting legacy raw shots. `monitoring/canonical_corpus.py` validates scoped,
+checksummed export parts and compares exact source revisions;
+`final_game_evidence.py` checks final totals without inventing missing events.
+Frozen proof summaries live in `docs/analytics-corpus-full-proof-20260906.json`
+(all 1394 stored games) and the earlier conflict-enriched sample. Matching here
+means identity/totals checks, not model-ready source or feature acceptance.
+
+`monitoring/collect_toi_receipts.py` collects a complete official skater summary
+population plus raw player game-log receipts and frozen stored-game rows.
+`projections/verified_toi_publication.py` builds explicit available/withheld
+candidates. `server/src/services/AnalyticsReadModelService.ts` is a background
+reader feeding actual dashboard/detail consumers only when
+`ANALYTICS_TOI_PUBLICATIONS_ENABLED=true`; the default remains false. The web
+hooks refresh versioned values and clear stale values while refreshing.
+
+Landing loaders no longer write approximate TOI derived from rounded averages.
+Per-game loaders preserve unavailable TOI as unavailable, withhold new incomplete
+rows and propagate failure health through their callers. Historical traded-player
+GP can come from a validated complete official summary, not summed ambiguous
+team totals. Strict raw-to-derived receipt binding is implemented and replayed:
+940 expected players, 939 available, one withheld for an extra stored appearance.
+The replay did not change any of its 953 frozen input files or freshen old sources.
+
+Native PostgreSQL race and actual Python publisher → PostgREST → TypeScript
+reader proofs are recorded under `docs/analytics-native-*-races-20260906.json`
+and `docs/analytics-local-publication-e2e-20260906.json`. The latter uses a clearly
+labeled proposed correction on a disposable local copy, never a production row
+change. The large raw-evidence payload failed at a 512 MiB database memory limit
+and passed at 2 GiB; hosted capacity remains an explicit rollout gate.
+`docs/analytics-evidence-archive-20260906.json` identifies the ignored local archive
+of frozen source receipts, scoped exports and replay/integration artifacts.
+
+`docs/analytics-writer-lineage-audit-20260906.md` holds exact live SQL writer
+definitions and confirmed shared-output permission risks. The unapplied
+`20260906022414_restrict_shared_analytics_writes.sql` removes ordinary-account
+writes to global GSAx and projections while preserving reads/service writes;
+actual staging rollback proof is recorded there. No production data was changed.
+
 ---
 
 ## 2. Historical data archives
