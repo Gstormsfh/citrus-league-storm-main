@@ -311,6 +311,13 @@ availability reasons, source observation/cutoff timestamps and immutable
 publication events preserve evidence separately from current serving tables.
 No reader switch is included. Test runner: `scripts/test_analytics_publication.mjs`
 (isolated PGlite, temporary dependency only; no application dependency added).
+`projections/analytics_publication.py` prepares deterministic immutable batches,
+resumes interrupted inserts and publishes only after preparation. The
+`verified_toi_publication.py` adapter includes frozen official receipts, stored
+rows and reconciliation reasons. `server/src/services/AnalyticsPublicationService.ts`
+is the background consumer adapter: exact variant/version matching, expected
+entity verification and explicit freshness expiry. These adapters are not enabled
+in production jobs or legacy readers pending rollout.
 
 **When adding a new data artifact, update this doc:**
 

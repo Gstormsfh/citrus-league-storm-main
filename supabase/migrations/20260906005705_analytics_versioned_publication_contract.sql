@@ -92,6 +92,7 @@ END $$;
 CREATE FUNCTION public.analytics_guard_publication() RETURNS trigger
 LANGUAGE plpgsql SET search_path=public AS $$
 DECLARE b public.analytics_metric_batches; actual bigint; observed timestamptz;
+  expected_ids bigint[]; actual_ids bigint[];
 BEGIN
   SELECT * INTO STRICT b FROM public.analytics_metric_batches WHERE id=NEW.batch_id FOR UPDATE;
   SELECT count(*) INTO actual FROM public.analytics_metric_values WHERE batch_id=b.id;
@@ -100,6 +101,16 @@ BEGIN
   END IF;
   IF b.validation->>'status' IS DISTINCT FROM 'passed' THEN
     RAISE EXCEPTION 'Analytics foundation validation has not passed';
+  END IF;
+  IF jsonb_typeof(b.validation->'entity_ids') IS DISTINCT FROM 'array' THEN
+    RAISE EXCEPTION 'Explicit expected entity identities are required';
+  END IF;
+  SELECT array_agg(v::bigint ORDER BY v::bigint) INTO expected_ids
+    FROM jsonb_array_elements_text(b.validation->'entity_ids') AS x(v);
+  SELECT array_agg(entity_id ORDER BY entity_id) INTO actual_ids
+    FROM public.analytics_metric_values WHERE batch_id=b.id;
+  IF expected_ids IS DISTINCT FROM actual_ids THEN
+    RAISE EXCEPTION 'Analytics entity identities do not match the expected manifest';
   END IF;
   SELECT observed_at INTO observed FROM public.analytics_source_snapshots WHERE id=b.source_snapshot_id;
   IF observed>b.data_cutoff THEN

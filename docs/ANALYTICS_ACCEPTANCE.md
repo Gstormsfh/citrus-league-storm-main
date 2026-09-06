@@ -58,6 +58,20 @@ before coordinate dedup/upsert, and partial-save errors propagate. The actual
 saver boundary test demonstrates quarantine before dedup or DB write without
 loading unrelated model binaries. Existing source revisions remain quarantined;
 they need a versioned correction publication, not naive coordinate-key replay.
+
+Further publication evidence: expected entity IDs now must match exactly, not
+merely count equally. Isolated Postgres: 15 checks; hosted staging rollback test
+also rejected an equally sized wrong-identity batch and left zero tables.
+Python candidate/publisher covers source receipts, availability, resumable
+inserts and correction-as-new-batch behavior. Server background reader covers
+exact variant/version, truncation/identity checks and stale-source null output.
+Local tests: 42 Python tests plus 4 reader tests; server TypeScript clean.
+Adapters are intentionally not enabled against absent production tables.
+
+Read-only ledger capture: `analytics-migration-drift-20260906.json`: 450 prod
+versions, 405 tracked local versions at capture, 41 overlap. No history repair
+was attempted. RLS is enabled on inspected raw/NHL shots, game/season/talent
+stats and goalie season tables; policy semantics still need separate review.
 Source research: user-provided audit, next steps, calibration investigation and
 hockey blueprint dated 2026-09-05. Stored probabilities are retrospective until
 the complete fit/calibration lineage proves otherwise. No novelty or superiority

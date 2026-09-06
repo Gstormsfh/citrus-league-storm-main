@@ -22,7 +22,7 @@ const { rows: [source] } = await db.query("INSERT INTO analytics_source_snapshot
 assert.match(source.payload_sha256, /^[a-f0-9]{64}$/); checks++;
 const { rows: [batch] } = await db.query(`INSERT INTO analytics_metric_batches
   (source_snapshot_id,metric,variant,unit,season,game_type,population,feature_version,model_version,code_revision,data_cutoff,expected_entities,validation)
-  VALUES($1,'avg_toi','official','minutes',2025,'regular','skaters','v1','none',$2,now(),2,'{"status":"passed"}') RETURNING id`, [source.id, '0'.repeat(40)]);
+  VALUES($1,'avg_toi','official','minutes',2025,'regular','skaters','v1','none',$2,now(),2,'{"status":"passed","entity_ids":[1,2]}') RETURNING id`, [source.id, '0'.repeat(40)]);
 await rejected(`INSERT INTO analytics_publications(batch_id,reason) VALUES('${batch.id}','incomplete')`, /Incomplete analytics batch/);
 await db.query(`INSERT INTO analytics_metric_values(batch_id,entity_id,value,availability,reason)
   VALUES($1,1,5,'available','verified'),($1,2,NULL,'unavailable','missing_source')`, [batch.id]);
@@ -40,11 +40,16 @@ await db.query("INSERT INTO analytics_metric_values VALUES($1,1,5,'available','v
 await rejected(`INSERT INTO analytics_publications(batch_id,reason) VALUES('${failed.id}','bad')`,/validation has not passed/);
 const {rows:[late]} = await db.query(`INSERT INTO analytics_metric_batches
  (source_snapshot_id,metric,variant,unit,season,game_type,population,feature_version,model_version,code_revision,data_cutoff,expected_entities,validation)
- VALUES($1,'avg_toi','official','minutes',2025,'regular','skaters','v1','none',$2,now()-interval '2 days',1,'{"status":"passed"}') RETURNING id`,[source.id,'0'.repeat(40)]);
+ VALUES($1,'avg_toi','official','minutes',2025,'regular','skaters','v1','none',$2,now()-interval '2 days',1,'{"status":"passed","entity_ids":[1]}') RETURNING id`,[source.id,'0'.repeat(40)]);
 await rejected(`INSERT INTO analytics_metric_values VALUES('${late.id}',1,'NaN','available','verified',NULL)`,/check constraint/);
 await rejected(`INSERT INTO analytics_metric_values VALUES('${late.id}',1,0,'unavailable','missing',NULL)`,/check constraint/);
 await db.query("INSERT INTO analytics_metric_values VALUES($1,1,5,'available','verified',NULL)",[late.id]);
 await rejected(`INSERT INTO analytics_publications(batch_id,reason) VALUES('${late.id}','bad')`,/observed after/);
+const {rows:[wrong]} = await db.query(`INSERT INTO analytics_metric_batches
+ (source_snapshot_id,metric,variant,unit,season,game_type,population,feature_version,model_version,code_revision,data_cutoff,expected_entities,validation)
+ VALUES($1,'avg_toi','official','minutes',2025,'regular','skaters','v1','none',$2,now(),1,'{"status":"passed","entity_ids":[99]}') RETURNING id`,[source.id,'0'.repeat(40)]);
+await db.query("INSERT INTO analytics_metric_values VALUES($1,1,5,'available','verified',NULL)",[wrong.id]);
+await rejected(`INSERT INTO analytics_publications(batch_id,reason) VALUES('${wrong.id}','wrong entity')`,/identities do not match/);
 await db.exec('RESET ROLE');
 await rejected(`UPDATE analytics_metric_values SET value=9 WHERE batch_id='${batch.id}'`, /immutable/);
 await db.close();
