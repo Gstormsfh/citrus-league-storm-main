@@ -1,0 +1,83 @@
+{
+  "contract": "citrus-first-official-retrospective-experiment-plan-v1",
+  "declared_at": "2026-09-06T06:11:00Z",
+  "status": "declared_before_real_fit_not_executed",
+  "evidence_claim": "retrospective_current_source_revisions",
+  "historical_as_of_verified": false,
+  "untouched_test_claim": false,
+  "publishable": false,
+  "windows": {
+    "train": {"start": "2019-07-01", "end": "2024-06-30"},
+    "calibration": {"start": "2024-07-01", "end": "2025-06-30"},
+    "test": {"start": "2025-07-01", "end": "2026-08-31"}
+  },
+  "source": "newly_frozen_official_nhl_gamecenter_play_by_play",
+  "source_files_excluded_from_training": ["MoneyPuck", "legacy_unverified_bulk_import", "unknown_joblib_or_pickle_artifacts"],
+  "preservation": {
+    "all_original_source_receipts_and_conflicts": "retain_unchanged",
+    "earlier_2017_2018_source_and_reports": "retain_for_separate_explicit_report_backed_variant",
+    "prior_model_artifacts": "preserve_without_loading",
+    "all_method_families": "docs/analytics-method-preservation-20260906.md",
+    "causal_family_status": "docs/analytics-causal-feature-plan-20260906.md"
+  },
+  "population": {
+    "version": "strict-official-unblocked-geometry-matched-v1",
+    "event_types": ["non_shootout_goal", "shot_on_goal", "missed_shot"],
+    "whole_game_source_gate": "exact_receipt_body_schedule_final_totals_identity_order_and_clock_validation",
+    "eligibility": "known_explicit_attacking_orientation_and_valid_distance_and_angle",
+    "context_missing_policy": "train_only_median_imputation_and_fixed_missingness_indicators",
+    "missing_shot_type": "retain_unknown_group_not_inferred_from_outcome",
+    "empty_net": "included_and_separately_reported",
+    "blocked_shots_and_shootout": "excluded_with_reason_in_full_source_inventory",
+    "unapproved_statistical_exceptions": "retain_quarantined_game_not_silently_adjudicated",
+    "same_event_cohort_for_all_predictors": true
+  },
+  "schema": {
+    "version": "official-neutral-geometry-context-numeric-v1",
+    "names": [
+      "distance_to_goal_ft", "signed_angle_deg", "shooting_skaters", "defending_skaters",
+      "shooting_empty_net", "defending_empty_net", "skater_advantage",
+      "score_differential_pre_shot", "seconds_since_immediate_event",
+      "distance_from_immediate_event_ft", "event_location_change_ft_per_second"
+    ],
+    "boolean_encoding": {"shooting_empty_net": "false=0,true=1,null=missing", "defending_empty_net": "false=0,true=1,null=missing"}
+  },
+  "fit": {
+    "seed": 60906,
+    "prevalence": "training_outcome_rate_only",
+    "geometry": "train_scaled_distance_abs_angle_quadratic_interaction_logistic",
+    "logistic": {"C": 1.0, "solver": "lbfgs", "max_iter": 2000, "tol": 1e-8},
+    "context": {"max_iter": 200, "learning_rate": 0.05, "max_leaf_nodes": 15, "min_samples_leaf": 100, "l2_regularization": 10.0, "early_stopping": false},
+    "calibration": "separate_later_window_fixed_L2_sigmoid_on_clipped_logit",
+    "calibration_C": 1.0,
+    "calibration_logit_epsilon": 0.000001,
+    "test_tuning": false,
+    "test_loading": "only_after_create_only_fit_artifacts_and_complete_pipeline_receipt_are_persisted"
+  },
+  "evaluation": {
+    "predictors": ["prevalence_raw", "prevalence_calibrated", "geometry_raw", "geometry_calibrated", "context_raw", "context_calibrated"],
+    "scorecard": {
+      "bin_edges": [0, 0.01, 0.025, 0.05, 0.1, 0.2, 0.35, 0.5, 0.75, 1],
+      "log_loss_epsilon": 1e-12,
+      "resamples": 256,
+      "seed": 60906,
+      "confidence": 0.95,
+      "min_games": 30,
+      "min_events": 100,
+      "min_valid_fraction": 0.9
+    },
+    "resampling": "paired_whole_game_percentile_not_independent_shot_bootstrap",
+    "subgroups": ["shot_type", "strength", "defending_empty_net", "season", "rink_home_id", "rebound_status_if_affirmatively_available"],
+    "unknown_groups": "retained_explicitly",
+    "external_peers": "none_without_authorized_same_event_predictions_and_disclosed_fit_history",
+    "automatic_acceptance_or_serving_promotion": false
+  },
+  "limitations": [
+    "First baseline measurement, not full-family world-class acceptance or a replacement of prior models.",
+    "Retrospective source corrections and previously inspected historical data prevent an untouched-history claim.",
+    "No shooter or goalie identity/talent terms; neutral probability is distinct from persistent finishing talent, GSAx and fantasy value.",
+    "Penalty-state power-play age, tracking passes, rink adjustment, shot-type encoding and learned rebound/flurry stages are not silently claimed as active features.",
+    "Sparse subgroups retain descriptive results; bootstrap intervals are conditional on the fixed pipeline and not multiplicity-adjusted.",
+    "Prospective acceptance needs a separately recorded complete fitted-pipeline reservation before future observations."
+  ]
+}

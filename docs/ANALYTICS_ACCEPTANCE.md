@@ -5,7 +5,7 @@ Status: foundation NOT accepted. Local work only; no production rollout authoriz
 
 | Gate | Source → writer → consumer | Acceptance evidence | Current state |
 |---|---|---|---|
-| Event identity | NHL/raw shots → scoring/season aggregates → player/goalie surfaces | Unique game/event plus shooter, period, outcome, population reconciliation; quarantine every conflict | BLOCKED: independent 61-week official schedule receipts confirm 1312 regular + 82 playoff completed games, with no whole games absent from either source. All 1394 stored games have PBP receipts. NHL: 1362 matched / 32 quarantined; raw: 783 matched / 611 quarantined. Frozen reconciliation has 814 cardinality and 226 semantic conflicts. Goal/SOG exceptions need explicit statistical adjudication; no silent repair |
+| Event identity | NHL/raw shots → scoring/season aggregates → player/goalie surfaces | Unique game/event plus shooter, period, outcome, population reconciliation; quarantine every conflict | PARTIAL: independent schedule covers all 1394 stored 2025-season games. Original NHL gate remains 1362 matched / 32 quarantined; all 32 now have separately reviewed exact-snapshot goal/SOG overlays, not silent source repair or new-revision approval. Raw remains 783 matched / 611 quarantined, with 814 cardinality and 226 semantic conflicts retained. Hosted reconciliation/publication remains blocked |
 | TOI provenance | NHL summary/game log → game/season/talent writers → deployment metrics | Exact event sets and every TOI value; official GP; historical seasons; source timestamps; late corrections | PARTIAL: strict raw/derived receipt replay passes: 940 expected, 939 available, 1 withheld; 953 frozen files unchanged. Future exports enforce explicit project/season/window and checksummed catalog or equal complete REST reads. Replay revalidates original catalog evidence or retains frozen REST provenance, without new online observations. Legacy evidence is not upgraded; no production correction/publication |
 | Season boundaries | NHL game identity → all writers | Explicit regular/playoff/shootout contract, ordered complete pagination | PARTIAL: rollup regular range + local guard; consumers already select variants; remaining writers unverified |
 | Traded players | Team stints → season aggregator → charts | Sum exposures/counts, recompute rates, no duplicate totals | PARTIAL: history and actual dashboard aggregation tested; unknown multi-stint distance denominator returns NULL. Live regular-season shot/xG totals agree for 937 players; remaining consumer/exposure coverage pending |
@@ -14,11 +14,46 @@ Status: foundation NOT accepted. Local work only; no production rollout authoriz
 | Version lineage | Features/model/calibrator → scores → aggregates | Same variant/version/population, immutable evidence, reversible serving selection | PARTIAL: new publication contract pins source/feature/model/code/variant and supports explicit rollback. Existing model families and stored-score lineage remain unverified |
 | Migration/security | Local migrations/live schema → readers/writers | Compare actual definitions/ledger; scoped RLS, staging, backup/rollback | PARTIAL: live definitions captured. Ordinary-user writes to global GSAx/projection tables confirmed; narrow restriction passes synthetic and actual staging rollback checks. Rollout unapplied. GSAx native races pass; hosted load, season-key redesign and broader writer lineage remain open |
 | Health | Source expectations → completed batches | Affirmative expected/actual/withheld; partial read failure cannot publish | PARTIAL: exact-page failure propagation, TOI withholding, landing/per-game caller failures and publication manifests tested. Official PBP collector preserves partial receipts and emits failed health on disk/import errors. Remaining jobs and operational coverage pending |
-| Chronological quality | Frozen earlier fit → later calibration → untouched test | Proper scores, reliability, game-cluster uncertainty, subgroups, fixed lineage | BLOCKED by foundation, incomplete full historical source freeze and missing run/split/calibrator evidence. Official historical PBP was found; nine archived/current pairs pass, not the entire historical corpus. Prior random/mixed-season training does not establish an untouched chronological test. User approved retrospective evaluation plus a frozen prospective test and excluded MoneyPuck files from new training. No new training/evaluation completed |
+| Chronological quality | Frozen earlier fit → later calibration → declared retrospective test; separately reserved prospective test | Proper scores, reliability, game-cluster uncertainty, subgroups, fixed lineage | IN PROGRESS: independently scheduled historical source freeze and first-party causal feature export are underway. Fixed chronological fit/calibration stages and matched probability scorecard are being validated. No real fit/evaluation result yet. Current historical revisions are retrospective, never historical-as-of or untouched evidence. Future prospective acceptance requires a complete genuinely frozen pipeline. MoneyPuck files remain excluded from new training |
 | Expected finishing/GAR/forecasts | Versioned history/context → persistent estimates | Observed G−xG distinct from persistent talent; exposure/units/opportunity/interval validation | Pending foundation and chronological evidence |
 | Fantasy and database integration | ScoringCalculator + feasible roster/waiver state → versioned outputs | League/horizon/eligibility, joint allocation, non-additive move value separate, RLS | Deferred until earlier gates pass |
 
 ## Current local verification (2026-09-06)
+
+### Continuing implementation checkpoint
+
+The original 32 goal/SOG conflicts now have source-specific statistical evidence
+and a separately pinned local overlay. Root replayed every exact original receipt;
+the source bytes and goal credit remain unchanged. Newly observed revisions do
+not inherit approval. See `analytics-goal-sog-adjudication-20260906.md`.
+
+Whole-transaction testing reproduced a real two-writer source-lock upgrade
+deadlock that individual function tests could not expose. A tenth unapplied
+migration coordinates sixteen reviewed entrypoints before their first writes.
+It passed nine isolated protocol checks and two native PostgreSQL 17.6 runs,
+each with three independent backends and three witnessed gate/lock observations.
+The exact native fixtures and their explicit synthetic dependencies are retained;
+full nightly dependency integration and hosted blocking/load remain unverified.
+See `analytics-nightly-lock-audit-20260906.md`. No global arbitrary-SQL
+deadlock-freedom claim is made.
+
+The last root-run full offline Python suite at this checkpoint passed 1133 tests,
+with 16 network tests deselected and 33 existing warnings. Later focused root
+runs passed 35 probability-scorecard tests, 31 report-source/collector tests and
+28 goal/SOG overlay/collection tests; these overlapping counts must not be added
+to infer a new full-suite total. Further fit/export code is still under review.
+The earlier complete-system suite counts below remain historical checkpoints.
+
+The historical collector preserves each scheduled game's exact response bytes,
+receipt, final-game evidence and every quarantine, with end-of-run source/code
+drift checks. A separate bounded collection retains 2017/2018 official reports
+because their JSON event order/orientation is not silently repaired. Report
+parse failures retain the complete available response for offline review. These
+collections are not yet complete and are not model acceptance. Public research
+families and prior model artifacts remain preserved; no unknown pickle/joblib
+artifact or MoneyPuck file is loaded by the new path.
+
+### Earlier complete-system verification
 
 The current local implementation contains typed immutable publication, complete-
 population TOI contracts and narrow writer handling, actual nullable consumer

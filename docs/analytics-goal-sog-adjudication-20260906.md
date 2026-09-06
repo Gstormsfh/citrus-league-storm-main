@@ -1,5 +1,45 @@
 # Goal credit is not always another shot on goal
 
+## Current exact-snapshot adjudication
+
+The later explicit review resolved the statistical treatment of all 32 original
+frozen cases locally. This supersedes the unresolved status in the initial
+investigation below, not its preserved source observations. The complete
+[statistical evidence bundle](analytics-goal-sog-statistical-evidence-20260906-v2.json)
+and [approval manifest](analytics-goal-sog-adjudications-20260906-v1.json) bind
+each exact original receipt, snapshot, payload, event, actor, team, period and
+clock. Twenty-three official play-by-play descriptions explicitly mark an own
+goal; nine awarded goals have separately retained official article evidence.
+Official event, player and team reports corroborate the reviewed contribution.
+Aggregate agreement alone was not treated as sufficient adjudication evidence.
+
+The separate local overlay retains goal credit of one, assigns a recorded SOG
+contribution of zero, and excludes the reviewed event from the base-shot model
+attempt population. It assigns **no model probability**, not a probability of
+zero. Every original event, coordinate, goal label, observation time and source
+hash remains unchanged; the original strict final-game gate remains quarantined.
+No canonical validator or hosted writer was activated by this review.
+
+Root independently replayed all 32 exact original receipts through
+`acquisition/goal_sog_adjudication.py`: all returned the reviewed statistical
+overlay and preserved the entire original source. The ordered result-set SHA256
+is `4515076b1c6d2924ac66ce38804858f2dfa0d4ae6e9ead22466ef71b76bb5dd3`.
+The bundle SHA256 is
+`43a7d5c2c17782ee5e4fe65dcf8512a46fef1248a337080f14aeeb93ea0bc864`;
+the manifest SHA256 is
+`e193ab68d55ae1f43c423df8dc07022aef4f264865af64e19c0e4a7eacc8c5a9`.
+The 28 focused overlay/collection tests passed locally. These are statistical
+identity and preservation checks, not predictive-quality measurements.
+
+Approval does not automatically transfer to a newly observed source revision,
+even if its event looks similar. A new receipt or observation timestamp must be
+explicitly compared and reviewed under a new pinned manifest. Missing shot type
+remains an invalid general-purpose classifier. The source-specific combination
+of event descriptions, official explanations and statistical reconciliation is
+not a universal rule for future goals.
+
+## Preserved initial investigation
+
 The initial 498-game conflict-enriched frozen sample contains 32 games where
 counting non-shootout typeCode 505 plus 506 exceeds the reported team SOG by
 exactly one. These are unresolved statistical semantics, not automatically feed
