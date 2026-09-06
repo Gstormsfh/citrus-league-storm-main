@@ -31,6 +31,9 @@ Primary recaps confirm shootouts in the three unpaired overtime cases' games,
 but do not adjudicate those exact attempts. Their state and exclusions remain
 unchanged. Foundation, quality and FPAR stay NOT accepted; production and hosted
 databases remain unchanged.
+The subsequent nested integrity pass also rehashes all 15,626 files named in
+the saved actor review with zero mismatches; this is byte verification, not a
+new fit, semantic review or validation outcome.
 
 ### Source → saved model → player/goalie accounting
 

@@ -19,6 +19,11 @@ The final integrity check ran at 13:52:43 UTC. It rehashed the named top-level
 pins; it did not rerun every nested source review or recreate the runtime.
 Archives are local duplicates, not off-machine backups.
 
+A subsequent [nested integrity pass](analytics-overnight-bound-integrity-20260906.json)
+at 13:57:14 UTC rehashed all 15,626 files named in the saved actor review,
+reading 3,703,157,340 bytes. Every digest still matches. This separately checks
+the bound file bytes, not a rerun of the review's semantic calculations or fits.
+
 Latest saved Python suite: **1,784 passed**, with 16 network tests deselected.
 Separate inference/review and special-state suites record 48 and 10 passes.
 These counts were checked against the saved XML; the final documentation-only

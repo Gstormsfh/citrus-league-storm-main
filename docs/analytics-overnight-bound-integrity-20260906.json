@@ -1,0 +1,16 @@
+{
+  "contract": "citrus-overnight-bound-integrity-v1",
+  "checked_at": "2026-09-06T13:57:14.030Z",
+  "review_path": "scripts/proof/results/actor-attribution-review-20260906/review.json",
+  "review_sha256": "c2a6d3c7310ca5d38a41132df34f868c84b7afdeed92150f9ea82da0e802e8be",
+  "bound_file_count": 15626,
+  "total_bytes_read": 3703157340,
+  "status": "all-bound-file-bytes-match",
+  "failed": [],
+  "method": "Read and SHA-256 every file named in the retained review bound_file_sha256 map; compare actual bytes against its pinned digest.",
+  "semantic_review_rerun": false,
+  "model_fit_or_inference_rerun": false,
+  "legacy_deserialized": false,
+  "production_changed": false,
+  "publishable": false
+}

@@ -105,6 +105,9 @@ preserved research and the remaining ordered source/calibration/forecast gates.
 SHA-256 comparison of 62 named prior/result/archive pins and binds its three
 input manifests. It is not a new experiment, nested-review rerun, runtime bundle
 or model/FPAR acceptance. No original evidence was rewritten.
+`docs/analytics-overnight-bound-integrity-20260906.json` separately records a
+subsequent byte-for-byte rehash of all 15,626 actor-review-bound files; it does
+not rerun model fits, inference or semantic ledger review.
 
 Additive actor/exposure diagnostics (2026-09-06):
 `data-pipeline/projections/player_goalie_attribution.py` preserves exact selected
