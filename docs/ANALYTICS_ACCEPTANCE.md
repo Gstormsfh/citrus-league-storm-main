@@ -20,6 +20,31 @@ Status: foundation NOT accepted. Local work only; no production rollout authoriz
 
 ## Current local verification (2026-09-06)
 
+### Source → saved model → player/goalie accounting
+
+The [actor checkpoint](analytics-actor-attribution-result-20260906.md) replays
+the frozen sources through unchanged feature gates and pinned JSON raw/calibrated
+inference. Every probability and original validation cohort digest matches
+exactly in both folds. The independently rebuilt actor/team-stint ledger keeps
+season/type/role separate, retains goalies as shooters, never assigns empty-net
+attempts to a goalie, and leaves incomplete totals and unverified exposure NULL.
+The review rehashes 15,626 bound files. This is eligible-event diagnostic
+accounting, not official actuals, TOI, serving or FPAR acceptance.
+
+The 103 goalie-state exclusions are special codes outside the current decoder:
+100 have a same-clock PS marker (82 matching drawn actor, 16 missing that field,
+two different), and three unpaired cases occur at the end of regular-season
+overtime. All original exclusions/features/probabilities remain unchanged;
+the separate context inspection is not reassignment approval. This narrows the
+next source-semantics work while keeping the earlier calibration bias visible.
+
+Full offline Python: 1,784 passed, 16 network tests deselected. Standalone
+inference/review: 48 passed; context inspection: ten passed. All 56 separately
+indexed prior pins still match. No production/hosted writes or new model fit.
+Next: versioned special-state semantics, independent adjudication of the three
+unpaired cases, and exact appearance/TOI joins before rates; then remaining
+nightly dependencies and validated physical forecasts. FPAR remains gated.
+
 ### Saved model → native publication → actual reader
 
 The [local diagnostic checkpoint](analytics-model-publication-result-20260906.md)

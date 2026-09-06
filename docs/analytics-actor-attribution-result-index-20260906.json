@@ -1,0 +1,30 @@
+{
+  "contract": "citrus-source-model-actor-checkpoint-index-v1",
+  "status": "source-model-attribution-verified-foundation-not-accepted",
+  "publishable": false,
+  "implementation_commit": "9df4d283",
+  "review_commit": "983a05c5",
+  "special_state_inspection_commit": "643ab5a1",
+  "files": {
+    "scripts/proof/results/official-actor-attribution-20260906/health.json": "167e0b7eed959083b4c93d5bf33673755a8e3fb8fe60c9fde0a74ccfe790a755",
+    "scripts/proof/results/official-actor-attribution-20260906/result.json": "81194951e9022f52c48c640f08215319901a20aa7d0f0091f863ab894e449893",
+    "scripts/proof/results/actor-attribution-review-20260906/review.json": "c2a6d3c7310ca5d38a41132df34f868c84b7afdeed92150f9ea82da0e802e8be",
+    "scripts/proof/results/actor-attribution-verification-20260906/goalie-gap-context.json": "0b6642edf37b5ea42a979ec864fd2f64987c041467a3cae72cbc70f3eb7fe12a"
+  },
+  "bound_review_files": 15626,
+  "raw_and_calibrated_prediction_max_absolute_error": 0,
+  "unresolved_goalie_state_events_preserved": 103,
+  "prior_indexed_pins_reverified": 56,
+  "model_accepted": false,
+  "foundation_accepted": false,
+  "production_changed": false,
+  "originals_removed_or_replaced": false,
+  "prospective_reservations_changed": false,
+  "remaining_gates": [
+    "calibration-bias-and-subgroup-weaknesses",
+    "versioned-penalty-shot-context-and-three-unpaired-overtime-cases",
+    "exact-official-appearance-and-toi-join-before-rates",
+    "remaining-nightly-dependency-and-hosted-operational-coverage",
+    "physical-forecast-validation-before-FPAR"
+  ]
+}
