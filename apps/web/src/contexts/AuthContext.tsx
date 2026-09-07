@@ -14,6 +14,10 @@ import {
 } from '@/lib/nativeAuth';
 import { registerForPush, unregisterDeviceToken } from '@/lib/pushNotifications';
 import { reportBootStage } from '@/lib/bootStages';
+import { useNotificationStore } from '@/stores/notificationStore';
+import { useDraftClientStore } from '@/stores/draftClientStore';
+import { retainAppleCleanupToken } from '@/lib/appleAccountCleanup';
+import { clearAccountContent } from '@/lib/accountCleanup';
 
 /** Returns true if JWT is expired or within 30s of expiry. */
 function isTokenExpired(token: string | undefined): boolean {
@@ -112,11 +116,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Register auth listener FIRST so we don't miss SIGNED_IN events
     // that fire during the getSession() call (e.g., OAuth callback redirect)
     let initialSessionHandled = false;
+    let activeAccountId: string | null = null;
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
+      const nextAccountId = session?.user.id ?? null;
+      if (activeAccountId && activeAccountId !== nextAccountId) {
+        useNotificationStore.getState().reset();
+        useDraftClientStore.getState().reset();
+        clearAccountContent();
+        queryClient.clear();
+      }
+      activeAccountId = nextAccountId;
       setSession(session);
 
       if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED') {
@@ -128,6 +141,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           setUser(session.user);
           recordLoginOnce(session);
+          if (session.provider_refresh_token) {
+            const signedInSession = session;
+            setTimeout(() => {
+              void retainAppleCleanupToken(signedInSession).catch(() =>
+                logger.error('[Auth] Apple account cleanup token was not retained'));
+            }, 0);
+          }
           initialSessionHandled = true;
           clearTimeout(timeout);
           analyticsService.setUserId(session.user.id);
@@ -159,8 +179,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         analyticsService.setUserId(null);
         setSentryUser(null);
-        // Clear profile from React Query cache on sign-out
-        queryClient.removeQueries({ queryKey: PROFILE_QUERY_KEY });
+        useNotificationStore.getState().reset();
+        useDraftClientStore.getState().reset();
+        clearAccountContent();
+        queryClient.clear();
         setLoading(false);
       }
     });
@@ -304,7 +326,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         logger.warn('[Auth] push cleanup: ' + msg),
       );
     }
-    await supabase.auth.signOut();
+    const result = await supabase.auth.signOut();
+    if (result?.error) {
+      const localResult = await supabase.auth.signOut({ scope: 'local' });
+      if (localResult?.error) throw localResult.error;
+    }
     // Clear user ID from analytics
     analyticsService.setUserId(null);
   };

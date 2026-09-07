@@ -22,6 +22,7 @@
  *
  * Pure: the hook fetches, this file computes, the tests read this file.
  */
+import { projectionStats, projectionSettings } from '@/components/player/projectionScoring';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 
 export interface RosterWeekPlayer {
@@ -40,6 +41,7 @@ export interface RosterWeekEntry {
 }
 
 export interface ProjectionRowLite {
+  [field: string]: unknown;
   player_id: number | string;
   projection_date: string;
   total_projected_points: number | string | null;
@@ -52,15 +54,20 @@ export function weekEntries(
   today: string,
   scoring?: unknown,
 ): Map<string, RosterWeekEntry> {
-  const scorer = new ScoringCalculator(scoring as ConstructorParameters<typeof ScoringCalculator>[0]);
+  const scorer = new ScoringCalculator(projectionSettings(scoring));
   const statsFor = (id: string): Record<string, number> | undefined =>
     weekStats instanceof Map ? weekStats.get(Number(id)) : weekStats[id];
 
+  const goalieById = new Map(players.map(p => [String(p.id), p.isGoalie]));
   const projByPlayer = new Map<string, { toDate: number; remaining: number; gamesRemaining: number }>();
   for (const row of projections) {
     const id = String(row.player_id);
     const date = String(row.projection_date).slice(0, 10);
-    const pts = Number(row.total_projected_points ?? 0) || 0;
+    const hasRawStats = Object.keys(row).some(key => key.startsWith('projected_'));
+    if (!hasRawStats && scoring != null) throw new Error('Raw projections are required for league scoring');
+    const pts = hasRawStats
+      ? scorer.calculatePoints(projectionStats(row), goalieById.get(id) ?? false)
+      : Number(row.total_projected_points ?? 0) || 0;
     const agg = projByPlayer.get(id) ?? { toDate: 0, remaining: 0, gamesRemaining: 0 };
     if (date < today) agg.toDate += pts;
     else {

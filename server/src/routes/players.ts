@@ -191,7 +191,7 @@ playerRoutes.get('/projections/batch', authMiddleware, async (c) => {
   try {
     let query = supabase
       .from('player_projected_stats')
-      .select('player_id, total_projected_points, projection_date, projected_goals, projected_assists, projected_sog, projected_blocks, projected_hits, projected_pim, projected_wins, projected_saves, projected_goals_against')
+      .select('player_id, total_projected_points, projection_date, projected_goals, projected_assists, projected_sog, projected_blocks, projected_hits, projected_pim, projected_ppp, projected_shp, projected_wins, projected_saves, projected_shutouts, projected_goals_against')
       .in('player_id', playerIds);
 
     if (startDate) {
@@ -200,9 +200,9 @@ playerRoutes.get('/projections/batch', authMiddleware, async (c) => {
     if (endDate) {
       query = query.lte('projection_date', endDate);
     }
-    // Default to current season so missing param doesn't return all
+    // Default to the projection season so offseason requests look ahead, not at all
     // historical projections (multiple rows per player × 82 games).
-    query = query.eq('season', season ? parseInt(season, 10) : getCurrentSeason());
+    query = query.eq('season', season ? parseInt(season, 10) : getProjectionsSeason());
 
     const { data, error } = await query;
 

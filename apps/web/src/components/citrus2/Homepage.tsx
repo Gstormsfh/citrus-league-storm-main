@@ -76,7 +76,7 @@ function getHeroSlides(): HeroSlide[] {
       id: 'fantasy',
       eyebrow: 'Fantasy Hockey 2026 · Drafts open · Puck drops Sep 29',
       headline: { lead: 'Fantasy Hockey', accent: '2026' },
-      sub: 'A 31-feature xG model. Live shift-level scoring. Snake, auction, or salary-cap drafts. Built by hockey heads, for hockey heads. Lock in founders pricing now.',
+      sub: 'A 31-feature xG model. Live shift-level scoring. Snake, auction, or salary-cap drafts. Built by hockey heads, for hockey heads. Create your league today.',
       primary: { label: 'Drop the Puck', to: '/create-league' },
       secondary: { label: 'Try a mock draft →', to: '/armchair-gm?tab=mockdraft' },
       visual: <SceneVisual src="/mascots/scene-squad.webp" alt="The Citrus Squad on the bench" />,
@@ -265,7 +265,7 @@ const REAL_FEATURES: Array<{
   },
   {
     label: 'Advanced Metrics',
-    desc: 'xGF%, Corsi, PP1 share, deployment splits, zone entry rates. Built in, no extra subscription.',
+    desc: 'xGF%, Corsi, PP1 share, deployment splits, zone entry rates. Available in your player dashboard.',
     icon: XGModelIcon,
     accent: 'sage',
   },
@@ -286,7 +286,7 @@ const FAQ: FaqEntry[] = [
   },
   {
     q: 'Is Citrus free?',
-    a: "Yes. Leagues, mock drafts, projections and Stormy are all free during launch. We're building a Stormy Pro tier and advanced commish tools for power managers later this year, but anyone who joins now gets founders pricing locked in.",
+    a: "Yes. Citrus is free to use. No credit card is required. Stormy has a weekly question limit.",
   },
   {
     q: 'What makes your projections different?',
@@ -323,7 +323,7 @@ export function Homepage() {
       <div className="relative z-10 bg-gradient-to-r from-pastel-orange/15 via-pastel-orange/25 to-pastel-orange/15 border-y border-pastel-orange/30">
         <div className="max-w-[1280px] mx-auto px-6 py-2 text-center">
           <span className="font-jbmono text-[11px] tracking-[0.18em] uppercase text-pastel-orange-soft font-bold">
-            🍊 Free during launch · Founders pricing locked in for early users
+            🍊 Free to play · No credit card required
           </span>
         </div>
       </div>
@@ -341,7 +341,7 @@ export function Homepage() {
           <span className="text-white/20">·</span>
           <span className="text-pastel-sage-soft">Stormy assistant GM</span>
           <span className="text-white/20">·</span>
-          <span className="text-pastel-sage-soft">Founders pricing</span>
+          <span className="text-pastel-sage-soft">Free to play</span>
         </div>
       </section>
 
@@ -386,7 +386,7 @@ export function Homepage() {
         <SectionHeader
           eyebrow="What You Get"
           title="The data that wins championships."
-          sub="Every feature below ships free during launch. Stormy Pro and advanced league tools are in the works, and early users get founders pricing for life."
+          sub="Explore the tools available on Citrus. No credit card required."
           align="center"
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -469,7 +469,7 @@ export function Homepage() {
             Your league is <span className="text-pastel-orange">waiting</span>.
           </>
         }
-        sub="Free during launch · Founders pricing locked in for early users"
+        sub="Free to play · No credit card required"
         ctaLabel="Create your league"
         ctaHref="/create-league"
       />

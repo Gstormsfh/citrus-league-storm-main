@@ -18,12 +18,14 @@
  *   onClick={(e) => { if (interceptExternal(url)) e.preventDefault(); }}
  */
 
+import { toast } from 'sonner';
 import { isNativeShell } from '@/lib/nativeAuth';
 
 /** Open a URL in the system browser sheet. Native-only effect. */
 export async function openExternal(url: string): Promise<void> {
   const { Browser } = await import('@capacitor/browser');
-  await Browser.open({ url });
+  const absoluteUrl = new URL(url, 'https://citrusfantasysports.com').href;
+  await Browser.open({ url: absoluteUrl });
 }
 
 /**
@@ -34,6 +36,9 @@ export async function openExternal(url: string): Promise<void> {
  */
 export function interceptExternal(url: string): boolean {
   if (!isNativeShell()) return false;
-  void openExternal(url);
+  if (!/^(https?:\/\/|\/(?!\/))/.test(url)) return false;
+  void openExternal(url).catch(() => {
+    toast.error('Could not open the link. Please try again.');
+  });
   return true;
 }

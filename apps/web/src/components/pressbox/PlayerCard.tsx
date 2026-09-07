@@ -167,6 +167,7 @@ export interface PressBoxStatTile {
   label: string;
   value: string;
   tone?: 'sage' | 'orange' | 'plain';
+  onClick?: () => void;
 }
 
 export function PressBoxStatTiles({ tiles, className }: { tiles: PressBoxStatTile[]; className?: string }) {
@@ -186,7 +187,7 @@ export function PressBoxStatTiles({ tiles, className }: { tiles: PressBoxStatTil
               (!t.tone || t.tone === 'plain') && 'text-pressbox-text',
             )}
           >
-            {t.value}
+            {t.onClick ? <button type="button" onClick={t.onClick} className="focus-citrus underline decoration-dotted underline-offset-4" aria-label={`${t.label} breakdown`}>{t.value}</button> : t.value}
           </p>
         </div>
       ))}
@@ -218,6 +219,8 @@ export interface PressBoxGameLogProps {
   rows: PressBoxGameLogRow[];
   /** `FPTS` for a played log; `PROJ` for the remaining games. */
   pointsHeading?: string;
+  showPoints?: boolean;
+  showTail?: boolean;
   /** The tail column's heading and width: TOI at 34px unless the table says otherwise. */
   tail?: { heading: string; width: number };
   className?: string;
@@ -227,12 +230,14 @@ export function PressBoxGameLog({
   statHeadings,
   rows,
   pointsHeading = 'FPTS',
+  showPoints = true,
+  showTail = true,
   tail = { heading: 'TOI', width: 34 },
   className,
 }: PressBoxGameLogProps) {
   // The artboard draws DT at 30px, which fits `9/30` and not `10/10`; 34px
   // fits every date a season has (2026-09-04).
-  const cols = `34px 44px 44px ${statHeadings.map(() => '1fr').join(' ')} ${tail.width}px`;
+  const cols = `34px 44px ${showPoints ? '44px' : ''} ${statHeadings.map(() => '1fr').join(' ')} ${showTail ? `${tail.width}px` : ''}`;
   return (
     <div
       className={cn(
@@ -248,13 +253,13 @@ export function PressBoxGameLog({
       >
         <span>DT</span>
         <span>OPP</span>
-        <span className="text-pressbox-sage">{pointsHeading}</span>
+        {showPoints && <span className="text-pressbox-sage">{pointsHeading}</span>}
         {statHeadings.map((h) => (
           <span key={h} className="text-center">
             {h}
           </span>
         ))}
-        <span className="text-right">{tail.heading}</span>
+        {showTail && <span className="text-right">{tail.heading}</span>}
       </div>
 
       {rows.map((r) => (
@@ -269,20 +274,20 @@ export function PressBoxGameLog({
         >
           <span className="text-pressbox-text/50">{r.date}</span>
           <span className="text-pressbox-text">{r.opponent}</span>
-          <span
+          {showPoints && <span
             className={cn(
               'font-semibold',
               r.summary ? 'text-pressbox-orange-soft' : r.latest ? 'text-pressbox-sage' : 'text-pressbox-text',
             )}
           >
             {r.pointsLabel ?? (r.points == null ? '–' : r.points.toFixed(1))}
-          </span>
+          </span>}
           {r.cells.map((c, i) => (
             <span key={i} className="text-center text-pressbox-text">
               {c}
             </span>
           ))}
-          <span className="text-right text-pressbox-text/50">{r.toi ?? '–'}</span>
+          {showTail && <span className="text-right text-pressbox-text/50">{r.toi ?? '–'}</span>}
         </div>
       ))}
     </div>

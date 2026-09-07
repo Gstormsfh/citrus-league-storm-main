@@ -203,6 +203,16 @@ export function validateSnapshotForBootstrap(
       details: 'snapshot_payload missing required fields',
     };
   }
+  if (record.snapshot.format === 'auction') {
+    const state = record.snapshot.stateSnapshot;
+    const auction = record.snapshot.auctionState;
+    if (!state || !auction ||
+        (state.picksMade > 0 && !(state.totalPicks > 0)) ||
+        Object.values(auction.teamRosterSlotsRemaining ?? {}).some(slots => !Number.isFinite(slots) || slots < 0)) {
+      return { ok: false, reason: 'payload_deserialization_failed',
+        details: 'auction snapshot has invalid roster capacity; rebuild from durable events' };
+    }
+  }
   return { ok: true };
 }
 

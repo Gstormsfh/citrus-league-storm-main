@@ -5,6 +5,7 @@ import HockeyPlayerCard, { HockeyPlayer } from "./HockeyPlayerCard";
 import { Plus } from "lucide-react";
 import { CitrusSparkle } from "@/components/icons/CitrusIcons";
 
+import { buildSlotConfig } from './slotConfig';
 import type { PositionType } from "@/utils/rosterUtils";
 
 interface PositionSlot {
@@ -107,11 +108,11 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, onPlayerTa
   const defenseRow = createIndividualSlots('D', getCount('D', 4));
 
   // Row 3: Goalies & Utility
-  const utilCount = getCount('UTIL', 1);
+  const slotConfig = buildSlotConfig(positionType, rosterSlots);
   const bottomRow = [
     ...createIndividualSlots('G', getCount('G', 2)),
-    ...Array.from({ length: utilCount }, (_, i) => ({
-      id: 'slot-UTIL',
+    ...slotConfig.utilSlots.map(id => ({
+      id,
       position: 'UTIL' as const,
       label: 'Utility',
       maxPlayers: 1,
@@ -139,12 +140,7 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, onPlayerTa
               forward cards into ~105px each inside the three-column app
               shell (~675px main column) — stat lines were unreadable soup.
               Three per row gives ~215px cards; forwards wrap to two rows. */}
-          <div className={cn(
-            "grid gap-2",
-            isForward
-              ? "grid-cols-2 sm:grid-cols-3"
-              : "grid-cols-2 sm:grid-cols-3"
-          )}>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-2">
             {/* Position colour now lives on the card itself (its left spine) —
                 consistent everywhere it renders, instead of a wrapper border
                 that this row remembered to apply and the defense/goalie rows
@@ -160,7 +156,7 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, onPlayerTa
           </h3>
           {/* Same density fix: 4-across defense was ~160px per card in the
               shell column — match the forwards' ~215px readable width. */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-2">
             {defenseRow.map(slot => renderSlot(slot))}
           </div>
         </div>
@@ -170,7 +166,7 @@ const StartersGrid = ({ players, slotAssignments = {}, onPlayerClick, onPlayerTa
           <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
             Goalies & Utility
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-2">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-2">
             {bottomRow.map(slot => renderSlot(slot))}
           </div>
         </div>

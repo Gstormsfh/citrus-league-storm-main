@@ -1010,3 +1010,20 @@ describe('reduce — Entry 99 COMPLETED-ROOM-2 (terminal_completed accepts snaps
     expect(result.sideEffects).toEqual([]);
   });
 });
+
+describe('reduce — completed draft snapshot failure', () => {
+  it('leaves the terminal loader and exposes a recoverable invalid-lobby state', () => {
+    const result = reduce(
+      { kind: 'terminal_completed', draftStatus: 'completed' },
+      { type: 'snapshot_fetch_failed', error: 'Draft not configured' },
+      noJitter,
+    );
+
+    expect(result.state).toEqual({
+      kind: 'fatal',
+      reason: 'invalid_lobby',
+      errorMessage: 'Draft not configured',
+    });
+    expect(result.sideEffects).toEqual([]);
+  });
+});

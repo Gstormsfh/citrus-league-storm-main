@@ -100,6 +100,60 @@ describe('AccountService', () => {
   });
 
   describe('deleteAccount', () => {
+    let bucket: { list: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
+    beforeEach(() => {
+      bucket = { list: vi.fn().mockResolvedValue({ data: [], error: null }), remove: vi.fn().mockResolvedValue({ error: null }) };
+      mockSupabase.storage = { from: vi.fn().mockReturnValue(bucket) };
+    });
+
+    it('removes only the authenticated user image folder before deleting the identity', async () => {
+      bucket.list.mockResolvedValue({ data: [{ id: 'image', name: 'avatar.jpg' }], error: null });
+      mockSupabase.rpc = vi.fn().mockResolvedValue({ data: { success: true }, error: null });
+      expect((await service.deleteAccount()).success).toBe(true);
+      expect(bucket.list).toHaveBeenCalledWith('user-1', expect.any(Object));
+      expect(bucket.remove).toHaveBeenCalledWith(['user-1/avatar.jpg']);
+      expect(bucket.remove.mock.invocationCallOrder[0]).toBeLessThan(mockSupabase.rpc.mock.invocationCallOrder[0]);
+    });
+
+    it('keeps the account available for retry when image removal fails', async () => {
+      bucket.list.mockResolvedValue({ data: [{ id: 'image', name: 'avatar.jpg' }], error: null });
+      bucket.remove.mockResolvedValue({ error: { message: 'Storage unavailable' } });
+      mockSupabase.rpc = vi.fn();
+      expect((await service.deleteAccount()).success).toBe(false);
+      expect(mockSupabase.rpc).not.toHaveBeenCalled();
+    });
+
+    it('does not delete an identity after a failed image listing', async () => {
+      bucket.list.mockResolvedValue({ data: null, error: { message: 'Offline' } });
+      mockSupabase.rpc = vi.fn();
+      expect((await service.deleteAccount()).success).toBe(false);
+      expect(mockSupabase.rpc).not.toHaveBeenCalled();
+    });
+
+    it('requires a live authenticated account', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null }, error: null });
+      expect((await service.deleteAccount()).success).toBe(false);
+      expect(bucket.list).not.toHaveBeenCalled();
+    });
+
+    it.each([null, {}, { success: 'true' }])('does not report an unconfirmed deletion as successful: %j', async (data) => {
+      mockSupabase.rpc = vi.fn().mockResolvedValue({ data, error: null });
+      expect((await service.deleteAccount()).success).toBe(false);
+    });
+
+    it('revokes Apple access before deleting the account and aborts on revocation failure', async () => {
+      const revoke = vi.fn().mockResolvedValue('revoked');
+      const appleService = new AccountService(mockSupabase, revoke);
+      mockSupabase.rpc.mockResolvedValue({ data: { success: true }, error: null });
+      expect(await appleService.deleteAccount()).toMatchObject({ success: true, appleRevocation: 'revoked' });
+      expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ id: 'user-1' }));
+      expect(revoke.mock.invocationCallOrder[0]).toBeLessThan(mockSupabase.rpc.mock.invocationCallOrder[0]);
+      mockSupabase.rpc.mockClear();
+      revoke.mockRejectedValue(new Error('Provider unavailable'));
+      expect((await appleService.deleteAccount()).success).toBe(false);
+      expect(mockSupabase.rpc).not.toHaveBeenCalled();
+    });
+
     it('deletes account via RPC', async () => {
       mockSupabase.rpc = vi.fn().mockResolvedValue({ data: { success: true }, error: null });
 

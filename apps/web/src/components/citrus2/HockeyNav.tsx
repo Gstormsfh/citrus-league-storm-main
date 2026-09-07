@@ -10,7 +10,7 @@ const DEFAULT_LINKS: NavLink[] = [
   { label: 'Pickem', to: '/pool/pickem' },
   { label: 'Brackets', to: '/nhl/playoffs' },
   { label: 'Stormy', to: '/gm-office/stormy' },
-  { label: 'Pricing', to: '/pricing' },
+  { label: 'Free to play', to: '/pricing' },
 ];
 
 /**

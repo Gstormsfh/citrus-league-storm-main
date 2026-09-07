@@ -2,9 +2,11 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import HockeyPlayerCard, { HockeyPlayer } from "./HockeyPlayerCard";
+import { irSlotIds } from './irSlots';
 import { Plus, AlertCircle } from "lucide-react";
 
 interface IRSlotProps {
+  irSlotCount?: number;
   players: HockeyPlayer[];
   slotAssignments?: Record<string | number, string>; // Map of Player ID -> Slot ID
   onPlayerClick?: (player: HockeyPlayer) => void; // View player detail (name/headshot tap)
@@ -113,18 +115,14 @@ const IndividualIRSlot = ({
   );
 };
 
-const IRSlot = ({ players, slotAssignments = {}, onPlayerClick, onPlayerTap, className, lockedPlayerIds = new Set(), tapSelectedPlayerId = null, tapEligibleSlots = new Set(), onSlotTap }: IRSlotProps) => {
+const IRSlot = ({ irSlotCount = 3, players, slotAssignments = {}, onPlayerClick, onPlayerTap, className, lockedPlayerIds = new Set(), tapSelectedPlayerId = null, tapEligibleSlots = new Set(), onSlotTap }: IRSlotProps) => {
   const getPlayerInSlot = (slotId: string) => {
     const playerId = Object.keys(slotAssignments).find(key => slotAssignments[key] === slotId);
     if (!playerId) return undefined;
     return players.find(p => String(p.id) === String(playerId));
   };
 
-  const irSlots = [
-    { id: 'ir-slot-1', number: 1 },
-    { id: 'ir-slot-2', number: 2 },
-    { id: 'ir-slot-3', number: 3 },
-  ];
+  const irSlots = irSlotIds(irSlotCount).map((id, index) => ({ id, number: index + 1 }));
 
   const filledSlots = irSlots.filter(slot => getPlayerInSlot(slot.id)).length;
 
@@ -135,7 +133,7 @@ const IRSlot = ({ players, slotAssignments = {}, onPlayerClick, onPlayerTap, cla
           <AlertCircle className="h-5 w-5 text-red-500" />
           Injured Reserve
           <Badge variant="outline" className="ml-2 text-xs">
-            {filledSlots}/3
+            {filledSlots}/{irSlots.length}
           </Badge>
         </h2>
       </div>

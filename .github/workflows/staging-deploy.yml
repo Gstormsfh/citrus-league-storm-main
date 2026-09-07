@@ -5,7 +5,7 @@ on:
     branches:
       - staging
       - staging-setup   # bootstrap: allow this branch until `staging` exists; remove after cutover
-  workflow_dispatch: {}
+  workflow_dispatch:
 
 concurrency:
   group: staging-deploy
@@ -31,7 +31,7 @@ jobs:
       - run: npm ci
 
       - name: Type check (web)
-        run: cd apps/web && npx tsc --noEmit -p tsconfig.app.json || echo "::warning::TypeScript found type errors — tracked for strict mode migration"
+        run: cd apps/web && npx tsc --noEmit -p tsconfig.app.json
 
       - name: Type check (server)
         run: cd server && npx tsc --noEmit
@@ -104,6 +104,9 @@ jobs:
         if: steps.check-gcp.outputs.has_creds == 'true'
         uses: google-github-actions/setup-gcloud@v2
 
+      # An authorized operator provisions Apple secrets separately using
+      # scripts/ops/configure-staging-apple-secrets.py. The deployment account
+      # deliberately has no permission to read or administer secret values.
       - name: Configure Docker for Artifact Registry
         if: steps.check-gcp.outputs.has_creds == 'true'
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
@@ -131,6 +134,9 @@ jobs:
             SUPABASE_URL=SUPABASE_URL:latest
             SUPABASE_ANON_KEY=SUPABASE_ANON_KEY:latest
             SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest
+            APPLE_CLIENT_ID=APPLE_CLIENT_ID:latest
+            APPLE_CLIENT_SECRET=APPLE_CLIENT_SECRET:latest
+            APPLE_TOKEN_ENCRYPTION_KEY=APPLE_TOKEN_ENCRYPTION_KEY:latest
           env_vars: |
             NODE_ENV=production
             DEPLOYMENT_ENV=staging
@@ -160,7 +166,8 @@ jobs:
             if [ "$status" = "200" ]; then
               echo "✓ Staging API health check passed (HTTP $status)"
             else
-              echo "::warning::Staging API health check returned HTTP $status"
+              echo "::error::Staging API health check returned HTTP $status"
+              exit 1
             fi
           fi
 
@@ -190,7 +197,8 @@ jobs:
             echo "has_creds=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_creds=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping staging Firebase deploy — STAGING_FIREBASE_SERVICE_ACCOUNT not configured"
+            echo "::error::STAGING_FIREBASE_SERVICE_ACCOUNT not configured"
+            exit 1
           fi
         env:
           FIREBASE_SA: ${{ secrets.STAGING_FIREBASE_SERVICE_ACCOUNT }}
@@ -213,7 +221,8 @@ jobs:
           if [ "$status" = "200" ]; then
             echo "✓ Staging health check passed (HTTP $status)"
           else
-            echo "::warning::Staging health check returned HTTP $status — verify manually"
+            echo "::error::Staging health check returned HTTP $status"
+            exit 1
           fi
 
   # ── Notify ────────────────────────────────────────────────────────
