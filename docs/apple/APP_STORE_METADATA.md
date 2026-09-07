@@ -8,7 +8,7 @@ The fields below record preparation and saved Connect values. Use [the current g
 - Subtitle: `Fresh-squeezed fantasy hockey`
 - Primary category: Sports
 - Bundle ID: `com.citrussports.app`
-- Version: 1.0. Build 12 uploaded successfully; build 13 is being prepared. Use the gate tracker for final candidate status.
+- Version: 1.0. Build 13 uploaded successfully; processing and attachment require verification. Use the gate tracker for final candidate status.
 - Price: free ($0 USD), saved.
 - Availability: Canada and United States only, saved.
 - Release: manual, saved. Mac and Vision Pro availability disabled.
