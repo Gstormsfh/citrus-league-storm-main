@@ -854,6 +854,25 @@ const LeagueDashboard = () => {
     },
     staleTime: 60_000,
   });
+  // A completed league does not necessarily have a saved draft board. The
+  // reviewer league, for example, was populated directly into rosters and has
+  // no draft_events or pick projection to render. Linking every completed
+  // league to DraftRoomV2 left those leagues on an endless "Loading final
+  // board" screen. The existing era endpoint is the authoritative, cheap
+  // signal that durable v2 draft history exists.
+  const draftHistoryQuery = useQuery({
+    queryKey: ['league-draft-history-available', leagueId],
+    enabled: !!leagueId && league?.draft_status === 'completed',
+    queryFn: async () => {
+      const { apiClient } = await import('@/api/client');
+      const response = await apiClient.get<{ v2Era?: boolean }>(
+        `/api/draft/v2/league/${encodeURIComponent(leagueId!)}/era`,
+      );
+      const payload = response.data ?? (response as unknown as { v2Era?: boolean });
+      return payload.v2Era === true;
+    },
+    staleTime: 60_000,
+  });
   const standingsStat = useMemo(
     () => (standingsQuery.data && userTeam ? standingsLine(standingsQuery.data, userTeam.id) : null),
     [standingsQuery.data, userTeam],
@@ -1015,7 +1034,7 @@ const LeagueDashboard = () => {
               stat: userTeam ? (myRosterCount !== null && myRosterCount > 0 ? `${myRosterCount} players` : userTeam.team_name) : null,
             },
             { title: 'GM office', to: '/gm-office', Icon: Briefcase },
-            ...(league.draft_status === 'completed'
+            ...(league.draft_status === 'completed' && draftHistoryQuery.data === true
               ? [{
                   title: 'Draft results',
                   to: `/draft-v2/${leagueId}`,
@@ -2461,4 +2480,3 @@ const LeagueDashboard = () => {
 };
 
 export default LeagueDashboard;
-

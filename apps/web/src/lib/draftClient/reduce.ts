@@ -579,6 +579,20 @@ function handleSnapshotFetchFailed(
   event: Extract<DraftClientEvent, { type: 'snapshot_fetch_failed' }>,
   randomFn: RandomFn,
 ): ReduceResult {
+  // A completed draft has no live socket to reconnect to. Retrying the normal
+  // resync cycle is therefore impossible, and ignoring this event strands the
+  // room forever on "Loading final board…". Fail visibly so direct links and
+  // stale bookmarks always offer a route back to the league dashboard.
+  if (state.kind === 'terminal_completed') {
+    return {
+      state: {
+        kind: 'fatal',
+        reason: 'invalid_lobby',
+        errorMessage: event.error,
+      },
+      sideEffects: [],
+    };
+  }
   if (state.kind !== 'snapshot_required') {
     return noTransition(state);
   }
