@@ -2,6 +2,28 @@
 
 Updated September 7: the user returned and authorized completing the remaining checks and then submitting for App Review. This supersedes the previous preparation-only instruction. Submission remains dependent on closing the recorded gates; manual release remains selected, and unfinished Game Day remains excluded.
 
+## Current gate status — September 7, 09:23 MDT
+
+This table supersedes earlier intermediate statuses below.
+
+| Gate | Verified status / remaining action |
+| --- | --- |
+| Build and listing | Build 13 validated and attached; four iPhone and three iPad screenshots uploaded; reviewer fields saved; manual release selected. Not submitted. |
+| Production alignment | Production subsequently deployed `d6f5b041`, `6f1e95e1` and analytics-access hardening `43425e3a` successfully (runs 34086339562, 34087418445 and 34137910847). Diff since build 13's merged source changes server goalie goals-against selection, SQL-output monitoring/operations and database permissions only; no app/native/shared-package changes. Build 13 remains the candidate. |
+| Apple sign-in and consent | Production Apple sign-in reached the account page. Refresh confirmed both current policies accepted September 7. Backend confirms an encrypted Apple cleanup token exists for `garrettstorms@hotmail.com`; no token contents were read. That identity predates this test and is the user's personal Apple identity, so it was preserved and no deletion/revocation is claimed. A genuinely disposable Apple-linked Citrus account is still required for the destructive proof. |
+| TestFlight access | Build 13 is Waiting for TestFlight Beta App Review. The internal group still lists one tester and one build, while its tester row shows No Builds Available. No installation is claimed. The public version separately remains Prepare for Submission with Add for Review available and manual release selected. |
+| Engine and push | Daylight approval was granted for run 34059704526 after read-only checks confirmed zero live drafts, zero scheduled in 24 hours and no freeze blockers. The deploy then failed at the first VM read because `citrus-deploy` lacks `compute.instances.get`; the last-look and all mutation steps were skipped, leaving production untouched. Grant the documented `citrusEngineDeployer` custom role plus `roles/logging.viewer`, then re-run and verify fingerprint, a fresh disposable auction and distribution push/tap. |
+| Database security | Production internal analytics views and their source tables no longer grant `anon` or `authenticated` access; `service_role` read access is preserved. Supabase security-advisor errors fell from three to zero. PR 418 merged as `43425e3a`; all PR CI, RLS and production deployment checks passed. The remaining 162 advisor notices are 96 warnings and 66 informational findings and were not represented as resolved. |
+| Physical release testing | TestFlight install, Apple native sign-in/deletion and remaining device journeys still required. Browser OAuth evidence is not native TestFlight evidence. |
+| Content and operations | Third-party content-rights basis and moderation backup/response coverage remain unresolved. |
+
+Focused application recheck at 09:00 MDT: 19 web tests passed across Apple-token retention, push registration/sign-out, account-deleted routing, content-report moderation and notification account switching. Forty-one server tests passed across Apple revocation/token validation, APNs delivery and notification services. Latest master CI runs for `d6f5b041` and `6f1e95e1` are green.
+
+Dependency audit at 09:23 MDT found no moderate, high or critical issue in the production dependency tree. The remaining low-severity item is an `esbuild` development-server issue on Windows reached through build/test tooling; it is not packaged into the iOS application or production server runtime. The full development-tool tree separately contains upgrade advisories and is tracked as maintenance rather than represented as an App Store runtime gate.
+
+PR 418 production run [34137910847](https://github.com/Gstormsfh/citrus-league-storm-main/actions/runs/34137910847) passed the draft-freeze guard, builds, web/server suites, type checks, high/critical audit and bundle check. It deployed serving API revision `citrus-api-00269-x5r`, whose image digest matched the expected commit and whose health check returned HTTP 200. Firebase Hosting version `bc5451b4a896fce2` deployed and the public-site health check also returned HTTP 200. Data Invariants run 34137910751 and post-merge CI run 34137910856 passed.
+
+
 Return check at 02:04 MDT: iPhone is available/paired; Chrome App Store Connect requires sign-in. Engine run 34059704526 still awaits reviewer approval, and its final daylight recheck blocks deployment before 07:00 MDT. Do not approve an old preflight as a way around that recheck.
 
 ## Corrections since build 12
