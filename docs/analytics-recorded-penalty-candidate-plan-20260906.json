@@ -1,0 +1,367 @@
+{
+  "contract": "citrus-recorded-penalty-candidate-v1:plan",
+  "declared_at": "2026-09-06T19:42:19Z",
+  "stage": "pre-fit-plan-implementation-and-independent-review-required",
+  "publishable": false,
+  "automatic_acceptance": false,
+  "historical_as_of_verified": false,
+  "hypothesis": "Strict-prefix recorded penalty context may explain variation beyond the preserved movement inputs. This tests recorded annotation information, not active penalties, power-play age, penalty time remaining, or fatigue.",
+  "selection_history": "Declared after inspecting earlier development, movement, zone, strength-partition and conditional-calibration experiments and penalty availability. This is adaptive development, not preregistration before prior inspection, an untouched test, or prospective evidence.",
+  "primary": "recorded_penalty_conditional_shape",
+  "outputs": [
+    "recorded_penalty_raw",
+    "recorded_penalty_conditional_shape",
+    "frozen_conditional_shape",
+    "frozen_monotone_group"
+  ],
+  "controls": {
+    "frozen_conditional_shape": {
+      "directory": "scripts/proof/results/official-conditional-shape-20260906-full",
+      "health_sha256": "0e395d181d810d1c616a3787633d778c9c0b75e76844304f45001663944f19c7",
+      "prediction_key": "conditional_shape"
+    },
+    "frozen_monotone_group": {
+      "directory": "scripts/proof/results/official-conditional-shape-20260906-full",
+      "health_sha256": "0e395d181d810d1c616a3787633d778c9c0b75e76844304f45001663944f19c7",
+      "prediction_key": "frozen_monotone_group",
+      "meaning": "Frozen neutral original shape control retained in the conditional run; not production."
+    }
+  },
+  "source": {
+    "movement_reuse_module": "data-pipeline/projections/verified_movement_reuse_v2.py",
+    "movement_reuse_sha256": "0bc8a642fb7edc9e1fab58ee91c56cbb5bce5dfcf345eba110f2402ab1f522cc",
+    "fast_proof": {
+      "path": "scripts/proof/results/verified-movement-reuse-v2-fast-20260906/health.json",
+      "sha256": "2ada9b942badd8f3e5d03da8028a6e4949628cec592f9225f27a9c1ec20e9930",
+      "report_sha256": "0979a44988b6dbfa7502b4b6e70d0d664b70a97ec766c6ae4669d8ac83178bf8"
+    },
+    "fast_slow_gate": "Before fitting, require a complete nonpublishable verified-movement-reuse-v2 slow/fast comparison with opposite_mode_equivalent true, identical schema/config, all fold row/group/cohort hashes and ordered memberships, and bound code/runtime. Pin both proof health/report digests and comparison receipt in the create-only attempt declaration. Fast report alone is insufficient; never silently fall back to unverified rows.",
+    "penalty_directory": "scripts/proof/results/penalty-full-coverage-20260906-development",
+    "penalty_health_sha256": "69046750d2bcdd8383dc8ac0ba1a1f9de84b82b7c750de5a53726c31dbce732a",
+    "penalty_expected_status": "complete-full-penalty-coverage-not-model-acceptance",
+    "penalty_files_sha256": {
+      "declaration.json": "9fa1cd25aabf8899b430f360233f160e5e0e39eee7d49e68e6414804c522e874",
+      "vectors.jsonl": "23bd74ddc0f8ddc2bf0ef47153d2f1d22a6047f4c3913738b8402fad4c27ed63",
+      "result.json": "f687262dfcb477515155af1c1fe68b45c3705700397d67f377ab900089956e35"
+    },
+    "annotation_contract": "citrus-recorded-penalty-context-v1",
+    "annotation_scope": "latest_recorded_penalty_in_current_period_not_active_state",
+    "annotation_module_sha256": "34b2757063167b2b78b279ec50a5f2bb8f2511e4e927daea231968d83811ecf6",
+    "integrity_gates": [
+      "Strict duplicate-key/nonfinite JSON rejection, bounded streaming lines and records, exact health inventory and all source/declaration/body hashes before and after consumption.",
+      "Each vectors.jsonl record has exactly game_id,event_id,annotation; validate exact annotation and channel fields/types, version, scope, publishable false, bounded positive game and nonnegative event identities.",
+      "Require unique global game/event keys and exact entire certified development population, counts and ordered-event-key digest; reject extras, missing records, duplicate IDs or conflicting rows.",
+      "Join only by game_id,event_id; preserve original ordered row vectors, categorical fields, labels, source/feature hashes and all group/cohort memberships. Do not zip by position, approximate location, player ID or clock.",
+      "Recompute augmented schema/feature hashes separately without overwriting original hashes; content-seal augmented rows and reverify original VerifiedFeatures before and after fitting.",
+      "Retain full annotation rows and IDs as audit evidence only. No new network/DB sources or historical-as-of claims."
+    ]
+  },
+  "features": {
+    "base_schema": {
+      "categorical_names": [
+        "shot_type",
+        "previous_event_type"
+      ],
+      "names": [
+        "distance_to_goal_ft",
+        "signed_angle_deg",
+        "shooting_skaters",
+        "defending_skaters",
+        "shooting_empty_net",
+        "defending_empty_net",
+        "skater_advantage",
+        "score_differential_pre_shot",
+        "seconds_since_immediate_event",
+        "distance_from_immediate_event_ft",
+        "event_location_change_ft_per_second",
+        "x_attacking",
+        "y_attacking",
+        "previous_x_in_shooting_frame_ft",
+        "previous_y_in_shooting_frame_ft",
+        "immediate_previous_event_same_team",
+        "immediate_previous_sog_same_team",
+        "prior_sog_angle_change_deg",
+        "prior_sog_angular_rate_deg_per_second",
+        "seconds_since_recorded_faceoff",
+        "shooting_is_home",
+        "period_number",
+        "seconds_into_period",
+        "immediate_recorded_live_event__event_elapsed_seconds",
+        "immediate_recorded_live_event__event_displacement_ft",
+        "immediate_recorded_live_event__event_lateral_displacement_ft",
+        "immediate_recorded_live_event__event_longitudinal_displacement_ft",
+        "immediate_recorded_live_event__prior_event_distance_to_net_ft",
+        "immediate_recorded_live_event__event_angle_change_deg",
+        "immediate_recorded_live_event__event_angular_rate_deg_per_second",
+        "immediate_recorded_live_event__event_lateral_rate_ft_per_second",
+        "immediate_recorded_live_event__event_crossed_centerline",
+        "immediate_recorded_live_event__legacy_style_immediacy",
+        "immediate_recorded_live_event__legacy_style_movement",
+        "immediate_recorded_live_event__same_team_indicator",
+        "prior_same_team_unblocked_attempt__event_elapsed_seconds",
+        "prior_same_team_unblocked_attempt__event_displacement_ft",
+        "prior_same_team_unblocked_attempt__event_lateral_displacement_ft",
+        "prior_same_team_unblocked_attempt__event_longitudinal_displacement_ft",
+        "prior_same_team_unblocked_attempt__prior_event_distance_to_net_ft",
+        "prior_same_team_unblocked_attempt__event_angle_change_deg",
+        "prior_same_team_unblocked_attempt__event_angular_rate_deg_per_second",
+        "prior_same_team_unblocked_attempt__event_lateral_rate_ft_per_second",
+        "prior_same_team_unblocked_attempt__event_crossed_centerline",
+        "prior_same_team_unblocked_attempt__legacy_style_immediacy",
+        "prior_same_team_unblocked_attempt__legacy_style_movement",
+        "prior_same_team_unblocked_attempt__same_team_indicator"
+      ],
+      "version": "citrus-matched-pre-shot-movement-v1"
+    },
+    "base_fit_receipt": {
+      "path": "scripts/proof/results/official-conditional-shape-20260906-full/fold1/fit-receipt.json",
+      "sha256": "fec56a5a46381509aabcbfdc1907b57a02f7423a68912ffb16ea7ade4003c5b8"
+    },
+    "candidate_schema_version": "citrus-matched-recorded-penalty-context-v1",
+    "preservation": "All 47 original movement numeric names and both categorical names remain in exact original order and in the fitted enhanced view, not merely retained in an audit.",
+    "append_numeric": [
+      {
+        "name": "recorded_penalty_same_team__age_seconds",
+        "source": "annotation.same_team.seconds_since_recorded_penalty_event",
+        "unit": "seconds",
+        "range": [
+          0,
+          1200
+        ]
+      },
+      {
+        "name": "recorded_penalty_same_team__duration_minutes",
+        "source": "annotation.same_team.recorded_duration_minutes",
+        "unit": "recorded minutes",
+        "range": [
+          0,
+          60
+        ]
+      },
+      {
+        "name": "recorded_penalty_opponent__age_seconds",
+        "source": "annotation.opponent.seconds_since_recorded_penalty_event",
+        "unit": "seconds",
+        "range": [
+          0,
+          1200
+        ]
+      },
+      {
+        "name": "recorded_penalty_opponent__duration_minutes",
+        "source": "annotation.opponent.recorded_duration_minutes",
+        "unit": "recorded minutes",
+        "range": [
+          0,
+          60
+        ]
+      }
+    ],
+    "append_categorical": [
+      {
+        "name": "recorded_penalty_same_team__type",
+        "source": "annotation.same_team.recorded_type_code",
+        "allowed": [
+          null,
+          "MIN",
+          "MAJ",
+          "BEN",
+          "MIS",
+          "GAM",
+          "PS"
+        ]
+      },
+      {
+        "name": "recorded_penalty_same_team__annotation_state",
+        "source": "annotation.same_team",
+        "rule": "If status unavailable, concatenate 'unavailable:' + exact reason. If recorded_annotation, concatenate 'recorded:type_' + ('known' if recorded_type_code is not null else 'missing') + ':duration_' + ('known' if recorded_duration_minutes is not null else 'missing'). Require availability reason/value consistency; unknown status/reason is fatal, not an OTHER category."
+      },
+      {
+        "name": "recorded_penalty_opponent__type",
+        "source": "annotation.opponent.recorded_type_code",
+        "allowed": [
+          null,
+          "MIN",
+          "MAJ",
+          "BEN",
+          "MIS",
+          "GAM",
+          "PS"
+        ]
+      },
+      {
+        "name": "recorded_penalty_opponent__annotation_state",
+        "source": "annotation.opponent",
+        "rule": "If status unavailable, concatenate 'unavailable:' + exact reason. If recorded_annotation, concatenate 'recorded:type_' + ('known' if recorded_type_code is not null else 'missing') + ':duration_' + ('known' if recorded_duration_minutes is not null else 'missing'). Require availability reason/value consistency; unknown status/reason is fatal, not an OTHER category."
+      }
+    ],
+    "unavailable_reasons": [
+      "no_recorded_penalty_in_current_period",
+      "shootout_scope_unsupported",
+      "unknown_current_event_owner",
+      "unattributed_recorded_penalty",
+      "unknown_event_boundary"
+    ],
+    "recorded_missing_reasons": {
+      "type": "missing_or_unknown_recorded_type",
+      "duration": "missing_or_invalid_recorded_duration"
+    },
+    "unknown_policy": "Unavailable channel requires null prior event/team/type/duration/age and each availability reason equal to channel reason. Recorded channel has positive team, nonnegative prior event, finite age, null channel reason; null type/duration has exactly its declared missing reason; observed values have null availability reasons. True zero is observed, never unknown. Null type remains categorical missing, not a invented penalty type.",
+    "forbidden_features": [
+      "game_id",
+      "event_id",
+      "prior_event_id",
+      "penalty_team_id",
+      "label",
+      "current goal/scorer/assists",
+      "future penalties",
+      "penalty expiry/countdown",
+      "active penalty flag",
+      "true PP age",
+      "cross-period inferred age"
+    ],
+    "no_feature_search": "Exactly this additive family; no outcome-selected type filtering, age bins/windows, interactions, category merging, numeric transforms, missingness pruning or added identity features."
+  },
+  "fold_windows": {
+    "fold1": {
+      "train": {
+        "start": "2019-07-01",
+        "end": "2021-06-30"
+      },
+      "calibration": {
+        "start": "2021-07-01",
+        "end": "2022-06-30"
+      },
+      "validation": {
+        "start": "2022-07-01",
+        "end": "2023-06-30"
+      }
+    },
+    "fold2": {
+      "train": {
+        "start": "2019-07-01",
+        "end": "2022-06-30"
+      },
+      "calibration": {
+        "start": "2022-07-01",
+        "end": "2023-06-30"
+      },
+      "validation": {
+        "start": "2023-07-01",
+        "end": "2024-06-30"
+      }
+    }
+  },
+  "fit": {
+    "raw_architecture": "sklearn 1.5.2 HistGradientBoostingClassifier binary numeric-tree enhanced context, fixed original architecture",
+    "context": {
+      "early_stopping": false,
+      "l2_regularization": 10,
+      "learning_rate": 0.05,
+      "max_iter": 200,
+      "max_leaf_nodes": 15,
+      "min_samples_leaf": 100
+    },
+    "seed": 60906,
+    "threads": 1,
+    "preprocessing": "Train split only: original development median policy, explicit numeric missing indicators, sorted training-only categorical vocabulary with distinct missing/unseen indicators. Preserve original base transform values; append only new columns. Never fit on calibration/validation or inference batches.",
+    "calibrator_module": "data-pipeline/projections/conditional_calibration_shape.py",
+    "calibrator_sha256": "a53b0b8f4667d00f50f9b1b232991c21486d622ad26b0c7a21b7d1b5bc697ad6",
+    "calibrator_settings": {
+      "absent_context_policy": "shared_slopes_zero_unseen_offsets",
+      "adjacent_slope_ridge": 100,
+      "epsilon": 0.000001,
+      "ftol": 1e-12,
+      "group_ridge": 100,
+      "gtol": 1e-8,
+      "knots": [
+        0.000001,
+        0.005,
+        0.01,
+        0.025,
+        0.05,
+        0.1,
+        0.2,
+        0.35,
+        0.5,
+        0.75,
+        0.95,
+        0.999999
+      ],
+      "max_cells": 32000000,
+      "max_rows": 1000000,
+      "maxiter": 3000,
+      "optimizer": "L-BFGS-B",
+      "pooling_ridge": 1000,
+      "projected_gradient_tolerance": 0.00001,
+      "reference_probability": 0.1,
+      "slope_context": "prior_sog_same_team",
+      "slope_identity_ridge": 100,
+      "threads": 1
+    },
+    "calibration": "Fit conditional_shape on this candidate's earlier calibration predictions only. Context remains prior_sog_same_team with original shot_type and strength offset fields; do not add penalty fields to calibration context or change knots/ridges/optimizer.",
+    "no_search": "One declared candidate per fold; no hyperparameter sweep, early stopping, fitted specialist, post-validation correction or fallback winner. Keep every failure."
+  },
+  "resource_gate": {
+    "raise_bounds": false,
+    "development": {
+      "numeric_features": 64,
+      "categorical_features": 8,
+      "categories_per_field": 256,
+      "rows_per_fold": 1000000,
+      "design_cells_per_fold": 100000000
+    },
+    "portable": {
+      "features": 1024,
+      "trees": 256,
+      "nodes_per_tree": 511,
+      "rows": 1000000,
+      "design_cells": 32000000
+    },
+    "conditional": {
+      "max_rows": 1000000,
+      "max_cells": 32000000
+    },
+    "rule": "Run unchanged original preflight/vocabulary/allocation checks before each fit and inference stage, including summed original geometry/base/enhanced dense-cell bound. Chunk only inference according to existing policy. If any bound fails, preserve a resource-failure receipt; do not raise bounds, drop features/cohorts or silently merge categories. Any revised design needs a new pre-fit plan."
+  },
+  "evaluation": {
+    "membership": "Exactly original fixed train/calibration/validation identities, labels and groups; no dropping unknown penalty channels or unsupported strengths.",
+    "point_guard": "For each of both folds, primary Brier <= each of both frozen mapped controls' Brier AND primary log_loss <= each control's log_loss. No averaging folds or controls; no tolerance to mask a loss increase. Failure of any comparison fails the development point guard.",
+    "scorecard": {
+      "bin_edges": [
+        0,
+        0.01,
+        0.025,
+        0.05,
+        0.1,
+        0.2,
+        0.35,
+        0.5,
+        0.75,
+        1
+      ],
+      "confidence": 0.95,
+      "log_loss_epsilon": 1e-12,
+      "min_events": 100,
+      "min_games": 30,
+      "min_valid_fraction": 0.9,
+      "resamples": 256,
+      "seed": 60906
+    },
+    "uncertainty": "Retain paired whole-game fixed-fit bootstrap differences against BOTH controls using identical seeded game draws, global and original eligible subgroups, original bin edges and original support rules. Report actual intervals/valid draws. They do not account for refitting, adaptive selection or multiplicity and folds are not independent replications.",
+    "diagnostics": "All existing group dimensions unchanged, especially strength including 5v3, prior event, prior same-team SOG, shot type and unknowns. Add separately labelled diagnostic marginal groups for same-team/opponent annotation state and recorded type (None explicit); never replace original groups or select a subgroup winner. Retain all reliability bins, calibration summaries and worst deficits even if point guard passes.",
+    "inference": "Export freshly fitted model as strict JSON only; no pickle/joblib deserialization. Verify original control identity and saved prediction membership; independent JSON raw vs freshly fitted raw within 1e-12. Calibrated independent scalar vs vector atol1e-12 rtol0. Raw JSON batch/single/reversal exact; mapped atol1e-12 rtol0. Report actual maximum errors; duplicate event requests must reject under named bundle API.",
+    "acceptance": "Point guard and numerical parity are development diagnostics only. No automatic model acceptance, original-family parity, publication, production change, FPAR/GAR admission or new prospective-reservation use."
+  },
+  "prefit_required": [
+    "Independent review of new additive flattening, category consistency, immutable joins, canonical schema and all existing resource guards.",
+    "Source/boundary tests: emit-before-current-update, current goal flip, future append, side reversal, unknown penalty owner, missing replacement annotation, same-clock ordering, periods/shootouts. No outcome-dependent category construction.",
+    "Completed reuse-v2 fast/slow equivalence gate and all exact penalty source hashes. Bind new runner/feature code/tests/plan and runtime hashes in create-only run declaration before any fit."
+  ],
+  "limitations": [
+    "Recorded annotation age can exceed its stated duration and remains historical, not active manpower.",
+    "This plan preserves but does not recover true legacy PP-clock semantics, continuous shifts, tracked passes/goalie motion, rink corrections, rebound creation or every original model family.",
+    "Previously inspected development supports adaptive research only; final changed pipeline still requires separately untouched/prospective validation.",
+    "No production, database, restricted dataset, frozen source or existing fitted artifact modifications."
+  ]
+}

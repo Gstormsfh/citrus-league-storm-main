@@ -1,0 +1,82 @@
+{
+  "archives": [
+    {
+      "bytes": 15442747,
+      "complete_membership_verified": true,
+      "every_member_matches_retained_source": true,
+      "extracted_to_filesystem": false,
+      "member_inventory_sha256": "e037f1ea008b0f560ffe1f78879f6b3e01f55e0e69477fde60cdae24a22b89f9",
+      "path": "scripts/proof/results/analytics-adaptive-calibration-checkpoint-20260906-1706/working-tree-source.tar.gz",
+      "regular_bytes": 45253596,
+      "regular_files": 2159,
+      "sha256": "722604f3c73aedb86db12b5143e3631ecd30bc800d1d7fc45f64af88566ced20"
+    },
+    {
+      "bytes": 33412915,
+      "complete_membership_verified": true,
+      "every_member_matches_retained_source": true,
+      "extracted_to_filesystem": false,
+      "member_inventory_sha256": "8498eb6d8409878fe198a3fe4b03ac3f929bb305acba60777bbe3a8e4e46634d",
+      "path": "scripts/proof/results/analytics-adaptive-calibration-checkpoint-20260906-1706/evidence.tar.gz",
+      "regular_bytes": 455987067,
+      "regular_files": 43,
+      "sha256": "d406dd22b34b15c6d6948c2f096848db4b474597ab343e634a5c8e400fe530fd"
+    }
+  ],
+  "base_git_commit": "094f3f8b4dc11c1da5495534924549f8f068cbe4",
+  "checkpoint_index": {
+    "docs/analytics-adaptive-calibration-index-20260906.json": {
+      "bytes": 4654,
+      "sha256": "1ef3c98eef2b05b382367a97e09da479ed0bd8e9713f364643dbe5ef24509868"
+    }
+  },
+  "contract": "citrus-adaptive-local-byte-checkpoint-v1",
+  "evidence_roots": [
+    "scripts/proof/results/official-prequential-calibration-20260906-1632",
+    "scripts/proof/results/official-selective-calibration-20260906-1651",
+    "scripts/proof/results/prequential-verification-20260906-1630",
+    "scripts/proof/results/selective-verification-20260906-1650"
+  ],
+  "foundation_accepted": false,
+  "fpar_accepted": false,
+  "inventory_files": {
+    "scripts/proof/results/analytics-adaptive-calibration-checkpoint-20260906-1706/evidence-members.json": {
+      "bytes": 8703,
+      "sha256": "28ab5efbb427f68dd5a4d3b204d5b1c813640b4d25494b6a4440d1d37512873d"
+    },
+    "scripts/proof/results/analytics-adaptive-calibration-checkpoint-20260906-1706/working-tree-source-members.json": {
+      "bytes": 353354,
+      "sha256": "c529d0dea73786c1567d5cd39811888f1527809347ebfcac3b247fad9c27e428"
+    }
+  },
+  "legacy_deserialized": false,
+  "limitations": [
+    "Local duplicate only, not off-machine backup or complete runtime reproduction.",
+    "Source archive records current selected working-tree bytes, including uncommitted changes; it is not the bytes of the base Git commit.",
+    "Prior inputs, original source captures and reservations remain separately retained and hash-bound; this evidence archive contains the two new experiment roots and their test roots.",
+    "Preservation and successful execution do not establish model quality or acceptance."
+  ],
+  "model_accepted": false,
+  "new_source_committed": false,
+  "originals_removed": false,
+  "production_changed": false,
+  "publishable": false,
+  "source_additions_from": "docs/analytics-adaptive-calibration-index-20260906.json",
+  "source_kind": "selected-working-tree-byte-snapshot",
+  "source_roots": [
+    "data-pipeline/projections",
+    "data-pipeline/acquisition",
+    "data-pipeline/monitoring",
+    "data-pipeline/models",
+    "data-pipeline/tests",
+    "supabase/migrations",
+    "scripts/proof",
+    "docs",
+    "server/src",
+    "packages/shared/src",
+    "apps/web/src",
+    "DATA_INVENTORY.md"
+  ],
+  "status": "complete-verified-local-duplicate",
+  "verified_at": "2026-09-06T17:06:30.354938+00:00"
+}

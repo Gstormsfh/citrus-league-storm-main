@@ -1,7 +1,15 @@
 # Analytics implementation acceptance record
 
+Latest local evidence checkpoint (2026-09-07):
+[current xG reference and unresolved gates](analytics-current-xg-checkpoint-20260907.md).
+This additive checkpoint reconciles later experiments and exact candidate replay;
+it does not close the foundation, production or FPAR gates below. Earlier dated
+results remain historical evidence rather than current reference rankings.
+
 Priority: foundation → metric validation → benchmarked quality → fantasy extensions.
-Status: foundation NOT accepted. Local work only; no production rollout authorized.
+Status: foundation NOT accepted. The user now authorizes accuracy-improving
+production work (2026-09-06), but quality, integration and rollback gates still
+apply. Current experiments remain local and non-serving; no rollout has occurred.
 
 | Gate | Source → writer → consumer | Acceptance evidence | Current state |
 |---|---|---|---|
@@ -19,6 +27,102 @@ Status: foundation NOT accepted. Local work only; no production rollout authoriz
 | Fantasy and database integration | ScoringCalculator + feasible roster/waiver state → versioned outputs | League/horizon/eligibility, joint allocation, non-additive move value separate, RLS | Deferred until earlier gates pass |
 
 ## Current local verification (2026-09-06)
+
+### Original input parity and event-memory result
+
+[Conditional calibration](analytics-conditional-shape-result-20260906.md) now
+passes the declared both-loss/both-control/both-fold development point guard,
+independently recomputed. Improvements versus movement are small; second-fold
+paired intervals versus neutral cross zero. Reused-development selection and
+unfinished parity/serving/prospective gates prevent acceptance or deployment.
+
+[Retained on-ice source recovery](analytics-pl-onice-pilot-result-20260906.md)
+adds an independently tested parser and a successful bounded retrospective
+membership pilot. This is a new evidence path, not continuous shifts or an
+admitted causal predictor. Its obligations remain visible in coverage ledger v5.
+
+[Corrected movement full replay and matched fit](analytics-movement-result-20260906.md)
+are complete with independent saved-point and sampled source/vector checks.
+Primary improves both fold-1 losses; fold-2 log loss improves but Brier worsens,
+so its declared gate fails. It remains experimental, with missing original
+feature families and downstream gates explicitly retained.
+
+The [completed zone/quality experiment](analytics-zone-context-result-20260906.md) preserves those movement inputs and
+adds original-style prior-attempt zone measurements. Its plan is
+`analytics-zone-context-plan-20260906.json`; both the original neutral and frozen
+movement predictions are required controls. Its primary guard fails; independent
+score and sampled source-vector checks are retained. Execution and arithmetic tests are
+not an acceptance waiver. The remaining PP/strength, rink, shift/TOI and
+downstream-family obligations remain separate.
+
+The [full-input recovery checkpoint](analytics-input-recovery-checkpoint-20260906.md)
+adds parallel extraction, serving and downstream-family audits; separate movement,
+history and saved-transform components; and an executable input/source ledger
+checked by the normal pipeline suite. Coverage success is not model acceptance:
+all delivery gates remain explicitly unresolved pending evidence review and
+integration. No original fitted model is silently assigned the new inputs.
+
+The [legacy input audit](analytics-legacy-input-parity-20260906.md) explicitly
+preserves the original pass/movement/timing design and inventories both complete
+shot-record builders and declared v3/v4 training lists. Executed witnesses expose
+crossing-sign loss and downstream angular-speed overwriting; these are not yet
+serving fixes. The newer development baseline is not a feature-complete legacy
+replacement. The [event-memory result](analytics-event-memory-result-20260906.md)
+improves one fold and worsens the other, failing its declared guard. No promotion.
+
+### Public-method applications and real forecast failure boundaries
+
+The [method checkpoint](analytics-method-checkpoint-20260906.md) records a full
+MoneyPuck dictionary study, independent strength and identity experiments, the
+actual nightly withholding correction, and a non-serving ScoringCalculator FPAR
+adapter. MoneyPuck shot files/predictions were not training inputs or targets.
+Strength specialists lose to the retained neutral baseline in both earlier
+development folds. The joint identity primary also fails its declared guard;
+the shooter-only ablation improves both point losses in both folds but is not
+promoted or relabeled neutral xG. The numerical failure and corrected solver
+remain separately frozen. All bins/subgroups/candidates are retained.
+
+Independent JS point/bin and baseline-membership review rehashes 12,951 files.
+It explicitly flags the generic identity scorecard's misleading neutral scope
+label; actor-conditioned probabilities are not a neutral goalie baseline.
+Current full offline Python: 2,009 passed, 16 network deselected. Targeted Python
+206 passed (overlapping); FPAR 29 tests, shared typechecking and two reviewer
+tests pass. None establishes source/as-of, quality, hosted capacity or acceptance.
+
+Daily input and parent orchestration fixes stop unavailable scores/tasks from
+becoming zero forecasts or false-success refreshes. They intentionally withhold
+unverified team exposure and stale-row reuse, so are **not rollout-ready**.
+Production authorization is present, but no deployment/hosted mutation occurred.
+Existing actuals, model artifacts, evidence and original prospective reservations
+remain preserved; current modified engine/runner bytes are distinct from archived
+historical source. FPAR remains gated by real verified physical forecasts.
+
+### Temporal calibration challengers: measured and rejected
+
+The [adaptive calibration result](analytics-adaptive-calibration-result-20260906.md)
+records two completed local challengers on the frozen monotone-logit baseline.
+Both improve Brier and log loss in the first earlier-development fold and worsen
+both in the second, failing their fixed no-regression guard. The conservative
+candidate changes predictions on only two second-fold dates; its small
+regressions are not statistical proof of inferiority, but do not pass the rule.
+Neither is promoted. Global bias reduction has not resolved conditional
+calibration, and no new rebound/sequence metric or FPAR is empirically accepted.
+
+The first run freshly replays source/feature cohorts and saved JSON inference;
+the second composes with that exact evidence. Every daily lagged history and
+intercept optimum is independently audited, with future-label perturbation
+checks. A separate JavaScript review recomputes 312 overall/subgroup cohorts and
+7,020 reliability bins, and rehashes 12,898 bound files. Historical availability
+is simulated, both seasons were already inspected, and paired intervals omit
+cross-date adaptation dependence. This is development evidence, not an untouched
+test or historical-as-of proof.
+
+Latest full offline Python: 1,853 passed, 16 network tests deselected; combined
+targeted tests: 133 passed (overlapping, not additive unique coverage). All 62
+named prior/result/archive pins remain unchanged. New source is hash-frozen and
+uncommitted under the current read-only Git metadata policy. Production, hosted
+databases, serving and original prospective reservations remain unchanged.
+The result's index and additive local archive preserve both rejected candidates.
 
 ### Overnight handoff
 

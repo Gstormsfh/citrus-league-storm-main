@@ -1,0 +1,61 @@
+{
+  "contract": "citrus-independent-adaptive-score-review-v1",
+  "checked_at": "2026-09-06T16:57:56.954Z",
+  "status": "reviewed-two-rejected-development-challengers",
+  "roots": {
+    "scripts/proof/results/official-prequential-calibration-20260906-1632": {
+      "fold1": {
+        "events": 120080,
+        "models": [
+          "frozen_monotone",
+          "rolling60_intercept"
+        ],
+        "subgroups": 77
+      },
+      "fold2": {
+        "events": 121033,
+        "models": [
+          "frozen_monotone",
+          "rolling60_intercept"
+        ],
+        "subgroups": 77
+      }
+    },
+    "scripts/proof/results/official-selective-calibration-20260906-1651": {
+      "fold1": {
+        "events": 120080,
+        "models": [
+          "frozen_monotone",
+          "rolling60_intercept",
+          "selective60_intercept"
+        ],
+        "subgroups": 77
+      },
+      "fold2": {
+        "events": 121033,
+        "models": [
+          "frozen_monotone",
+          "rolling60_intercept",
+          "selective60_intercept"
+        ],
+        "subgroups": 77
+      }
+    }
+  },
+  "cohorts_recomputed": 312,
+  "model_bins_recomputed": 7020,
+  "max_absolute_point_metric_error": 1.0550138540565968e-10,
+  "checked_file_count": 12898,
+  "files": {
+    "scripts/proof/results/official-prequential-calibration-20260906-1632/health.json": "ad51791196ccb4bb35580bf5cba99478895eabfcf2ac2209af5cc08d5a9bc373",
+    "scripts/proof/results/official-prequential-calibration-20260906-1632/result.json": "0e40337c5e0ae2ef34daac268a09b25164a13dbef6addc4422a0783ca9e10f0f",
+    "scripts/proof/results/official-prequential-calibration-20260906-1632/consumed-file-sha256.json": "acac506b3be0a4b7daab2f9169474bea90d48f7d1d3bed9d1df8536b7c811536",
+    "scripts/proof/results/official-selective-calibration-20260906-1651/health.json": "8a7f403fd131c142d2b374df97373a106a8ffe67993d56cdfffe448c666970b7",
+    "scripts/proof/results/official-selective-calibration-20260906-1651/result.json": "37204eca18395088532e6e398df3ba73d24aac55eb105c22f4c4283d87cef568",
+    "scripts/proof/results/official-selective-calibration-20260906-1651/consumed-file-sha256.json": "3fa6d49f60f84485180f2e2042a597a57d38838e4a63d785a8f43171c86f2082"
+  },
+  "review_scope": "Independent JavaScript cohort counts, Brier, clipped log loss, expected goals and every reliability bin; all original subgroup categories; all latest consumed file hashes. Bootstrap intervals and discrimination statistics were not independently recomputed.",
+  "publishable": false,
+  "model_accepted": false,
+  "production_changed": false
+}

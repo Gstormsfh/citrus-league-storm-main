@@ -1,0 +1,9 @@
+# Declared within-band timing shape experiment
+
+Before computing this comparison, freeze one extension of the successful recent-timing adjustment. For each existing timing band fit `sigmoid(z + intercept + slope_delta * (z - training_mean_z))`, where z is the clipped logit of the saved prequential control probability. Use the same preceding 90 calendar days, original-cohort-only fitting, monthly boundaries and minimum 30 attempts/10 games as the reference. Recovered outcomes remain evaluation-only. Unknown/non-timing and insufficient-support rows keep the exact control probability.
+
+Minimize summed Bernoulli negative log likelihood plus `5*(intercept² + slope_delta²)`. Bound intercept to [-10,10] and slope_delta to [-0.75,3], preserving positive within-cell ordering. Center using training logits only. Fixed settings, no search or tuning after results. This nests the reference intercept-only map at slope_delta=0; an earlier-training fit improvement does not guarantee later improvement.
+
+Evaluate identical original/recovered/expanded populations, timing bands and months against the frozen recent-timing reference. Require both original-fold Brier and log loss not to worsen for the point guard. Record reliability bins and subgroup failures; lower overall losses alone do not prove calibration or acceptance. Historical folds are repeatedly inspected development data, not pristine holdouts. No production or FPAR authorization.
+
+Motivation: an intercept-only map cannot correct differences in calibration slope within the timing band. Logistic calibration's separate location and scale parameters are documented in [scikit-learn's primary documentation](https://scikit-learn.org/stable/modules/calibration.html#sigmoid). This is a Citrus-specific, regularized, chronological adaptation, not a claim that sigmoid calibration must work for hockey. Preserve all original movement features, source events and player-finishing artifacts.

@@ -1,0 +1,24 @@
+{
+  "contract": "citrus-matched-pre-shot-movement-v1:plan",
+  "declared_at": "2026-09-06T18:33:52+00:00",
+  "primary": "movement_monotone_group",
+  "baseline": "frozen_monotone_group",
+  "source_plan": "docs/analytics-development-ablation-plan-20260906.json",
+  "freeze_dir": "scripts/proof/results/historical-official-freeze-20260906",
+  "export_dir": "scripts/proof/results/official-development-features-20260906",
+  "feature_definition": "Append 24 numeric features to the unchanged 23 baseline numeric measurements, preserving its categorical inputs. For immediate_recorded_live_event and prior_same_team_unblocked_attempt, append all 11 pre_shot_movement.NAMES in order then same_team_indicator (1 same team, 0 opponent, null no context). Sources and exact semantics are frozen by declaration hashes of pre_shot_history.py and pre_shot_movement.py. No real pass or tracked goalie movement is asserted; legacy-style timing and lateral interactions are explicit comparators.",
+  "fit": "Unchanged fixed HGB architecture and original chronological train/calibration/validation windows. Training-only medians and categories with existing missing indicators; no population filtering or hyperparameter tuning. Fit unchanged sigmoid and monotone_logit_group calibrations on original calibration period only. All-missing training features fail closed.",
+  "evaluation": "Evaluate frozen_monotone_group, movement_raw, movement_sigmoid and movement_monotone_group on identical events, outcomes, groups and bins. Primary must be no worse on BOTH Brier and clipped log loss in EACH development fold. No automatic acceptance or fallback winner selection.",
+  "source_audit": "Replay original frozen sources. Verify old raw and mapped predictions exactly. Sample one selected shot per game for prefix and current-outcome invariance. Preserve every appended event vector and seasonal availability. Export JSON model and compare independent inference for calibration and validation rows within 1e-12.",
+  "limitations": [
+    "Development seasons have been inspected; this is not untouched test evidence or historical-as-of proof.",
+    "Bundled movement family does not establish each individual feature's contribution.",
+    "Recorded event displacement is not a measured pass, possession, puck speed or goalie tracking.",
+    "Game bootstrap intervals keep fitted models fixed and omit adaptive-selection and refit uncertainty.",
+    "Legacy artifact compatibility and serving replacement are not claimed.",
+    "Preserve all original actuals, artifact bytes, failed experiments and prospective reservations; no MoneyPuck data or predictions are used."
+  ],
+  "publishable": false,
+  "automatic_acceptance": false,
+  "historical_as_of_verified": false
+}

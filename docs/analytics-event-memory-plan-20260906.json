@@ -1,0 +1,17 @@
+{
+  "contract": "citrus-recorded-event-memory-v1:plan",
+  "declared_at": "2026-09-06T17:57:48+00:00",
+  "primary": "memory_monotone_group",
+  "baseline": "frozen_monotone_group",
+  "source_plan": "docs/analytics-development-ablation-plan-20260906.json",
+  "freeze_dir": "scripts/proof/results/historical-official-freeze-20260906",
+  "export_dir": "scripts/proof/results/official-development-features-20260906",
+  "feature_definition": "Append eight recorded-event memory measurements to every unchanged eligible baseline row. Ten-second windows include their left endpoint, exclude the current event, and stop at explicit boundaries; unknown events or ownership invalidate count completeness. Last same-team attempt survives only intervening recognized live events. Observed strength-spell age is time since first equal state observation, not adjudicated penalty age or a true transition time.",
+  "fit": "Unchanged fixed HGB architecture and original chronological train/calibration/validation windows. Train-only medians and categories; preserve missing indicators. No rows filtered or hyperparameters tuned. Calibrate new raw predictions using the unchanged sigmoid and monotone_logit_group algorithms on the original calibration period only.",
+  "evaluation": "Keep frozen neutral, new raw, new sigmoid and new monotone-group probabilities on exactly the same outcomes and original subgroups/bins. Primary must be no worse on BOTH Brier and log loss in EACH development fold versus frozen neutral; no automatic acceptance or fallback winner selection.",
+  "source_audit": "Fresh original source replay; preserve exact old raw and calibrated inference; verify source current-goal/outcome changes cannot alter same-event new features, and truncated prefix reproduces same-event features. Save all appended feature vectors and per-season availability.",
+  "limitations": ["Inspected development seasons, not untouched test or historical-as-of proof.", "Bundled event-history ablation does not establish individual feature-family value.", "Recorded-event counts and displacement are not possession, passes, goalie tracking, shifts or power-play reconstruction.", "Game bootstrap intervals hold fits fixed and omit adaptive-selection and model-refit uncertainty.", "All original artifacts, actuals and prospective reservations remain unchanged. No MoneyPuck data or predictions are used."],
+  "publishable": false,
+  "automatic_acceptance": false,
+  "historical_as_of_verified": false
+}

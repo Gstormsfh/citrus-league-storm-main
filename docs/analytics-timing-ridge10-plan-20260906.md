@@ -1,0 +1,9 @@
+# Single weaker timing-penalty experiment
+
+Before fitting, fix timing ridge at 10 instead of 100. No grid search, recency change, new feature, clock rewrite, raw-model refit, dropped event, or production change. Preserve every completed predecessor artifact.
+
+Use exactly the monthly cohorts, raw probabilities, original conditional parameters/penalties, scorecard settings, training-only timing categories, initial fits, earlier-only chronology and numerical tolerances declared in `analytics-timing-candidate-plan-20260906.md` (SHA256 `406084699d40ddfc4b6c735ea6f0cdfd2d5188f131734fde0b85098d8595cb8c`). Only the four extra timing-offset penalties change; the original group ridge remains 100. Use a separate versioned engine and runner.
+
+Primary control is the completed ridge-100 timing candidate, `official-timing-candidate-20260906-full`, health SHA256 `f035ec542fc02d7b91f9ec3f66cd8218c3746bb095f47dc31ace7ebc89e49ed9`. Preserve its predictions exactly, alongside the older fixed and expanding controls. Require candidate Brier and clipped log loss to be no worse than ridge-100 separately in both folds. All months and original subgroup dimensions remain; timing diagnostics stay separate. Retain regressions and all failed attempts. No cross-fold compensation or automatic promotion.
+
+Pin the original candidate plan and completed control before any fitting. Retain exact source closure, plan/code hashes, model/input/prediction receipts, scalar replay and scorecards. Test the changed penalty's analytic gradient and zero-offset equivalence; verify the copied implementation differs statistically only in timing ridge. Both-fold preflight precedes the first fit. A pass remains adaptive retrospective development: neither historical availability nor untouched evaluation is established. Finishing/talent and FPAR gates remain separate.

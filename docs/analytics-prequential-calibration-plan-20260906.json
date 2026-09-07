@@ -1,0 +1,32 @@
+{
+  "contract": "citrus-prequential-intercept-v1:plan",
+  "declared_at": "2026-09-06T16:20:37Z",
+  "purpose": "One fixed challenger for temporal calibration bias; not an unbounded map search.",
+  "baseline": "monotone_logit_group",
+  "candidate": "rolling60_intercept",
+  "settings": {"history_days": 60, "label_lag_days": 2, "min_events": 1000, "min_games": 20, "ridge": 100.0, "max_abs_offset": 1.5, "epsilon": 0.000001, "bisection_iterations": 60, "max_rows": 300000},
+  "prior_shape_review_sha256": "eef47805687e40df9b92c02947672c71a5ec4d4701b3d9b776c77de316b88c3c",
+  "source_policy": "Replay unchanged official development projector for every original calibration and validation game; exact cohort/source/feature membership and raw probabilities required.",
+  "history_policy": "For each target date D use only game dates D-62 < date <= D-2. Fit one intercept shared by all games on D. Seed with the original earlier calibration period; then add only lag-eligible earlier validation labels. Never use same-day or future labels.",
+  "history_insufficient_policy": "Exactly retain frozen baseline when fewer than 1000 events or 20 games.",
+  "fit_policy": "Convex Bernoulli log loss with frozen probability logits as offsets and identity-centered ridge 100; bisection inside [-1.5,1.5]. No slope, context, lookback or ridge search.",
+  "selection_guard": "No worse Brier and log loss in EACH original development fold versus frozen baseline; preserve every subgroup and reliability bin regardless of guard outcome.",
+  "evaluation": "Same original scorecard configuration and eight subgroup dimensions; additionally retain per-calendar-month losses and every daily state/history hash.",
+  "causal_audit": "Perturb all labels on or after a chosen target date; states and probabilities through that target date must remain identical. Independent state reconstruction checks exact lag/window game memberships, hashes and scalar optimum conditions.",
+  "uncertainty": "Existing whole-game paired intervals are descriptive conditional-on-realized-predictions diagnostics only; they do not replay adaptation and omit cross-date training dependence. No acceptance from these intervals.",
+  "research": ["https://proceedings.mlr.press/v108/park20b.html", "https://proceedings.mlr.press/v119/alexandari20a.html"],
+  "research_scope": "These papers motivate distinguishing distribution shifts and checking calibration assumptions. Citrus's supervised lagged intercept simulation is neither their importance-weighting algorithm nor an assumed label-shift correction.",
+  "limitations": [
+    "Adaptive retrospective development on already-inspected seasons, not untouched evaluation.",
+    "Game dates plus two days simulate label availability. Actual historical completion, ingestion and revision timestamps are not verified.",
+    "Base model/map training is unchanged. This challenger uses earlier validation labels by an explicit sequential protocol, not a fixed-model batch holdout protocol.",
+    "Global intercept adaptation cannot by itself resolve conditional probability shape, rink, special-state or subgroup weaknesses.",
+    "No MoneyPuck files, fitted constants or predictions; no legacy pickle/joblib deserialization.",
+    "Original experiments, actuals and all six prospective reservations remain unchanged. A new complete adaptive pipeline needs a separate future reservation.",
+    "No production, hosted database, serving, foundation, FPAR or industry-superiority acceptance."
+  ],
+  "publishable": false,
+  "historical_as_of_verified": false,
+  "untouched_test_claim": false,
+  "automatic_acceptance": false
+}

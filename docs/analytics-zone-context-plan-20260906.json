@@ -1,0 +1,24 @@
+{
+  "contract": "citrus-matched-zone-context-v1:plan",
+  "declared_at": "2026-09-06T18:50:49+00:00",
+  "primary": "zone_monotone_group",
+  "baseline": "frozen_movement_monotone_group",
+  "additional_control": "frozen_monotone_group",
+  "source_plan": "docs/analytics-development-ablation-plan-20260906.json",
+  "freeze_dir": "scripts/proof/results/historical-official-freeze-20260906",
+  "export_dir": "scripts/proof/results/official-development-features-20260906",
+  "feature_definition": "Preserve all 24 corrected movement features plus original23numeric/2categorical. Append only prior_same_team_unblocked_attempt zone family's six numeric measures and one categorical zone. Total53numeric/3categorical. Strict same-team context and 0<elapsed<=3 seconds; two locations require explicit common orientation. No observed pass/tracking claim. New module source and tests pinned before fit.",
+  "fit": "Original fixed HGB architecture, seed, train/calibration/validation memberships, training-only medians/vocabularies, missing indicators and calibration algorithms unchanged. Keep original64 numeric and100million designcell bounds; compute design bound before fit, fail closed, do not raise bounds.",
+  "evaluation": "Keep five prediction columns: original frozen neutral, frozen movement monotone group, zone raw, zone sigmoid, zone monotone group. Primary must be no worse on BOTH Brier and log loss in EACH fold versus BOTH frozen controls. No automatic acceptance or fallback winner selection.",
+  "source_audit": "Replay all baseline sources. Bind movement completed health and all artifact hashes. Reproduce movement raw/mapped validation predictions and original raw/mapped predictions exactly, same targets/groups/events. Verify independent portable JSON calibration/validation inference within1e-12. Sample pergame prefix/currentoutcome invariance; save all feature vectors and numeric availability.",
+  "limitations": [
+    "Previously inspected development data, not untouched test or historical-as-of evidence.",
+    "Zone family implements original-style concepts, not full legacy pass extraction or identical old fitted model.",
+    "Bundled features cannot identify each feature's causal contribution; repeateddevelopment selection is exploratory.",
+    "Bootstrap holds fits fixed; no refit or adaptive-selection uncertainty.",
+    "No production writes, MoneyPuck data/parameters/training, accepted-model claim or prospective reservation changes."
+  ],
+  "publishable": false,
+  "automatic_acceptance": false,
+  "historical_as_of_verified": false
+}

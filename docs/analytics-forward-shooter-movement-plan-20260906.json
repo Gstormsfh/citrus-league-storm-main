@@ -1,0 +1,214 @@
+{
+  "contract": "citrus-forward-shooter-movement-v1:plan",
+  "declared_at": "2026-09-06T21:19:17Z",
+  "publishable": false,
+  "automatic_acceptance": false,
+  "historical_as_of_verified": false,
+  "untouched_test_claim": false,
+  "primary": "shooter",
+  "outputs": [
+    "new_neutral",
+    "global_control",
+    "shooter",
+    "frozen_conditional_shape"
+  ],
+  "controls": [
+    "new_neutral",
+    "global_control",
+    "frozen_conditional_shape"
+  ],
+  "design": "Three-stage forward holdout; not pooled K-fold cross-fitting. Freeze raw movement model/preprocessing trained before original calibration. Fit a new conditional map on the earlier half of calibration games; fit identity effects on the later half; evaluate full original validation.",
+  "source": {
+    "movement_directory": "scripts/proof/results/official-conditional-shape-20260906-full",
+    "movement_health_sha256": "0e395d181d810d1c616a3787633d778c9c0b75e76844304f45001663944f19c7",
+    "identity_directory": "scripts/proof/results/official-identity-probability-v2-20260906-1742",
+    "identity_health_sha256": "cf78050f635442423a32a3ce38ff36e289afb369ff9ecb47e69bdea50d94c6c8",
+    "reuse": "verified_movement_reuse_v2 certified exact replay; recheck source closure and inventories before and after"
+  },
+  "schema": {
+    "categorical_names": [
+      "shot_type",
+      "previous_event_type"
+    ],
+    "names": [
+      "distance_to_goal_ft",
+      "signed_angle_deg",
+      "shooting_skaters",
+      "defending_skaters",
+      "shooting_empty_net",
+      "defending_empty_net",
+      "skater_advantage",
+      "score_differential_pre_shot",
+      "seconds_since_immediate_event",
+      "distance_from_immediate_event_ft",
+      "event_location_change_ft_per_second",
+      "x_attacking",
+      "y_attacking",
+      "previous_x_in_shooting_frame_ft",
+      "previous_y_in_shooting_frame_ft",
+      "immediate_previous_event_same_team",
+      "immediate_previous_sog_same_team",
+      "prior_sog_angle_change_deg",
+      "prior_sog_angular_rate_deg_per_second",
+      "seconds_since_recorded_faceoff",
+      "shooting_is_home",
+      "period_number",
+      "seconds_into_period",
+      "immediate_recorded_live_event__event_elapsed_seconds",
+      "immediate_recorded_live_event__event_displacement_ft",
+      "immediate_recorded_live_event__event_lateral_displacement_ft",
+      "immediate_recorded_live_event__event_longitudinal_displacement_ft",
+      "immediate_recorded_live_event__prior_event_distance_to_net_ft",
+      "immediate_recorded_live_event__event_angle_change_deg",
+      "immediate_recorded_live_event__event_angular_rate_deg_per_second",
+      "immediate_recorded_live_event__event_lateral_rate_ft_per_second",
+      "immediate_recorded_live_event__event_crossed_centerline",
+      "immediate_recorded_live_event__legacy_style_immediacy",
+      "immediate_recorded_live_event__legacy_style_movement",
+      "immediate_recorded_live_event__same_team_indicator",
+      "prior_same_team_unblocked_attempt__event_elapsed_seconds",
+      "prior_same_team_unblocked_attempt__event_displacement_ft",
+      "prior_same_team_unblocked_attempt__event_lateral_displacement_ft",
+      "prior_same_team_unblocked_attempt__event_longitudinal_displacement_ft",
+      "prior_same_team_unblocked_attempt__prior_event_distance_to_net_ft",
+      "prior_same_team_unblocked_attempt__event_angle_change_deg",
+      "prior_same_team_unblocked_attempt__event_angular_rate_deg_per_second",
+      "prior_same_team_unblocked_attempt__event_lateral_rate_ft_per_second",
+      "prior_same_team_unblocked_attempt__event_crossed_centerline",
+      "prior_same_team_unblocked_attempt__legacy_style_immediacy",
+      "prior_same_team_unblocked_attempt__legacy_style_movement",
+      "prior_same_team_unblocked_attempt__same_team_indicator"
+    ],
+    "version": "citrus-matched-pre-shot-movement-v1"
+  },
+  "conditional_settings": {
+    "absent_context_policy": "shared_slopes_zero_unseen_offsets",
+    "adjacent_slope_ridge": 100,
+    "epsilon": 0.000001,
+    "ftol": 1e-12,
+    "group_ridge": 100,
+    "gtol": 1e-8,
+    "knots": [
+      0.000001,
+      0.005,
+      0.01,
+      0.025,
+      0.05,
+      0.1,
+      0.2,
+      0.35,
+      0.5,
+      0.75,
+      0.95,
+      0.999999
+    ],
+    "max_cells": 32000000,
+    "max_rows": 1000000,
+    "maxiter": 3000,
+    "optimizer": "L-BFGS-B",
+    "pooling_ridge": 1000,
+    "projected_gradient_tolerance": 0.00001,
+    "reference_probability": 0.1,
+    "slope_context": "prior_sog_same_team",
+    "slope_identity_ridge": 100,
+    "threads": 1
+  },
+  "identity_settings": {
+    "global_ridge": 100,
+    "shooter_ridge": 25,
+    "goalie_ridge": 100,
+    "coefficient_bound": 1.5,
+    "max_rows": 150000,
+    "max_actors_per_role": 3000,
+    "max_iterations": 1000,
+    "gradient_tolerance": 0.00005
+  },
+  "identity_numerics": {
+    "method": "diagonal-L-BFGS-B+sparse-Newton",
+    "max_refinement_iterations": 20,
+    "max_line_search_steps": 40,
+    "raw_projected_gradient_threshold": 0.00005
+  },
+  "scorecard": {
+    "bin_edges": [
+      0,
+      0.01,
+      0.025,
+      0.05,
+      0.1,
+      0.2,
+      0.35,
+      0.5,
+      0.75,
+      1
+    ],
+    "confidence": 0.95,
+    "log_loss_epsilon": 1e-12,
+    "min_events": 100,
+    "min_games": 30,
+    "min_valid_fraction": 0.9,
+    "resamples": 256,
+    "seed": 60906
+  },
+  "split_rule": "Sort unique calibration games by (game_date, game_id), choose index floor(game_count/2), and assign the entire chosen date and all later dates to identity fitting. Earlier dates only fit the map. No outcome-based changes or repairs.",
+  "expected_splits": {
+    "fold1": {
+      "cutoff_date": "2022-02-01",
+      "earlier_map": {
+        "events": 59101,
+        "games": 690,
+        "start": "2021-07-02",
+        "end": "2022-01-31",
+        "event_keys_sha256": "61a55b47146c98b9620c5f0ad0e6c6f796beb22fa1becb6299bc72d41ece62cc"
+      },
+      "later_identity": {
+        "events": 60815,
+        "games": 693,
+        "start": "2022-02-01",
+        "end": "2022-06-26",
+        "event_keys_sha256": "b8c2deebc2184ce16dac5d7046d6bf011a7080e5bd71ba74ed6bc5d057b55b46"
+      }
+    },
+    "fold2": {
+      "cutoff_date": "2023-01-16",
+      "earlier_map": {
+        "events": 59128,
+        "games": 682,
+        "start": "2022-10-07",
+        "end": "2023-01-15",
+        "event_keys_sha256": "987cc2b1b3d66dc8a17491c4cffea3b525d4d2f73abc8ca606a46b0eb20b7bd7"
+      },
+      "later_identity": {
+        "events": 60952,
+        "games": 696,
+        "start": "2023-01-16",
+        "end": "2023-06-13",
+        "event_keys_sha256": "4a0a589dcaf69bce721af2f70c308e5345112505d5d31707c2572ff5c65d0673"
+      }
+    }
+  },
+  "fit": {
+    "threads": 1,
+    "no_search": true,
+    "raw_model_refit": false,
+    "map_modes": [
+      "conditional_shape"
+    ],
+    "identity_modes": [
+      "global_control",
+      "shooter"
+    ],
+    "no_goalie_effect": true,
+    "preflight": "Check both folds before ANY map/identity fit: exact source and row identities, strict raw preprocessing/train < map < identity < validation dates, whole-game disjointness, both outcomes in map/identity, unchanged resource/vocabulary bounds. No dropping rows or missing actors, no moving split if insufficient support."
+  },
+  "guard": "Each fold: primary shooter Brier <= every control Brier AND primary shooter log loss <= every control log loss. No cross-fold compensation, tolerance or replacing primary. This development guard never authorizes publication.",
+  "inference": "Exact raw validation replay against frozen movement_raw; scalar map parity <=1e-12; independent identity objective/KKT and scalar replay; exact complete bounded prediction outputs; batch/reversal/singleton consistency after canonical sorting. Saved JSON only.",
+  "limitations": [
+    "Adaptive development after inspecting earlier identity and movement outcomes; not a fresh heldout superiority result.",
+    "Full-calibration frozen conditional comparator has more map-fit data than new_neutral; preserve unequal allocation disclosure.",
+    "Current revised source actor annotations do not prove historical-as-of availability.",
+    "Additive shooter log-odds effects are not causal skill, a persistent probability multiplier, or future shot exposure.",
+    "No legacy family discarded; penalty stability remains a separate pending experiment.",
+    "No FPAR/GAR, daily finishing, uncertainty, live serving or production acceptance."
+  ]
+}

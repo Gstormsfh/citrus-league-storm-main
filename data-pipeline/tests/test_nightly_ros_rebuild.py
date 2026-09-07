@@ -125,12 +125,16 @@ def fake_projection_worker(task):
             "season": season, "is_goalie": True, "total_projected_points": 4.7,
             "projected_wins": 0.55, "projected_saves": 26.0, "projected_shutouts": 0.06,
             "projected_goals_against": 2.6, "projected_gp": 1,
+            "projected_gaa": 2.6, "projected_save_pct": .909,
+            "starter_confirmed": False,
             "opponent_abbrev": game_info["opponent_abbrev"],
         }
     return {
         "player_id": player_id, "game_id": game_id, "projection_date": game_date,
         "season": season, "is_goalie": False, "total_projected_points": 1.9,
         "projected_goals": 0.35, "projected_assists": 0.45, "projected_sog": 2.8,
+        "projected_blocks": .6, "projected_ppp": .1, "projected_shp": .01,
+        "projected_hits": 1.1, "projected_pim": .2, "projected_xg": .31,
         "opponent_abbrev": game_info["opponent_abbrev"],
     }
 

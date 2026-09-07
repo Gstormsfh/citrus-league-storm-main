@@ -1,0 +1,337 @@
+{
+  "contract": "citrus-calibration-stability-v1:plan",
+  "declared_at": "2026-09-06T22:16:20Z",
+  "publishable": false,
+  "automatic_acceptance": false,
+  "untouched_test_claim": false,
+  "source": {
+    "directory": "scripts/proof/results/official-forward-shooter-movement-20260906-retry1",
+    "health_sha256": "829119131d856969b5278d1b14d1a711c19b4a5a404b6b932ee40cf29af9fe22",
+    "reuse": "verified_movement_reuse_v2 source closure; only original calibration rows used for predictions/fitting/scoring"
+  },
+  "schema": {
+    "categorical_names": [
+      "shot_type",
+      "previous_event_type"
+    ],
+    "names": [
+      "distance_to_goal_ft",
+      "signed_angle_deg",
+      "shooting_skaters",
+      "defending_skaters",
+      "shooting_empty_net",
+      "defending_empty_net",
+      "skater_advantage",
+      "score_differential_pre_shot",
+      "seconds_since_immediate_event",
+      "distance_from_immediate_event_ft",
+      "event_location_change_ft_per_second",
+      "x_attacking",
+      "y_attacking",
+      "previous_x_in_shooting_frame_ft",
+      "previous_y_in_shooting_frame_ft",
+      "immediate_previous_event_same_team",
+      "immediate_previous_sog_same_team",
+      "prior_sog_angle_change_deg",
+      "prior_sog_angular_rate_deg_per_second",
+      "seconds_since_recorded_faceoff",
+      "shooting_is_home",
+      "period_number",
+      "seconds_into_period",
+      "immediate_recorded_live_event__event_elapsed_seconds",
+      "immediate_recorded_live_event__event_displacement_ft",
+      "immediate_recorded_live_event__event_lateral_displacement_ft",
+      "immediate_recorded_live_event__event_longitudinal_displacement_ft",
+      "immediate_recorded_live_event__prior_event_distance_to_net_ft",
+      "immediate_recorded_live_event__event_angle_change_deg",
+      "immediate_recorded_live_event__event_angular_rate_deg_per_second",
+      "immediate_recorded_live_event__event_lateral_rate_ft_per_second",
+      "immediate_recorded_live_event__event_crossed_centerline",
+      "immediate_recorded_live_event__legacy_style_immediacy",
+      "immediate_recorded_live_event__legacy_style_movement",
+      "immediate_recorded_live_event__same_team_indicator",
+      "prior_same_team_unblocked_attempt__event_elapsed_seconds",
+      "prior_same_team_unblocked_attempt__event_displacement_ft",
+      "prior_same_team_unblocked_attempt__event_lateral_displacement_ft",
+      "prior_same_team_unblocked_attempt__event_longitudinal_displacement_ft",
+      "prior_same_team_unblocked_attempt__prior_event_distance_to_net_ft",
+      "prior_same_team_unblocked_attempt__event_angle_change_deg",
+      "prior_same_team_unblocked_attempt__event_angular_rate_deg_per_second",
+      "prior_same_team_unblocked_attempt__event_lateral_rate_ft_per_second",
+      "prior_same_team_unblocked_attempt__event_crossed_centerline",
+      "prior_same_team_unblocked_attempt__legacy_style_immediacy",
+      "prior_same_team_unblocked_attempt__legacy_style_movement",
+      "prior_same_team_unblocked_attempt__same_team_indicator"
+    ],
+    "version": "citrus-matched-pre-shot-movement-v1"
+  },
+  "conditional_settings": {
+    "absent_context_policy": "shared_slopes_zero_unseen_offsets",
+    "adjacent_slope_ridge": 100,
+    "epsilon": 0.000001,
+    "ftol": 1e-12,
+    "group_ridge": 100,
+    "gtol": 1e-8,
+    "knots": [
+      0.000001,
+      0.005,
+      0.01,
+      0.025,
+      0.05,
+      0.1,
+      0.2,
+      0.35,
+      0.5,
+      0.75,
+      0.95,
+      0.999999
+    ],
+    "max_cells": 32000000,
+    "max_rows": 1000000,
+    "maxiter": 3000,
+    "optimizer": "L-BFGS-B",
+    "pooling_ridge": 1000,
+    "projected_gradient_tolerance": 0.00001,
+    "reference_probability": 0.1,
+    "slope_context": "prior_sog_same_team",
+    "slope_identity_ridge": 100,
+    "threads": 1
+  },
+  "scorecard": {
+    "bin_edges": [
+      0,
+      0.01,
+      0.025,
+      0.05,
+      0.1,
+      0.2,
+      0.35,
+      0.5,
+      0.75,
+      1
+    ],
+    "confidence": 0.95,
+    "log_loss_epsilon": 1e-12,
+    "min_events": 100,
+    "min_games": 30,
+    "min_valid_fraction": 0.9,
+    "resamples": 256,
+    "seed": 60906
+  },
+  "outputs": [
+    "fixed",
+    "expanding"
+  ],
+  "primary": "expanding",
+  "cutoffs": {
+    "fold1": "2022-02-01",
+    "fold2": "2023-01-16"
+  },
+  "blocks": {
+    "fold1": [
+      {
+        "month": "2022-02",
+        "train": {
+          "events": 59101,
+          "games": 690,
+          "start": "2021-07-02",
+          "end": "2022-01-31",
+          "keys_sha256": "1a5c25ec42f1118b130857bac42ad5fa1c8f66c1c97e07de5cee18b1ddf76551"
+        },
+        "test": {
+          "events": 12752,
+          "games": 148,
+          "start": "2022-02-01",
+          "end": "2022-02-28",
+          "keys_sha256": "a07b8e0282ecaa6e21d123c1555ca32d6eb0d828c44e7d9291a717f1ec623d8c"
+        }
+      },
+      {
+        "month": "2022-03",
+        "train": {
+          "events": 71853,
+          "games": 838,
+          "start": "2021-07-02",
+          "end": "2022-02-28",
+          "keys_sha256": "bb58b69fccaad6406641e352d85758f81257b69a8a85ffad2a202389f745e19a"
+        },
+        "test": {
+          "events": 20113,
+          "games": 230,
+          "start": "2022-03-01",
+          "end": "2022-03-31",
+          "keys_sha256": "e4c92f16b8ebb0024dba07728f5766d99cae65d8a227d9acd582aaa098369fff"
+        }
+      },
+      {
+        "month": "2022-04",
+        "train": {
+          "events": 91966,
+          "games": 1068,
+          "start": "2021-07-02",
+          "end": "2022-03-31",
+          "keys_sha256": "40e2eefd39c3cf7ab0a965d8c541e24692c49aa3854b483c09eeb4d687fb6bf5"
+        },
+        "test": {
+          "events": 19652,
+          "games": 226,
+          "start": "2022-04-01",
+          "end": "2022-04-29",
+          "keys_sha256": "0654ae2a9d0ab341fadde47e5828a0c2dcf733dc5f6f6e5ee9d17d1717f2825a"
+        }
+      },
+      {
+        "month": "2022-05",
+        "train": {
+          "events": 111618,
+          "games": 1294,
+          "start": "2021-07-02",
+          "end": "2022-04-29",
+          "keys_sha256": "6ffa4b5ae2456ad5b1f558aa2a77973fa6fad895d0483f7c947a4328c95d26fa"
+        },
+        "test": {
+          "events": 6969,
+          "games": 74,
+          "start": "2022-05-01",
+          "end": "2022-05-31",
+          "keys_sha256": "d62d04bf1ae3fa0f4d39e66173382fde7c168fddb7539b6f9fc04dee5101851b"
+        }
+      },
+      {
+        "month": "2022-06",
+        "train": {
+          "events": 118587,
+          "games": 1368,
+          "start": "2021-07-02",
+          "end": "2022-05-31",
+          "keys_sha256": "ed974f2325ce08cb37d920d40d06cedea921449a12ced4bff9fdd6055d69b788"
+        },
+        "test": {
+          "events": 1329,
+          "games": 15,
+          "start": "2022-06-01",
+          "end": "2022-06-26",
+          "keys_sha256": "6098bec8c31923ef5486f8f71c4eb507decd4490aa56fe142e44f935d86a9d7c"
+        }
+      }
+    ],
+    "fold2": [
+      {
+        "month": "2023-01",
+        "train": {
+          "events": 59128,
+          "games": 682,
+          "start": "2022-10-07",
+          "end": "2023-01-15",
+          "keys_sha256": "e9966d730c07bd0c501139d8916969560e55ad1d82e46874d3dd59b23a648ec1"
+        },
+        "test": {
+          "events": 9474,
+          "games": 107,
+          "start": "2023-01-16",
+          "end": "2023-01-31",
+          "keys_sha256": "df4efe720c6e17a01b1e0fc30edd16b070b78c08ec830fb6c7b859fa3b8ecdd8"
+        }
+      },
+      {
+        "month": "2023-02",
+        "train": {
+          "events": 68602,
+          "games": 789,
+          "start": "2022-10-07",
+          "end": "2023-01-31",
+          "keys_sha256": "5eff8e433a2b5b5dd51133eee3f07b5bcbf7a57c76921bcd0b98d9448b32d23d"
+        },
+        "test": {
+          "events": 14166,
+          "games": 160,
+          "start": "2023-02-01",
+          "end": "2023-02-28",
+          "keys_sha256": "8e1e2c4c12ff1b9a6963844009798eaab359f4a24d9e6e2db6e84c7a77ab3d8f"
+        }
+      },
+      {
+        "month": "2023-03",
+        "train": {
+          "events": 82768,
+          "games": 949,
+          "start": "2022-10-07",
+          "end": "2023-02-28",
+          "keys_sha256": "1d049407a9151cac37d46d7035865a8561a7bdfba6a1054e415263e836055bdd"
+        },
+        "test": {
+          "events": 20130,
+          "games": 234,
+          "start": "2023-03-01",
+          "end": "2023-03-31",
+          "keys_sha256": "d0485e8625c6738c22d03ab5358a6274ae10acca7b64d1e14fc53ea88c96da83"
+        }
+      },
+      {
+        "month": "2023-04",
+        "train": {
+          "events": 102898,
+          "games": 1183,
+          "start": "2022-10-07",
+          "end": "2023-03-31",
+          "keys_sha256": "360a1b1fbade951eac903235233cfad49e00eaabf2a3e071aa8eb206f74387dc"
+        },
+        "test": {
+          "events": 13659,
+          "games": 156,
+          "start": "2023-04-01",
+          "end": "2023-04-30",
+          "keys_sha256": "dd2c05e17124be180d0ef832074823b4700d085d99ed228f5250c44abc0a328c"
+        }
+      },
+      {
+        "month": "2023-05",
+        "train": {
+          "events": 116557,
+          "games": 1339,
+          "start": "2022-10-07",
+          "end": "2023-04-30",
+          "keys_sha256": "0e2d3c8a2b835489b86bfc20d1d68dd92805153ff0135eb933da4627bb86628a"
+        },
+        "test": {
+          "events": 3042,
+          "games": 34,
+          "start": "2023-05-01",
+          "end": "2023-05-29",
+          "keys_sha256": "9a1d34b133732cb5a843d7d84d9c003277354f5aed4aa293414cc70e5f06d7d3"
+        }
+      },
+      {
+        "month": "2023-06",
+        "train": {
+          "events": 119599,
+          "games": 1373,
+          "start": "2022-10-07",
+          "end": "2023-05-29",
+          "keys_sha256": "12464488220faa5a5557f664d0b11628d1455c3cff7f3315e1bd90621054c28f"
+        },
+        "test": {
+          "events": 481,
+          "games": 5,
+          "start": "2023-06-03",
+          "end": "2023-06-13",
+          "keys_sha256": "7008223684f3dd364b22d66037608ce8b7ad2bd62f3e0e533e6b5a78c6b4e4e7"
+        }
+      }
+    ]
+  },
+  "membership_hash": "SHA256 of compact JSON sorted numeric [game_id,event_id] pairs; no dates or outcomes in digest",
+  "design": "Original calibration later-half calendar blocks only, including partial first month. Fixed model is saved earlier-half conditional map; expanding model uses all calibration rows strictly earlier than each test block's first date. First block reuses identical saved map for both outputs; no redundant fit. Never fit raw movement model, shooter effects or global-only adjustment.",
+  "preflight": "Both folds and every planned block before ANY fit: exact source closure and identity/date/outcome joins; model/schema/settings unchanged; planned event/game counts, dates and key hashes exact; each training stage >=100 events and >=30 games and both outcomes; nonempty test stage with sparse periods retained and flagged, not repaired; raw train end earlier than calibration start; training/test game and date disjoint; original numerical/resource bounds. Fail rather than alter the plan.",
+  "inference": "Saved raw model only; fixed calibration probabilities exactly replay prior calibration-identity-inputs. New maps JSON roundtrip and independent scalar parity <=1e-12; complete finite interior output arrays, batch reversal and singleton parity; source and output hashes rechecked after execution.",
+  "guard": "Each fold aggregate over all planned later-half events: expanding Brier <= fixed Brier AND expanding log loss <= fixed log loss, strict point comparison without tolerance. Both folds must pass. Monthly and subgroup results are diagnostics, not selectors. No automatic acceptance even if guard passes.",
+  "limitations": [
+    "Adaptive development motivated by inspected outer validation; this is not an untouched superiority test.",
+    "Earlier fold validation overlaps later fold calibration historically, so these cohorts are not newly blinded. Outcomes may have been seen in previous tasks.",
+    "Integrity verification/reuse may read outer artifact bytes; outer validation rows/outcomes are not inputs to this study's fitting, scoring, or policy selection.",
+    "Rolling expanding history changes support and recency jointly; not a causal separation of those factors.",
+    "Intervals condition on fixed fitted maps and omit fitting, serial dependence beyond games, and model-selection uncertainty.",
+    "No parameter/split search, probability-band tuning, identity adjustment or new data download.",
+    "No neutral-xG replacement, production, daily finishing, uncertainty, GAR or FPAR acceptance."
+  ]
+}

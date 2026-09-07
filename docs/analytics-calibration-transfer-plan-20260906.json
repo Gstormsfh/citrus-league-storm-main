@@ -1,0 +1,500 @@
+{
+  "contract": "citrus-calibration-transfer-v1:plan",
+  "declared_at": "2026-09-06T23:07:51.958Z",
+  "publishable": false,
+  "automatic_acceptance": false,
+  "untouched_test_claim": false,
+  "historical_as_of_verified": false,
+  "source": {
+    "directory": "scripts/proof/results/official-conditional-shape-20260906-full",
+    "health_sha256": "0e395d181d810d1c616a3787633d778c9c0b75e76844304f45001663944f19c7"
+  },
+  "bounded_proof": {
+    "directory": "scripts/proof/results/bounded-conditional-proof-20260906-full",
+    "health_sha256": "a86f40c8d30e1e29081e0369ee136ccb2eabec51618e05f8764120c63c7ae4ed"
+  },
+  "schema": {
+    "categorical_names": [
+      "shot_type",
+      "previous_event_type"
+    ],
+    "names": [
+      "distance_to_goal_ft",
+      "signed_angle_deg",
+      "shooting_skaters",
+      "defending_skaters",
+      "shooting_empty_net",
+      "defending_empty_net",
+      "skater_advantage",
+      "score_differential_pre_shot",
+      "seconds_since_immediate_event",
+      "distance_from_immediate_event_ft",
+      "event_location_change_ft_per_second",
+      "x_attacking",
+      "y_attacking",
+      "previous_x_in_shooting_frame_ft",
+      "previous_y_in_shooting_frame_ft",
+      "immediate_previous_event_same_team",
+      "immediate_previous_sog_same_team",
+      "prior_sog_angle_change_deg",
+      "prior_sog_angular_rate_deg_per_second",
+      "seconds_since_recorded_faceoff",
+      "shooting_is_home",
+      "period_number",
+      "seconds_into_period",
+      "immediate_recorded_live_event__event_elapsed_seconds",
+      "immediate_recorded_live_event__event_displacement_ft",
+      "immediate_recorded_live_event__event_lateral_displacement_ft",
+      "immediate_recorded_live_event__event_longitudinal_displacement_ft",
+      "immediate_recorded_live_event__prior_event_distance_to_net_ft",
+      "immediate_recorded_live_event__event_angle_change_deg",
+      "immediate_recorded_live_event__event_angular_rate_deg_per_second",
+      "immediate_recorded_live_event__event_lateral_rate_ft_per_second",
+      "immediate_recorded_live_event__event_crossed_centerline",
+      "immediate_recorded_live_event__legacy_style_immediacy",
+      "immediate_recorded_live_event__legacy_style_movement",
+      "immediate_recorded_live_event__same_team_indicator",
+      "prior_same_team_unblocked_attempt__event_elapsed_seconds",
+      "prior_same_team_unblocked_attempt__event_displacement_ft",
+      "prior_same_team_unblocked_attempt__event_lateral_displacement_ft",
+      "prior_same_team_unblocked_attempt__event_longitudinal_displacement_ft",
+      "prior_same_team_unblocked_attempt__prior_event_distance_to_net_ft",
+      "prior_same_team_unblocked_attempt__event_angle_change_deg",
+      "prior_same_team_unblocked_attempt__event_angular_rate_deg_per_second",
+      "prior_same_team_unblocked_attempt__event_lateral_rate_ft_per_second",
+      "prior_same_team_unblocked_attempt__event_crossed_centerline",
+      "prior_same_team_unblocked_attempt__legacy_style_immediacy",
+      "prior_same_team_unblocked_attempt__legacy_style_movement",
+      "prior_same_team_unblocked_attempt__same_team_indicator"
+    ],
+    "version": "citrus-matched-pre-shot-movement-v1"
+  },
+  "conditional_settings": {
+    "absent_context_policy": "shared_slopes_zero_unseen_offsets",
+    "adjacent_slope_ridge": 100,
+    "epsilon": 0.000001,
+    "ftol": 1e-12,
+    "group_ridge": 100,
+    "gtol": 1e-8,
+    "knots": [
+      0.000001,
+      0.005,
+      0.01,
+      0.025,
+      0.05,
+      0.1,
+      0.2,
+      0.35,
+      0.5,
+      0.75,
+      0.95,
+      0.999999
+    ],
+    "max_cells": 32000000,
+    "max_rows": 1000000,
+    "maxiter": 3000,
+    "optimizer": "L-BFGS-B",
+    "pooling_ridge": 1000,
+    "projected_gradient_tolerance": 0.00001,
+    "reference_probability": 0.1,
+    "slope_context": "prior_sog_same_team",
+    "slope_identity_ridge": 100,
+    "threads": 1
+  },
+  "scorecard": {
+    "bin_edges": [
+      0,
+      0.01,
+      0.025,
+      0.05,
+      0.1,
+      0.2,
+      0.35,
+      0.5,
+      0.75,
+      1
+    ],
+    "confidence": 0.95,
+    "log_loss_epsilon": 1e-12,
+    "min_events": 100,
+    "min_games": 30,
+    "min_valid_fraction": 0.9,
+    "resamples": 256,
+    "seed": 60906
+  },
+  "outputs": [
+    "fixed",
+    "expanding"
+  ],
+  "primary": "expanding",
+  "chunk_rows": 4096,
+  "cohorts": {
+    "fold1": {
+      "calibration": {
+        "events": 119916,
+        "games": 1383,
+        "start": "2021-07-02",
+        "end": "2022-06-26",
+        "keys_sha256": "45d30ccb80a6d0dcae47cf364f16e214bf96aed0427c1a240b89cd18bc8fc3ea"
+      },
+      "validation": {
+        "events": 120080,
+        "games": 1378,
+        "start": "2022-10-07",
+        "end": "2023-06-13",
+        "keys_sha256": "db4bc58cc25007e031c714f1d3fdab05bc2894d3a8789047448c6345e0e55bbd"
+      }
+    },
+    "fold2": {
+      "calibration": {
+        "events": 120080,
+        "games": 1378,
+        "start": "2022-10-07",
+        "end": "2023-06-13",
+        "keys_sha256": "db4bc58cc25007e031c714f1d3fdab05bc2894d3a8789047448c6345e0e55bbd"
+      },
+      "validation": {
+        "events": 121033,
+        "games": 1383,
+        "start": "2023-10-10",
+        "end": "2024-06-24",
+        "keys_sha256": "d2882753a4dc90ad774076d0f989c8751acad64128495a706489e2e8b3014ea5"
+      }
+    }
+  },
+  "blocks": {
+    "fold1": [
+      {
+        "month": "2022-10",
+        "train": {
+          "events": 119916,
+          "games": 1383,
+          "start": "2021-07-02",
+          "end": "2022-06-26",
+          "keys_sha256": "45d30ccb80a6d0dcae47cf364f16e214bf96aed0427c1a240b89cd18bc8fc3ea"
+        },
+        "test": {
+          "events": 12683,
+          "games": 146,
+          "start": "2022-10-07",
+          "end": "2022-10-31",
+          "keys_sha256": "d6f585e65519baec43a9d3ad5850d55755222416655a100ab0b6cd646ffa5b97"
+        }
+      },
+      {
+        "month": "2022-11",
+        "train": {
+          "events": 132599,
+          "games": 1529,
+          "start": "2021-07-02",
+          "end": "2022-10-31",
+          "keys_sha256": "952f5b64d9abf88d87da509c8cb9c81099976c0451406d45d678682a5485c653"
+        },
+        "test": {
+          "events": 18585,
+          "games": 214,
+          "start": "2022-11-01",
+          "end": "2022-11-30",
+          "keys_sha256": "1c234387e65d9ae01aab8d9e580c5823cc8da7cbcbc25ae9d67d9e0482ba3fc1"
+        }
+      },
+      {
+        "month": "2022-12",
+        "train": {
+          "events": 151184,
+          "games": 1743,
+          "start": "2021-07-02",
+          "end": "2022-11-30",
+          "keys_sha256": "71773a89c19e19c90f7b19642fba79e974e1dca381b2ca38f99f8fc1fc4576a7"
+        },
+        "test": {
+          "events": 19127,
+          "games": 221,
+          "start": "2022-12-01",
+          "end": "2022-12-31",
+          "keys_sha256": "7ea280ddac793b5badf843ad15235a7ad078bbd1cfbe826987e37637883a6af2"
+        }
+      },
+      {
+        "month": "2023-01",
+        "train": {
+          "events": 170311,
+          "games": 1964,
+          "start": "2021-07-02",
+          "end": "2022-12-31",
+          "keys_sha256": "d65d0ecd8036920111bf4823e3c344d1494916d58082cf4bd5459b5f7d6a08e2"
+        },
+        "test": {
+          "events": 18207,
+          "games": 208,
+          "start": "2023-01-01",
+          "end": "2023-01-31",
+          "keys_sha256": "1bc30e97e98d1131c6892f37c79285905282fecc7634db0b025cf4eed11ca5b5"
+        }
+      },
+      {
+        "month": "2023-02",
+        "train": {
+          "events": 188518,
+          "games": 2172,
+          "start": "2021-07-02",
+          "end": "2023-01-31",
+          "keys_sha256": "19ad353368eb4f850918e8569a200f4e9d56ba935c3ba80ce84a541983a6ac0b"
+        },
+        "test": {
+          "events": 14166,
+          "games": 160,
+          "start": "2023-02-01",
+          "end": "2023-02-28",
+          "keys_sha256": "8e1e2c4c12ff1b9a6963844009798eaab359f4a24d9e6e2db6e84c7a77ab3d8f"
+        }
+      },
+      {
+        "month": "2023-03",
+        "train": {
+          "events": 202684,
+          "games": 2332,
+          "start": "2021-07-02",
+          "end": "2023-02-28",
+          "keys_sha256": "5ac3910360e6d2e8b5410d7ef94fe124c9b7fda820f748199e2f4785b80bedf2"
+        },
+        "test": {
+          "events": 20130,
+          "games": 234,
+          "start": "2023-03-01",
+          "end": "2023-03-31",
+          "keys_sha256": "d0485e8625c6738c22d03ab5358a6274ae10acca7b64d1e14fc53ea88c96da83"
+        }
+      },
+      {
+        "month": "2023-04",
+        "train": {
+          "events": 222814,
+          "games": 2566,
+          "start": "2021-07-02",
+          "end": "2023-03-31",
+          "keys_sha256": "fa572e8a978c5603c69793616e1edd00de82a79dedcf26b56c53831cfab35e3f"
+        },
+        "test": {
+          "events": 13659,
+          "games": 156,
+          "start": "2023-04-01",
+          "end": "2023-04-30",
+          "keys_sha256": "dd2c05e17124be180d0ef832074823b4700d085d99ed228f5250c44abc0a328c"
+        }
+      },
+      {
+        "month": "2023-05",
+        "train": {
+          "events": 236473,
+          "games": 2722,
+          "start": "2021-07-02",
+          "end": "2023-04-30",
+          "keys_sha256": "1683460b8702982857b648c8c129b156a821ef456cf594163fe85c7765e2600a"
+        },
+        "test": {
+          "events": 3042,
+          "games": 34,
+          "start": "2023-05-01",
+          "end": "2023-05-29",
+          "keys_sha256": "9a1d34b133732cb5a843d7d84d9c003277354f5aed4aa293414cc70e5f06d7d3"
+        }
+      },
+      {
+        "month": "2023-06",
+        "train": {
+          "events": 239515,
+          "games": 2756,
+          "start": "2021-07-02",
+          "end": "2023-05-29",
+          "keys_sha256": "80e8bef6b489c98a1952a80e21c3344931b71d54ea226f198a3b9890cea542ee"
+        },
+        "test": {
+          "events": 481,
+          "games": 5,
+          "start": "2023-06-03",
+          "end": "2023-06-13",
+          "keys_sha256": "7008223684f3dd364b22d66037608ce8b7ad2bd62f3e0e533e6b5a78c6b4e4e7"
+        }
+      }
+    ],
+    "fold2": [
+      {
+        "month": "2023-10",
+        "train": {
+          "events": 120080,
+          "games": 1378,
+          "start": "2022-10-07",
+          "end": "2023-06-13",
+          "keys_sha256": "db4bc58cc25007e031c714f1d3fdab05bc2894d3a8789047448c6345e0e55bbd"
+        },
+        "test": {
+          "events": 12169,
+          "games": 138,
+          "start": "2023-10-10",
+          "end": "2023-10-31",
+          "keys_sha256": "0265ff455a997c8ca39bb0b836619b200392e0184cfb04c5f9edce66a73123f7"
+        }
+      },
+      {
+        "month": "2023-11",
+        "train": {
+          "events": 132249,
+          "games": 1516,
+          "start": "2022-10-07",
+          "end": "2023-10-31",
+          "keys_sha256": "51a281f87efe53b03ef27cf1cdc3719e8df17fd53256e94dcdb71769e8dbdfd5"
+        },
+        "test": {
+          "events": 18540,
+          "games": 212,
+          "start": "2023-11-01",
+          "end": "2023-11-30",
+          "keys_sha256": "00fd3e0424c2e4cf0663f02efb193c75119e60f5433e99606a48b017aad38c10"
+        }
+      },
+      {
+        "month": "2023-12",
+        "train": {
+          "events": 150789,
+          "games": 1728,
+          "start": "2022-10-07",
+          "end": "2023-11-30",
+          "keys_sha256": "33b2a403d2d6bf4d4e32cd07a8aa1610bd906420fba2068ab953757e1fa6d0f2"
+        },
+        "test": {
+          "events": 19116,
+          "games": 217,
+          "start": "2023-12-01",
+          "end": "2023-12-31",
+          "keys_sha256": "b1f22d8eef54fc33e6a5ec5abce1b37ef597a9a71e4c622a4ac3458c08d99e2a"
+        }
+      },
+      {
+        "month": "2024-01",
+        "train": {
+          "events": 169905,
+          "games": 1945,
+          "start": "2022-10-07",
+          "end": "2023-12-31",
+          "keys_sha256": "aebf187f846766d89e22c29b920631ca95024a6ba5caa5355cae1815f9c12a68"
+        },
+        "test": {
+          "events": 17769,
+          "games": 204,
+          "start": "2024-01-01",
+          "end": "2024-01-31",
+          "keys_sha256": "1a4ba03b1c29344bab6314efee892985cf86e2f240f4127dfb2c56193bd5c17c"
+        }
+      },
+      {
+        "month": "2024-02",
+        "train": {
+          "events": 187674,
+          "games": 2149,
+          "start": "2022-10-07",
+          "end": "2024-01-31",
+          "keys_sha256": "cc92e7d531ca3a2694457c8b1ece4fabddd44817764a1a9a821771f45c26d5fa"
+        },
+        "test": {
+          "events": 15071,
+          "games": 170,
+          "start": "2024-02-05",
+          "end": "2024-02-29",
+          "keys_sha256": "e4a4b78079e1ced888589a61ff27697be9a55b4e390685e1a1c9b9659150d9c0"
+        }
+      },
+      {
+        "month": "2024-03",
+        "train": {
+          "events": 202745,
+          "games": 2319,
+          "start": "2022-10-07",
+          "end": "2024-02-29",
+          "keys_sha256": "50072610d2f17c039f85f43b09bd4b71a738d4c53974ba762def01693b11717a"
+        },
+        "test": {
+          "events": 19581,
+          "games": 226,
+          "start": "2024-03-01",
+          "end": "2024-03-31",
+          "keys_sha256": "f51c02ba0b050800d7a09ad35a106ffaf9dcdbe0858ddd90ce561c0fa067422e"
+        }
+      },
+      {
+        "month": "2024-04",
+        "train": {
+          "events": 222326,
+          "games": 2545,
+          "start": "2022-10-07",
+          "end": "2024-03-31",
+          "keys_sha256": "ce2c51cd2247b01a27cdf9b9b6a81a22d8cfac98673920e779fbaadc91b28d6a"
+        },
+        "test": {
+          "events": 14552,
+          "games": 167,
+          "start": "2024-04-01",
+          "end": "2024-04-30",
+          "keys_sha256": "48c2a20c4b10025099ecbe1f1ac9b74a5d106375f27ad2d04e88eba9623d0d1f"
+        }
+      },
+      {
+        "month": "2024-05",
+        "train": {
+          "events": 236878,
+          "games": 2712,
+          "start": "2022-10-07",
+          "end": "2024-04-30",
+          "keys_sha256": "0cd63f8fa439e3ac4a8da464a2d8a83cd18a8202022699114a910287166a0755"
+        },
+        "test": {
+          "events": 3510,
+          "games": 40,
+          "start": "2024-05-01",
+          "end": "2024-05-31",
+          "keys_sha256": "3aad79c890190bebbad6a927b40d1caacaf5d00f604151ecb889b2e767e58f41"
+        }
+      },
+      {
+        "month": "2024-06",
+        "train": {
+          "events": 240388,
+          "games": 2752,
+          "start": "2022-10-07",
+          "end": "2024-05-31",
+          "keys_sha256": "145b950f92a0a0e8b3ee5b418f746eb7a8257b17c9ad20e396c773ebaf9bf547"
+        },
+        "test": {
+          "events": 725,
+          "games": 9,
+          "start": "2024-06-01",
+          "end": "2024-06-24",
+          "keys_sha256": "0231c2d9424e6a2917a5d79323b4b33779267387abf579210c89537b6da7c3d2"
+        }
+      }
+    ]
+  },
+  "membership_source_sha256": {
+    "scripts/proof/results/official-forward-shooter-movement-20260906-retry1/fold1/calibration-identity-inputs.json": "05833868ae25557e97b96ff06bd48fd0ee46c1279b19749b0c1e7d8336da0993",
+    "scripts/proof/results/official-forward-shooter-movement-20260906-retry1/fold1/validation-identity-inputs.json": "695550ef806a5946da598f1a43b34d6bd65d2199cf39821bfadd95124978aec0",
+    "scripts/proof/results/official-forward-shooter-movement-20260906-retry1/fold2/calibration-identity-inputs.json": "506e597b130ca507bb79831dd7733e365da1e8707b92f678678e67ccbbad95ec",
+    "scripts/proof/results/official-forward-shooter-movement-20260906-retry1/fold2/validation-identity-inputs.json": "a9e038c349d8d72f5e26c12f49c55f056e8b23d75a4144b86ab61ae4fa8a1f41"
+  },
+  "policy": {
+    "initial": "frozen full original calibration conditional map",
+    "updates": "from second outer calendar month: all original calibration plus outer rows strictly before first scoring game date; refit same conditional map from original initialization",
+    "raw_model": "frozen original movement JSON, no raw or shooter fits",
+    "first_block": "reuse saved fullcal map; assert <=1e-12 replay then reuse fixed saved probabilities exactly",
+    "label_availability": "simulated game-date ordering only, not verified real-time finality or ingestion cutoff",
+    "inclusion": "all original outer validation rows and all calendar months, including sparse final months",
+    "guard": "Brier and clipped log loss no worse than fixed in each fold; both folds must pass; no automatic acceptance",
+    "search": "none: no hyperparameter, feature, window, band or policy search"
+  },
+  "limitations": [
+    "Adaptive retrospective evaluation on already inspected development validation cohorts.",
+    "Earlier validation labels update subsequent maps; not a fixed heldout test.",
+    "Game dates do not establish actual label availability or historical source revisions.",
+    "Whole-game fixed-fit uncertainty omits refitting and adaptive selection uncertainty.",
+    "No MoneyPuck files or weights, no production changes, no finishing or FPAR acceptance."
+  ]
+}

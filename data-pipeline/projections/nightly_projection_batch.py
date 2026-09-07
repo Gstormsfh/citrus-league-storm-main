@@ -41,6 +41,8 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from collections import defaultdict
 import statistics
 import logging
+import json
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +79,7 @@ from data_pipeline.scoring import scoring_defaults
 from calculate_daily_projections import (
     calculate_daily_projection,
     get_league_averages,
+    xg_input_health,
     DEFAULT_SEASON
 )
 
@@ -436,6 +439,95 @@ def calculate_projection_worker(args: Tuple) -> Optional[Dict]:
         return None
 
 
+def calculate_projection_outcome(task: Tuple) -> Dict:
+    """Transport per-task availability across process boundaries, not live proof.
+
+    The core calculator's absent result is never a measured zero. Count deltas
+    refer only to this task, not earlier tasks handled by the same process.
+    Do not serialize exception messages, clients, or credentials to the parent.
+    """
+    before = xg_input_health()["reasons"]
+    try:
+        projection = calculate_projection_worker(task)
+        reason = None if projection else "projection_unavailable"
+    except Exception:
+        projection, reason = None, "worker_exception"
+    after = xg_input_health()["reasons"]
+    reasons = {key: count - before.get(key, 0) for key, count in after.items()
+               if count > before.get(key, 0)}
+    if reasons:
+        # A swallowed input failure must not yield an apparently valid forecast.
+        projection, reason = None, "xg_input_unavailable"
+    return {"status": "available" if projection else "withheld",
+            "reason": reason, "input_reasons": reasons, "projection": projection}
+
+
+def projection_batch_health(tasks: List[Tuple], outcomes: List[Dict]) -> Dict:
+    """Reconcile submitted tasks only; source/forecast quality is not attested."""
+    if len(tasks) != len(outcomes):
+        raise ValueError("One explicit outcome per submitted task required")
+    seen, reasons, available = set(), defaultdict(int), 0
+    for task, outcome in zip(tasks, outcomes):
+        identity = (task[0], task[1], task[2], task[3])
+        if (type(identity[0]) is not int or not 1000000 <= identity[0] <= 9999999
+                or type(identity[1]) is not int or len(str(identity[1])) != 10
+                or identity[1] // 10000 % 100 not in (2, 3) or identity[1] % 10000 == 0
+                or type(identity[3]) is not int or identity[3] != identity[1] // 1000000
+                or not isinstance(identity[2], str) or date.fromisoformat(identity[2]).isoformat() != identity[2]):
+            raise ValueError("Explicit canonical submitted identity required")
+        if identity in seen:
+            raise ValueError("Duplicate submitted projection identity")
+        seen.add(identity)
+        if not isinstance(outcome, dict) or outcome.get("status") not in ("available", "withheld"):
+            raise ValueError("Explicit worker availability required")
+        if outcome["status"] == "withheld":
+            if outcome.get("projection") is not None or not outcome.get("reason"):
+                raise ValueError("Withheld task must have reason and no projection")
+            reasons[outcome["reason"]] += 1
+            continue
+        projection = outcome.get("projection")
+        if (not isinstance(projection, dict) or outcome.get("reason") is not None
+                or outcome.get("input_reasons")
+                or any(type(projection.get(k)) is not int for k in ("player_id", "game_id", "season"))
+                or tuple(projection.get(k) for k in ("player_id", "game_id", "projection_date", "season")) != identity):
+            raise ValueError("Available projection must match its exact submitted scope")
+        validate_projection_values(projection)
+        available += 1
+    return {"event": "projection_batch.health", "scope": "submitted_tasks_only",
+            "status": "complete" if tasks and available == len(tasks) else "incomplete",
+            "expected": len(tasks), "available": available, "withheld": len(tasks) - available,
+            "reasons": dict(reasons), "source_population_verified": False,
+            "forecast_quality_verified": False}
+
+
+def validate_projection_values(projection: Dict) -> None:
+    """Minimum role-specific output schema; no defaulting or quality claim."""
+    if type(projection.get("is_goalie")) is not bool:
+        raise ValueError("Explicit forecast role required")
+    def finite(key):
+        value = projection.get(key)
+        if type(value) not in (int, float) or not math.isfinite(value):
+            raise ValueError("Complete finite forecast values required")
+        return value
+    finite("total_projected_points")  # Negative league points are legitimate.
+    fields = ("wins", "saves", "shutouts", "goals_against", "gaa", "save_pct", "gp") if projection["is_goalie"] else (
+        "goals", "assists", "sog", "blocks", "ppp", "shp", "hits", "pim", "xg")
+    for field in fields:
+        if finite("projected_" + field) < 0:
+            raise ValueError("Physical forecast counts/rates must be nonnegative")
+    if projection["is_goalie"]:
+        if any(projection["projected_" + k] > 1 for k in ("wins", "shutouts", "save_pct", "gp")):
+            raise ValueError("Single-game forecast probabilities must be bounded")
+        if type(projection.get("starter_confirmed")) is not bool:
+            raise ValueError("Explicit existing starter flag required; this does not authenticate it")
+    elif (projection["projected_goals"] > projection["projected_sog"]
+          or projection["projected_ppp"] + projection["projected_shp"] >
+          projection["projected_goals"] + projection["projected_assists"] + .002):
+        # Core outputs round each component to .001; the sum guard allows the
+        # worst-case four-component rounding difference, not model tuning.
+        raise ValueError("Inconsistent physical forecast populations")
+
+
 # ============================================================================
 # PHASE 4: BULK UPSERT
 # ============================================================================
@@ -698,8 +790,10 @@ def main():
     logger.info("")
     
     if not schedule:
-        logger.info("No remaining games found. Exiting.")
-        return
+        logger.error("projection_batch.health status=incomplete reason=no_schedule_evidence writes_attempted=0")
+        # An empty query alone cannot distinguish a genuinely finished season
+        # from an absent/partial schedule. Do not call it a verified no-op.
+        raise SystemExit(2)
     
     # ========================================================================
     # PHASE 2: MATCHUP DIFFICULTY
@@ -823,17 +917,23 @@ def main():
     ]
     skipped_count = original_count - len(worker_tasks)
     logger.info(f"  Filtered to {len(worker_tasks)} new projection tasks (skipped {skipped_count} existing)")
-    
-    if len(worker_tasks) == 0:
-        logger.info(f"  ✅ All projections already exist! Nothing to calculate.")
-        logger.info("")
-        logger.info("=" * 80)
-        logger.info("BATCH COMPLETE - NO NEW PROJECTIONS NEEDED")
-        logger.info("=" * 80)
-        return
+
+    if skipped_count or not worker_tasks:
+        # Row existence has no source/model freshness binding. A later ROS
+        # rebuild would mix unverified old rows with this run's new outputs.
+        # Keep those rows intact, but do not certify reuse or force a refresh.
+        logger.error(json.dumps({"event": "projection_batch.health", "status": "incomplete",
+            "scope": "constructed_eligible_tasks", "expected": original_count,
+            "unverified_existing": skipped_count, "writes_attempted": 0,
+            "reason": "existing_projection_lineage_unverified" if skipped_count else "no_eligible_tasks"}))
+        raise SystemExit(2)
+    if len({(t[0], t[1], t[2], t[3]) for t in worker_tasks}) != len(worker_tasks):
+        logger.error("projection_batch.health status=incomplete reason=duplicate_submitted_identity writes_attempted=0")
+        raise SystemExit(2)
     
     # Execute in parallel
     projections = []
+    outcomes = [None] * len(worker_tasks)
     completed = 0
     last_progress_time = time.time()
     
@@ -843,20 +943,19 @@ def main():
         logger.info(f"  Progress updates every 60 seconds...\n")
         
         with ProcessPoolExecutor(max_workers=args.workers) as executor:
-            futures = {executor.submit(calculate_projection_worker, task): task for task in worker_tasks}
+            futures = {executor.submit(calculate_projection_outcome, task): i for i, task in enumerate(worker_tasks)}
 
             for future in as_completed(futures):
                 if _shutdown_requested:
                     executor.shutdown(wait=False, cancel_futures=True)
                     logger.info(f"\n[SHUTDOWN] Graceful shutdown complete. Calculated {completed}/{len(worker_tasks)} projections.")
-                    sys.exit(0)
+                    sys.exit(2)
 
                 try:
-                    result = future.result(timeout=30)
-                    if result:
-                        projections.append(result)
+                    outcomes[futures[future]] = future.result(timeout=30)
                 except Exception:
-                    pass
+                    outcomes[futures[future]] = {"status": "withheld", "reason": "worker_exception",
+                                                "projection": None, "input_reasons": {}}
 
                 completed += 1
 
@@ -872,19 +971,29 @@ def main():
                     last_progress_time = current_time
     else:
         # Sequential for small batches
-        for task in worker_tasks:
+        for i, task in enumerate(worker_tasks):
             if _shutdown_requested:
                 logger.info(f"\n[SHUTDOWN] Graceful shutdown complete. Calculated {completed}/{len(worker_tasks)} projections.")
-                sys.exit(0)
+                sys.exit(2)
 
-            result = calculate_projection_worker(task)
-            if result:
-                projections.append(result)
+            outcomes[i] = calculate_projection_outcome(task)
             completed += 1
     
     phase3_elapsed = time.time() - phase3_start
     
-    # Final 100% progress update
+    try:
+        health = projection_batch_health(worker_tasks, outcomes)
+    except ValueError:
+        logger.error("projection_batch.health status=incomplete reason=invalid_worker_scope writes_attempted=0")
+        raise SystemExit(2) from None
+    logger.info(json.dumps(health, sort_keys=True))
+    if health["status"] != "complete":
+        logger.error("Incomplete projections: no per-game writes, ROS rebuild, or matchup writes attempted.")
+        raise SystemExit(2)
+    projections = [outcome["projection"] for outcome in outcomes]
+
+    # Completion means each submitted task returned an explicitly scoped row,
+    # not that the input population or physical-stat model is validated.
     rate = len(worker_tasks) / phase3_elapsed if phase3_elapsed > 0 else 0
     logger.info(f"  ✅ [100.0%] {len(worker_tasks):,}/{len(worker_tasks):,} | Rate: {rate:.1f}/s | Complete!")
     logger.info(f"  Calculated {len(projections)} projections")
@@ -909,6 +1018,12 @@ def main():
     logger.info(f"  Upserted {upserted} projections")
     logger.info(f"  Phase 4 complete in {phase4_elapsed:.1f}s")
     logger.info("")
+    if upserted != len(projections):
+        logger.error(json.dumps({"event": "projection_batch.health", "status": "incomplete",
+            "reason": "partial_projection_write", "expected": len(projections),
+            "write_acknowledged": upserted, "ros_rebuild_attempted": False,
+            "partial_writes_may_exist": True, "rolled_back": False}))
+        raise SystemExit(2)
     
     # ========================================================================
     # PHASE 5: ROS PROJECTIONS
@@ -972,4 +1087,3 @@ def main():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     main()
-

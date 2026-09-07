@@ -1,0 +1,2747 @@
+{
+  "created_utc": "2026-09-07T21:02:04.789790+00:00",
+  "branch": "fix/analytics-contracts-phase-one",
+  "head": "91f56de5fa634e4096f35c046e4906cd41afb10f",
+  "fetched_origin_master": "19981b870c562b6b35c2f9485952fa4df8bdb8d0",
+  "ahead_behind": [
+    "78",
+    "0"
+  ],
+  "safety_stash": "47b1ca23",
+  "duplicate_file_backup": "/tmp/citrus-handoff-sync.FzkMsR",
+  "status": "M DATA_INVENTORY.md\n M data-pipeline/projections/calculate_daily_projections.py\n M data-pipeline/projections/nightly_projection_batch.py\n M data-pipeline/tests/test_nightly_ros_rebuild.py\n M data-pipeline/tests/test_projection_source_contracts.py\n M docs/ANALYTICS_ACCEPTANCE.md\n M server/src/__tests__/MatchupService.playerGameLog.test.ts\n?? data-pipeline/projections/conditional_calibration_shape.py\n?? data-pipeline/projections/event_memory_features.py\n?? data-pipeline/projections/fixed_feature_transform.py\n?? data-pipeline/projections/identity_probability.py\n?? data-pipeline/projections/identity_probability_v2.py\n?? data-pipeline/projections/offline_xg_bundle.py\n?? data-pipeline/projections/passing_sequence_geometry.py\n?? data-pipeline/projections/passing_sequence_review.py\n?? data-pipeline/projections/passing_system.py\n?? data-pipeline/projections/passing_time_alignment.py\n?? data-pipeline/projections/pl_onice_membership.py\n?? data-pipeline/projections/possession_candidates.py\n?? data-pipeline/projections/possession_evidence.py\n?? data-pipeline/projections/possession_probability.py\n?? data-pipeline/projections/possession_review_import.py\n?? data-pipeline/projections/possession_source_validation.py\n?? data-pipeline/projections/pre_shot_history.py\n?? data-pipeline/projections/pre_shot_movement.py\n?? data-pipeline/projections/pre_shot_penalty_context.py\n?? data-pipeline/projections/pre_shot_zone_context.py\n?? data-pipeline/projections/prequential_calibration.py\n?? data-pipeline/projections/recorded_penalty_features.py\n?? data-pipeline/projections/recorded_sequence_map.py\n?? data-pipeline/projections/selective_calibration.py\n?? data-pipeline/projections/strength_partition_candidate.py\n?? data-pipeline/projections/tracked_comotion_candidates.py\n?? data-pipeline/projections/tracked_transfer_candidates.py\n?? data-pipeline/projections/verified_movement_reuse.py\n?? data-pipeline/projections/verified_movement_reuse_v2.py\n?? data-pipeline/projections/xg_candidate_inference.py\n?? data-pipeline/tests/test_analytics_scope_coverage.py\n?? data-pipeline/tests/test_conditional_calibration_shape.py\n?? data-pipeline/tests/test_conditional_calibration_shape_review.py\n?? data-pipeline/tests/test_daily_projection_xg_availability.py\n?? data-pipeline/tests/test_event_memory_features.py\n?? data-pipeline/tests/test_event_memory_geometry.py\n?? data-pipeline/tests/test_fixed_feature_transform.py\n?? data-pipeline/tests/test_identity_probability.py\n?? data-pipeline/tests/test_identity_probability_v2.py\n?? data-pipeline/tests/test_legacy_finishing_uncertainty_diagnostics.py\n?? data-pipeline/tests/test_legacy_powerplay_diagnostics.py\n?? data-pipeline/tests/test_movement_transform_integration.py\n?? data-pipeline/tests/test_nightly_projection_health.py\n?? data-pipeline/tests/test_offline_xg_bundle.py\n?? data-pipeline/tests/test_offline_xg_bundle_review.py\n?? data-pipeline/tests/test_passing_sequence_geometry.py\n?? data-pipeline/tests/test_passing_sequence_review.py\n?? data-pipeline/tests/test_passing_system.py\n?? data-pipeline/tests/test_passing_time_alignment.py\n?? data-pipeline/tests/test_pl_onice_membership.py\n?? data-pipeline/tests/test_pl_onice_membership_review.py\n?? data-pipeline/tests/test_portable_batch_invariance.py\n?? data-pipeline/tests/test_possession_candidates.py\n?? data-pipeline/tests/test_possession_evidence.py\n?? data-pipeline/tests/test_possession_goalie_role.py\n?? data-pipeline/tests/test_possession_label_integrity.py\n?? data-pipeline/tests/test_possession_probability.py\n?? data-pipeline/tests/test_possession_retention.py\n?? data-pipeline/tests/test_possession_review_end_to_end.py\n?? data-pipeline/tests/test_possession_review_import.py\n?? data-pipeline/tests/test_possession_role_evidence.py\n?? data-pipeline/tests/test_possession_source_validation.py\n?? data-pipeline/tests/test_pre_shot_history.py\n?? data-pipeline/tests/test_pre_shot_movement.py\n?? data-pipeline/tests/test_pre_shot_movement_review.py\n?? data-pipeline/tests/test_pre_shot_penalty_context.py\n?? data-pipeline/tests/test_pre_shot_penalty_context_review.py\n?? data-pipeline/tests/test_pre_shot_zone_context.py\n?? data-pipeline/tests/test_pre_shot_zone_context_review.py\n?? data-pipeline/tests/test_prequential_calibration.py\n?? data-pipeline/tests/test_recorded_penalty_features.py\n?? data-pipeline/tests/test_recorded_penalty_features_review.py\n?? data-pipeline/tests/test_recorded_sequence_map.py\n?? data-pipeline/tests/test_selective_calibration.py\n?? data-pipeline/tests/test_strength_partition_candidate.py\n?? data-pipeline/tests/test_tracked_comotion_candidates.py\n?? data-pipeline/tests/test_tracked_transfer_candidates.py\n?? data-pipeline/tests/test_verified_movement_reuse.py\n?? data-pipeline/tests/test_verified_movement_reuse_v2.py\n?? data-pipeline/tests/test_video_review_coverage.py\n?? docs/analytics-adaptive-calibration-archive-20260906.json\n?? docs/analytics-adaptive-calibration-index-20260906.json\n?? docs/analytics-adaptive-calibration-integrity-20260906.json\n?? docs/analytics-adaptive-calibration-result-20260906.md\n?? docs/analytics-adaptive-calibration-review-20260906.json\n?? docs/analytics-body-possession-prototype-20260907.md\n?? docs/analytics-bounded-calibration-execution-20260906.md\n?? docs/analytics-bounded-calibration-result-20260906.md\n?? docs/analytics-bounded-timing-prior-plan-20260907.md\n?? docs/analytics-bounded-timing-prior-result-20260907.md\n?? docs/analytics-calibration-stability-plan-20260906.json\n?? docs/analytics-calibration-stability-result-20260906.md\n?? docs/analytics-calibration-transfer-plan-20260906.json\n?? docs/analytics-calibration-transfer-result-20260906.md\n?? docs/analytics-comotion-unseen-validation-20260907.md\n?? docs/analytics-composed-player-finishing-20260907.md\n?? docs/analytics-composed-xg-replay-20260907.md\n?? docs/analytics-conditional-shape-plan-20260906.json\n?? docs/analytics-conditional-shape-proposal-20260906.md\n?? docs/analytics-conditional-shape-result-20260906.md\n?? docs/analytics-continuous-event-movement-20260907.md\n?? docs/analytics-current-xg-checkpoint-20260907.md\n?? docs/analytics-development-sog-review-20260907.md\n?? docs/analytics-earlier-shape-selection-20260907.md\n?? docs/analytics-event-memory-plan-20260906.json\n?? docs/analytics-event-memory-result-20260906.md\n?? docs/analytics-expanded-timing-diagnostic-20260907.md\n?? docs/analytics-finishing-exposure-reconciliation-20260907.md\n?? docs/analytics-finishing-live-source-check-20260907.json\n?? docs/analytics-finishing-quantity-contract-20260906.md\n?? docs/analytics-finishing-talent-preservation-20260906.md\n?? docs/analytics-five-calibration-ideas-20260907.md\n?? docs/analytics-forward-shooter-decomposition-plan-20260906.md\n?? docs/analytics-forward-shooter-decomposition-result-20260906.md\n?? docs/analytics-forward-shooter-execution-20260906.md\n?? docs/analytics-forward-shooter-movement-plan-20260906.json\n?? docs/analytics-forward-shooter-result-20260906.md\n?? docs/analytics-fpar-foundation-adapter-20260906.md\n?? docs/analytics-frozen-last-season-evaluation-20260907.md\n?? docs/analytics-full-pbp-preshot-review-20260907.md\n?? docs/analytics-hall-pass-alignment-20260907.md\n?? docs/analytics-identity-probability-plan-20260906.json\n?? docs/analytics-identity-probability-v2-plan-20260906.json\n?? docs/analytics-independent-possession-review-pack-20260907.md\n?? docs/analytics-input-coverage-ledger-20260906-v2.json\n?? docs/analytics-input-coverage-ledger-20260906-v3.json\n?? docs/analytics-input-coverage-ledger-20260906-v4.json\n?? docs/analytics-input-coverage-ledger-20260906-v5.json\n?? docs/analytics-input-coverage-ledger-20260906-v6.json\n?? docs/analytics-input-coverage-ledger-20260906-v7.json\n?? docs/analytics-input-coverage-ledger-20260906-v8.json\n?? docs/analytics-input-coverage-ledger-20260906.json\n?? docs/analytics-input-coverage-ledger-20260907-v9.json\n?? docs/analytics-input-recovery-checkpoint-20260906.md\n?? docs/analytics-joint-residual-improvement-20260907.md\n?? docs/analytics-lateral-time-grid-20260907.md\n?? docs/analytics-legacy-input-parity-20260906.md\n?? docs/analytics-legacy-serving-audit-20260906.md\n?? docs/analytics-linked-replay-pilot-20260907.md\n?? docs/analytics-linked-tracking-source-revisit-20260907.md\n?? docs/analytics-live-model-gap-20260906.md\n?? docs/analytics-method-checkpoint-20260906.md\n?? docs/analytics-model-dependency-audit-20260906.md\n?? docs/analytics-moneypuck-schema-inspection-20260906.md\n?? docs/analytics-movement-candidate-plan-20260906.json\n?? docs/analytics-movement-diagnostic-20260906.md\n?? docs/analytics-movement-loss-weights-20260907.md\n?? docs/analytics-movement-residual-context-20260907.md\n?? docs/analytics-movement-result-20260906.md\n?? docs/analytics-nightly-forecast-health-20260906.md\n?? docs/analytics-offline-bundle-result-20260906.md\n?? docs/analytics-pass-factor-percentages-20260907.md\n?? docs/analytics-pass-integration-source-gates-20260907.md\n?? docs/analytics-pass-review-viewer-20260907.md\n?? docs/analytics-passing-method-reproduction-20260907.md\n?? docs/analytics-passing-review-integration-20260907.md\n?? docs/analytics-passing-system-20260907.md\n?? docs/analytics-passing-video-validation-20260907.md\n?? docs/analytics-penalty-full-coverage-result-20260906.md\n?? docs/analytics-pl-onice-parser-proposal-20260906.md\n?? docs/analytics-pl-onice-pilot-result-20260906.md\n?? docs/analytics-possession-goalie-role-20260907.md\n?? docs/analytics-possession-reliability-20260907.md\n?? docs/analytics-possession-retention-20260907.md\n?? docs/analytics-possession-role-integration-20260907.md\n?? docs/analytics-possession-scoring-20260907.md\n?? docs/analytics-possession-video-coverage-20260907.md\n?? docs/analytics-powerplay-input-recovery-20260906.md\n?? docs/analytics-prequential-calibration-plan-20260906.json\n?? docs/analytics-prior-sog-fidelity-plan-20260906.md\n?? docs/analytics-prior-sog-fidelity-result-20260906.md\n?? docs/analytics-production-projection-ownership-20260907.md\n?? docs/analytics-production-projection-write-restriction-20260907.md\n?? docs/analytics-public-method-gap-20260906.md\n?? docs/analytics-raw-followup-clock-audit-20260907.md\n?? docs/analytics-raw-learning-logic-20260907.md\n?? docs/analytics-raw-movement-interactions-20260907.md\n?? docs/analytics-recent-candidate-replay-20260907.md\n?? docs/analytics-recent-finishing-bridge-20260907.md\n?? docs/analytics-recent-timing-plan-20260907.md\n?? docs/analytics-recent-timing-result-20260907.md\n?? docs/analytics-recorded-penalty-candidate-plan-20260906.json\n?? docs/analytics-recorded-penalty-decomposition-20260906.md\n?? docs/analytics-recorded-penalty-result-20260906.md\n?? docs/analytics-recorded-sequence-maps-20260907.md\n?? docs/analytics-recovered-xg-evaluation-20260907.md\n?? docs/analytics-replay-comotion-investigation-20260907.md\n?? docs/analytics-retained-venue-shift-inventory-20260906.md\n?? docs/analytics-reviewed-feature-reconstruction-20260907.md\n?? docs/analytics-reviewed-goal-credit-partition-20260907.md\n?? docs/analytics-selected-timing-inference-20260907.md\n?? docs/analytics-selective-calibration-plan-20260906.json\n?? docs/analytics-shift-rink-recovery-spec-20260906.md\n?? docs/analytics-shooter-evidence-replay-20260906.md\n?? docs/analytics-shooter-offset-plan-20260907.md\n?? docs/analytics-shooter-offset-result-20260907.md\n?? docs/analytics-strength-partition-plan-20260906.json\n?? docs/analytics-targeted-timestamp-strength-fix-20260907.md\n?? docs/analytics-timing-candidate-plan-20260906.md\n?? docs/analytics-timing-candidate-result-20260906.md\n?? docs/analytics-timing-era-audit-plan-20260906.md\n?? docs/analytics-timing-era-audit-result-20260906.md\n?? docs/analytics-timing-loss-gate-plan-20260907.md\n?? docs/analytics-timing-loss-gate-result-20260907.md\n?? docs/analytics-timing-ridge10-plan-20260906.md\n?? docs/analytics-timing-ridge10-result-20260906.md\n?? docs/analytics-timing-shape-plan-20260907.md\n?? docs/analytics-timing-shape-result-20260907.md\n?? docs/analytics-timing-shrinkage-result-20260906.md\n?? docs/analytics-verified-feature-cache-proposal-20260906.md\n?? docs/analytics-verified-feature-reuse-result-20260906.md\n?? docs/analytics-xg-measured-improvement-20260907.md\n?? docs/analytics-zone-context-plan-20260906.json\n?? docs/analytics-zone-context-result-20260906.md\n?? docs/citrus-handoff-20260907/\n?? docs/feature_parity_audit-20260906.md\n?? packages/shared/src/utils/fparFoundation.test.ts\n?? packages/shared/src/utils/fparFoundation.ts\n?? scripts/proof/analyze_linked_transfer_pilot.py\n?? scripts/proof/archive_input_recovery_checkpoint.py\n?? scripts/proof/archive_method_checkpoint.py\n?? scripts/proof/audit_gamecenter_pass_sources.cjs\n?? scripts/proof/audit_legacy_xg_inputs.py\n?? scripts/proof/audit_movement_source_sample.py\n?? scripts/proof/audit_penalty_full_coverage.py\n?? scripts/proof/audit_penalty_source_sample.py\n?? scripts/proof/audit_possession_sensitivity.py\n?? scripts/proof/audit_prior_sog_fidelity.py\n?? scripts/proof/audit_public_routing.py\n?? scripts/proof/audit_raw_followup_clocks.py\n?? scripts/proof/audit_same_timestamp_events.mjs\n?? scripts/proof/audit_timing_eras.py\n?? scripts/proof/audit_timing_shrinkage.py\n?? scripts/proof/bounded_conditional_calibration.py\n?? scripts/proof/bridge_recent_finishing.py\n?? scripts/proof/build_body_review.py\n?? scripts/proof/build_independent_possession_pack.py\n?? scripts/proof/build_mission_handoff.py\n?? scripts/proof/build_pass_review_viewer.py\n?? scripts/proof/check_analytics_input_coverage.py\n?? scripts/proof/check_band_timing_weight.mjs\n?? scripts/proof/check_current_xg_checkpoint.py\n?? scripts/proof/check_earlier_shape_selection.mjs\n?? scripts/proof/check_earlier_timing_weight.mjs\n?? scripts/proof/check_fixed_timing_blend.mjs\n?? scripts/proof/check_followup_report_clocks.py\n?? scripts/proof/check_last_season_protocol.py\n?? scripts/proof/check_possession_landmark_consistency.py\n?? scripts/proof/check_refresh_ensemble.py\n?? scripts/proof/check_replay_nongoal_coverage.cjs\n?? scripts/proof/collect_development_award_narratives.py\n?? scripts/proof/collect_development_sog_reports.py\n?? scripts/proof/collect_linked_replay_sample.cjs\n?? scripts/proof/compose_player_finishing.py\n?? scripts/proof/decompose_forward_shooter.py\n?? scripts/proof/decompose_recorded_penalty.py\n?? scripts/proof/detect_review_bodies.py\n?? scripts/proof/detect_review_bodies.swift\n?? scripts/proof/diagnose_expanded_timing.py\n?? scripts/proof/diagnose_recent_residuals.py\n?? scripts/proof/evaluate_frozen_last_season.py\n?? scripts/proof/evaluate_possession_retention.py\n?? scripts/proof/evaluate_recovered_xg.py\n?? scripts/proof/export_last_season_candidate_features.py\n?? scripts/proof/export_passing_review_packets.py\n?? scripts/proof/export_recorded_sequence_maps.py\n?? scripts/proof/feature_parity_audit_tests.py\n?? scripts/proof/finishing_quantity_contract.py\n?? scripts/proof/forward_shooter_split.py\n?? scripts/proof/inspect_moneypuck_dictionary.py\n?? scripts/proof/inspect_movement_residual_context.mjs\n?? scripts/proof/inspect_rejected_tracking_handoffs.py\n?? scripts/proof/inventory_all_pbp_fields.cjs\n?? scripts/proof/joint_residual_inference.py\n?? scripts/proof/lateral_grid_inference.py\n?? scripts/proof/partition_reviewed_goal_credit.py\n?? scripts/proof/pass-review-viewer.html\n?? scripts/proof/pass-review-viewer.js\n?? scripts/proof/pilot_pl_onice_membership.py\n?? scripts/proof/possession-blind-review.html\n?? scripts/proof/possession-review.js\n?? scripts/proof/prior_sog_fidelity.py\n?? scripts/proof/projection_write_access_regression.sql\n?? scripts/proof/projection_write_access_rollback.sql\n?? scripts/proof/prove_bounded_conditional.py\n?? scripts/proof/prove_offline_xg_bundle.py\n?? scripts/proof/prove_verified_movement_reuse.py\n?? scripts/proof/prove_verified_movement_reuse_v2.py\n?? scripts/proof/recent_timing_inference.py\n?? scripts/proof/reconcile_finishing_exposure.py\n?? scripts/proof/reconcile_hall_pass_landmarks.py\n?? scripts/proof/reconcile_knies_coverage.py\n?? scripts/proof/reconstruct_reviewed_features.py\n?? scripts/proof/refreshed_xg_ensemble.py\n?? scripts/proof/render_pass_landmarks.py\n?? scripts/proof/render_pass_video_review.py\n?? scripts/proof/repair_reviewed_score_origin.py\n?? scripts/proof/replay_movement_challengers.py\n?? scripts/proof/replay_movement_coverage.py\n?? scripts/proof/replay_prior_reason_geometry.py\n?? scripts/proof/replay_recent_candidate.py\n?? scripts/proof/replay_refreshed_xg.py\n?? scripts/proof/replay_shooter_evidence.py\n?? scripts/proof/reproduce_legacy_rebound_index.py\n?? scripts/proof/review_bounded_timing_prior.mjs\n?? scripts/proof/review_calibration_stability.mjs\n?? scripts/proof/review_calibration_transfer.mjs\n?? scripts/proof/review_comotion_unseen.py\n?? scripts/proof/review_conditional_shape_candidate.mjs\n?? scripts/proof/review_development_sog_reports.py\n?? scripts/proof/review_development_sog_v2.py\n?? scripts/proof/review_event_memory.mjs\n?? scripts/proof/review_five_calibration_ideas.mjs\n?? scripts/proof/review_forward_shooter_decomposition.mjs\n?? scripts/proof/review_forward_shooter_movement.mjs\n?? scripts/proof/review_knies_goalie_role.py\n?? scripts/proof/review_last_season_evaluation.py\n?? scripts/proof/review_method_challengers.mjs\n?? scripts/proof/review_movement_candidate.mjs\n?? scripts/proof/review_movement_vectors.py\n?? scripts/proof/review_recent_timing.mjs\n?? scripts/proof/review_recorded_penalty_candidate.mjs\n?? scripts/proof/review_recorded_penalty_decomposition.mjs\n?? scripts/proof/review_refresh_metrics.mjs\n?? scripts/proof/review_shooter_offset.mjs\n?? scripts/proof/review_targeted_adjustments.py\n?? scripts/proof/review_timing_candidate.mjs\n?? scripts/proof/review_timing_eras.mjs\n?? scripts/proof/review_timing_loss_gate.mjs\n?? scripts/proof/review_timing_ridge10.mjs\n?? scripts/proof/review_timing_shape.mjs\n?? scripts/proof/review_zone_context_candidate.mjs\n?? scripts/proof/review_zone_inference_batches.py\n?? scripts/proof/review_zone_inference_batches_v2.py\n?? scripts/proof/review_zone_source_vectors.py\n?? scripts/proof/revisit_pbp_tracking_sources.cjs\n?? scripts/proof/run_bounded_timing_prior.py\n?? scripts/proof/run_bounded_xg_refresh.py\n?? scripts/proof/run_calibration_stability.py\n?? scripts/proof/run_calibration_transfer.py\n?? scripts/proof/run_composed_xg_replay.py\n?? scripts/proof/run_conditional_shape_candidate.py\n?? scripts/proof/run_event_memory_candidate.py\n?? scripts/proof/run_forward_shooter_movement.py\n?? scripts/proof/run_forward_shooter_movement_v2.py\n?? scripts/proof/run_identity_probability.py\n?? scripts/proof/run_identity_probability_v2.py\n?? scripts/proof/run_movement_candidate.py\n?? scripts/proof/run_movement_interactions.py\n?? scripts/proof/run_movement_loss_weights.py\n?? scripts/proof/run_pass_factor_percentages.py\n?? scripts/proof/run_prequential_calibration.py\n?? scripts/proof/run_raw_learning_logic.py\n?? scripts/proof/run_recent_timing.py\n?? scripts/proof/run_recorded_penalty_candidate.py\n?? scripts/proof/run_selective_calibration.py\n?? scripts/proof/run_shooter_offset.py\n?? scripts/proof/run_strength_partition_candidate.py\n?? scripts/proof/run_timing_candidate.py\n?? scripts/proof/run_timing_loss_gate.py\n?? scripts/proof/run_timing_ridge10.py\n?? scripts/proof/run_timing_shape.py\n?? scripts/proof/run_zone_context_candidate.py\n?? scripts/proof/save_alignment_clip.py\n?? scripts/proof/selected_timing_candidate.py\n?? scripts/proof/targeted_xg_inference.py\n?? scripts/proof/test_analytics_input_coverage.py\n?? scripts/proof/test_audit_prior_sog_fidelity.py\n?? scripts/proof/test_audit_raw_followup_clocks.py\n?? scripts/proof/test_audit_timing_eras.py\n?? scripts/proof/test_audit_timing_shrinkage.py\n?? scripts/proof/test_bounded_conditional_calibration.py\n?? scripts/proof/test_bounded_conditional_review.py\n?? scripts/proof/test_bounded_timing_prior.py\n?? scripts/proof/test_bridge_recent_finishing.py\n?? scripts/proof/test_calibration_stability_review.py\n?? scripts/proof/test_calibration_transfer_review.py\n?? scripts/proof/test_check_followup_report_clocks.py\n?? scripts/proof/test_collect_development_sog_reports.py\n?? scripts/proof/test_compose_player_finishing.py\n?? scripts/proof/test_composed_xg.py\n?? scripts/proof/test_continuous_event_movement.py\n?? scripts/proof/test_continuous_movement_units.py\n?? scripts/proof/test_current_xg_checkpoint.py\n?? scripts/proof/test_decompose_forward_shooter.py\n?? scripts/proof/test_decompose_forward_shooter_review.py\n?? scripts/proof/test_decompose_recorded_penalty.py\n?? scripts/proof/test_decompose_recorded_penalty_review.py\n?? scripts/proof/test_diagnose_expanded_timing.py\n?? scripts/proof/test_diagnose_recent_residuals.py\n?? scripts/proof/test_evaluate_recovered_xg.py\n?? scripts/proof/test_finishing_quantity_contract.py\n?? scripts/proof/test_five_calibration_ideas.py\n?? scripts/proof/test_forward_shooter_movement_review.py\n?? scripts/proof/test_forward_shooter_movement_v2_review.py\n?? scripts/proof/test_forward_shooter_split.py\n?? scripts/proof/test_grid_context_calibration.py\n?? scripts/proof/test_grid_context_units.py\n?? scripts/proof/test_inspect_moneypuck_dictionary.py\n?? scripts/proof/test_joint_residual_adjustments.py\n?? scripts/proof/test_joint_residual_units.py\n?? scripts/proof/test_lateral_time_grid.py\n?? scripts/proof/test_lateral_time_grid_units.py\n?? scripts/proof/test_legacy_serving_diagnostics.py\n?? scripts/proof/test_legacy_xg_feature_diagnostics.py\n?? scripts/proof/test_movement_interactions.py\n?? scripts/proof/test_partition_reviewed_goal_credit.py\n?? scripts/proof/test_prior_reason_geometry.py\n?? scripts/proof/test_prior_reason_geometry_units.py\n?? scripts/proof/test_prior_sog_fidelity.py\n?? scripts/proof/test_prior_sog_fidelity_review.py\n?? scripts/proof/test_prove_bounded_conditional.py\n?? scripts/proof/test_prove_offline_xg_bundle_review.py\n?? scripts/proof/test_recent_timing_inference.py\n?? scripts/proof/test_reconcile_finishing_exposure.py\n?? scripts/proof/test_reconstruct_reviewed_features.py\n?? scripts/proof/test_refreshed_ensemble.py\n?? scripts/proof/test_repair_reviewed_score_origin.py\n?? scripts/proof/test_replay_shooter_evidence.py\n?? scripts/proof/test_review_calibration_stability.mjs\n?? scripts/proof/test_review_calibration_transfer.mjs\n?? scripts/proof/test_review_conditional_shape_candidate.mjs\n?? scripts/proof/test_review_development_sog_reports.py\n?? scripts/proof/test_review_development_sog_v2.py\n?? scripts/proof/test_review_forward_shooter_decomposition.mjs\n?? scripts/proof/test_review_forward_shooter_movement.mjs\n?? scripts/proof/test_review_method_challengers.mjs\n?? scripts/proof/test_review_movement_candidate.mjs\n?? scripts/proof/test_review_recorded_penalty_candidate.mjs\n?? scripts/proof/test_review_recorded_penalty_decomposition.mjs\n?? scripts/proof/test_review_timing_candidate.mjs\n?? scripts/proof/test_review_timing_eras.mjs\n?? scripts/proof/test_review_timing_ridge10.mjs\n?? scripts/proof/test_review_zone_context_candidate.mjs\n?? scripts/proof/test_review_zone_inference_batches_v2.py\n?? scripts/proof/test_review_zone_source_vectors.py\n?? scripts/proof/test_run_calibration_stability.py\n?? scripts/proof/test_run_calibration_transfer.py\n?? scripts/proof/test_run_conditional_shape_candidate.py\n?? scripts/proof/test_run_event_memory_candidate.py\n?? scripts/proof/test_run_forward_shooter_movement.py\n?? scripts/proof/test_run_forward_shooter_movement_v2.py\n?? scripts/proof/test_run_identity_probability.py\n?? scripts/proof/test_run_identity_probability_v2.py\n?? scripts/proof/test_run_movement_candidate.py\n?? scripts/proof/test_run_prequential_calibration.py\n?? scripts/proof/test_run_recent_timing.py\n?? scripts/proof/test_run_recorded_penalty_candidate.py\n?? scripts/proof/test_run_recorded_penalty_candidate_review.py\n?? scripts/proof/test_run_selective_calibration.py\n?? scripts/proof/test_run_strength_partition_candidate.py\n?? scripts/proof/test_run_timing_loss_gate.py\n?? scripts/proof/test_run_zone_context_candidate.py\n?? scripts/proof/test_selected_timing_candidate.py\n?? scripts/proof/test_shooter_offset.py\n?? scripts/proof/test_targeted_last_season_adjustments.py\n?? scripts/proof/test_targeted_xg_inference.py\n?? scripts/proof/test_timing_candidate_runner_review.py\n?? scripts/proof/test_timing_conditional_calibration.py\n?? scripts/proof/test_timing_conditional_review.py\n?? scripts/proof/test_timing_eras_review.py\n?? scripts/proof/test_timing_ridge10.py\n?? scripts/proof/test_timing_ridge10_runner.py\n?? scripts/proof/test_timing_shape.py\n?? scripts/proof/test_tracked_comotion_pilot.py\n?? scripts/proof/timing_conditional_calibration.py\n?? scripts/proof/timing_conditional_calibration_ridge10.py\n?? supabase/migrations/20260907050403_restrict_global_projected_stats_writes.sql",
+  "preserved_uncommitted_files": {
+    "DATA_INVENTORY.md": {
+      "sha256": "4a1d8bb7680a59c62e1fdffa16c35da5eca20802ca0c1cbd46b4f36151267916",
+      "bytes": 95163
+    },
+    "data-pipeline/projections/calculate_daily_projections.py": {
+      "sha256": "6c540718c9469c9dbee4b52d63b7948420e868d4fa4ba7afc99f4e19aa45af78",
+      "bytes": 141376
+    },
+    "data-pipeline/projections/conditional_calibration_shape.py": {
+      "sha256": "a53b0b8f4667d00f50f9b1b232991c21486d622ad26b0c7a21b7d1b5bc697ad6",
+      "bytes": 10316
+    },
+    "data-pipeline/projections/event_memory_features.py": {
+      "sha256": "a90c0c600c046afc03d46cfe45a5e611e3bece2e43e6742f983b453e10ac5725",
+      "bytes": 5295
+    },
+    "data-pipeline/projections/fixed_feature_transform.py": {
+      "sha256": "bd5e53394cd59b474dfd072cac35f111063909c2b1f2602846c02ccbfb33d80c",
+      "bytes": 5327
+    },
+    "data-pipeline/projections/identity_probability.py": {
+      "sha256": "d640d742522c5177d23657d0e1f1b621389ea2365eb2aaab7fb24116f5da3acd",
+      "bytes": 11504
+    },
+    "data-pipeline/projections/identity_probability_v2.py": {
+      "sha256": "61b71b675ac36d251320060cc8029b6104225d20a4045a8c5f7cf7f4ca587ef0",
+      "bytes": 16417
+    },
+    "data-pipeline/projections/nightly_projection_batch.py": {
+      "sha256": "9259bfe5da500993aacb085487405d8a01d2d3510e2d3b49a3e11c8993d7fac5",
+      "bytes": 44424
+    },
+    "data-pipeline/projections/offline_xg_bundle.py": {
+      "sha256": "54b489e339b91ab0176428ed5efe59c0466d088405161e2d981efcc14b8c7be2",
+      "bytes": 8071
+    },
+    "data-pipeline/projections/passing_sequence_geometry.py": {
+      "sha256": "313983c8750459045391db472a45eaa2c65160f087024353c9daef0944dc0e04",
+      "bytes": 2439
+    },
+    "data-pipeline/projections/passing_sequence_review.py": {
+      "sha256": "0198a7da57748a36a45b611f5089f9e3875666cf6fd01463cf6c62cd842d7047",
+      "bytes": 6872
+    },
+    "data-pipeline/projections/passing_system.py": {
+      "sha256": "1241ae56215caeb791085aa84d99b0be30bcd2e2629ba71879dc847c109e1d62",
+      "bytes": 9325
+    },
+    "data-pipeline/projections/passing_time_alignment.py": {
+      "sha256": "6595acc2e80213d5fb8969f544b548a2ae464f603234d24c4005394a497e617c",
+      "bytes": 4114
+    },
+    "data-pipeline/projections/pl_onice_membership.py": {
+      "sha256": "2b90c9df636942b08743828cd9648e9c47b3bc8ec15c1f580b96fe51176c25f8",
+      "bytes": 11849
+    },
+    "data-pipeline/projections/possession_candidates.py": {
+      "sha256": "bf37889ab8002895ea7a675a9d9181ffdab473b4820981f2564a34d8d238a2fb",
+      "bytes": 3954
+    },
+    "data-pipeline/projections/possession_evidence.py": {
+      "sha256": "8ded5665db069b4ee2fce3aa5d1350bd787f43d761d9254a35af26f6b078f9be",
+      "bytes": 3490
+    },
+    "data-pipeline/projections/possession_probability.py": {
+      "sha256": "ab15387fd9b0bce502be9dc8ff21ce4fe8095a2dc402a3d219ea52e89f02b708",
+      "bytes": 8366
+    },
+    "data-pipeline/projections/possession_review_import.py": {
+      "sha256": "78569c7297aa46dc9d1cbc70a4accbf87d52885b9eb1044a8162c74056800d7a",
+      "bytes": 4830
+    },
+    "data-pipeline/projections/possession_source_validation.py": {
+      "sha256": "cf63dc3d96984ff6a2b3c8624d6090959db7d74010c90dd7cff2b47a778f6f01",
+      "bytes": 854
+    },
+    "data-pipeline/projections/pre_shot_history.py": {
+      "sha256": "b0e0e2f9349addc355754eec5e5795ff11f7a5382ca3f437efe040f181e1ce6d",
+      "bytes": 5391
+    },
+    "data-pipeline/projections/pre_shot_movement.py": {
+      "sha256": "ac0d3a8bfadaf3166221c8fc12e83bc205517717c207b4181035e2377e3bbdaf",
+      "bytes": 3811
+    },
+    "data-pipeline/projections/pre_shot_penalty_context.py": {
+      "sha256": "34b2757063167b2b78b279ec50a5f2bb8f2511e4e927daea231968d83811ecf6",
+      "bytes": 6139
+    },
+    "data-pipeline/projections/pre_shot_zone_context.py": {
+      "sha256": "24a672c4c9cc7ffbf27c2a8047dbb3442fd67e596d47aeb0115cde43d124e43e",
+      "bytes": 5061
+    },
+    "data-pipeline/projections/prequential_calibration.py": {
+      "sha256": "53a234a723ebf22278a9a65be1aca8a1ac4dd101da22958fed53aa9e0246d40e",
+      "bytes": 9309
+    },
+    "data-pipeline/projections/recorded_penalty_features.py": {
+      "sha256": "207114e16efbb765795e9cac6d0c6620b32a7bdd88a7a3322397211e9ffbec69",
+      "bytes": 13067
+    },
+    "data-pipeline/projections/recorded_sequence_map.py": {
+      "sha256": "5ef5533c9e6f79f0a6822ce02602c8e0a4dc6b0b4ebe279175a34b2ad7e75bb6",
+      "bytes": 4468
+    },
+    "data-pipeline/projections/selective_calibration.py": {
+      "sha256": "2a6b5d4d2e8642032632a3657630f8026df65c81db76bf37ada355cc22fea5ca",
+      "bytes": 6153
+    },
+    "data-pipeline/projections/strength_partition_candidate.py": {
+      "sha256": "6481ccc21495b8fc2fd727672e620c972ee05e1bd94cee9ff6dba3fed86eae11",
+      "bytes": 8560
+    },
+    "data-pipeline/projections/tracked_comotion_candidates.py": {
+      "sha256": "6ebd91f1ff04728848a36bf21485bdd85ded86f76c218ba97ec2b372c9f45aa4",
+      "bytes": 4208
+    },
+    "data-pipeline/projections/tracked_transfer_candidates.py": {
+      "sha256": "39ae14685cc9d3229ec4b63f2fc2c2d86ca5fcbf96a50726d43b17383f20878e",
+      "bytes": 3368
+    },
+    "data-pipeline/projections/verified_movement_reuse.py": {
+      "sha256": "16cb4da8214b5b47640284c4168ddc927dffe4b29c7cd32f61f74b6dec82250d",
+      "bytes": 10808
+    },
+    "data-pipeline/projections/verified_movement_reuse_v2.py": {
+      "sha256": "0bc8a642fb7edc9e1fab58ee91c56cbb5bce5dfcf345eba110f2402ab1f522cc",
+      "bytes": 11750
+    },
+    "data-pipeline/projections/xg_candidate_inference.py": {
+      "sha256": "b5ae09ac2bc2f9e808046e49b491b67fcfc31e869b17d22879de915ac06feb91",
+      "bytes": 7534
+    },
+    "data-pipeline/tests/test_analytics_scope_coverage.py": {
+      "sha256": "2941d7fed3b645c4f13163dcdcb98a4a947e31d22f411699cec47066ed3324df",
+      "bytes": 674
+    },
+    "data-pipeline/tests/test_conditional_calibration_shape.py": {
+      "sha256": "1c7e26a5ac2eacdf2246712a67e786847291a2d582dab4dda5c4809e303c2dbf",
+      "bytes": 5635
+    },
+    "data-pipeline/tests/test_conditional_calibration_shape_review.py": {
+      "sha256": "78ba187142862206f89a59f665191e3695249cacc45d09ae3a4bb1d8feb33b4b",
+      "bytes": 5025
+    },
+    "data-pipeline/tests/test_daily_projection_xg_availability.py": {
+      "sha256": "9cf400e1615a78c22b549262e86320c388f9a166e763c75fb8ea130176e6bbfa",
+      "bytes": 6211
+    },
+    "data-pipeline/tests/test_event_memory_features.py": {
+      "sha256": "1478ca57e3886ac5b8b6b02e70cec5d59ac28d03e53c6463438da3ea82456519",
+      "bytes": 2844
+    },
+    "data-pipeline/tests/test_event_memory_geometry.py": {
+      "sha256": "152d9fa93b833a7c2cc03227d5d96e2ef1d3c33f2ffe974582061256f41e7926",
+      "bytes": 1977
+    },
+    "data-pipeline/tests/test_fixed_feature_transform.py": {
+      "sha256": "16394721c90dd1b24602425b481150c08f823d258143c62b740fb4f388993a6e",
+      "bytes": 3465
+    },
+    "data-pipeline/tests/test_identity_probability.py": {
+      "sha256": "d613223cbeca62d48ea7ce12773694e6ab2392b88abca24cbf1703c19e066244",
+      "bytes": 6722
+    },
+    "data-pipeline/tests/test_identity_probability_v2.py": {
+      "sha256": "9afcbd1fa164f7e5c845a101a22f7cbdb5115fc92d4f71e7d451d62fc475f6c7",
+      "bytes": 8229
+    },
+    "data-pipeline/tests/test_legacy_finishing_uncertainty_diagnostics.py": {
+      "sha256": "63eda5713daa5919850b43190f61f2fce105d3fa032af57412136faa12ae9729",
+      "bytes": 4531
+    },
+    "data-pipeline/tests/test_legacy_powerplay_diagnostics.py": {
+      "sha256": "d4f6c7d2459d01bd69631ace372fb52f47d22b72523014bda8c7ce9c53179e3b",
+      "bytes": 4301
+    },
+    "data-pipeline/tests/test_movement_transform_integration.py": {
+      "sha256": "0fdf42164cdcb3dfa364830fd1a36fde0468f7968c2009a80d4c70f0c448c53a",
+      "bytes": 2581
+    },
+    "data-pipeline/tests/test_nightly_projection_health.py": {
+      "sha256": "1bc2efb6290d7164f26c0db379225764f03d61e4e76044fd33b4e012d8f58ff8",
+      "bytes": 9338
+    },
+    "data-pipeline/tests/test_nightly_ros_rebuild.py": {
+      "sha256": "ceb5cfb47f10a8802e86acc6fc658a1365707d3352eb25c2f81a98fe594ed610",
+      "bytes": 10629
+    },
+    "data-pipeline/tests/test_offline_xg_bundle.py": {
+      "sha256": "060e7561b87140398df908474e0e7d3d5273c3a59f5e4ec0fd65c2e2aa5ebb2c",
+      "bytes": 4615
+    },
+    "data-pipeline/tests/test_offline_xg_bundle_review.py": {
+      "sha256": "2496ab7c7e94315fd24e3ff3df1173041739c36047be40c0d43a0a7593afbdba",
+      "bytes": 5303
+    },
+    "data-pipeline/tests/test_passing_sequence_geometry.py": {
+      "sha256": "1c3bf2dfe8c4ee1afe01cade2da7688b0576f2fc74c5986aa27df9309724e807",
+      "bytes": 1993
+    },
+    "data-pipeline/tests/test_passing_sequence_review.py": {
+      "sha256": "c2303127ed29a8eb294fc6d8f1f9e3c98aae4c0215d6b08ec1711dbd04a035a1",
+      "bytes": 3336
+    },
+    "data-pipeline/tests/test_passing_system.py": {
+      "sha256": "3a6c65cae488de237c34adf6da50765d456d62168b304b37812b2b606dab0670",
+      "bytes": 4764
+    },
+    "data-pipeline/tests/test_passing_time_alignment.py": {
+      "sha256": "b47730449e97c325e4dbd1417e26bd974688c8240a42068a0c2a4020270b614f",
+      "bytes": 1238
+    },
+    "data-pipeline/tests/test_pl_onice_membership.py": {
+      "sha256": "ca974c22aeff24846159b2973031f0952c0f2e6b28a2aca8a442a73a9d959894",
+      "bytes": 3375
+    },
+    "data-pipeline/tests/test_pl_onice_membership_review.py": {
+      "sha256": "3e48695573277dc5da895caa9072f76f4a7415faf19062ec9fccf8a4285099f4",
+      "bytes": 6571
+    },
+    "data-pipeline/tests/test_portable_batch_invariance.py": {
+      "sha256": "a84a459d41d5e5e22b952d546b24cb56b503e7fcbcc25fd5640166c137a25383",
+      "bytes": 2204
+    },
+    "data-pipeline/tests/test_possession_candidates.py": {
+      "sha256": "1ffeb42370e9653b81420d994561d01c3372116fd9436a46a887d0cd7c3eefab",
+      "bytes": 1609
+    },
+    "data-pipeline/tests/test_possession_evidence.py": {
+      "sha256": "70c25beffa5762f3fb4aaedbc3c35c6e0ace4f10688d023c9f3f277e42227d3a",
+      "bytes": 1721
+    },
+    "data-pipeline/tests/test_possession_goalie_role.py": {
+      "sha256": "26ae00286b571db71bd7fa7452fde6b26b696748bebc848b85abfeea7a355cb4",
+      "bytes": 1054
+    },
+    "data-pipeline/tests/test_possession_label_integrity.py": {
+      "sha256": "2247f5a0912c7d1ef6c9a921ffe16baa2bcdd1267b344e4bac67f8ae81f1b658",
+      "bytes": 2497
+    },
+    "data-pipeline/tests/test_possession_probability.py": {
+      "sha256": "a2710226cae1275a1a3a89062f4e16b50f01e51ff5dfb803273500a7728facc5",
+      "bytes": 2745
+    },
+    "data-pipeline/tests/test_possession_retention.py": {
+      "sha256": "cfa3149dfa4e1c29bfe0eec448fcd5dd5b4366b7a96d3a9864e10bb29b2cb110",
+      "bytes": 1417
+    },
+    "data-pipeline/tests/test_possession_review_end_to_end.py": {
+      "sha256": "95e433bdae470ebf622e37210b3731b5ab61fb8b7cca43ac0445abb446626761",
+      "bytes": 2156
+    },
+    "data-pipeline/tests/test_possession_review_import.py": {
+      "sha256": "8634bfb9eab0ee40d1d7dab239a4e8f9f13b685f148ea4e74617990256328f74",
+      "bytes": 4314
+    },
+    "data-pipeline/tests/test_possession_role_evidence.py": {
+      "sha256": "7778ed47124a473add342f5d7bf44cfe1e226920617ef20db53195216f1e1d13",
+      "bytes": 1732
+    },
+    "data-pipeline/tests/test_possession_source_validation.py": {
+      "sha256": "056b2aa78b3d855a73047e86e73dd92c15bfba2fde478d059a6cd57d2a032a7c",
+      "bytes": 1025
+    },
+    "data-pipeline/tests/test_pre_shot_history.py": {
+      "sha256": "b6481e9dd6f55ee9c269cbbb63dec85ca5467fb1930213f10bf138bfc3726a9d",
+      "bytes": 5351
+    },
+    "data-pipeline/tests/test_pre_shot_movement.py": {
+      "sha256": "e352e18ae8a9e68f6723a0132a1a7cf5bd0648ce2cd39856b62753c4ef6dca7e",
+      "bytes": 3178
+    },
+    "data-pipeline/tests/test_pre_shot_movement_review.py": {
+      "sha256": "2b2eacfef5fc18620ad20a5f58757e980d6bbafb5c1fb563f829a4e61e635d81",
+      "bytes": 3290
+    },
+    "data-pipeline/tests/test_pre_shot_penalty_context.py": {
+      "sha256": "0855f5ed854be0b2534602e3a7646abfaf1b7d4d6c7f8de4c4ac7f987d27571a",
+      "bytes": 6195
+    },
+    "data-pipeline/tests/test_pre_shot_penalty_context_review.py": {
+      "sha256": "2716de738a50633ffbbdf94813c8fa0e522d8e9bfff915ebb6e4fd68d7326e8d",
+      "bytes": 3453
+    },
+    "data-pipeline/tests/test_pre_shot_zone_context.py": {
+      "sha256": "08a2213cbae1e1e0918434e92eee68c4711ba4114b21fbb9616229200a207b46",
+      "bytes": 3718
+    },
+    "data-pipeline/tests/test_pre_shot_zone_context_review.py": {
+      "sha256": "73f6a474cef3533ac252b4025d358cb1b801d8bbddf34cae41a39984410a917f",
+      "bytes": 3050
+    },
+    "data-pipeline/tests/test_prequential_calibration.py": {
+      "sha256": "b6ecd41dce8f0ac7cadc3e5e5d5faa9a6ab01ad7b38c60c419b5d288d068b8b4",
+      "bytes": 6374
+    },
+    "data-pipeline/tests/test_projection_source_contracts.py": {
+      "sha256": "ac9b02163503189c174089b00a1933e2650355fec317cb59f65f54ad951a96ed",
+      "bytes": 2994
+    },
+    "data-pipeline/tests/test_recorded_penalty_features.py": {
+      "sha256": "98b3cdcb54ce805ff81a6d5d9a3796dacad0e0bc1bd6afa1f5a290bd862aaa74",
+      "bytes": 9278
+    },
+    "data-pipeline/tests/test_recorded_penalty_features_review.py": {
+      "sha256": "fc28f0821976e36254b684b8efd969e68d1a91b56214912dc2904ff23e5d95cc",
+      "bytes": 6720
+    },
+    "data-pipeline/tests/test_recorded_sequence_map.py": {
+      "sha256": "21526d38c14730e7f79c5b4c00d2698b4beb1c91896f65794515d8ea7b6c6d43",
+      "bytes": 2404
+    },
+    "data-pipeline/tests/test_selective_calibration.py": {
+      "sha256": "e29684df5bacaebe91a5d4180686b05d9d7dbf8bab67e2077d23f0ec85ff2873",
+      "bytes": 4445
+    },
+    "data-pipeline/tests/test_strength_partition_candidate.py": {
+      "sha256": "5df9f17f386e74e9a209814a94c44b13106b80e49a0c588019385fff042ae012",
+      "bytes": 3468
+    },
+    "data-pipeline/tests/test_tracked_comotion_candidates.py": {
+      "sha256": "744d1746f98a6a2d1f4491371d112ba3fe90ccea4b792aae5a0927d53cc88b7d",
+      "bytes": 2054
+    },
+    "data-pipeline/tests/test_tracked_transfer_candidates.py": {
+      "sha256": "89466bd3f56b37178b7fa61ba207bf3edf4ef72cdeafe272faeedcf5f08e7713",
+      "bytes": 1236
+    },
+    "data-pipeline/tests/test_verified_movement_reuse.py": {
+      "sha256": "4fed3536555401c4a263ae965eaae840d9e507b6b7130164de3d65f4984d1f44",
+      "bytes": 4118
+    },
+    "data-pipeline/tests/test_verified_movement_reuse_v2.py": {
+      "sha256": "2199c20d9b0b132538d4fd0b63ad0003f996ead6969a0ded1a770d160b3abe41",
+      "bytes": 5639
+    },
+    "data-pipeline/tests/test_video_review_coverage.py": {
+      "sha256": "7e51b0a987f6dedea34c0b05132e30ac2a760420b533126bc534832e0faa43f0",
+      "bytes": 2461
+    },
+    "docs/ANALYTICS_ACCEPTANCE.md": {
+      "sha256": "5d10512b380a048de3e7f24fdaec1532a8c95aa3664364c7bdb33bf55b060725",
+      "bytes": 44806
+    },
+    "docs/analytics-adaptive-calibration-archive-20260906.json": {
+      "sha256": "3b0d77f2b2d6072a42a1c8fd1b3ec95227c7204823d4e71cf759bd4662057a5a",
+      "bytes": 3548
+    },
+    "docs/analytics-adaptive-calibration-index-20260906.json": {
+      "sha256": "1ef3c98eef2b05b382367a97e09da479ed0bd8e9713f364643dbe5ef24509868",
+      "bytes": 4654
+    },
+    "docs/analytics-adaptive-calibration-integrity-20260906.json": {
+      "sha256": "d62270908b0e68d6e6f365a204d2d18ab5a2497f6550b2dfcfb16ba39ed65402",
+      "bytes": 10025
+    },
+    "docs/analytics-adaptive-calibration-result-20260906.md": {
+      "sha256": "f9768e3f2ec52e95b0fa8fbc46a50ccf3c74f8382795d0f23147211d81953eeb",
+      "bytes": 8759
+    },
+    "docs/analytics-adaptive-calibration-review-20260906.json": {
+      "sha256": "f5c0fa14599b8dfeba1015170a3fe436f8bdec5357747facab509e76a2949778",
+      "bytes": 2583
+    },
+    "docs/analytics-body-possession-prototype-20260907.md": {
+      "sha256": "2df28e837c5b0bc5e1eec44c6cd6ca3e6bc272c51aceefd6a2e5bf74b7d4cd61",
+      "bytes": 4506
+    },
+    "docs/analytics-bounded-calibration-execution-20260906.md": {
+      "sha256": "cf51de15e4b2c3da8815535cfb4e80c877ee2671463933e53fab8cfd14fd7dcc",
+      "bytes": 2844
+    },
+    "docs/analytics-bounded-calibration-result-20260906.md": {
+      "sha256": "eb349c4c444052a23f7e9b8d2d931e8e65f4c4ba26b69c0d702a37e775e80fd6",
+      "bytes": 3423
+    },
+    "docs/analytics-bounded-timing-prior-plan-20260907.md": {
+      "sha256": "5e0269de4f052f0c42d4e44db8d156c32ca280b5d979161485728d202d94024c",
+      "bytes": 1366
+    },
+    "docs/analytics-bounded-timing-prior-result-20260907.md": {
+      "sha256": "4915681cfb09314f14fa19db4cc0847de98b0352583002b2d132d877115614bd",
+      "bytes": 3749
+    },
+    "docs/analytics-calibration-stability-plan-20260906.json": {
+      "sha256": "9c9d2751ae71dc94a40207260368d0228aefd616184a0f32abb4441fa8fa9b54",
+      "bytes": 12576
+    },
+    "docs/analytics-calibration-stability-result-20260906.md": {
+      "sha256": "8ecb8cb95e1a2454297463897ad91d04dc93896f1a726992f9ab3e23c945955b",
+      "bytes": 5632
+    },
+    "docs/analytics-calibration-transfer-plan-20260906.json": {
+      "sha256": "f60544d9eb9ce69fb0c6041947d9c7bde401864cc69371e35f88f7622f909f6e",
+      "bytes": 16843
+    },
+    "docs/analytics-calibration-transfer-result-20260906.md": {
+      "sha256": "a83667e83f1f2ad5d376a6723f8d0cc8b9755a83049c1c7c86d969dc43573864",
+      "bytes": 5932
+    },
+    "docs/analytics-comotion-unseen-validation-20260907.md": {
+      "sha256": "528bee1b53e1d9a621060cc89f6fedb15fc2645bc6d8e2fcf0c5d57deb37d1d8",
+      "bytes": 4603
+    },
+    "docs/analytics-composed-player-finishing-20260907.md": {
+      "sha256": "789d5687a16af35ce50c68c4eb5d53553e760026d5fd2bf181de6d4d22dd4dd9",
+      "bytes": 3739
+    },
+    "docs/analytics-composed-xg-replay-20260907.md": {
+      "sha256": "54882ac03074fcaa94c3a2091d9a8a78689c95929bb7d67cb73ca8f4212555a1",
+      "bytes": 4369
+    },
+    "docs/analytics-conditional-shape-plan-20260906.json": {
+      "sha256": "6dfe3721f02d71fe9f5e610152ad53d69a51b2fbb9056cfc7c660b22dffe7767",
+      "bytes": 2288
+    },
+    "docs/analytics-conditional-shape-proposal-20260906.md": {
+      "sha256": "2d35d1d84c3227849273642a7f7fbfefb640e9d036432dcb592ba55732fda99a",
+      "bytes": 5248
+    },
+    "docs/analytics-conditional-shape-result-20260906.md": {
+      "sha256": "ef5866f2612fa843bc786a9e4107b0d8702d65cc3db6fdaa9c8befb59a24a9ec",
+      "bytes": 3480
+    },
+    "docs/analytics-continuous-event-movement-20260907.md": {
+      "sha256": "cae2235d7b1bf302516c445a6bdf56afff00fba0bdeeecb989457cd97932391f",
+      "bytes": 5601
+    },
+    "docs/analytics-current-xg-checkpoint-20260907.md": {
+      "sha256": "a09aec01ca930b35558c1ec5dfd525e2fb84597b6fd284aa360fd9a7142ad3e0",
+      "bytes": 3232
+    },
+    "docs/analytics-development-sog-review-20260907.md": {
+      "sha256": "43589ada5c10b38d8edb48a2bfc4798466a1ce196ffe4e7a1aae2a2d4b4e931d",
+      "bytes": 6167
+    },
+    "docs/analytics-earlier-shape-selection-20260907.md": {
+      "sha256": "d1bc9679c658f92214641ed0238de89fe34ee041e8914d6d0710ba2ccaedac93",
+      "bytes": 1802
+    },
+    "docs/analytics-event-memory-plan-20260906.json": {
+      "sha256": "0f2b35b63399426b401fb55352f37c905637fd658d4d4f418ef027f37ef6c4bf",
+      "bytes": 2486
+    },
+    "docs/analytics-event-memory-result-20260906.md": {
+      "sha256": "b02efad564b740f7725cd80b1ad510a82b3efdb86c4cc53376295f51050573ab",
+      "bytes": 2550
+    },
+    "docs/analytics-expanded-timing-diagnostic-20260907.md": {
+      "sha256": "966c08fe038a542b398cf4973b1738000341ef3f19b8925cd1c99fbd4092ec22",
+      "bytes": 3764
+    },
+    "docs/analytics-finishing-exposure-reconciliation-20260907.md": {
+      "sha256": "70fed0ffd4bc02b28bce483835d3bb41765e5ef8d1a7efcc7b103d41fac00942",
+      "bytes": 4538
+    },
+    "docs/analytics-finishing-live-source-check-20260907.json": {
+      "sha256": "9df109d4a7451bdeabf35686d914f4b4de2335206ab36d6d944ed8068ee61c6f",
+      "bytes": 1207
+    },
+    "docs/analytics-finishing-quantity-contract-20260906.md": {
+      "sha256": "5268ac08605b19c1d01a208939ae7ebea1241ec271f59f1ed0c15ffed7ca27f2",
+      "bytes": 2669
+    },
+    "docs/analytics-finishing-talent-preservation-20260906.md": {
+      "sha256": "997df611b03634f1b7d553c1e7e6a87b56ce85d5267bd12736aa7fc01c0e1760",
+      "bytes": 5675
+    },
+    "docs/analytics-five-calibration-ideas-20260907.md": {
+      "sha256": "bdc097b7237d3dcdc0c9f575f536b7a8f453a3c4d00dec2a3da9fdc1be3c0fe9",
+      "bytes": 3357
+    },
+    "docs/analytics-forward-shooter-decomposition-plan-20260906.md": {
+      "sha256": "aa79a619e76647de8c9496d89a8ac9517792f9d93e623130e28ff17bac133540",
+      "bytes": 2872
+    },
+    "docs/analytics-forward-shooter-decomposition-result-20260906.md": {
+      "sha256": "e9565f9ee9485a498c1d7827b4f8d5129e376b9e80df90341477ff988d082952",
+      "bytes": 6160
+    },
+    "docs/analytics-forward-shooter-execution-20260906.md": {
+      "sha256": "842ab560739fd66c9e448834cd083345ac1a2b72401943a79e1bb00443c26bfe",
+      "bytes": 3041
+    },
+    "docs/analytics-forward-shooter-movement-plan-20260906.json": {
+      "sha256": "144abff89374538279c0dde29ee737708c92e27a6c833c4c0dec94bfcfaa9cae",
+      "bytes": 8447
+    },
+    "docs/analytics-forward-shooter-result-20260906.md": {
+      "sha256": "19320e0ccee9faeb7be6a283ff20c514b45aa2042868ef1d715b7a7e2fbf4a39",
+      "bytes": 5653
+    },
+    "docs/analytics-fpar-foundation-adapter-20260906.md": {
+      "sha256": "b28b5c411d0c67857ebdcff4e140f95a058ef1e00ce5fcdff5749dc919ce12ba",
+      "bytes": 6376
+    },
+    "docs/analytics-frozen-last-season-evaluation-20260907.md": {
+      "sha256": "cd58e747f10b54cd1b35d4aca4280ef9cd008f7e0448712d67c9798f73817af1",
+      "bytes": 6180
+    },
+    "docs/analytics-full-pbp-preshot-review-20260907.md": {
+      "sha256": "60aa91726d7ac7dbe870f68d2eb8cbddbeb4cfe15dc95b7e4749615a4ed0158f",
+      "bytes": 7876
+    },
+    "docs/analytics-hall-pass-alignment-20260907.md": {
+      "sha256": "c9888009f8784a978f67368bc10912749c7aaae3f0792f1283482828d42a158b",
+      "bytes": 2570
+    },
+    "docs/analytics-identity-probability-plan-20260906.json": {
+      "sha256": "97834d03cbbcec6aeffd6e83119cce4e80ec30b61278bcc2a5f226b78f259b5c",
+      "bytes": 4311
+    },
+    "docs/analytics-identity-probability-v2-plan-20260906.json": {
+      "sha256": "40f40a6702ba0c7820ee17cbad92d4f443c1dc89d0983f699f02dc45a52761ac",
+      "bytes": 6359
+    },
+    "docs/analytics-independent-possession-review-pack-20260907.md": {
+      "sha256": "5fd8cceb4dabb5af750bee997e5892631936f3e292c65f6bf7987596d77a7750",
+      "bytes": 4322
+    },
+    "docs/analytics-input-coverage-ledger-20260906-v2.json": {
+      "sha256": "6956cca69520e5a412dcf0580fd03830f8af157d8ab69985c550b8d0a3c6a8bc",
+      "bytes": 422862
+    },
+    "docs/analytics-input-coverage-ledger-20260906-v3.json": {
+      "sha256": "e97707e5cfe5418653ca1ee6111b134a45b825381f89cf768444bb30fe993786",
+      "bytes": 430063
+    },
+    "docs/analytics-input-coverage-ledger-20260906-v4.json": {
+      "sha256": "7850e09da463a1ffa5b6d86a82f54519a8ab814c71312e17763b694477fd5f60",
+      "bytes": 447789
+    },
+    "docs/analytics-input-coverage-ledger-20260906-v5.json": {
+      "sha256": "e751800b2f3e6f5814c8e03966d7cab92b20ec7e3352bad8cf6750324d1cbd11",
+      "bytes": 474440
+    },
+    "docs/analytics-input-coverage-ledger-20260906-v6.json": {
+      "sha256": "ef25642df96858bc11aad8cd2e568a185966d1d92413c1d466760cf3b71a0a96",
+      "bytes": 339355
+    },
+    "docs/analytics-input-coverage-ledger-20260906-v7.json": {
+      "sha256": "f6c96e2762fb94f031bffb3a010a7068045fd6e5323008c87dabc9a204c45281",
+      "bytes": 359257
+    },
+    "docs/analytics-input-coverage-ledger-20260906-v8.json": {
+      "sha256": "81584825dfbf40e33826f99de376362fd4e79e4d7e8b5175c2a27c697f06e8b3",
+      "bytes": 368915
+    },
+    "docs/analytics-input-coverage-ledger-20260906.json": {
+      "sha256": "711992b83f6eee83f1a207ddc604629141b67efa7680d683d4e781b00a8d87d0",
+      "bytes": 394705
+    },
+    "docs/analytics-input-coverage-ledger-20260907-v9.json": {
+      "sha256": "8b02d4d1648f18bf3b7d5a1511ae0ebce26e2a81c03f5b536997feb5031c44d2",
+      "bytes": 375041
+    },
+    "docs/analytics-input-recovery-checkpoint-20260906.md": {
+      "sha256": "8284f44716c2ef5b3651dee242253bb17d772c879b73923d4abe387ca0544114",
+      "bytes": 7978
+    },
+    "docs/analytics-joint-residual-improvement-20260907.md": {
+      "sha256": "dd2a66adc077a2092374b5beb30141368db91b60c3c5d2ee5eebaec8866c10ce",
+      "bytes": 4522
+    },
+    "docs/analytics-lateral-time-grid-20260907.md": {
+      "sha256": "181eab3f1b9525f015733d37fd58131aecf92eb4165c521aaee9e93271b4a57c",
+      "bytes": 4526
+    },
+    "docs/analytics-legacy-input-parity-20260906.md": {
+      "sha256": "2409a0fb43ae59ce61dce4f66aa2beb568e1359ee0e0feb8c8d3dfa47d738b3b",
+      "bytes": 8653
+    },
+    "docs/analytics-legacy-serving-audit-20260906.md": {
+      "sha256": "560f7dd656648dfbceee223508818e78d740a225497a375efd25d3513bb51c64",
+      "bytes": 4636
+    },
+    "docs/analytics-linked-replay-pilot-20260907.md": {
+      "sha256": "a7a88e4fd64e31cecfd8d73072464cbbbea3ad02afe95067b6c716dfd4094c82",
+      "bytes": 4783
+    },
+    "docs/analytics-linked-tracking-source-revisit-20260907.md": {
+      "sha256": "b0a396c05134986552f59c51b4ac4fc36b77daf97eed267ca6439893945124d0",
+      "bytes": 3425
+    },
+    "docs/analytics-live-model-gap-20260906.md": {
+      "sha256": "1489972cfbeb451f3b1e9d1ea0ff126ced4839854ffef2eb8e5a587da46803b6",
+      "bytes": 11022
+    },
+    "docs/analytics-method-checkpoint-20260906.md": {
+      "sha256": "de5824b0060b79fcf6b1fdb5ab7aa9c883a8867378525d3e52d4f39603b65ef1",
+      "bytes": 6769
+    },
+    "docs/analytics-model-dependency-audit-20260906.md": {
+      "sha256": "cffa126bc141080955a2d6317c5f47624bd78e3a225699e4cfbae7dd9548e22b",
+      "bytes": 14413
+    },
+    "docs/analytics-moneypuck-schema-inspection-20260906.md": {
+      "sha256": "6b3bfa11bc4e8546806d7fbbbcd0d200ccbaabfd8a4b8c9ae0e573b06e769a74",
+      "bytes": 6595
+    },
+    "docs/analytics-movement-candidate-plan-20260906.json": {
+      "sha256": "b96a800aa6296bcda2893dfb15c36fcd32df99eb292884ea0d65a16b2b3e4517",
+      "bytes": 2746
+    },
+    "docs/analytics-movement-diagnostic-20260906.md": {
+      "sha256": "34eb86b1c584f26dd47bf85ffccdcd27a0741900a8f38c8a31f30b450df6338d",
+      "bytes": 6975
+    },
+    "docs/analytics-movement-loss-weights-20260907.md": {
+      "sha256": "99dd6e03cd70bac92155f191599b47d351201d50e66dad45139b99eec86fad9b",
+      "bytes": 2093
+    },
+    "docs/analytics-movement-residual-context-20260907.md": {
+      "sha256": "a260fdd24651bd28ca469cc748b3a8f10e5e1c6ff2083ed48b9809e0955a84bb",
+      "bytes": 3197
+    },
+    "docs/analytics-movement-result-20260906.md": {
+      "sha256": "3bb8e63f76aaebde2fdf27490e50170ee9a55ec82f5b280b7e6f1fcd66c6f167",
+      "bytes": 2755
+    },
+    "docs/analytics-nightly-forecast-health-20260906.md": {
+      "sha256": "82ebc7251c56ac2ef4c31c58c84fedf8454f6c7f94a74365727c0e8b9959b80d",
+      "bytes": 3891
+    },
+    "docs/analytics-offline-bundle-result-20260906.md": {
+      "sha256": "3f32abe2a66b47878615184f5bd5f75fd4c97a0c9646ad35930851f5bcf6eb89",
+      "bytes": 4774
+    },
+    "docs/analytics-pass-factor-percentages-20260907.md": {
+      "sha256": "93b34b3bf99f7ab33a2ae9ced3ed399da43154afeb8c2af5d27e8ced3742ad7a",
+      "bytes": 3587
+    },
+    "docs/analytics-pass-integration-source-gates-20260907.md": {
+      "sha256": "d6e4647f2ba1c7d6fa5143ac15e2a9dfd995f681cb36f3ba9f27d82e0403c2d0",
+      "bytes": 3116
+    },
+    "docs/analytics-pass-review-viewer-20260907.md": {
+      "sha256": "6aef8701dd1d2359c4c2f8e507ff21a256aacffb9e925d383156816851adf48d",
+      "bytes": 1808
+    },
+    "docs/analytics-passing-method-reproduction-20260907.md": {
+      "sha256": "81514aae70bf378fff8cccff99690063e975f2045496f92e8ce0c8daaae6f18c",
+      "bytes": 3237
+    },
+    "docs/analytics-passing-review-integration-20260907.md": {
+      "sha256": "c7931bfab47959bca0176e228bdad5a1ba993e2fcda461ce52ead8641343bf3f",
+      "bytes": 4446
+    },
+    "docs/analytics-passing-system-20260907.md": {
+      "sha256": "bf7fee88ec7deafd41f471b6f1bf8559a71fac363aca3522ff001574225e9c64",
+      "bytes": 4237
+    },
+    "docs/analytics-passing-video-validation-20260907.md": {
+      "sha256": "7c1070368e89d07516636f4492b6a3c96620ce0412efa1220ea6d583929c962b",
+      "bytes": 2637
+    },
+    "docs/analytics-penalty-full-coverage-result-20260906.md": {
+      "sha256": "60fcfd1b35f30ae4af0140c8c25cea53031ed4be00d903a00c15495a193389ce",
+      "bytes": 2836
+    },
+    "docs/analytics-pl-onice-parser-proposal-20260906.md": {
+      "sha256": "d743c85b456912c2a6b6f60b308d3de1600ee164f0e2b89492cceacc9cefd975",
+      "bytes": 4015
+    },
+    "docs/analytics-pl-onice-pilot-result-20260906.md": {
+      "sha256": "ffe5374fe361c3cfc837d99244342f39c36667dc14791eb7dff94accada78648",
+      "bytes": 1825
+    },
+    "docs/analytics-possession-goalie-role-20260907.md": {
+      "sha256": "3537e9ab980ff04272f32296b8cd3b7776cc9e9fe92194d540e8b7597bc31c79",
+      "bytes": 2708
+    },
+    "docs/analytics-possession-reliability-20260907.md": {
+      "sha256": "f31df944cf1ee6a6201436ec8ea23c41f207448724ff1a417d0f4b443a2d1013",
+      "bytes": 2474
+    },
+    "docs/analytics-possession-retention-20260907.md": {
+      "sha256": "632100a51439aca990bd2e9578c8424f3d53f55c41b68eb3afc8a3557d3d0c6f",
+      "bytes": 2945
+    },
+    "docs/analytics-possession-role-integration-20260907.md": {
+      "sha256": "81507661dfbf25a4344dcce4691c8c1d1ba1f1ca4d728db66f6d83b8248a5faf",
+      "bytes": 1989
+    },
+    "docs/analytics-possession-scoring-20260907.md": {
+      "sha256": "0675f416b0a81499912c2926c5c2a9222a588137126dbc9a15733aa56cbb180a",
+      "bytes": 4473
+    },
+    "docs/analytics-possession-video-coverage-20260907.md": {
+      "sha256": "81add6bceac1a34de9505023e18f78c93078239e18ec960e5f1faa60bbac71a0",
+      "bytes": 2620
+    },
+    "docs/analytics-powerplay-input-recovery-20260906.md": {
+      "sha256": "69fa4a17a3bd56a112142533544cd7b8fcb670366dd258138cadbfac5c6586bd",
+      "bytes": 9068
+    },
+    "docs/analytics-prequential-calibration-plan-20260906.json": {
+      "sha256": "00774da1c7fb1ccc67d5b937be9116dfe90ac28449fafa9a5a670df6abbc3548",
+      "bytes": 3624
+    },
+    "docs/analytics-prior-sog-fidelity-plan-20260906.md": {
+      "sha256": "323b2c1e886605255ac0e66eae87bd34fbf4e248b933292c35a2b7de754803a7",
+      "bytes": 2446
+    },
+    "docs/analytics-prior-sog-fidelity-result-20260906.md": {
+      "sha256": "92f02fee5f6dcb6a754a8d024a9cea9773dc468446f99d9d07aa8936eadc6a82",
+      "bytes": 5116
+    },
+    "docs/analytics-production-projection-ownership-20260907.md": {
+      "sha256": "8b577a0de4cd60a96e2921f906d8f416b79845c19c1fe3d365f6bbfb392e2548",
+      "bytes": 3334
+    },
+    "docs/analytics-production-projection-write-restriction-20260907.md": {
+      "sha256": "df37c9be052ca3c5300fe55e400e4d27e30883375f664347aa9c050750c8ed0f",
+      "bytes": 4166
+    },
+    "docs/analytics-public-method-gap-20260906.md": {
+      "sha256": "bfc2538af3c0f35701cbc72b735cb808811755a37a8510c83dc3fe08cce36f0b",
+      "bytes": 16401
+    },
+    "docs/analytics-raw-followup-clock-audit-20260907.md": {
+      "sha256": "a7f282b0eb185008a15ac07493672065c8a5d9ce40d726650fa06dd2a55c57ae",
+      "bytes": 4818
+    },
+    "docs/analytics-raw-learning-logic-20260907.md": {
+      "sha256": "a267236d3dcac7512c586473d1247759ef57cdc8f2a087b410e821d92309a004",
+      "bytes": 2288
+    },
+    "docs/analytics-raw-movement-interactions-20260907.md": {
+      "sha256": "075f00e9b54cd9d703aaf9b0136c50ca9276f60ccd61212f0e79d5a1ef661fda",
+      "bytes": 2143
+    },
+    "docs/analytics-recent-candidate-replay-20260907.md": {
+      "sha256": "e8b00a5c2bd41e5a25b9df40f64f1ecfcb617a04cac47534dd1e2069d77eef51",
+      "bytes": 2904
+    },
+    "docs/analytics-recent-finishing-bridge-20260907.md": {
+      "sha256": "283fb122b008983a44803c69b9aa58f9337402d44ee0a7db069548924930167d",
+      "bytes": 2780
+    },
+    "docs/analytics-recent-timing-plan-20260907.md": {
+      "sha256": "0c457cda1829d3428a121eee97039e55e694c804b023e0170fa4a47e21604a4a",
+      "bytes": 1966
+    },
+    "docs/analytics-recent-timing-result-20260907.md": {
+      "sha256": "4880a2245d6115558c0a9a8c492c5742707a5e31d020c597c93431c647653ff9",
+      "bytes": 4364
+    },
+    "docs/analytics-recorded-penalty-candidate-plan-20260906.json": {
+      "sha256": "ec85d8a967f0dd138ddce61944e3d106f0315be816910636e8123761c17b7367",
+      "bytes": 18876
+    },
+    "docs/analytics-recorded-penalty-decomposition-20260906.md": {
+      "sha256": "c413425fb2edf724dc7a008f62ca609b944bad7b36130f73080cb871d16184ff",
+      "bytes": 7220
+    },
+    "docs/analytics-recorded-penalty-result-20260906.md": {
+      "sha256": "8e7b4d21b705af3ebd7cc6c6ce0715649d76a720a3108623877ecb15abc98545",
+      "bytes": 5161
+    },
+    "docs/analytics-recorded-sequence-maps-20260907.md": {
+      "sha256": "d8b94ed9ef24499dd35eaf5374cd3415a0b2dfd28d0d3ad7fe3006ee3ac53a19",
+      "bytes": 4021
+    },
+    "docs/analytics-recovered-xg-evaluation-20260907.md": {
+      "sha256": "ed99174f182f715971a786e1535c02e9afa979485a2b3a3328267f0b17193677",
+      "bytes": 4313
+    },
+    "docs/analytics-replay-comotion-investigation-20260907.md": {
+      "sha256": "b6d06d3bb96e5d8ffb00fc6e5225aa4ca1118f803aff343a97b80af9fd49396b",
+      "bytes": 5093
+    },
+    "docs/analytics-retained-venue-shift-inventory-20260906.md": {
+      "sha256": "475865a53424f4789c05c83dc7404d79b3ae997ae7151111a7d1ac00ca9dd851",
+      "bytes": 4801
+    },
+    "docs/analytics-reviewed-feature-reconstruction-20260907.md": {
+      "sha256": "9be10b473faa5f79a4d8a3471653d4ddd94df1936f4a2d79dec598235c6bf308",
+      "bytes": 3399
+    },
+    "docs/analytics-reviewed-goal-credit-partition-20260907.md": {
+      "sha256": "335a946089765643e68b7fd20d8dc31887186f0465e33bf1a326610a5aec1238",
+      "bytes": 3258
+    },
+    "docs/analytics-selected-timing-inference-20260907.md": {
+      "sha256": "24285e5e84dbda2be364b9148a92d76ab7cc06a6c958056a0f23c1712c1b4a6b",
+      "bytes": 2334
+    },
+    "docs/analytics-selective-calibration-plan-20260906.json": {
+      "sha256": "b546ec83c234d594b6cc472876347fee5c971079830b2c7f9100afa9e4119b00",
+      "bytes": 2735
+    },
+    "docs/analytics-shift-rink-recovery-spec-20260906.md": {
+      "sha256": "3240099dc998b05b768009cebd6b892152c0541990917b4a8499a12551838611",
+      "bytes": 5878
+    },
+    "docs/analytics-shooter-evidence-replay-20260906.md": {
+      "sha256": "d9e76a9d09ab5a65a2af7f5153453b3578f26bdbed9eb776d8c95ec2962a972d",
+      "bytes": 3998
+    },
+    "docs/analytics-shooter-offset-plan-20260907.md": {
+      "sha256": "a4da4e488d120e5484f13361d7435e01abad2d0350515bac0488ea44c23e0648",
+      "bytes": 2568
+    },
+    "docs/analytics-shooter-offset-result-20260907.md": {
+      "sha256": "246cc248c9899b6bcea57db41138310cbd0f4768fc99af874f71efb2119d88a5",
+      "bytes": 3605
+    },
+    "docs/analytics-strength-partition-plan-20260906.json": {
+      "sha256": "492e664a32929853038e805028b8ff2ff2a3e14a60302f731dda6bc62f2891d2",
+      "bytes": 2622
+    },
+    "docs/analytics-targeted-timestamp-strength-fix-20260907.md": {
+      "sha256": "6a163d0c35fca41b93c487384f0920f572c52cc593728b637b110d5f07c1210d",
+      "bytes": 4565
+    },
+    "docs/analytics-timing-candidate-plan-20260906.md": {
+      "sha256": "406084699d40ddfc4b6c735ea6f0cdfd2d5188f131734fde0b85098d8595cb8c",
+      "bytes": 4068
+    },
+    "docs/analytics-timing-candidate-result-20260906.md": {
+      "sha256": "667c199b46c7a7eb618606b15e5995b45e1cb5c398a2e9865f226f01dbb95a74",
+      "bytes": 5882
+    },
+    "docs/analytics-timing-era-audit-plan-20260906.md": {
+      "sha256": "160481f8b77a2d833546077cb8ffc27ba77730d85c2ddd94b000c64ce8a77d9a",
+      "bytes": 3767
+    },
+    "docs/analytics-timing-era-audit-result-20260906.md": {
+      "sha256": "6d4aaef8b4ed079c8a2e45597d79bfce31faa436e43a3b165b87dc4a70547ced",
+      "bytes": 5486
+    },
+    "docs/analytics-timing-loss-gate-plan-20260907.md": {
+      "sha256": "a06479a7ca77ae61c496512e19ed29d5f60050f3046de26daa003f802ba37cca",
+      "bytes": 1287
+    },
+    "docs/analytics-timing-loss-gate-result-20260907.md": {
+      "sha256": "370b32e3b290dfbd1c16edcd8529c0c43dbfc38df7c07bb72971ba8232e0192b",
+      "bytes": 2767
+    },
+    "docs/analytics-timing-ridge10-plan-20260906.md": {
+      "sha256": "9153733a6251fb85726ae577d5a150f7e7bc713a000d82df5a89edff29c8a635",
+      "bytes": 1846
+    },
+    "docs/analytics-timing-ridge10-result-20260906.md": {
+      "sha256": "845a93acbae942d20dc626c2f0646cc6e6a42ddc4ecec5ed09a45c228ac011e9",
+      "bytes": 3485
+    },
+    "docs/analytics-timing-shape-plan-20260907.md": {
+      "sha256": "553f86a73145ff2f12f4b645e538fd355cab286c8674166244db0867666970ee",
+      "bytes": 1951
+    },
+    "docs/analytics-timing-shape-result-20260907.md": {
+      "sha256": "05b81cffe74b3138717fe669b75d361a6fba8bee945d0c32c366d3548955c840",
+      "bytes": 2919
+    },
+    "docs/analytics-timing-shrinkage-result-20260906.md": {
+      "sha256": "986b4be6fc5b4106551007cef143e55216b450b783355a935b94e995dc7ae024",
+      "bytes": 2707
+    },
+    "docs/analytics-verified-feature-cache-proposal-20260906.md": {
+      "sha256": "58ab3a5f87c3eaf5ce3bc215fab10c1af03badee619315ed59ef3ac1bb68043d",
+      "bytes": 5831
+    },
+    "docs/analytics-verified-feature-reuse-result-20260906.md": {
+      "sha256": "0f4beb207b6247f174a839afe74c8f40fbbae6a665be0eaee1c2ebdc87797694",
+      "bytes": 3748
+    },
+    "docs/analytics-xg-measured-improvement-20260907.md": {
+      "sha256": "8513407c08ee704869329a995b68446b72077781e8333d381d2ad144f063697e",
+      "bytes": 6210
+    },
+    "docs/analytics-zone-context-plan-20260906.json": {
+      "sha256": "8158b5e58a171fdda81e724ec3b62fbb20f91796b649bd9753e1eca460c9fc13",
+      "bytes": 2567
+    },
+    "docs/analytics-zone-context-result-20260906.md": {
+      "sha256": "933329186a1e16a0ea495d00d782c98a79ad63b96eff34153c4aad980418ca23",
+      "bytes": 4284
+    },
+    "docs/feature_parity_audit-20260906.md": {
+      "sha256": "53299c31c52d96cafb15ec14b6def6e95d9a431084f871d164dcf71fb4df3f37",
+      "bytes": 6316
+    },
+    "packages/shared/src/utils/fparFoundation.test.ts": {
+      "sha256": "2da5c841ceaf90b0cccaf01153faf5749520b055d396dffdd8f06a89f7d8904c",
+      "bytes": 10300
+    },
+    "packages/shared/src/utils/fparFoundation.ts": {
+      "sha256": "da3a05ed445c45c799f798d187f515ac29a896b1d53c6f31cb29087996d62187",
+      "bytes": 16748
+    },
+    "scripts/proof/analyze_linked_transfer_pilot.py": {
+      "sha256": "0cca4501d54f0a30086d884a21d88a0f32f34e9d95474889424c16e7e2dc1847",
+      "bytes": 3103
+    },
+    "scripts/proof/archive_input_recovery_checkpoint.py": {
+      "sha256": "d89f58f3eadd9361a16d2929f67d2945a7c8e5d35d30ac084463d2d7cba9922d",
+      "bytes": 10863
+    },
+    "scripts/proof/archive_method_checkpoint.py": {
+      "sha256": "bb4dbc2a37904fc25766d39a4ddadccb1adc8f5dff281d171c6c16c6af211f9b",
+      "bytes": 6719
+    },
+    "scripts/proof/audit_gamecenter_pass_sources.cjs": {
+      "sha256": "a48fe05de8b8256406e52c49e2675b884f52248442c9260769064c031a924934",
+      "bytes": 2097
+    },
+    "scripts/proof/audit_legacy_xg_inputs.py": {
+      "sha256": "274943b9f1644c0d37ba515b23396d1725ef36d4569aaf3291f8253953f6c08f",
+      "bytes": 3503
+    },
+    "scripts/proof/audit_movement_source_sample.py": {
+      "sha256": "61c7a59581cd2c3e6f490ffd6512542a5b766df3b34bace9329ed18a81a4ab8e",
+      "bytes": 5180
+    },
+    "scripts/proof/audit_penalty_full_coverage.py": {
+      "sha256": "6092763ffb34f6efe1a9d2b1219894ae9d697a871e83905f430087550a6af7cc",
+      "bytes": 9466
+    },
+    "scripts/proof/audit_penalty_source_sample.py": {
+      "sha256": "89db6d73557fc64f6a68889df411bdec2d8636af873658224d25f79ce85ed6a9",
+      "bytes": 7907
+    },
+    "scripts/proof/audit_possession_sensitivity.py": {
+      "sha256": "e2599a0831bfa9710969eed8f37c475a4e2b4554f23f70ebab1ae182b1355fb9",
+      "bytes": 4141
+    },
+    "scripts/proof/audit_prior_sog_fidelity.py": {
+      "sha256": "22712e74780c311001500b52e8cecd9209f3fee807fc14a30503e083a97371a9",
+      "bytes": 16322
+    },
+    "scripts/proof/audit_public_routing.py": {
+      "sha256": "7e536543667d1b5f52fed8f1c6d4ec006092c6e32127a06a634713dbcdc166fb",
+      "bytes": 2305
+    },
+    "scripts/proof/audit_raw_followup_clocks.py": {
+      "sha256": "7b4c35d3171706f03d9b4342799a94a8b7da084f2e3015d108772e35ac4061a7",
+      "bytes": 7146
+    },
+    "scripts/proof/audit_same_timestamp_events.mjs": {
+      "sha256": "6834e665df5308ca925932c0bad84c23276d12eee17946e87833cf9043ce39f8",
+      "bytes": 2868
+    },
+    "scripts/proof/audit_timing_eras.py": {
+      "sha256": "fc046a594da33ed022b7cf9ca508a90a65eb4a9a616378f2b8da66ddb6bbdc0f",
+      "bytes": 19018
+    },
+    "scripts/proof/audit_timing_shrinkage.py": {
+      "sha256": "dcc86230b51ed478d2bf59a3b366dd93ecb937681a2f75ddcbb0b58c5225065d",
+      "bytes": 7425
+    },
+    "scripts/proof/bounded_conditional_calibration.py": {
+      "sha256": "3bcb7778c8465d326b62b76d646d1df702538b98e094f2cf3f192ceac1929441",
+      "bytes": 10888
+    },
+    "scripts/proof/bridge_recent_finishing.py": {
+      "sha256": "6324b80262b47b9c333232c43b3c8b50160755df7cdd03554af96305ac15b234",
+      "bytes": 10700
+    },
+    "scripts/proof/build_body_review.py": {
+      "sha256": "acb3ea3711a47e1055a766b28f0f662a8b3b23373ede13b0a3fc1e74c75f3cc7",
+      "bytes": 3111
+    },
+    "scripts/proof/build_independent_possession_pack.py": {
+      "sha256": "17dbf592dfd58066c6350a53b5675e25753957789b9687aa78d6758aa0d3b244",
+      "bytes": 3910
+    },
+    "scripts/proof/build_mission_handoff.py": {
+      "sha256": "135d8455fd4c9764420c44bfebf9244bdeb8ef46cb19b4e37648b8eb94a6e459",
+      "bytes": 18478
+    },
+    "scripts/proof/build_pass_review_viewer.py": {
+      "sha256": "50d8287314418e1795e44c11ca0ebdbc76707f5f9f1305d533f41f7f77e3efdd",
+      "bytes": 2256
+    },
+    "scripts/proof/check_analytics_input_coverage.py": {
+      "sha256": "4a9b1fcff98701849b8e7939f151e6496f8775dd101132654698eba4a6d97b4e",
+      "bytes": 11061
+    },
+    "scripts/proof/check_band_timing_weight.mjs": {
+      "sha256": "68edb5b675159b4edd9b2edc44bbb25f77a85653d6c68a3a79e9d5d1d57cf905",
+      "bytes": 3592
+    },
+    "scripts/proof/check_current_xg_checkpoint.py": {
+      "sha256": "fd4c2e5bf8a4996cba70e4826ad33b1faa7ec5c740d5e90bb75467658c6efacd",
+      "bytes": 7062
+    },
+    "scripts/proof/check_earlier_shape_selection.mjs": {
+      "sha256": "723cdf9f8d63fca7e42ac0b59845d8ce980b05f7e1fabb262339d26ff39939c7",
+      "bytes": 3642
+    },
+    "scripts/proof/check_earlier_timing_weight.mjs": {
+      "sha256": "3abdac95cc9e1fe5f2a08ee04f3819379066894c10c40397f2c0defd74ae9739",
+      "bytes": 3895
+    },
+    "scripts/proof/check_fixed_timing_blend.mjs": {
+      "sha256": "573c043ae44f9ed14c96bcaed03d99d37edcbf62217c0ca27c70cefa46e73c16",
+      "bytes": 3291
+    },
+    "scripts/proof/check_followup_report_clocks.py": {
+      "sha256": "f55b8aaabfec19763c6b8f236aa0e0159faceeac9db67ce0c8565aa17dbb6816",
+      "bytes": 5385
+    },
+    "scripts/proof/check_last_season_protocol.py": {
+      "sha256": "dd3deaaf98c88eb2fe03483b26b4499b3a765d5718ff3b4ee2e861cfce365962",
+      "bytes": 2278
+    },
+    "scripts/proof/check_possession_landmark_consistency.py": {
+      "sha256": "bcdbe4a354ad77f82eb8e412c8d0bdf694fb00e37ac6f060dcd53a588167f3c0",
+      "bytes": 1763
+    },
+    "scripts/proof/check_refresh_ensemble.py": {
+      "sha256": "a4886a4fb58065dbc7d629c43a31519e0ade71c34f4ee51654ee1a6cca793614",
+      "bytes": 2885
+    },
+    "scripts/proof/check_replay_nongoal_coverage.cjs": {
+      "sha256": "98cb580c8b6e12443023e9dc69fd29570b460fb51557d3c93652548d71af69fb",
+      "bytes": 2625
+    },
+    "scripts/proof/collect_development_award_narratives.py": {
+      "sha256": "8457ccc11678b5da2543d3d94226d7ac658c991bb0317c9a15b89e50541c2a27",
+      "bytes": 2782
+    },
+    "scripts/proof/collect_development_sog_reports.py": {
+      "sha256": "bd58da718253324a6300c151bd2cc43487875f58faa2d1f28fb7af34c6d06355",
+      "bytes": 6295
+    },
+    "scripts/proof/collect_linked_replay_sample.cjs": {
+      "sha256": "16233ff1f9b8f8a54f5981617875c07b491e215d78beca36bb53475214d70730",
+      "bytes": 3010
+    },
+    "scripts/proof/compose_player_finishing.py": {
+      "sha256": "0a8aa55ed32b329d94497c73fb620610d61379d61e48de898dd01f3782a2147e",
+      "bytes": 8652
+    },
+    "scripts/proof/decompose_forward_shooter.py": {
+      "sha256": "0195af39aeb0a75c032617e4505a17f5ef947bfe0700ea92cd433379175ac3a6",
+      "bytes": 17078
+    },
+    "scripts/proof/decompose_recorded_penalty.py": {
+      "sha256": "209835549e801f810bf89d4598d9d8be0c8fecb7f541b076cfca016398133017",
+      "bytes": 12864
+    },
+    "scripts/proof/detect_review_bodies.py": {
+      "sha256": "e4c88af9ec8c6f1af8fccebf38f9ece248e6dda43e48724f102ded6cd8113372",
+      "bytes": 2804
+    },
+    "scripts/proof/detect_review_bodies.swift": {
+      "sha256": "9e5a5494e7e08320f29b5eafd5348305443819f9b09813f4d552a007e070b18d",
+      "bytes": 2531
+    },
+    "scripts/proof/diagnose_expanded_timing.py": {
+      "sha256": "c30276bda0611635b03bf20b1cc164787724ee72882e82c40e48bffbc31d5403",
+      "bytes": 7238
+    },
+    "scripts/proof/diagnose_recent_residuals.py": {
+      "sha256": "e2080441e61324bd7cab7eb9d8d80eac231e01511a5374092b68f174ac5a60e5",
+      "bytes": 4267
+    },
+    "scripts/proof/evaluate_frozen_last_season.py": {
+      "sha256": "0105eb7c11044a642eb88c4d21b6a1049b7bf2b8cae6045d4f1e07fe513c1143",
+      "bytes": 8792
+    },
+    "scripts/proof/evaluate_possession_retention.py": {
+      "sha256": "a9923ea76dd6636313c3e04dadd84a357aa72132d23f55e51d26c6e178a7f0a6",
+      "bytes": 2739
+    },
+    "scripts/proof/evaluate_recovered_xg.py": {
+      "sha256": "b56b53a465b2d9443b56370691a947dec224b4b6a77bdab2daa3f9d11809b650",
+      "bytes": 8806
+    },
+    "scripts/proof/export_last_season_candidate_features.py": {
+      "sha256": "6190fe4a466b1ad3441ffdd5964f993a122ff36efe64a78e8188589af2fa3421",
+      "bytes": 5450
+    },
+    "scripts/proof/export_passing_review_packets.py": {
+      "sha256": "cd3b71420f8ffb36e1527f1328c9bab98e375b2e4f3fde826ab301d022b764b6",
+      "bytes": 3672
+    },
+    "scripts/proof/export_recorded_sequence_maps.py": {
+      "sha256": "e7a17e40369b8fda5c4a9f689742f13f47ec0f37c1981bf5a49727169ff4b900",
+      "bytes": 3308
+    },
+    "scripts/proof/feature_parity_audit_tests.py": {
+      "sha256": "413e5eaedc9916154a4c6fa99be7c6a1c82fa55d7ed68fa2f825819ea0f1eabd",
+      "bytes": 3384
+    },
+    "scripts/proof/finishing_quantity_contract.py": {
+      "sha256": "99ef192b24994be5fa01a8a2771864fa62ad1981f286d50a14a3f2d6658c0b25",
+      "bytes": 4943
+    },
+    "scripts/proof/forward_shooter_split.py": {
+      "sha256": "ff583c92f2f05a9ee03cfce4d980371a3d6abf0f0f57c626b4676eadacae05b5",
+      "bytes": 2170
+    },
+    "scripts/proof/inspect_moneypuck_dictionary.py": {
+      "sha256": "0531ac7b5e155e8e6ed3a01c75f055dec5fcaadb03257a4c1ab76917305a6c0e",
+      "bytes": 3871
+    },
+    "scripts/proof/inspect_movement_residual_context.mjs": {
+      "sha256": "321fee6eac5a38508cab58ad0804f5496370df71817a94ca928511f9bb891cd5",
+      "bytes": 3624
+    },
+    "scripts/proof/inspect_rejected_tracking_handoffs.py": {
+      "sha256": "1b029db9c778bbf009fe0024ac850f9b51958eb6e8100cb8fb7c22bbfb734611",
+      "bytes": 2484
+    },
+    "scripts/proof/inventory_all_pbp_fields.cjs": {
+      "sha256": "b7ef9e012e26ae05e8b56f4ee8a05ae63a52802dbeeedb531f0c29ba7360c497",
+      "bytes": 2330
+    },
+    "scripts/proof/joint_residual_inference.py": {
+      "sha256": "18c19c41664e9417cc8ac9f26143f2f8ef806b7513d0335d91b6b2dc343061ed",
+      "bytes": 4562
+    },
+    "scripts/proof/lateral_grid_inference.py": {
+      "sha256": "1928e80291099be5f06e926398c41273ff540a0035ce2f826c428a30d06df330",
+      "bytes": 3797
+    },
+    "scripts/proof/partition_reviewed_goal_credit.py": {
+      "sha256": "84617bb2d5e7a97b900eaaa71fa0ffb56d0fdfd6915ca10460b7df383a42c47a",
+      "bytes": 10189
+    },
+    "scripts/proof/pass-review-viewer.html": {
+      "sha256": "da4936ddcbb1777447f5a4c8b6b23d4d2c156cd86b9e81bb4e71bb0dccaf5088",
+      "bytes": 5562
+    },
+    "scripts/proof/pass-review-viewer.js": {
+      "sha256": "494ad1b6f933d6eaaa35c69f724080ba5659a07ec8db6a0e15997e681a66d460",
+      "bytes": 9160
+    },
+    "scripts/proof/pilot_pl_onice_membership.py": {
+      "sha256": "83e52bc7ad5973625b348273e5162261a8baa0cac8cad803ba7f68c4c7ab5037",
+      "bytes": 5550
+    },
+    "scripts/proof/possession-blind-review.html": {
+      "sha256": "6578e844ba42ebedfc2d3f54fc6474b0ce18366de27093d2cafc65e07bf03dd9",
+      "bytes": 6407
+    },
+    "scripts/proof/possession-review.js": {
+      "sha256": "6015bde237fd73958f65f141ceaa11f633167f380658bb90e28fe29ead5fa034",
+      "bytes": 3580
+    },
+    "scripts/proof/prior_sog_fidelity.py": {
+      "sha256": "2b28ad1b4c19abab90c22dd7e0a2c91cf856e92ce94209cff940c9d24eea4b1a",
+      "bytes": 4601
+    },
+    "scripts/proof/projection_write_access_regression.sql": {
+      "sha256": "f85cd53f83bc2bd116970c0aa60b86b510f2443a1d1ec3fd32e92698d071f0d8",
+      "bytes": 1507
+    },
+    "scripts/proof/projection_write_access_rollback.sql": {
+      "sha256": "e2bc08919daa54df80ee10716b3926464253af3d30e8a7ce2711988d2e7dcf3e",
+      "bytes": 437
+    },
+    "scripts/proof/prove_bounded_conditional.py": {
+      "sha256": "f0a2ccb17309c4a1dc14eb1b1382607cb7b1563b90b776646ff158395fb36cc8",
+      "bytes": 12044
+    },
+    "scripts/proof/prove_offline_xg_bundle.py": {
+      "sha256": "bea0e54d588ade53c9db155c212fb2c20d207712b65bafebbf4f9c75c41c7edf",
+      "bytes": 8643
+    },
+    "scripts/proof/prove_verified_movement_reuse.py": {
+      "sha256": "6280316f10beaf18eefd3f0e77358ae4d889675cf570cbb37f3f9bc17608eaf9",
+      "bytes": 6638
+    },
+    "scripts/proof/prove_verified_movement_reuse_v2.py": {
+      "sha256": "0f4ea7d9999b6e61b97ef65e7761aa71624d5c840b020e2aec3c7735d8b676b8",
+      "bytes": 7459
+    },
+    "scripts/proof/recent_timing_inference.py": {
+      "sha256": "708eb3e10e46a0434d98deec8ce9e063aba1cb1be237b12d6282fb1055e7eede",
+      "bytes": 5381
+    },
+    "scripts/proof/reconcile_finishing_exposure.py": {
+      "sha256": "f43be653b55594008557c301a81a6a02148a25f9c307b82330df8ab213502362",
+      "bytes": 8545
+    },
+    "scripts/proof/reconcile_hall_pass_landmarks.py": {
+      "sha256": "14a354ad946fd27ad25d5a84ec99bad8feb55efb2400f331a9c75a80d338020c",
+      "bytes": 3544
+    },
+    "scripts/proof/reconcile_knies_coverage.py": {
+      "sha256": "262a3735552f10e19e28b0f823f218487fef03c93401335d30b84eff77f5c5bb",
+      "bytes": 2943
+    },
+    "scripts/proof/reconstruct_reviewed_features.py": {
+      "sha256": "bebfa68124c587388188ae258be6fa5827c2a93f02dd740f370ff85d7c0fe465",
+      "bytes": 9084
+    },
+    "scripts/proof/refreshed_xg_ensemble.py": {
+      "sha256": "1b62a7d703c669df1b35c8ae2a2e9e4e7b4e3be604cf8a6432dd8e6a8f0ba29a",
+      "bytes": 5030
+    },
+    "scripts/proof/render_pass_landmarks.py": {
+      "sha256": "a44d6a665f4092c4e1826b3446f0d105b5da4ff3ab172bc378d06ab2ed7953be",
+      "bytes": 2108
+    },
+    "scripts/proof/render_pass_video_review.py": {
+      "sha256": "e1c293babe7a09bc9e5a1f0afffea7b68732d8cb52e187baa4e751f4215c15cc",
+      "bytes": 1811
+    },
+    "scripts/proof/repair_reviewed_score_origin.py": {
+      "sha256": "f1d6d71f28176a6e91d610a74b0e8a274d1cd9a9c085fdcc5891b96901992fb8",
+      "bytes": 5273
+    },
+    "scripts/proof/replay_movement_challengers.py": {
+      "sha256": "92bc967e92c9c8dc57fefae7c661c537037fcddbc560e6431d737ffaa1055496",
+      "bytes": 3412
+    },
+    "scripts/proof/replay_movement_coverage.py": {
+      "sha256": "a987d25b0e65853298dcbd5adf1458aba7db84c46737fb204ed0358f8171a0b4",
+      "bytes": 3839
+    },
+    "scripts/proof/replay_prior_reason_geometry.py": {
+      "sha256": "eeb8584e650f8f457180b454c89f76286f95efc95926495d566ce25a136505d0",
+      "bytes": 4139
+    },
+    "scripts/proof/replay_recent_candidate.py": {
+      "sha256": "295bfaff84e2cefc8e7253f748631801a7ba4d6ba27674e0659c17dff8914a3d",
+      "bytes": 4622
+    },
+    "scripts/proof/replay_refreshed_xg.py": {
+      "sha256": "9ac7c2ed9b69a28007971b4355c71998e0c6109069eaa1f6ee34ba7b064918ea",
+      "bytes": 6168
+    },
+    "scripts/proof/replay_shooter_evidence.py": {
+      "sha256": "ed7b517356577b6162c148bce65d67f8a93f1e1c4417fac4af136697051882aa",
+      "bytes": 8343
+    },
+    "scripts/proof/reproduce_legacy_rebound_index.py": {
+      "sha256": "e8d9564548ef1cad3e032f1d9ea280c6cbaaa5cd86d890cd5d2f5a0e79855962",
+      "bytes": 1274
+    },
+    "scripts/proof/review_bounded_timing_prior.mjs": {
+      "sha256": "1dc98488f8db6f37a64cc292aac4e04e9a696b7e0b20b4f8da8c31f5f34272f2",
+      "bytes": 2680
+    },
+    "scripts/proof/review_calibration_stability.mjs": {
+      "sha256": "47973152a6ae8ed28c68c95e2b4ea777568a21a36a2bb3fd9ba1569ef369de02",
+      "bytes": 12035
+    },
+    "scripts/proof/review_calibration_transfer.mjs": {
+      "sha256": "14341adb06193c497ae578d977ea60a1a74f7c670508ca2f2a6a8672dd82057c",
+      "bytes": 14151
+    },
+    "scripts/proof/review_comotion_unseen.py": {
+      "sha256": "41df874bc0026b14dfc89777efee719c6160b42b617ef58b389c446ec94ea321",
+      "bytes": 2926
+    },
+    "scripts/proof/review_conditional_shape_candidate.mjs": {
+      "sha256": "cd100bd1967e04057c259b381a4f8aa07199d6562a97e5fa9e1ac9b0f2730797",
+      "bytes": 10308
+    },
+    "scripts/proof/review_development_sog_reports.py": {
+      "sha256": "25a546562f05ef3dadd3c740b4517fa1864ebf6d1a3d28d2b23a27147161ec9a",
+      "bytes": 8146
+    },
+    "scripts/proof/review_development_sog_v2.py": {
+      "sha256": "6b44d0e4b5e9439c9141f21691032058974fa5d42d516e641aeda919782c3ca9",
+      "bytes": 7573
+    },
+    "scripts/proof/review_event_memory.mjs": {
+      "sha256": "7922b1a653252d0b9fe60c629d95d6ec89c113ff0ca0e8cdcdcce22d1fbe90c3",
+      "bytes": 3763
+    },
+    "scripts/proof/review_five_calibration_ideas.mjs": {
+      "sha256": "57196ef572fb95af7d7bd07647ccae03f50c6e6355081f01d0e1f4d346152501",
+      "bytes": 3615
+    },
+    "scripts/proof/review_forward_shooter_decomposition.mjs": {
+      "sha256": "52a06455640a588c3962b90cad75c901f40b57f947ed249786a1c980b1d06469",
+      "bytes": 10265
+    },
+    "scripts/proof/review_forward_shooter_movement.mjs": {
+      "sha256": "b88eb8d936d2ea41bc37a8143ab2146bf4fd33dfad9ef36d212c6c2b9036ada5",
+      "bytes": 13274
+    },
+    "scripts/proof/review_knies_goalie_role.py": {
+      "sha256": "7c7b3ee866dc959add7ee3842f6c9ec89fd1534c41635c8abcf4488383e79550",
+      "bytes": 2556
+    },
+    "scripts/proof/review_last_season_evaluation.py": {
+      "sha256": "e019a191fd0c34000b008bfb32bdf6b75668f6e1e2166a3b8bb895596b089e8f",
+      "bytes": 3611
+    },
+    "scripts/proof/review_method_challengers.mjs": {
+      "sha256": "9c7dda66be7592a40b47e74acfc3905f3c73a252fe6a56e1a75f2dee948fad22",
+      "bytes": 12096
+    },
+    "scripts/proof/review_movement_candidate.mjs": {
+      "sha256": "5a18fc2fbfca78ccfcb11103d137745215134032eb0cde951d539e19e0dbe52b",
+      "bytes": 8993
+    },
+    "scripts/proof/review_movement_vectors.py": {
+      "sha256": "7aa44886be3dc7e92fc96013d523bbed231ec444afc944c1c587d82bf997db0b",
+      "bytes": 5095
+    },
+    "scripts/proof/review_recent_timing.mjs": {
+      "sha256": "ce312613c45137c353471324b0edf1758ba02c94f944d6d34aabaa12279117df",
+      "bytes": 2747
+    },
+    "scripts/proof/review_recorded_penalty_candidate.mjs": {
+      "sha256": "f0472eabeaead8b56c9c4d4375d4ad675be3e0f892e4f8916487caa77fc008ee",
+      "bytes": 10217
+    },
+    "scripts/proof/review_recorded_penalty_decomposition.mjs": {
+      "sha256": "2a2cc9883e618b135a1e91a85e71f8aaa9c10a1abd851a3f01bac476af813f61",
+      "bytes": 8699
+    },
+    "scripts/proof/review_refresh_metrics.mjs": {
+      "sha256": "3088f70c452eb79561d10ecf44b6ac0bdc336bffe3c95107d886b97f7ee75df1",
+      "bytes": 2577
+    },
+    "scripts/proof/review_shooter_offset.mjs": {
+      "sha256": "c6aa3321d31402a195e6e28171a6ae0fb0fd0a762a707f7f5aa4b1a41cd32646",
+      "bytes": 3436
+    },
+    "scripts/proof/review_targeted_adjustments.py": {
+      "sha256": "9808140663829e73a90385ac179d6a2fe8a56b1757c1b1c4e31b0a7612b9b3c0",
+      "bytes": 1963
+    },
+    "scripts/proof/review_timing_candidate.mjs": {
+      "sha256": "4abdb72523cb7868ddcde60df6cdc3c5975755933d9593e6b22973dd0aa4344d",
+      "bytes": 14178
+    },
+    "scripts/proof/review_timing_eras.mjs": {
+      "sha256": "ad8383f224901647578b15d7a2dc213144057e26a005881a53acb7abcc8d03af",
+      "bytes": 13074
+    },
+    "scripts/proof/review_timing_loss_gate.mjs": {
+      "sha256": "c79f35d4fb5af2ae990a68fa862c5bc3667587ea89b7018b4123f57539a5d0f5",
+      "bytes": 2383
+    },
+    "scripts/proof/review_timing_ridge10.mjs": {
+      "sha256": "b0033fbdd88d40f81326da02e1b30e7f9e707c109931b3182e1e72b39fbbbaff",
+      "bytes": 15272
+    },
+    "scripts/proof/review_timing_shape.mjs": {
+      "sha256": "af90b24d52301a7acece44546502161bd692ea1223cc95f9922d3856c7134b10",
+      "bytes": 3371
+    },
+    "scripts/proof/review_zone_context_candidate.mjs": {
+      "sha256": "32ad70772e023240e7faf0141a03fefaf647300e5d5ef4cb1dfa4d8e09c4bda1",
+      "bytes": 10176
+    },
+    "scripts/proof/review_zone_inference_batches.py": {
+      "sha256": "fa249a2b470f3550fd34fc9c6854d018f7998e6dfb02b37f58f7e958dc1232e9",
+      "bytes": 7530
+    },
+    "scripts/proof/review_zone_inference_batches_v2.py": {
+      "sha256": "a4ca26a25ccb8993e8c2b6d02d12b49bfbccc3387cdd3ec0674578d8f3ae9599",
+      "bytes": 9632
+    },
+    "scripts/proof/review_zone_source_vectors.py": {
+      "sha256": "5559b90a226758b64deed00adff744ca33f4a79a14ac472618edc9a2629f12fd",
+      "bytes": 9245
+    },
+    "scripts/proof/revisit_pbp_tracking_sources.cjs": {
+      "sha256": "aa1bd4f535578c31a801dcaf4c41081433a7b99965e46917a8dbf9fc70e981db",
+      "bytes": 3058
+    },
+    "scripts/proof/run_bounded_timing_prior.py": {
+      "sha256": "5eb5714497b48d91a15463758b40fb21938cae8452cd8f2dfde36d6be239a9b2",
+      "bytes": 5399
+    },
+    "scripts/proof/run_bounded_xg_refresh.py": {
+      "sha256": "7e2d2590dc15c375351126d5199d4fb7bca51f5be44e0622847e70cfd835fd4c",
+      "bytes": 9528
+    },
+    "scripts/proof/run_calibration_stability.py": {
+      "sha256": "1f8fc788fb83fdd9d4f7c92a9c1927b32b223f5a48bdaed93ad906ae06e328c1",
+      "bytes": 21036
+    },
+    "scripts/proof/run_calibration_transfer.py": {
+      "sha256": "5f973c7287ef315f704a3cb8a2519cbd429bca30ce03d055a6e0564b75a60e04",
+      "bytes": 20554
+    },
+    "scripts/proof/run_composed_xg_replay.py": {
+      "sha256": "e22230b0ac0c82e81f460db8e2afe346d4fe588f9da303328af267043719c133",
+      "bytes": 5946
+    },
+    "scripts/proof/run_conditional_shape_candidate.py": {
+      "sha256": "4b3ddd4459c1ac85ff720458248d94ae7670f9582ac48b4681e4f0b611cf120d",
+      "bytes": 17778
+    },
+    "scripts/proof/run_event_memory_candidate.py": {
+      "sha256": "bcf5fbd07d5194605969e0faf27774f3d0bfb734b4800aa90dcda5b221c240ce",
+      "bytes": 13241
+    },
+    "scripts/proof/run_forward_shooter_movement.py": {
+      "sha256": "f9026ebb557033d83059ba30b34597d504d393ad539fc8317b197122d9e3d53d",
+      "bytes": 30441
+    },
+    "scripts/proof/run_forward_shooter_movement_v2.py": {
+      "sha256": "dd4f38be0856ea307c8fa9c146c57bcceb5613c61285fd02676631766c710a29",
+      "bytes": 4681
+    },
+    "scripts/proof/run_identity_probability.py": {
+      "sha256": "0fffbc93e9c26d9861c25e2dc85c051b43fcfc8b6e7fc2e68b99455248674c24",
+      "bytes": 23029
+    },
+    "scripts/proof/run_identity_probability_v2.py": {
+      "sha256": "d7810377a82ada92a8a23b3cc625c29e3416eb48c76bd9b0ad54196d2e8aca01",
+      "bytes": 26645
+    },
+    "scripts/proof/run_movement_candidate.py": {
+      "sha256": "fb9434688cb03f57d01aa9b60f8fa87249a9c8670e78b0bbfeb2611452280171",
+      "bytes": 14262
+    },
+    "scripts/proof/run_movement_interactions.py": {
+      "sha256": "0244719856dbf3971daf1eb7fe99e39cc63dfb586794d39cc0c223e560877c73",
+      "bytes": 5402
+    },
+    "scripts/proof/run_movement_loss_weights.py": {
+      "sha256": "3c2224540be044f1ae239a5996a9aa90eb98c0ac983ac75ab511e765c93589c7",
+      "bytes": 4957
+    },
+    "scripts/proof/run_pass_factor_percentages.py": {
+      "sha256": "812b989fded8d183dab9e52ebbef5f52d9519a676021a15c0ed89855d618829a",
+      "bytes": 5757
+    },
+    "scripts/proof/run_prequential_calibration.py": {
+      "sha256": "c365c7c18483e8ac60a86e07a9764353f5c09e24ad64d925c3af85556361eb27",
+      "bytes": 22524
+    },
+    "scripts/proof/run_raw_learning_logic.py": {
+      "sha256": "8e50aa87b2644666589495e2e38f6e8500b6fc968aab5c4e9581a2cba031f2e5",
+      "bytes": 4461
+    },
+    "scripts/proof/run_recent_timing.py": {
+      "sha256": "bc0ce36347962ce0b80f10155b3ddc6025dcf7ac6983bbac994f03ff8732d318",
+      "bytes": 7413
+    },
+    "scripts/proof/run_recorded_penalty_candidate.py": {
+      "sha256": "7aea1ebc4b81d2ddaac5431449555d761cc22572528b1de829cfbee090e30a0e",
+      "bytes": 25037
+    },
+    "scripts/proof/run_selective_calibration.py": {
+      "sha256": "2b7c28704d12f27956567302a2e9f0b3714517341f2f4b2f09d6a8b1f7814ba3",
+      "bytes": 16081
+    },
+    "scripts/proof/run_shooter_offset.py": {
+      "sha256": "c1bddb9dfee14ace67f204f366b35dc06e3ba473738f21713ebe51f1a57c13d2",
+      "bytes": 7461
+    },
+    "scripts/proof/run_strength_partition_candidate.py": {
+      "sha256": "3c32422e5ec3fbaec583d58c7f830c82a89b0170cac9d0b4b9bcbdb7782b78d0",
+      "bytes": 10444
+    },
+    "scripts/proof/run_timing_candidate.py": {
+      "sha256": "66deb36b01862fb87e64f343b0146baf3838bb5f024402a395ed5700d7dcfc6a",
+      "bytes": 18150
+    },
+    "scripts/proof/run_timing_loss_gate.py": {
+      "sha256": "179c15fe58f32d20434cf9945a8afeb7e9676cd45af64e7775da2660b40a4a91",
+      "bytes": 5309
+    },
+    "scripts/proof/run_timing_ridge10.py": {
+      "sha256": "0125b2a7960149116960a95c9e72c95536bfd42877d68b0561cf2e5d6c3065ad",
+      "bytes": 19321
+    },
+    "scripts/proof/run_timing_shape.py": {
+      "sha256": "24b43dff4776d488f7bac4d032f8dac90f26b94dc7e62d19d2df925f06b5d9af",
+      "bytes": 6019
+    },
+    "scripts/proof/run_zone_context_candidate.py": {
+      "sha256": "2c790b523820c0c668f86e208d27b0fba984547370f0f56858a6b24ba0be36e7",
+      "bytes": 18193
+    },
+    "scripts/proof/save_alignment_clip.py": {
+      "sha256": "b89458ef9bbb0f4af7127a52046884d349c109b24e5c5323396d1e85745e8258",
+      "bytes": 2364
+    },
+    "scripts/proof/selected_timing_candidate.py": {
+      "sha256": "803a8be8f6cd5bb14e75c09f76b53e15d4c499860319e428f146e542eeb42588",
+      "bytes": 8987
+    },
+    "scripts/proof/targeted_xg_inference.py": {
+      "sha256": "635bba6d6cef416782e32f1b8b2442fec2be199a8d1b2e4a9eb2e0ae32672224",
+      "bytes": 4407
+    },
+    "scripts/proof/test_analytics_input_coverage.py": {
+      "sha256": "49087250d300f5e3bee2fc7518ae22bdba3250b55240b70511efb69cad926d3b",
+      "bytes": 4636
+    },
+    "scripts/proof/test_audit_prior_sog_fidelity.py": {
+      "sha256": "f3244bb64030922cc51863510acc8b305dec1a6485d81daaadb9b1b1c1c4c54d",
+      "bytes": 7916
+    },
+    "scripts/proof/test_audit_raw_followup_clocks.py": {
+      "sha256": "96bab422dd5434b71648ace67ebe63ec89275e23368e594759b5bd434fa36bb9",
+      "bytes": 1296
+    },
+    "scripts/proof/test_audit_timing_eras.py": {
+      "sha256": "598a20ea8f0ea8033bb26b8696f4eeb479dddd4a032a6354536e64e8fc0c7578",
+      "bytes": 6471
+    },
+    "scripts/proof/test_audit_timing_shrinkage.py": {
+      "sha256": "e7c42143fcab768616929e43189fb0c7d250c51ae19263fb4131c6dfcdbe591e",
+      "bytes": 1517
+    },
+    "scripts/proof/test_bounded_conditional_calibration.py": {
+      "sha256": "93fe0168905aab23fd1831e5e7c7856eb1b990fe7a3f3f64584cd83432152ece",
+      "bytes": 6663
+    },
+    "scripts/proof/test_bounded_conditional_review.py": {
+      "sha256": "00f9536470bef6be862076f88adeb31faa9aeacfcfc8746f8aab55c27e9ff557",
+      "bytes": 5680
+    },
+    "scripts/proof/test_bounded_timing_prior.py": {
+      "sha256": "8c4382dd440db4483798521ac94d724eaa5eafb0143c9ba7604bd3271880c130",
+      "bytes": 974
+    },
+    "scripts/proof/test_bridge_recent_finishing.py": {
+      "sha256": "5f113375b283b5c9892ce71fd83a3e857917001b7549d265d5327e2a4276f368",
+      "bytes": 3369
+    },
+    "scripts/proof/test_calibration_stability_review.py": {
+      "sha256": "ce276c09f379cd324faaa7e2df224df367103a22cdfa20eb1e1e2a00b8d1d0a4",
+      "bytes": 12278
+    },
+    "scripts/proof/test_calibration_transfer_review.py": {
+      "sha256": "14ec1a532c9a9f2bcddaf4025493d929d0b5fd21604267f5020f7c73adc710ba",
+      "bytes": 6968
+    },
+    "scripts/proof/test_check_followup_report_clocks.py": {
+      "sha256": "2b7b5f64a6f55131950f7fd36964b1d76d6f71191582ac20b84487f79b906d37",
+      "bytes": 833
+    },
+    "scripts/proof/test_collect_development_sog_reports.py": {
+      "sha256": "4243895887130e924552b858bc26ac019b78469ed291077787ab5b6802ceeb83",
+      "bytes": 1023
+    },
+    "scripts/proof/test_compose_player_finishing.py": {
+      "sha256": "2c8811adb88f8f0687bd560060fd4bab501d2075aa299fe3d937443ecab9cd6f",
+      "bytes": 3283
+    },
+    "scripts/proof/test_composed_xg.py": {
+      "sha256": "19ef7fa7b86837ad7ddc44994b299c5d0cd0d6d736458fc35aac05a4d2aae431",
+      "bytes": 3936
+    },
+    "scripts/proof/test_continuous_event_movement.py": {
+      "sha256": "14d6aa123ad5827abc12fbe0939e300d99056d31d9e0714a95bc5149ae6c349c",
+      "bytes": 7440
+    },
+    "scripts/proof/test_continuous_movement_units.py": {
+      "sha256": "ceb8281ea74670377f04291af5dca90a041bc8b054260778c487077649d60b10",
+      "bytes": 1442
+    },
+    "scripts/proof/test_current_xg_checkpoint.py": {
+      "sha256": "f32a4e13a3687ee05c60455c93ae8e7f56d230020210fc8ca8fb812d85649e38",
+      "bytes": 748
+    },
+    "scripts/proof/test_decompose_forward_shooter.py": {
+      "sha256": "dd34ac01fa227e0a5dd4775d2f1d62af7b3cf56dda1ea0629d2d3aeba1613a8c",
+      "bytes": 4647
+    },
+    "scripts/proof/test_decompose_forward_shooter_review.py": {
+      "sha256": "76aead2d2c34591d4f1d76937832fa82da5a8099c8754b8ab21613672dca7763",
+      "bytes": 7832
+    },
+    "scripts/proof/test_decompose_recorded_penalty.py": {
+      "sha256": "61d646c41d0175979abcfa0e8e502cf8660864daf935faa0056713b25b2ec7df",
+      "bytes": 3676
+    },
+    "scripts/proof/test_decompose_recorded_penalty_review.py": {
+      "sha256": "0248ee55487e8981f4bc046375fa92d8e0ff13ad40cbc9d941222238c8d089fd",
+      "bytes": 4751
+    },
+    "scripts/proof/test_diagnose_expanded_timing.py": {
+      "sha256": "364fef5413956910f1d32fd09c4b944e295261fa2dcf62c69ee0419f83ff0b8b",
+      "bytes": 1002
+    },
+    "scripts/proof/test_diagnose_recent_residuals.py": {
+      "sha256": "4d177974526fadc2b83fe9d0a99a01dc118907c9e3589d5640fe175f9746294f",
+      "bytes": 634
+    },
+    "scripts/proof/test_evaluate_recovered_xg.py": {
+      "sha256": "de8e6c52b7e15aabf3522e2dfee9e20eb89edd6392a372afe2d5cfbe77ed002c",
+      "bytes": 1455
+    },
+    "scripts/proof/test_finishing_quantity_contract.py": {
+      "sha256": "31d4d1844d8f8c61dd9b33c397c8af517504140caa8f2ac23e481fd1a6d6fdd4",
+      "bytes": 4078
+    },
+    "scripts/proof/test_five_calibration_ideas.py": {
+      "sha256": "390de6ae34c80ce402b3a2b0f9a932f709612c1a192f7a227e0a4053615c8729",
+      "bytes": 8406
+    },
+    "scripts/proof/test_forward_shooter_movement_review.py": {
+      "sha256": "adce3d2f4cfbd87e84be196d0ab4d97ec1ac3f7f9d5c89bdff202d1561f826b0",
+      "bytes": 8331
+    },
+    "scripts/proof/test_forward_shooter_movement_v2_review.py": {
+      "sha256": "faada9727b12e012b48b28ebb7ec917fec4f22515ea793cffd2c01e924ebae42",
+      "bytes": 3410
+    },
+    "scripts/proof/test_forward_shooter_split.py": {
+      "sha256": "48206b349a38e9a0ceb6e512bb6261df31451afbfe0e2c41ad372f292dc262f2",
+      "bytes": 1473
+    },
+    "scripts/proof/test_grid_context_calibration.py": {
+      "sha256": "cb28a60ffd5d2105faa7233121b96eea7e96e5a506c8baee81c922e8237a016d",
+      "bytes": 7503
+    },
+    "scripts/proof/test_grid_context_units.py": {
+      "sha256": "0f286bc43759971d04dbe30dbd3b46e8b59aaf40636d427ed88f61db0ac009db",
+      "bytes": 1176
+    },
+    "scripts/proof/test_inspect_moneypuck_dictionary.py": {
+      "sha256": "49a93adbc7cfa8246996d05f5fa40a2fd4d64bc6662bf8cd6a41cb66d1e518f5",
+      "bytes": 1219
+    },
+    "scripts/proof/test_joint_residual_adjustments.py": {
+      "sha256": "7bfa5270177ad6cb94772dec62e9d6d8633b08fab89e45536867a2c86d4849ef",
+      "bytes": 6838
+    },
+    "scripts/proof/test_joint_residual_units.py": {
+      "sha256": "f68983626cf391acbd6ee4ba009e048e67b6ae7728b42108fa7e77efcdc73ec4",
+      "bytes": 1287
+    },
+    "scripts/proof/test_lateral_time_grid.py": {
+      "sha256": "8dfdbf7ed9bcebfd53104eada2f3c7a72bce838228cd42daad030bb87598f946",
+      "bytes": 7763
+    },
+    "scripts/proof/test_lateral_time_grid_units.py": {
+      "sha256": "1d8f90c59e46ef42487a7782087dfd7cfcd4f8d6bfa0efc104c1d10b7bcbedf4",
+      "bytes": 1140
+    },
+    "scripts/proof/test_legacy_serving_diagnostics.py": {
+      "sha256": "09263ca325b5625b47d64196e44d8d70bc6d68258b0cb9eb0b472421af25afd2",
+      "bytes": 2368
+    },
+    "scripts/proof/test_legacy_xg_feature_diagnostics.py": {
+      "sha256": "402d5123e76f811af248bb8ad061dfff0a1bb2cf7ab22ee8ac20aa97efebc333",
+      "bytes": 2524
+    },
+    "scripts/proof/test_movement_interactions.py": {
+      "sha256": "4c06fbc2c40a28b016836c2fc2f5bdf0111c1a774a2ca0e509453fe31ca3d893",
+      "bytes": 1070
+    },
+    "scripts/proof/test_partition_reviewed_goal_credit.py": {
+      "sha256": "0463c7d19ffc2570fe9e1456a4f51c356394c749867bf9047789195b7274133f",
+      "bytes": 3808
+    },
+    "scripts/proof/test_prior_reason_geometry.py": {
+      "sha256": "23d41db9a329e23c4838b0f30cc97c063aceaab45bb0171e9c333df00f9e5a53",
+      "bytes": 8342
+    },
+    "scripts/proof/test_prior_reason_geometry_units.py": {
+      "sha256": "4673f90abbb419a71744b3b91ca78eae5021829ada03f652fe49a746ecef90c2",
+      "bytes": 1790
+    },
+    "scripts/proof/test_prior_sog_fidelity.py": {
+      "sha256": "96783d8c9f0f3a525dcbc9022f0d1313979ff0785203b41af60e84aa388c350b",
+      "bytes": 3503
+    },
+    "scripts/proof/test_prior_sog_fidelity_review.py": {
+      "sha256": "c2ae38e0a53816aae030aeb1cd4fea6a66aa81521c2db368f1d43d476d70d163",
+      "bytes": 10845
+    },
+    "scripts/proof/test_prove_bounded_conditional.py": {
+      "sha256": "50f7f6fa7f6358b82129da564282870c8d6fed3c99a2ef94e96adee6c7dc9ede",
+      "bytes": 4192
+    },
+    "scripts/proof/test_prove_offline_xg_bundle_review.py": {
+      "sha256": "b5a2ab3582c28b158cd2fa5381c35f33fdfcfacf111ca3df8a9d6f3cbc91e949",
+      "bytes": 5235
+    },
+    "scripts/proof/test_recent_timing_inference.py": {
+      "sha256": "1a32d48aa52459be4e8c1376526883feb319421766c8dc4fa790bc577ba62d37",
+      "bytes": 1952
+    },
+    "scripts/proof/test_reconcile_finishing_exposure.py": {
+      "sha256": "15f5790dcea30e8104cf14bd70858277683aac33c3a49390b144b49b9055528e",
+      "bytes": 3277
+    },
+    "scripts/proof/test_reconstruct_reviewed_features.py": {
+      "sha256": "625ec59178448c54258822bf2fbd546a5839f4d34477a4bc04a2491c88dcb53a",
+      "bytes": 2525
+    },
+    "scripts/proof/test_refreshed_ensemble.py": {
+      "sha256": "7f51b57c9e24a3be1f6c348c1e850e569e902bcb5cd2715a71245832b1cf6ca4",
+      "bytes": 1486
+    },
+    "scripts/proof/test_repair_reviewed_score_origin.py": {
+      "sha256": "c7cfb57a785ed01495118d24f061f8087233b2ffa5a56336749b6d986c5a1368",
+      "bytes": 1292
+    },
+    "scripts/proof/test_replay_shooter_evidence.py": {
+      "sha256": "c9e43e8c0a6090a4144694f3bd763be258c66797af0e6d325ba8098c8e582520",
+      "bytes": 2106
+    },
+    "scripts/proof/test_review_calibration_stability.mjs": {
+      "sha256": "885e7357de000fe570a6a9e5c3c0c0c955f5083f66f99bea247f478e7c00742d",
+      "bytes": 3819
+    },
+    "scripts/proof/test_review_calibration_transfer.mjs": {
+      "sha256": "d0f20e4aca7d6ed1b557887ad9b482e76e1a256d375b6105f938ccb194460b59",
+      "bytes": 5234
+    },
+    "scripts/proof/test_review_conditional_shape_candidate.mjs": {
+      "sha256": "39ee295794ceffe3dc934a17a3b964254c2b0b5553d487d012e9832223080c79",
+      "bytes": 5645
+    },
+    "scripts/proof/test_review_development_sog_reports.py": {
+      "sha256": "5e8ac7af5dc6f6d33ddf2e8f348bc0db45c69659ee6fcb1ff49cafcda88ae76f",
+      "bytes": 1235
+    },
+    "scripts/proof/test_review_development_sog_v2.py": {
+      "sha256": "61a90357974de621bd37e175bd7606b3138fb31daa543fa34c7447e3aaef50d4",
+      "bytes": 1767
+    },
+    "scripts/proof/test_review_forward_shooter_decomposition.mjs": {
+      "sha256": "a84e8bcccd3d38de5368102e4011112c2763e30ed489dc84002c1022c54b4279",
+      "bytes": 5201
+    },
+    "scripts/proof/test_review_forward_shooter_movement.mjs": {
+      "sha256": "8e14a902951d25a0349ae21f53265372949e13e9202d8a9ddd6d064eeee72893",
+      "bytes": 4799
+    },
+    "scripts/proof/test_review_method_challengers.mjs": {
+      "sha256": "0b1a12c62a6b4830869597bea300a49535fbee08e7ce14292b4e6b3875df8758",
+      "bytes": 990
+    },
+    "scripts/proof/test_review_movement_candidate.mjs": {
+      "sha256": "950975a1fe7c10d93bed716b9f69a0793e3bd6323081c98a7f22de56762616a6",
+      "bytes": 4559
+    },
+    "scripts/proof/test_review_recorded_penalty_candidate.mjs": {
+      "sha256": "c269a51afcb6d1101d53386ea7ea5bf3d204b636c03de60616315a911e8c002d",
+      "bytes": 3149
+    },
+    "scripts/proof/test_review_recorded_penalty_decomposition.mjs": {
+      "sha256": "e220e622e3ad20614c483c88aacc793b9c7859cfd311c27ba39b1cd8823ae529",
+      "bytes": 3307
+    },
+    "scripts/proof/test_review_timing_candidate.mjs": {
+      "sha256": "e25a81df970052417d18fb88ae6c14a3543c1101d98d3c7bd4285b5252873d1d",
+      "bytes": 4676
+    },
+    "scripts/proof/test_review_timing_eras.mjs": {
+      "sha256": "d4f4b21cf8c577487e369d3d2b55c4b7fd3b48c295bea88c632d24e26c7763ff",
+      "bytes": 3521
+    },
+    "scripts/proof/test_review_timing_ridge10.mjs": {
+      "sha256": "392b7cd4856a4d27dab58d0d2145a119b06fcc0b230fac29acc82ef969d688eb",
+      "bytes": 4695
+    },
+    "scripts/proof/test_review_zone_context_candidate.mjs": {
+      "sha256": "08441012c30eec63178582dab7fe0f5636a9ebeb4673620465dc3d360140f1ba",
+      "bytes": 5508
+    },
+    "scripts/proof/test_review_zone_inference_batches_v2.py": {
+      "sha256": "45a998ea47a5e0b28aebd05d010b339d2bab7eb68234addfb9ada22bb14cd043",
+      "bytes": 2970
+    },
+    "scripts/proof/test_review_zone_source_vectors.py": {
+      "sha256": "18e05711fca0038e7c76718632b6fa727dd24529f68099372ac9e201eaf4e50d",
+      "bytes": 2314
+    },
+    "scripts/proof/test_run_calibration_stability.py": {
+      "sha256": "f112706475cfbc8b4becc268090b197e062cc1e287c5ab3703272501e0001e2e",
+      "bytes": 4944
+    },
+    "scripts/proof/test_run_calibration_transfer.py": {
+      "sha256": "7a9e35bc406cff6dfd6aaf6cccee3b4caba9eb928b4adf2d3058ec3337a05925",
+      "bytes": 4721
+    },
+    "scripts/proof/test_run_conditional_shape_candidate.py": {
+      "sha256": "4f35a4c6d2bef4d7e4d899e8256aa0944bc1d17c81ee726ff32f2b0622f73ee5",
+      "bytes": 1555
+    },
+    "scripts/proof/test_run_event_memory_candidate.py": {
+      "sha256": "c241393fe6d407e0dcb8a270c673377c8b8803102a64770066d1f26107801373",
+      "bytes": 1228
+    },
+    "scripts/proof/test_run_forward_shooter_movement.py": {
+      "sha256": "e253a5e08c652e436492acb74439a70047596326f9dcf9d58c61413c139c9a8d",
+      "bytes": 5440
+    },
+    "scripts/proof/test_run_forward_shooter_movement_v2.py": {
+      "sha256": "80497bca815517ad66471e17c7a56655af8fe3eced61594d85b8b4353cc901b3",
+      "bytes": 3153
+    },
+    "scripts/proof/test_run_identity_probability.py": {
+      "sha256": "e4cff6d1b5c2e01ad06f848ac667eb0fd8ac834968f0f7cb2894a634caa6e7ed",
+      "bytes": 5276
+    },
+    "scripts/proof/test_run_identity_probability_v2.py": {
+      "sha256": "f0a4b8f5e0fe7e7050480660e7f2829f6c14221f25e4eacf33e81c9ff6d79a53",
+      "bytes": 5285
+    },
+    "scripts/proof/test_run_movement_candidate.py": {
+      "sha256": "e8b4e126b05103031b7eb4e2fa4da0168f570ea3779301449f90fb987d5f6535",
+      "bytes": 2038
+    },
+    "scripts/proof/test_run_prequential_calibration.py": {
+      "sha256": "4a1468c31175e4b08121bfddb399d61f7bca9e1112a98b40296d6dbb81d69d0e",
+      "bytes": 5667
+    },
+    "scripts/proof/test_run_recent_timing.py": {
+      "sha256": "062ea99ef01020173a6c7f992287ce386e8c405d834726d73faa2e9c6800237d",
+      "bytes": 1103
+    },
+    "scripts/proof/test_run_recorded_penalty_candidate.py": {
+      "sha256": "0ad7e6e9e19aea2cab7762220e285e1e3e6845e04e632a7e7e8f45463ebb64cc",
+      "bytes": 8572
+    },
+    "scripts/proof/test_run_recorded_penalty_candidate_review.py": {
+      "sha256": "e6f9dbddef6caac6c245a93f46aa2dceed091d304567721ae6007e6b980594ca",
+      "bytes": 6078
+    },
+    "scripts/proof/test_run_selective_calibration.py": {
+      "sha256": "e7d6d89732bc155c269f69a81d3e76954e6e2d8cc50eb79108aea87cbf2b80c3",
+      "bytes": 3651
+    },
+    "scripts/proof/test_run_strength_partition_candidate.py": {
+      "sha256": "b394b2a955c9ffaa682347bbc7ea1df4f2b4d65ed3021e51afff8880331bd962",
+      "bytes": 886
+    },
+    "scripts/proof/test_run_timing_loss_gate.py": {
+      "sha256": "085c1c8f9d7cea791f0d889dd2e3df2ce1aaadac42027dd22d17eb93aab6edff",
+      "bytes": 1077
+    },
+    "scripts/proof/test_run_zone_context_candidate.py": {
+      "sha256": "eb4b4a7101077329640ad8505a9168845663119d5d758057331828284bc237e4",
+      "bytes": 2666
+    },
+    "scripts/proof/test_selected_timing_candidate.py": {
+      "sha256": "c4f3137ae41780ae88b76b475badd7fa9ff1cfe622e5f5a03af44ee4bf14c2b9",
+      "bytes": 2336
+    },
+    "scripts/proof/test_shooter_offset.py": {
+      "sha256": "1a4252296992b6b8679d421b644de1bbf1a4fa4eff4ff2e91893d1f453270517",
+      "bytes": 2003
+    },
+    "scripts/proof/test_targeted_last_season_adjustments.py": {
+      "sha256": "1a60ee4e037481826e400d0444747de7d291b7529a955e96e8bcb2e243b70da2",
+      "bytes": 6129
+    },
+    "scripts/proof/test_targeted_xg_inference.py": {
+      "sha256": "0c96fe9170775a163bf028104badae9c022817dc7d3a218195ed5d8f2379ad9f",
+      "bytes": 887
+    },
+    "scripts/proof/test_timing_candidate_runner_review.py": {
+      "sha256": "0a5308bd44f9b68a8caf401bf6a3e6c85dad0a5349719f5dc91f1f2417721511",
+      "bytes": 7948
+    },
+    "scripts/proof/test_timing_conditional_calibration.py": {
+      "sha256": "80b30b6e06df8df551eea3ccba8df3bc84859d21e95ae936d63b3fb1a89a71db",
+      "bytes": 6858
+    },
+    "scripts/proof/test_timing_conditional_review.py": {
+      "sha256": "7ec707ad41fee9f607f1db133be6c82ca6be1d3c64b4426556707ae6fa5b1674",
+      "bytes": 6476
+    },
+    "scripts/proof/test_timing_eras_review.py": {
+      "sha256": "717572475cb65d5a24ead89cb877deebd2f51f0b4d082f22e04d8cd7d8c1f735",
+      "bytes": 5451
+    },
+    "scripts/proof/test_timing_ridge10.py": {
+      "sha256": "c35be860a09c8bd95eca998f184e924be8c3d5147127989417f29a567d68378d",
+      "bytes": 7615
+    },
+    "scripts/proof/test_timing_ridge10_runner.py": {
+      "sha256": "74e6d31c0e04236ccc84fa311416828e49b6b76aefc941f3088f55c346af5a93",
+      "bytes": 8230
+    },
+    "scripts/proof/test_timing_shape.py": {
+      "sha256": "e3a3b3c06cfbf4be626e88ee0a1b7c1ec1d62176cd91e24fca5f84a69ca27b05",
+      "bytes": 1588
+    },
+    "scripts/proof/test_tracked_comotion_pilot.py": {
+      "sha256": "24b482e629cb5c53b0614f40fa82f36d949725fde3cc4c5a5303e16e91323933",
+      "bytes": 2127
+    },
+    "scripts/proof/timing_conditional_calibration.py": {
+      "sha256": "09230207515cc24316da838b276346aa0ac7c6ea98a3c679c8d2daec1d1fe151",
+      "bytes": 12144
+    },
+    "scripts/proof/timing_conditional_calibration_ridge10.py": {
+      "sha256": "b4e210f61eaf154f18f1f2aa4a47a93e48947fa180142eae3ce208725fc9bb93",
+      "bytes": 12149
+    },
+    "server/src/__tests__/MatchupService.playerGameLog.test.ts": {
+      "sha256": "093f8614391eae9528a22f9c0e7dd2a264e7aaa475fdb2d227afc3c374427f61",
+      "bytes": 6848
+    },
+    "supabase/migrations/20260907050403_restrict_global_projected_stats_writes.sql": {
+      "sha256": "2a9021aad9d304130f2126fd7f6c4116c9b21089d4074e97e1f899851dd31589",
+      "bytes": 1765
+    }
+  },
+  "source_metrics": {
+    "path": "scripts/proof/results/joint-residual-adjustments-20260907/summary.json",
+    "sha256": "a3f792fd3a1f906a4fe9b722a29ca9b823a4a04debb6e9ffa16b09acd31fa35e"
+  },
+  "documents": [
+    {
+      "path": "docs/analytics-actor-attribution-plan-20260906.json",
+      "sha256": "fe48a07b294948778bbf92973bcf2a7933c19a5ff415dcb927cad35725db310c"
+    },
+    {
+      "path": "docs/analytics-actor-attribution-result-20260906.md",
+      "sha256": "bac417f51e2e42f749a0466b6f6c0e377e3865a5cc24ced0641c1b50a528a046"
+    },
+    {
+      "path": "docs/analytics-actor-attribution-result-index-20260906.json",
+      "sha256": "f94f99a4d0c3505655923ba62a4f0f1cbce3ebed12db3b0f94fade28b69bb316"
+    },
+    {
+      "path": "docs/analytics-actor-checkpoint-archive-20260906.json",
+      "sha256": "f48c2b192ebf528a3c38e92765954ae52eaec81c29f29dcf3a8dfd0bfd1b79c6"
+    },
+    {
+      "path": "docs/analytics-adaptive-calibration-archive-20260906.json",
+      "sha256": "3b0d77f2b2d6072a42a1c8fd1b3ec95227c7204823d4e71cf759bd4662057a5a"
+    },
+    {
+      "path": "docs/analytics-adaptive-calibration-index-20260906.json",
+      "sha256": "1ef3c98eef2b05b382367a97e09da479ed0bd8e9713f364643dbe5ef24509868"
+    },
+    {
+      "path": "docs/analytics-adaptive-calibration-integrity-20260906.json",
+      "sha256": "d62270908b0e68d6e6f365a204d2d18ab5a2497f6550b2dfcfb16ba39ed65402"
+    },
+    {
+      "path": "docs/analytics-adaptive-calibration-result-20260906.md",
+      "sha256": "f9768e3f2ec52e95b0fa8fbc46a50ccf3c74f8382795d0f23147211d81953eeb"
+    },
+    {
+      "path": "docs/analytics-adaptive-calibration-review-20260906.json",
+      "sha256": "f5c0fa14599b8dfeba1015170a3fe436f8bdec5357747facab509e76a2949778"
+    },
+    {
+      "path": "docs/analytics-archive-writer-proof-20260906.md",
+      "sha256": "2d984607f4a348ec295d2f05313a356705bf7b3b2ef2fae4b64746174a5c49b9"
+    },
+    {
+      "path": "docs/analytics-body-possession-prototype-20260907.md",
+      "sha256": "2df28e837c5b0bc5e1eec44c6cd6ca3e6bc272c51aceefd6a2e5bf74b7d4cd61"
+    },
+    {
+      "path": "docs/analytics-bounded-calibration-execution-20260906.md",
+      "sha256": "cf51de15e4b2c3da8815535cfb4e80c877ee2671463933e53fab8cfd14fd7dcc"
+    },
+    {
+      "path": "docs/analytics-bounded-calibration-result-20260906.md",
+      "sha256": "eb349c4c444052a23f7e9b8d2d931e8e65f4c4ba26b69c0d702a37e775e80fd6"
+    },
+    {
+      "path": "docs/analytics-bounded-timing-prior-plan-20260907.md",
+      "sha256": "5e0269de4f052f0c42d4e44db8d156c32ca280b5d979161485728d202d94024c"
+    },
+    {
+      "path": "docs/analytics-bounded-timing-prior-result-20260907.md",
+      "sha256": "4915681cfb09314f14fa19db4cc0847de98b0352583002b2d132d877115614bd"
+    },
+    {
+      "path": "docs/analytics-calibration-checkpoint-archive-20260906.json",
+      "sha256": "92b5b06badeee11583e3b323aa558e04f97e5f812a9e684b79cc949283668c0c"
+    },
+    {
+      "path": "docs/analytics-calibration-plan-20260906.json",
+      "sha256": "3f81d582cd11a09875dbc889771567440c82413173ebb9ed9513510149a75bb5"
+    },
+    {
+      "path": "docs/analytics-calibration-result-20260906.md",
+      "sha256": "b3dd54ab5b4242fc6facf2f64eeb14f1e0fd3f1a2f48d927a7c048d72be9cd23"
+    },
+    {
+      "path": "docs/analytics-calibration-result-index-20260906.json",
+      "sha256": "5875f2d811d5c98ca4b0a19fdaac0e448528166c9c5ee3a7971958e038de367f"
+    },
+    {
+      "path": "docs/analytics-calibration-shape-checkpoint-archive-20260906.json",
+      "sha256": "f0a78c54bdc9f5aff56add5a527f0ebd97268ae214577ef264eb5b3f59278d5c"
+    },
+    {
+      "path": "docs/analytics-calibration-shape-plan-20260906.json",
+      "sha256": "7eed305131b49f511e9a41889d49744d8fb6856339c74a5b7d3a0e756aa5dc3d"
+    },
+    {
+      "path": "docs/analytics-calibration-shape-result-20260906.md",
+      "sha256": "8c989dd7113035676aca38126732561df93efbb75922007243fe07c53d62893c"
+    },
+    {
+      "path": "docs/analytics-calibration-shape-result-index-20260906.json",
+      "sha256": "85881f86dbbd269652a7b7af83060eb662c8d8925db13230723751d0c39cca85"
+    },
+    {
+      "path": "docs/analytics-calibration-stability-plan-20260906.json",
+      "sha256": "9c9d2751ae71dc94a40207260368d0228aefd616184a0f32abb4441fa8fa9b54"
+    },
+    {
+      "path": "docs/analytics-calibration-stability-result-20260906.md",
+      "sha256": "8ecb8cb95e1a2454297463897ad91d04dc93896f1a726992f9ab3e23c945955b"
+    },
+    {
+      "path": "docs/analytics-calibration-transfer-plan-20260906.json",
+      "sha256": "f60544d9eb9ce69fb0c6041947d9c7bde401864cc69371e35f88f7622f909f6e"
+    },
+    {
+      "path": "docs/analytics-calibration-transfer-result-20260906.md",
+      "sha256": "a83667e83f1f2ad5d376a6723f8d0cc8b9755a83049c1c7c86d969dc43573864"
+    },
+    {
+      "path": "docs/analytics-causal-feature-plan-20260906.md",
+      "sha256": "269324c4b0ed0cf403fdbdc76de96de5ffc173efdb8ed0efe2579c03accc6097"
+    },
+    {
+      "path": "docs/analytics-comotion-unseen-validation-20260907.md",
+      "sha256": "528bee1b53e1d9a621060cc89f6fedb15fc2645bc6d8e2fcf0c5d57deb37d1d8"
+    },
+    {
+      "path": "docs/analytics-completed-experiment-archive-20260906.json",
+      "sha256": "67ed668f1d9de790792ca3ed19785c228b25aa77703210443e790bc578cda932"
+    },
+    {
+      "path": "docs/analytics-composed-nightly-20260906.md",
+      "sha256": "d50d99f12e6889b866b4f887ae631f10c54ff4a0be452442cea4c27ab5d1803f"
+    },
+    {
+      "path": "docs/analytics-composed-player-finishing-20260907.md",
+      "sha256": "789d5687a16af35ce50c68c4eb5d53553e760026d5fd2bf181de6d4d22dd4dd9"
+    },
+    {
+      "path": "docs/analytics-composed-xg-replay-20260907.md",
+      "sha256": "54882ac03074fcaa94c3a2091d9a8a78689c95929bb7d67cb73ca8f4212555a1"
+    },
+    {
+      "path": "docs/analytics-conditional-shape-plan-20260906.json",
+      "sha256": "6dfe3721f02d71fe9f5e610152ad53d69a51b2fbb9056cfc7c660b22dffe7767"
+    },
+    {
+      "path": "docs/analytics-conditional-shape-proposal-20260906.md",
+      "sha256": "2d35d1d84c3227849273642a7f7fbfefb640e9d036432dcb592ba55732fda99a"
+    },
+    {
+      "path": "docs/analytics-conditional-shape-result-20260906.md",
+      "sha256": "ef5866f2612fa843bc786a9e4107b0d8702d65cc3db6fdaa9c8befb59a24a9ec"
+    },
+    {
+      "path": "docs/analytics-conflict-game-manifest-20260906.json",
+      "sha256": "c18538f14b47d132013ccc5cb22365fb1ecdbc12b143f176766f04082cf12288"
+    },
+    {
+      "path": "docs/analytics-continuous-event-movement-20260907.md",
+      "sha256": "cae2235d7b1bf302516c445a6bdf56afff00fba0bdeeecb989457cd97932391f"
+    },
+    {
+      "path": "docs/analytics-corpus-full-proof-20260906.json",
+      "sha256": "86d4b1dd0451e702a787a26f86f136407d39546598d53295a4a5c2d6560365ab"
+    },
+    {
+      "path": "docs/analytics-corpus-proof-20260906.json",
+      "sha256": "b533a664460310a130fe83cccf1caca870d2405c83bd889b4745e7d755173d9a"
+    },
+    {
+      "path": "docs/analytics-current-xg-checkpoint-20260907.md",
+      "sha256": "a09aec01ca930b35558c1ec5dfd525e2fb84597b6fd284aa360fd9a7142ad3e0"
+    },
+    {
+      "path": "docs/analytics-development-ablation-plan-20260906.json",
+      "sha256": "f2ea437a51bd316f9b45ff8ba69dbc77fa7cc7bdb5845528d05a27fb267bc3a2"
+    },
+    {
+      "path": "docs/analytics-development-checkpoint-archive-20260906.json",
+      "sha256": "0774917d3d723178d951dac4e45dd290d7c657439f29f578c9ad5462a2d8dd10"
+    },
+    {
+      "path": "docs/analytics-development-methods-20260906.md",
+      "sha256": "aeaeaf4156a8efe2d81d2e65b996cf434996f5a91160d9d7e37b38f456a1f4be"
+    },
+    {
+      "path": "docs/analytics-development-result-20260906.md",
+      "sha256": "c13a8f68627f9f64b2cf1e1ec0d6685691cfe4a48ea79b4585d4268c3d76e3d5"
+    },
+    {
+      "path": "docs/analytics-development-result-proof-20260906.json",
+      "sha256": "21543979baa3d623d2afd8362c203aabf57e1f1090ee6e81ce198bb716c1a6a1"
+    },
+    {
+      "path": "docs/analytics-development-sog-review-20260907.md",
+      "sha256": "43589ada5c10b38d8edb48a2bfc4798466a1ce196ffe4e7a1aae2a2d4b4e931d"
+    },
+    {
+      "path": "docs/analytics-earlier-shape-selection-20260907.md",
+      "sha256": "d1bc9679c658f92214641ed0238de89fe34ee041e8914d6d0710ba2ccaedac93"
+    },
+    {
+      "path": "docs/analytics-era-exclusion-guard-proof-20260906.md",
+      "sha256": "e2d0f58dc5b7ba93ed3cd274c91aed03495fead3d063f02ad745427aa3493949"
+    },
+    {
+      "path": "docs/analytics-event-memory-plan-20260906.json",
+      "sha256": "0f2b35b63399426b401fb55352f37c905637fd658d4d4f418ef027f37ef6c4bf"
+    },
+    {
+      "path": "docs/analytics-event-memory-result-20260906.md",
+      "sha256": "b02efad564b740f7725cd80b1ad510a82b3efdb86c4cc53376295f51050573ab"
+    },
+    {
+      "path": "docs/analytics-evidence-archive-20260906.json",
+      "sha256": "d20f59d9410ecddfc8b05dedb017fb40c46b54e7497180d16d4f347ae8e21640"
+    },
+    {
+      "path": "docs/analytics-expanded-timing-diagnostic-20260907.md",
+      "sha256": "966c08fe038a542b398cf4973b1738000341ef3f19b8925cd1c99fbd4092ec22"
+    },
+    {
+      "path": "docs/analytics-finishing-exposure-reconciliation-20260907.md",
+      "sha256": "70fed0ffd4bc02b28bce483835d3bb41765e5ef8d1a7efcc7b103d41fac00942"
+    },
+    {
+      "path": "docs/analytics-finishing-live-source-check-20260907.json",
+      "sha256": "9df109d4a7451bdeabf35686d914f4b4de2335206ab36d6d944ed8068ee61c6f"
+    },
+    {
+      "path": "docs/analytics-finishing-quantity-contract-20260906.md",
+      "sha256": "5268ac08605b19c1d01a208939ae7ebea1241ec271f59f1ed0c15ffed7ca27f2"
+    },
+    {
+      "path": "docs/analytics-finishing-talent-preservation-20260906.md",
+      "sha256": "997df611b03634f1b7d553c1e7e6a87b56ce85d5267bd12736aa7fc01c0e1760"
+    },
+    {
+      "path": "docs/analytics-first-neutral-experiment-plan-20260906.json",
+      "sha256": "fccb4b46c17ac6a4e3a2b6482eedc986c695c74ae2ba6ac925922f4b1f7b1c2f"
+    },
+    {
+      "path": "docs/analytics-first-neutral-experiment-proof-20260906.json",
+      "sha256": "ccd50d273bfc4c26587346b9a05213f4af27e41c09034f981fc16adaca77cb1a"
+    },
+    {
+      "path": "docs/analytics-first-neutral-experiment-result-20260906.md",
+      "sha256": "d9ed0dd80739a8917ac27f096eb8e04d4ba661326945b7f73b1472c893d1b759"
+    },
+    {
+      "path": "docs/analytics-five-calibration-ideas-20260907.md",
+      "sha256": "bdc097b7237d3dcdc0c9f575f536b7a8f453a3c4d00dec2a3da9fdc1be3c0fe9"
+    },
+    {
+      "path": "docs/analytics-forward-shooter-decomposition-plan-20260906.md",
+      "sha256": "aa79a619e76647de8c9496d89a8ac9517792f9d93e623130e28ff17bac133540"
+    },
+    {
+      "path": "docs/analytics-forward-shooter-decomposition-result-20260906.md",
+      "sha256": "e9565f9ee9485a498c1d7827b4f8d5129e376b9e80df90341477ff988d082952"
+    },
+    {
+      "path": "docs/analytics-forward-shooter-execution-20260906.md",
+      "sha256": "842ab560739fd66c9e448834cd083345ac1a2b72401943a79e1bb00443c26bfe"
+    },
+    {
+      "path": "docs/analytics-forward-shooter-movement-plan-20260906.json",
+      "sha256": "144abff89374538279c0dde29ee737708c92e27a6c833c4c0dec94bfcfaa9cae"
+    },
+    {
+      "path": "docs/analytics-forward-shooter-result-20260906.md",
+      "sha256": "19320e0ccee9faeb7be6a283ff20c514b45aa2042868ef1d715b7a7e2fbf4a39"
+    },
+    {
+      "path": "docs/analytics-fpar-foundation-adapter-20260906.md",
+      "sha256": "b28b5c411d0c67857ebdcff4e140f95a058ef1e00ce5fcdff5749dc919ce12ba"
+    },
+    {
+      "path": "docs/analytics-frozen-last-season-evaluation-20260907.md",
+      "sha256": "cd58e747f10b54cd1b35d4aca4280ef9cd008f7e0448712d67c9798f73817af1"
+    },
+    {
+      "path": "docs/analytics-full-pbp-preshot-review-20260907.md",
+      "sha256": "60aa91726d7ac7dbe870f68d2eb8cbddbeb4cfe15dc95b7e4749615a4ed0158f"
+    },
+    {
+      "path": "docs/analytics-gar-candidate-guard-proof-20260906.md",
+      "sha256": "adac4f444e5dc4ff6f29257d3b1d7dcf9c8ea50f2ea4de809fa3f7567a366c41"
+    },
+    {
+      "path": "docs/analytics-goal-sog-adjudication-20260906.md",
+      "sha256": "91bf353a17118dc7c03cb3b34aee7fba03011e77a77029758ddafce41578c3f9"
+    },
+    {
+      "path": "docs/analytics-goal-sog-adjudications-20260906-v1.json",
+      "sha256": "e193ab68d55ae1f43c423df8dc07022aef4f264865af64e19c0e4a7eacc8c5a9"
+    },
+    {
+      "path": "docs/analytics-goal-sog-evidence-20260906.json",
+      "sha256": "701eea37151a0e071db9077dd57f9a71dccc2726c8f866f75e5a83d4983d2da2"
+    },
+    {
+      "path": "docs/analytics-goal-sog-http-adjudications-20260906-v1.json",
+      "sha256": "733e340e77a69f35a017cbb719f9fc1bb2b158a8c2648c961eef16ce2aa81478"
+    },
+    {
+      "path": "docs/analytics-goal-sog-statistical-evidence-20260906-v2.json",
+      "sha256": "43a7d5c2c17782ee5e4fe65dcf8512a46fef1248a337080f14aeeb93ea0bc864"
+    },
+    {
+      "path": "docs/analytics-hall-pass-alignment-20260907.md",
+      "sha256": "c9888009f8784a978f67368bc10912749c7aaae3f0792f1283482828d42a158b"
+    },
+    {
+      "path": "docs/analytics-historical-freeze-proof-20260906.json",
+      "sha256": "190f86302b5839ee2136b88a32e55c3339df3deb4480e0c96ebfa3668dac1a74"
+    },
+    {
+      "path": "docs/analytics-historical-report-proof-20260906.json",
+      "sha256": "be6a74e47f394d86787031c84bff79319e8c5f0fb025b96649097ac292eb628d"
+    },
+    {
+      "path": "docs/analytics-identity-probability-plan-20260906.json",
+      "sha256": "97834d03cbbcec6aeffd6e83119cce4e80ec30b61278bcc2a5f226b78f259b5c"
+    },
+    {
+      "path": "docs/analytics-identity-probability-v2-plan-20260906.json",
+      "sha256": "40f40a6702ba0c7820ee17cbad92d4f443c1dc89d0983f699f02dc45a52761ac"
+    },
+    {
+      "path": "docs/analytics-independent-possession-review-pack-20260907.md",
+      "sha256": "5fd8cceb4dabb5af750bee997e5892631936f3e292c65f6bf7987596d77a7750"
+    },
+    {
+      "path": "docs/analytics-input-coverage-ledger-20260906-v2.json",
+      "sha256": "6956cca69520e5a412dcf0580fd03830f8af157d8ab69985c550b8d0a3c6a8bc"
+    },
+    {
+      "path": "docs/analytics-input-coverage-ledger-20260906-v3.json",
+      "sha256": "e97707e5cfe5418653ca1ee6111b134a45b825381f89cf768444bb30fe993786"
+    },
+    {
+      "path": "docs/analytics-input-coverage-ledger-20260906-v4.json",
+      "sha256": "7850e09da463a1ffa5b6d86a82f54519a8ab814c71312e17763b694477fd5f60"
+    },
+    {
+      "path": "docs/analytics-input-coverage-ledger-20260906-v5.json",
+      "sha256": "e751800b2f3e6f5814c8e03966d7cab92b20ec7e3352bad8cf6750324d1cbd11"
+    },
+    {
+      "path": "docs/analytics-input-coverage-ledger-20260906-v6.json",
+      "sha256": "ef25642df96858bc11aad8cd2e568a185966d1d92413c1d466760cf3b71a0a96"
+    },
+    {
+      "path": "docs/analytics-input-coverage-ledger-20260906-v7.json",
+      "sha256": "f6c96e2762fb94f031bffb3a010a7068045fd6e5323008c87dabc9a204c45281"
+    },
+    {
+      "path": "docs/analytics-input-coverage-ledger-20260906-v8.json",
+      "sha256": "81584825dfbf40e33826f99de376362fd4e79e4d7e8b5175c2a27c697f06e8b3"
+    },
+    {
+      "path": "docs/analytics-input-coverage-ledger-20260906.json",
+      "sha256": "711992b83f6eee83f1a207ddc604629141b67efa7680d683d4e781b00a8d87d0"
+    },
+    {
+      "path": "docs/analytics-input-coverage-ledger-20260907-v9.json",
+      "sha256": "8b02d4d1648f18bf3b7d5a1511ae0ebce26e2a81c03f5b536997feb5031c44d2"
+    },
+    {
+      "path": "docs/analytics-input-recovery-checkpoint-20260906.md",
+      "sha256": "8284f44716c2ef5b3651dee242253bb17d772c879b73923d4abe387ca0544114"
+    },
+    {
+      "path": "docs/analytics-joint-residual-improvement-20260907.md",
+      "sha256": "dd2a66adc077a2092374b5beb30141368db91b60c3c5d2ee5eebaec8866c10ce"
+    },
+    {
+      "path": "docs/analytics-lateral-time-grid-20260907.md",
+      "sha256": "181eab3f1b9525f015733d37fd58131aecf92eb4165c521aaee9e93271b4a57c"
+    },
+    {
+      "path": "docs/analytics-legacy-artifact-inventory-20260906.json",
+      "sha256": "b1fe49903afc9929a5fe06ba9e7bcb52f6b40b681b50fdfcf99fc7985e203e76"
+    },
+    {
+      "path": "docs/analytics-legacy-gsax-guard-proof-20260906.md",
+      "sha256": "2754c870dad9bbbe104a32c8878b9ee0084a0646146523083f34f051bc4b6021"
+    },
+    {
+      "path": "docs/analytics-legacy-input-parity-20260906.md",
+      "sha256": "2409a0fb43ae59ce61dce4f66aa2beb568e1359ee0e0feb8c8d3dfa47d738b3b"
+    },
+    {
+      "path": "docs/analytics-legacy-serving-audit-20260906.md",
+      "sha256": "560f7dd656648dfbceee223508818e78d740a225497a375efd25d3513bb51c64"
+    },
+    {
+      "path": "docs/analytics-linked-replay-pilot-20260907.md",
+      "sha256": "a7a88e4fd64e31cecfd8d73072464cbbbea3ad02afe95067b6c716dfd4094c82"
+    },
+    {
+      "path": "docs/analytics-linked-tracking-source-revisit-20260907.md",
+      "sha256": "b0a396c05134986552f59c51b4ac4fc36b77daf97eed267ca6439893945124d0"
+    },
+    {
+      "path": "docs/analytics-live-model-gap-20260906.md",
+      "sha256": "1489972cfbeb451f3b1e9d1ea0ff126ced4839854ffef2eb8e5a587da46803b6"
+    },
+    {
+      "path": "docs/analytics-local-archive-rest-20260906.json",
+      "sha256": "31a7957378e239373ffd7bf4c87ec5c1a8c133f7379892d148d30b9200eb0dd7"
+    },
+    {
+      "path": "docs/analytics-local-publication-e2e-20260906.json",
+      "sha256": "c4abf0c4c80ec2687f942f0b5514251ba6d3b15849fee8db020488500fb67df9"
+    },
+    {
+      "path": "docs/analytics-method-checkpoint-20260906.md",
+      "sha256": "de5824b0060b79fcf6b1fdb5ab7aa9c883a8867378525d3e52d4f39603b65ef1"
+    },
+    {
+      "path": "docs/analytics-method-preservation-20260906.md",
+      "sha256": "66619bc5fa17193fe7cce29031bdbc7d441715d60403c30dcfc87f09a4826d8d"
+    },
+    {
+      "path": "docs/analytics-migration-drift-20260906.json",
+      "sha256": "43b0d94b42d5b2daa2aeee61f6729604470ce5c1e9e64ce7758aaab2afcfcc65"
+    },
+    {
+      "path": "docs/analytics-model-dependency-audit-20260906.md",
+      "sha256": "cffa126bc141080955a2d6317c5f47624bd78e3a225699e4cfbae7dd9548e22b"
+    },
+    {
+      "path": "docs/analytics-model-publication-checkpoint-archive-20260906.json",
+      "sha256": "495d81b2e3a212bd3e978fd27e30b9cf2a50f51f8a093b215e6e6eb169604f70"
+    },
+    {
+      "path": "docs/analytics-model-publication-result-20260906.md",
+      "sha256": "98e9c27129a0b235f11054500686434516214ae3e1411ea59d52aecae84f8116"
+    },
+    {
+      "path": "docs/analytics-model-publication-result-index-20260906.json",
+      "sha256": "5bed4f70b10d3fd44b85ab2464fee3b15e04c4359e2c00cb82ea7035b3a27c19"
+    },
+    {
+      "path": "docs/analytics-moneypuck-schema-inspection-20260906.md",
+      "sha256": "6b3bfa11bc4e8546806d7fbbbcd0d200ccbaabfd8a4b8c9ae0e573b06e769a74"
+    },
+    {
+      "path": "docs/analytics-movement-candidate-plan-20260906.json",
+      "sha256": "b96a800aa6296bcda2893dfb15c36fcd32df99eb292884ea0d65a16b2b3e4517"
+    },
+    {
+      "path": "docs/analytics-movement-diagnostic-20260906.md",
+      "sha256": "34eb86b1c584f26dd47bf85ffccdcd27a0741900a8f38c8a31f30b450df6338d"
+    },
+    {
+      "path": "docs/analytics-movement-loss-weights-20260907.md",
+      "sha256": "99dd6e03cd70bac92155f191599b47d351201d50e66dad45139b99eec86fad9b"
+    },
+    {
+      "path": "docs/analytics-movement-residual-context-20260907.md",
+      "sha256": "a260fdd24651bd28ca469cc748b3a8f10e5e1c6ff2083ed48b9809e0955a84bb"
+    },
+    {
+      "path": "docs/analytics-movement-result-20260906.md",
+      "sha256": "3bb8e63f76aaebde2fdf27490e50170ee9a55ec82f5b280b7e6f1fcd66c6f167"
+    },
+    {
+      "path": "docs/analytics-native-composed-cells-20260906.json",
+      "sha256": "52fa7149ab7ee17a67063484524310ad9da2c9218dd6eacc2b84392a99e65b66"
+    },
+    {
+      "path": "docs/analytics-native-composed-expanded-20260906.json",
+      "sha256": "c16c9aaf9850c25400031de9b02c477d2984722d693013797058e9797daf59dc"
+    },
+    {
+      "path": "docs/analytics-native-composed-nightly-20260906.json",
+      "sha256": "9b31c4fa46833ef161ff543863029f5c04706a902a2d3c47d4593dfee2226284"
+    },
+    {
+      "path": "docs/analytics-native-gar-races-20260906.json",
+      "sha256": "5ab9051d0f64f9deb1c1230ec61a848f3a945c5026adc547cae21aa3998a5fd9"
+    },
+    {
+      "path": "docs/analytics-native-gsax-races-20260906.json",
+      "sha256": "6715e8dab1f64eb88dc3e283516b6f2fc5dd5e376f5f7b4aeaffc76d06e04117"
+    },
+    {
+      "path": "docs/analytics-native-nightly-deadlock-20260906.json",
+      "sha256": "fe8aace93ae360dc74d9e8588fcb09e4223fefc57a812b7c1c31a74f25e8d650"
+    },
+    {
+      "path": "docs/analytics-native-onice-races-20260906.json",
+      "sha256": "4d876ad7c41de7ade13848fca72dbe2f3915c073425bc3128436e7bf8e8b8fc3"
+    },
+    {
+      "path": "docs/analytics-native-publication-races-20260906.json",
+      "sha256": "af4b6feeb06c4d28297192318af25f4662364769dc3c4a1412c4da52e589ffbc"
+    },
+    {
+      "path": "docs/analytics-native-writer-protocol-20260906.json",
+      "sha256": "37d3b6f99bcec580120fc54d95acce1cdef0c956e8046f4a500db3878c58d8df"
+    },
+    {
+      "path": "docs/analytics-native-xg-refresh-races-20260906.json",
+      "sha256": "21429ec17a3b8cfd81bcce55c5ca5e01a99d9ca88118234a2735cf9ca12e1f20"
+    },
+    {
+      "path": "docs/analytics-nightly-forecast-health-20260906.md",
+      "sha256": "82ebc7251c56ac2ef4c31c58c84fedf8454f6c7f94a74365727c0e8b9959b80d"
+    },
+    {
+      "path": "docs/analytics-nightly-lock-audit-20260906.md",
+      "sha256": "f4e71f03f777ff01307f9e5d8fd82ef0daa83f787a18f01e7edfdd01fc8be707"
+    },
+    {
+      "path": "docs/analytics-nullable-xg-consumers-20260906.md",
+      "sha256": "c8923205e5e80068f9afe8b0a7cc6dc7a6ee2969e7c0f6cecaa8ce204e4bbea3"
+    },
+    {
+      "path": "docs/analytics-offline-bundle-result-20260906.md",
+      "sha256": "3f32abe2a66b47878615184f5bd5f75fd4c97a0c9646ad35930851f5bcf6eb89"
+    },
+    {
+      "path": "docs/analytics-onice-guard-proof-20260906.md",
+      "sha256": "e7c0787c08ba795889ec5cc12eaae4d2a11f9edf60a6704e95042047d635f341"
+    },
+    {
+      "path": "docs/analytics-overnight-bound-integrity-20260906.json",
+      "sha256": "7a65e85a2164670b74bfcb78156fe363157de1c881b47598cc098209e69766d6"
+    },
+    {
+      "path": "docs/analytics-overnight-handoff-20260906.md",
+      "sha256": "eb16987c1cdb822370895b144eefe26ba53b3502cc08bf2511314a6f510fc254"
+    },
+    {
+      "path": "docs/analytics-overnight-integrity-20260906.json",
+      "sha256": "8db9044fd5097c64217aafa564473efbbaf8901f7b9fc7153a4b5f23b236b568"
+    },
+    {
+      "path": "docs/analytics-pass-factor-percentages-20260907.md",
+      "sha256": "93b34b3bf99f7ab33a2ae9ced3ed399da43154afeb8c2af5d27e8ced3742ad7a"
+    },
+    {
+      "path": "docs/analytics-pass-integration-source-gates-20260907.md",
+      "sha256": "d6e4647f2ba1c7d6fa5143ac15e2a9dfd995f681cb36f3ba9f27d82e0403c2d0"
+    },
+    {
+      "path": "docs/analytics-pass-review-viewer-20260907.md",
+      "sha256": "6aef8701dd1d2359c4c2f8e507ff21a256aacffb9e925d383156816851adf48d"
+    },
+    {
+      "path": "docs/analytics-passing-method-reproduction-20260907.md",
+      "sha256": "81514aae70bf378fff8cccff99690063e975f2045496f92e8ce0c8daaae6f18c"
+    },
+    {
+      "path": "docs/analytics-passing-review-integration-20260907.md",
+      "sha256": "c7931bfab47959bca0176e228bdad5a1ba993e2fcda461ce52ead8641343bf3f"
+    },
+    {
+      "path": "docs/analytics-passing-system-20260907.md",
+      "sha256": "bf7fee88ec7deafd41f471b6f1bf8559a71fac363aca3522ff001574225e9c64"
+    },
+    {
+      "path": "docs/analytics-passing-video-validation-20260907.md",
+      "sha256": "7c1070368e89d07516636f4492b6a3c96620ce0412efa1220ea6d583929c962b"
+    },
+    {
+      "path": "docs/analytics-penalty-full-coverage-result-20260906.md",
+      "sha256": "60fcfd1b35f30ae4af0140c8c25cea53031ed4be00d903a00c15495a193389ce"
+    },
+    {
+      "path": "docs/analytics-pl-onice-parser-proposal-20260906.md",
+      "sha256": "d743c85b456912c2a6b6f60b308d3de1600ee164f0e2b89492cceacc9cefd975"
+    },
+    {
+      "path": "docs/analytics-pl-onice-pilot-result-20260906.md",
+      "sha256": "ffe5374fe361c3cfc837d99244342f39c36667dc14791eb7dff94accada78648"
+    },
+    {
+      "path": "docs/analytics-possession-goalie-role-20260907.md",
+      "sha256": "3537e9ab980ff04272f32296b8cd3b7776cc9e9fe92194d540e8b7597bc31c79"
+    },
+    {
+      "path": "docs/analytics-possession-reliability-20260907.md",
+      "sha256": "f31df944cf1ee6a6201436ec8ea23c41f207448724ff1a417d0f4b443a2d1013"
+    },
+    {
+      "path": "docs/analytics-possession-retention-20260907.md",
+      "sha256": "632100a51439aca990bd2e9578c8424f3d53f55c41b68eb3afc8a3557d3d0c6f"
+    },
+    {
+      "path": "docs/analytics-possession-role-integration-20260907.md",
+      "sha256": "81507661dfbf25a4344dcce4691c8c1d1ba1f1ca4d728db66f6d83b8248a5faf"
+    },
+    {
+      "path": "docs/analytics-possession-scoring-20260907.md",
+      "sha256": "0675f416b0a81499912c2926c5c2a9222a588137126dbc9a15733aa56cbb180a"
+    },
+    {
+      "path": "docs/analytics-possession-video-coverage-20260907.md",
+      "sha256": "81add6bceac1a34de9505023e18f78c93078239e18ec960e5f1faa60bbac71a0"
+    },
+    {
+      "path": "docs/analytics-powerplay-input-recovery-20260906.md",
+      "sha256": "69fa4a17a3bd56a112142533544cd7b8fcb670366dd258138cadbfac5c6586bd"
+    },
+    {
+      "path": "docs/analytics-prequential-calibration-plan-20260906.json",
+      "sha256": "00774da1c7fb1ccc67d5b937be9116dfe90ac28449fafa9a5a670df6abbc3548"
+    },
+    {
+      "path": "docs/analytics-prior-sog-fidelity-plan-20260906.md",
+      "sha256": "323b2c1e886605255ac0e66eae87bd34fbf4e248b933292c35a2b7de754803a7"
+    },
+    {
+      "path": "docs/analytics-prior-sog-fidelity-result-20260906.md",
+      "sha256": "92f02fee5f6dcb6a754a8d024a9cea9773dc468446f99d9d07aa8936eadc6a82"
+    },
+    {
+      "path": "docs/analytics-probability-scorecard-20260906.md",
+      "sha256": "2b61666e7fb1dd64cb89e7d531ff097f0a68e1337646d6cb4b2b0b7b2b2684dc"
+    },
+    {
+      "path": "docs/analytics-production-projection-ownership-20260907.md",
+      "sha256": "8b577a0de4cd60a96e2921f906d8f416b79845c19c1fe3d365f6bbfb392e2548"
+    },
+    {
+      "path": "docs/analytics-production-projection-write-restriction-20260907.md",
+      "sha256": "df37c9be052ca3c5300fe55e400e4d27e30883375f664347aa9c050750c8ed0f"
+    },
+    {
+      "path": "docs/analytics-public-method-gap-20260906.md",
+      "sha256": "bfc2538af3c0f35701cbc72b735cb808811755a37a8510c83dc3fe08cce36f0b"
+    },
+    {
+      "path": "docs/analytics-raw-followup-clock-audit-20260907.md",
+      "sha256": "a7f282b0eb185008a15ac07493672065c8a5d9ce40d726650fa06dd2a55c57ae"
+    },
+    {
+      "path": "docs/analytics-raw-learning-logic-20260907.md",
+      "sha256": "a267236d3dcac7512c586473d1247759ef57cdc8f2a087b410e821d92309a004"
+    },
+    {
+      "path": "docs/analytics-raw-movement-interactions-20260907.md",
+      "sha256": "075f00e9b54cd9d703aaf9b0136c50ca9276f60ccd61212f0e79d5a1ef661fda"
+    },
+    {
+      "path": "docs/analytics-recent-candidate-replay-20260907.md",
+      "sha256": "e8b00a5c2bd41e5a25b9df40f64f1ecfcb617a04cac47534dd1e2069d77eef51"
+    },
+    {
+      "path": "docs/analytics-recent-finishing-bridge-20260907.md",
+      "sha256": "283fb122b008983a44803c69b9aa58f9337402d44ee0a7db069548924930167d"
+    },
+    {
+      "path": "docs/analytics-recent-timing-plan-20260907.md",
+      "sha256": "0c457cda1829d3428a121eee97039e55e694c804b023e0170fa4a47e21604a4a"
+    },
+    {
+      "path": "docs/analytics-recent-timing-result-20260907.md",
+      "sha256": "4880a2245d6115558c0a9a8c492c5742707a5e31d020c597c93431c647653ff9"
+    },
+    {
+      "path": "docs/analytics-recorded-penalty-candidate-plan-20260906.json",
+      "sha256": "ec85d8a967f0dd138ddce61944e3d106f0315be816910636e8123761c17b7367"
+    },
+    {
+      "path": "docs/analytics-recorded-penalty-decomposition-20260906.md",
+      "sha256": "c413425fb2edf724dc7a008f62ca609b944bad7b36130f73080cb871d16184ff"
+    },
+    {
+      "path": "docs/analytics-recorded-penalty-result-20260906.md",
+      "sha256": "8e7b4d21b705af3ebd7cc6c6ce0715649d76a720a3108623877ecb15abc98545"
+    },
+    {
+      "path": "docs/analytics-recorded-sequence-maps-20260907.md",
+      "sha256": "d8b94ed9ef24499dd35eaf5374cd3415a0b2dfd28d0d3ad7fe3006ee3ac53a19"
+    },
+    {
+      "path": "docs/analytics-recovered-xg-evaluation-20260907.md",
+      "sha256": "ed99174f182f715971a786e1535c02e9afa979485a2b3a3328267f0b17193677"
+    },
+    {
+      "path": "docs/analytics-replacement-pool-contract-20260906.md",
+      "sha256": "4918975bb8d8e1d9e697df18eef9304d3bd96b978919369bbf881f673cd97034"
+    },
+    {
+      "path": "docs/analytics-replay-comotion-investigation-20260907.md",
+      "sha256": "b6d06d3bb96e5d8ffb00fc6e5225aa4ca1118f803aff343a97b80af9fd49396b"
+    },
+    {
+      "path": "docs/analytics-report-v2-review-20260906.md",
+      "sha256": "d4ee78cd57f154b4cab539502c07a4de0b3fed3ac0037d5263afd0772d8f173e"
+    },
+    {
+      "path": "docs/analytics-retained-venue-shift-inventory-20260906.md",
+      "sha256": "475865a53424f4789c05c83dc7404d79b3ae997ae7151111a7d1ac00ca9dd851"
+    },
+    {
+      "path": "docs/analytics-reviewed-feature-reconstruction-20260907.md",
+      "sha256": "9be10b473faa5f79a4d8a3471653d4ddd94df1936f4a2d79dec598235c6bf308"
+    },
+    {
+      "path": "docs/analytics-reviewed-goal-credit-partition-20260907.md",
+      "sha256": "335a946089765643e68b7fd20d8dc31887186f0465e33bf1a326610a5aec1238"
+    },
+    {
+      "path": "docs/analytics-schedule-proof-20260906.json",
+      "sha256": "f1091cf3489ce353437f535a65973e9f2c5c61f890d63b7fb1916cc69dd29bb6"
+    },
+    {
+      "path": "docs/analytics-selected-timing-inference-20260907.md",
+      "sha256": "24285e5e84dbda2be364b9148a92d76ab7cc06a6c958056a0f23c1712c1b4a6b"
+    },
+    {
+      "path": "docs/analytics-selective-calibration-plan-20260906.json",
+      "sha256": "b546ec83c234d594b6cc472876347fee5c971079830b2c7f9100afa9e4119b00"
+    },
+    {
+      "path": "docs/analytics-sequence-archive-proof-20260906.json",
+      "sha256": "001d3d93a65ef82abd1850d95a495ca66abc2572a95c8338d4bdf1796827e004"
+    },
+    {
+      "path": "docs/analytics-sequence-methods-20260906.md",
+      "sha256": "d228909fc6339a73b8814cf1e910b841b79a07ea5def71d0237e6cd2741fe00e"
+    },
+    {
+      "path": "docs/analytics-shift-rink-recovery-spec-20260906.md",
+      "sha256": "3240099dc998b05b768009cebd6b892152c0541990917b4a8499a12551838611"
+    },
+    {
+      "path": "docs/analytics-shooter-evidence-replay-20260906.md",
+      "sha256": "d9e76a9d09ab5a65a2af7f5153453b3578f26bdbed9eb776d8c95ec2962a972d"
+    },
+    {
+      "path": "docs/analytics-shooter-offset-plan-20260907.md",
+      "sha256": "a4da4e488d120e5484f13361d7435e01abad2d0350515bac0488ea44c23e0648"
+    },
+    {
+      "path": "docs/analytics-shooter-offset-result-20260907.md",
+      "sha256": "246cc248c9899b6bcea57db41138310cbd0f4768fc99af874f71efb2119d88a5"
+    },
+    {
+      "path": "docs/analytics-strength-partition-plan-20260906.json",
+      "sha256": "492e664a32929853038e805028b8ff2ff2a3e14a60302f731dda6bc62f2891d2"
+    },
+    {
+      "path": "docs/analytics-targeted-timestamp-strength-fix-20260907.md",
+      "sha256": "6a163d0c35fca41b93c487384f0920f572c52cc593728b637b110d5f07c1210d"
+    },
+    {
+      "path": "docs/analytics-timing-candidate-plan-20260906.md",
+      "sha256": "406084699d40ddfc4b6c735ea6f0cdfd2d5188f131734fde0b85098d8595cb8c"
+    },
+    {
+      "path": "docs/analytics-timing-candidate-result-20260906.md",
+      "sha256": "667c199b46c7a7eb618606b15e5995b45e1cb5c398a2e9865f226f01dbb95a74"
+    },
+    {
+      "path": "docs/analytics-timing-era-audit-plan-20260906.md",
+      "sha256": "160481f8b77a2d833546077cb8ffc27ba77730d85c2ddd94b000c64ce8a77d9a"
+    },
+    {
+      "path": "docs/analytics-timing-era-audit-result-20260906.md",
+      "sha256": "6d4aaef8b4ed079c8a2e45597d79bfce31faa436e43a3b165b87dc4a70547ced"
+    },
+    {
+      "path": "docs/analytics-timing-loss-gate-plan-20260907.md",
+      "sha256": "a06479a7ca77ae61c496512e19ed29d5f60050f3046de26daa003f802ba37cca"
+    },
+    {
+      "path": "docs/analytics-timing-loss-gate-result-20260907.md",
+      "sha256": "370b32e3b290dfbd1c16edcd8529c0c43dbfc38df7c07bb72971ba8232e0192b"
+    },
+    {
+      "path": "docs/analytics-timing-ridge10-plan-20260906.md",
+      "sha256": "9153733a6251fb85726ae577d5a150f7e7bc713a000d82df5a89edff29c8a635"
+    },
+    {
+      "path": "docs/analytics-timing-ridge10-result-20260906.md",
+      "sha256": "845a93acbae942d20dc626c2f0646cc6e6a42ddc4ecec5ed09a45c228ac011e9"
+    },
+    {
+      "path": "docs/analytics-timing-shape-plan-20260907.md",
+      "sha256": "553f86a73145ff2f12f4b645e538fd355cab286c8674166244db0867666970ee"
+    },
+    {
+      "path": "docs/analytics-timing-shape-result-20260907.md",
+      "sha256": "05b81cffe74b3138717fe669b75d361a6fba8bee945d0c32c366d3548955c840"
+    },
+    {
+      "path": "docs/analytics-timing-shrinkage-result-20260906.md",
+      "sha256": "986b4be6fc5b4106551007cef143e55216b450b783355a935b94e995dc7ae024"
+    },
+    {
+      "path": "docs/analytics-toi-replay-proof-20260906.json",
+      "sha256": "085949e626d8e4f834d37a34865a1b950511398a97ea023f7698b08c2fabad71"
+    },
+    {
+      "path": "docs/analytics-training-lineage-20260906.md",
+      "sha256": "7ef74efe2e12279cb1d2b1d408cea2d4cb9119b5407c66d72f4a4561d2e6aa5d"
+    },
+    {
+      "path": "docs/analytics-verified-feature-cache-proposal-20260906.md",
+      "sha256": "58ab3a5f87c3eaf5ce3bc215fab10c1af03badee619315ed59ef3ac1bb68043d"
+    },
+    {
+      "path": "docs/analytics-verified-feature-reuse-result-20260906.md",
+      "sha256": "0f4beb207b6247f174a839afe74c8f40fbbae6a665be0eaee1c2ebdc87797694"
+    },
+    {
+      "path": "docs/analytics-writer-lineage-audit-20260906.md",
+      "sha256": "b19f34dc70082b16967040d6c7dee9745463e8d23f8eb8e1da590dfb7246b289"
+    },
+    {
+      "path": "docs/analytics-xg-measured-improvement-20260907.md",
+      "sha256": "8513407c08ee704869329a995b68446b72077781e8333d381d2ad144f063697e"
+    },
+    {
+      "path": "docs/analytics-xg-season-refresh-guard-proof-20260906.md",
+      "sha256": "7a8204e4de4dfaa9315e07a0b866f337be4a2af3ec0d96c4f265767db2e91b4d"
+    },
+    {
+      "path": "docs/analytics-zone-context-plan-20260906.json",
+      "sha256": "8158b5e58a171fdda81e724ec3b62fbb20f91796b649bd9753e1eca460c9fc13"
+    },
+    {
+      "path": "docs/analytics-zone-context-result-20260906.md",
+      "sha256": "933329186a1e16a0ea495d00d782c98a79ad63b96eff34153c4aad980418ca23"
+    }
+  ],
+  "limitations": [
+    "Local snapshot, not off-machine backup",
+    "Ignored results and dependency caches are not bundled",
+    "Evidence catalog is path/hash inventory, not a fresh semantic audit of every report",
+    "Targeted tests rerun after merge; full application suite and production were not revalidated"
+  ]
+}

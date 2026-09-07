@@ -1,0 +1,37 @@
+{
+  "contract": "citrus-neutral-strength-partition-v1:plan",
+  "declared_at": "2026-09-06T17:29:00+00:00",
+  "declaration_time_note": "UTC clock read before first fit; plan bytes are also hashed before fitting. This is not independent timestamp attestation.",
+  "publishable": false,
+  "automatic_acceptance": false,
+  "historical_as_of_verified": false,
+  "untouched_test_claim": false,
+  "source_plan": "docs/analytics-development-ablation-plan-20260906.json",
+  "freeze_dir": "scripts/proof/results/historical-official-freeze-20260906",
+  "export_dir": "scripts/proof/results/official-development-features-20260906",
+  "settings": {
+    "train_min_events": 2000, "train_min_goals": 100, "train_min_nongoals": 100,
+    "train_min_games": 30, "calibration_min_events": 500, "calibration_min_goals": 20,
+    "calibration_min_nongoals": 20, "calibration_min_games": 10,
+    "fallback": "pooled-raw-and-pooled-sigmoid", "epsilon": 0.000001
+  },
+  "state_precedence": ["missing-invalid-special-count:pooled", "shooting-empty-net:pooled", "defending-empty-net:specialist", "both-goalies-present:equal-or-count-advantage-or-count-disadvantage"],
+  "state_semantics": "Observed counts, not adjudicated power-play/penalty-kill; penalty-shot special states are never remapped. Support must pass both train and calibration before routing either output to specialist.",
+  "design": "Unchanged enhanced features; pooled train-only medians/vocabulary shared by all fits; exact original HGB and sigmoid settings; no tuning or row filtering.",
+  "comparison": ["partition_sigmoid versus pooled_sigmoid", "partition_sigmoid versus frozen_monotone_logit_group", "partition_raw versus pooled_raw"],
+  "evaluation": "Original chronological folds, exact unchanged validation IDs/labels/groups and scorecard config; Brier/log loss and original reliability/subgroups; all outputs retained, no automatic acceptance.",
+  "code_files": [
+    "data-pipeline/projections/strength_partition_candidate.py",
+    "data-pipeline/tests/test_strength_partition_candidate.py",
+    "scripts/proof/run_strength_partition_candidate.py",
+    "scripts/proof/test_run_strength_partition_candidate.py",
+    "data-pipeline/projections/development_experiment.py",
+    "data-pipeline/projections/development_replay.py",
+    "data-pipeline/projections/chronological_fit.py",
+    "data-pipeline/projections/calibration_shape.py",
+    "data-pipeline/projections/calibration_candidate.py",
+    "data-pipeline/projections/portable_context_model.py",
+    "data-pipeline/projections/probability_scorecard.py",
+    "data-pipeline/projections/analytics_publication.py"
+  ]
+}

@@ -127,7 +127,6 @@ describe('MatchupService.getPlayerProjectionLog', () => {
     expect(projections[0]).toMatchObject({ projected_goals_against: 2.65 });
   });
 
-
   it('reads the range in one query, bounded by player and date', async () => {
     const { service, supabase, projChain } = serviceWith([], PROJECTION_ROWS);
     const { projections } = await service.getPlayerProjectionLog(8476883, '2026-01-01', '2026-06-30');

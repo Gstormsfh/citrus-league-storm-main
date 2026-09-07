@@ -648,11 +648,46 @@ def calculate_hybrid_base(
     return base_projection
 
 
+_xg_input_failures: Dict[str, int] = {}
+
+
+def xg_input_health() -> Dict[str, Any]:
+    """Process-local failure counters, not cross-worker complete batch health."""
+    return {"status": "withheld" if _xg_input_failures else "no_failures_observed",
+            "scope": "current_process", "reasons": dict(_xg_input_failures)}
+
+
+class XgInputUnavailable(ValueError):
+    """Fail closed before a derived projection can be persisted as measured."""
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        _xg_input_failures[reason] = _xg_input_failures.get(reason, 0) + 1
+        logger.warning("projection_xg_input availability=unavailable reason=%s", reason)
+        super().__init__(reason)
+
+
+def _observed_probability(value) -> float:
+    # SQL numeric may arrive as text; Boolean/blank/nonfinite are not scores.
+    if (value is None or isinstance(value, bool)
+            or not isinstance(value, (int, float, str))
+            or isinstance(value, str) and not value.strip()):
+        raise XgInputUnavailable("missing_or_invalid_probability")
+    try:
+        number = float(value)
+    except (ValueError, OverflowError):
+        raise XgInputUnavailable("missing_or_invalid_probability") from None
+    if not math.isfinite(number) or not 0 <= number <= 1:
+        raise XgInputUnavailable("missing_or_invalid_probability")
+    return number
+
+
 def calculate_finishing_talent(db: SupabaseRest, player_id: int, season: int) -> float:
     """
     Calculate finishing talent multiplier from xG vs actual goals.
     
-    Formula: Finishing_Talent = (Actual_Goals / xG_Total) if xG_Total > 0 else 1.0
+    Formula: Finishing_Talent = Actual_Goals / xG_Total for a positive
+    completely read score sum. Missing inputs or a zero denominator withhold.
     
     Stabilization: If player has < 50 career shots, regress toward 1.0 to avoid
     over-projecting players on a "lucky" shooting percentage heater.
@@ -660,10 +695,7 @@ def calculate_finishing_talent(db: SupabaseRest, player_id: int, season: int) ->
     Returns:
         Multiplier (typically 0.7 to 1.5, capped)
     """
-    # Check cache — same player + season yields same finishing talent
-    cache_key = (player_id, season)
-    if cache_key in _finishing_talent_cache:
-        return _finishing_talent_cache[cache_key]
+    # Re-read score inputs: a player/season key cannot identify corrections.
 
     # Get player's actual goals from season stats (official NHL.com)
     player_stats = db.select(
@@ -673,10 +705,18 @@ def calculate_finishing_talent(db: SupabaseRest, player_id: int, season: int) ->
         limit=1
     )
 
-    if not player_stats or len(player_stats) == 0:
-        return 1.0
+    if not player_stats or len(player_stats) != 1:
+        raise XgInputUnavailable("missing_official_goals")
 
-    actual_goals = float(player_stats[0].get("nhl_goals", 0))
+    actual = player_stats[0].get("nhl_goals")
+    if isinstance(actual, bool) or actual is None:
+        raise XgInputUnavailable("missing_official_goals")
+    try:
+        actual_goals = float(actual)
+    except (TypeError, ValueError, OverflowError):
+        raise XgInputUnavailable("invalid_official_goals") from None
+    if not math.isfinite(actual_goals) or actual_goals < 0 or not actual_goals.is_integer():
+        raise XgInputUnavailable("invalid_official_goals")
     
     # Get xG total from nhl_shots.xg_sql -- the shipped, 5-fold cross-fitted
     # model. This used to read raw_shots and prefer shooting_talent_adjusted_xg,
@@ -704,25 +744,30 @@ def calculate_finishing_talent(db: SupabaseRest, player_id: int, season: int) ->
     try:
         shots = db.select(
             "nhl_shots",
-            select="xg_sql",
+            select="game_id,event_id,xg_sql",
             filters=[("shooter_id", "eq", player_id), ("season", "eq", season),
                      ("game_type", "eq", "regular")],
-            limit=10000  # Large limit to get all shots
+            order="game_id.asc,event_id.asc", limit=None
         )
         
         if not shots:
-            return 1.0
+            raise XgInputUnavailable("missing_player_score_population")
         
         total_xg = 0.0
         shot_count = 0
         
+        seen = set()
         for shot in shots:
+            identity = (shot.get("game_id"), shot.get("event_id"))
+            if any(type(v) is not int for v in identity) or identity in seen:
+                raise XgInputUnavailable("invalid_or_duplicate_score_identity")
+            seen.add(identity)
             shot_count += 1
-            total_xg += float(shot.get("xg_sql") or 0)
+            total_xg += _observed_probability(shot.get("xg_sql"))
         
         if total_xg == 0:
-            _finishing_talent_cache[cache_key] = 1.0
-            return 1.0
+            # A measured zero sum is valid, but goals / zero is undefined.
+            raise XgInputUnavailable("zero_xg_finishing_ratio_undefined")
 
         # Calculate raw finishing talent
         raw_multiplier = actual_goals / total_xg
@@ -734,12 +779,12 @@ def calculate_finishing_talent(db: SupabaseRest, player_id: int, season: int) ->
         # Cap multiplier to reasonable range [0.7, 1.5]
         capped_multiplier = max(0.7, min(1.5, stabilized_multiplier))
 
-        _finishing_talent_cache[cache_key] = capped_multiplier
         return capped_multiplier
 
+    except XgInputUnavailable:
+        raise
     except Exception as e:
-        logger.warning(f"⚠️  Warning: Could not calculate finishing talent for player {player_id}: {e}")
-        return 1.0
+        raise XgInputUnavailable("player_score_read_failed") from None
 
 
 def get_opposing_goalie_save_pct(
@@ -836,165 +881,16 @@ def get_opposing_goalie_save_pct(
 
 
 def get_team_xga_per_60(
-    db: SupabaseRest,
-    team: str,
-    season: int,
-    last_n_games: int = 10,
+    db: SupabaseRest, team: str, season: int, last_n_games: int = 10,
     debug: bool = False
 ) -> Optional[float]:
+    """Unavailable until verified team elapsed exposure is supplied.
+
+    Summed player ice time is not team elapsed time. No nominal game duration,
+    zero denominator or old cached rate may stand in for that missing contract.
+    This explicit failure propagates to the projection's withholding boundary.
     """
-    Calculate team xGA/60 (Expected Goals Against per 60 minutes) over last N games.
-    
-    Performance-optimized: Uses raw_shots with efficient aggregation.
-    For a team's xGA, we sum xG of all shots taken AGAINST that team.
-    
-    Uses canonical team code for cache lookups.
-
-    Returns:
-        xGA per 60 minutes (e.g., 2.3) or None if unavailable
-    """
-    try:
-        # Use canonical team code for cache lookups
-        canonical_team = get_canonical_team_code(db, team)
-
-        # Check cache first — same team + season yields same xGA/60
-        cache_key = (canonical_team, season)
-        if cache_key in _team_xga_cache:
-            return _team_xga_cache[cache_key]
-
-        # Data leak protection: Only use games up to today
-        today = date.today()
-
-        # Get team's last N games (use canonical team for historical continuity)
-        recent_games = db.select(
-            "nhl_games",
-            select="game_id,game_date,home_team,away_team",
-            filters=[
-                ("season", "eq", season),
-                ("game_date", "lte", today.isoformat())  # Data leak protection
-            ],
-            order="game_date.desc",
-            limit=100  # Get more games to filter
-        )
-        
-        team_game_ids = []
-        for game in recent_games:
-            # Check both original and canonical team codes
-            home_team = game.get("home_team")
-            away_team = game.get("away_team")
-            home_canonical = get_canonical_team_code(db, home_team) if home_team else None
-            away_canonical = get_canonical_team_code(db, away_team) if away_team else None
-            
-            if (home_canonical == canonical_team or away_canonical == canonical_team or
-                home_team == team or away_team == team):
-                team_game_ids.append(int(game.get("game_id")))
-                if len(team_game_ids) >= last_n_games:
-                    break
-        
-        if not team_game_ids:
-            return None
-        
-        # Get all shots in these games
-        # raw_shots doesn't have team_abbrev, but has team_code, is_home_team, home_team_abbrev, away_team_abbrev
-        # xg_v5 is our model. The three columns this used to read --
-        # xg_value, shooting_talent_adjusted_xg, flurry_adjusted_xg -- all came
-        # from the retired bulk import. xg_value scores AUC 0.936 against an
-        # honest pre-shot ceiling of about 0.82: it reads the outcome. The
-        # database-side separation invariant never caught this because it
-        # inspects views and SQL functions, and this reads the columns straight
-        # over PostgREST.
-        all_shots = db.select(
-            "raw_shots",
-            select="game_id,team_code,is_home_team,home_team_abbrev,away_team_abbrev,xg_v5",
-            filters=[("game_id", "in", team_game_ids)],
-            limit=50000  # Large limit for all shots in these games
-        )
-        
-        if not all_shots:
-            return None
-        
-        # Get game info to determine which team is opponent
-        game_info_map = {}
-        for game in recent_games:
-            gid = int(game.get("game_id", 0))
-            if gid in team_game_ids:
-                game_info_map[gid] = {
-                    "home_team": game.get("home_team"),
-                    "away_team": game.get("away_team")
-                }
-        
-        # Sum xG for shots AGAINST this team (opposing team's shots)
-        total_xga = 0.0
-        total_toi = 0
-        
-        # Get TOI from player_game_stats for the team we're analyzing (defending team)
-        for game_id in team_game_ids:
-            game_info = game_info_map.get(game_id)
-            if not game_info:
-                continue
-            
-            # Determine opponent team
-            opponent_team = game_info["away_team"] if game_info["home_team"] == team else game_info["home_team"]
-            
-            # Get TOI for the team we're analyzing (the defending team)
-            # This is the team that allowed the xGA, so we need their TOI
-            team_stats = db.select(
-                "player_game_stats",
-                select="icetime_seconds",
-                filters=[
-                    ("game_id", "eq", game_id),
-                    ("team_abbrev", "eq", team)
-                ],
-                limit=1000
-            )
-            
-            game_toi = sum(int(s.get("icetime_seconds", 0)) for s in team_stats)
-            total_toi += game_toi
-            
-            # Sum xG for shots from opposing team (shots AGAINST this team)
-            for shot in all_shots:
-                if int(shot.get("game_id", 0)) == game_id:
-                    # Determine shot team from raw_shots columns
-                    shot_team = None
-                    is_home = shot.get("is_home_team")
-                    if is_home is not None:
-                        # Use is_home_team to determine team
-                        shot_team = game_info["home_team"] if is_home else game_info["away_team"]
-                    elif shot.get("team_code"):
-                        # Fallback: try to match team_code (less reliable)
-                        # team_code might be numeric, so we'd need to map it
-                        # For now, skip if we can't determine from is_home_team
-                        continue
-                    else:
-                        # Try home_team_abbrev/away_team_abbrev as last resort
-                        if shot.get("home_team_abbrev") == opponent_team or shot.get("away_team_abbrev") == opponent_team:
-                            shot_team = opponent_team
-                        else:
-                            continue
-                    
-                    if shot_team == opponent_team:
-                        # Our model or nothing. No fallback chain: a missing
-                        # xg_v5 means the shot was not scored, and silently
-                        # substituting a third-party number is how the leaked
-                        # model survived nine seasons in the serving path.
-                        total_xga += float(shot.get("xg_v5") or 0.0)
-        
-        # Calculate xGA per 60
-        if total_toi > 0:
-            xga_per_60 = (total_xga / total_toi) * 3600
-            if debug:
-                logger.debug(f"  [DDR Debug] {team} xGA/60: {xga_per_60:.3f} (Total xGA: {total_xga:.2f}, Total TOI: {total_toi/60:.1f} min)")
-            _team_xga_cache[cache_key] = xga_per_60
-            return xga_per_60
-
-        if debug:
-            logger.debug(f"  [DDR Debug] No TOI data for {team}, returning None")
-        _team_xga_cache[cache_key] = None
-        return None
-
-    except Exception as e:
-        logger.warning(f"⚠️  Warning: Could not calculate team xGA/60 for {team}: {e}")
-        return None
+    raise XgInputUnavailable("unverified_team_elapsed_exposure")
 
 
 def get_player_on_ice_xga_per_60(
@@ -1033,15 +929,15 @@ def get_player_on_ice_xga_per_60(
             )
         
         # Blend: 60% current, 40% previous
-        if current_xga and prev_xga:
+        if current_xga is not None and prev_xga is not None:
             blended_xga = (current_xga * 0.6) + (prev_xga * 0.4)
             if debug:
                 logger.debug(f"  [VOPA Debug] Player {player_id} on-ice xGA/60 (blended): {blended_xga:.3f} (current: {current_xga:.3f} × 0.6 + prev: {prev_xga:.3f} × 0.4)")
-        elif current_xga:
+        elif current_xga is not None:
             blended_xga = current_xga
             if debug:
                 logger.debug(f"  [VOPA Debug] Player {player_id} on-ice xGA/60 (current only): {blended_xga:.3f} (no previous season data)")
-        elif prev_xga:
+        elif prev_xga is not None:
             blended_xga = prev_xga
             if debug:
                 logger.debug(f"  [VOPA Debug] Player {player_id} on-ice xGA/60 (previous only): {blended_xga:.3f} (no current season data)")
@@ -1051,6 +947,8 @@ def get_player_on_ice_xga_per_60(
             return None
         
         return blended_xga
+    except XgInputUnavailable:
+        raise
     except Exception as e:
         if debug:
             logger.error(f"  [VOPA Debug] Error calculating on-ice xGA/60 for player {player_id}: {e}")
@@ -1322,8 +1220,7 @@ def get_opponent_strength(
     try:
         # Check cache — same opponent + game yields same DDR
         cache_key = (opponent_team, game_id, season)
-        if cache_key in _opponent_strength_cache and not debug:
-            return _opponent_strength_cache[cache_key]
+        # No unversioned cache bypass of current xG/exposure availability.
 
         if debug:
             logger.debug(f"\n[DDR Debug] Calculating DDR for opponent: {opponent_team}")
@@ -1332,10 +1229,8 @@ def get_opponent_strength(
 
         # Get team xGA/60 over last 10 games
         opponent_xga_per_60 = get_team_xga_per_60(db, opponent_team, season, last_n_games=10, debug=debug)
-        if not opponent_xga_per_60 or opponent_xga_per_60 == 0:
-            team_multiplier = 1.0
-            if debug:
-                logger.debug(f"  [DDR Debug] No xGA data, using team_multiplier = 1.0")
+        if opponent_xga_per_60 is None:
+            raise XgInputUnavailable("unavailable_opponent_xga")
         else:
             # Formula: opponent_xga / league_avg_xga
             # If opponent has HIGHER xGA (worse defense) → multiplier > 1.0 → increases projection ✓
@@ -1417,6 +1312,8 @@ def get_opponent_strength(
         _opponent_strength_cache[cache_key] = ddr_capped
         return ddr_capped
 
+    except XgInputUnavailable:
+        raise
     except Exception as e:
         logger.warning(f"⚠️  Warning: Could not calculate DDR for {opponent_team}: {e}")
         if debug:
@@ -1471,93 +1368,75 @@ def calculate_goalie_days_rest(
 
 
 def get_opponent_offensive_context(
-    db: SupabaseRest,
-    opponent_team: str,
-    season: int,
-    last_n_games: int = 10
-) -> Dict[str, float]:
-    """
-    Calculates opponent's finishing talent and high-danger shot rate.
-    
-    Returns:
-        Dict with "finishing_ratio" (goals/xG) and "hd_rate" (high-danger shots per game)
+    db: SupabaseRest, opponent_team: str, season: int, last_n_games: int = 10
+) -> Dict[str, Any]:
+    """Opponent-only recorded score context; never infer ownership from a matchup.
+
+    No rows/ambiguous side/incomplete scores withhold the dependent forecast.
+    A zero score sum is measured, but its finishing ratio is undefined.
+    Complete REST selection is not independent official event-set adjudication.
     """
     try:
-        # Get opponent's recent games
-        recent_games = db.select(
-            "nhl_games",
-            select="game_id,home_team,away_team",
-            filters=[
-                ("season", "eq", season),
-                ("game_date", "lte", date.today().isoformat())
-            ],
-            order="game_date.desc",
-            limit=last_n_games * 2  # Get more games to filter by team
-        )
-        
-        # Filter to opponent's games
-        opponent_game_ids = []
-        for game in recent_games:
-            if game.get("home_team") == opponent_team or game.get("away_team") == opponent_team:
-                game_id = game.get("game_id")
-                if game_id:
-                    opponent_game_ids.append(int(game_id))
-        
-        if not opponent_game_ids:
-            return {"finishing_ratio": 1.0, "hd_rate": 5.0}  # Defaults
-        
-        # Limit to last_n_games
-        opponent_game_ids = opponent_game_ids[:last_n_games]
-        
-        # Get shots data for opponent's recent games
-        shots = db.select(
-            "raw_shots",
-            select="game_id,is_goal,xg_v5",
-            filters=[("game_id", "in", opponent_game_ids)],
-            limit=10000
-        )
-        
-        total_goals = 0
-        total_xg = 0.0
-        hd_shots = 0
-        game_ids_seen = set()
-        
+        if type(last_n_games) is not int or last_n_games <= 0:
+            raise XgInputUnavailable("invalid_context_window")
+        games = db.select("nhl_games", select="game_id,game_date,home_team,away_team",
+            filters=[("season", "eq", season), ("game_date", "lte", date.today().isoformat())],
+            order="game_date.desc,game_id.desc", limit=None)
+        selected = {}
+        for game in games:
+            home, away = game.get("home_team"), game.get("away_team")
+            if opponent_team not in (home, away):
+                continue
+            gid = game.get("game_id")
+            if (type(gid) is not int or gid in selected or not home or not away or home == away):
+                raise XgInputUnavailable("ambiguous_scheduled_team")
+            selected[gid] = (home, away)
+            if len(selected) == last_n_games:
+                break
+        if not selected:
+            raise XgInputUnavailable("missing_opponent_game_population")
+        shots = db.select("raw_shots",
+            select="game_id,event_id,is_goal,xg_v5,is_home_team,period_type",
+            filters=[("game_id", "in", list(selected))],
+            order="game_id.asc,event_id.asc", limit=None)
+        seen, represented = set(), set()
+        total_goals, total_xg, hd_shots = 0, 0.0, 0
         for shot in shots:
-            game_id = shot.get("game_id")
-            if game_id:
-                game_ids_seen.add(game_id)
-            
-            # Our model. shooting_talent_adjusted_xg was doubly wrong here: it
-            # is a bulk-import column, and it already bakes the shooter's
-            # finishing history into the number -- so dividing goals by it to
-            # get a "finishing ratio" applied finishing talent twice.
-            xg = float(shot.get("xg_v5") or 0.0)
-            
-            if shot.get("is_goal"):
-                total_goals += 1
-            
+            gid, eid = shot.get("game_id"), shot.get("event_id")
+            identity = (gid, eid)
+            if (type(gid) is not int or type(eid) is not int or gid not in selected or identity in seen):
+                raise XgInputUnavailable("invalid_or_duplicate_score_identity")
+            seen.add(identity)
+            if shot.get("period_type") == "SO":
+                continue
+            if shot.get("period_type") not in ("REG", "OT"):
+                raise XgInputUnavailable("unknown_shot_period_type")
+            side = shot.get("is_home_team")
+            if type(side) is not bool:
+                raise XgInputUnavailable("ambiguous_shot_team")
+            home, away = selected[gid]
+            if (home if side else away) != opponent_team:
+                continue
+            if type(shot.get("is_goal")) is not bool:
+                raise XgInputUnavailable("invalid_observed_goal")
+            represented.add(gid)
+            xg = _observed_probability(shot.get("xg_v5"))
+            total_goals += int(shot["is_goal"])
             total_xg += xg
-            
-            # High-danger. The threshold moves with the column: the old
-            # xg_value put 3.54% of shots above 0.30, while xg_v5 -- which is
-            # calibrated rather than inflated -- puts only 1.44% there and
-            # 3.92% above 0.20. Keeping 0.30 would have cut the high-danger
-            # population by sixty percent overnight and read as a league-wide
-            # collapse in chance quality.
-            if xg > HIGH_DANGER_XG:
-                hd_shots += 1
-        
-        total_games = len(game_ids_seen) if game_ids_seen else 1
-        
-        finishing_ratio = total_goals / total_xg if total_xg > 0 else 1.0
-        hd_rate = hd_shots / total_games if total_games > 0 else 5.0
-        
-        return {
-            "finishing_ratio": finishing_ratio,
-            "hd_rate": hd_rate
-        }
-    except Exception as e:
-        return {"finishing_ratio": 1.0, "hd_rate": 5.0}  # Defaults on error
+            hd_shots += int(xg > HIGH_DANGER_XG)
+        if represented != set(selected):
+            # No-attempt games need independent affirmative population evidence.
+            raise XgInputUnavailable("incomplete_opponent_score_population")
+        return {"finishing_ratio": total_goals / total_xg if total_xg > 0 else None,
+                "hd_rate": hd_shots / len(selected),
+                "availability": "available" if total_xg > 0 else "partial",
+                "reason": None if total_xg > 0 else "zero_xg_finishing_ratio_undefined",
+                "total_xg": total_xg, "recorded_goals": total_goals,
+                "population": "selected_stored_opponent_non_shootout_attempts"}
+    except XgInputUnavailable:
+        raise
+    except Exception:
+        raise XgInputUnavailable("opponent_score_read_failed") from None
 
 
 def check_back_to_back(db: SupabaseRest, team: str, game_date: date) -> float:
@@ -1910,6 +1789,8 @@ def calculate_goalie_projection(
         
         # Get opponent offensive context and adjust win probability
         opponent_context = get_opponent_offensive_context(db, opponent_team, season, last_n_games=10)
+        if opponent_context.get("finishing_ratio") is None:
+            raise XgInputUnavailable("zero_xg_finishing_ratio_undefined")
         
         # Adjust win probability based on opponent's offensive strength
         # Strong finishing (above 1.1) = 5% reduction
@@ -2249,7 +2130,9 @@ def calculate_skater_physical_projection(
     # Get opponent xGA suppression (for model transparency)
     opponent_xga_suppression = get_team_xga_per_60(
         db, canonical_opponent, season, last_n_games=10, debug=False
-    ) or league_avg_xga
+    )
+    if opponent_xga_suppression is None:
+        raise XgInputUnavailable("unavailable_opponent_xga")
 
     # Get opposing goalie GSAx factor
     goalie_gsax_factor = 1.0
@@ -3251,8 +3134,8 @@ def calculate_daily_projection(
             },
             "projected_paa": round(offensive_paa_60_raw * projected_toi_hours, 3),
             "projected_paa_per_60": round(offensive_paa_60_raw, 3),
-            "on_ice_xga_per_60": round(player_xga_per_60, 3) if player_xga_per_60 else None,
-            "on_ice_xga_per_60_raw": round(player_xga_per_60_raw, 3) if player_xga_per_60_raw else None,
+            "on_ice_xga_per_60": round(player_xga_per_60, 3) if player_xga_per_60 is not None else None,
+            "on_ice_xga_per_60_raw": round(player_xga_per_60_raw, 3) if player_xga_per_60_raw is not None else None,
             "xga_suppressed": round(xga_suppressed, 3),
             "defensive_value": round(defensive_value_60_raw * projected_toi_hours, 3),
             "defensive_value_per_60": round(defensive_value_60_raw, 3),

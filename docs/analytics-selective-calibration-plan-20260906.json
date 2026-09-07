@@ -1,0 +1,26 @@
+{
+  "contract": "citrus-selective-prequential-intercept-v1:plan",
+  "declared_at": "2026-09-06T16:42:49Z",
+  "candidate": "selective60_intercept",
+  "baseline": "frozen_monotone",
+  "prior_challenger": "rolling60_intercept",
+  "prior_health_sha256": "ad51791196ccb4bb35580bf5cba99478895eabfcf2ac2209af5cc08d5a9bc373",
+  "settings": {"history_days":60,"label_lag_days":2,"min_events":1000,"min_games":20,"ridge":100.0,"max_abs_offset":1.5,"epsilon":0.000001,"bisection_iterations":60,"max_rows":300000,"cluster_penalty_multiplier":2.0},
+  "design_reason": "The first prequential challenger reduced fold1 aggregate bias but regressed both fold2 losses. Add one fixed uncertainty-scaled L1 penalty to avoid reacting to weak prior-game residuals. No lookback, ridge, multiplier or subgroup search.",
+  "penalty": "lambda=2*sqrt(max(G/(G-1)*sum_g(R_g-n_g*R/N)^2, sum_i p_i*(1-p_i))). R_g=sum_i_in_g(y_i-p_i). The second term floors the empirical game-residual variance. The objective adds lambda*abs(intercept) to the prior Bernoulli-plus-ridge objective.",
+  "history_and_population": "Exactly the prior source-replayed seed and validation rows, original dates and base predictions; unchanged 60-day window and two-day simulated lag. Only earlier eligible labels enter fits. All same-date games share one state.",
+  "verification": "Rehash prior complete output inventory and all consumed source/code pins; exact original and prior-challenger row join; independent game residual/penalty/root reconstruction; future-label perturbation; full original scorecard bins and subgroups for all three candidates; monthly diagnostics retained.",
+  "guard": "No worse Brier AND log loss versus frozen_monotone in EACH fold; ranking is development-only. Keep previous failed challenger visible.",
+  "uncertainty": "The game-residual scale is a regularizer, not a confidence interval or false-update guarantee. Original paired whole-game intervals hold realized adaptive predictions fixed; they omit cross-date adaptation dependence and refitting.",
+  "limitations": [
+    "Further adaptive development informed by inspected validation outcomes, not independent confirmation.",
+    "No global or subgroup superiority is assumed from this conservative design.",
+    "Current source revisions and game-date lag do not establish historical label availability.",
+    "No raw xG/model-map refit, source-state correction, MoneyPuck input, legacy deserialization, production change or serving promotion.",
+    "All prior runs and prospective reservations remain unchanged; no automatic foundation, FPAR or model acceptance."
+  ],
+  "publishable": false,
+  "historical_as_of_verified": false,
+  "untouched_test_claim": false,
+  "automatic_acceptance": false
+}

@@ -1,0 +1,24 @@
+{
+  "contract": "citrus-matched-conditional-shape-v1:plan",
+  "declared_at": "2026-09-06T19:04:46+00:00",
+  "primary": "conditional_shape",
+  "baseline": "frozen_movement_monotone_group",
+  "additional_control": "frozen_monotone_group",
+  "source_plan": "docs/analytics-development-ablation-plan-20260906.json",
+  "freeze_dir": "scripts/proof/results/historical-official-freeze-20260906",
+  "export_dir": "scripts/proof/results/official-development-features-20260906",
+  "raw_model": "Fixed completed official-movement-20260906-full model JSON, independent of zone experiment outcomes. No raw model fit or feature change.",
+  "fit": "Fit new conditional_calibration_shape on original earlier calibration split only. Exact original knots, shared identity and adjacent-slope penalties and context offset penalties; fixed1000 poolingridge. Nonnegative context/sharedslopes. Require convergence/projectedgradient checks and unchanged resource bounds. No hyperparameter sweep, in-validation updating or fallback winner.",
+  "evaluation": "Four outputs on identical original validation identities/groups/outcomes: movement_raw, frozen_movement_monotone_group, frozen_monotone_group, conditional_shape. Primary no worse on bothBrier and logloss in eachfold versus BOTH mappedcontrols. Noautomaticacceptance.",
+  "source_audit": "Full frozen rawsourceReplay and movementfeature recomputation; exact allsavedmovementvectors and validationraw/mappedpredictor parity; originalneutral raw/mappedparity. Independent scalar JSON conditional arithmetic versus module predictor on everycalibration/validationrow within1e-12. No pickle/joblib loading.",
+  "limitations": [
+    "Already-inspected development data and adaptive experiment choice; not untouched or prospective evidence.",
+    "The fixed1000 poolingridge is an explicit engineering choice, not a learned optimum.",
+    "Fixed-fit game bootstrap does not account for multiplicity, adaptive selection or refitting.",
+    "Sourcecapture replay does not establish historical-as-of data availability.",
+    "No production writes, publication, FPAR acceptance, restricted-data training, originalartifact edits or prospective reservation changes."
+  ],
+  "publishable": false,
+  "automatic_acceptance": false,
+  "historical_as_of_verified": false
+}

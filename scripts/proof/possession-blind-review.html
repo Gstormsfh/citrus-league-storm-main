@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Citrus · Independent possession review</title>
+<style>body{font:16px/1.5 system-ui;background:#101e16;color:#edf3ed;margin:0}main{max-width:960px;margin:auto;padding:20px}video,img{width:100%;background:#000}label{display:block;margin:12px 0}input,select,textarea,button{font:inherit;padding:8px;box-sizing:border-box;max-width:100%}input,textarea{width:100%}button{margin:8px 8px 8px 0}#status{color:#ffda93}small{display:block}fieldset{border:1px solid #668471}a{color:inherit}</style>
+<main><h1>Independent possession review</h1><p>Review the video and sampled stills. No model owner, score or replay-coordinate suggestion is shown. Do not infer possession from proximity alone. Unknown identity or contact should stay uncertain.</p>
+<label>Reviewer <input id="reviewer" autocomplete="off"></label>
+<label>Clip <select id="clip"></select></label><video id="video" controls muted playsinline></video>
+<p id="sample"></p><img id="still" alt="Selected original video sample">
+<button id="prev">Previous sample</button><button id="next">Next sample</button>
+<button id="returnSample">Return video to sample time</button>
+<fieldset><legend>Observation at the sampled video timestamp</legend>
+<label>Observed state <select id="state"><option value="">Not reviewed</option><option value="controlled">Player controls puck</option><option value="no_control">Puck not controlled by any player</option><option value="uncertain">Contact or identity uncertain</option><option value="not_play">Not live play / camera cut / celebration</option></select></label>
+<label>Controlling player (match visible team/jersey; otherwise choose uncertain) <select id="player"><option value="">Not identified</option></select></label>
+<label>Evidence and uncertainty <textarea id="note" rows="3"></textarea></label>
+<button id="save">Save observation in this page</button></fieldset>
+<button id="download">Download observations</button><p id="status" role="status"></p>
+<small>Page memory only—download before closing. Exports are single-reviewer observations, not approved training labels. These goal-selected development clips are not an unbiased test set. No xG or possession accuracy is certified.</small></main>
+<script>
+'use strict';
+const el=id=>document.getElementById(id);let manifest,clip=0,frame=0,loadGeneration=0;const observations=new Map(),mediaUrls=new Map();
+const key=()=>`${clip}:${frame}`;
+function roster(){el('player').replaceChildren();const blank=document.createElement('option');blank.value='';blank.textContent='Not identified';el('player').appendChild(blank);for(const p of manifest.clips[clip].players){const o=document.createElement('option');o.value=p.player_id;o.textContent=`${p.team} #${p.jersey}`;el('player').appendChild(o);}}
+function draw(){const c=manifest.clips[clip],f=c.frames[frame];el('sample').textContent=`${c.name} · sample ${frame+1}/${c.frames.length} · original video PTS ${f.video_pts_seconds.toFixed(6)} s`;el('still').src=`${c.directory}/${f.file}`;const r=observations.get(key());el('state').value=r?.state||'';el('player').value=r?.player_id||'';el('note').value=r?.evidence_note||'';el('prev').disabled=frame===0;el('next').disabled=frame===c.frames.length-1;el('video').pause();el('video').currentTime=f.video_pts_seconds;}
+async function openClip(){const c=manifest.clips[clip],generation=++loadGeneration;el('video').pause();for(const id of ['prev','next','save'])el(id).disabled=true;el('status').textContent='Loading saved clip…';try{if(!mediaUrls.has(c.directory)){const r=await fetch(`${c.directory}/highlight.mp4`);if(!r.ok)throw Error('Video unavailable');mediaUrls.set(c.directory,URL.createObjectURL(await r.blob()));}if(generation!==loadGeneration)return;el('video').addEventListener('loadedmetadata',()=>{if(generation===loadGeneration){draw();el('save').disabled=false;el('status').textContent='Saved clip ready. Observations apply to the displayed sampled still. Save before changing samples.';}},{once:true});el('video').src=mediaUrls.get(c.directory);}catch(e){el('status').textContent=e.message;}}
+window.addEventListener('pagehide',()=>{for(const url of mediaUrls.values())URL.revokeObjectURL(url);});
+el('clip').onchange=()=>{clip=Number(el('clip').value);frame=0;roster();openClip();};
+el('prev').onclick=()=>{if(frame>0){frame--;draw();}};
+el('next').onclick=()=>{if(frame<manifest.clips[clip].frames.length-1){frame++;draw();}};
+el('returnSample').onclick=()=>{el('video').pause();el('video').currentTime=manifest.clips[clip].frames[frame].video_pts_seconds;};
+el('save').onclick=()=>{const reviewer=el('reviewer').value.trim(),state=el('state').value,note=el('note').value.trim(),pid=el('player').value.trim();if(!reviewer||!state||!note||(state==='controlled'&&!/^\d+$/.test(pid))){el('status').textContent='Enter reviewer, state and evidence. Controlled labels require an identified player ID; otherwise choose uncertain.';return;}const c=manifest.clips[clip],f=c.frames[frame];observations.set(key(),{game_id:c.game_id,event_id:c.event_id,video_sha256:c.video_sha256,frame_sha256:f.sha256,video_seconds:f.video_pts_seconds,frame_file:`${c.directory}/${f.file}`,reviewer,state,player_id:state==='controlled'?Number(pid):null,evidence_note:note,model_suggestion_shown:false,review_status:'single_reviewer_unadjudicated',training_eligible:false});el('status').textContent=`Saved ${observations.size} observations in this page. Download to retain them.`;};
+el('download').onclick=()=>{if(!observations.size){el('status').textContent='No saved observations to export.';return;}const result={schema_version:1,pack_id:manifest.pack_id,observations:[...observations.values()],training_eligible:false,production_eligible:false};const url=URL.createObjectURL(new Blob([JSON.stringify(result,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='citrus-independent-possession-observations.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+fetch('manifest.json').then(r=>{if(!r.ok)throw Error('Manifest unavailable');return r.json();}).then(m=>{manifest=m;m.clips.forEach((c,i)=>{const o=document.createElement('option');o.value=i;o.textContent=c.name;el('clip').appendChild(o);});roster();openClip();}).catch(e=>{el('status').textContent=e.message;});
+</script></html>

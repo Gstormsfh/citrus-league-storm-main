@@ -1,0 +1,67 @@
+{
+  "contract": "citrus-identity-conditioned-probability-v2:plan",
+  "declared_at": "2026-09-06T17:40:15Z",
+  "purpose": "Test whether earlier shooter and opposing-goalie identities add predictive information beyond the frozen neutral probability and an identity-free intercept control.",
+  "baseline": "frozen_monotone",
+  "primary_candidate": "joint",
+  "controls": [
+    "global_control",
+    "shooter"
+  ],
+  "settings": {
+    "global_ridge": 100.0,
+    "shooter_ridge": 25.0,
+    "goalie_ridge": 100.0,
+    "coefficient_bound": 1.5,
+    "max_rows": 150000,
+    "max_actors_per_role": 3000,
+    "max_iterations": 1000,
+    "gradient_tolerance": 0.00005
+  },
+  "fit": "Joint convex Bernoulli log loss with frozen neutral logits as offsets and identity-centered L2 penalties. Fit once on each original earlier calibration period; no validation labels or online updating. Penalties are fixed Citrus regularization choices, not externally fitted constants or optimized hyperparameters.",
+  "source": "Freshly replay unchanged official source and feature gates on exactly the previous calibration and validation populations. Join original source-rostered actor identities with the unchanged actor-attribution contract. Preserve all selected rows; unavailable or unseen actors get zero identity effect, not invented identity or a learned missing-actor effect.",
+  "prior_prequential_health_sha256": "ad51791196ccb4bb35580bf5cba99478895eabfcf2ac2209af5cc08d5a9bc373",
+  "prior_shape_review_sha256": "eef47805687e40df9b92c02947672c71a5ec4d4701b3d9b776c77de316b88c3c",
+  "guard": "Primary joint candidate must have no worse Brier AND log loss than BOTH frozen_monotone and global_control in EACH earlier development fold. Shooter-only is a prespecified ablation, not a replacement selected after inspection. A passing development guard is not production acceptance.",
+  "evaluation": "Retain all four models, original nine reliability bins, eight subgroup dimensions and every subgroup. Also retain identity support/fallback accounting by outcome and per-calendar-month diagnostics. No subset removal to improve results.",
+  "independence": "Audit objective and projected gradients using independently constructed sparse matrices; reproduce every probability without the production predictor; verify future labels cannot be prediction inputs and validation game identities/dates are disjoint from every fit.",
+  "uncertainty": "Original paired whole-game resampling holds fitted models fixed; it does not include refit uncertainty, actor cross-game dependence or adaptive-development multiplicity. Do not treat intervals as acceptance or league-comparative proof.",
+  "metric_semantics": "An identity-conditioned forecast, distinct from neutral chance-quality xG. Actor effects are predictive associations, not causal isolated talent. In particular, opposing-goalie-conditioned probability must never replace the neutral expectation used to evaluate that goalie. All unblocked attempts remain included; this is not conditional-on-on-target xG.",
+  "research": [
+    "https://arxiv.org/abs/2511.07703",
+    "https://moneypuck.com/about.htm",
+    "https://hockeyviz.com/txt/preview2526"
+  ],
+  "research_scope": "Public methodological motivation only. Implement Citrus's own penalized identity-offset model. No author performance result is adopted as a Citrus result; no MoneyPuck files, predictions or fitted constants are used.",
+  "limitations": [
+    "Already-inspected earlier development seasons; not an untouched test or industry-superiority benchmark.",
+    "Frozen current source revisions do not establish historical-as-of actor or event availability.",
+    "The existing neutral model and probability map are not refit or relabeled; their conditional calibration weaknesses remain.",
+    "No player exposure, official actuals, season GSAx, rebound/continuation model, physical forecast or FPAR acceptance is implied.",
+    "All existing evidence, legacy artifacts, failed candidates and six prospective reservations remain byte-preserved.",
+    "Production accuracy improvements are user-authorized as of this request, but this development run cannot publish and requires independent quality, serving, migration and rollback gates before any rollout.",
+    "Actor inputs come from current retrospective event records: goals use scoringPlayerId, other attempts shootingPlayerId; label-flip predictor invariance does not establish raw-source pre-shot attribution availability.",
+    "Identity effects fit on the same earlier calibration period used for the frozen probability map: sequential in-sample stacking, not cross-fitted nuisance probabilities; validation remains strictly later and whole-game disjoint."
+  ],
+  "publishable": false,
+  "automatic_acceptance": false,
+  "historical_as_of_verified": false,
+  "untouched_test_claim": false,
+  "numerics": {
+    "method": "diagonal-L-BFGS-B+sparse-Newton",
+    "max_refinement_iterations": 20,
+    "max_line_search_steps": 40,
+    "raw_projected_gradient_threshold": 0.00005
+  },
+  "numerical_change": "Same summed Bernoulli objective, L2 penalties, raw coefficient bounds and raw projected-gradient gate. Fixed initial Hessian diagonal reparameterization; at most 20 sparse Newton refinements with clipped feasible line search and objective descent up to 1e-10 roundoff. No validation outcomes informed numerical choices.",
+  "v1_failure_sha256": "048bd2d58913b9b0d75babbf0fe2b78906dc1b34db0482ffdd9745eaf473f572",
+  "numerical_diagnosis_path": "scripts/proof/results/official-identity-probability-v2-numerical-diagnosis-20260906/diagnosis.json",
+  "numerical_diagnosis_sha256": "000e4f22c7230b3fa7fa2fa22fc3a6881c27a7d1b46467fc47b4fc7ee80b808a",
+  "preserved_v1_code_sha256": {
+    "data-pipeline/projections/identity_probability.py": "d640d742522c5177d23657d0e1f1b621389ea2365eb2aaab7fb24116f5da3acd",
+    "data-pipeline/tests/test_identity_probability.py": "d613223cbeca62d48ea7ce12773694e6ab2392b88abca24cbf1703c19e066244",
+    "scripts/proof/run_identity_probability.py": "0fffbc93e9c26d9861c25e2dc85c051b43fcfc8b6e7fc2e68b99455248674c24",
+    "scripts/proof/test_run_identity_probability.py": "e4cff6d1b5c2e01ad06f848ac667eb0fd8ac834968f0f7cb2894a634caa6e7ed",
+    "docs/analytics-identity-probability-plan-20260906.json": "97834d03cbbcec6aeffd6e83119cce4e80ec30b61278bcc2a5f226b78f259b5c"
+  }
+}

@@ -121,3 +121,6 @@ __pycache__/
 
 .fuse_hidden*
 Claude outputs/
+
+# Local recovery copy; underlying source is committed separately.
+docs/citrus-handoff-20260907/uncommitted-work.zip

@@ -1,0 +1,28 @@
+{
+  "status": "two-game-read-only-triage-not-adjudication",
+  "production_changed": false,
+  "originals_replaced": false,
+  "checks": [
+    {
+      "game_id": 2022020158,
+      "url": "https://api-web.nhle.com/v1/gamecenter/2022020158/play-by-play",
+      "observed_at": "2026-09-07T01:41:31.197609+00:00",
+      "response_sha256": "24808726be5e6c861ca4c995532d36c0f5165f4c4ab6c557518d416cea50292d",
+      "response_hash_matches_retained_body": true,
+      "live_sog": {"24": 44, "28": 45},
+      "live_reported": {"28": 44, "24": 44},
+      "plays_unchanged": true
+    },
+    {
+      "game_id": 2023020068,
+      "url": "https://api-web.nhle.com/v1/gamecenter/2023020068/play-by-play",
+      "observed_at": "2026-09-07T01:41:31.518101+00:00",
+      "response_sha256": "c4ab515f1c3f81b07fe95fd1eed8dae894cec928c762448deea3d8fcf79377d7",
+      "response_hash_matches_retained_body": true,
+      "live_sog": {"13": 37, "23": 31},
+      "live_reported": {"13": 36, "23": 31},
+      "plays_unchanged": true
+    }
+  ],
+  "limitation": "Fresh responses match preserved body bytes. This rules out a simple refresh repair for these two games only; it does not determine which event or reported total is correct."
+}

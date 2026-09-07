@@ -1,0 +1,32 @@
+{
+  "contract": "citrus-identity-conditioned-probability-v1:plan",
+  "declared_at": "2026-09-06T17:11:18Z",
+  "purpose": "Test whether earlier shooter and opposing-goalie identities add predictive information beyond the frozen neutral probability and an identity-free intercept control.",
+  "baseline": "frozen_monotone",
+  "primary_candidate": "joint",
+  "controls": ["global_control", "shooter"],
+  "settings": {"global_ridge":100.0,"shooter_ridge":25.0,"goalie_ridge":100.0,"coefficient_bound":1.5,"max_rows":150000,"max_actors_per_role":3000,"max_iterations":1000,"gradient_tolerance":0.00005},
+  "fit": "Joint convex Bernoulli log loss with frozen neutral logits as offsets and identity-centered L2 penalties. Fit once on each original earlier calibration period; no validation labels or online updating. Penalties are fixed Citrus regularization choices, not externally fitted constants or optimized hyperparameters.",
+  "source": "Freshly replay unchanged official source and feature gates on exactly the previous calibration and validation populations. Join original source-rostered actor identities with the unchanged actor-attribution contract. Preserve all selected rows; unavailable or unseen actors get zero identity effect, not invented identity or a learned missing-actor effect.",
+  "prior_prequential_health_sha256": "ad51791196ccb4bb35580bf5cba99478895eabfcf2ac2209af5cc08d5a9bc373",
+  "prior_shape_review_sha256": "eef47805687e40df9b92c02947672c71a5ec4d4701b3d9b776c77de316b88c3c",
+  "guard": "Primary joint candidate must have no worse Brier AND log loss than BOTH frozen_monotone and global_control in EACH earlier development fold. Shooter-only is a prespecified ablation, not a replacement selected after inspection. A passing development guard is not production acceptance.",
+  "evaluation": "Retain all four models, original nine reliability bins, eight subgroup dimensions and every subgroup. Also retain identity support/fallback accounting by outcome and per-calendar-month diagnostics. No subset removal to improve results.",
+  "independence": "Audit objective and projected gradients using independently constructed sparse matrices; reproduce every probability without the production predictor; verify future labels cannot be prediction inputs and validation game identities/dates are disjoint from every fit.",
+  "uncertainty": "Original paired whole-game resampling holds fitted models fixed; it does not include refit uncertainty, actor cross-game dependence or adaptive-development multiplicity. Do not treat intervals as acceptance or league-comparative proof.",
+  "metric_semantics": "An identity-conditioned forecast, distinct from neutral chance-quality xG. Actor effects are predictive associations, not causal isolated talent. In particular, opposing-goalie-conditioned probability must never replace the neutral expectation used to evaluate that goalie. All unblocked attempts remain included; this is not conditional-on-on-target xG.",
+  "research": ["https://arxiv.org/abs/2511.07703", "https://moneypuck.com/about.htm", "https://hockeyviz.com/txt/preview2526"],
+  "research_scope": "Public methodological motivation only. Implement Citrus's own penalized identity-offset model. No author performance result is adopted as a Citrus result; no MoneyPuck files, predictions or fitted constants are used.",
+  "limitations": [
+    "Already-inspected earlier development seasons; not an untouched test or industry-superiority benchmark.",
+    "Frozen current source revisions do not establish historical-as-of actor or event availability.",
+    "The existing neutral model and probability map are not refit or relabeled; their conditional calibration weaknesses remain.",
+    "No player exposure, official actuals, season GSAx, rebound/continuation model, physical forecast or FPAR acceptance is implied.",
+    "All existing evidence, legacy artifacts, failed candidates and six prospective reservations remain byte-preserved.",
+    "Production accuracy improvements are user-authorized as of this request, but this development run cannot publish and requires independent quality, serving, migration and rollback gates before any rollout."
+  ],
+  "publishable": false,
+  "automatic_acceptance": false,
+  "historical_as_of_verified": false,
+  "untouched_test_claim": false
+}
