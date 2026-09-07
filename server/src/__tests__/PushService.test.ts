@@ -117,7 +117,11 @@ describe('PushService — delivery dedupe', () => {
   });
 
   it('claims on (league_id, pick_number) with ignoreDuplicates so concurrent pods cannot double-send', async () => {
-    const supabase = makeSupabase();
+    // This assertion ends at the database claim. Keep recipient resolution
+    // deterministic so it never opens a real APNs socket after winning it.
+    const supabase = makeSupabase({
+      device_tokens: createChain({ data: [], error: null }),
+    });
     const svc = new PushService(supabase, testConfig());
     await svc.notifyOnTheClock(input);
 
