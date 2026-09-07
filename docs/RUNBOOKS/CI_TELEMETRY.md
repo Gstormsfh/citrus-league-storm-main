@@ -86,10 +86,19 @@ Nightlies over the last week (projections, invariants, snapshot):
 ```sql
 SELECT created_at::date AS day, workflow, job, status, summary
   FROM public.ops_ci_runs
- WHERE workflow IN ('Nightly Projection Batch', 'Data Invariants (daily)', 'Schema Snapshot')
+ WHERE workflow IN ('Nightly Projection Batch', 'Projection Output Health', 'Data Invariants (daily)', 'Schema Snapshot')
    AND created_at > now() - interval '7 days'
  ORDER BY created_at DESC;
 ```
+
+`Projection Output Health` replaces the scheduled Python projection writer.
+SQL cron owns ROS (08:50 UTC) and per-game (09:05 UTC) rebuilding; the workflow
+checks output availability and oldest-row freshness at 10:30 UTC using the
+database's projection target season. A successful check is not a rebuild or
+model-accuracy certification. Missing/stale outputs fail the job; no remaining
+schedule is explicitly reported as not required. The legacy workflow name stays
+in the query above to retain historical incidents. Revert the isolated workflow
+change to restore the former job; do not disable the SQL cron writers.
 
 Run/attempt roll-up (one line per run):
 
