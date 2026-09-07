@@ -28,3 +28,11 @@ After that approval: verify engine fingerprint, then nomination, bidding and rec
 Still required: Chrome App Store Connect sign-in and final build processing/attachment/screenshots/reviewer fields; reconnect the iPhone for the latest build and distribution/TestFlight push/tap tests; actual Apple OAuth and deletion/revocation with a disposable Apple identity; hands-on iPad scrolling and remaining device journeys; content-rights evidence or replacement assets; moderation backup/response coverage. Garrett’s regular account must remain untouched.
 
 The metadata worksheet now reflects published privacy, live policies, prepared reviewer access, free pricing and Canada/United States availability. Earlier status documents remain historical evidence. Readiness is not complete, and Apple approval is not guaranteed.
+
+## September 7 App Store Connect follow-through
+
+Chrome sign-in restored. Apple reports build 1.0 (13) as Validated, with production APNs, get-task-allow=false and no non-exempt encryption. Build 13 is attached to the iOS 1.0 version draft. Reviewer login, Garrett’s phone/email and the verified roster/player/game-log walkthrough notes were saved; manual release remains selected. Sensitive form values are omitted from browser DOM snapshots, so their presence was checked visually. No Add for Review or final submission action was taken.
+
+Created internal TestFlight group `Citrus Release QA` with automatic distribution disabled, added only build 13 and Garrett’s existing App Store Connect account. Group confirms one tester and one build. Initial tester status was `No Builds Available` while the group build was `Ready to Test`; installation/invitation acceptance is not yet verified. User was asked to check TestFlight and install 1.0 (13).
+
+Four native iPhone screenshots were prepared for the 6.9-inch media slot, whose accepted dimensions include 1320×2868. The file chooser accepted selection but Chrome rejected `setFiles` with `Not allowed`; no screenshot upload is claimed complete. Browser upload documentation requires enabling the ChatGPT extension’s `Allow access to file URLs`; the user has been given that exact setup step. iPad screenshots also remain to upload.
