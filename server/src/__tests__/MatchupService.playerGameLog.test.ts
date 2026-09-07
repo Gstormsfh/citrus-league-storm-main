@@ -118,7 +118,7 @@ describe('MatchupService.getPlayerProjectionLog', () => {
     const { projections } = await service.getPlayerProjectionLog(8476883, '2026-01-01', '2026-06-30');
     const selected = String(projChain.select.mock.calls[0][0]).split(',').map(c => c.trim());
     expect(selected).toContain('projected_goals_against');
-    expect(projections[0].projected_goals_against).toBe(2.65);
+    expect(projections[0]).toMatchObject({ projected_goals_against: 2.65 });
   });
 
 
