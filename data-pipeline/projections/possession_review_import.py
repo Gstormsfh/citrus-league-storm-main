@@ -44,7 +44,7 @@ def validate_export(manifest, export):
             raise ValueError('Duplicate reviewer/sample; resolve conflict explicitly')
         seen.add(unique)
         state = row.get('state')
-        if state not in ('controlled', 'no_control', 'uncertain', 'not_play'):
+        if state not in ('controlled', 'controlled_unidentified', 'no_control', 'uncertain', 'not_play'):
             raise ValueError('Unknown control state')
         player = row.get('player_id')
         if state == 'controlled':

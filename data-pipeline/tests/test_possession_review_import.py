@@ -21,7 +21,7 @@ class ReviewImportTests(unittest.TestCase):
                            training_eligible=False, production_eligible=False)
 
     def test_import_preserves_uncertainty_and_non_play(self):
-        for state in ('controlled', 'no_control', 'uncertain', 'not_play'):
+        for state in ('controlled', 'controlled_unidentified', 'no_control', 'uncertain', 'not_play'):
             with self.subTest(state=state):
                 self.row.update(state=state, player_id=3 if state == 'controlled' else None)
                 result = validate_export(self.manifest, self.export)

@@ -1,0 +1,245 @@
+{
+  "pack_id": "citrus-possession-review-ad78128a2222fee7",
+  "clips": [
+    {
+      "name": "Hall",
+      "game_id": 2025030416,
+      "event_id": 117,
+      "directory": "hall",
+      "video_sha256": "58f93d8c4997517bcb26da78e33316f43afe7ad9502ddf0082ceb56b8547291c",
+      "frames": [
+        {
+          "file": "transfer/frame-001.png",
+          "video_pts_seconds": 5.005,
+          "sha256": "dca5af6c9780c60144d2aacc5ca9836aed21a8c7830286932b9adb865269c214"
+        },
+        {
+          "file": "transfer/frame-009.png",
+          "video_pts_seconds": 5.538867,
+          "sha256": "129090ce884cfe0f1ceb1499b23c73c8f934c191f154b8dbd96d18ab0c708f0d"
+        },
+        {
+          "file": "transfer/frame-016.png",
+          "video_pts_seconds": 6.006,
+          "sha256": "53e2bc2f0b72488f7ae5cef0cb32a4c433f0b19392e2eeb34c5aa5873b6351f4"
+        },
+        {
+          "file": "transfer/frame-024.png",
+          "video_pts_seconds": 6.539867,
+          "sha256": "2778632c2587b0f73958f52eb5b2bea32d9b093cbd99316097037ffbffcb006a"
+        },
+        {
+          "file": "shot/frame-001.png",
+          "video_pts_seconds": 8.008,
+          "sha256": "3dcfba5c5b89081b2e0f78d30554e27b54b63a5b30e03aee0b835a27cca15ffa"
+        },
+        {
+          "file": "shot/frame-009.png",
+          "video_pts_seconds": 8.541867,
+          "sha256": "e81c17a21ee1ebf27a022f7cac0d3c3d5c9e359939498a82547ed039fd4f8db8"
+        },
+        {
+          "file": "shot/frame-016.png",
+          "video_pts_seconds": 9.009,
+          "sha256": "75ec7bca9b17d2d524fc4a1219b2c6dc232c673ed4f55de44556894dd88b748a"
+        },
+        {
+          "file": "shot/frame-024.png",
+          "video_pts_seconds": 9.542867,
+          "sha256": "ce0da172d4b9ad2215f4b1efdcd81e697b46c5bb279d512b14388d21b6591754"
+        }
+      ],
+      "roster_source_sha256": "4b531f3f2262362cf209b9e3c3617bbe5ff9b4709282d124ac00ad86a21503f2",
+      "players": [
+        {
+          "player_id": 8479394,
+          "team": "VGK",
+          "jersey": 79
+        },
+        {
+          "player_id": 8482702,
+          "team": "CAR",
+          "jersey": 22
+        },
+        {
+          "player_id": 8478970,
+          "team": "CAR",
+          "jersey": 5
+        },
+        {
+          "player_id": 8478397,
+          "team": "VGK",
+          "jersey": 4
+        },
+        {
+          "player_id": 8475791,
+          "team": "CAR",
+          "jersey": 71
+        },
+        {
+          "player_id": 8482809,
+          "team": "CAR",
+          "jersey": 53
+        },
+        {
+          "player_id": 8483548,
+          "team": "CAR",
+          "jersey": 32
+        },
+        {
+          "player_id": 8477964,
+          "team": "VGK",
+          "jersey": 49
+        },
+        {
+          "player_id": 8476958,
+          "team": "CAR",
+          "jersey": 74
+        },
+        {
+          "player_id": 8479353,
+          "team": "VGK",
+          "jersey": 21
+        },
+        {
+          "player_id": 8478483,
+          "team": "VGK",
+          "jersey": 93
+        },
+        {
+          "player_id": 8478396,
+          "team": "VGK",
+          "jersey": 15
+        },
+        {
+          "player_id": 8477478,
+          "team": "CAR",
+          "jersey": 28
+        },
+        {
+          "player_id": 8476921,
+          "team": "CAR",
+          "jersey": 48
+        },
+        {
+          "player_id": 8480830,
+          "team": "CAR",
+          "jersey": 37
+        }
+      ]
+    },
+    {
+      "name": "Knies",
+      "game_id": 2025020061,
+      "event_id": 271,
+      "directory": "knies",
+      "video_sha256": "7063aa997ba33ffc9aa6312baa543db93f2d66f47d4c4da879a68cbc30357b6c",
+      "frames": [
+        {
+          "file": "frame-001.png",
+          "video_pts_seconds": 0.0,
+          "sha256": "00e3e1337709ff3fb274933dc581963e4730bfed6836dd353db1790d5ca7a63b"
+        },
+        {
+          "file": "frame-004.png",
+          "video_pts_seconds": 1.5015,
+          "sha256": "af2009dbd0c4a0a565fb86990f9ab081305241db2ff9f686c8c3b146c2e23162"
+        },
+        {
+          "file": "frame-007.png",
+          "video_pts_seconds": 3.003,
+          "sha256": "6e3023e5b9de435b2a23934f8c0cb249da6b98fa94519b2a32b7fdbf5e44cbd2"
+        },
+        {
+          "file": "frame-010.png",
+          "video_pts_seconds": 4.5045,
+          "sha256": "eaec8cdacedab135e2ce7f8033bbd1965273db9c7cf35d1886eb6c4d3c0c08ee"
+        },
+        {
+          "file": "frame-013.png",
+          "video_pts_seconds": 6.006,
+          "sha256": "e47bc49b84d0a8df22a7c1a0b854ecf137dea92eeb8d809334424fef2f9bda21"
+        },
+        {
+          "file": "frame-016.png",
+          "video_pts_seconds": 7.5075,
+          "sha256": "7a3d7766ccde4add40220d201e2f5b10ff2dffeee09cc850444dd32d2b4e27f6"
+        },
+        {
+          "file": "frame-019.png",
+          "video_pts_seconds": 9.009,
+          "sha256": "0fa284a079d4d9d9468fd31f2a40f596ecdccc7ddd4437d623e3d2ced20c3c50"
+        },
+        {
+          "file": "frame-022.png",
+          "video_pts_seconds": 10.5105,
+          "sha256": "5b0ae68ea4d4c79326c32a2cb75bf6b6e4813f0ac8dc95bc546614c1f9f2e027"
+        }
+      ],
+      "roster_source_sha256": "e2f61413cde19492dbe28000f177616d9441dd73f3353f38d27361068c33cd34",
+      "players": [
+        {
+          "player_id": 8478048,
+          "team": "NYR",
+          "jersey": 31
+        },
+        {
+          "player_id": 8483690,
+          "team": "NYR",
+          "jersey": 42
+        },
+        {
+          "player_id": 8476932,
+          "team": "TOR",
+          "jersey": 41
+        },
+        {
+          "player_id": 8478840,
+          "team": "NYR",
+          "jersey": 17
+        },
+        {
+          "player_id": 8482720,
+          "team": "TOR",
+          "jersey": 23
+        },
+        {
+          "player_id": 8476468,
+          "team": "NYR",
+          "jersey": 8
+        },
+        {
+          "player_id": 8475171,
+          "team": "TOR",
+          "jersey": 95
+        },
+        {
+          "player_id": 8478882,
+          "team": "NYR",
+          "jersey": 44
+        },
+        {
+          "player_id": 8477939,
+          "team": "TOR",
+          "jersey": 88
+        },
+        {
+          "player_id": 8476853,
+          "team": "TOR",
+          "jersey": 44
+        },
+        {
+          "player_id": 8479318,
+          "team": "TOR",
+          "jersey": 34
+        }
+      ]
+    }
+  ],
+  "selection": "Up to 8 evenly spaced saved samples per clip; no model-score selection",
+  "sampling_limit": "Two goal-selected development clips; not a holdout or population-representative sample",
+  "model_suggestions_included": false,
+  "labels_collected": 0,
+  "training_eligible": false,
+  "production_eligible": false
+}

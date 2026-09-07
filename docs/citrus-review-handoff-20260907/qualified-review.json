@@ -1,0 +1,155 @@
+{
+  "summary": {
+    "expected_samples": 16,
+    "reviewed_samples": 13,
+    "remaining_samples": 3,
+    "states": {
+      "controlled": 7,
+      "no_control": 3,
+      "not_play": 3
+    }
+  },
+  "qualifications": [
+    {
+      "frame_file": "hall/transfer/frame-001.png",
+      "submitted_state": "controlled",
+      "submitted_player_id": 8475791,
+      "identity_status": "unverified_reviewer_reported_guess",
+      "control_status": "single_reviewer_observation",
+      "usable_as_actor_training_label": false,
+      "adjudicated": false
+    },
+    {
+      "frame_file": "hall/transfer/frame-016.png",
+      "submitted_state": "controlled",
+      "submitted_player_id": 8475791,
+      "identity_status": "unverified_reviewer_reported_guess",
+      "control_status": "single_reviewer_observation",
+      "usable_as_actor_training_label": false,
+      "adjudicated": false
+    },
+    {
+      "frame_file": "hall/transfer/frame-024.png",
+      "submitted_state": "no_control",
+      "submitted_player_id": null,
+      "identity_status": "not_applicable",
+      "control_status": "ambiguous_nonvisibility_is_not_no_control",
+      "usable_as_actor_training_label": false,
+      "adjudicated": false
+    },
+    {
+      "frame_file": "hall/shot/frame-001.png",
+      "submitted_state": "controlled",
+      "submitted_player_id": 8482702,
+      "identity_status": "unverified_reviewer_reported_guess",
+      "control_status": "single_reviewer_observation",
+      "usable_as_actor_training_label": false,
+      "adjudicated": false
+    },
+    {
+      "frame_file": "hall/shot/frame-009.png",
+      "submitted_state": "controlled",
+      "submitted_player_id": 8482702,
+      "identity_status": "unverified_reviewer_reported_guess",
+      "control_status": "single_reviewer_observation",
+      "usable_as_actor_training_label": false,
+      "adjudicated": false
+    },
+    {
+      "frame_file": "hall/shot/frame-016.png",
+      "submitted_state": "controlled",
+      "submitted_player_id": 8482702,
+      "identity_status": "unverified_reviewer_reported_guess",
+      "control_status": "single_reviewer_observation",
+      "usable_as_actor_training_label": false,
+      "adjudicated": false
+    },
+    {
+      "frame_file": "hall/shot/frame-024.png",
+      "submitted_state": "no_control",
+      "submitted_player_id": null,
+      "identity_status": "not_applicable",
+      "control_status": "single_reviewer_observation",
+      "usable_as_actor_training_label": false,
+      "adjudicated": false
+    },
+    {
+      "frame_file": "knies/frame-001.png",
+      "submitted_state": "controlled",
+      "submitted_player_id": 8475171,
+      "identity_status": "reviewer_identified_not_independently_verified",
+      "control_status": "single_reviewer_observation",
+      "usable_as_actor_training_label": false,
+      "adjudicated": false
+    },
+    {
+      "frame_file": "knies/frame-004.png",
+      "submitted_state": "controlled",
+      "submitted_player_id": 8477939,
+      "identity_status": "reviewer_identified_not_independently_verified",
+      "control_status": "single_reviewer_observation",
+      "usable_as_actor_training_label": false,
+      "adjudicated": false
+    },
+    {
+      "frame_file": "knies/frame-007.png",
+      "submitted_state": "no_control",
+      "submitted_player_id": null,
+      "identity_status": "not_applicable",
+      "control_status": "single_reviewer_observation",
+      "usable_as_actor_training_label": false,
+      "adjudicated": false
+    },
+    {
+      "frame_file": "knies/frame-010.png",
+      "submitted_state": "not_play",
+      "submitted_player_id": null,
+      "identity_status": "not_applicable",
+      "control_status": "single_reviewer_observation",
+      "usable_as_actor_training_label": false,
+      "adjudicated": false
+    },
+    {
+      "frame_file": "knies/frame-013.png",
+      "submitted_state": "not_play",
+      "submitted_player_id": null,
+      "identity_status": "not_applicable",
+      "control_status": "single_reviewer_observation",
+      "usable_as_actor_training_label": false,
+      "adjudicated": false
+    },
+    {
+      "frame_file": "knies/frame-016.png",
+      "submitted_state": "not_play",
+      "submitted_player_id": null,
+      "identity_status": "not_applicable",
+      "control_status": "single_reviewer_observation",
+      "usable_as_actor_training_label": false,
+      "adjudicated": false
+    }
+  ],
+  "missing": [
+    {
+      "clip": "Hall",
+      "frame_file": "hall/transfer/frame-009.png",
+      "video_seconds": 5.538867
+    },
+    {
+      "clip": "Knies",
+      "frame_file": "knies/frame-019.png",
+      "video_seconds": 9.009
+    },
+    {
+      "clip": "Knies",
+      "frame_file": "knies/frame-022.png",
+      "video_seconds": 10.5105
+    }
+  ],
+  "clarification": "Garrett reported he could not rewatch Carolina and did not know player identities; he could watch Toronto and identify players.",
+  "clarification_source": "User clarification in this conversation after export; not an independent second review",
+  "original_sha256": "8c2c81ce688994ad6ea8178ef7fe26eb8cec13c2a387c118cee94b2ab50ffbcb",
+  "manifest_sha256": "cabb6d941aa16d16f4adf7cec36b437e2e201770160b418bb00a361450fbd33d",
+  "training_eligible": false,
+  "production_eligible": false,
+  "media_location": "scripts/proof/results/body-possession-review-20260907/garrett-batch-one (local only)"
+}
