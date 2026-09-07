@@ -1,6 +1,8 @@
 # Citrus 1.0 (13) readiness — September 6, 2026
 
-Preparation only. The user is away from the computer for approximately four hours and authorized continued independent work. Final App Review submission/release remains prohibited, and unfinished Game Day remains excluded.
+Updated September 7: the user returned and authorized completing the remaining checks and then submitting for App Review. This supersedes the previous preparation-only instruction. Submission remains dependent on closing the recorded gates; manual release remains selected, and unfinished Game Day remains excluded.
+
+Return check at 02:04 MDT: iPhone is available/paired; Chrome App Store Connect requires sign-in. Engine run 34059704526 still awaits reviewer approval, and its final daylight recheck blocks deployment before 07:00 MDT. Do not approve an old preflight as a way around that recheck.
 
 ## Corrections since build 12
 
