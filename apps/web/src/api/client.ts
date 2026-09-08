@@ -256,9 +256,18 @@ async function request<T = unknown>(
 
       if (!response.ok) {
         const fallback = `API request failed with status ${response.status}`;
-        const errorMsg = typeof json.error === 'string'
-          ? json.error
-          : json.error?.message || json.message || fallback;
+        // 2026-09-09 (#20): the server's zod layer answers
+        // { error: { code: 'VALIDATION_ERROR', message: 'Validation failed', details: 'name: Keep it clean...' } }.
+        // The sentence a person can act on is `details`, so it leads.
+        const validationDetails =
+          json.error?.code === 'VALIDATION_ERROR' && typeof json.error?.details === 'string'
+            ? json.error.details.replace(/^[a-zA-Z_.]+: /, '')
+            : null;
+        const errorMsg = validationDetails
+          ? validationDetails
+          : typeof json.error === 'string'
+            ? json.error
+            : json.error?.message || json.message || fallback;
         throw new ApiError(errorMsg, response.status, json);
       }
 

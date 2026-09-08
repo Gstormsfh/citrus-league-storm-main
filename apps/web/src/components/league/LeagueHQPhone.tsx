@@ -82,6 +82,17 @@ export interface LeagueHQPhoneProps {
   teams?: LeagueHQTeam[];
   /** Under the teams: the commissioner's invite control. */
   invite?: ReactNode;
+  /**
+   * 2026-09-09 (#18): while the league has open seats the invite control is the
+   * next real action, so it moves to the top of HQ as a banner that says how
+   * many seats are open. `undefined` keeps the old placement under the teams.
+   */
+  seats?: { filled: number; max: number } | null;
+  /**
+   * 2026-09-09 (#21): "Report a name" belongs here, not only on Standings,
+   * because Standings is season-gated and App Review happens in September.
+   */
+  report?: ReactNode;
   className?: string;
 }
 
@@ -94,8 +105,12 @@ export function LeagueHQPhone({
   tiles,
   teams,
   invite,
+  seats = null,
+  report,
   className,
 }: LeagueHQPhoneProps) {
+  const openSeats = seats && seats.max > seats.filled ? seats.max - seats.filled : 0;
+  const inviteOnTop = !!invite && openSeats > 0;
   // Yours first — it is the one card you came for — then the week's order.
   const ordered = matchups
     ? [...matchups].sort(
@@ -107,6 +122,17 @@ export function LeagueHQPhone({
 
   return (
     <div className={cn(PB_TYPE, 'flex flex-col gap-3 px-3 pt-3 border-t border-white/[0.08]', className)} data-testid="league-hq-phone">
+      {inviteOnTop && (
+        <section className="rounded-[12px] p-3.5 bg-pressbox-tile border border-pressbox-orange/35" data-testid="league-hq-invite-banner">
+          <p className="font-plex font-semibold text-[9px] uppercase tracking-[0.12em] text-pressbox-orange-soft">
+            {seats!.filled} of {seats!.max} teams · {openSeats} {openSeats === 1 ? 'seat' : 'seats'} open
+          </p>
+          <p className="mt-1 mb-2 font-barlow text-[13px] leading-[1.35] text-pressbox-text/80">
+            Invite your league. The draft can start once every seat is filled.
+          </p>
+          {invite}
+        </section>
+      )}
       {draft && (
         <section
           className={cn(
@@ -243,7 +269,8 @@ export function LeagueHQPhone({
               );
             })}
           </ol>
-          {invite && <div className="mt-3">{invite}</div>}
+          {invite && !inviteOnTop && <div className="mt-3">{invite}</div>}
+          {report && <div className="mt-2 flex justify-end">{report}</div>}
         </section>
       )}
     </div>

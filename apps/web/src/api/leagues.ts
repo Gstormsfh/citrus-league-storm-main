@@ -14,6 +14,18 @@ import { createApiCache, CACHE_TTL } from './cache';
 // so every read of .data.league / .data.id was a compile error in the services.
 import type { League, Team } from '@/services/LeagueService';
 
+/** Shape of GET /api/leagues/invite/:code (server/src/routes/leagues.ts). */
+export interface InvitePreview {
+  leagueId: string;
+  name: string;
+  leagueType: string;
+  commissionerName: string | null;
+  draftStatus: string | null;
+  filled: number;
+  maxTeams: number;
+  alreadyMember: boolean;
+}
+
 const c = createApiCache();
 
 export const leagueApi = {
@@ -63,6 +75,14 @@ export const leagueApi = {
    * 'already a member' and confuse users. Mobile SMS invite flow used
    * to trigger this: slow network → client timeout → silent retry →
    * 'already a member' error shown even though join succeeded. */
+  /**
+   * 2026-09-09 (#19): what an invite link points at, before joining. Drawn by
+   * the accept screen at /join/:code. Not cached: the seat count is the point.
+   */
+  getInvite(code: string) {
+    return apiClient.get<InvitePreview>(`/api/leagues/invite/${encodeURIComponent(code.trim())}`, { retries: 1 });
+  },
+
   joinLeague(params: { joinCode: string; teamName?: string }) {
     c.invalidate('leagues:');
     return apiClient.post<{ league: League; team: Team }>('/api/leagues/join', params, { retries: 0 });

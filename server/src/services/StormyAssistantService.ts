@@ -123,12 +123,17 @@ export async function logStormyUsage(
   userId: string,
   tokensUsed: number,
   preview: string,
+  // 2026-09-09 (#6): the answer and the context size, so quality can be
+  // reviewed against what the model was actually given. Both bounded.
+  extra?: { answer?: string; contextChars?: number },
 ): Promise<void> {
   try {
     await svc.from('stormy_chat_log').insert({
       user_id: userId,
       tokens_used: tokensUsed,
       message_preview: preview.substring(0, 200),
+      ...(extra?.answer !== undefined ? { answer_preview: extra.answer.substring(0, 600) } : {}),
+      ...(extra?.contextChars !== undefined ? { context_chars: extra.contextChars } : {}),
     });
   } catch {
     /* non-critical */

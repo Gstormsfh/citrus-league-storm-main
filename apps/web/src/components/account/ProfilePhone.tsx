@@ -1,4 +1,5 @@
 import { AnalyticsPreference } from '@/components/AnalyticsPreference';
+import { MASCOTS, type Mascot } from '@/constants/mascots';
 /**
  * THE ACCOUNT SCREEN, THE PHONE (PR10p, 2026-09-04)
  *
@@ -76,6 +77,8 @@ export interface ProfilePhoneProps {
     championships: number;
     uploading: boolean;
     onAvatarInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    /** 2026-09-09 (#12): set one of the Citrus characters as the picture. */
+    onPickMascot?: (image: string) => void;
   };
   identity: ProfileIdentity & {
     editing: boolean;
@@ -224,6 +227,32 @@ export function ProfilePhone({ tab, onTabChange, hero, identity, stats, activity
           )}
         </div>
       </div>
+      {hero.onPickMascot && (
+        <div className="flex items-center gap-2 px-3.5 pt-2.5" data-testid="profile-mascot-picker">
+          <span className="font-plex font-medium text-[10px] tracking-[0.06em] uppercase text-pressbox-text/45">Or pick a character</span>
+          <div className="flex gap-1.5 ml-auto">
+            {(Object.values(MASCOTS) as Mascot[]).map((m) => {
+              const selected = !!hero.avatarUrl && hero.avatarUrl.endsWith(m.image);
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => hero.onPickMascot?.(m.image)}
+                  disabled={hero.uploading}
+                  aria-label={`Use ${m.name} as your picture`}
+                  aria-pressed={selected}
+                  className={cn(
+                    'focus-citrus w-9 h-9 rounded-full overflow-hidden border-[1.5px] disabled:opacity-50',
+                    selected ? 'border-pressbox-orange' : 'border-white/[0.12]',
+                  )}
+                >
+                  <img src={m.image} alt="" className="w-full h-full object-cover" loading="lazy" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="mt-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <PressBoxChips chips={TABS} activeKey={tab} onSelect={(k) => onTabChange(k as ProfileTab)} label="Account section" outlined className="w-max px-3.5" />

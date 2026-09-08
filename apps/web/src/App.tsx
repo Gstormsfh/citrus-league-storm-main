@@ -21,6 +21,7 @@ import ScrollToTop from "./components/ScrollToTop";
 import PushDeepLink from "./components/PushDeepLink";
 import NativeAuthDeepLink from "./components/NativeAuthDeepLink";
 import UniversalLinkDeepLink from "./components/UniversalLinkDeepLink";
+import PrefetchWarm from "./components/PrefetchWarm";
 import LoadingScreen from "./components/LoadingScreen";
 import '@/integrations/firebase/config'; // Initialize Firebase
 import "./App.css";
@@ -101,6 +102,7 @@ const TradeAnalyzer = lazyWithErrorHandling(() => import("./pages/TradeAnalyzer"
 const ArmchairGM = lazyWithErrorHandling(() => import("./pages/ArmchairGM"));
 const OtherTeam = lazyWithErrorHandling(() => import("./pages/OtherTeam"));
 const CreateLeague = lazyWithErrorHandling(() => import("./pages/CreateLeague"));
+const InviteAccept = lazyWithErrorHandling(() => import("./pages/InviteAccept"));
 const Features = lazyWithErrorHandling(() => import("./pages/Features"));
 const Pricing = lazyWithErrorHandling(() => import("./pages/Pricing"));
 const About = lazyWithErrorHandling(() => import("./pages/About"));
@@ -213,6 +215,8 @@ const App = () => {
                     silently became "you have no leagues, create one".
                     Mounted here so every page inherits it. */}
                 <LeagueLoadErrorBanner />
+                {/* 2026-09-09 (#22): warm the player pool once after sign-in. */}
+                <PrefetchWarm />
                 {/* Terms sign-off (2026-09-05): one sheet, once, on the
                     first session a policy is due. See lib/consent.ts. */}
                 <TermsGate />
@@ -267,6 +271,8 @@ const App = () => {
                 {/* Phase 4.5 chunk 11g.5b — v2 draft room (chunk-11g.4 persistent engine path). */}
                 <Route path="/draft-v2/:leagueId/:draftId?" element={<ProtectedRoute><ErrorBoundary><DraftRoomV2 /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/create-league" element={<ProtectedRoute><CreateLeague /></ProtectedRoute>} />
+                {/* 2026-09-09 (#19): invite links land here and join on Accept; /join/* is a universal link. */}
+                <Route path="/join/:code" element={<ProtectedRoute><ErrorBoundary><InviteAccept /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/league/:leagueId" element={<ProtectedRoute><ErrorBoundary><LeagueDashboard /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/profile" element={<ProtectedRoute><ErrorBoundary><Profile /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/team-analytics" element={<ProtectedRoute><ErrorBoundary><TeamAnalytics /></ErrorBoundary></ProtectedRoute>} />

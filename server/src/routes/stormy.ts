@@ -262,7 +262,10 @@ stormyRoutes.post('/chat', async (c) => {
 
     // Fire-and-forget: a failed usage write must not fail a delivered
     // answer, but it must also not be awaited into the response path.
-    void logStormyUsage(supabaseAdmin, userId, inputTokens + outputTokens, message);
+    void logStormyUsage(supabaseAdmin, userId, inputTokens + outputTokens, message, {
+      answer: aiResponse,
+      contextChars: context ? Math.min(context.length, 8000) : 0,
+    });
 
     return ok(c, {
       response: aiResponse,

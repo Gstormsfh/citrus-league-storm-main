@@ -36,6 +36,55 @@ leagueRoutes.get('/', async (c) => {
   }
 });
 
+// GET /api/leagues/invite/:code — What an invite link points at, before joining.
+// 2026-09-09 (#19): the invite accept screen (/join/:code) shows who is inviting
+// you to which league and how full it is, then joins on Accept. Read through the
+// admin client because the viewer is not a member yet; only the fields the screen
+// draws leave the server. Declared before the /:leagueId routes on purpose.
+leagueRoutes.get('/invite/:code', async (c) => {
+  const code = (c.req.param('code') || '').trim();
+  // Letters and digits only: `ilike` treats % and _ as wildcards, and a code
+  // is never anything else (join_flow_friendly_codes generates [A-Z0-9]).
+  if (!/^[A-Za-z0-9-]{4,64}$/.test(code)) {
+    return fail(c, AppError.badRequest('Invalid join code. Please check and try again.'));
+  }
+  try {
+    const userId = c.get('userId');
+    const admin = getSupabaseAdmin();
+    const { data: league, error } = await admin
+      .from('leagues')
+      .select('id, name, commissioner_id, draft_status, settings')
+      .ilike('join_code', code)
+      .maybeSingle();
+    if (error) return handleError(c, error, 'Failed to look up invite');
+    if (!league) return fail(c, AppError.notFound('Invite'));
+
+    const settings = (league.settings ?? {}) as Record<string, unknown>;
+    const maxTeams = Number(settings.teamsCount ?? settings.teamCount ?? 12) || 12;
+
+    const [{ count: filled }, { data: mine }, { data: commish }] = await Promise.all([
+      admin.from('teams').select('id', { count: 'exact', head: true }).eq('league_id', league.id),
+      admin.from('teams').select('id').eq('league_id', league.id).eq('owner_id', userId).maybeSingle(),
+      admin.from('profiles').select('username, first_name, last_name').eq('id', league.commissioner_id).maybeSingle(),
+    ]);
+    const commissionerName =
+      [commish?.first_name, commish?.last_name].filter(Boolean).join(' ') || commish?.username || null;
+
+    return ok(c, {
+      leagueId: league.id,
+      name: league.name,
+      leagueType: (settings.leagueType as string | undefined) ?? 'fantasy',
+      commissionerName,
+      draftStatus: league.draft_status,
+      filled: filled ?? 0,
+      maxTeams,
+      alreadyMember: !!mine,
+    });
+  } catch (err) {
+    return handleError(c, err, 'Failed to look up invite');
+  }
+});
+
 // GET /api/leagues/:leagueId — Get a specific league
 leagueRoutes.get('/:leagueId', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');

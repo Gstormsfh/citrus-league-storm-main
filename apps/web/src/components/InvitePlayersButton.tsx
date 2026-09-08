@@ -25,11 +25,15 @@ import {
 interface InvitePlayersButtonProps {
   joinCode: string;
   leagueName: string;
+  /** Start expanded (the League tab banner while seats are open, 2026-09-09 #18). */
+  defaultOpen?: boolean;
+  /** Full width inside a banner instead of the floating 18rem card. */
+  fill?: boolean;
 }
 
-export const InvitePlayersButton = ({ joinCode, leagueName }: InvitePlayersButtonProps) => {
+export const InvitePlayersButton = ({ joinCode, leagueName, defaultOpen = false, fill = false }: InvitePlayersButtonProps) => {
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
 
   const showSystemShare = canSystemShare();
   const showSchemeButtons = !isNativeApp();
@@ -63,13 +67,19 @@ export const InvitePlayersButton = ({ joinCode, leagueName }: InvitePlayersButto
   }
 
   return (
-    <div className="bg-[#1A2A20] rounded-xl border border-citrus-sage/20 shadow-lg p-4 w-72">
-      <div className="flex items-center justify-between mb-3">
+    <div className={fill ? 'bg-[#1A2A20] rounded-xl border border-citrus-sage/20 shadow-lg p-4 w-full' : 'bg-[#1A2A20] rounded-xl border border-citrus-sage/20 shadow-lg p-4 w-72'}>
+      <div className="flex items-center justify-between mb-1">
         <span className="font-display font-bold text-sm text-pastel-cream">Invite Players</span>
-        <button onClick={() => setOpen(false)} className="text-white/55 hover:text-pastel-cream">
-          <X className="w-4 h-4" />
-        </button>
+        {!defaultOpen && (
+          <button onClick={() => setOpen(false)} className="text-white/55 hover:text-pastel-cream" aria-label="Close">
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
+      {/* 2026-09-09 (#18): say what the two things are for. */}
+      <p className="mb-3 text-[12px] leading-snug text-white/60">
+        Share the link and friends land in the app ready to join. The code is for anyone typing it in by hand.
+      </p>
 
       {/* Join code */}
       <div className="flex items-center gap-2 mb-3 p-2 bg-white/5 rounded-lg">

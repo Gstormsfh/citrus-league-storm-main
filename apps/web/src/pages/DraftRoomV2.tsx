@@ -389,7 +389,8 @@ export default function DraftRoomV2() {
           // (measured at 1.8s on Garrett's machine, invisible on any clock).
           // That is strictly better than a confidently wrong correction.
           if (typeof snapshot.serverReceivedAtMs === 'number') {
-            updateOffset(Date.now(), snapshot.serverReceivedAtMs);
+            // 2026-09-09 (#4): the Date-header reading is the authoritative seed.
+            updateOffset(Date.now(), snapshot.serverReceivedAtMs, 'snapshot');
           }
           // 2026-08-18 launch audit: fetchDraftOrderMatrix's own comment
           // says "caller retries with backoff" — no caller ever did.
@@ -420,7 +421,7 @@ export default function DraftRoomV2() {
         onEvent: (event) => {
           const clientReceiveMs = Date.now();
           const serverMs = new Date(event.timestamp).getTime();
-          if (Number.isFinite(serverMs)) updateOffset(clientReceiveMs, serverMs);
+          if (Number.isFinite(serverMs)) updateOffset(clientReceiveMs, serverMs, 'event');
           store.applyEvent(event);
         },
         onEvents: (events) => {

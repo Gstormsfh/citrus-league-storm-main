@@ -23,7 +23,10 @@ export function universalLinkToPath(raw: string): string | null {
     return null;
   }
   if (url.protocol !== 'https:' || !UNIVERSAL_LINK_HOSTS.has(url.hostname)) return null;
-  if (url.pathname.startsWith('/auth') || url.pathname === '/reset-password' || url.pathname.startsWith('/api/')) return null;
+  // /auth?redirect=... is the invite link (utils/inviteShare.ts) and belongs in-app;
+  // /auth/callback and friends are OAuth returns and stay with the browser.
+  const inviteAuth = url.pathname === '/auth' && url.searchParams.has('redirect');
+  if ((url.pathname.startsWith('/auth') && !inviteAuth) || url.pathname === '/reset-password' || url.pathname.startsWith('/api/')) return null;
   return `${url.pathname}${url.search}${url.hash}` || '/';
 }
 

@@ -32,13 +32,15 @@ export function canSystemShare(): boolean {
 }
 
 /**
- * Invite link, always on the public origin. Routed through /auth so a
- * signed-out invitee authenticates first and lands on the join screen
- * with the code pre-filled; signed-in users pass straight through.
+ * Invite link, always on the public origin. 2026-09-09 (#19): it points at
+ * the accept screen, /join/<code>, which is a universal link (AASA) so it
+ * opens inside the app, shows who is inviting you to what, and joins on
+ * Accept. Signed-out invitees are sent through /auth by ProtectedRoute with
+ * the same destination preserved; the old /auth?redirect=/create-league form
+ * still works for links already in the wild.
  */
 export function buildInviteLink(joinCode: string): string {
-  const joinPath = `/create-league?tab=join&code=${encodeURIComponent(joinCode)}`;
-  return `${SITE_ORIGIN}/auth?redirect=${encodeURIComponent(joinPath)}`;
+  return `${SITE_ORIGIN}/join/${encodeURIComponent(joinCode.trim().toUpperCase())}`;
 }
 
 /**
