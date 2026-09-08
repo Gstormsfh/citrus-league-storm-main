@@ -22,6 +22,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { PressBoxSkeletonBar } from '@/components/pressbox/Skeleton';
 import type { ScoresGameDetailResponse, ScoresPlayerLine } from '@citrus/shared';
@@ -48,11 +49,13 @@ function ConfidenceDot({ label }: { label: string | null }) {
 
 function PlayerRow({ player }: { player: ScoresPlayerLine }) {
   const a = player.actuals;
+  // QA PASS 1 (2026-09-09): every listed name opens the player's page.
   return (
-    <div
+    <Link
+      to={`/players/${player.playerId}`}
       data-testid="scores-detail-player"
       className={cn(
-        'flex items-center gap-2 px-2.5 py-1.5 rounded-[8px]',
+        'focus-citrus flex items-center gap-2 px-2.5 py-1.5 rounded-[8px]',
         player.roster?.isMine ? 'bg-pressbox-orange/[0.08]' : 'odd:bg-white/[0.02]',
       )}
     >
@@ -109,7 +112,7 @@ function PlayerRow({ player }: { player: ScoresPlayerLine }) {
           </>
         )}
       </div>
-    </div>
+    </Link>
   );
 }
 

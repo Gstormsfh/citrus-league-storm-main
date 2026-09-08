@@ -5781,9 +5781,12 @@ const Matchup = () => {
                     className="w-40 h-40 mx-auto mb-4 rounded-2xl object-cover ring-1 ring-white/10"
                     loading="lazy"
                   />
-                  <h3 className="text-lg font-bold text-pastel-cream mb-2">Draft Your Team First</h3>
+                  {/* QA PASS 1 (2026-09-09): this and the Team screen's empty
+                      state read as the same card. Each now says what THIS
+                      screen will hold once the draft is done. */}
+                  <h3 className="text-lg font-bold text-pastel-cream mb-2">No matchup yet</h3>
                   <p className="text-sm text-white/55 mb-4">
-                    Weekly matchups open as soon as your league finishes its draft.
+                    Your first head-to-head is set the moment the draft ends. Until then there is nothing here to score.
                   </p>
                   <Button onClick={() => navigate(`/draft-v2/${activeLeagueId}`)}>
                     Go to Draft Room

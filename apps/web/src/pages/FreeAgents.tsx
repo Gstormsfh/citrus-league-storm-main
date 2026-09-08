@@ -1654,7 +1654,7 @@ const FreeAgents = () => {
           view={phoneView}
           onView={setPhoneView}
           ownership={ownership.size > 0}
-          leadersTo="/players"
+          leadersTo={activeLeagueId ? `/players?league=${activeLeagueId}` : '/players'}
           tradeTo={activeLeagueId ? `/trade-analyzer?league=${activeLeagueId}` : '/trade-analyzer'}
           trendMode={trendMode}
           onTrendMode={setTrendMode}

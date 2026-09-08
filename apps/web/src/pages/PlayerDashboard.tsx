@@ -877,11 +877,11 @@ export default function PlayerDashboard() {
                 own caption there. The label position is the primitive's
                 behaviour (its iter #2 fix #5) and is not changed here. */}
             {isMobile && (
-              <Eyebrow className="mb-2">Expected goals by season · our model</Eyebrow>
+              <Eyebrow className="mb-2">Expected goals, past seasons · our model</Eyebrow>
             )}
             <SparklineMicroChart
               data={arc.points}
-              eyebrow={isMobile ? undefined : 'Expected goals by season · our model'}
+              eyebrow={isMobile ? undefined : 'Expected goals, past seasons · our model'}
               endpointValue={arc.endpoint ?? undefined}
               tooltipUnit=" xG"
               height={isMobile ? 120 : 150}
@@ -889,7 +889,7 @@ export default function PlayerDashboard() {
           </>
         ) : (
           <div className="rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile p-5 ring-1 ring-white/10 sm:p-7">
-            <Eyebrow>Expected goals by season · our model</Eyebrow>
+            <Eyebrow>Expected goals, past seasons · our model</Eyebrow>
             <p className="mt-3 text-[13px] leading-snug text-white/70">
               {arc.points.length === 1
                 ? `One season on record (${seasonLabel(arc.firstSeason!)}). A line needs two points; this one gets drawn as soon as there is a second.`
@@ -1100,7 +1100,9 @@ export default function PlayerDashboard() {
         </div>
       </section>
 
-      <div className="mx-auto mt-12 max-w-[1280px] px-4 sm:px-6">
+      {/* QA PASS 1 (2026-09-09): room under the last link so it clears the
+          tab bar and the home indicator on the phone. */}
+      <div className="mx-auto mt-12 max-w-[1280px] px-4 sm:px-6 max-lg:pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
         <Link
           to="/players"
           className="font-jbmono max-lg:font-plex text-[10px] font-bold uppercase tracking-[0.22em] text-white/70 transition-colors hover:text-pastel-orange-soft hover:max-lg:text-pressbox-orange-soft"

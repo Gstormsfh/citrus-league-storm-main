@@ -118,7 +118,9 @@ export function PressBoxHome({ inOffseason, className }: PressBoxHomeProps) {
   }, [fantasy]);
 
   return (
-    <div className={cn(PB_TYPE, 'min-h-screen bg-pressbox-surface pb-app-chrome', className)} data-testid="pressbox-home">
+    // QA PASS 1 (2026-09-09): the one Press Box screen without the safe-area
+    // top inset, so the status bar sat over the header and its buttons.
+    <div className={cn(PB_TYPE, 'min-h-screen bg-pressbox-surface pt-[env(safe-area-inset-top)] pb-app-chrome', className)} data-testid="pressbox-home">
       <PressBoxAppHeader
         logoSrc="/favicon.svg"
         onSearch={() => navigate('/players')}

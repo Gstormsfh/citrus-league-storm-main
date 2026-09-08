@@ -221,3 +221,26 @@ export function compareGames(a: ScoreboardGame, b: ScoreboardGame): number {
   if (at !== bt) return at < bt ? -1 : 1;
   return a.gameId - b.gameId;
 }
+
+/** Whole days from `from` to `to` (negative when `to` is earlier). */
+export function daysBetween(from: string, to: string): number {
+  const [fy, fm, fd] = from.split('-').map(Number);
+  const [ty, tm, td] = to.split('-').map(Number);
+  return Math.round((Date.UTC(ty, (tm || 1) - 1, td || 1) - Date.UTC(fy, (fm || 1) - 1, fd || 1)) / 86_400_000);
+}
+
+/**
+ * The strip a person can actually scroll (QA pass 1, 2026-09-09). The old
+ * strip was rebuilt around the selected day on every tap (3 back, 10
+ * forward), so it always re-centred and you could never scroll back past
+ * three days; you had to click your way home. This window is anchored on
+ * TODAY, wide in both directions, and only grows when the selected day
+ * (a deep link, say) falls outside it. Scrolling is the strip's job.
+ */
+export function buildScrollableDateStrip(selected: string, back = 21, forward = 21): StripDay[] {
+  const today = getTodayMST();
+  const offset = daysBetween(today, selected);
+  const b = Math.max(back, -offset + 3);
+  const f = Math.max(forward, offset + 3);
+  return buildDateStrip(today, b, f);
+}

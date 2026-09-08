@@ -418,7 +418,7 @@ const StormyChatBubbleSession = () => {
     <Card
       className={`fixed shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] ring-1 ring-white/10 border-0 overflow-hidden flex flex-col transition-all duration-300 bg-pastel-surface-tile ${
         isMobile
-          ? 'rounded-t-2xl rounded-b-none'
+          ? 'rounded-t-2xl rounded-b-none animate-in slide-in-from-bottom duration-200'
           : `w-[440px] rounded-2xl ${isMinimized ? 'h-[70px]' : 'h-[min(640px,80vh)]'}`
       }`}
       style={isMobile ? mobileSheetStyle : desktopCardStyle}

@@ -633,7 +633,9 @@ export function dateStripShape(src: string): DateStripShape {
       !tablist.includes('flex-col') &&
       !tablist.includes('overflow-y-auto'),
     snaps: tablist.includes('snap-x') && tab.includes('flex-shrink-0') && tab.includes('snap-center'),
-    scrollsSelectedIntoView: /\.scrollIntoView\(/.test(code),
+    // QA pass 1 (2026-09-09): revealed by the strip's own scrollLeft
+    // (pressbox/scrollStrip), never scrollIntoView, which moved the page.
+    scrollsSelectedIntoView: /scrollStripTo\(/.test(code) && !/\.scrollIntoView\(/.test(code),
     pickerConstructs: pickers,
   };
 }

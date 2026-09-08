@@ -22,6 +22,7 @@
  */
 
 import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom';
 import type { ScoresGameCitrus, ScoresPlayerLine } from '@citrus/shared';
 import { Mug } from '@/components/roster/Mug';
 import { formatPoints, hasUnconfirmedGoalieDuel } from './scoresFormat';
@@ -42,10 +43,12 @@ function confidenceClass(label: string | null): string {
 
 function PlayerPill({ player }: { player: ScoresPlayerLine }) {
   const hasActual = player.actualPoints !== null;
+  // QA PASS 1 (2026-09-09): the pill opens the player's page.
   return (
-    <div
+    <Link
+      to={`/players/${player.playerId}`}
       className={cn(
-        'flex items-center gap-1.5 min-w-0 flex-1 rounded-[8px] px-1.5 py-1 border',
+        'focus-citrus flex items-center gap-1.5 min-w-0 flex-1 rounded-[8px] px-1.5 py-1 border',
         player.roster?.isMine ? 'bg-pressbox-orange/[0.08] border-pressbox-orange/30' : 'bg-white/[0.03] border-white/[0.06]',
       )}
     >
@@ -87,7 +90,7 @@ function PlayerPill({ player }: { player: ScoresPlayerLine }) {
           )}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useSearchParams, Navigate } from 'react-router-dom';
+import { useSearchParams, Navigate, Link as RouterLink } from 'react-router-dom';
 import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -380,6 +380,37 @@ const TradeAnalyzer = () => {
   const _poolType = activeLeagueFormat?.leagueType;
   if (isPoolLeague(_poolType) && activeLeagueId) {
     return <Navigate to={getPoolRoute(_poolType!, activeLeagueId)} replace />;
+  }
+
+  // QA PASS 1 (2026-09-09, Zach): a signed-in manager with no league landed
+  // in the demo analyzer with no way out. The demo is for guests; a member
+  // without a league needs one before a trade means anything.
+  if (user && !activeLeagueId && !isGuestMode(userLeagueState)) {
+    return (
+      <div className="min-h-screen bg-pressbox-surface text-pressbox-text flex flex-col">
+        <div className="hidden lg:block"><Navbar /></div>
+        <main
+          className="flex-1 flex items-center justify-center px-6 pt-[calc(2.5rem+env(safe-area-inset-top))] pb-app-chrome"
+          data-testid="trade-analyzer-no-league"
+        >
+          <div className="w-full max-w-md text-center">
+            <div className="font-plex font-semibold text-[11px] tracking-[0.18em] uppercase text-pressbox-orange-soft mb-3">Trade center</div>
+            <h1 className="font-condensed font-extrabold uppercase text-[2rem] leading-[0.95] tracking-[-0.01em] mb-3">Join a league first.</h1>
+            <p className="font-barlow text-[15px] text-pressbox-text/70 leading-relaxed mb-6">
+              Trades happen inside a league. Once you have a team, this is where you propose them and read the offers that come in.
+            </p>
+            <div className="flex flex-col gap-2">
+              <Button asChild className="h-12 rounded-[12px] bg-pressbox-orange text-pressbox-orange-ink font-condensed font-bold uppercase tracking-[0.06em] text-[15px]">
+                <RouterLink to="/create-league">Create a league</RouterLink>
+              </Button>
+              <Button asChild variant="outline" className="h-12 rounded-[12px] border-white/15 bg-transparent text-pressbox-text font-condensed font-bold uppercase tracking-[0.06em] text-[15px]">
+                <RouterLink to="/create-league?tab=join">Join with a code</RouterLink>
+              </Button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   const toggleMyPlayer = (id: string) => {

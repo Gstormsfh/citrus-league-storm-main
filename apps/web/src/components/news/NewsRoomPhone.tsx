@@ -121,7 +121,7 @@ export function NewsRoomPhone({
       </div>
 
       {chips.length > 1 && (
-        <div className="mt-2.5 -mx-3.5 py-2.5 -my-2.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mt-2.5 -mx-3.5 py-2.5 -my-2.5 overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <PressBoxChips chips={chips} activeKey={team} onSelect={onTeam} label="Team filter" outlined compact className="w-max px-3.5" />
         </div>
       )}

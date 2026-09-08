@@ -13,10 +13,11 @@
  */
 
 import { useEffect, useRef } from 'react';
+import { scrollStripTo } from '@/components/pressbox/scrollStrip';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
-import { buildDateStrip, shiftDate, friendlyDateLabel } from './scoresFormat';
+import { buildScrollableDateStrip, shiftDate, friendlyDateLabel } from './scoresFormat';
 
 interface ScoresDateStripProps {
   selected: string;
@@ -26,11 +27,17 @@ interface ScoresDateStripProps {
 }
 
 export function ScoresDateStrip({ selected, onSelect, datesWithGames }: ScoresDateStripProps) {
-  const days = buildDateStrip(selected);
+  const days = buildScrollableDateStrip(selected);
   const selectedRef = useRef<HTMLButtonElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const centredOnce = useRef(false);
 
+  // QA PASS 1 (2026-09-09): centre the selected day once on mount, then only
+  // nudge it into view when a tap or a chevron moves it off screen. The
+  // strip's own scrollLeft, never scrollIntoView (see pressbox/scrollStrip).
   useEffect(() => {
-    selectedRef.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    scrollStripTo(stripRef.current, selectedRef.current, centredOnce.current ? 'nearest' : 'center');
+    centredOnce.current = true;
   }, [selected]);
 
   return (
@@ -38,7 +45,9 @@ export function ScoresDateStrip({ selected, onSelect, datesWithGames }: ScoresDa
        condensed label between chevrons, then the strip of day tiles with
        the selected one in cream on the dark ground, the way the artboard
        draws every selected pill. */
-    <div className={cn(PB_TYPE, 'bg-pressbox-surface/95 backdrop-blur-sm border-b border-white/[0.06]')}>
+    // QA PASS 1 (2026-09-09): solid, not 95% + blur. A translucent sticky bar
+    // shows the rows sliding under it, half-visible, which read as broken.
+    <div className={cn(PB_TYPE, 'bg-pressbox-surface border-b border-white/[0.06]')}>
       <div className="flex items-center justify-between px-3.5 pt-2 pb-1">
         <button
           type="button"
@@ -62,11 +71,12 @@ export function ScoresDateStrip({ selected, onSelect, datesWithGames }: ScoresDa
       </div>
 
       <div
+        ref={stripRef}
         role="tablist"
         aria-label="Choose a date"
         // `scrollbar-hide` is the repo's own utility in src/index.css, not a
         // Tailwind default. It covers Firefox and WebKit in one class.
-        className="flex gap-1.5 overflow-x-auto px-3.5 pb-2.5 scrollbar-hide snap-x"
+        className="flex gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain px-3.5 pb-2.5 scrollbar-hide snap-x"
       >
         {days.map((d) => {
           const isSelected = d.date === selected;

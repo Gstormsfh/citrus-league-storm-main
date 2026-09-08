@@ -12,8 +12,8 @@ describe('projected game display', () => {
   });
   it('opens the total breakdown with an accessible button', () => {
     const open = vi.fn();
-    render(<PressBoxStatTiles tiles={[{ key: 'szn', label: 'SZN PROJ', value: '240', onClick: open }]} />);
-    fireEvent.click(screen.getByRole('button', { name: 'SZN PROJ breakdown' }));
+    render(<PressBoxStatTiles tiles={[{ key: 'szn', label: 'PROJECTION', value: '240', onClick: open }]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'PROJECTION breakdown' }));
     expect(open).toHaveBeenCalledTimes(1);
   });
 });

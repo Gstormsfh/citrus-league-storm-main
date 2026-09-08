@@ -14,6 +14,7 @@
  * the share sheet's job on the league page.
  */
 import { useEffect, useRef, useState } from 'react';
+import { scrollStripTo } from '@/components/pressbox/scrollStrip';
 import { cn } from '@/lib/utils';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { BOTTOM_CHROME_H } from '@/components/pressbox/chromeMetrics';
@@ -79,7 +80,7 @@ export function CreateLeaguePhone({
   const chipsRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const active = chipsRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]');
-    active?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' });
+    scrollStripTo(chipsRef.current, active);
   }, [section?.key]);
 
   return (
@@ -103,7 +104,7 @@ export function CreateLeaguePhone({
 
       {tab === 'create' ? (
         <>
-          <div ref={chipsRef} className="mt-2.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div ref={chipsRef} className="mt-2.5 overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <PressBoxChips
               chips={sections.map((s) => ({ key: s.key, label: s.label }))}
               activeKey={section?.key ?? ''}

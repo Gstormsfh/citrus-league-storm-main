@@ -399,6 +399,7 @@ const Players = () => {
    */
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const fromLeague = Boolean(searchParams.get('league')) && Boolean(activeLeagueId);
   const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
   const [cardPlayer, setCardPlayer] = useState<HockeyPlayer | null>(null);
 
@@ -468,13 +469,19 @@ const Players = () => {
     <div className="min-h-screen bg-background">
       <div className="hidden lg:block"><Navbar /></div>
       <div className="lg:hidden relative min-h-screen bg-pressbox-surface pt-[env(safe-area-inset-top)] pb-app-chrome">
+        {/* QA PASS 1 (2026-09-09): opened from a league's Players tab
+            (Leaders), this page keeps the league's name and a way back
+            instead of dropping into the global tab with no context. */}
         <PressBoxAppHeader
-          title="Players"
-          logoSrc="/favicon.svg"
+          title={fromLeague ? 'Leaders' : 'Players'}
+          logoSrc={fromLeague ? undefined : '/favicon.svg'}
+          onBack={fromLeague ? () => navigate(-1) : undefined}
           onSearch={() => setPhoneSearchOpen((o) => !o)}
           onNotifications={() => navigate('/profile')}
         />
-        <p className="px-4 pt-2 text-xs text-pressbox-text/60">{scoringLabel}</p>
+        <p className="px-4 pt-2.5 pb-1 font-plex text-[11px] text-pressbox-text/60">
+          {fromLeague && activeLeague?.name ? `${activeLeague.name} · ` : ''}{scoringLabel}
+        </p>
         <PlayersBrowsePhone
           className="mt-1"
           rows={sorted}

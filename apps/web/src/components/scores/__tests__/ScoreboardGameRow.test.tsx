@@ -8,7 +8,12 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render as rtlRender, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
+
+// QA PASS 1 (2026-09-09): player names in the strip and the detail are links now.
+const render = (ui: ReactElement) => rtlRender(ui, { wrapper: MemoryRouter });
 import type { ScoreboardGame, ScoresGameCitrus, ScoresPlayerLine } from '@citrus/shared';
 import { ScoreboardGameRow } from '../ScoreboardGameRow';
 import { ScoresEmptyDay } from '../ScoresEmptyDay';

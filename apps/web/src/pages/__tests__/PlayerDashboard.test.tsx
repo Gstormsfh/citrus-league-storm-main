@@ -281,7 +281,7 @@ describe('PlayerDashboard — the shipped page', () => {
     renderAt(MCDAVID);
     await screen.findByLabelText(/shot heatmap/i);
 
-    expect(screen.getByText(/expected goals by season · our model/i)).toBeInTheDocument();
+    expect(screen.getByText(/expected goals, past seasons · our model/i)).toBeInTheDocument();
     expect(screen.getByText(/seasons on record · regular season/i)).toBeInTheDocument();
     expect(screen.getAllByText(/our model/i).length).toBeGreaterThan(1);
   });

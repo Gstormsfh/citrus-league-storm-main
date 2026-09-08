@@ -254,7 +254,7 @@ export function ProfilePhone({ tab, onTabChange, hero, identity, stats, activity
         </div>
       )}
 
-      <div className="mt-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mt-3 overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <PressBoxChips chips={TABS} activeKey={tab} onSelect={(k) => onTabChange(k as ProfileTab)} label="Account section" outlined className="w-max px-3.5" />
       </div>
 

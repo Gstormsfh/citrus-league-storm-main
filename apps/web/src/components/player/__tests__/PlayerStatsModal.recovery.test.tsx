@@ -38,11 +38,11 @@ beforeEach(() => {
 describe('player-card projection availability and request recovery', () => {
   it('reweights the same raw games when the active league changes', async () => {
     const { rerender, player } = openCard();
-    await waitFor(() => expect(screen.getByRole('button', { name: 'SZN PROJ breakdown' })).toHaveTextContent('20'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'PROJECTION breakdown' })).toHaveTextContent('20'));
     mocks.leagueId = 'second-league';
     mocks.league.mockResolvedValue({ league: { scoring_settings: { skater: { goals: 1 } } } });
     rerender(<MemoryRouter><PlayerStatsModal player={player} isOpen onClose={() => {}} /></MemoryRouter>);
-    await waitFor(() => expect(screen.getByRole('button', { name: 'SZN PROJ breakdown' })).toHaveTextContent(/^2$/));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'PROJECTION breakdown' })).toHaveTextContent(/^2$/));
     expect(mocks.log).toHaveBeenCalledTimes(1);
   });
   it('does not turn a failed log request into cached DNPs; retry loads the projection', async () => {
@@ -50,9 +50,9 @@ describe('player-card projection availability and request recovery', () => {
     openCard();
     fireEvent.click(screen.getByRole('tab', { name: 'Game log' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t load');
-    expect(screen.queryByRole('button', { name: 'SZN PROJ breakdown' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'PROJECTION breakdown' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Retry game log' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'SZN PROJ breakdown' })).toHaveTextContent('20'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'PROJECTION breakdown' })).toHaveTextContent('20'));
     expect(mocks.log).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole('alert')).toBeNull();
   });
@@ -65,8 +65,8 @@ describe('player-card projection availability and request recovery', () => {
   });
   it('hides the projection and its breakdown when the selected season only contains history', async () => {
     openCard();
-    await screen.findByRole('button', { name: 'SZN PROJ breakdown' });
-    fireEvent.click(screen.getByRole('button', { name: 'SZN PROJ breakdown' }));
+    await screen.findByRole('button', { name: 'PROJECTION breakdown' });
+    fireEvent.click(screen.getByRole('button', { name: 'PROJECTION breakdown' }));
     expect(screen.getByRole('region', { name: 'Projection breakdown' })).toBeTruthy();
     mocks.schedule.mockResolvedValue({ games: [scheduled('2026-01-01')], error: null });
     mocks.log.mockResolvedValue({ data: { games: [{ game_date: '2026-01-01', goals: 1 }], projections: [] } });
@@ -74,18 +74,18 @@ describe('player-card projection availability and request recovery', () => {
     fireEvent.click(screen.getByTestId('gamelog-season-2025'));
     await screen.findByText('1 Game');
     expect(mocks.log).toHaveBeenCalledTimes(2);
-    expect(screen.queryByRole('button', { name: 'SZN PROJ breakdown' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'PROJECTION breakdown' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Projection breakdown' })).toBeNull();
   });
   it('preserves a real zero projection as available', async () => {
     mocks.log.mockResolvedValue(payload(0));
     openCard();
-    expect(await screen.findByRole('button', { name: 'SZN PROJ breakdown' })).toHaveTextContent('0');
+    expect(await screen.findByRole('button', { name: 'PROJECTION breakdown' })).toHaveTextContent('0');
   });
   it('discloses the missing plus/minus projection when that category is scored', async () => {
     mocks.league.mockResolvedValue({ league: { scoring_settings: { skater: { goals: 1, plus_minus: 1 } } } });
     openCard();
-    fireEvent.click(await screen.findByRole('button', { name: 'SZN PROJ breakdown' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'PROJECTION breakdown' }));
     expect(screen.getByText('Plus/minus isn’t projected; this total excludes it.')).toBeTruthy();
   });
   it('shows raw projections without a fantasy total in a category league', async () => {
@@ -93,7 +93,7 @@ describe('player-card projection availability and request recovery', () => {
     openCard();
     fireEvent.click(screen.getByRole('tab', { name: 'Game log' }));
     await screen.findByText('Upcoming');
-    expect(screen.queryByRole('button', { name: 'SZN PROJ breakdown' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'PROJECTION breakdown' })).toBeNull();
     expect(screen.queryByText(/20\.0 PROJ/)).toBeNull();
     expect(screen.getByText('2.00')).toBeTruthy();
   });
@@ -102,7 +102,7 @@ describe('player-card projection availability and request recovery', () => {
     openCard();
     fireEvent.click(screen.getByRole('tab', { name: 'Game log' }));
     await screen.findByText('Upcoming');
-    expect(screen.queryByRole('button', { name: 'SZN PROJ breakdown' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'PROJECTION breakdown' })).toBeNull();
     expect(screen.queryByText(/20\.0 PROJ/)).toBeNull();
   });
 });

@@ -3908,11 +3908,11 @@ const Roster = () => {
                     return (
                       <div className="flex flex-col items-center justify-center py-20 text-center">
                         <Users className="w-16 h-16 text-white/55 mb-4 opacity-50" aria-hidden="true" />
-                        <h3 className="text-xl font-semibold mb-2">Empty Roster</h3>
+                        <h3 className="text-xl font-semibold mb-2">No roster yet</h3>
                         <p className="text-white/55 mb-4">
-                          {isPreDraft 
-                            ? "Your roster will be populated after the draft is completed. Head to the draft room to start drafting!"
-                            : "Your roster is empty. Complete your draft to add players."}
+                          {isPreDraft
+                            ? "Your team fills in pick by pick during the draft. This is where you set your lineup once it is done."
+                            : "Your roster is empty. Finish the draft and your players land here."}
                         </p>
                         {isPreDraft && (
                           <Button asChild className="mt-4">

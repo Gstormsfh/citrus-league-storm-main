@@ -1573,7 +1573,7 @@ function StickyHeader({ leagueId, leagueName, onRetryNow, clockOffsetMs, teams }
     ) : null;
 
   return (
-    <div className="sticky top-0 z-section-header bg-pressbox-surface/95 backdrop-blur border-b border-white/[0.08] pb-2 mb-3 pt-safe">
+    <div className="sticky top-0 z-section-header bg-pressbox-surface border-b border-white/[0.08] pb-2 mb-3 pt-safe">
       <PressBoxDraftHeader
         exit={
           <Link

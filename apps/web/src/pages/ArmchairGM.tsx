@@ -82,7 +82,7 @@ const ArmchairGM = () => {
           twins on every surface class, so the desktop is untouched. */}
       <div className="lg:hidden pt-[env(safe-area-inset-top)]">
         <PressBoxAppHeader title="Armchair GM" logoSrc="/favicon.svg" />
-        <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-2.5 -my-2.5">
+        <div className="overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden py-2.5 -my-2.5">
           <PressBoxChips
             className="w-max px-4"
             label="Armchair GM tool"
