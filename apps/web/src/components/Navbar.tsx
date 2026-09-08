@@ -443,13 +443,19 @@ const Navbar = () => {
           painted behind the menu items. The items then floated over the
           page with no backdrop: Garrett's "transparent menu." Verified
           live (computed height 4px, top:56px inside a 60px box).
-          Portaling to <body> restores true viewport positioning. */}
+          Portaling to <body> restores true viewport positioning.
+          SAFE-AREA FIX (2026-09-09, TestFlight 16): the header is
+          56px + env(safe-area-inset-top) tall on phones, and this panel
+          sits ABOVE it in z-order (nav-panel 70 vs app-nav 45). Anchoring
+          at a bare 56px put the panel's top edge ~59px inside the header
+          on notched iPhones and painted over the X button, so the menu
+          could not be closed. The top offset now includes the inset. */}
       {mobileMenuOpen && createPortal(
         // SWEEP FIX (2026-08-16): bg-pastel-surface/98 — /98 is not a
         // generated opacity step, so the class silently produced NO
         // background and the menu rendered transparent over page content.
-        <div className="lg:hidden fixed inset-0 top-[56px] z-nav-panel bg-pastel-surface backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10">
-          <div className="flex flex-col h-[calc(100dvh-56px-env(safe-area-inset-bottom)-4.5rem)] px-4 py-3">
+        <div className="lg:hidden fixed inset-0 top-[calc(56px+env(safe-area-inset-top))] z-nav-panel bg-pastel-surface backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10">
+          <div className="flex flex-col h-[calc(100dvh-56px-env(safe-area-inset-top)-env(safe-area-inset-bottom)-4.5rem)] px-4 py-3">
             {/* League context + switcher */}
             {user && !leagueLoading && userLeagues.length === 0 && (
               <div className="mb-3">
