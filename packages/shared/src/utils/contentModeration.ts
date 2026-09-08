@@ -103,7 +103,7 @@ function tokens(normalized: string): string[] {
 
 const REJECT_MESSAGE: Record<ModerationTier, string> = {
   hate: 'That name includes language we do not allow on Citrus. Please choose another.',
-  profanity: 'Keep it clean — that name includes profanity. Please choose another.',
+  profanity: 'Keep it clean. That name includes profanity. Please choose another.',
 };
 
 /**

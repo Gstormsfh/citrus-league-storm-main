@@ -91,17 +91,17 @@ export function draftNeedLine(input: DraftNeedInput): DraftNeed | null {
   if (topEightGone !== null && topEightGone >= Math.max(best.need, 3)) {
     urgency = 'now';
     phoneText = bestAtPosition
-      ? `${best.position} runs dry before your pick — take ${bestAtPosition} now`
-      : `${best.position} runs dry before your pick — take one now`;
+      ? `${best.position} runs dry before your pick. Take ${bestAtPosition} now`
+      : `${best.position} runs dry before your pick. Take one now`;
   } else if (topEightGone !== null && topEightGone === 0) {
     urgency = 'wait';
     phoneText = bestOverall && bestOverallPos && bestOverallPos !== best.position
-      ? `${best.position} will keep — ${bestOverall} (${bestOverallPos}) is the value here`
-      : `${best.position} will keep — all top-${TOP} still there next pick`;
+      ? `${best.position} will keep. ${bestOverall} (${bestOverallPos}) is the value here`
+      : `${best.position} will keep. All top-${TOP} still there next pick`;
   } else {
     urgency = 'open';
     phoneText = bestAtPosition
-      ? `Need ${best.need} ${best.position} — ${bestAtPosition} is the best left`
+      ? `Need ${best.need} ${best.position}. ${bestAtPosition} is the best left`
       : head;
   }
   return { position: best.position, need: best.need, topEightGone, text: tail ? `${head} · ${tail}` : head, phoneText, urgency };
