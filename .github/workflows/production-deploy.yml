@@ -134,6 +134,9 @@ jobs:
           name: web-build
           path: apps/web/dist/
           retention-days: 7
+          # UNIVERSAL LINKS (2026-09-09): v4 drops dotfiles by default, which
+          # silently left dist/.well-known/ (the AASA) out of every deploy.
+          include-hidden-files: true
 
       # Every job ends with this step: one row in public.ops_ci_runs so Claude
       # can read the deploy outcome through the Supabase MCP without a pasted
@@ -478,6 +481,15 @@ jobs:
           else
             echo "::warning::Health check returned HTTP $status — verify manually"
             echo "Health check returned HTTP $status" > /tmp/deploy-web.summary
+          fi
+          # The AASA is the one static file the iOS app depends on. Fail the
+          # deploy loudly if production is not serving the repo's file.
+          aasa=$(curl -s "https://citrusfantasysports.com/.well-known/apple-app-site-association" --max-time 10) || true
+          if echo "$aasa" | grep -q "TFMG57326Z.com.citrussports.app"; then
+            echo "AASA check passed"
+          else
+            echo "::error::AASA is not the repo file. Universal links are broken. Got: ${aasa:0:200}"
+            exit 1
           fi
 
       - name: Report run
