@@ -193,8 +193,16 @@ publicRoutes.post('/matchups/matchup-stats', async (c) => {
 });
 
 // POST /api/public/waitlist — Add email to waitlist (no auth required)
+/** Bounded, plain-object payload for a lead-gen source (2026-09-09). */
+function cleanMetadata(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const text = JSON.stringify(raw);
+  if (text.length > 4000) return null;
+  return JSON.parse(text) as Record<string, unknown>;
+}
+
 publicRoutes.post('/waitlist', async (c) => {
-  let body: { email?: string; source?: string };
+  let body: { email?: string; source?: string; metadata?: unknown };
   try {
     body = await c.req.json();
   } catch {
@@ -205,11 +213,27 @@ publicRoutes.post('/waitlist', async (c) => {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return fail(c, AppError.badRequest('Please enter a valid email address'));
   }
+  const source = (body.source || 'landing_page').slice(0, 64);
+  const metadata = cleanMetadata(body.metadata);
 
   const supabase = getSupabaseAdmin();
+
+  // 2026-09-09: a source that carries a payload (the Opening Night pick'em,
+  // Bring Your League) must work for someone already on the list, so it
+  // merges into the existing row instead of bouncing off UNIQUE(email).
+  if (metadata) {
+    const { data: existing } = await supabase.from('waitlist').select('id, metadata').eq('email', email).maybeSingle();
+    const merged = { ...((existing?.metadata as Record<string, unknown> | null) ?? {}), [source]: { ...metadata, at: new Date().toISOString() } };
+    const { error } = existing
+      ? await supabase.from('waitlist').update({ metadata: merged, updated_at: new Date().toISOString() }).eq('id', existing.id)
+      : await supabase.from('waitlist').insert({ email, source, metadata: merged });
+    if (error) return handleError(c, error, 'Failed to save your entry');
+    return ok(c, { success: true, message: existing ? "You're in. We've saved your entry." : "You're in. We'll email you the moment the app is live." });
+  }
+
   const { error } = await supabase
     .from('waitlist')
-    .insert({ email, source: body.source || 'landing_page' });
+    .insert({ email, source });
 
   if (error) {
     if (error.code === '23505' || error.message?.includes('duplicate')) {
@@ -219,6 +243,37 @@ publicRoutes.post('/waitlist', async (c) => {
   }
 
   return ok(c, { success: true, message: "Successfully added to waitlist! We'll notify you when we launch." });
+});
+
+/**
+ * GET /api/public/schedule/opening-night (2026-09-09): the first date on or
+ * after today with scheduled games, and those games. The Opening Night
+ * pick'em page draws from this so nothing about the date is hardcoded; when
+ * the schedule is not loaded yet it answers { date: null, games: [] } and
+ * the page falls back to plain email capture.
+ */
+publicRoutes.get('/schedule/opening-night', async (c) => {
+  const supabase = getSupabaseAdmin();
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: first, error: e1 } = await supabase
+    .from('nhl_games')
+    .select('game_date')
+    .gte('game_date', today)
+    .eq('status', 'scheduled')
+    .order('game_date', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (e1) return handleError(c, e1, 'Failed to fetch the schedule');
+  if (!first?.game_date) return ok(c, { date: null, games: [] });
+  const { data: games, error: e2 } = await supabase
+    .from('nhl_games')
+    .select('game_id, game_time, home_team, away_team, venue')
+    .eq('game_date', first.game_date)
+    .eq('status', 'scheduled')
+    .order('game_time', { ascending: true });
+  if (e2) return handleError(c, e2, 'Failed to fetch the schedule');
+  c.header('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600');
+  return ok(c, { date: first.game_date, games: games ?? [] });
 });
 
 // GET /api/public/schedule/games — Public game schedule (for GameLockService)

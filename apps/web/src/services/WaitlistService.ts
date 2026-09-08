@@ -14,7 +14,7 @@ export const WaitlistService = {
    * Add an email to the waitlist via API server.
    * Uses the public endpoint (no auth required).
    */
-  async addToWaitlist(email: string, source?: string): Promise<{ success: boolean; message: string }> {
+  async addToWaitlist(email: string, source?: string, metadata?: Record<string, unknown>): Promise<{ success: boolean; message: string }> {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return { success: false, message: 'Please enter a valid email address' };
@@ -24,6 +24,7 @@ export const WaitlistService = {
       const response = await publicApi.joinWaitlist(
         email.toLowerCase().trim(),
         source || 'landing_page',
+        metadata,
       );
 
       const result = response.data as { success: boolean; message: string } | undefined;

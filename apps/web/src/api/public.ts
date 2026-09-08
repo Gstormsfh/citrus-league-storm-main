@@ -72,8 +72,15 @@ export const publicApi = {
   // ── Waitlist ─────────────────────────────────────────────────────────────
 
   /** Submit a waitlist signup (no auth required, not cached) */
-  joinWaitlist(email: string, source: string) {
-    return apiClient.post('/api/public/waitlist', { email, source });
+  joinWaitlist(email: string, source: string, metadata?: Record<string, unknown>) {
+    return apiClient.post('/api/public/waitlist', metadata ? { email, source, metadata } : { email, source });
+  },
+
+  /** 2026-09-09: first scheduled game date on or after today, with its games. */
+  openingNight() {
+    return apiClient.get<{ date: string | null; games: Array<{ game_id: number; game_time: string | null; home_team: string; away_team: string; venue: string | null }> }>(
+      '/api/public/schedule/opening-night',
+    );
   },
 
   // ── Cache management ────────────────────────────────────────────────────

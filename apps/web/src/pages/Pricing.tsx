@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom';
+import { usePageMeta } from '@/lib/pageMeta';
 import Navbar from '@/components/Navbar';
 import { DarkLayout, HockeyFooter } from '@/components/citrus2';
 
 /** Retain the existing URL so bookmarks and shared links still work. */
 export default function Pricing() {
+  usePageMeta({ title: 'Pricing', description: 'Citrus is free to play. Leagues, drafts, Stormy and player analytics at no cost.', path: '/pricing' });
   return (
     <DarkLayout>
       <Navbar />

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { usePageMeta } from '@/lib/pageMeta';
 import { ArrowRight } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -40,6 +41,7 @@ const GUIDES = {
 };
 
 const Guides = () => {
+  usePageMeta({ title: 'Fantasy Hockey Guides', description: 'Draft strategy, start/sit, waiver targets and how to read expected goals. Guides from the Citrus Fantasy Sports team.', path: '/guides' });
   return (
     <DarkLayout>
       <Navbar />

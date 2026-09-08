@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import { usePageMeta } from '@/lib/pageMeta';
 import { Capacitor } from '@capacitor/core';
 import Navbar from '@/components/Navbar';
 import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
@@ -28,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DarkLayout, HockeyFooter } from '@/components/citrus2';
 
 const Contact = () => {
+  usePageMeta({ title: 'Contact', description: 'Get in touch with the Citrus Fantasy Sports team.', path: '/contact' });
   const [formData, setFormData] = useState({
     name: '',
     email: '',
