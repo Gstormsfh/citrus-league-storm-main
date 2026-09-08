@@ -5772,9 +5772,15 @@ const Matchup = () => {
                 </div>
               ) : error === 'draft_not_completed' ? (
                 <div className="max-w-md mx-auto text-center">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-pastel-sage/20 flex items-center justify-center">
-                    <span className="text-2xl">🏒</span>
-                  </div>
+                  {/* 2026-09-08: the emoji placeholder was the last pre-redesign
+                      graphic left in the app; use the draft scene artwork. */}
+                  <img
+                    src="/mascots/scene-draft.webp"
+                    alt=""
+                    aria-hidden="true"
+                    className="w-40 h-40 mx-auto mb-4 rounded-2xl object-cover ring-1 ring-white/10"
+                    loading="lazy"
+                  />
                   <h3 className="text-lg font-bold text-pastel-cream mb-2">Draft Your Team First</h3>
                   <p className="text-sm text-white/55 mb-4">
                     Weekly matchups open as soon as your league finishes its draft.

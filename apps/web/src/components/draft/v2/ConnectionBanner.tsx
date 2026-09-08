@@ -163,17 +163,26 @@ function ReconnectingBanner({ state, onRetryNow }: ReconnectingBannerProps) {
   // — every one of them who opens the room before the commissioner
   // does — and "Connection lost" in red is the wrong first impression
   // of a product that is working exactly as designed.
+  // 2026-09-08 (test-draft feedback): reloading into the room produced a red
+  // "Connection lost: WebSocket dropped" on the FIRST reconnect attempt, which
+  // is the normal path when the page reloads. The first two attempts are
+  // routine and read as loading; the raw transport error never appears in the
+  // headline — it lives behind "Technical details" like the fatal banner.
+  const routine = !state.waitingForStart && !state.staleTriggered && state.attempt <= 2;
   const title = state.waitingForStart
     ? 'Waiting for the draft to start'
     : state.staleTriggered
       ? 'Connection appears stale'
-      : 'Connection lost';
+      : routine
+        ? 'Reconnecting to the draft room…'
+        : 'Connection lost';
 
   return (
     <Alert
-      variant={state.waitingForStart ? 'default' : 'destructive'}
-      role={state.waitingForStart ? 'status' : 'alert'}
+      variant={state.waitingForStart || routine ? 'default' : 'destructive'}
+      role={state.waitingForStart || routine ? 'status' : 'alert'}
       data-banner-kind="reconnecting"
+      data-routine={routine ? 'true' : undefined}
       data-stale-triggered={state.staleTriggered ? 'true' : undefined}
       data-waiting-for-start={state.waitingForStart ? 'true' : undefined}
     >
@@ -184,8 +193,13 @@ function ReconnectingBanner({ state, onRetryNow }: ReconnectingBannerProps) {
             <>You&apos;re in the room. It will open the moment your commissioner starts the draft.</>
           ) : (
             <>
-              Reconnecting in {Math.max(0, secondsRemaining)}s
-              {state.lastError ? `: ${state.lastError}` : ''}
+              {routine ? 'Your picks are safe. ' : ''}Reconnecting in {Math.max(0, secondsRemaining)}s
+              {state.lastError && (
+                <details className="mt-1 text-xs opacity-70">
+                  <summary className="cursor-pointer">Technical details</summary>
+                  <pre className="whitespace-pre-wrap">{state.lastError}</pre>
+                </details>
+              )}
             </>
           )}
         </span>

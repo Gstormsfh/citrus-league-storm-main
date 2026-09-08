@@ -35,6 +35,20 @@
     animation: float ease-in-out infinite;
   }
   
+
+  /* ===== READABILITY BUMP (2026-09-08) =====
+     Founder feedback before iOS 1.0: the smallest tiers are "the tiniest bit too
+     small" for older eyes. One reversible rule instead of 1,300 class edits:
+     on phones the three smallest arbitrary sizes move up exactly 1px
+     (9→10, 10→11, 11→12). Tablet/desktop untouched, so md:/lg: variants never fight it. Layout was designed with
+     truncation on every data cell, so +1px does not reflow. To revert, delete
+     this block. */
+  @media (max-width: 767px) {
+    .text-\[9px\] { font-size: 10px; }
+    .text-\[10px\] { font-size: 11px; }
+    .text-\[11px\] { font-size: 12px; }
+  }
+
   /* ===== iOS MOBILE UTILITIES ===== */
   
   /* Safe area padding utilities */

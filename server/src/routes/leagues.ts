@@ -12,7 +12,7 @@ import { AuditService } from '../services/AuditService';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
 import { mirrorRulesIntoSettings, mirrorRulesIntoStatsList, settingsDiffer } from '../lib/scoringMirror';
-import { getCurrentSeason, logger, SCORING_DEFAULTS } from '@citrus/shared';
+import { getCurrentSeason, logger, SCORING_DEFAULTS, moderationError } from '@citrus/shared';
 
 const leagueRoutes = new Hono<Env>();
 
@@ -388,6 +388,10 @@ leagueRoutes.post('/:leagueId/simulate-fill', commissionerMiddleware, async (c) 
 
     if (!teamNames.length) {
       return fail(c, AppError.badRequest('No team names provided'));
+    }
+    for (const name of teamNames) {
+      const problem = typeof name === 'string' ? moderationError(name) : 'Team names must be text';
+      if (problem) return fail(c, AppError.badRequest(problem));
     }
 
     // Use admin client to bypass RLS — AI teams have null owner_id

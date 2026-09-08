@@ -110,8 +110,11 @@ export const TeamRosters = ({ teams, draftHistory, userTeamId, onPlayerClick }: 
           ))}
         </div>
 
-        {/* Draft Picks List */}
-        <div className="mt-1.5 max-h-60 overflow-y-auto">
+        {/* Draft Picks List. 2026-09-08 (test-draft feedback): on the phone the
+            nested scroller fought the page scroll and slid picks under the
+            position chips. Phone = one scroller (the page); the 240px cap
+            stays only inside the desktop sidebar, where the page cannot grow. */}
+        <div className="mt-1.5 lg:max-h-60 lg:overflow-y-auto lg:overscroll-contain">
           {picks.length > 0 ? (
             picks.map(pick => (
               <div

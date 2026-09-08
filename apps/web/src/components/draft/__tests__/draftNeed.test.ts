@@ -13,12 +13,30 @@ describe('draftNeedLine', () => {
     // Drafted 2 C, 1 D, 1 G: D needs 3, the most. 11 picks before my turn:
     // of the top-8 D (d1..d8, at pool indexes 0,2,4,7,8,9,10,11), those under 11 are d1,d2,d3,d4,d5,d6,d7 = 7.
     const line = draftNeedLine({ caps, myPositions: ['C', 'C', 'D', 'G'], orderedIds: pool, positionOf, picksAway: 11 });
-    expect(line).toEqual({ position: 'D', need: 3, topEightGone: 7, text: 'Need 3 D · 7 of the top-8 D go before your next pick' });
+    expect(line).toMatchObject({ position: 'D', need: 3, topEightGone: 7, text: 'Need 3 D · 7 of the top-8 D go before your next pick' });
+    // Phone line (2026-09-08): the position is about to run dry, so the urgency is "now".
+    expect(line?.urgency).toBe('now');
+    expect(line?.phoneText).toBe('D runs dry before your pick — take one now');
+  });
+
+  it('phone line names the best available when the room knows names', () => {
+    const nameOf = (id: string) => ({ d1: 'Cale Makar', c1: 'Connor McDavid' } as Record<string, string>)[id];
+    const now = draftNeedLine({ caps, myPositions: ['C', 'C', 'D', 'G'], orderedIds: pool, positionOf, picksAway: 11, nameOf });
+    expect(now?.phoneText).toBe('D runs dry before your pick — take Makar now');
+    const open = draftNeedLine({ caps, myPositions: [], orderedIds: pool, positionOf, picksAway: null, nameOf });
+    expect(open?.urgency).toBe('open');
+    expect(open?.phoneText).toBe('Need 4 D — Makar is the best left');
+    // Your turn is next and D will keep: point at the best overall value when it is another position.
+    const wait = draftNeedLine({ caps, myPositions: ['C', 'C', 'LW', 'LW', 'RW', 'RW', 'G', 'G', 'D'], orderedIds: ['c1', ...pool], positionOf, picksAway: 0, nameOf });
+    expect(wait?.urgency).toBe('wait');
+    expect(wait?.phoneText).toBe('D will keep — McDavid (C) is the value here');
   });
 
   it('reads "none" when your turn is next', () => {
     const line = draftNeedLine({ caps, myPositions: ['C', 'C', 'LW', 'LW', 'RW', 'RW', 'G', 'G', 'D'], orderedIds: pool, positionOf, picksAway: 0 });
     expect(line?.text).toBe('Need 3 D · none of the top-8 D go before your next pick');
+    expect(line?.urgency).toBe('wait');
+    expect(line?.phoneText).toBe('D will keep — all top-8 still there next pick');
   });
 
   it('with no picks-away in hand the line is the need alone', () => {

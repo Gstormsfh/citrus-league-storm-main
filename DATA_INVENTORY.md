@@ -81,6 +81,47 @@ server-side inside F / D / G cohorts and are not stored.
 
 ---
 
+### 1.4 Game Day Suite tables
+
+`supabase/migrations/20260906120000_game_day_suite_foundation.sql`. **Written,
+NOT yet applied** to prod or staging as of 2026-09-06.
+
+The suite's puzzles do **not** live in Postgres. Each is an immutable dated
+JSON artifact emitted by a scheduled Python job and published to a public,
+CDN-fronted Supabase Storage bucket (`game-day-artifacts`, path
+`gameday/v1/<game>/<YYYY-MM-DD>.json`). That is the burst read path: thousands
+of concurrent phones fetch a cached static file and touch neither Postgres nor
+the Hono server. The tables below carry only what a CDN cannot.
+
+| Table | Purpose | Write path | RLS |
+|---|---|---|---|
+| `game_day_themes` | Theme records: palette, brand, copy, prize rules. One default (`is_default`, partial unique index) | service role only | Enabled. SELECT policy exposes **only** rows with `requires_feature_flag = false`, so a club theme is invisible to anon and to ordinary authenticated users — a public build cannot reach one even if the client asks for it by key |
+| `game_day_puzzle_log` | One row per emitted puzzle with its `answer_key`. Two jobs: the key the scoring RPC grades against, and the no-repeat memory the generator consults | `data-pipeline/gameday/emit.py` | Enabled, **zero policies** — service role only, same posture as `ops_ci_runs`. A readable row would spoil every puzzle and let anyone forge a perfect score |
+| `game_day_plays` | One completed puzzle per user per game per day. `user_id` is an `auth.users` id, usually an anonymous one | `game_day_submit_daily_player` (SECURITY DEFINER) | Enabled. Users SELECT their own rows; **no write policy exists** |
+| `game_day_points_ledger` | Append-only cross-game points | same | Enabled. Users SELECT their own rows; **no write policy exists** |
+
+Two SECURITY DEFINER functions, both `SET search_path = public`:
+`game_day_score_for(...)` (pure, immutable, so a score can be recomputed and
+audited from the play row alone) and `game_day_submit_daily_player(date,
+integer[])`, which **re-grades the submitted guess sequence** against
+`game_day_puzzle_log` before writing anything. The client grades its own
+guesses offline — that is what keeps the burst path serverless — so the server
+never trusts a client-reported result. Idempotent per user per day.
+
+Generator source: `data-pipeline/gameday/` (`pool.py` builds the curated,
+difficulty-banded eligibility pool; `games/daily_player.py` selects and builds;
+`codec.py` mirrors `packages/shared/src/utils/gameDay.ts` byte for byte;
+`publisher.py` uploads). Scheduled by `.github/workflows/gameday-emit.yml`
+(twice daily, today's date only — publishing ahead would expose tomorrow's
+answer at a public URL).
+
+The suite READS existing tables and adds no player data of its own:
+`player_directory` (identity, club, position, `shoots_catches`, `career.draft`,
+headshot) and `player_season_stats` (points, games played for the banding).
+
+---
+
+
 ## 2. Historical data archives
 
 ### 2.1 MoneyPuck multi-season shot data — the xG training corpus

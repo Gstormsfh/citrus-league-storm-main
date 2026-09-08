@@ -169,12 +169,29 @@ export function toV1Teams(
   derived: DerivedDraftState,
   playersById: ReadonlyMap<string, Player>,
   participatingTeamIds?: ReadonlySet<string>,
+  /**
+   * 2026-09-08 (test-draft feedback): the board and history columns were in
+   * the league's team order, not the draft order — after "Randomize" the
+   * board still showed the original sequence. Pass round-1 team ids from the
+   * draft-order matrix (`round1OrderFromMatrix`) and columns follow the
+   * order the engine actually drafted in. Teams absent from the list keep
+   * their fetched order after the ordered ones.
+   */
+  orderedTeamIds?: ReadonlyArray<string>,
 ): V1Team[] {
   const filtered =
     participatingTeamIds !== undefined
       ? fetchedTeams.filter((t) => participatingTeamIds.has(t.id))
       : fetchedTeams;
-  return filtered.map((t, index) => {
+  const ordered =
+    orderedTeamIds && orderedTeamIds.length > 0
+      ? [...filtered].sort((a, b) => {
+          const ia = orderedTeamIds.indexOf(a.id);
+          const ib = orderedTeamIds.indexOf(b.id);
+          return (ia === -1 ? Number.MAX_SAFE_INTEGER : ia) - (ib === -1 ? Number.MAX_SAFE_INTEGER : ib);
+        })
+      : filtered;
+  return ordered.map((t, index) => {
     const roster = derived.teamRosters.get(t.id) ?? [];
     const picks = roster.map((entry) =>
       rosterEntryToDraftPick(entry, t.id, t.team_name, playersById),
@@ -199,6 +216,20 @@ export function toV1Teams(
  * out" which correctly renders zero teams pre-matrix (the room shows
  * its loading/waiting UI in that case, not an empty board).
  */
+/**
+ * Round-1 pick order from the draft-order matrix — the column order the
+ * board and history should use (2026-09-08). Null matrix → empty list.
+ */
+export function round1OrderFromMatrix(
+  matrix: ReadonlyArray<{ round: number; pickNumber: number; teamId: string }> | null,
+): string[] {
+  if (matrix === null) return [];
+  return [...matrix]
+    .filter((s) => s.round === 1)
+    .sort((a, b) => a.pickNumber - b.pickNumber)
+    .map((s) => s.teamId);
+}
+
 export function participatingTeamIdsFromMatrix(
   matrix: ReadonlyArray<{ teamId: string }> | null,
 ): ReadonlySet<string> {

@@ -1,0 +1,94 @@
+name: Game Day — emit daily puzzles
+
+# Emits one immutable dated artifact per game per day and logs its answer key
+# to `game_day_puzzle_log`. The web app renders emitted artifacts and never
+# generates a puzzle at request time.
+#
+# WHY TWICE A DAY, AND WHY ONLY ONE DAY AHEAD OF NOBODY.
+#
+# Only today's puzzle is ever emitted. Running ahead would publish tomorrow's
+# artifact at a predictable public URL, and the answer travels inside it —
+# obfuscated, not encrypted. A day early is a day spoiled.
+#
+# That rules out "emit a week ahead so a bad morning is survivable", so
+# resilience comes from retrying instead: selection is a pure function of the
+# date, the pool and the no-repeat history, and `recent_answer_ids` excludes
+# the date being emitted, so the second run of a day reproduces the first run
+# byte for byte. A re-run is a no-op upsert over an identical artifact. If the
+# 02:20 run fails, the 05:20 run fixes it and nobody notices; if both fail,
+# the client falls back to yesterday's puzzle rather than showing a dead
+# screen, and this workflow's failure is the alert.
+#
+# Manual run:  gh workflow run gameday-emit.yml
+# Backfill:    gh workflow run gameday-emit.yml -f date=2026-09-01 -f days=5
+
+on:
+  schedule:
+    - cron: '20 8 * * *'    # 02:20 MDT / 01:20 MST
+    - cron: '20 11 * * *'   # 05:20 MDT / 04:20 MST — the idempotent retry
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'First puzzle date (YYYY-MM-DD). Default: today in Mountain Time'
+        required: false
+        type: string
+      days:
+        description: 'How many consecutive dates to emit. Backfill only — never run ahead of today'
+        required: false
+        default: '1'
+        type: string
+      dry_run:
+        description: 'Build and verify without publishing'
+        required: false
+        default: 'false'
+        type: string
+
+concurrency:
+  # Two runs writing the same artifact at once is not dangerous (they produce
+  # identical bytes) but it makes the logs unreadable when something is wrong.
+  group: gameday-emit
+  cancel-in-progress: false
+
+jobs:
+  emit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'data-pipeline/requirements.txt'
+
+      - run: pip install -r data-pipeline/requirements.txt
+
+      - name: Emit and publish
+        shell: bash
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PYTHONUNBUFFERED: '1'
+          PUZZLE_DATE: ${{ inputs.date }}
+          PUZZLE_DAYS: ${{ inputs.days }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          args=()
+          [ -n "${PUZZLE_DATE:-}" ] && args+=(--date "$PUZZLE_DATE")
+          [ -n "${PUZZLE_DAYS:-}" ] && args+=(--days "$PUZZLE_DAYS")
+          [ "${DRY_RUN:-false}" = "true" ] && args+=(--dry-run)
+          python -u -m data_pipeline.gameday.emit "${args[@]}" 2>&1 | tee /tmp/gameday.log
+
+      - name: Confirm the job actually emitted something
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The affirmative completion line. A job that dies partway through
+          # leaves no such line, and a job that emitted zero puzzles is a
+          # failure even when every step exited 0.
+          grep -q "gameday emit complete" /tmp/gameday.log \
+            || { echo "::error::no completion line in the log"; exit 1; }
+          grep -qE "gameday emit complete: [1-9][0-9]* puzzles emitted, 0 failed" /tmp/gameday.log \
+            || { echo "::error::the run emitted nothing, or some puzzles failed verification"; exit 1; }

@@ -108,6 +108,40 @@ export type Database = {
         }
         Relationships: []
       }
+      content_reports: {
+        Row: {
+          id: string
+          reporter_id: string
+          content_type: 'team_name' | 'league_name' | 'user_profile'
+          content_id: string
+          content_text: string
+          reason: 'offensive' | 'inappropriate' | 'harassment' | 'spam' | 'other'
+          details: string | null
+          status: 'pending' | 'reviewed' | 'actioned' | 'dismissed'
+          reviewed_at: string | null
+          reviewed_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          reporter_id: string
+          content_type: 'team_name' | 'league_name' | 'user_profile'
+          content_id: string
+          content_text: string
+          reason: 'offensive' | 'inappropriate' | 'harassment' | 'spam' | 'other'
+          details?: string | null
+          status?: 'pending' | 'reviewed' | 'actioned' | 'dismissed'
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          status?: 'pending' | 'reviewed' | 'actioned' | 'dismissed'
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           id: string

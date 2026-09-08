@@ -109,7 +109,7 @@ import {
   toDraftedPlayerIds,
   toKeeperSlots,
   toV1Teams,
-  participatingTeamIdsFromMatrix,
+  participatingTeamIdsFromMatrix, round1OrderFromMatrix,
   type FetchedTeam,
 } from '@/lib/draftClient/v1Adapters';
 import { overlayPendingPicks } from '@/lib/draftClient/overlayPending';
@@ -2006,12 +2006,13 @@ function MainTabs({
     () => overlayPendingPicks(derived, pendingActions),
     [derived, pendingActions],
   );
+  const round1Order = useMemo(() => round1OrderFromMatrix(matrix ?? null), [matrix]);
   const v1Teams = useMemo(
     () =>
       renderDerived
-        ? toV1Teams(teams, renderDerived, playersById, participatingTeamIds)
+        ? toV1Teams(teams, renderDerived, playersById, participatingTeamIds, round1Order)
         : [],
-    [teams, renderDerived, playersById, participatingTeamIds],
+    [teams, renderDerived, playersById, participatingTeamIds, round1Order],
   );
   const draftHistory = useMemo(
     () => (renderDerived ? toDraftHistory(teams, renderDerived, playersById) : []),
@@ -2836,9 +2837,10 @@ function SidebarPanel({
     () => participatingTeamIdsFromMatrix(matrix ?? null),
     [matrix],
   );
+  const round1Order = useMemo(() => round1OrderFromMatrix(matrix ?? null), [matrix]);
   const v1Teams = useMemo(
-    () => (derived ? toV1Teams(teams, derived, playersById, participatingTeamIds) : []),
-    [teams, derived, playersById, participatingTeamIds],
+    () => (derived ? toV1Teams(teams, derived, playersById, participatingTeamIds, round1Order) : []),
+    [teams, derived, playersById, participatingTeamIds, round1Order],
   );
   const draftHistory = useMemo(
     () => (derived ? toDraftHistory(teams, derived, playersById) : []),

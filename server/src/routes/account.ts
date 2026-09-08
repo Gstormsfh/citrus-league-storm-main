@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { moderationError } from '@citrus/shared';
 import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
@@ -140,6 +141,14 @@ accountRoutes.put('/profile', async (c) => {
         fields[key] = body[key];
       }
     }
+    // Content filter on everything other users can see (2026-09-08, Guideline 1.2).
+    for (const key of ['username', 'display_name', 'first_name', 'last_name', 'location', 'bio', 'default_team_name'] as const) {
+      const value = fields[key];
+      if (typeof value === 'string') {
+        const problem = moderationError(value);
+        if (problem) return fail(c, AppError.badRequest(problem));
+      }
+    }
     // The on-the-clock push opt-in (2026-09-04). A boolean column takes a
     // boolean; anything else is a 400 here rather than a Postgres cast error.
     if ('push_notifications' in body) {
@@ -181,6 +190,8 @@ accountRoutes.put('/team-name', async (c) => {
     if (!teamName) {
       return fail(c, AppError.badRequest('teamName is required'));
     }
+    const problem = moderationError(teamName);
+    if (problem) return fail(c, AppError.badRequest(problem));
 
     const supabase = createUserClient(c.get('userToken'));
 
