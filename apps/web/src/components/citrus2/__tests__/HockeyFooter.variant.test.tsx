@@ -34,18 +34,18 @@ describe('HockeyFooter — the app variant drops the pitch', () => {
   it('marketing keeps the CTA and the elevator pitch', () => {
     const f = renderFooter();
     expect(ctaButton(f)).not.toBeNull();
-    expect(f.getByText(/31-feature xG model/i)).toBeTruthy();
+    expect(f.getByText(/an assistant GM who has read your roster/i)).toBeTruthy();
   });
 
   it('app drops both', () => {
     const f = renderFooter({ variant: 'app' });
     expect(ctaButton(f)).toBeNull();
-    expect(f.queryByText(/31-feature xG model/i)).toBeNull();
+    expect(f.queryByText(/an assistant GM who has read your roster/i)).toBeNull();
   });
 
   it('marketing is the default, so a public page cannot lose its pitch by omission', () => {
     const f = renderFooter();
-    expect(f.getByText(/31-feature xG model/i)).toBeTruthy();
+    expect(f.getByText(/an assistant GM who has read your roster/i)).toBeTruthy();
   });
 });
 
