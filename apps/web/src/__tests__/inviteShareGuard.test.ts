@@ -62,7 +62,9 @@ describe('the utility holds the invariants', () => {
   });
 
   it('URL-encodes the join code into the link', () => {
-    expect(UTILITY).toMatch(/code=\$\{encodeURIComponent\(joinCode\)\}/);
+    // 2026-09-09 (#19): the link is the accept screen, /join/<CODE>; the code
+    // is still encoded, now as the path segment.
+    expect(UTILITY).toMatch(/\/join\/\$\{encodeURIComponent\(joinCode[^}]*\)\}/);
   });
 
   it('gates scheme senders as web-only in their contract', () => {

@@ -265,6 +265,17 @@ describe('error handling', () => {
     await expect(apiClient.get('/api/test')).rejects.toThrow('Validation failed');
   });
 
+  it('leads with the zod details sentence on a VALIDATION_ERROR (2026-09-09 #20)', async () => {
+    mockSession(VALID_TOKEN);
+    mockFetchError(400, {
+      error: { code: 'VALIDATION_ERROR', message: 'Validation failed', details: 'name: Keep it clean. That name includes profanity. Please choose another.' },
+    });
+
+    await expect(apiClient.post('/api/leagues', { name: 'x' })).rejects.toThrow(
+      'Keep it clean. That name includes profanity. Please choose another.',
+    );
+  });
+
   it('throws ApiError with json.message as fallback', async () => {
     mockSession(VALID_TOKEN);
     mockFetchError(500, { message: 'Internal error' });

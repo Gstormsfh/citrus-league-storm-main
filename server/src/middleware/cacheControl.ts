@@ -27,6 +27,12 @@ const CACHE_RULES: Array<{ pattern: RegExp; maxAge: number; staleWhileRevalidate
   // Dynamic data — minimal or no cache
   { pattern: /\/api\/leagues\/[^/]+\/matchups/, maxAge: 15 },
   { pattern: /\/api\/leagues\/[^/]+\/roster/, maxAge: 15 },
+  // 2026-09-09 (#22): the whole player pool (~1.9k rows, the largest response
+  // in the app) had no rule, so every relaunch and every 5-minute lapse of the
+  // client cache re-downloaded it in full. It is the same for every user and
+  // the server rebuilds it at most every 2 minutes (PlayerService CACHE_TTL),
+  // so a short max-age plus the ETag lets the shell revalidate with a 304.
+  { pattern: /\/api\/players\/?(\?|$)/, maxAge: 60, staleWhileRevalidate: 300 },
 ];
 
 /** Generate a lightweight ETag from response body */
@@ -78,10 +84,15 @@ export async function cacheControlMiddleware(c: Context, next: Next) {
           const etag = generateETag(body);
           c.header('ETag', etag);
 
-          // Check If-None-Match
+          // Check If-None-Match. 2026-09-09: this used to `return c.body(null, 304)`,
+          // but a middleware's RETURN value after `await next()` is ignored by
+          // Hono once the handler has finalized the context, so the 304 never
+          // left the server and every ETag round trip carried the full body.
+          // Assigning c.res replaces the finalized response (its headers,
+          // including the ETag and Cache-Control just set, are carried over).
           const ifNoneMatch = c.req.header('If-None-Match');
           if (ifNoneMatch === etag) {
-            return c.body(null, 304);
+            c.res = new Response(null, { status: 304, headers: c.res.headers });
           }
         }
       } catch {

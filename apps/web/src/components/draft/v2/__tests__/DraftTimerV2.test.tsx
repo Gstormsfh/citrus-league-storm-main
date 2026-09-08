@@ -336,6 +336,54 @@ describe('useClockOffsetEstimator — implausible readings are discarded', () =>
   });
 });
 
+// 2026-09-09 (#4): event frames carry the DB created_at, so delivery lag
+// under the 30s guard used to leak into the EMA and jump the countdown.
+describe('useClockOffsetEstimator — a snapshot seed is not moved by late event frames', () => {
+  function Probe({ frames }: { frames: Array<[number, number, 'snapshot' | 'event']> }) {
+    const { offsetMs, updateOffset } = useClockOffsetEstimator();
+    return (
+      <div>
+        <button onClick={() => frames.forEach(([c, s, src]) => updateOffset(c, s, src))} data-testid="feed">
+          feed
+        </button>
+        <span data-testid="offset">{Math.round(offsetMs)}</span>
+      </div>
+    );
+  }
+
+  it('an event frame 6s late (inside the 30s guard) is ignored once a snapshot has seeded', () => {
+    const now = 1_700_000_000_000;
+    // Device is 1.8s behind the server (snapshot says so); then an event whose
+    // created_at is 6s old arrives -- a slow commit, not a clock change.
+    render(<Probe frames={[[now, now + 1_800, 'snapshot'], [now, now - 6_000, 'event']]} />);
+    fireEvent.click(screen.getByTestId('feed'));
+    expect(screen.getByTestId('offset').textContent).toBe('-1800');
+  });
+
+  it('an event frame within the jitter window still refines the estimate', () => {
+    const now = 1_700_000_000_000;
+    render(<Probe frames={[[now, now + 1_800, 'snapshot'], [now, now + 1_000, 'event']]} />);
+    fireEvent.click(screen.getByTestId('feed'));
+    // EMA: -1800 * 0.7 + -1000 * 0.3 = -1560
+    expect(screen.getByTestId('offset').textContent).toBe('-1560');
+  });
+
+  it('a snapshot arriving after event-seeded guesses replaces them whole', () => {
+    const now = 1_700_000_000_000;
+    render(<Probe frames={[[now, now - 5_000, 'event'], [now, now + 1_800, 'snapshot']]} />);
+    fireEvent.click(screen.getByTestId('feed'));
+    expect(screen.getByTestId('offset').textContent).toBe('-1800');
+  });
+
+  it('without a snapshot, event frames behave as before (guard + EMA)', () => {
+    const now = 1_700_000_000_000;
+    render(<Probe frames={[[now, now + 2_000, 'event'], [now, now + 1_000, 'event']]} />);
+    fireEvent.click(screen.getByTestId('feed'));
+    // -2000 * 0.7 + -1000 * 0.3 = -1700
+    expect(screen.getByTestId('offset').textContent).toBe('-1700');
+  });
+});
+
 describe('DraftTimerV2 — the freeze, end to end', () => {
   it('counts down instead of pinning at the cap when skew is sane', () => {
     // 520s of real time left on a 600s clock: the number that was stuck.

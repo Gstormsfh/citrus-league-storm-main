@@ -2,7 +2,7 @@
 export function clearAccountContent(): void {
   const exact = new Set(['stormyMessages', 'stormyApiHistory', 'citrus.consent.signup',
     'citrus.audit.lastLoginSessionId', 'citrus-armchair-gm-trades']);
-  const prefixes = ['citrus:stormy:', 'citrus:activeLeagueId:', 'lineup_team_', 'draft-queue-',
+  const prefixes = ['citrus:stormy:', 'citrus.stormy.sharing.', 'citrus:activeLeagueId:', 'lineup_team_', 'draft-queue-',
     'citrus:offline-draft-entry:', 'citrus:autodraft:'];
   try {
     for (const key of Object.keys(localStorage)) {

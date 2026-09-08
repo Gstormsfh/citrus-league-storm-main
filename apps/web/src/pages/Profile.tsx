@@ -1,4 +1,7 @@
 import { interceptExternal } from '@/lib/openExternal';
+import { MASCOTS, type Mascot } from '@/constants/mascots';
+import { deriveAccomplishments } from '@/components/account/achievements';
+import { SITE_ORIGIN } from '@/utils/inviteShare';
 import { AnalyticsPreference } from '@/components/AnalyticsPreference';
 import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useRef } from 'react';
@@ -37,6 +40,7 @@ import {
   User,
   Settings,
   Trophy,
+  Award,
   Calendar,
   Target,
   TrendingUp,
@@ -110,7 +114,7 @@ const CONSENT_PRESENTATION: Record<
 
 const Profile = () => {
   const { user, signOut, resetPassword } = useAuth();
-  const { userLeagueState, activeLeagueId, activeLeague } = useLeague();
+  const { userLeagueState, activeLeagueId, activeLeague, userLeagues } = useLeague();
   const { data: profile } = useProfile();
   const updateProfile = useUpdateProfile();
   const { toast } = useToast();
@@ -215,6 +219,27 @@ const Profile = () => {
       setUploadingAvatar(false);
       // Reset input so the same file can be re-selected
       if (avatarInputRef.current) avatarInputRef.current.value = '';
+    }
+  };
+
+  /**
+   * 2026-09-09 (#12): the Citrus characters as profile pictures. The mascot
+   * art already ships in /public; pointing avatar_url at its public URL means
+   * every surface that draws an owner picture (Mug, scoreboard discs, team
+   * rows) shows the character with no schema change. Absolute, so the native
+   * shell and the web resolve the same file.
+   */
+  const handlePickMascot = async (image: string) => {
+    if (!user) return;
+    setUploadingAvatar(true);
+    try {
+      await updateProfile.mutateAsync({ avatar_url: `${SITE_ORIGIN}${image}` });
+      toast({ title: 'Avatar updated', description: 'Your Citrus character is set.' });
+    } catch (err) {
+      logger.error('Mascot avatar failed:', err);
+      toast({ title: 'Could not set avatar', description: 'Please try again.', variant: 'destructive' });
+    } finally {
+      setUploadingAvatar(false);
     }
   };
 
@@ -709,9 +734,6 @@ const Profile = () => {
     return () => { cancelled = true; };
   }, [user, activeLeagueId, activeLeague?.draft_status]);
 
-  // Achievements - empty for new users
-  const achievements: Array<{ title: string; year?: string; description?: string; icon: any; color: string }> = [];
-
   // Recent activity - empty for new users
   const recentActivity: Array<{ action: string; points?: string; date: string }> = [];
 
@@ -759,6 +781,25 @@ const Profile = () => {
     }
     return new Date().getFullYear();
   };
+
+  // 2026-09-09 (#13): accomplishments derived from what the page already
+  // holds (components/account/achievements.ts). Nothing is read for them and
+  // nothing is claimed without a figure behind it.
+  const toneColor = { gold: 'text-yellow-300', silver: 'text-pastel-cream', orange: 'text-pastel-orange', sage: 'text-citrus-sage' } as const;
+  const toneIcon = { gold: Trophy, silver: Award, orange: Crown, sage: Shield } as const;
+  const achievements: Array<{ title: string; year?: string; description?: string; icon: any; color: string }> = deriveAccomplishments({
+    championships: userStats.championships,
+    playoffAppearances: userStats.playoffAppearances,
+    wins: userStats.wins,
+    losses: userStats.losses,
+    ties: userStats.ties,
+    currentRank: userStats.currentRank,
+    totalSeasons: userStats.totalSeasons,
+    memberSince: getMemberSince(),
+    leagues: userLeagues,
+    commissionerLeagueCount: commissionerLeagues.length,
+  }).map((a) => ({ title: a.title, year: a.year, description: a.description, icon: toneIcon[a.tone], color: toneColor[a.tone] }));
+
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -1216,6 +1257,7 @@ const Profile = () => {
             championships: userStats.championships,
             uploading: uploadingAvatar,
             onAvatarInput: handleAvatarUpload,
+            onPickMascot: handlePickMascot,
           }}
           identity={{
             firstName: formData.firstName,
@@ -1315,6 +1357,22 @@ const Profile = () => {
                       ) : (
                         <Camera className="h-6 w-6 text-pastel-cream" />
                       )}
+                    </div>
+                    {/* 2026-09-09 (#12): the Citrus characters, desktop parity with ProfilePhone. */}
+                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-1" data-testid="profile-mascot-picker-desktop">
+                      {(Object.values(MASCOTS) as Mascot[]).map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => handlePickMascot(m.image)}
+                          disabled={uploadingAvatar}
+                          aria-label={`Use ${m.name} as your picture`}
+                          aria-pressed={!!profile?.avatar_url && profile.avatar_url.endsWith(m.image)}
+                          className={`h-6 w-6 rounded-full overflow-hidden border ${profile?.avatar_url?.endsWith(m.image) ? 'border-pastel-orange' : 'border-white/20'} bg-[#0F1F15] disabled:opacity-50`}
+                        >
+                          <img src={m.image} alt="" className="h-full w-full object-cover" loading="lazy" />
+                        </button>
+                      ))}
                     </div>
                   </div>
                   <div>

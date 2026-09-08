@@ -249,7 +249,7 @@ const StormyChatBubbleSession = () => {
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
     if (!text || isLoading) return;
-    if (!confirmStormySharing()) return;
+    if (!confirmStormySharing(auth?.user?.id)) return;
 
     // Add user message to UI
     const userMsg: ChatMessage = {

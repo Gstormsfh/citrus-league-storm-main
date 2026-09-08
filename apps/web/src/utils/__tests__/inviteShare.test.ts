@@ -30,19 +30,15 @@ describe('buildInviteLink', () => {
     expect(SITE_ORIGIN).toBe('https://citrusfantasysports.com');
   });
 
-  it('routes through auth with the join path (code included) as redirect', () => {
-    const link = buildInviteLink('ABC123');
-    expect(link).toContain('/auth?redirect=');
-    expect(decodeURIComponent(link.split('redirect=')[1])).toBe(
-      '/create-league?tab=join&code=ABC123',
-    );
+  // 2026-09-09 (#19): the link is the accept screen, a universal link the
+  // AASA claims (/join/*), so it opens in the app and asks before joining.
+  it('points at the accept screen /join/<CODE>, upper-cased', () => {
+    expect(buildInviteLink('abc123')).toBe('https://citrusfantasysports.com/join/ABC123');
   });
 
   it('URL-encodes the join code', () => {
     const link = buildInviteLink('A&B 1');
-    expect(decodeURIComponent(link.split('redirect=')[1])).toContain(
-      `code=${encodeURIComponent('A&B 1')}`,
-    );
+    expect(link.endsWith(`/join/${encodeURIComponent('A&B 1')}`)).toBe(true);
   });
 });
 

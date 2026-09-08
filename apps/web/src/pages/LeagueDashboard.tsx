@@ -50,6 +50,7 @@ import { Loader2, Trophy, Users, Calendar, Settings, Play, Copy, CheckCircle, Cl
 import { useToast } from '@/hooks/use-toast';
 import { buildInviteLink, canSystemShare, emailInvite, shareInvite } from '@/utils/inviteShare';
 import { InvitePlayersButton } from '@/components/InvitePlayersButton';
+import ReportContentDialog from '@/components/moderation/ReportContentDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -1056,7 +1057,20 @@ const LeagueDashboard = () => {
           }))}
           /* Every member can invite — the guard is the join code existing,
              not the commissioner's role (leagueHqCompositionGuard). */
-          invite={league.join_code && <InvitePlayersButton joinCode={league.join_code} leagueName={league.name} />}
+          invite={league.join_code && (
+            <InvitePlayersButton
+              joinCode={league.join_code}
+              leagueName={league.name}
+              defaultOpen={teams.length < (league.settings?.teamsCount || 12)}
+              fill={teams.length < (league.settings?.teamsCount || 12)}
+            />
+          )}
+          seats={{ filled: teams.length, max: league.settings?.teamsCount || 12 }}
+          report={
+            teams.length > 0 ? (
+              <ReportContentDialog items={teams.map((t) => ({ id: t.id, type: 'team_name' as const, text: t.team_name }))} />
+            ) : null
+          }
         />
       </div>
       {/* PRESS BOX (2026-09-04): the commissioner's settings as artboard
@@ -2258,6 +2272,11 @@ const LeagueDashboard = () => {
               <CardTitle className="font-calistoga text-pastel-cream flex items-center gap-2">
                 <CrossedSticksIcon className="h-5 w-5 text-pastel-orange" strokeWidth={2} aria-hidden="true" />
                 Teams
+                {teams.length > 0 && (
+                  <span className="ml-auto">
+                    <ReportContentDialog items={teams.map((t) => ({ id: t.id, type: 'team_name' as const, text: t.team_name }))} />
+                  </span>
+                )}
               </CardTitle>
               <CardDescription className="text-white/55">All teams in this league</CardDescription>
             </CardHeader>

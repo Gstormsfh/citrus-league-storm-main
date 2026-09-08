@@ -53,7 +53,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { logger, defaultLeagueStats, type LeagueStatSetting } from "@citrus/shared";
+import { logger, defaultLeagueStats, moderationError, type LeagueStatSetting } from "@citrus/shared";
 import {
   type LeagueType,
   type ScoringFormat,
@@ -448,6 +448,13 @@ const CreateLeague = () => {
       setError("League name is required");
       return;
     }
+    // 2026-09-09 (#20): same filter the server and the DB apply, answered
+    // before the request so the reason is on screen, not a generic 400.
+    const nameProblem = moderationError(leagueName);
+    if (nameProblem) {
+      setError(nameProblem);
+      return;
+    }
 
     const count = parseInt(teamsCount);
     if (isNaN(count) || count < 2 || count > 100) {
@@ -715,6 +722,11 @@ const CreateLeague = () => {
       return;
     }
     const effectiveCode = resolvedCode;
+    const teamNameProblem = teamNameForJoin.trim() ? moderationError(teamNameForJoin) : null;
+    if (teamNameProblem) {
+      setError(teamNameProblem);
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -1048,7 +1060,13 @@ const CreateLeague = () => {
                         className="h-12 text-lg"
                         value={leagueName}
                         onChange={(e) => setLeagueName(e.target.value)}
+                        aria-describedby={moderationError(leagueName) ? 'league-name-moderation' : undefined}
                       />
+                      {moderationError(leagueName) && (
+                        <p id="league-name-moderation" role="alert" className="text-sm text-red-300">
+                          {moderationError(leagueName)}
+                        </p>
+                      )}
                     </div>
 
                     {/* Teams Count - always visible */}

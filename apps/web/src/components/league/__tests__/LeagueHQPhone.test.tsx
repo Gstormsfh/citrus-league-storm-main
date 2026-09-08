@@ -130,4 +130,30 @@ describe('LeagueHQPhone', () => {
     expect(rows[1].textContent).toContain('17 players');
     expect(screen.getByRole('heading', { level: 2, name: /Teams/ }).textContent).toMatch(/2/);
   });
+
+  // 2026-09-09 (#18, #21): the invite moves to the top while seats are open,
+  // and the report control is reachable from the teams list year-round.
+  it('puts the invite at the top with the open-seat count while the league is filling, and under the teams once full', () => {
+    const teams = [{ id: 't1', name: 'G Daddy', owner: 'You', rosterCount: null, isYou: true, to: '/team/t1' }];
+    const { rerender } = mount(
+      <LeagueHQPhone week={null} tiles={tiles} teams={teams} seats={{ filled: 1, max: 10 }} invite={<button>INVITE</button>} report={<button>Report a name</button>} />,
+    );
+    const banner = screen.getByTestId('league-hq-invite-banner');
+    expect(banner.textContent).toMatch(/1 of 10 teams · 9 seats open/);
+    expect(banner.querySelector('button')?.textContent).toBe('INVITE');
+    // The banner precedes the tiles in document order.
+    expect(banner.compareDocumentPosition(screen.getByTestId('league-hq-tiles')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Only one invite control on the page.
+    expect(screen.getAllByText('INVITE')).toHaveLength(1);
+    expect(screen.getByText('Report a name')).toBeTruthy();
+
+    rerender(
+      <MemoryRouter>
+        <LeagueHQPhone week={null} tiles={tiles} teams={teams} seats={{ filled: 10, max: 10 }} invite={<button>INVITE</button>} report={<button>Report a name</button>} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByTestId('league-hq-invite-banner')).toBeNull();
+    expect(screen.getAllByText('INVITE')).toHaveLength(1);
+    expect(screen.getByText('Report a name')).toBeTruthy();
+  });
 });

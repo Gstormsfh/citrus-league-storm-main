@@ -314,14 +314,33 @@ DraftTimerV2.displayName = 'DraftTimerV2';
  */
 const MAX_PLAUSIBLE_CLOCK_SKEW_MS = 30_000;
 
+/**
+ * 2026-09-09 (#4, clock "glitch" audit). Event frames carry the event's DB
+ * `created_at` (LobbyManager: `timestamp: event.created_at`), not the moment
+ * it was broadcast. Any delivery lag under the 30s guard -- a slow commit, a
+ * NOTIFY backlog, a phone coming back from the background -- therefore reads
+ * as "skew" and moves the EMA by 30% of the lag per frame: a frame 6s late
+ * pushes the deadline ~1.8s later, the next clean frame pulls it back, and
+ * the countdown visibly jumps. The snapshot frame is different: it is built
+ * from the HTTP Date header plus half the measured round trip, which is a
+ * true "server now". So the snapshot seeds the estimate, and an event frame
+ * may only nudge it within this window; anything further is delivery lag
+ * and is ignored. Real device skew is stable for the length of a draft.
+ */
+const EVENT_FRAME_JITTER_MS = 1_500;
+
+export type ClockFrameSource = 'snapshot' | 'event';
+
 export function useClockOffsetEstimator(): {
   offsetMs: number;
-  updateOffset: (clientReceiveMs: number, serverMs: number) => void;
+  updateOffset: (clientReceiveMs: number, serverMs: number, source?: ClockFrameSource) => void;
 } {
   const [offsetMs, setOffsetMs] = useState(0);
   const seededRef = useRef(false);
+  const seededBySnapshotRef = useRef(false);
+  const currentRef = useRef(0);
   const updateOffset = useMemo(
-    () => (clientReceiveMs: number, serverMs: number) => {
+    () => (clientReceiveMs: number, serverMs: number, source: ClockFrameSource = 'event') => {
       const frameOffset = clientReceiveMs - serverMs;
       if (!Number.isFinite(frameOffset)) return;
       // TIMER-2 (2026-08-12) — plausibility guard.
@@ -344,15 +363,25 @@ export function useClockOffsetEstimator(): {
       // reading costs at most a few seconds of skew correction; accepting
       // one costs the manager their turn.
       if (Math.abs(frameOffset) > MAX_PLAUSIBLE_CLOCK_SKEW_MS) return;
-      setOffsetMs((prev) => {
-        if (!seededRef.current) {
-          seededRef.current = true;
-          return frameOffset;
-        }
+      if (source === 'event' && seededBySnapshotRef.current) {
+        // Refine only; a frame this far from a snapshot-seeded estimate is
+        // delivery lag, not the device clock moving.
+        if (Math.abs(frameOffset - currentRef.current) > EVENT_FRAME_JITTER_MS) return;
+      }
+      let next: number;
+      if (!seededRef.current || (source === 'snapshot' && !seededBySnapshotRef.current)) {
+        // First reading, or the first TRUE server-now reading replacing an
+        // event-seeded guess: take it whole.
+        seededRef.current = true;
+        next = frameOffset;
+      } else {
         // EMA with alpha=0.3 — smooths per-frame jitter, still
         // responsive enough to track slow clock drift over minutes.
-        return prev * 0.7 + frameOffset * 0.3;
-      });
+        next = currentRef.current * 0.7 + frameOffset * 0.3;
+      }
+      if (source === 'snapshot') seededBySnapshotRef.current = true;
+      currentRef.current = next;
+      setOffsetMs(next);
     },
     [],
   );

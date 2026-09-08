@@ -873,7 +873,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
             >
               ⇄ Trade
             </Link>
-            {leagueId && user && isOnRoster ? (
+            {leagueId && user && isOnRoster && (
               <button
                 type="button"
                 onClick={handleDropPlayer}
@@ -882,15 +882,20 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
               >
                 {isDropping ? 'Dropping…' : 'Drop'}
               </button>
-            ) : (
-              <Link
-                to={`/players/${player.id}`}
-                onClick={onClose}
-                className="focus-citrus flex-1 h-9 rounded-[9px] bg-white/[0.06] border border-white/[0.12] text-pressbox-text flex items-center justify-center uppercase"
-              >
-                Dashboard
-              </Link>
             )}
+            {/* 2026-09-09 (#7): the dashboard is reachable from EVERY card.
+                Until now DROP replaced it for rostered players, so the one
+                place a manager most wants the deep read (his own guy) was
+                the one place it was missing. Citrus orange: it is the card's
+                real destination, the others are transactions. */}
+            <Link
+              to={`/players/${player.id}`}
+              onClick={onClose}
+              className="focus-citrus flex-1 h-9 rounded-[9px] bg-pressbox-orange/15 border border-pressbox-orange/45 text-pressbox-orange-soft flex items-center justify-center uppercase"
+              data-testid="player-card-dashboard"
+            >
+              Dashboard
+            </Link>
             <button
               type="button"
               aria-label={watched ? 'Stop watching' : 'Watch'}

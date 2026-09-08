@@ -83,7 +83,10 @@ export function LeagueMenu({
           pulled, and the thing it is switched TO belongs in the middle. The
           crest, the name and `SWITCH` are one target: on a phone the whole
           pill is the tap, not a 12px chevron inside it. */}
-      <div className="flex items-center justify-between gap-2 px-3.5 pt-2">
+      {/* 2026-09-09 (#8): a fixed inset-0 overlay starts under the status
+          bar, so the title row carries the safe-area inset itself; without
+          it the close button and the league pill sat under the clock. */}
+      <div className="flex items-center justify-between gap-2 px-3.5 pt-[calc(0.5rem+env(safe-area-inset-top))]">
         <button
           type="button"
           onClick={onClose}

@@ -145,3 +145,40 @@ play exists (keeps the app out of the gambling category review path).
 ## Not in scope tonight
 xG model and database work continues in the analytics worktree and is unaffected by
 this build.
+
+## Added during Build 15 smoke test (2026-09-09, 1:05 AM)
+
+18. **Invite Players card is buried and unexplained (League tab, phone).** With one team in
+    the league the card renders below Trades/Schedule/My team/GM office/League settings and
+    the TEAMS list, i.e. under the fold, and nothing says what "Share invite" does versus the
+    code. For Build 16: when `teams.length < maxTeams`, render an invite banner at the top of
+    the League tab ("1 of 10 teams · Invite your league") with a single primary SHARE INVITE
+    action, and under the code a one-liner: "Friends can tap the link or enter this code in
+    the app." Keep the existing card for the full-league case. Also verify the shared link is
+    the universal-link form (`/create-league?tab=join&code=…`) so it opens in-app on Build 15+.
+
+19. **Invite acceptance screen.** Product intent (Garrett, 1:10 AM): link opens the app on a
+    screen that says who invited you to which league, with an Accept button; join happens on
+    Accept, not silently. Today `CreateLeague.autoJoin` joins the moment a signed-in user
+    lands. Build 16: `InviteAccept` at `/join/:code` (already in the AASA), share link becomes
+    `/join/<code>`, `/auth?redirect=` remains the signed-out fallback only.
+    Also in this tree, uncommitted: AASA now claims `/auth` when it carries `redirect`, and
+    `universalLinkToPath` accepts that one shape (test added). Ship with Build 16, not before:
+    Build 15's router ignores `/auth`, so deploying the AASA alone would open the app and drop
+    the link.
+
+20. **Moderation message not surfaced on create-league.** On device, `sh1t show` and other
+    names were refused (server/DB guard works) but the UI showed the generic "error validating
+    the league" instead of the zod message. Build 16: client-side `moderateText` on the name
+    field with an inline message, and surface the server 400 message on the fallback path.
+
+21. **Report a name unreachable in the offseason (review risk, Guideline 1.2).** Standings is
+    gated on the season, and that is the only place the report dialog is mounted. Build 16:
+    mount `ReportContentDialog` under the TEAMS list on the League tab (always visible), keep
+    the Standings one. Reviewer note for Build 15 points at Standings and at creation-time
+    rejection.
+
+22. **Navigation latency.** Every tab feels like it reloads everything on mount. Before
+    touching it: capture a per-screen request waterfall on device (Safari Web Inspector
+    attached to the app) and count requests per navigation; then cache league context and
+    the player directory across tabs.

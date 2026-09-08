@@ -28,6 +28,8 @@ import type { SeasonStatus } from '@citrus/shared';
 
 vi.mock('@/components/Navbar', () => ({ default: () => <nav data-testid="navbar" /> }));
 vi.mock('@/components/matchup/LeagueNotifications', () => ({ default: () => null }));
+// The Report-a-name dialog imports the Supabase client, which throws without env in tests.
+vi.mock('@/components/moderation/ReportContentDialog', () => ({ default: () => null }));
 vi.mock('@/components/dashboard/LeagueTimelineCard', () => ({ LeagueTimelineCard: () => null }));
 vi.mock('@/components/InvitePlayersButton', () => ({ InvitePlayersButton: () => null }));
 vi.mock('@/components/league/ScoringRulesEditor', () => ({ ScoringRulesEditor: () => null }));

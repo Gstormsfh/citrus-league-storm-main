@@ -265,7 +265,7 @@ const StormyAssistantSession = () => {
   const handleSend = useCallback(async () => {
     const text = inputValue.trim();
     if (!text || isLoading) return;
-    if (!confirmStormySharing()) return;
+    if (!confirmStormySharing(auth?.user?.id)) return;
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
