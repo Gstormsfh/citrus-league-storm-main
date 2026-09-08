@@ -255,6 +255,30 @@ describe('the browser is allowed to open the socket the deploy points it at', ()
     }
   });
 
+  // UNIVERSAL LINKS (2026-09-09). The AASA work landed in apps/web/firebase.json
+  // (stop ignoring dotfiles, appAssociation NONE, a rewrite and a JSON header)
+  // and production kept serving Firebase's auto-generated empty stub,
+  // {"applinks":{"apps":[],"details":[]}}, because the root file is what
+  // deploys and it had none of it. Invite links opened Safari instead of the
+  // app. Every one of these is required in BOTH files, so the deploy that
+  // actually runs serves the file the repo carries.
+  describe('both firebase.json files serve the repo AASA, not the auto-generated stub', () => {
+    it.each(CSP_FILES)('%s', (rel) => {
+      const hosting = JSON.parse(read(rel)).hosting as {
+        appAssociation?: string;
+        ignore?: string[];
+        rewrites?: Array<{ source?: string; destination?: string }>;
+        headers?: Array<{ source?: string; headers?: Array<{ key: string; value: string }> }>;
+      };
+      expect(hosting.appAssociation, `${rel}: Firebase generates an empty AASA unless appAssociation is NONE`).toBe('NONE');
+      expect(hosting.ignore ?? [], `${rel}: ignoring **/.* drops .well-known from the upload`).not.toContain('**/.*');
+      const rewrite = (hosting.rewrites ?? []).find((r) => r.source === '/.well-known/apple-app-site-association');
+      expect(rewrite?.destination, `${rel}: the AASA rewrite must sit ahead of the SPA catch-all`).toBe('/.well-known/apple-app-site-association');
+      const header = (hosting.headers ?? []).find((h) => h.source === '/.well-known/apple-app-site-association');
+      expect(header?.headers?.find((h) => h.key === 'Content-Type')?.value, `${rel}: AASA must be served as JSON`).toBe('application/json');
+    });
+  });
+
   /**
    * The load-bearing one. Whatever hostname `ops/cloudrun/service.yaml`
    * hands to a browser must appear in the CSP, or discovery returns a
