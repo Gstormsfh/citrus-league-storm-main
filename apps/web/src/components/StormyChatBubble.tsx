@@ -1,6 +1,6 @@
 import { stormyStorageKey } from '@/lib/accountCleanup';
 import { confirmStormySharing } from '@/lib/stormySharing';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -382,16 +382,49 @@ const StormyChatBubbleSession = () => {
 
   // ── Open State (Chat Card) ─────────────────────────────────────
 
+  // 2026-09-08 (founder feedback: the phone open state "comes up very obscure").
+  // On a phone the chat is a full-width bottom sheet with a dimmed backdrop —
+  // one clean open from the Stormy bar, composer at the bottom, tap the backdrop
+  // or X to close. Desktop keeps the floating card.
+  const mobileSheetStyle: CSSProperties = {
+    position: 'fixed',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    top: 'max(env(safe-area-inset-top), 8vh)',
+    width: '100vw',
+    zIndex: 110,
+    paddingBottom: 'env(safe-area-inset-bottom)',
+  };
+  const desktopCardStyle: CSSProperties = {
+    position: 'fixed',
+    bottom: '1.5rem',
+    left: '1.5rem',
+    right: 'auto',
+    zIndex: 100,
+  };
+
   return (
+    <>
+    {isMobile && (
+      <div
+        aria-hidden="true"
+        onClick={() => setIsOpen(false)}
+        className="fixed inset-0 bg-black/55 backdrop-blur-[2px]"
+        style={{ zIndex: 105 }}
+        data-testid="stormy-sheet-backdrop"
+      />
+    )}
     <Card
-      className={`fixed w-[calc(100vw-3rem)] md:w-[440px] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] ring-1 ring-white/10 border-0 rounded-2xl overflow-hidden flex flex-col transition-all duration-300 bg-pastel-surface-tile ${isMinimized ? 'h-[70px]' : 'h-[min(640px,80vh)]'}`}
-      style={{
-        position: 'fixed',
-        bottom: isMobile ? 'calc(5rem + env(safe-area-inset-bottom) + 4rem)' : '1.5rem',
-        right: isMobile ? '1rem' : 'auto',
-        left: isMobile ? 'auto' : '1.5rem',
-        zIndex: 100,
-      }}
+      className={`fixed shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] ring-1 ring-white/10 border-0 overflow-hidden flex flex-col transition-all duration-300 bg-pastel-surface-tile ${
+        isMobile
+          ? 'rounded-t-2xl rounded-b-none'
+          : `w-[440px] rounded-2xl ${isMinimized ? 'h-[70px]' : 'h-[min(640px,80vh)]'}`
+      }`}
+      style={isMobile ? mobileSheetStyle : desktopCardStyle}
+      role="dialog"
+      aria-modal={isMobile ? true : undefined}
+      aria-label="Chat with Stormy"
     >
       {/* Header */}
       <CardHeader className="p-4 border-b border-white/10 flex flex-row items-center justify-between shrink-0">
@@ -411,9 +444,11 @@ const StormyChatBubbleSession = () => {
         </div>
 
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/55 hover:text-pastel-cream hover:bg-white/5" onClick={() => setIsMinimized(!isMinimized)}>
-            {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
-          </Button>
+          {!isMobile && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/55 hover:text-pastel-cream hover:bg-white/5" onClick={() => setIsMinimized(!isMinimized)}>
+              {isMinimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+            </Button>
+          )}
           <Button variant="ghost" size="icon" className="h-8 w-8 text-white/55 hover:text-pastel-cream hover:bg-white/5" onClick={() => setIsOpen(false)}>
             <X className="h-4 w-4" />
           </Button>
@@ -494,5 +529,6 @@ const StormyChatBubbleSession = () => {
         </>
       )}
     </Card>
+    </>
   );
 };

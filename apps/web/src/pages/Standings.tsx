@@ -41,6 +41,7 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { PB_TYPE, PressBoxSectionHead, PressBoxStandingsTable } from '@/components/pressbox';
 import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 import { PressBoxPageLoading } from '@/components/pressbox/PageLoading';
+import ReportContentDialog from '@/components/moderation/ReportContentDialog';
 
 interface StandingsTeam {
   id: string;
@@ -680,6 +681,12 @@ const Standings = () => {
             playoffSpots={hasMatchups ? leagueFormat.playoffTeams : null}
             onRowPress={(row) => navigate(`/team/${row.teamId}`)}
           />
+        )}
+        {/* App Store 1.2: a visible way to report a team name (2026-09-08). */}
+        {sortedTeams.length > 0 && (
+          <div className="mt-3 px-2.5 text-right">
+            <ReportContentDialog items={sortedTeams.map((t) => ({ id: t.id, type: 'team_name' as const, text: t.name }))} />
+          </div>
         )}
       </div>
 

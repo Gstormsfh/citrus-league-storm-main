@@ -21,6 +21,8 @@ export interface DraftNeedInput {
   positionOf: (id: string) => string | null | undefined;
   /** Picks made before your next turn; null when the room does not know. */
   picksAway: number | null;
+  /** Optional: display name for an id, so the line can name the best available. */
+  nameOf?: (id: string) => string | null | undefined;
 }
 
 export interface DraftNeed {
@@ -29,6 +31,15 @@ export interface DraftNeed {
   /** Of the position's top eight available, how many sit inside the picks ahead of you. */
   topEightGone: number | null;
   text: string;
+  /**
+   * 2026-09-08: a second, shorter line built for the phone (≤ ~48 chars) that
+   * reads the room: urgency when the position is about to run dry, the best
+   * name at that position when it is not, and the best overall value when
+   * nothing is pressing. `text` stays as it was for existing consumers.
+   */
+  phoneText: string;
+  /** `now` = draft the position on this pick, `wait` = it will keep, `open` = no pressing need. */
+  urgency: 'now' | 'wait' | 'open';
 }
 
 const TOP = 8;
@@ -67,5 +78,38 @@ export function draftNeedLine(input: DraftNeedInput): DraftNeed | null {
       : topEightGone === 0
         ? `none of the top-${TOP} ${best.position} go before your next pick`
         : `${topEightGone} of the top-${TOP} ${best.position} go before your next pick`;
-  return { position: best.position, need: best.need, topEightGone, text: tail ? `${head} · ${tail}` : head };
+
+  // Best available at the needed position, and best overall, by the pool's order.
+  const bestAtPositionId = input.orderedIds.find((id) => positionChipKey(input.positionOf(id)) === best!.position) ?? null;
+  const name = (id: string | null) => (id && input.nameOf ? shortName(input.nameOf(id)) : null);
+  const bestAtPosition = name(bestAtPositionId);
+  const bestOverall = name(input.orderedIds[0] ?? null);
+  const bestOverallPos = input.orderedIds[0] ? positionChipKey(input.positionOf(input.orderedIds[0])) : null;
+
+  let urgency: 'now' | 'wait' | 'open';
+  let phoneText: string;
+  if (topEightGone !== null && topEightGone >= Math.max(best.need, 3)) {
+    urgency = 'now';
+    phoneText = bestAtPosition
+      ? `${best.position} runs dry before your pick — take ${bestAtPosition} now`
+      : `${best.position} runs dry before your pick — take one now`;
+  } else if (topEightGone !== null && topEightGone === 0) {
+    urgency = 'wait';
+    phoneText = bestOverall && bestOverallPos && bestOverallPos !== best.position
+      ? `${best.position} will keep — ${bestOverall} (${bestOverallPos}) is the value here`
+      : `${best.position} will keep — all top-${TOP} still there next pick`;
+  } else {
+    urgency = 'open';
+    phoneText = bestAtPosition
+      ? `Need ${best.need} ${best.position} — ${bestAtPosition} is the best left`
+      : head;
+  }
+  return { position: best.position, need: best.need, topEightGone, text: tail ? `${head} · ${tail}` : head, phoneText, urgency };
+}
+
+/** "Connor McDavid" -> "McDavid"; keeps single-token names as-is. */
+function shortName(full: string | null | undefined): string | null {
+  if (!full) return null;
+  const parts = full.trim().split(/\s+/);
+  return parts.length > 1 ? parts.slice(1).join(' ') : parts[0];
 }

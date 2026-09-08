@@ -338,7 +338,7 @@ export function OnClockActionBar({
             data-testid="on-clock-scarcity"
           >
             <span className="shrink-0 font-plex font-semibold text-[9px] uppercase tracking-[0.12em] text-pressbox-text/45">
-              Starters left
+              Need · left
             </span>
             {scarcity.map((row) => (
               <span
@@ -352,7 +352,10 @@ export function OnClockActionBar({
                   row.urgent && 'text-pressbox-grapefruit-text ring-1 ring-pressbox-grapefruit/50',
                 )}
               >
-                {row.position} {row.startersLeft}
+                {/* 2026-09-08: "D 8" read as "you need 8 D" in the test draft. It is
+                    startable D left league-wide; the number the user needs is their
+                    own open slots, so show both: "D 2 · 8". */}
+                {row.position} {row.openSlots} · {row.startersLeft}
               </span>
             ))}
           </div>

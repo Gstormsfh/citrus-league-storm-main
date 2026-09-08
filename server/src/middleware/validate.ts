@@ -1,6 +1,6 @@
 import { Context, Next } from 'hono';
 import { z, ZodSchema, ZodError } from 'zod';
-import { DRAFT_STATUSES } from '@citrus/shared';
+import { DRAFT_STATUSES, moderationError } from '@citrus/shared';
 
 /**
  * Request validation middleware using Zod schemas.
@@ -61,9 +61,18 @@ export function validateQuery<T extends ZodSchema>(schema: T) {
 
 // ── Shared validation schemas for mutations ──────────────────────────
 
+/**
+ * User-visible names go through the shared content filter (2026-09-08, App Store
+ * Guideline 1.2). `moderationError` returns a user-safe message or null; the
+ * refine surfaces it as the validation error so the client can show it as-is.
+ */
+export const cleanName = (label: string, max = 100) =>
+  z.string().trim().min(1, `${label} is required`).max(max)
+    .refine((v) => moderationError(v) === null, (v) => ({ message: moderationError(v) ?? `${label} is not allowed` }));
+
 export const schemas = {
   createLeague: z.object({
-    name: z.string().min(1, 'League name is required').max(100),
+    name: cleanName('League name'),
     roster_size: z.number().int().min(0).max(30).optional(),
     draft_rounds: z.number().int().min(0).max(30).optional(),
     settings: z.record(z.unknown()).optional(),
@@ -73,7 +82,7 @@ export const schemas = {
 
   joinLeague: z.object({
     joinCode: z.string().min(1, 'Join code is required'),
-    teamName: z.string().min(1).max(100).optional(),
+    teamName: cleanName('Team name').optional(),
   }),
 
   makeDraftPick: z.object({

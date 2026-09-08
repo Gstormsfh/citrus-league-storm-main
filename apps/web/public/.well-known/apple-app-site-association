@@ -1,0 +1,27 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TFMG57326Z.com.citrussports.app"],
+        "components": [
+          { "/": "/api/*", "exclude": true, "comment": "Cloud Run API, never the app" },
+          { "/": "/auth/*", "exclude": true, "comment": "Auth callbacks use the citrussports:// scheme (lib/nativeAuth.ts)" },
+          { "/": "/reset-password", "exclude": true, "comment": "Password reset uses the citrussports:// scheme" },
+          { "/": "/privacy-policy.html", "exclude": true },
+          { "/": "/create-league", "?": { "code": "?*" }, "comment": "Invite links: /create-league?tab=join&code=XXXX" },
+          { "/": "/create-league", "?": { "tab": "join" } },
+          { "/": "/join", "comment": "Invite short path" },
+          { "/": "/join/*" },
+          { "/": "/joined" },
+          { "/": "/league/*" },
+          { "/": "/draft-room" },
+          { "/": "/draft" },
+          { "/": "/draft-kit" }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["TFMG57326Z.com.citrussports.app"]
+  }
+}

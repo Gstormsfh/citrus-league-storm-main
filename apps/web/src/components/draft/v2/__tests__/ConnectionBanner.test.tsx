@@ -88,10 +88,26 @@ describe('ConnectionBanner — reconnecting state', () => {
       lastError: 'WebSocket dropped',
     });
     renderBanner();
+    // 2026-09-08: first attempts are routine (status, not alert); the raw
+    // transport error is behind "Technical details", not in the headline.
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByText(/Reconnecting to the draft room/)).toBeInTheDocument();
+    expect(screen.getByText(/Reconnecting in/)).toBeInTheDocument();
+    expect(screen.getByText(/Technical details/)).toBeInTheDocument();
+    expect(screen.getByText(/WebSocket dropped/)).toBeInTheDocument();
+    expect(screen.queryByText(/Connection lost/)).not.toBeInTheDocument();
+  });
+
+  it('escalates to a red "Connection lost" alert from the third attempt', () => {
+    setStateTo({
+      kind: 'reconnecting',
+      attempt: 3,
+      nextAttemptAt: Date.now() + 3000,
+      lastError: 'WebSocket dropped',
+    });
+    renderBanner();
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getByText(/Connection lost/)).toBeInTheDocument();
-    expect(screen.getByText(/Reconnecting in/)).toBeInTheDocument();
-    expect(screen.getByText(/WebSocket dropped/)).toBeInTheDocument();
   });
 
   it('"Retry now" button calls onRetryNow', () => {
@@ -148,9 +164,12 @@ describe('ConnectionBanner — reconnecting state', () => {
       lastError: null,
     });
     renderBanner();
-    const alert = screen.getByRole('alert');
-    expect(alert.getAttribute('data-stale-triggered')).toBe(null);
-    expect(screen.getByText(/Connection lost/)).toBeInTheDocument();
+    // 2026-09-08 (#5): attempts 1-2 are routine -- a calm status, not a red alert.
+    const banner = screen.getByRole('status');
+    expect(banner.getAttribute('data-stale-triggered')).toBe(null);
+    expect(banner.getAttribute('data-routine')).toBe('true');
+    expect(screen.getByText(/Reconnecting to the draft room/)).toBeInTheDocument();
+    expect(screen.queryByText(/Connection lost/)).toBeNull();
   });
 });
 

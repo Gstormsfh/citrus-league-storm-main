@@ -259,7 +259,7 @@ export const PlayerPool = memo(({
     if (!need) return null;
     const byId = new Map(availablePlayers.map((p) => [p.id, p]));
     const ordered = [...rankMap.entries()].sort((a, b) => a[1] - b[1]).map(([id]) => id).filter((id) => !draftedSet.has(id));
-    return draftNeedLine({ caps: need.caps, myPositions: need.myPositions, orderedIds: ordered, positionOf: (id) => byId.get(id)?.position, picksAway: need.picksAway });
+    return draftNeedLine({ caps: need.caps, myPositions: need.myPositions, orderedIds: ordered, positionOf: (id) => byId.get(id)?.position, picksAway: need.picksAway, nameOf: (id) => byId.get(id)?.full_name });
   }, [need, availablePlayers, rankMap, draftedSet]);
 
   // Compute data freshness from the most recent last_updated timestamp across all players
@@ -665,11 +665,15 @@ export const PlayerPool = memo(({
 
         {needLine && (
           <p
-            className="mt-2.5 flex items-center gap-2 rounded-[10px] bg-pressbox-tile border border-white/[0.08] px-3 py-2 font-barlow text-[12px] text-pressbox-text/85"
+            className="mt-2.5 flex items-start gap-2 rounded-[10px] bg-pressbox-tile border border-white/[0.08] px-3 py-2 font-barlow text-[12px] leading-snug text-pressbox-text/85"
             data-testid="draft-need-line"
           >
             <span aria-hidden="true" className="w-[18px] h-[18px] flex-none rounded-full bg-pressbox-orange/20 border border-pressbox-orange flex items-center justify-center font-condensed font-bold text-[9px] text-pressbox-orange-soft">S</span>
-            <span className="min-w-0 truncate"><span className="font-plex font-semibold text-[9px] uppercase tracking-[0.1em] text-pressbox-orange-soft">Stormy</span> · {needLine.text}</span>
+            {/* 2026-09-08: two lines max on the phone, never a mid-word truncation;
+                the phone line reads the room (urgency / best name), the fuller
+                arithmetic line stays for wider screens. */}
+            <span className="min-w-0 line-clamp-2 md:hidden" data-urgency={needLine.urgency}><span className="font-plex font-semibold text-[9px] uppercase tracking-[0.1em] text-pressbox-orange-soft">Stormy</span> · {needLine.phoneText}</span>
+            <span className="min-w-0 truncate hidden md:inline"><span className="font-plex font-semibold text-[9px] uppercase tracking-[0.1em] text-pressbox-orange-soft">Stormy</span> · {needLine.text}</span>
           </p>
         )}
 

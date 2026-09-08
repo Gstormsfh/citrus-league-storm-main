@@ -136,7 +136,8 @@ describe('the scarcity strip', () => {
   it('renders before a player is selected, because that is when it helps', () => {
     render(<OnClockActionBar {...base} selectedPlayer={null} scarcity={SCARCITY} />);
     const chips = screen.getAllByTestId('on-clock-scarcity-chip');
-    expect(chips.map((c) => c.textContent)).toEqual(['G 2', 'D 14']);
+    // position · your open slots · startable left league-wide (2026-09-08 relabel)
+    expect(chips.map((c) => c.textContent)).toEqual(['G 1 · 2', 'D 3 · 14']);
   });
 
   it('marks the position where the run is on', () => {

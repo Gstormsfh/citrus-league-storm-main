@@ -11,6 +11,7 @@ import {
   toDraftedPlayerIds,
   toAvailablePlayers,
   participatingTeamIdsFromMatrix,
+  round1OrderFromMatrix,
   type FetchedTeam,
 } from '../v1Adapters';
 import type {
@@ -303,6 +304,19 @@ describe('toV1Teams — DR-3.1 F9 filter (12-in-order + 1 spectator)', () => {
     const teams = toV1Teams(THIRTEEN_TEAMS, mkDerived(), new Map(), participating);
     expect(teams.length).toBe(12);
     expect(teams.map((t) => t.id).includes(SPECTATOR_ID)).toBe(false);
+  });
+
+  it('orders board columns by the round-1 draft order, not league team order (2026-09-08)', () => {
+    // Randomized order: reverse of the fetched order.
+    const shuffled = [...HARNESS_IDS].reverse();
+    const matrix = shuffled.map((teamId, i) => ({ round: 1, pickNumber: i + 1, teamId }));
+    const order = round1OrderFromMatrix(matrix);
+    expect(order).toEqual(shuffled);
+    const teams = toV1Teams(THIRTEEN_TEAMS, mkDerived(), new Map(), participatingTeamIdsFromMatrix(matrix), order);
+    expect(teams.map((t) => t.id)).toEqual(shuffled);
+    // Null matrix → empty order → fetched order preserved.
+    expect(round1OrderFromMatrix(null)).toEqual([]);
+    expect(toV1Teams(THIRTEEN_TEAMS, mkDerived(), new Map(), undefined, []).map((t) => t.id)).toEqual(THIRTEEN_TEAMS.map((t) => t.id));
   });
 
   it('includes all teams when participatingTeamIds is undefined (legacy caller compat)', () => {

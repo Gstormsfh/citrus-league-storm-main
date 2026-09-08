@@ -42,3 +42,27 @@
  *               A one-line revert here hides the HQ entry again.
  */
 export const FEATURE_PRACTICE_DRAFT = true;
+
+/**
+ * TEAM THEMES IN THE GAME DAY SUITE.
+ *
+ * WHAT IT GATES (the only consumer, 2026-09-06):
+ *   apps/web/src/lib/gameDay/theme.ts. With this flag off, `loadGameDayTheme`
+ *   ignores any requested theme key and always reads the default row, so a
+ *   public build renders neutral Citrus and nothing else.
+ *
+ * WHAT IT DOES NOT GATE — and this is the important half:
+ *   The real lock is in the database, not here. `game_day_themes` grants
+ *   SELECT only on rows with `requires_feature_flag = false`, so a club's
+ *   theme row is invisible to anon and to ordinary authenticated users. A
+ *   client bug, a hand-edited query string or someone flipping this constant
+ *   in a fork all get the same thing back: nothing, and the neutral fallback.
+ *   Turning a team theme on for real means a service-role write that clears
+ *   `requires_feature_flag` on that row — a deliberate act by someone holding
+ *   the key, which is the point.
+ *
+ * Flip history:
+ *   2026-09-06  false. Team themes are built but unreachable in a public
+ *               build, per the Game Day brief.
+ */
+export const FEATURE_GAME_DAY_TEAM_THEMES = false;

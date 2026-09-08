@@ -20,6 +20,7 @@ import { CookieConsent } from "./components/CookieConsent";
 import ScrollToTop from "./components/ScrollToTop";
 import PushDeepLink from "./components/PushDeepLink";
 import NativeAuthDeepLink from "./components/NativeAuthDeepLink";
+import UniversalLinkDeepLink from "./components/UniversalLinkDeepLink";
 import LoadingScreen from "./components/LoadingScreen";
 import '@/integrations/firebase/config'; // Initialize Firebase
 import "./App.css";
@@ -113,6 +114,10 @@ const ResetPassword = lazyWithErrorHandling(() => import("./pages/ResetPassword"
 const VerifyEmail = lazyWithErrorHandling(() => import("./pages/VerifyEmail"));
 const LeagueDashboard = lazyWithErrorHandling(() => import("./pages/LeagueDashboard"));
 const Waitlist = lazyWithErrorHandling(() => import("./pages/Waitlist"));
+// Game Day Suite — anonymous-play-first puzzles. Public routes: the whole
+// point is that a first play needs no account (see lib/gameDay/session.ts).
+const GameDay = lazyWithErrorHandling(() => import("./pages/GameDay"));
+const GameDayDailyPlayer = lazyWithErrorHandling(() => import("./pages/gameday/DailyPlayer"));
 const PoolPickem = lazyWithErrorHandling(() => import("./pages/PoolPickem"));
 const PoolSurvivor = lazyWithErrorHandling(() => import("./pages/PoolSurvivor"));
 const PoolConfidence = lazyWithErrorHandling(() => import("./pages/PoolConfidence"));
@@ -201,6 +206,7 @@ const App = () => {
               <ScrollToTop />
               <PushDeepLink />
               <NativeAuthDeepLink />
+              <UniversalLinkDeepLink />
               <LeagueProvider>
                 {/* Consumes LeagueContext.error, which nothing rendered
                     until the 2026-08-18 audit — a failed league load
@@ -277,6 +283,8 @@ const App = () => {
                 <Route path="/settings" element={<ProtectedRoute><ErrorBoundary><Settings /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/admin" element={<ProtectedRoute><ErrorBoundary><Admin /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/waitlist" element={<Waitlist />} />
+                <Route path="/game-day" element={<ErrorBoundary><GameDay /></ErrorBoundary>} />
+                <Route path="/game-day/daily-player" element={<ErrorBoundary><GameDayDailyPlayer /></ErrorBoundary>} />
                 <Route path="/pool/pickem" element={<ProtectedRoute><ErrorBoundary><PoolPickem /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/pool/survivor" element={<ProtectedRoute><ErrorBoundary><PoolSurvivor /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/pool/confidence" element={<ProtectedRoute><ErrorBoundary><PoolConfidence /></ErrorBoundary></ProtectedRoute>} />

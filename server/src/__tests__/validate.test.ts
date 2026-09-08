@@ -103,6 +103,13 @@ describe('validateQuery middleware', () => {
 });
 
 describe('Schema definitions', () => {
+  describe('joinLeague teamName content filter', () => {
+    it('rejects a slur in a team name and accepts a clean one', () => {
+      expect(schemas.joinLeague.safeParse({ joinCode: 'ABCD', teamName: 'sand n!ggers' }).success).toBe(false);
+      expect(schemas.joinLeague.safeParse({ joinCode: 'ABCD', teamName: "Storms' Army" }).success).toBe(true);
+    });
+  });
+
   describe('createLeague', () => {
     it('accepts valid league data', () => {
       const result = schemas.createLeague.safeParse({
@@ -121,6 +128,25 @@ describe('Schema definitions', () => {
     it('rejects empty name', () => {
       const result = schemas.createLeague.safeParse({ name: '' });
       expect(result.success).toBe(false);
+    });
+
+    // Content filter (2026-09-08, App Store Guideline 1.2)
+    it('rejects hateful and profane league names with a user-safe message', () => {
+      for (const name of ['n1gg3r nation', 'F.U.C.K Cup', 'Team Retards']) {
+        const result = schemas.createLeague.safeParse({ name });
+        expect(result.success, name).toBe(false);
+        if (!result.success) {
+          const msg = result.error.issues[0]?.message ?? '';
+          expect(msg).toMatch(/not allow|Keep it clean/);
+          expect(msg.toLowerCase()).not.toContain('nigg');
+        }
+      }
+    });
+
+    it('does not block innocent names that contain awkward substrings', () => {
+      for (const name of ['Scunthorpe United', 'Raccoon City', 'Cockburn FC', 'Japan Jets']) {
+        expect(schemas.createLeague.safeParse({ name }).success, name).toBe(true);
+      }
     });
 
     it('rejects name over 100 chars', () => {
