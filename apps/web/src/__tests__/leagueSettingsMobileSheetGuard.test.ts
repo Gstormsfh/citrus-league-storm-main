@@ -72,7 +72,10 @@ describe('the phone screen is the artboard', () => {
     // hid half the sections past the edge. The chips scroll, and the active
     // one is scrolled into view whenever the section changes.
     expect(PHONE).toContain('label="Settings section"');
-    expect(PHONE).toContain("scrollIntoView?.({ inline: 'nearest', block: 'nearest' })");
+    // QA pass 1 (2026-09-09): the strip's OWN scrollLeft, never scrollIntoView,
+    // which walked the sheet and scrolled the title off the top.
+    expect(PHONE).toContain('scrollStripTo(chipsRef.current, active)');
+    expect(PHONE).not.toContain('scrollIntoView');
   });
 
   it('offers the desktop dialog\'s sections in the same order, under the same keys', () => {

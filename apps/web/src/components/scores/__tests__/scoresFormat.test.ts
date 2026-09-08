@@ -10,6 +10,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ScoreboardGame, ScoresGameCitrus, ScoresPlayerLine } from '@citrus/shared';
 import {
   buildDateStrip,
+  buildScrollableDateStrip,
+  daysBetween,
   citrusSummaryText,
   compareGames,
   formatPoints,
@@ -249,5 +251,40 @@ describe('date strip', () => {
     expect(friendlyDateLabel('2026-09-03')).toBe('Tomorrow');
     expect(friendlyDateLabel('2026-09-29')).toBe('Tuesday, September 29');
     expect(shortDateLabel('2026-06-14')).toBe('Jun 14');
+  });
+});
+
+describe('buildScrollableDateStrip (QA pass 1)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-02T18:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('anchors on today and reaches three weeks either way', () => {
+    const strip = buildScrollableDateStrip('2026-09-02');
+    expect(strip[0].date).toBe('2026-08-12');
+    expect(strip[strip.length - 1].date).toBe('2026-09-23');
+    expect(strip.filter((d) => d.isToday)).toHaveLength(1);
+  });
+
+  it('does not move when the selection moves inside the window', () => {
+    const a = buildScrollableDateStrip('2026-09-02').map((d) => d.date);
+    const b = buildScrollableDateStrip('2026-09-10').map((d) => d.date);
+    expect(b).toEqual(a);
+  });
+
+  it('grows to include a selection outside the window', () => {
+    const strip = buildScrollableDateStrip('2026-11-15');
+    expect(strip[0].date).toBe('2026-08-12');
+    expect(strip.some((d) => d.date === '2026-11-15')).toBe(true);
+    expect(strip[strip.length - 1].date).toBe('2026-11-18');
+  });
+
+  it('daysBetween is signed', () => {
+    expect(daysBetween('2026-09-02', '2026-09-05')).toBe(3);
+    expect(daysBetween('2026-09-05', '2026-09-02')).toBe(-3);
   });
 });

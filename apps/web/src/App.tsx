@@ -15,6 +15,7 @@ import MobileBottomNav from "./components/MobileBottomNav";
 import NativeBootSplash from "./components/NativeBootSplash";
 import { reportBootStage } from "@/lib/bootStages";
 import { LeagueLoadErrorBanner } from "./components/LeagueLoadErrorBanner";
+import { RouteUnlock } from "./components/RouteUnlock";
 import { TermsGate } from "./components/TermsGate";
 import { CookieConsent } from "./components/CookieConsent";
 import ScrollToTop from "./components/ScrollToTop";
@@ -208,6 +209,9 @@ const App = () => {
             <BrowserRouter>
               <a href="#main-content" className="skip-to-content">Skip to content</a>
               <ScrollToTop />
+              {/* QA pass 1 (2026-09-09): lift a stranded body pointer lock
+                  after navigation so a dialog race can never freeze the app. */}
+              <RouteUnlock />
               <PushDeepLink />
               <NativeAuthDeepLink />
               <UniversalLinkDeepLink />

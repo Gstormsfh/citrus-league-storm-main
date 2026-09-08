@@ -5,7 +5,7 @@ import { useGameLogIdentity } from '@/components/player/useGameLogIdentity';
 import { userMessage } from '@/lib/userMessage';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
-import { AlertCircle, Clock, Trash2, Snowflake, CalendarDays, Loader2, Newspaper } from 'lucide-react';
+import { AlertCircle, Clock, Trash2, Snowflake, CalendarDays, Loader2, Newspaper, Star, Share2, ArrowLeftRight } from 'lucide-react';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { cn } from '@/lib/utils';
 import { LeagueService, getLeagueFormat } from '@/services/LeagueService';
@@ -39,7 +39,7 @@ import {
 } from '@/components/pressbox/PlayerCard';
 import { usePlayerDashboardIndex } from '@/hooks/usePlayerDashboardIndex';
 import { newestRowFor, vitalsFrom, type DirectoryVitalsRow, type Vital } from '@/components/player/vitals';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { PressBoxSectionHead } from '@/components/pressbox/SectionHead';
 import { PressBoxTabs } from '@/components/pressbox/Tabs';
 import {
@@ -243,6 +243,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
   }, [leagueId, isOpen, projectionPlayerId, projectionGoalie]);
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const tradeHref = `/trade-analyzer${leagueId ? `?league=${leagueId}` : ''}`;
   const [isDropping, setIsDropping] = useState(false);
   // Headshot-first avatar (2026-08-18): try the player's real NHL
   // headshot, fall back to team logo, then jersey number. Mirrors
@@ -749,8 +751,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
   const hasProjection = scoringReady && pointsFormat && !gameLogLoading && !gameLogError && futureGames.some(g => g.projection != null);
   const heroProjectedPts = leagueProjection.points;
   const cardTiles: PressBoxStatTile[] = [
-    { key: 'wk', label: 'L7 PTS', value: weekPoints != null ? weekPoints.toFixed(1) : '–', tone: weekPoints != null ? 'sage' : 'plain' },
-    { key: 'szn', label: 'SZN PROJ', value: hasProjection ? String(Math.round(heroProjectedPts)) : '–', onClick: hasProjection ? () => setShowProjectionBreakdown(v => !v) : undefined },
+    // QA PASS 1 (2026-09-09): say what each tile is. "SZN PROJ" and "L7 PTS"
+    // read as two unlabelled numbers; "PROJECTION" is the season projection
+    // and "LAST 7 DAYS" is what he has actually scored.
+    { key: 'wk', label: 'LAST 7 DAYS', value: weekPoints != null ? weekPoints.toFixed(1) : '–', tone: weekPoints != null ? 'sage' : 'plain' },
+    { key: 'szn', label: 'PROJECTION', value: hasProjection ? String(Math.round(heroProjectedPts)) : '–', onClick: hasProjection ? () => setShowProjectionBreakdown(v => !v) : undefined },
     { key: 'rank', label: 'POS RANK', value: positionRank ?? '–' },
     {
       key: 'xg',
@@ -866,12 +871,24 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
               gone); TRADE goes to the analyzer with the league. The week
               projection banner that sat here lives on as the SZN PROJ tile. */}
           <div className={cn(PB_TYPE, 'flex gap-1.5 mt-3.5 font-plex font-semibold text-[11px] tracking-[0.06em]')} data-testid="player-card-actions">
+            {/* QA PASS 1 (2026-09-09, Zach): Players → McDavid → Trade froze the
+                app until a restart. The Link closed the dialog and changed
+                the route in the same tick, so the dialog unmounted mid-close
+                under the page that owned it, and Radix's outside-pointer
+                lock could stay on <body> (pointer-events: none) with nothing
+                left to lift it. Close first, navigate after the close
+                animation has run. RouteUnlock in App.tsx is the belt to this
+                suspender. */}
             <Link
-              to={`/trade-analyzer${leagueId ? `?league=${leagueId}` : ''}`}
-              onClick={onClose}
+              to={tradeHref}
+              onClick={(e) => {
+                e.preventDefault();
+                onClose();
+                window.setTimeout(() => navigate(tradeHref), 220);
+              }}
               className="focus-citrus flex-1 h-9 rounded-[9px] bg-white/[0.06] border border-white/[0.12] text-pressbox-text flex items-center justify-center gap-1.5 uppercase"
             >
-              ⇄ Trade
+              <ArrowLeftRight className="w-3.5 h-3.5" strokeWidth={2.25} aria-hidden="true" /> Trade
             </Link>
             {leagueId && user && isOnRoster && (
               <button
@@ -901,20 +918,23 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
               aria-label={watched ? 'Stop watching' : 'Watch'}
               aria-pressed={watched}
               onClick={toggleWatch}
+              // QA PASS 1 (2026-09-09): a 44px target and a real icon. The
+              // share button drew `▢`, which is the literal "box next to the
+              // star" from the review, not a missing font.
               className={cn(
-                'focus-citrus w-9 h-9 rounded-[9px] border flex items-center justify-center text-[14px]',
+                'focus-citrus w-11 h-9 rounded-[9px] border flex items-center justify-center',
                 watched ? 'bg-pressbox-orange/15 border-pressbox-orange/45 text-pressbox-orange-soft' : 'bg-white/[0.06] border-white/[0.12] text-pressbox-text',
               )}
             >
-              ★
+              <Star className="w-[18px] h-[18px]" strokeWidth={2} fill={watched ? 'currentColor' : 'none'} aria-hidden="true" />
             </button>
             <button
               type="button"
               aria-label="Share"
               onClick={sharePlayer}
-              className="focus-citrus w-9 h-9 rounded-[9px] bg-white/[0.06] border border-white/[0.12] text-pressbox-text flex items-center justify-center text-[14px]"
+              className="focus-citrus w-11 h-9 rounded-[9px] bg-white/[0.06] border border-white/[0.12] text-pressbox-text flex items-center justify-center"
             >
-              ▢
+              <Share2 className="w-[17px] h-[17px]" strokeWidth={2} aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -924,7 +944,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
             underline, condensed caps — and it drives the same three panes.
             `max-h-[55vh] overflow-y-auto` stays for the modal; on the phone
             sheet the body takes what the hero and the footer leave. */}
-        <div className={cn(PB_TYPE, 'px-4 pt-1 pb-4 max-h-[55vh] overflow-y-auto max-sm:max-h-none max-sm:flex-1 max-sm:min-h-0')}>
+        <div className={cn(PB_TYPE, 'px-4 pt-1 pb-4 max-h-[55vh] overflow-y-auto max-sm:max-h-none max-sm:flex-1 max-sm:min-h-0 max-sm:pb-[calc(2rem+env(safe-area-inset-bottom))]')}>
           <Tabs value={cardTab} onValueChange={(v) => setCardTab(v as CardTab)}>
             <PressBoxTabs
               className="px-0 gap-4 mb-3 border-white/10"

@@ -57,7 +57,8 @@ export function ChatBar({
         PB_TYPE,
         'fixed left-0 right-0 z-app-nav lg:hidden',
         'bg-pressbox-surface border-t border-white/[0.08]',
-        'flex items-center gap-2 px-3',
+        // QA PASS 1 (2026-09-09): a little more air inside the bar.
+        'flex items-center gap-2.5 px-4',
         className,
       )}
       style={{ height: CHATBAR_H, bottom: `calc(${BOTTOMNAV_H}px + env(safe-area-inset-bottom))` }}

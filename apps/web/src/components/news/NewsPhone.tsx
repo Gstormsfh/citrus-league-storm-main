@@ -91,7 +91,7 @@ export function NewsPhone({
             type="search"
             value={searchQuery}
             onChange={(e) => onSearchQuery(e.target.value)}
-            placeholder="Search the wire…"
+            placeholder="Search any player or team…"
             aria-label="Search news"
             data-testid="news-phone-search"
             className="flex-1 min-w-0 bg-transparent font-barlow text-[14px] text-pressbox-text placeholder:text-pressbox-text/45 outline-none"
@@ -108,7 +108,7 @@ export function NewsPhone({
         </div>
       )}
 
-      <div className="-mx-3.5 py-2.5 -my-2.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-3.5 py-2.5 -my-2.5 overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <PressBoxChips
           chips={categories.map((c) => ({ key: c.key, label: c.label.toUpperCase() }))}
           activeKey={category}

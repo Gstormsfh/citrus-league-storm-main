@@ -16,6 +16,7 @@
  * transcript -- the one setting that was ever real.
  */
 import { useState, type RefObject } from 'react';
+import { useVisualViewport } from '@/hooks/useVisualViewport';
 import { Loader2, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BOTTOMNAV_H } from '@/components/pressbox/chromeMetrics';
@@ -75,6 +76,13 @@ export function StormyPhone({
   const [pane, setPane] = useState<'chat' | 'about'>('chat');
   const [confirmClear, setConfirmClear] = useState(false);
   const canSend = inputValue.trim().length > 0 && !isLoading;
+  // QA PASS 1 (2026-09-09): with the keyboard up, the layer is sized to the
+  // VISIBLE viewport and the bottom nav (under the keyboard anyway) is no
+  // longer subtracted, so the composer sits right on the keyboard.
+  const viewport = useVisualViewport();
+  const layerStyle: React.CSSProperties = viewport.keyboardOpen && viewport.height
+    ? { top: viewport.offsetTop, height: viewport.height, bottom: 'auto' }
+    : { bottom: `calc(${BOTTOMNAV_H}px + env(safe-area-inset-bottom))` };
 
   return (
     /* The layer owns the viewport above the nav: header, control, the
@@ -87,7 +95,8 @@ export function StormyPhone({
         'lg:hidden fixed inset-x-0 top-0 flex flex-col bg-pressbox-surface text-pressbox-text pt-[env(safe-area-inset-top)]',
         className,
       )}
-      style={{ bottom: `calc(${BOTTOMNAV_H}px + env(safe-area-inset-bottom))` }}
+      style={layerStyle}
+      data-keyboard-open={viewport.keyboardOpen ? 'true' : undefined}
       data-testid="stormy-phone"
     >
       {header}

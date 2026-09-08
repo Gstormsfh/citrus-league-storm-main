@@ -20,6 +20,7 @@
  * a responsive class.
  */
 import { useEffect, useRef, useState } from 'react';
+import { scrollStripTo } from '@/components/pressbox/scrollStrip';
 import { cn } from '@/lib/utils';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { PressBoxSheet } from '@/components/pressbox/Sheet';
@@ -66,7 +67,7 @@ export function LeagueSettingsPhone({
   useEffect(() => {
     if (!open) return;
     const active = chipsRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]');
-    active?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' });
+    scrollStripTo(chipsRef.current, active);
   }, [open, section?.key]);
   const fields = section ? section.groups.flatMap((g) => g.fields) : [];
 
@@ -80,7 +81,7 @@ export function LeagueSettingsPhone({
           onBack={() => onOpenChange(false)}
         />
 
-        <div ref={chipsRef} className="mt-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div ref={chipsRef} className="mt-1 overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <PressBoxChips
             chips={sections.map((s) => ({ key: s.key, label: s.label }))}
             activeKey={section?.key ?? ''}

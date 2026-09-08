@@ -29,12 +29,16 @@ export function PressBoxGameDay({ className }: { className?: string }) {
             data-testid="game-day-tile"
             data-type={g.type}
             className={cn(
-              'focus-citrus block min-h-[84px] p-3 rounded-[12px] bg-pressbox-tile border border-white/[0.08]',
-              'flex flex-col justify-end',
+              // QA PASS 1 (2026-09-09): titles start at the same line on all
+              // three tiles. `justify-end` let a two-line blurb push its title
+              // lower than its neighbours'; now the title sits at the top and
+              // the blurb takes a fixed two-line box under it.
+              'focus-citrus block min-h-[92px] p-3 rounded-[12px] bg-pressbox-tile border border-white/[0.08]',
+              'flex flex-col justify-start',
             )}
           >
             <span className="block font-condensed font-bold text-[15px] uppercase tracking-[0.06em] text-pressbox-text">{g.title}</span>
-            <span className="block mt-0.5 font-barlow text-[11px] leading-[1.25] text-pressbox-text/55">{g.line}</span>
+            <span className="block mt-1 font-barlow text-[11px] leading-[1.25] text-pressbox-text/55 min-h-[2.5em] line-clamp-3">{g.line}</span>
           </Link>
         ))}
       </div>

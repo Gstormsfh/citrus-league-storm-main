@@ -113,10 +113,13 @@ export function PlayersBrowsePhone({
   const visible = rows.slice(0, shown);
 
   return (
-    <div data-testid="players-browse-phone" className={cn(PB_TYPE, 'px-3.5', className)}>
+    // QA PASS 1 (2026-09-09): more air between the controls (search, the
+    // skaters/goalies switch, the filter chips, the list head) and a search
+    // field a thumb can find: 48px tall, 16px type.
+    <div data-testid="players-browse-phone" className={cn(PB_TYPE, 'px-3.5 pt-1', className)}>
       {searchOpen && (
-        <div className="mb-2.5 flex items-center gap-2 h-[38px] px-3 rounded-[10px] bg-pressbox-tile border border-white/[0.08]">
-          <Search className="w-[15px] h-[15px] text-pressbox-text/45" strokeWidth={2} aria-hidden />
+        <div className="mb-3.5 flex items-center gap-2.5 h-12 px-3.5 rounded-[12px] bg-pressbox-tile border border-white/[0.1]">
+          <Search className="w-[18px] h-[18px] text-pressbox-text/45" strokeWidth={2} aria-hidden />
           <input
             ref={searchRef}
             type="search"
@@ -125,7 +128,7 @@ export function PlayersBrowsePhone({
             placeholder="Search every player…"
             aria-label="Search players"
             data-testid="players-browse-search"
-            className="flex-1 min-w-0 bg-transparent font-barlow text-[14px] text-pressbox-text placeholder:text-pressbox-text/45 outline-none"
+            className="flex-1 min-w-0 h-full bg-transparent font-barlow text-[16px] text-pressbox-text placeholder:text-pressbox-text/45 outline-none"
           />
           {searchQuery && (
             <button
@@ -149,7 +152,7 @@ export function PlayersBrowsePhone({
         onSelect={(k) => onGroup(k as 'skaters' | 'goalies')}
       />
 
-      <div className="mt-2.5 -mx-3.5 py-2.5 -my-2.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mt-3.5 -mx-3.5 py-2.5 -my-2.5 overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <PressBoxChips
           chips={chips}
           activeKey={chipActive}
@@ -166,7 +169,7 @@ export function PlayersBrowsePhone({
       </div>
 
       <PressBoxSectionHead
-        className="mt-3.5"
+        className="mt-5"
         title={searchQuery ? 'Results' : goalies ? 'Goalies' : 'Skaters'}
         count={!loading && total > 0 ? String(total) : null}
         action={
