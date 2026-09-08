@@ -33,18 +33,18 @@ export function SectionHeader({
         <div className={`flex items-center gap-2 mb-2 ${eyebrowJustify}`}>
           {mascot && <MascotAvatar id={mascot} size="xs" ring={false} />}
           {eyebrow && (
-            <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">
+            <div className="font-plex font-semibold text-[11px] tracking-[0.18em] uppercase text-pressbox-orange-soft">
               {eyebrow}
             </div>
           )}
         </div>
       )}
-      <h2 className="font-sans font-black text-[1.75rem] sm:text-[2.25rem] md:text-[2.75rem] tracking-[-0.025em] text-pastel-cream leading-tight">
+      <h2 className="font-condensed font-extrabold uppercase text-[2.25rem] sm:text-[2.75rem] md:text-[3.25rem] tracking-[-0.01em] text-pressbox-text leading-[0.95]">
         {title}
       </h2>
       {sub && (
         <p
-          className={`text-[14px] md:text-[15px] text-white/55 leading-relaxed mt-3 md:mt-4 ${
+          className={`font-barlow font-normal text-[16px] md:text-[17px] text-pressbox-text/70 leading-relaxed mt-3 md:mt-4 ${
             align === 'center' ? 'max-w-xl mx-auto' : 'max-w-2xl'
           }`}
         >

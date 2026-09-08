@@ -15,7 +15,7 @@ function FaqItem({ q, a }: FaqEntry) {
         className="w-full flex items-center justify-between py-5 text-left group"
         aria-expanded={open}
       >
-        <span className="font-sans font-semibold text-[16px] text-pastel-cream group-hover:text-pastel-orange-soft transition-colors">
+        <span className="font-condensed font-bold uppercase tracking-[0.04em] text-[19px] text-pressbox-text group-hover:text-pressbox-orange-soft transition-colors">
           {q}
         </span>
         <ChevronDown
@@ -24,7 +24,7 @@ function FaqItem({ q, a }: FaqEntry) {
         />
       </button>
       {open && (
-        <div className="pb-5 text-[14px] text-white/65 leading-relaxed max-w-2xl">{a}</div>
+        <p className="pb-5 font-barlow font-normal text-[16px] text-pressbox-text/75 leading-relaxed max-w-2xl">{a}</p>
       )}
     </div>
   );

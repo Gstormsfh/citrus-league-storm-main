@@ -51,10 +51,10 @@ export function FeatureCard({
         )}
 
         <div className="px-6 pb-6 pt-2 flex flex-col flex-1">
-          <h3 className="font-sans font-bold text-[1.15rem] text-pastel-cream mb-2">
+          <h3 className="font-condensed font-bold uppercase tracking-[0.04em] text-[22px] leading-none text-pressbox-text mb-2.5">
             {label}
           </h3>
-          <p className="text-[13px] text-white/60 leading-relaxed mb-4 flex-grow">
+          <p className="font-barlow font-normal text-[15px] text-pressbox-text/70 leading-relaxed mb-4 flex-grow">
             {desc}
           </p>
           {decoration && <div className="mt-auto">{decoration}</div>}

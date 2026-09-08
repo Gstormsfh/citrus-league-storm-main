@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
  */
 export function DarkLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-pastel-surface text-pastel-cream relative overflow-x-hidden">
+    <div className="min-h-screen bg-pressbox-surface text-pressbox-text relative overflow-x-hidden">
       {/* Atmospheric glow accents — purely decorative */}
       <div
         aria-hidden="true"

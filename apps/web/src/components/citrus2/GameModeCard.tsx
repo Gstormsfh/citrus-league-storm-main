@@ -34,7 +34,7 @@ export function GameModeCard({
 }) {
   const a = ACCENT_CLASSES[accent];
   const button = (
-    <button className="mt-auto w-full inline-flex items-center justify-center gap-1.5 bg-pastel-orange text-[#581E00] px-4 h-11 rounded-md text-[13px] font-bold hover:bg-pastel-orange-soft transition-all duration-200 active:scale-95 group/btn">
+    <button className="mt-auto w-full inline-flex items-center justify-center gap-1.5 bg-pressbox-orange text-pressbox-orange-ink px-4 h-11 rounded-md font-condensed font-bold uppercase tracking-[0.06em] text-[15px] hover:bg-pastel-orange-soft transition-all duration-200 active:scale-95 group/btn">
       {ctaLabel} <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" strokeWidth={2.5} />
     </button>
   );
@@ -59,7 +59,7 @@ export function GameModeCard({
                 style={{ background: 'linear-gradient(to bottom, transparent 0%, #1A2A20 100%)' }}
               />
               {badge && (
-                <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-md font-jbmono text-[9px] tracking-wider uppercase font-bold ring-1 ${a.chip} backdrop-blur-md bg-pastel-surface/70`}>
+                <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-md font-plex font-semibold text-[10px] tracking-[0.12em] uppercase ring-1 ${a.chip} backdrop-blur-md bg-pastel-surface/70`}>
                   {badge}
                 </span>
               )}
@@ -80,10 +80,10 @@ export function GameModeCard({
           )}
 
           <div className="px-4 pb-4 pt-2 flex flex-col flex-1">
-            <h3 className="font-sans font-bold text-[1.1rem] leading-snug text-pastel-cream mb-1.5">
+            <h3 className="font-condensed font-bold uppercase tracking-[0.04em] text-[21px] leading-none text-pressbox-text mb-2">
               {label}
             </h3>
-            <p className="text-[12px] text-white/55 leading-snug mb-4 flex-grow min-h-[80px] line-clamp-4">
+            <p className="font-barlow font-normal text-[14px] text-pressbox-text/70 leading-snug mb-4 flex-grow min-h-[80px] line-clamp-4">
               {sub}
             </p>
             {to ? <Link to={to} className="contents">{button}</Link> : button}

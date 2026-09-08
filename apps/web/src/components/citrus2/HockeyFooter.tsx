@@ -126,9 +126,9 @@ export function HockeyFooter({
             </Link>
             {!isApp && (
               <>
-                <p className="text-white/55 text-[13px] leading-relaxed mb-5 max-w-xs">
-                  A 31-feature xG model, live shift-level scoring, and an AI assistant GM who knows
-                  your roster. Built by hockey heads, for hockey heads.
+                <p className="font-barlow font-normal text-pressbox-text/65 text-[14px] leading-relaxed mb-5 max-w-xs">
+                  Season-long fantasy hockey with live scoring, projections from an expected-goals
+                  model built for the NHL, and an assistant GM who has read your roster. Made in Edmonton.
                 </p>
                 <Link
                   to="/create-league"
@@ -141,7 +141,7 @@ export function HockeyFooter({
           </div>
           {columns.map((col) => (
             <div key={col.title}>
-              <div className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 mb-3 font-bold">
+              <div className="font-plex font-semibold text-[11px] tracking-[0.16em] uppercase text-pressbox-text/55 mb-3">
                 {col.title}
               </div>
               <ul className="space-y-2.5">

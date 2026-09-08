@@ -22,7 +22,6 @@ import { SectionHeader } from './SectionHeader';
 import { CtaBanner } from './CtaBanner';
 import { Faq, type FaqEntry } from './Faq';
 import { GameModeCard } from './GameModeCard';
-import { OnboardingCard } from './OnboardingCard';
 import { FeatureCard } from './FeatureCard';
 import { MascotCard } from './MascotCard';
 import { StormyChatTile } from './StormyChatTile';
@@ -44,80 +43,38 @@ import {
 import type { AccentName } from './tokens';
 
 // =============================================================================
-// HERO SLIDES — playoffs front and center, fantasy as off-season tease
+// HERO
 // =============================================================================
 
-// Five blocks of invented data lived here and none of them were rendered:
-// EAST_SERIES / WEST_SERIES (fabricated playoff results), PICKEM_GAMES (with
-// invented team records like 47-23-8), SURVIVOR_PICKS, and a canned
-// STORMY_EXCHANGE. Dead code is not harmless when it is fake data next to the
-// components that would display it — the whole set was one JSX line away from
-// being on the homepage. Removed 2026-08-26 with the imports that fed it.
-
-// Inline component to render a mascot action scene as a slide visual. Uses
-// the same scene assets that drive the GameModeCard hero zone — mascots
-// doing the thing each slide describes.
+// Inline component to render a mascot action scene as the hero visual.
 function SceneVisual({ src, alt }: { src: string; alt: string }) {
   return (
-    <div className="relative w-full aspect-square max-w-[480px] mx-auto rounded-3xl overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
+    <div className="relative w-full aspect-square max-w-[520px] mx-auto rounded-[28px] overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
       <img src={src} alt={alt} className="w-full h-full object-cover" loading="eager" />
     </div>
   );
 }
 
-// SWEEP FIX (2026-08-16): the carousel led with "Stanley Cup Playoffs ·
-// Live now" — in August, months after the Cup was lifted. The season-long
-// fantasy slide (the actual live product, drafts open) now leads; the
-// brackets slide is seasonal-honest and moved to the back. Opening-night
-// date corrected to the ingested 2026-27 schedule (Sep 29, not Oct 8).
+// SITE REWRITE (2026-09-09). One static hero instead of a five-slide carousel.
+// A carousel hides the pitch behind a timer, the game modes it cycled through
+// are the grid two sections down, and every slide's sub-line was a stack of
+// fragments. The copy is house voice, one thought per
+// sentence, first person where it is his story, and no counts we have not
+// verified (the "31-feature" claim is gone until the model artifact confirms
+// it). Opening night is the first scheduled row in `nhl_games` as of
+// 2026-09-09: 2026-09-29, five games.
+export const OPENING_NIGHT_LABEL = 'Puck drops Sep 29';
+
 function getHeroSlides(): HeroSlide[] {
   return [
     {
       id: 'fantasy',
-      eyebrow: 'Fantasy Hockey 2026 · Drafts open · Puck drops Sep 29',
-      headline: { lead: 'Fantasy Hockey', accent: '2026' },
-      sub: 'A 31-feature xG model. Live shift-level scoring. Snake, auction, or salary-cap drafts. Built by hockey heads, for hockey heads. Create your league today.',
-      primary: { label: 'Drop the Puck', to: '/create-league' },
-      secondary: { label: 'Try a mock draft →', to: '/armchair-gm?tab=mockdraft' },
+      eyebrow: `Season-long fantasy hockey · Free · ${OPENING_NIGHT_LABEL}`,
+      headline: { lead: 'Fantasy hockey', accent: 'for people who watch hockey.' },
+      sub: 'Season-long leagues with your buddies, live scoring on every shift, and projections from an expected-goals model built for the NHL. There are no entry fees and no payouts. It is just hockey.',
+      primary: { label: 'Create a league', to: '/create-league' },
+      secondary: { label: 'Try a mock draft first', to: '/armchair-gm?tab=mockdraft' },
       visual: <SceneVisual src="/mascots/scene-squad.webp" alt="The Citrus Squad on the bench" />,
-    },
-    {
-      id: 'pickem',
-      eyebrow: 'Pickem · Daily · Free',
-      headline: { lead: 'Pick tonight.', accent: 'Pick every night.' },
-      sub: 'Pick the winner of every NHL game on the slate. Straight up, no spreads, no over-unders. Locks at puck drop, settled at the final horn. Climb the league leaderboard.',
-      primary: { label: 'Drop In', to: '/pool/pickem' },
-      secondary: { label: "Tonight's slate →", to: '/pool/pickem' },
-      visual: <SceneVisual src="/mascots/scene-pickem.webp" alt="Lemon picking between EDM and COL" />,
-    },
-    {
-      id: 'survivor',
-      eyebrow: 'Survivor · Weekly · Free',
-      headline: { lead: 'One pick a week.', accent: "Don't lose" },
-      sub: "Pick one team to win each week. Use any team only once all season. Lose your pick and you're in the sin bin, eliminated on the spot. Last manager standing takes the pool.",
-      primary: { label: 'Last One Standing', to: '/pool/survivor' },
-      secondary: { label: 'How it works →', to: '/pool/survivor' },
-      visual: <SceneVisual src="/mascots/scene-survivor.webp" alt="Kiwi alone in the spotlight" />,
-    },
-    {
-      id: 'stormy',
-      eyebrow: 'Stormy · Assistant GM · Free during launch',
-      // SWEEP FIX (2026-08-16): "An assistant GM who" overflowed the
-      // viewport edge at tablet widths — shorter lead line wraps cleanly.
-      headline: { lead: 'An assistant GM', accent: 'who knows hockey' },
-      sub: 'Stormy is plugged into your roster, scoring, and matchup. He quotes the actual numbers, xGF%, TOI, PP1 share, save%, and names where each one came from. The assistant GM you wish your team had.',
-      primary: { label: 'Talk to Stormy', to: '/gm-office/stormy' },
-      secondary: { label: 'See an example →', to: '#stormy' },
-      visual: <SceneVisual src="/mascots/scene-stormy-ai.webp" alt="Stormy with coach playbook and lineup board" />,
-    },
-    {
-      id: 'brackets',
-      eyebrow: '🏒 Stanley Cup Playoff Brackets · Returns in April',
-      headline: { lead: 'Lift the', accent: 'Cup' },
-      sub: 'Predict the entire Stanley Cup playoffs round by round: First Round, Second Round, Conference Finals, Cup Final. Live bracket updates every 60 seconds once the field is set.',
-      primary: { label: 'See How Brackets Work', to: '/nhl/playoffs' },
-      secondary: { label: 'Last season’s bracket →', to: '/nhl/playoffs' },
-      visual: <SceneVisual src="/mascots/scene-cup.webp" alt="Pineapple lifting the Stanley Cup" />,
     },
   ];
 }
@@ -125,6 +82,8 @@ function getHeroSlides(): HeroSlide[] {
 // =============================================================================
 // SECTION DATA
 // =============================================================================
+
+const FACT_STRIP = ['Drafts are open', OPENING_NIGHT_LABEL, 'Snake, auction and salary-cap drafts', 'No card, no fees'];
 
 const GAME_MODES: Array<{
   label: string;
@@ -138,8 +97,8 @@ const GAME_MODES: Array<{
   {
     label: 'Fantasy Hockey',
     scene: '/mascots/scene-squad.webp',
-    sub: 'Snake, auction, or salary cap. Custom scoring, commish tools, live draft rooms.',
-    badge: 'Free',
+    sub: 'Snake, auction or salary-cap draft, your own scoring, and a live draft room. This is the main event.',
+    badge: 'Season',
     accent: 'orange',
     icon: CrossedSticksIcon,
     to: '/create-league',
@@ -147,7 +106,7 @@ const GAME_MODES: Array<{
   {
     label: 'Daily Pickem',
     scene: '/mascots/scene-pickem.webp',
-    sub: "Pick tonight's winners. Settled when the final horn sounds.",
+    sub: "Pick the winner of every game on tonight's slate. It locks at puck drop and settles at the final horn.",
     badge: 'Daily',
     accent: 'sage',
     icon: PickemIcon,
@@ -156,7 +115,7 @@ const GAME_MODES: Array<{
   {
     label: 'Survivor Pool',
     scene: '/mascots/scene-survivor.webp',
-    sub: "One pick a week. Win or you're in the sin bin. Last manager standing takes it.",
+    sub: "One team a week, and you can only use each team once. Lose and you're out. The last manager standing takes it.",
     badge: 'Weekly',
     accent: 'butter',
     icon: SurvivorIcon,
@@ -165,7 +124,7 @@ const GAME_MODES: Array<{
   {
     label: 'Confidence Pool',
     scene: '/mascots/scene-confidence.webp',
-    sub: 'Weighted weekly picks. Rank your confidence, multiply your edge.',
+    sub: 'Rank your weekly picks by how sure you are. The ones you are most confident in are worth the most.',
     badge: 'Weekly',
     accent: 'peach',
     icon: ScoreboardIcon,
@@ -174,7 +133,7 @@ const GAME_MODES: Array<{
   {
     label: 'Stanley Cup Brackets',
     scene: '/mascots/scene-cup.webp',
-    sub: 'Predict the entire playoff run. Confidence-weighted scoring all the way to the Cup.',
+    sub: 'Fill in the whole bracket before the first round starts and score it round by round through the Cup Final.',
     badge: 'Apr–Jun',
     accent: 'orange',
     icon: CupIcon,
@@ -183,49 +142,11 @@ const GAME_MODES: Array<{
   {
     label: 'Mock Draft',
     scene: '/mascots/scene-draft.webp',
-    sub: 'Spin up a 12-team mock against AI managers. No signup, instant board.',
+    sub: 'A 12-team mock against AI managers, no account needed. Good for testing a strategy before the real draft.',
     badge: 'Anytime',
     accent: 'sage',
     icon: DraftIcon,
     to: '/armchair-gm?tab=mockdraft',
-  },
-];
-
-const ONBOARDING_CARDS: Array<{
-  title: string;
-  body: string;
-  cta: string;
-  icon: React.ComponentType<{ className?: string }>;
-  accent: AccentName;
-  to: string;
-  mascotPeek?: 'stormy' | 'lemon' | 'kiwi' | 'pineapple';
-}> = [
-  {
-    title: 'Drop the Puck',
-    body: 'Snake, auction, or salary cap. Pick your scoring, drop the invite in the group chat, draft this weekend.',
-    cta: 'Start a league',
-    icon: CrossedSticksIcon,
-    accent: 'orange',
-    to: '/create-league',
-    mascotPeek: 'lemon',
-  },
-  {
-    title: 'Run a Mock',
-    body: 'A 12-team mock against AI managers. No signup, instant board, and the projections run live while you pick.',
-    cta: 'Mock now',
-    icon: DraftIcon,
-    accent: 'sage',
-    to: '/armchair-gm?tab=mockdraft',
-    mascotPeek: 'kiwi',
-  },
-  {
-    title: 'Chirp at Stormy',
-    body: 'Ask the assistant GM anything: a roster move, a matchup edge, a trade. He reads the xGF%, the Corsi and the TOI before he answers.',
-    cta: 'Open Stormy',
-    icon: ShiftIcon,
-    accent: 'butter',
-    to: '/gm-office/stormy',
-    mascotPeek: 'stormy',
   },
 ];
 
@@ -237,42 +158,42 @@ const REAL_FEATURES: Array<{
   scene?: string;
 }> = [
   {
-    label: '31-Feature xG Model',
+    label: 'An expected-goals model',
     scene: '/mascots/scene-xg-model.webp',
-    desc: 'XGBoost projections using xGF%, deployment, line chemistry, and Bayesian shrinkage.',
+    desc: 'Every shot gets an expected-goal value from a gradient-boosted model trained on shot location, shot type and the passing sequence before the shot. Player projections start there, not at last season\'s point totals.',
     icon: XGModelIcon,
     accent: 'orange',
   },
   {
-    label: 'Saturday Slate',
-    desc: 'Sun–Sat weeks. Your matchup ends with 12 games on the ice, not Sunday morning when 3 teams play.',
-    icon: SlateIcon,
+    label: 'A range, not a number',
+    desc: 'Every projection is run as a simulation, so you see a floor, a middle and a ceiling for each skater each night instead of one average. That is what a start-or-sit call actually needs.',
+    icon: RangeIcon,
     accent: 'sage',
   },
   {
-    label: 'Live Shift Scoring',
+    label: 'Live scoring on every shift',
     scene: '/mascots/scene-livescoring.webp',
-    desc: 'Every goal, apple, hit, block updates your matchup in real time as the play unfolds.',
+    desc: 'Goals, assists, hits and blocks land in your matchup as they happen during the game, not after the box score posts.',
     icon: ShiftIcon,
     accent: 'butter',
   },
   {
-    label: 'Stormy · Assistant GM',
+    label: 'Stormy, the assistant GM',
     scene: '/mascots/scene-stormy-ai.webp',
-    desc: 'Plugged into your roster, scoring, and matchup. Real hockey advice, not generic boilerplate.',
+    desc: 'Stormy knows your roster and your scoring settings before you ask, and he quotes the number he is leaning on when he answers.',
     icon: ScoreboardIcon,
     accent: 'peach',
   },
   {
-    label: 'Advanced Metrics',
-    desc: 'xGF%, Corsi, PP1 share, deployment splits, zone entry rates. Available in your player dashboard.',
+    label: 'The stats the pros look at',
+    desc: 'xGF%, Corsi, power-play unit share, deployment and zone entries are on every player\'s page. None of it is behind an upgrade.',
     icon: XGModelIcon,
     accent: 'sage',
   },
   {
-    label: 'Monte Carlo Ranges',
-    desc: 'Floor, median and ceiling per skater per night. You see the range, not one number.',
-    icon: RangeIcon,
+    label: 'Weeks that end on Saturday',
+    desc: 'Matchup weeks run Sunday to Saturday, so your week ends on the biggest slate of the schedule instead of a three-game Sunday morning.',
+    icon: SlateIcon,
     accent: 'orange',
   },
 ];
@@ -282,33 +203,50 @@ const MASCOT_ACCENTS: AccentName[] = ['orange', 'butter', 'sage', 'peach'];
 const FAQ: FaqEntry[] = [
   {
     q: 'How does Citrus work?',
-    a: "Create or join a fantasy hockey league. Draft your roster in a snake, an auction or a salary-cap format. Set your lineup before puck drop each day. Live shift-level scoring updates your matchup in real time. Stormy, your AI assistant GM, answers questions about your roster, matchup, or trades.",
+    a: 'You create a league, send your friends the invite link, and draft. From there you set your lineup before puck drop each day, your matchup updates live during the games, and Stormy is there when you want a second opinion.',
   },
   {
-    q: 'Is Citrus free?',
-    a: "Yes. Citrus is free to use. No credit card is required. Stormy has a weekly question limit.",
+    q: 'Is it free?',
+    a: 'Yes. There is nothing to pay and no card to enter. Stormy has a weekly question limit while we are in launch.',
   },
   {
-    q: 'What makes your projections different?',
-    a: "A 31-feature XGBoost xG model with Bayesian shrinkage for low-sample players. xGF%, deployment patterns, line combos, PP1 time, zone entry rates. Each projection is a Monte Carlo distribution, so you get a floor, a median and a ceiling for every skater, every night.",
+    q: 'Is this a gambling app?',
+    a: 'No. Citrus does not take entry fees and does not pay anything out. It is season-long fantasy with your friends, and that is the whole business.',
   },
   {
-    q: 'What league formats do you support?',
-    a: "Snake, linear, auction, salary cap, and autopick drafts. Head-to-head points, head-to-head categories, roto, total points, points-per-game, and best-ball scoring. Plus pickem, survivor, confidence pools, and Stanley Cup brackets.",
+    q: 'What is different about the projections?',
+    a: 'They come from an expected-goals model built for the NHL and retrained through the season, and every projection is a range with a floor and a ceiling rather than one average. The Features page has the details.',
   },
   {
-    q: "How does Stormy actually help? Isn't AI just hot air?",
-    a: "Stormy is plugged into your league: your roster, your scoring settings, your matchup. Ask him start/sit, trade analysis, waiver targets. He quotes real metrics (xGF%, TOI, PP1 time, save%) and says which source each one came from, instead of telling you to monitor the situation.",
+    q: 'What formats do you support?',
+    a: 'Snake, linear, auction, salary-cap and autopick drafts. Head-to-head points, head-to-head categories, roto, total points, points-per-game and best-ball scoring. Pickem, survivor and confidence pools, and a Stanley Cup bracket in the spring.',
   },
   {
-    q: 'Where is Citrus available?',
-    a: 'Web app, anywhere with a browser. Mobile-optimized, so it works on a phone with no install.',
+    q: 'Can I bring my existing league over?',
+    a: 'Yes. Tell us your league\'s format and scoring on the Bring Your League page and we will set it up to match.',
+  },
+  {
+    q: 'Where can I use it?',
+    a: 'In any browser, on a laptop or a phone. An iPhone app is on the way.',
   },
 ];
+
+const STORMY_EXAMPLE = {
+  question: "I'm offered a second-line winger and a 3rd-round pick for my top defenceman. Take it?",
+  answer:
+    "I wouldn't. He is your only defenceman on a first power-play unit and your scoring pays for power-play points. The winger they are offering is on his team's second unit and would slot behind two of your current wingers. If they will add their PP1 defenceman instead of the pick, that is a different conversation.",
+};
 
 // =============================================================================
 // HOMEPAGE COMPOSITION
 // =============================================================================
+
+const SECTION = 'relative max-w-[1280px] mx-auto px-6 pb-24';
+const BODY = 'font-barlow font-normal text-[17px] leading-relaxed text-pressbox-text/75';
+const PRIMARY_LINK =
+  'inline-flex items-center gap-2 bg-pressbox-orange text-pressbox-orange-ink font-condensed font-bold uppercase tracking-[0.06em] text-[16px] px-6 h-12 rounded-md hover:bg-pastel-orange-soft transition-colors';
+const GHOST_LINK =
+  'inline-flex items-center gap-2 font-condensed font-bold uppercase tracking-[0.06em] text-[16px] text-pressbox-text hover:text-pressbox-orange-soft transition-colors px-5 h-12 rounded-md ring-1 ring-white/15 hover:ring-white/30';
 
 export function Homepage() {
   const slides = getHeroSlides();
@@ -320,89 +258,102 @@ export function Homepage() {
       <Navbar />
 
       {/* Promo banner below the nav */}
-      <div className="relative z-10 bg-gradient-to-r from-pastel-orange/15 via-pastel-orange/25 to-pastel-orange/15 border-y border-pastel-orange/30">
+      <div className="relative z-10 bg-gradient-to-r from-pressbox-orange/15 via-pressbox-orange/25 to-pressbox-orange/15 border-y border-pressbox-orange/30">
         <div className="max-w-[1280px] mx-auto px-6 py-2 text-center">
-          <span className="font-jbmono text-[11px] tracking-[0.18em] uppercase text-pastel-orange-soft font-bold">
-            🍊 Free to play · No credit card required
+          <span className="font-plex font-semibold text-[11px] tracking-[0.16em] uppercase text-pressbox-orange-soft">
+            Free to play · No card required · {OPENING_NIGHT_LABEL}
           </span>
         </div>
       </div>
 
       <RotatingHero slides={slides} />
 
-      {/* Trust strip — what's real about Citrus, no fake numbers */}
-      <section className="relative max-w-[1280px] mx-auto px-6 pb-16">
-        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55 border-t border-white/5 pt-6">
-          <span className="text-pastel-sage-soft">31 model features</span>
-          <span className="text-white/20">·</span>
-          <span className="text-pastel-sage-soft">Sun–Sat weeks</span>
-          <span className="text-white/20">·</span>
-          <span className="text-pastel-sage-soft">Live shift scoring</span>
-          <span className="text-white/20">·</span>
-          <span className="text-pastel-sage-soft">Stormy assistant GM</span>
-          <span className="text-white/20">·</span>
-          <span className="text-pastel-sage-soft">Free to play</span>
-        </div>
+      {/* Fact strip. Every item is a fact about the product today, none of them a stat. */}
+      <section className="relative max-w-[1280px] mx-auto px-6 pb-20">
+        <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 font-plex font-semibold text-[11px] tracking-[0.16em] uppercase text-pressbox-sage-soft border-t border-white/5 pt-6">
+          {FACT_STRIP.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
       </section>
 
-      {/* Game Modes — horizontal carousel of all available formats */}
-      <section className="relative max-w-[1280px] mx-auto px-6 pb-24">
-        <div className="flex items-baseline justify-between mb-8 gap-4 flex-wrap">
-          <div>
-            <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-2 font-bold">
-              ✦ Game Modes
-            </div>
-            <h2 className="font-sans font-black text-[2.25rem] md:text-[2.75rem] tracking-[-0.025em] text-pastel-cream leading-tight">
-              Every way to play hockey.
-            </h2>
-          </div>
-          <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-white/55">
-            Scroll for more →
-          </span>
-        </div>
+      {/* Game modes */}
+      <section className={SECTION}>
+        <SectionHeader
+          eyebrow="Ways to play"
+          title="Pick your format."
+          sub="Season-long leagues are the main event. The pools are there for the friends who will not commit to a draft."
+        />
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6 snap-x snap-mandatory">
           {GAME_MODES.map((g) => (
-            <GameModeCard key={g.label} {...g} />
+            <GameModeCard key={g.label} {...g} ctaLabel="Open" />
           ))}
         </div>
       </section>
 
-      {/* Three Ways In */}
-      <section className="relative max-w-[1280px] mx-auto px-6 pb-24">
+      {/* The numbers */}
+      <section className={SECTION}>
         <SectionHeader
-          eyebrow="Three Ways In"
-          title="Pick where to start."
-          align="center"
-        />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {ONBOARDING_CARDS.map((c) => (
-            <OnboardingCard key={c.title} {...c} ctaLabel={c.cta} />
-          ))}
-        </div>
-      </section>
-
-      {/* What You Get — real product features */}
-      <section className="relative max-w-[1280px] mx-auto px-6 pb-24">
-        <SectionHeader
-          eyebrow="What You Get"
-          title="The data that wins championships."
-          sub="Explore the tools available on Citrus. No credit card required."
-          align="center"
+          eyebrow="The numbers"
+          title="Projections that show their work."
+          sub="Most fantasy sites hand you one number per player and never say where it came from. This is what is under the hood here."
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {REAL_FEATURES.map((f) => (
             <FeatureCard key={f.label} {...f} />
           ))}
         </div>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link to="/features" className={GHOST_LINK}>
+            How the model works <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
+          </Link>
+          <Link to="/armchair-gm?tab=mockdraft" className={GHOST_LINK}>
+            See it in a mock draft
+          </Link>
+        </div>
       </section>
 
-      {/* Roll Call — The Citrus Squad */}
-      <section className="relative max-w-[1280px] mx-auto px-6 pb-24">
+      {/* Stormy */}
+      <section id="stormy" className={SECTION}>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+          <div className="lg:col-span-5">
+            <div className="flex items-center gap-3 mb-4">
+              <MascotAvatar id="stormy" size="md" />
+              <div className="font-plex font-semibold text-[11px] tracking-[0.18em] uppercase text-pressbox-orange-soft">
+                Stormy · Assistant GM
+              </div>
+            </div>
+            <h2 className="font-condensed font-extrabold uppercase text-[2.25rem] md:text-[3.25rem] leading-[0.95] tracking-[-0.01em] text-pressbox-text mb-5">
+              An assistant GM who has read your roster.
+            </h2>
+            <p className={`${BODY} mb-5`}>
+              Stormy is plugged into your league. He knows your scoring settings, your roster and this
+              week's matchup before you type anything, and when he answers he tells you which number he
+              is leaning on.
+            </p>
+            <p className={`${BODY} mb-7`}>
+              Ask him a start-or-sit, a trade, or who to grab off waivers. He is free while we are in
+              launch, with a weekly question limit.
+            </p>
+            <Link to="/gm-office/stormy" className={PRIMARY_LINK}>
+              Talk to Stormy <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
+            </Link>
+          </div>
+          <div className="lg:col-span-7">
+            <StormyChatTile exchange={STORMY_EXAMPLE} />
+            <p className="mt-3 font-plex text-[11px] tracking-[0.1em] uppercase text-pressbox-text/55 text-right">
+              An example. In your league he reads your actual roster and settings.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* The Squad */}
+      <section className={SECTION}>
         <SectionHeader
-          eyebrow="Roll Call"
+          eyebrow="Roll call"
           title="The Citrus Squad."
-          sub="Four characters who live inside the app. Stormy runs the bench; Lemon, Kiwi, and Pineapple show up in drafts, matchups, and the league chat."
-          align="center"
+          sub="Four characters who show up around the app. Stormy is the assistant GM. Lemon, Kiwi and Pineapple turn up in drafts, matchups and the league chat."
         />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {MASCOT_LIST.map((m, i) => (
@@ -411,65 +362,20 @@ export function Homepage() {
         </div>
       </section>
 
-      {/* Stormy deep dive */}
-      <section id="stormy" className="relative max-w-[1280px] mx-auto px-6 pb-24">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-          <div className="lg:col-span-5">
-            <div className="flex items-center gap-3 mb-4">
-              <MascotAvatar id="stormy" size="md" />
-              <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold">
-                Stormy AI
-              </div>
-            </div>
-            <h2 className="font-sans font-black text-[2.25rem] md:text-[2.75rem] tracking-[-0.025em] text-pastel-cream leading-tight mb-5">
-              An AI assistant GM<br />who actually knows hockey.
-            </h2>
-            <p className="text-[15px] text-white/60 leading-relaxed mb-5">
-              Stormy is plugged into your league: your roster, your scoring settings, your matchup.
-              Every answer cites real metrics: xGF%, TOI, PP1 share, save%, line combos.
-            </p>
-            <p className="text-[15px] text-white/60 leading-relaxed mb-7">
-              No generic "monitor the situation" boilerplate. Just real hockey advice grounded in
-              your actual team.
-            </p>
-            <Link
-              to="/gm-office/stormy"
-              className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] font-bold px-5 h-11 rounded-md hover:bg-pastel-orange-soft transition-colors"
-            >
-              Try Stormy <ArrowRight className="w-4 h-4" strokeWidth={2.5} />
-            </Link>
-          </div>
-          <div className="lg:col-span-7">
-            <StormyChatTile
-              exchange={{
-                question: 'Is this trade fair? I give Matthews, get MacKinnon plus a 3rd round pick.',
-                answer:
-                  "Take it. MacKinnon's xGF% is 61.4% vs Matthews' 54.8%. MacKinnon also gets 3+ minutes more TOI per game and his line has better zone entry rates. The 3rd rounder is gravy. Our projections have MacKinnon finishing 8–12 points higher ROS. Matthews is also shooting 18.2%, which nobody holds. That comes back to earth.",
-              }}
-            />
-          </div>
-        </div>
-      </section>
-
       {/* FAQ */}
       <section className="relative max-w-[860px] mx-auto px-6 pb-24">
-        <SectionHeader eyebrow="FAQ" title="Questions, answered." align="center" />
+        <SectionHeader eyebrow="FAQ" title="Fair questions." align="center" />
         <Faq entries={FAQ} />
       </section>
 
       {/* Final CTA */}
-      {/* The eyebrow read "7 Games Tonight · Puck drops 7pm ET" with the live
-          pulse — the app's own affordance for real-time data — as a static
-          string. Today is 34 days before the season opens. The trust strip
-          further up this file is commented "no fake numbers"; this was one.
-          Nothing replaces it: the CTA does not need a slate to work. */}
       <CtaBanner
         title={
           <>
-            Your league is <span className="text-pastel-orange">waiting</span>.
+            Start the league. <span className="text-pressbox-orange">Send the link.</span>
           </>
         }
-        sub="Free to play · No credit card required"
+        sub={`Free to play. Drafts are open now and the season starts Sep 29.`}
         ctaLabel="Create your league"
         ctaHref="/create-league"
       />
