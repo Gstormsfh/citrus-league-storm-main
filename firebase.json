@@ -3,10 +3,16 @@
     "public": "apps/web/dist",
     "ignore": [
       "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "**/.git/**",
+      "**/.DS_Store",
+      "**/.env*"
     ],
     "rewrites": [
+      {
+        "source": "/.well-known/apple-app-site-association",
+        "destination": "/.well-known/apple-app-site-association"
+      },
       {
         "source": "/ads.txt",
         "destination": "/ads.txt"
@@ -14,6 +20,10 @@
       {
         "source": "/robots.txt",
         "destination": "/robots.txt"
+      },
+      {
+        "source": "/sitemap.xml",
+        "destination": "/sitemap.xml"
       },
       {
         "source": "/api/**",
@@ -28,6 +38,19 @@
       }
     ],
     "headers": [
+      {
+        "source": "/.well-known/apple-app-site-association",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=3600"
+          }
+        ]
+      },
       {
         "source": "**",
         "headers": [
@@ -92,6 +115,7 @@
           }
         ]
       }
-    ]
+    ],
+    "appAssociation": "NONE"
   }
 }
