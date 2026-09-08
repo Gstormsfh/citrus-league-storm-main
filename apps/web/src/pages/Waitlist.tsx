@@ -29,23 +29,23 @@ const Waitlist = () => {
               </div>
               <div className="inline-flex items-center gap-2 mb-7 px-3 py-1.5 rounded-md bg-pastel-orange/15 ring-1 ring-pastel-orange/30">
                 <LivePulse size="xs" />
-                <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft leading-none font-bold">
-                  Coming Soon · Be First In Line
+                <span className="font-plex font-semibold text-[11px] tracking-[0.16em] uppercase text-pressbox-orange-soft leading-none">
+                  Launch updates · Puck drops Sep 29
                 </span>
               </div>
 
-              <h1 className="font-sans font-black text-[3rem] md:text-[4.5rem] lg:text-[5.5rem] leading-[0.95] tracking-[-0.035em] text-pastel-cream mb-6">
-                Fantasy Hockey<br />
-                <span className="text-pastel-orange">Reimagined</span>
+              <h1 className="font-condensed font-extrabold uppercase text-[3rem] md:text-[4.5rem] lg:text-[5.5rem] leading-[0.92] tracking-[-0.01em] text-pressbox-text mb-6">
+                Hear from us<br />
+                <span className="text-pressbox-orange">when it matters</span>
               </h1>
 
-              <p className="text-[17px] md:text-[19px] leading-relaxed text-white/65 max-w-xl mx-auto mb-4">
-                Citrus is building the next generation of fantasy hockey. Real-time xG projections,
-                Stormy AI as your assistant GM, and a platform designed by people who actually watch the games.
+              <p className="font-barlow font-normal text-[17px] md:text-[19px] leading-relaxed text-pressbox-text/75 max-w-xl mx-auto mb-4">
+                Citrus is live and drafts are open. Leave your email and we will write when the
+                iPhone app ships, when the model gets a real update, and the week before puck drop.
               </p>
 
-              <p className="text-[14px] text-white/55 max-w-lg mx-auto mb-10 leading-relaxed">
-                We're currently in testing. Join the waitlist to be first when full multiplayer leagues launch.
+              <p className="font-barlow font-normal text-[15px] text-pressbox-text/60 max-w-lg mx-auto mb-10 leading-relaxed">
+                A few emails a season and nothing else.
               </p>
 
               {/* Waitlist Signup - The Main Event */}
@@ -54,12 +54,12 @@ const Waitlist = () => {
                   <div className="p-8">
                     <div className="flex items-center justify-center gap-2 mb-4">
                       <Narwhal className="h-7 w-7 text-pastel-orange" />
-                      <h2 className="font-sans font-black text-[1.5rem] tracking-[-0.02em] text-pastel-cream">
-                        Join the <span className="text-pastel-orange">Waitlist</span>
+                      <h2 className="font-condensed font-extrabold uppercase text-[1.5rem] tracking-[-0.02em] text-pastel-cream">
+                        Get the <span className="text-pressbox-orange">updates</span>
                       </h2>
                     </div>
                     <p className="text-[13px] text-white/65 mb-6 leading-relaxed">
-                      Drop your email below and we'll notify you as soon as we're live. No spam. Just launch news.
+                      Leave your email and you will hear from us when something worth knowing ships.
                     </p>
                     <WaitlistSignup source="waitlist_page" variant="default" />
                   </div>
@@ -93,22 +93,22 @@ const Waitlist = () => {
         {/* Why Citrus? Features Grid */}
         <section className="max-w-[1100px] mx-auto px-6 py-16">
           <div className="text-center mb-12">
-            <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">
-              ✦ Why Citrus
+            <div className="font-plex font-semibold text-[11px] tracking-[0.18em] uppercase text-pressbox-orange-soft mb-3">
+              Why Citrus
             </div>
-            <h2 className="font-sans font-black text-[2rem] md:text-[2.75rem] tracking-[-0.025em] text-pastel-cream">
-              Built different. <span className="text-pastel-orange">Play different.</span>
+            <h2 className="font-condensed font-extrabold uppercase text-[2rem] md:text-[2.75rem] tracking-[-0.025em] text-pastel-cream">
+              What you are <span className="text-pressbox-orange">signing up for</span>.
             </h2>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
             {[
-              { icon: <BarChart3 className="h-5 w-5" strokeWidth={2.5} />, title: 'xG Projections', desc: '31-feature XGBoost model using Expected Goals, deployment patterns, and line combos updated in real-time.', accent: 'orange' as const },
-              { icon: <Zap className="h-5 w-5" strokeWidth={2.5} />, title: 'AI-Powered Insights', desc: 'Stormy, our AI assistant, watches every shift and gives you trade, start/sit, and pickup advice grounded in data.', accent: 'sage' as const },
-              { icon: <Trophy className="h-5 w-5" strokeWidth={2.5} />, title: 'Saturday Finishes', desc: 'Matchup weeks end Saturday so the entire league is battling it out on the biggest night in hockey.', accent: 'orange' as const },
-              { icon: <Users className="h-5 w-5" strokeWidth={2.5} />, title: 'Built for Hockey Fans', desc: 'Not a generic sports app with hockey bolted on. Every feature is designed by people who watch the games.', accent: 'sage' as const },
-              { icon: <Star className="h-5 w-5" strokeWidth={2.5} />, title: 'Full Player Projections', desc: 'Daily projections with confidence intervals and Monte Carlo ranges for every rostered NHL player.', accent: 'orange' as const },
-              { icon: <CitrusLogo className="h-5 w-5" />, title: 'Modern Platform', desc: 'While Yahoo and ESPN serve stale 2015 data, we pull real-time xGF%, line combos, and deployment patterns.', accent: 'sage' as const },
+              { icon: <BarChart3 className="h-5 w-5" strokeWidth={2.5} />, title: 'xG Projections', desc: 'Every projection comes from an expected-goals model built for the NHL, and it is a range with a floor and a ceiling rather than one number.', accent: 'orange' as const },
+              { icon: <Zap className="h-5 w-5" strokeWidth={2.5} />, title: 'AI-Powered Insights', desc: 'Stormy knows your roster and your scoring settings before you ask, and he quotes the number he is leaning on when he answers.', accent: 'sage' as const },
+              { icon: <Trophy className="h-5 w-5" strokeWidth={2.5} />, title: 'Saturday Finishes', desc: 'Matchup weeks run Sunday to Saturday, so your week ends on the biggest slate of the schedule.', accent: 'orange' as const },
+              { icon: <Users className="h-5 w-5" strokeWidth={2.5} />, title: 'Built for hockey', desc: 'Citrus is a hockey app first. Every screen, stat and rule was designed around the NHL season, not ported from another sport.', accent: 'sage' as const },
+              { icon: <Star className="h-5 w-5" strokeWidth={2.5} />, title: 'Full Player Projections', desc: 'A floor, a middle and a ceiling for every skater every night, on the player page next to the stats.', accent: 'orange' as const },
+              { icon: <CitrusLogo className="h-5 w-5" />, title: 'No fees, no payouts', desc: 'Citrus does not take entry fees and does not pay anything out. It is season-long fantasy with your friends.', accent: 'sage' as const },
             ].map((feature, i) => (
               <GlowCard key={i} accent={feature.accent}>
                 <article className="p-5 h-full flex flex-col">
@@ -132,14 +132,14 @@ const Waitlist = () => {
           <div className="max-w-lg mx-auto">
             <GlowCard accent="orange">
               <div className="p-8 text-center">
-                <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold">
-                  ✦ Don't Miss the Drop
+                <div className="font-plex font-semibold text-[11px] tracking-[0.18em] uppercase text-pressbox-orange-soft mb-3">
+                  Before puck drop
                 </div>
-                <h3 className="font-sans font-black text-[1.75rem] text-pastel-cream mb-3 tracking-[-0.025em]">
-                  Be among the <span className="text-pastel-orange">first.</span>
+                <h3 className="font-condensed font-extrabold uppercase text-[1.75rem] text-pastel-cream mb-3 tracking-[-0.025em]">
+                  One email <span className="text-pressbox-orange">the week before</span>.
                 </h3>
                 <p className="text-[13px] text-white/65 mb-6 leading-relaxed">
-                  Be first to create real multiplayer leagues when we go live.
+                  A reminder to get your league drafted before the season starts, and nothing else.
                 </p>
                 <WaitlistSignup source="waitlist_page_bottom" variant="default" />
               </div>

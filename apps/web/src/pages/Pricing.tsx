@@ -10,13 +10,16 @@ export default function Pricing() {
     <DarkLayout>
       <Navbar />
       <main className="max-w-3xl mx-auto px-6 pt-28 pb-24 text-center">
-        <h1 className="font-sans font-black text-5xl text-pastel-cream mb-6">Free to play.</h1>
-        <p className="text-lg text-white/70 mb-4">
-          Citrus is free to use. No credit card is required.
+        <div className="font-plex font-semibold text-[11px] tracking-[0.18em] uppercase text-pressbox-orange-soft mb-4">Pricing</div>
+        <h1 className="font-condensed font-extrabold uppercase text-[3.5rem] md:text-[5rem] leading-[0.92] tracking-[-0.01em] text-pressbox-text mb-6">There is no pricing page.</h1>
+        <p className="font-barlow font-normal text-[18px] text-pressbox-text/75 leading-relaxed mb-4">
+          Citrus is free to play. There is no card to enter, no entry fee and no payout.
         </p>
-        <p className="text-white/60 mb-8">Stormy includes a weekly question limit, shown in the assistant.</p>
-        <Link to="/auth" className="inline-flex rounded-md bg-pastel-orange px-6 py-3 font-bold text-[#581E00]">
-          Create your account
+        <p className="font-barlow font-normal text-[17px] text-pressbox-text/70 leading-relaxed mb-8">
+          Stormy has a weekly question limit while we are in launch, and the app shows you where you are against it.
+        </p>
+        <Link to="/create-league" className="inline-flex items-center rounded-md bg-pressbox-orange px-6 h-12 font-condensed font-bold uppercase tracking-[0.06em] text-[17px] text-pressbox-orange-ink hover:bg-pastel-orange-soft transition-colors">
+          Create a league
         </Link>
       </main>
       <HockeyFooter />

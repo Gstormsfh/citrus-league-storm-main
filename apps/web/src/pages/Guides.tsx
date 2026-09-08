@@ -120,10 +120,10 @@ const Guides = () => {
       <CtaBanner
         title={
           <>
-            Stop guessing. <span className="text-pastel-orange">Start dominating.</span>
+            Read up, then <span className="text-pressbox-orange">go draft</span>.
           </>
         }
-        sub="Free during launch · 31-feature xG model · Built by hockey heads"
+        sub="Free to play. No card, no entry fee."
         ctaLabel="Create your league"
         ctaHref="/create-league"
       />

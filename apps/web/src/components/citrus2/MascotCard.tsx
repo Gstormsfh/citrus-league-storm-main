@@ -26,10 +26,10 @@ export function MascotCard({
           id={id}
           className={`mb-4 ring-1 ${a.ring} group-hover:scale-[1.02] transition-transform duration-300`}
         />
-        <div className={`font-jbmono text-[10px] tracking-[0.22em] uppercase mb-1.5 font-bold ${a.text}`}>
+        <div className={`font-plex font-semibold text-[10px] tracking-[0.16em] uppercase mb-1.5 ${a.text}`}>
           {m.position}{m.number ? ` · #${m.number}` : ''}
         </div>
-        <h3 className="font-sans font-black text-[1.5rem] text-pastel-cream mb-2 leading-none">
+        <h3 className="font-condensed font-extrabold uppercase text-[1.75rem] text-pressbox-text mb-2 leading-none">
           {m.name}
         </h3>
         <p className="text-[13px] text-white/55 leading-relaxed">

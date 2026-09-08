@@ -24,20 +24,20 @@ export function StormyChatTile({
         {/* User question */}
         <div className="flex justify-end">
           <div className="bg-white/5 rounded-2xl rounded-tr-sm px-4 py-3 max-w-[85%]">
-            <div className="font-jbmono text-[10px] tracking-wider uppercase text-white/55 font-bold mb-1">
+            <div className="font-plex font-semibold text-[10px] tracking-[0.12em] uppercase text-pressbox-text/55 mb-1">
               YOU
             </div>
-            <div className="text-[13px] text-pastel-cream leading-snug">{exchange.question}</div>
+            <div className="font-barlow font-normal text-[15px] text-pressbox-text leading-snug">{exchange.question}</div>
           </div>
         </div>
         {/* Stormy answer */}
         <div className="flex items-start gap-3">
           <MascotAvatar id="stormy" size="sm" />
           <div className="bg-pastel-orange/10 ring-1 ring-pastel-orange/20 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%]">
-            <div className="font-jbmono text-[10px] tracking-wider uppercase text-pastel-orange-soft font-bold mb-1.5">
+            <div className="font-plex font-semibold text-[10px] tracking-[0.12em] uppercase text-pressbox-orange-soft mb-1.5">
               STORMY
             </div>
-            <div className="text-[13px] text-pastel-cream leading-relaxed">
+            <div className="font-barlow font-normal text-[15px] text-pressbox-text leading-relaxed">
               {exchange.answer}
             </div>
           </div>

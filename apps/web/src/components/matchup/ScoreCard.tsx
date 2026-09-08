@@ -327,7 +327,7 @@ export const ScoreCard = ({
 
           {/* Center scores with stitched divider */}
           <div className="flex items-center gap-6 relative">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-cream font-script text-xl px-3 py-1 rounded-varsity shadow-patch">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-pastel-sage/20 ring-1 ring-pastel-sage/40 text-pastel-cream font-condensed font-bold uppercase text-lg px-3 py-1 rounded-varsity shadow-patch">
               vs
             </div>
             <div className="text-center">

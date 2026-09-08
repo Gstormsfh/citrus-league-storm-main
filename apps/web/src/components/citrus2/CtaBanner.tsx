@@ -52,22 +52,22 @@ export function CtaBanner({
 
         <div className="relative z-10">
           {eyebrow && (
-            <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft mb-3 font-bold flex items-center justify-center gap-2">
+            <div className="font-plex font-semibold text-[11px] tracking-[0.18em] uppercase text-pressbox-orange-soft mb-3 flex items-center justify-center gap-2">
               {eyebrowPulse && <LivePulse size="xs" />}
               {eyebrow}
             </div>
           )}
-          <h2 className="font-sans font-black text-[2.25rem] md:text-[3.75rem] leading-[1] tracking-[-0.03em] mb-5 text-pastel-cream">
+          <h2 className="font-condensed font-extrabold uppercase text-[2.75rem] md:text-[4.5rem] leading-[0.92] tracking-[-0.01em] mb-5 text-pressbox-text">
             {title}
           </h2>
           {sub && (
-            <p className="text-[16px] text-white/60 max-w-md mx-auto mb-8">
+            <p className="font-barlow font-normal text-[17px] text-pressbox-text/70 max-w-md mx-auto mb-8">
               {sub}
             </p>
           )}
           <Link
             to={ctaHref}
-            className="inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[15px] font-bold px-8 rounded-md hover:bg-white hover:text-[#0F1F15] transition-all duration-200 shadow-[0_8px_32px_-8px_rgba(255,107,26,0.5)] hover:shadow-[0_16px_48px_-8px_rgba(255,107,26,0.6)] hover:-translate-y-0.5 active:scale-95"
+            className="inline-flex items-center gap-2 bg-pressbox-orange text-pressbox-orange-ink font-condensed font-bold uppercase tracking-[0.06em] text-[17px] px-8 rounded-md hover:bg-white hover:text-[#0F1F15] transition-all duration-200 shadow-[0_8px_32px_-8px_rgba(255,107,26,0.5)] hover:shadow-[0_16px_48px_-8px_rgba(255,107,26,0.6)] hover:-translate-y-0.5 active:scale-95"
             style={{ height: '54px' }}
           >
             <span>{ctaLabel}</span>

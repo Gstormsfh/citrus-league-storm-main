@@ -44,7 +44,7 @@ export function OnboardingCard({
         <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-5 ring-1 ${a.bg} ${a.ring} ${a.text} group-hover:scale-110 transition-transform duration-300`}>
           <Icon className="w-7 h-7" />
         </div>
-        <h3 className="font-sans font-bold text-[1.5rem] leading-snug text-pastel-cream mb-3">
+        <h3 className="font-condensed font-bold uppercase tracking-[0.04em] text-[1.6rem] leading-none text-pressbox-text mb-3">
           {title}
         </h3>
         <p className="text-[14px] text-white/60 leading-relaxed mb-6 flex-grow">

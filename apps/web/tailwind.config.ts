@@ -323,7 +323,7 @@ export default {
 				sans: ['Inter', 'Montserrat', 'sans-serif'],         // Clean body text
 				display: ['Montserrat', 'sans-serif'],               // Secondary headers
 				varsity: ['Graduate', 'Alfa Slab One', 'serif'],     // Bold varsity lettering
-				script: ['Pacifico', 'Bangers', 'cursive'],          // Surfer script accent
+				script: ['"Barlow Condensed"', 'cursive'],          // Retired 2026-09-09: Pacifico/Bangers no longer loaded (font trim); alias kept for old call sites
 				// Premium redesign — additive, used only on /preview-redesign
 				'editorial': ['"Playfair Display"', 'Georgia', 'serif'],   // Editorial serif headlines
 				'caps': ['"Bebas Neue"', '"Arial Narrow"', 'sans-serif'],   // Condensed caps section labels

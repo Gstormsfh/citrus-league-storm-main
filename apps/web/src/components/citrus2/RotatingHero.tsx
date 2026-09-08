@@ -32,7 +32,7 @@ export function RotatingHero({
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
-    if (paused) return;
+    if (paused || slides.length < 2) return;
     const id = setInterval(() => setActive((i) => (i + 1) % slides.length), intervalMs);
     return () => clearInterval(id);
   }, [paused, slides.length, intervalMs]);
@@ -48,25 +48,25 @@ export function RotatingHero({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 lg:gap-16 items-center min-h-[400px] sm:min-h-[480px]">
         {/* LEFT — copy. key forces re-mount so animate-fade-in re-fires per slide */}
         <div key={`copy-${active}`} className="relative z-10 animate-fade-in">
-          <div className="inline-flex items-center gap-2 mb-5 sm:mb-7 px-3 py-1.5 rounded-md bg-pastel-orange/15 ring-1 ring-pastel-orange/30">
+          <div className="inline-flex items-center gap-2 mb-5 sm:mb-7 px-3 py-1.5 rounded-md bg-pressbox-orange/15 ring-1 ring-pressbox-orange/30">
             <LivePulse size="xs" />
-            <span className="font-jbmono text-[10px] tracking-[0.22em] uppercase text-pastel-orange-soft leading-none font-bold">
+            <span className="font-plex font-semibold text-[11px] tracking-[0.16em] uppercase text-pressbox-orange-soft leading-none">
               {slide.eyebrow}
             </span>
           </div>
-          <h1 className="font-sans font-black text-[2.25rem] sm:text-[3rem] md:text-[3.5rem] lg:text-[5rem] leading-[1.0] sm:leading-[0.98] tracking-[-0.035em] text-pastel-cream mb-4 sm:mb-6">
+          <h1 className="font-condensed font-extrabold uppercase text-[3rem] sm:text-[4rem] md:text-[4.75rem] lg:text-[6rem] leading-[0.92] tracking-[-0.01em] text-pressbox-text mb-5 sm:mb-6">
             {slide.headline.lead}
             <br />
-            <span className="text-pastel-orange">{slide.headline.accent}</span>
+            <span className="font-condensed text-pressbox-orange">{slide.headline.accent}</span>
             {slide.headline.tail}
           </h1>
-          <p className="text-[15px] sm:text-[16px] md:text-[18px] leading-relaxed text-white/65 max-w-md mb-6 sm:mb-8">
+          <p className="font-barlow font-normal text-[16px] sm:text-[17px] md:text-[18px] leading-relaxed text-pressbox-text/75 max-w-lg mb-6 sm:mb-8">
             {slide.sub}
           </p>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
             <Link
               to={slide.primary.to}
-              className="group inline-flex items-center gap-2 bg-pastel-orange text-[#581E00] text-[14px] sm:text-[15px] font-bold px-6 sm:px-7 rounded-md hover:bg-pastel-orange-soft hover:-translate-y-0.5 transition-all duration-200 shadow-[0_8px_24px_-8px_rgba(255,107,26,0.5)] hover:shadow-[0_16px_40px_-8px_rgba(255,107,26,0.6)] active:scale-95"
+              className="group inline-flex items-center gap-2 bg-pressbox-orange text-pressbox-orange-ink font-condensed font-bold uppercase tracking-[0.06em] text-[16px] px-6 sm:px-7 rounded-md hover:bg-pastel-orange-soft hover:-translate-y-0.5 transition-all duration-200 shadow-[0_8px_24px_-8px_rgba(255,107,26,0.5)] hover:shadow-[0_16px_40px_-8px_rgba(255,107,26,0.6)] active:scale-95"
               style={{ height: '48px' }}
             >
               <span>{slide.primary.label}</span>
@@ -74,7 +74,7 @@ export function RotatingHero({
             </Link>
             <Link
               to={slide.secondary.to}
-              className="inline-flex items-center text-[13px] sm:text-[14px] font-bold text-pastel-cream hover:text-pastel-orange-soft transition-colors px-4 sm:px-5 rounded-md ring-1 ring-white/15 hover:ring-white/30"
+              className="inline-flex items-center font-condensed font-bold uppercase tracking-[0.06em] text-[16px] text-pressbox-text hover:text-pressbox-orange-soft transition-colors px-4 sm:px-5 rounded-md ring-1 ring-white/15 hover:ring-white/30"
               style={{ height: '48px' }}
             >
               {slide.secondary.label}
@@ -88,7 +88,8 @@ export function RotatingHero({
         </div>
       </div>
 
-      {/* Indicator dots */}
+      {/* Indicator dots. One slide is a static hero: no dots, no counter. */}
+      {slides.length > 1 && (<>
       {/* gap-3 (12px) pairs with before:-inset-x-1.5 (6px a side) so the hit
           areas meet exactly and never overlap. */}
       <div className="flex items-center justify-center gap-3 mt-10">
@@ -115,6 +116,7 @@ export function RotatingHero({
       <div className="text-center mt-3 font-jbmono text-[10px] tracking-[0.32em] uppercase text-white/55">
         {String(active + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')} · {slide.id}
       </div>
+      </>)}
     </section>
   );
 }
