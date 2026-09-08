@@ -250,7 +250,7 @@ export function upcomingCards(entries: GameLogEntry[]): UpcomingCard[] {
         key: e.date,
         when: e.isToday ? 'TODAY' : `${e.dayLabel.toUpperCase()} ${shortDate(e.date)}`,
         opponent: e.opponent,
-        note: e.projectedPoints > 0 ? `${e.projectedPoints.toFixed(1)} PROJ${b2b ? ' ·' : ''}` : null,
+        note: null,
         noteTail: b2b ? 'B2B' : null,
       };
     });

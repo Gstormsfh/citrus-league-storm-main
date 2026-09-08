@@ -39,7 +39,7 @@ export function announceConsentChanged(): void {
 export const SIGNUP_CONSENT_KEY = 'citrus.consent.signup';
 
 /** The version the signup form's checkbox refers to (the linked documents). */
-export const SIGNUP_POLICY_VERSION = '2026-01-13';
+export const SIGNUP_POLICY_VERSION = '2026-09-06';
 
 /** The policies the gate asks for: never recorded, or recorded for an older version. */
 export function consentDue(rows: ConsentStatus[]): ConsentStatus[] {

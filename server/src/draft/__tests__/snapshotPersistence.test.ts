@@ -295,3 +295,16 @@ describe('writeSnapshot UPSERT-per-league (chunk 11g.10 sub-step 10c-2 batch 1 i
     expect(mock.del).not.toHaveBeenCalled();
   });
 });
+
+
+describe('auction snapshot capacity regression', () => {
+  it.each([0, 28])('rejects malformed capacity so bootstrap uses full replay (total=%s)', totalPicks => {
+    const record = makeRecord({ snapshot: {
+      ...VALID_SNAPSHOT, format: 'auction',
+      stateSnapshot: { ...VALID_SNAPSHOT.stateSnapshot, totalPicks, picksMade: 1 },
+      auctionState: { currentNomination: null, nominationsCompleted: 1,
+        teamBudgets: { t1: 180 }, teamRosterSlotsRemaining: { t1: -1 } },
+    } });
+    expect(validateSnapshotForBootstrap(record, 10, 1)).toMatchObject({ ok: false });
+  });
+});

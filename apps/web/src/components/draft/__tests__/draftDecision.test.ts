@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_SCORING, ScoringCalculator, type ScoringSettings } from '@citrus/shared';
 import type { DashboardIndexEntry } from '@/hooks/usePlayerDashboardIndex';
+import { leagueDashboardProjection, usesFantasyPoints } from '@/components/player/leagueDashboardProjection';
 import {
   DRAFT_POSITIONS,
   buildDraftProjectionMap,
@@ -105,6 +106,25 @@ describe('normalizeDraftPosition', () => {
 });
 
 describe('projectionFor — a skater', () => {
+  it('scores sparse three-category and eight-category commissioner settings without defaults', () => {
+    const raw = entry({ proj_goals: 1, proj_assists: 1, proj_sog: 1, proj_ppp: 1, proj_blocks: 1, proj_hits: 1, proj_pim: 1, proj_shp: 1 });
+    const three = { skater: { goals: 1, assists: 1, shots_on_goal: 1 } };
+    const eight = { skater: { ...three.skater, power_play_points: 1, blocks: 1, hits: 1, penalty_minutes: 1, short_handed_points: 1 } };
+    expect(leagueDashboardProjection([raw], three)[0].proj_fantasy_points).toBe(3);
+    expect(leagueDashboardProjection([raw], eight)[0].proj_fantasy_points).toBe(8);
+    expect(leagueDashboardProjection([raw], { skater: { ...three.skater, goals: 10 } })[0].proj_fantasy_points).toBe(12);
+    expect(raw.proj_fantasy_points).toBe(entry().proj_fantasy_points);
+  });
+  it('suppresses unready or category-scoring point totals while preserving raw stats', () => {
+    const raw = entry();
+    const row = leagueDashboardProjection([raw], null, false)[0];
+    expect(row.proj_fantasy_points).toBeNull();
+    expect(row.proj_fantasy_ppg).toBeNull();
+    expect(row.proj_goals).toBe(raw.proj_goals);
+    expect(usesFantasyPoints('h2h-categories')).toBe(false);
+    expect(usesFantasyPoints('roto')).toBe(false);
+    expect(usesFantasyPoints('h2h-points')).toBe(true);
+  });
   it('scores every category the payload projects, through league scoring', () => {
     const p = projectionFor(entry(), DEFAULT_SCORER, null)!;
     const expected =
@@ -203,6 +223,11 @@ describe('projectionFor — a goalie', () => {
       proj_hits: null,
       ...over,
     });
+
+  it('prefers the projected goals against total over historical save percentage', () => {
+    const p = projectionFor(keeper({ proj_goals_against: 40, save_pct: null }), DEFAULT_SCORER, null)!;
+    expect(p.total).toBeCloseTo(18 * DEFAULT_SCORING.goalie.wins + 900 * DEFAULT_SCORING.goalie.saves + 2 * DEFAULT_SCORING.goalie.shutouts + 40 * DEFAULT_SCORING.goalie.goals_against);
+  });
 
   it('charges the projected goals against under default scoring', () => {
     const p = projectionFor(keeper(), DEFAULT_SCORER, null)!;

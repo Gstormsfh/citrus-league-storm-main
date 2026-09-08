@@ -70,6 +70,21 @@ spec:
                 secretKeyRef:
                   key: latest
                   name: SUPABASE_SERVICE_ROLE_KEY
+            - name: APPLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: APPLE_CLIENT_ID
+            - name: APPLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: APPLE_CLIENT_SECRET
+            - name: APPLE_TOKEN_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: latest
+                  name: APPLE_TOKEN_ENCRYPTION_KEY
           startupProbe:
             httpGet:
               path: /api/health

@@ -5,6 +5,12 @@
 import { apiClient } from './client';
 
 export const adminApi = {
+  getContentReports() {
+    return apiClient.get('/api/admin/content-reports');
+  },
+  moderateReport(id: string, action: 'dismiss' | 'remove' | 'suspend') {
+    return apiClient.post(`/api/admin/content-reports/${encodeURIComponent(id)}`, { action });
+  },
   /** Get platform-wide stats */
   getStats() {
     return apiClient.get('/api/admin/stats');

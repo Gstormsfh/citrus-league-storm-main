@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { NotificationService } from '../services/NotificationService';
 import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
@@ -35,6 +36,21 @@ adminRoutes.use('*', async (c, next) => {
 });
 
 // GET /api/admin/stats — Platform-wide statistics
+adminRoutes.get('/content-reports', async (c) => {
+  const result = await new NotificationService(supabaseAdmin).getContentReports();
+  if (result.error) return handleError(c, result.error, 'Could not load content reports');
+  return ok(c, result.data);
+});
+
+adminRoutes.post('/content-reports/:id', validateBody(z.object({ action: z.enum(['dismiss', 'remove', 'suspend']) })), async (c) => {
+  if (!z.string().uuid().safeParse(c.req.param('id')).success) return fail(c, AppError.badRequest('Invalid report'));
+  const { action } = getValidatedBody<{ action: 'dismiss' | 'remove' | 'suspend' }>(c);
+  // RPC independently verifies the live admin profile and logs the result.
+  const result = await new NotificationService(createUserClient(c.get('userToken'))).moderateReport(c.req.param('id'), action);
+  if (!result.success) return handleError(c, result.error, 'Could not resolve report');
+  return ok(c, { success: true });
+});
+
 adminRoutes.get('/stats', async (c) => {
   const { count: userCount } = await supabaseAdmin
     .from('profiles')

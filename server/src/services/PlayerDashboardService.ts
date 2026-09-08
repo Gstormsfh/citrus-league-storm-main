@@ -108,6 +108,9 @@ interface RosRow {
   projected_ppp: number | null;
   projected_hits: number | null;
   projected_blocks: number | null;
+  projected_pim: number | null;
+  projected_shp: number | null;
+  projected_ga_ros: number | null;
   projected_wins_ros: number | null;
   projected_saves_ros: number | null;
   projected_shutouts_ros: number | null;
@@ -140,7 +143,7 @@ const GAR_COLS =
   'player_id, evo_gar_per_60, evd_gar_per_60, ppo_gar_per_60, ppd_gar_per_60, penalty_gar_per_60, total_gar_per_60, toi_total_minutes, updated_at';
 const TALENT_COLS = 'player_id, xg_per_60, xg_rating, roster_status, vopa_score, avg_toi_per_game, updated_at';
 const ROS_COLS =
-  'player_id, games_remaining, total_projected_points, avg_points_per_game, projected_goals, projected_assists, projected_sog, projected_ppp, projected_hits, projected_blocks, projected_wins_ros, projected_saves_ros, projected_shutouts_ros, updated_at';
+  'player_id, games_remaining, total_projected_points, avg_points_per_game, projected_goals, projected_assists, projected_sog, projected_ppp, projected_hits, projected_blocks, projected_pim, projected_shp, projected_ga_ros, projected_wins_ros, projected_saves_ros, projected_shutouts_ros, updated_at';
 const INDEX_GSAX_COLS =
   'goalie_id, season, total_shots_faced, total_xga, total_ga, raw_gsax, regressed_gsax, updated_at';
 
@@ -880,6 +883,9 @@ export class PlayerDashboardService {
         proj_ppp: r?.projected_ppp ?? null,
         proj_blocks: r?.projected_blocks ?? null,
         proj_hits: r?.projected_hits ?? null,
+        proj_pim: r?.projected_pim ?? null,
+        proj_shp: r?.projected_shp ?? null,
+        proj_goals_against: r?.projected_ga_ros ?? null,
         proj_wins: r?.projected_wins_ros ?? null,
         proj_saves: r?.projected_saves_ros ?? null,
         proj_shutouts: r?.projected_shutouts_ros ?? null,

@@ -1,3 +1,4 @@
+import { DesktopProduct } from '@/components/DesktopProduct';
 import React, { Suspense, lazy, useEffect } from "react";
 import { CitrusToaster } from "@/components/notifications/CitrusToaster";
 import { logger } from '@/utils/logger';
@@ -78,7 +79,9 @@ const PlayoffBracket = lazyWithErrorHandling(() => import("./pages/PlayoffBracke
 const FreeAgents = lazyWithErrorHandling(() => import("./pages/FreeAgents"));
 const Players = lazyWithErrorHandling(() => import("./pages/Players"));
 const PlayerDashboard = lazyWithErrorHandling(() => import("./pages/PlayerDashboard"));
-const DraftKit = lazyWithErrorHandling(() => import("./pages/DraftKit"));
+const DraftKit = import.meta.env.VITE_NATIVE === '1'
+  ? () => null
+  : lazyWithErrorHandling(() => import("./pages/DraftKit"));
 const GMOffice = lazyWithErrorHandling(() => import("./pages/GMOffice"));
 const StormyAssistant = lazyWithErrorHandling(() => import("./pages/StormyAssistant"));
 const News = lazyWithErrorHandling(() => import("./pages/News"));
@@ -90,6 +93,7 @@ const DraftRoom = lazyWithErrorHandling(() => import("./pages/DraftRoom"));
 // migrated. League-by-league rollout via the v2 URL.
 const DraftRoomV2 = lazyWithErrorHandling(() => import("./pages/DraftRoomV2"));
 const Profile = lazyWithErrorHandling(() => import("./pages/Profile"));
+const AccountDeleted = lazyWithErrorHandling(() => import("./pages/AccountDeleted"));
 const TeamAnalytics = lazyWithErrorHandling(() => import("./pages/TeamAnalytics"));
 const WaiverWire = lazyWithErrorHandling(() => import("./pages/WaiverWire"));
 const ScheduleManager = lazyWithErrorHandling(() => import("./pages/ScheduleManager"));
@@ -197,7 +201,7 @@ const App = () => {
           <TooltipProvider>
             <CitrusToaster />
             <Sonner position="top-right" closeButton />
-            <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <BrowserRouter>
               <a href="#main-content" className="skip-to-content">Skip to content</a>
               <ScrollToTop />
               <PushDeepLink />
@@ -217,6 +221,7 @@ const App = () => {
                   <Routes>
                     <Route path="/" element={<Index />} />
                 <Route path="/auth" element={<Auth />} />
+                <Route path="/account-deleted" element={<AccountDeleted />} />
                 <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/profile-setup" element={<ProfileSetup />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
@@ -224,6 +229,7 @@ const App = () => {
                 <Route path="/roster" element={<ErrorBoundary><Roster /></ErrorBoundary>} />
                 <Route path="/standings" element={<ErrorBoundary><Standings /></ErrorBoundary>} />
                 <Route path="/contact" element={<Contact />} />
+                <Route path="/support" element={<Contact />} />
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/podcasts" element={<Podcasts />} />
                 <Route path="/guides" element={<Guides />} />
@@ -252,7 +258,7 @@ const App = () => {
                 {/* Draft Kit — paid analytics section. Authed because the
                     entitlement gate needs an identity to resolve; the free
                     tier still gets a real preview from the server. */}
-                <Route path="/draft-kit" element={<ProtectedRoute><ErrorBoundary><DraftKit /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/draft-kit/*" element={<DesktopProduct route><ProtectedRoute><ErrorBoundary><DraftKit /></ErrorBoundary></ProtectedRoute></DesktopProduct>} />
                 <Route path="/gm-office" element={<ProtectedRoute><ErrorBoundary><GMOffice /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/gm-office/stormy" element={<ProtectedRoute><ErrorBoundary><StormyAssistant /></ErrorBoundary></ProtectedRoute>} />
                 <Route path="/news" element={<News />} />

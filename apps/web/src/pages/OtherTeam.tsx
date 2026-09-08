@@ -5,6 +5,8 @@ import { PressBoxLeagueChrome } from '@/components/pressbox/LeagueChrome';
 import { PressBoxRosterList, PressBoxTeamCard, PB_TYPE } from '@/components/pressbox';
 import { buildRosterRows } from '@/components/pressbox/rosterRows';
 import { buildSlotConfig } from '@/components/roster/slotConfig';
+import { repairSlotAssignments } from '@/components/roster/repairSlotAssignments';
+import type { PositionType } from '@/utils/rosterUtils';
 import { resolveIrSlotCount } from '@/components/roster/irSlots';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRightLeft, Star } from 'lucide-react';
@@ -54,6 +56,8 @@ const OtherTeam = () => {
   const [searchParams] = useSearchParams();
   const activeLeagueId = searchParams.get('league') || contextLeagueId;
   const [loading, setLoading] = useState(true);
+  const [viewRosterSlots, setViewRosterSlots] = useState<Record<string, number> | undefined>();
+  const [viewPositionType, setViewPositionType] = useState<PositionType>('individual');
   const [roster, setRoster] = useState<{
     starters: HockeyPlayer[];
     bench: HockeyPlayer[];
@@ -326,6 +330,11 @@ const OtherTeam = () => {
 
         // Check if draft is completed
         const { league: leagueData, error: leagueError } = await LeagueService.getLeague(activeLeagueId, user.id);
+        const loadedSettings = leagueData?.settings as { rosterSlots?: Record<string, number>; positionType?: string } | undefined;
+        const loadedSlots = loadedSettings?.rosterSlots;
+        const loadedPosition: PositionType = loadedSettings?.positionType === 'forward' ? 'forward' : 'individual';
+        setViewRosterSlots(loadedSlots);
+        setViewPositionType(loadedPosition);
         if (leagueError || !leagueData || leagueData.draft_status !== 'completed') {
           setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
           setLoading(false);
@@ -449,71 +458,29 @@ const OtherTeam = () => {
             }
           });
           
-          setRoster({ starters, bench, ir, slotAssignments: validSlotAssignments });
-        } else {
-          // No saved lineup - auto-assign slots
-          const starters: HockeyPlayer[] = [];
-          const bench: HockeyPlayer[] = [];
-          const ir: HockeyPlayer[] = [];
-          const assignments: Record<string, string> = {};
-          
-          const slotsNeeded = { 'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 1 };
-          const slotsFilled = { 'C': 0, 'LW': 0, 'RW': 0, 'D': 0, 'G': 0, 'UTIL': 0 };
-          
-          let irSlotIndex = 1;
-
-          // Only use actual IR/SUSP status for IR placement (deterministic)
-          // Don't use nextGame.isToday for initial auto-assignment
-          transformedPlayers.forEach(p => {
-            if (p.status === 'IR' || p.status === 'SUSP') {
-              if (irSlotIndex <= 3) {
-                ir.push(p);
-                assignments[p.id] = `ir-slot-${irSlotIndex}`;
-                irSlotIndex++;
-              } else {
-                bench.push(p);
-              }
-              return;
-            }
-            const pos = getFantasyPosition(p.position);
-            let assigned = false;
-
-            if (pos !== 'UTIL' && slotsFilled[pos] < slotsNeeded[pos]) {
-              slotsFilled[pos]++;
-              assigned = true;
-              assignments[p.id] = `slot-${pos}-${slotsFilled[pos]}`;
-            } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
-              slotsFilled['UTIL']++;
-              assigned = true;
-              assignments[p.id] = `slot-UTIL`;
-            }
-
-            if (assigned) {
-              starters.push({ ...p, starter: true });
-            } else {
-              bench.push(p);
-            }
-          });
-
-          const initialRoster = { starters, bench, ir, slotAssignments: assignments };
-          setRoster(initialRoster);
-
-          // Save initial lineup for this team (handles UUID)
-          // This ensures the lineup is persisted even if initialization missed it
-          if (starters.length >= 10 && bench.length > 0) {
-            try {
-              await LeagueService.saveLineup(teamId, activeLeagueId, {
-                starters: starters.map(p => String(p.id)),
-                bench: bench.map(p => String(p.id)),
-                ir: ir.map(p => String(p.id)),
-                slotAssignments: assignments
-              });
-            } catch (err) {
-              logger.error(`OtherTeam: Team ${teamId} - ❌ FAILED to save lineup:`, err);
-            }
-          } else {
-            logger.error(`OtherTeam: Team ${teamId} - ❌ CRITICAL: Generated lineup is still invalid (${starters.length} starters, ${bench.length} bench). This should not happen!`);
+          const repaired = repairSlotAssignments(starters, validSlotAssignments, loadedPosition, loadedSlots);
+          const placed = starters.filter(player => repaired[String(player.id)]);
+          bench.push(...starters.filter(player => !repaired[String(player.id)]));
+          for (const player of ir) {
+            const slot = validSlotAssignments[String(player.id)];
+            if (slot?.startsWith('ir-slot-')) repaired[String(player.id)] = slot;
           }
+          setRoster({ starters: placed, bench, ir, slotAssignments: repaired });
+        } else {
+          // Read-only fallback: project this league's legal slots without
+          // writing another manager's lineup merely because it was viewed.
+          const irCount = resolveIrSlotCount(loadedSlots);
+          const ir: HockeyPlayer[] = [];
+          const candidates: HockeyPlayer[] = [];
+          for (const player of transformedPlayers) {
+            if ((player.status === 'IR' || player.status === 'SUSP') && ir.length < irCount) ir.push(player);
+            else candidates.push(player);
+          }
+          const assignments = repairSlotAssignments(candidates, {}, loadedPosition, loadedSlots);
+          const starters = candidates.filter(player => assignments[String(player.id)]).map(player => ({ ...player, starter: true }));
+          const bench = candidates.filter(player => !assignments[String(player.id)]);
+          ir.forEach((player, index) => { assignments[String(player.id)] = `ir-slot-${index + 1}`; });
+          setRoster({ starters, bench, ir, slotAssignments: assignments });
         }
       } catch (e) {
         logger.error(e);
@@ -577,13 +544,13 @@ const OtherTeam = () => {
           (() => {
             // The league's slot shape, from its settings as the roster page
             // reads them; the defaults when a league has none.
-            const leagueSlots = ((activeLeague?.settings as { rosterSlots?: Record<string, number> } | null)?.rosterSlots) ?? undefined;
+            const leagueSlots = viewRosterSlots;
             const rows = buildRosterRows({
               starters: roster.starters,
               bench: roster.bench,
               ir: roster.ir,
               irSlotCount: resolveIrSlotCount(leagueSlots),
-              slotConfig: buildSlotConfig(activeLeagueFormat?.positionType, leagueSlots),
+              slotConfig: buildSlotConfig(viewPositionType, leagueSlots),
               slotAssignments: roster.slotAssignments,
               // Read-only: every chip wears the lock rather than the swap
               // glyph, because nothing on this page moves a player.
@@ -695,6 +662,8 @@ const OtherTeam = () => {
           ) : (
             <>
               <StartersGrid
+                rosterSlots={viewRosterSlots}
+                positionType={viewPositionType}
                 players={roster.starters}
                 slotAssignments={roster.slotAssignments}
                 className="bg-[#1A2A20] ring-1 ring-white/10 p-6 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]"
@@ -707,6 +676,7 @@ const OtherTeam = () => {
               />
               {roster.ir.length > 0 && (
                 <IRSlot 
+                  irSlotCount={resolveIrSlotCount(viewRosterSlots)}
                   players={roster.ir}
                   slotAssignments={roster.slotAssignments}
                   onPlayerClick={handlePlayerClick}

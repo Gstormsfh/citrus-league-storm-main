@@ -1,3 +1,5 @@
+import { interceptExternal } from '@/lib/openExternal';
+import { AnalyticsPreference } from '@/components/AnalyticsPreference';
 import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -1064,8 +1066,9 @@ const Profile = () => {
     try {
       const result = await UserAccountService.deleteAccount();
       if (!result.success) throw new Error(result.error || 'Deletion failed');
-      await signOut();
-      navigate('/auth', { replace: true });
+      // Commit the public destination before clearing auth. Otherwise the
+      // protected profile route can redirect to login and unmount this handler.
+      navigate('/account-deleted', { replace: true, state: { deleted: true } });
     } catch (error: unknown) {
       logger.error('Account deletion error:', error);
       setSettingsMessage({
@@ -2343,6 +2346,8 @@ const Profile = () => {
                     </CardContent>
                   </Card>
 
+                  <AnalyticsPreference />
+
                   {/* Legal & Privacy */}
                   <Card className="animated-element bg-[#1A2A20] border-0 ring-1 ring-white/10 rounded-2xl shadow-[0_16px_40px_-12px_rgba(0,0,0,0.4)]">
                     <CardHeader>
@@ -2355,6 +2360,7 @@ const Profile = () => {
                     <CardContent className="space-y-2">
                       <a
                         href="/privacy-policy.html"
+                        onClick={(e) => { if (interceptExternal('/privacy-policy.html')) e.preventDefault(); }}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center justify-between p-3 rounded-xl bg-white/5 ring-1 ring-white/10 hover:bg-white/[0.07] hover:ring-pastel-orange/30 transition-all group"
@@ -2364,6 +2370,7 @@ const Profile = () => {
                       </a>
                       <a
                         href="/terms-of-service.html"
+                        onClick={(e) => { if (interceptExternal('/terms-of-service.html')) e.preventDefault(); }}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center justify-between p-3 rounded-xl bg-white/5 ring-1 ring-white/10 hover:bg-white/[0.07] hover:ring-pastel-orange/30 transition-all group"
@@ -2488,7 +2495,7 @@ const Profile = () => {
                         Delete Account
                       </CardTitle>
                       <CardDescription className="text-red-300/80">
-                        Permanently delete your account and all associated data
+                        Permanently delete your account and remove your personal data
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -2500,9 +2507,9 @@ const Profile = () => {
                         <h4 className="font-bold text-pastel-cream mb-2">This action cannot be undone</h4>
                         <ul className="text-sm space-y-1 ml-4 list-disc marker:text-pastel-orange/60 leading-relaxed">
                           <li>Your account and authentication credentials will be permanently deleted</li>
-                          <li>All your fantasy teams and league data will be removed</li>
-                          <li>If you're a league commissioner, your leagues may be orphaned</li>
-                          <li>Your draft history and transactions will be anonymized</li>
+                          <li>Your fantasy teams will be removed</li>
+                          <li>Shared leagues pass to another manager; leagues with no managers are deleted</li>
+                          <li>Your identity is removed from shared draft history</li>
                         </ul>
                       </DestructiveConsequence>
 
@@ -2518,7 +2525,8 @@ const Profile = () => {
                             <AlertDialogTitle className="font-calistoga text-pastel-cream">Are you absolutely sure?</AlertDialogTitle>
                             <AlertDialogDescription className="space-y-4 text-white/70">
                               <p>
-                                This will permanently delete your account and all associated data.
+                                This permanently deletes your account and teams. Shared leagues pass to another manager,
+                                or are deleted if no managers remain. Your identity is removed from shared draft history.
                                 This action cannot be undone.
                               </p>
                               <div>

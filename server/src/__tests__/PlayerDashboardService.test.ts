@@ -135,6 +135,9 @@ const ROS = [
     projected_ppp: 17.81,
     projected_hits: 49.02,
     projected_blocks: 78.87,
+    projected_pim: 24,
+    projected_shp: 2.5,
+    projected_ga_ros: 0,
     projected_wins_ros: 0,
     projected_saves_ros: 0,
     projected_shutouts_ros: 0,
@@ -195,6 +198,9 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     const am = players.find((p) => p.id === 8479318)!;
     expect(am.proj_blocks).toBeCloseTo(78.87);
     expect(am.proj_hits).toBeCloseTo(49.02);
+    expect(am.proj_pim).toBe(24);
+    expect(am.proj_shp).toBe(2.5);
+    expect(am.proj_goals_against).toBe(0);
   });
 
   it('a player with no projection row gets null blocks and hits, not zeros', async () => {
@@ -203,6 +209,9 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     const woll = players.find((p) => p.id === 8479361)!;
     expect(woll.proj_blocks).toBeNull();
     expect(woll.proj_hits).toBeNull();
+    expect(woll.proj_pim).toBeNull();
+    expect(woll.proj_shp).toBeNull();
+    expect(woll.proj_goals_against).toBeNull();
   });
 
   // 2026-09-03: the four columns the condensed card said it could not show.

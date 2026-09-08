@@ -1,10 +1,14 @@
+import { useLeague } from '@/contexts/LeagueContext';
+import { projectedSummary, scoreGameLog } from '@/components/player/projectionScoring';
+import { hasUnprojectedPlusMinus, leagueDashboardProjection, usesFantasyPoints } from '@/components/player/leagueDashboardProjection';
+import { useGameLogIdentity } from '@/components/player/useGameLogIdentity';
 import { userMessage } from '@/lib/userMessage';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { AlertCircle, Clock, Trash2, Snowflake, CalendarDays, Loader2, Newspaper } from 'lucide-react';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { cn } from '@/lib/utils';
-import { LeagueService } from '@/services/LeagueService';
+import { LeagueService, getLeagueFormat } from '@/services/LeagueService';
 import { ScheduleService } from '@/services/ScheduleService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -203,7 +207,40 @@ function seasonWindow(season: number): { start: string; end: string } {
   return { start, end: `${season + 1}-06-30` };
 }
 
-const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = false, onPlayerDropped, action }: PlayerStatsModalProps) => {
+const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId, isOnRoster = false, onPlayerDropped, action }: PlayerStatsModalProps) => {
+  const { activeLeagueId } = useLeague();
+  const leagueId = suppliedLeagueId ?? activeLeagueId ?? undefined;
+  const [leagueScoring, setLeagueScoring] = useState<unknown>(null);
+  const [scoringReady, setScoringReady] = useState(!leagueId);
+  const [pointsFormat, setPointsFormat] = useState(true);
+  const [goalieRos, setGoalieRos] = useState<Record<string, unknown> | null>(null);
+  const [showProjectionBreakdown, setShowProjectionBreakdown] = useState(false);
+  const projectionPlayerId = player?.id;
+  const projectionGoalie = player?.position === 'G' || player?.position === 'Goalie';
+  useEffect(() => {
+    let cancelled = false;
+    setShowProjectionBreakdown(false);
+    setScoringReady(!leagueId);
+    setLeagueScoring(null);
+    setGoalieRos(null);
+    if (!isOpen) return;
+    void (async () => {
+      try {
+        const result = leagueId ? await LeagueService.getLeague(leagueId) : null;
+        if (result?.error || (leagueId && !result?.league)) throw new Error('League scoring unavailable');
+        if (cancelled) return;
+        setLeagueScoring(result?.league?.scoring_settings ?? null);
+        setPointsFormat(usesFantasyPoints(result?.league ? getLeagueFormat(result.league).scoringFormat : undefined));
+        setScoringReady(true);
+        if (projectionGoalie && projectionPlayerId) {
+          const response = await playerApi.getRosProjectionForPlayer(Number(projectionPlayerId));
+          const rows = response.data as Record<string, unknown>[] | undefined;
+          if (!cancelled) setGoalieRos(rows?.[0] ?? null);
+        }
+      } catch (error) { logger.error('[PlayerStatsModal] League projection scoring unavailable:', error); }
+    })();
+    return () => { cancelled = true; };
+  }, [leagueId, isOpen, projectionPlayerId, projectionGoalie]);
   const { user } = useAuth();
   const { toast } = useToast();
   const [isDropping, setIsDropping] = useState(false);
@@ -223,6 +260,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   // Game log state (all 82 games: actuals for played + projections for future)
   const [gameLog, setGameLog] = useState<GameLogEntry[]>([]);
   const [gameLogLoading, setGameLogLoading] = useState(false);
+  const [gameLogError, setGameLogError] = useState(false);
+  const [gameLogAttempt, setGameLogAttempt] = useState(0);
   const [totalProjected, setTotalProjected] = useState(0);
   /** GOALIE-PROJ SANITY (2026-09-01): start-aware remaining games for goalies. */
   const [goalieStartsRemaining, setGoalieStartsRemaining] = useState<number | null>(null);
@@ -273,11 +312,14 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
     });
   }, [gameLog, gameLogLoading]);
 
+  const gameLogPlayer = useGameLogIdentity(player);
+
   // Fetch full season game log when modal opens (actuals for played games + projections for future)
   useEffect(() => {
-    if (!isOpen || !player) {
+    if (!isOpen || !gameLogPlayer) {
       if (!isOpen) {
         setGameLog([]);
+        setGameLogError(false);
         setTotalProjected(0);
         setTotalActual(0);
         setGoalieStartsRemaining(null);
@@ -289,7 +331,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
       return;
     }
 
-    const playerKey = `${player.id}-${player.team}-${logSeason}`;
+    const playerKey = `${gameLogPlayer.id}-${gameLogPlayer.team}-${logSeason}`;
     if (fetchedForPlayerRef.current === playerKey) return;
     fetchedForPlayerRef.current = playerKey;
 
@@ -314,6 +356,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
     // it used to be set inside the async body, one render too late, and the
     // `!teamAbbrev` path bailed before ever setting it.
     setGameLog([]);
+    setGameLogError(false);
     setTotalProjected(0);
     setTotalActual(0);
     setGoalieStartsRemaining(null);
@@ -326,7 +369,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
     let cancelled = false;
 
     const fetchGameLog = async () => {
-      const teamAbbrev = player.teamAbbreviation || player.team || '';
+      const teamAbbrev = gameLogPlayer.team || '';
       if (!teamAbbrev) {
         setGameLogLoading(false);
         return;
@@ -344,8 +387,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
       try {
         const todayStr = getTodayMST();
-        const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-        const playerIsGoalie = player.position === 'Goalie' || player.position === 'G';
+        const playerId = typeof gameLogPlayer.id === 'string' ? parseInt(gameLogPlayer.id, 10) : gameLogPlayer.id;
+        const playerIsGoalie = gameLogPlayer.position === 'Goalie' || gameLogPlayer.position === 'G';
 
         // WHICH SEASON'S GAMES (2026-09-04). Reported: "schedule in the game
         // log is still showing 2025 - we need to have it show THIS year, and
@@ -377,13 +420,12 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         // The schedule and the log in parallel: the log's range is the
         // season window, known before the schedule answers. One round trip
         // on a phone, not two in a row.
-        const [{ games: scheduled }, logResponse] = await Promise.all([
+        const [scheduleResult, logResponse] = await Promise.all([
           ScheduleService.getGamesForTeam(teamAbbrev, windowStart, windowEnd),
-          matchupApi.getPlayerGameLog(playerId, windowStart, windowEnd).catch((err: unknown) => {
-            logger.warn('[PlayerStatsModal] Could not fetch the game log:', err);
-            return null;
-          }),
+          matchupApi.getPlayerGameLog(playerId, windowStart, windowEnd),
         ]);
+        if (scheduleResult.error) throw scheduleResult.error;
+        const scheduled = scheduleResult.games;
 
         // REGULAR SEASON ONLY (2026-09-05). The season window runs to the
         // eve of the next opener so a full run of playoff games sat in the
@@ -523,10 +565,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
             startsRemaining = null;
           }
         }
-        setGoalieStartsRemaining(startsRemaining);
-
         if (cancelled) return;
         setGameLog(entries);
+        setGoalieStartsRemaining(startsRemaining);
         setTotalProjected(goalieAwareTotal);
         setTotalActual(actTotal);
         gameLogCache.set(playerKey, {
@@ -538,6 +579,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
         });
       } catch (error) {
         logger.error('[PlayerStatsModal] Error fetching game log:', error);
+        if (!cancelled) setGameLogError(true);
       } finally {
         if (!cancelled) setGameLogLoading(false);
       }
@@ -547,8 +589,14 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
 
     return () => {
       cancelled = true;
+      if (fetchedForPlayerRef.current === playerKey) fetchedForPlayerRef.current = null;
     };
-  }, [isOpen, player, logSeason]);
+  }, [isOpen, gameLogPlayer, logSeason, gameLogAttempt]);
+
+  const leagueProjection = useMemo(() => projectedSummary(
+    projectionGoalie && goalieRos ? [goalieRos] : gameLog.filter(g => !g.isPast && g.projection).map(g => g.projection!),
+    leagueScoring, projectionGoalie,
+  ), [gameLog, leagueScoring, projectionGoalie, goalieRos]);
 
   // MUST sit above the `if (!player) return null` below — a hook called after
   // an early return runs conditionally, which breaks the Rules of Hooks and
@@ -558,14 +606,19 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   // the goalie flag off `player` directly because `isGoalie` is declared
   // below it.
   const logIsGoalie = player?.position === 'Goalie' || player?.position === 'G';
-  const playedLog = useMemo(() => playedRows(gameLog, logIsGoalie), [gameLog, logIsGoalie]);
+  const scoredGameLog = useMemo(() => scoreGameLog(gameLog, leagueScoring), [gameLog, leagueScoring]);
+  const leagueActualTotal = scoredGameLog.reduce((sum, entry) => sum + (entry.isPast ? entry.actualPoints ?? 0 : 0), 0);
+  const playedLog = useMemo(() => playedRows(scoredGameLog, logIsGoalie), [scoredGameLog, logIsGoalie]);
   const upcomingLog = useMemo(() => upcomingRows(gameLog, logIsGoalie), [gameLog, logIsGoalie]);
 
   // ── THE ARTBOARD'S TILES, WATCH AND SHARE (2026-09-05) ────────────────
   // Rank and the xG rate come off the shared dashboard index, already in
   // memory on every surface that opens a card; the week's points are the
   // log's last seven days; the season projection is the hero's figure.
-  const index = usePlayerDashboardIndex({ enabled: isOpen });
+  const rawIndex = usePlayerDashboardIndex({ enabled: isOpen });
+  const leagueIndex = useMemo(() => leagueDashboardProjection(rawIndex.players, leagueScoring, isOpen && scoringReady && pointsFormat),
+    [rawIndex.players, leagueScoring, isOpen, scoringReady, pointsFormat]);
+  const index = { ...rawIndex, players: leagueIndex };
   // The bio strip from player_directory (age, height, weight, shoots), when
   // the player object did not bring its own.
   const [directoryVitals, setDirectoryVitals] = useState<Vital[]>([]);
@@ -608,22 +661,23 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   // the projection with the framing the card uses. See WriteupExtras.
   const xgHistory = usePlayerXgHistory(Number(player?.id) || null, { enabled: isOpen });
   const positionRank = useMemo(() => {
-    if (!indexEntry) return null;
+    if (!indexEntry || !scoringReady || !pointsFormat) return null;
     const cohort = index.players.filter((p) => p.position === indexEntry.position);
-    const key = (p: typeof indexEntry) => p.proj_fantasy_points ?? p.points;
+    const key = (p: typeof indexEntry) => p.proj_fantasy_points;
     const mine = key(indexEntry);
     if (mine == null) return null;
     const ahead = cohort.filter((p) => (key(p) ?? -Infinity) > mine).length;
     return `${indexEntry.position}${ahead + 1}`;
-  }, [index.players, indexEntry]);
+  }, [index.players, indexEntry, scoringReady, pointsFormat]);
   const weekPoints = useMemo(() => {
+    if (!scoringReady || !pointsFormat) return null;
     const today = getTodayMST();
     const from = new Date(`${today}T00:00:00`);
     from.setDate(from.getDate() - 6);
     const fromStr = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`;
-    const played = gameLog.filter((e) => e.isPast && e.date >= fromStr && e.actualPoints != null);
+    const played = scoredGameLog.filter((e) => e.isPast && e.date >= fromStr && e.actualPoints != null);
     return played.length ? played.reduce((sum, e) => sum + (e.actualPoints ?? 0), 0) : null;
-  }, [gameLog]);
+  }, [scoredGameLog, scoringReady, pointsFormat]);
   const [watched, setWatched] = useState(() => {
     const wl = LeagueService.getWatchlist() as unknown;
     const id = String(player?.id ?? '');
@@ -677,8 +731,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
       garPercentile: pct('gar_per_60'),
       cohortNoun: advanced?.cohortNoun ?? null,
       cohortSize: advanced?.cohortSize ?? null,
-      projFp: indexEntry?.proj_fantasy_points ?? null,
-      projGp: indexEntry?.proj_gp ?? null,
+      projFp: scoringReady && pointsFormat && !gameLogLoading && gameLog.some(g => !g.isPast && g.projection) ? leagueProjection.points : null,
+      projGp: isGoalie ? goalieStartsRemaining : gameLog.filter(g => !g.isPast && g.projection).length || null,
       posRank: positionRank,
       projectionLabel: framing.beforeOpener ? `for ${framing.eyebrow.replace(' projection', '')}` : 'the rest of the way',
       career,
@@ -690,14 +744,13 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
   const teamAbbr = player.teamAbbreviation || player.team?.split(' ').pop()?.substring(0, 3).toUpperCase() || '';
 
   // Use game log totals for the hero banner
-  const dailyProj = isGoalie ? player.goalieProjection : player.daily_projection;
   const futureGames = gameLog.filter(g => !g.isPast);
   const pastGames = gameLog.filter(g => g.isPast);
-  const hasGame = gameLog.length > 0 || dailyProj != null;
-  const heroProjectedPts = futureGames.length > 0 ? totalProjected : (dailyProj?.total_projected_points || 0);
+  const hasProjection = scoringReady && pointsFormat && !gameLogLoading && !gameLogError && futureGames.some(g => g.projection != null);
+  const heroProjectedPts = leagueProjection.points;
   const cardTiles: PressBoxStatTile[] = [
     { key: 'wk', label: 'L7 PTS', value: weekPoints != null ? weekPoints.toFixed(1) : '–', tone: weekPoints != null ? 'sage' : 'plain' },
-    { key: 'szn', label: 'SZN PROJ', value: hasGame && heroProjectedPts > 0 ? String(Math.round(heroProjectedPts)) : '–' },
+    { key: 'szn', label: 'SZN PROJ', value: hasProjection ? String(Math.round(heroProjectedPts)) : '–', onClick: hasProjection ? () => setShowProjectionBreakdown(v => !v) : undefined },
     { key: 'rank', label: 'POS RANK', value: positionRank ?? '–' },
     {
       key: 'xg',
@@ -887,6 +940,20 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 real name and shows a dash rather than a number it does not
                 have. */}
             {(cardTab === 'summary' || cardTab === 'log') && <PressBoxStatTiles className="mb-3" tiles={cardTiles} />}
+            {(cardTab === 'summary' || cardTab === 'log') && scoringReady && !pointsFormat && <p className="mb-3 text-xs text-pressbox-text/60">Category scoring: compare individual projected stats in Game log.</p>}
+            {showProjectionBreakdown && hasProjection && (
+              <section className="mt-2 rounded-xl border border-white/10 bg-pressbox-tile p-3 text-pressbox-text" aria-label="Projection breakdown">
+                <div className="flex justify-between text-sm font-semibold"><span>Projected scoring breakdown</span><button type="button" onClick={() => setShowProjectionBreakdown(false)} aria-label="Close projection breakdown">Close</button></div>
+                {!scoringReady ? <p className="text-sm mt-2">League scoring is unavailable. Try reopening the player.</p> : <>
+                  <p className="text-xs text-pressbox-text/60 mt-1">{leagueId ? 'Using this league’s scoring settings.' : 'Using default scoring; no league selected.'}</p>
+                  {!isGoalie && hasUnprojectedPlusMinus(leagueScoring) && <p className="text-xs text-pressbox-text/60 mt-1">Plus/minus isn’t projected; this total excludes it.</p>}
+                  <table className="w-full text-xs mt-2"><thead><tr><th className="text-left">Stat</th><th>Projected</th><th>Weight</th><th>Points</th></tr></thead><tbody>
+                    {Object.entries(leagueProjection.breakdown).filter(([, b]) => b.points !== 0).map(([stat, b]) => <tr key={stat}><td className="py-1">{stat}</td><td className="text-center">{b.count.toFixed(2)}</td><td className="text-center">{(b.points / b.count).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td><td className="text-right">{b.points.toFixed(1)}</td></tr>)}
+                  </tbody></table>
+                  <p className="text-right text-sm font-semibold mt-2">Total {leagueProjection.points.toFixed(1)} points</p>
+                </>}
+              </section>
+            )}
 
             {/* ─── Overview Tab ─── */}
             <TabsContent value="summary" className="mt-0 space-y-4">
@@ -1037,6 +1104,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                 playerId={player.id}
                 variant="expanded"
                 enabled={isOpen}
+                indexOverride={index.players}
               />
             </TabsContent>
 
@@ -1228,6 +1296,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                   <Loader2 className="w-8 h-8 text-pressbox-sage/40 mx-auto mb-3 animate-spin" />
                   <p className="font-plex font-medium text-[10px] text-pressbox-text/45">Loading game log…</p>
                 </div>
+              ) : gameLogError ? (
+                <div role="alert" className="text-center py-10">
+                  <p className="text-sm text-pressbox-text">Couldn’t load this season’s games. Please try again.</p>
+                  <button type="button" className="focus-citrus mt-3 rounded-lg px-4 py-2 bg-pressbox-orange text-pressbox-surface" onClick={() => setGameLogAttempt(attempt => attempt + 1)}>Retry game log</button>
+                </div>
               ) : gameLog.length > 0 ? (
                 <>
                   {/* Season summary banner. Only once it says something the
@@ -1248,11 +1321,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                       </span>
                     </div>
                     <div className="ml-auto text-right">
-                      {totalActual > 0 && (
-                        <div className="font-plex font-semibold text-[17px] tabular-nums text-pressbox-text leading-tight">{totalActual.toFixed(1)}<span className="font-plex font-medium text-[9px] text-pressbox-text/45 uppercase ml-1">actual</span></div>
+                      {scoringReady && pointsFormat && scoredGameLog.some(g => g.isPast && g.actualPoints != null) && (
+                        <div className="font-plex font-semibold text-[17px] tabular-nums text-pressbox-text leading-tight">{leagueActualTotal.toFixed(1)}<span className="font-plex font-medium text-[9px] text-pressbox-text/45 uppercase ml-1">actual</span></div>
                       )}
-                      {futureGames.length > 0 && (
-                        <div className="font-plex font-semibold text-[14px] tabular-nums text-pressbox-orange-soft leading-tight">{totalProjected.toFixed(1)}<span className="font-plex font-medium text-[9px] text-pressbox-text/45 uppercase ml-1">proj</span></div>
+                      {hasProjection && (
+                        <div className="font-plex font-semibold text-[14px] tabular-nums text-pressbox-orange-soft leading-tight">{leagueProjection.points.toFixed(1)}<span className="font-plex font-medium text-[9px] text-pressbox-text/45 uppercase ml-1">proj</span></div>
                       )}
                     </div>
                   </div>
@@ -1265,6 +1338,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                   {playedLog.length > 0 && (
                     <div>
                       <PressBoxGameLog
+                        showPoints={scoringReady && pointsFormat}
                         statHeadings={isGoalie ? GOALIE_LOG_HEADINGS : SKATER_LOG_HEADINGS}
                         rows={
                           showAllPlayed || playedLog.length <= PLAYED_ROWS + 1
@@ -1296,12 +1370,14 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId, isOnRoster = fals
                         action={
                           <span className="font-plex font-medium text-[10px] tabular-nums text-pressbox-text/45 whitespace-nowrap">
                             {futureGames.length} GAME{futureGames.length === 1 ? '' : 'S'}
-                            {totalProjected > 0 ? ` · ${totalProjected.toFixed(1)} PROJ` : ''}
+                            {hasProjection ? ` · ${leagueProjection.points.toFixed(1)} PROJ` : ''}
                           </span>
                         }
                       />
                       <PressBoxUpcomingCards games={upcomingCards(gameLog)} />
                       <PressBoxGameLog
+                        showPoints={false}
+                        showTail={false}
                         pointsHeading="PROJ"
                         tail={{ heading: 'RANGE', width: 64 }}
                         statHeadings={isGoalie ? GOALIE_PROJ_HEADINGS : SKATER_PROJ_HEADINGS}

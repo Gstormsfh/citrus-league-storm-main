@@ -138,6 +138,10 @@ describe('UserAccountService', () => {
   // deleteAccount
   // ---------------------------------------------------------------------------
   describe('deleteAccount', () => {
+    it.each([null, {}, { success: 'true' }])('rejects an unconfirmed API result: %j', async (data) => {
+      vi.mocked(accountApi.deleteAccount).mockResolvedValue({ data } as any);
+      expect((await UserAccountService.deleteAccount()).success).toBe(false);
+    });
     it('calls accountApi.deleteAccount', async () => {
       (accountApi.deleteAccount as any).mockResolvedValue({ data: { success: true } });
 

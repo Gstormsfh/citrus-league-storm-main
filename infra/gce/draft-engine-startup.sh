@@ -381,6 +381,53 @@ if [ -z "${SUPABASE_ANON_KEY}" ]; then
 fi
 echo "  loaded (length ${#SUPABASE_ANON_KEY})"
 
+# APNs is opt-in per VM. Once enabled, missing credentials stop the converge
+# before any running container is removed. Never echo private key material.
+# BEGIN APNS CONFIG
+load_apns_config() {
+  APNS_ENABLED="$(metadata_get apns-enabled)"
+  APNS_ENABLED="${APNS_ENABLED:-false}"
+  APNS_KEY_ID=""
+  APNS_TEAM_ID=""
+  APNS_PRIVATE_KEY=""
+  APNS_BUNDLE_ID="com.citrussports.app"
+  APNS_PRODUCTION="false"
+  case "${APNS_ENABLED}" in
+    false) return 0 ;;
+    true) ;;
+    *) echo "FATAL: apns-enabled must be true or false" >&2; return 1 ;;
+  esac
+  APNS_PRODUCTION="$(metadata_get apns-production)"
+  case "${APNS_PRODUCTION}" in
+    true|false) ;;
+    *) echo "FATAL: enabled APNs requires explicit apns-production=true or false" >&2; return 1 ;;
+  esac
+  local name value
+  for name in APNS_KEY_ID APNS_TEAM_ID APNS_PRIVATE_KEY; do
+    if ! value="$(gcloud secrets versions access latest --secret="${name}" --project="${PROJECT_ID}")"; then
+      echo "FATAL: cannot load ${name}" >&2
+      return 1
+    fi
+    if [ -z "${value}" ]; then
+      echo "FATAL: ${name} is empty" >&2
+      return 1
+    fi
+    printf -v "${name}" '%s' "${value}"
+  done
+  if ! [[ "${APNS_KEY_ID}" =~ ^[A-Z0-9]{10}$ && "${APNS_TEAM_ID}" =~ ^[A-Z0-9]{10}$ ]]; then
+    echo "FATAL: invalid APNs key or team identifier" >&2
+    return 1
+  fi
+  if ! printf '%s' "${APNS_PRIVATE_KEY}" | openssl pkey -noout >/dev/null 2>&1; then
+    echo "FATAL: APNs private key is invalid" >&2
+    return 1
+  fi
+  # Passing variable names to Docker keeps the private key out of argv.
+  export APNS_KEY_ID APNS_TEAM_ID APNS_PRIVATE_KEY APNS_BUNDLE_ID APNS_PRODUCTION
+}
+load_apns_config
+# END APNS CONFIG
+
 # ── Step 3a: secrets fingerprint (2026-08-19) ─────────────────────────────────
 # WHY: the Step 4c idempotency skip below used to consider ONLY image
 # digests and the Caddyfile. Secrets are baked into the container env
@@ -400,7 +447,7 @@ echo "  loaded (length ${#SUPABASE_ANON_KEY})"
 # at run time, and require the running container's label to match
 # before taking the idempotent-skip branch. A rotated secret now forces
 # a replace on the next converge; an unchanged stack still skips.
-SECRETS_SHA="$(printf '%s' "${SUPABASE_JWT_SECRET}${SUPABASE_DB_URL}${SUPABASE_SERVICE_ROLE_KEY}${SUPABASE_ANON_KEY}${SUPABASE_URL_VALUE}" | sha256sum | awk '{print $1}')"
+SECRETS_SHA="$(printf '%s' "${SUPABASE_JWT_SECRET}${SUPABASE_DB_URL}${SUPABASE_SERVICE_ROLE_KEY}${SUPABASE_ANON_KEY}${SUPABASE_URL_VALUE}${APNS_ENABLED}${APNS_KEY_ID}${APNS_TEAM_ID}${APNS_PRIVATE_KEY}${APNS_BUNDLE_ID}${APNS_PRODUCTION}" | sha256sum | awk '{print $1}')"
 echo "  secrets fingerprint: ${SECRETS_SHA:0:12}..."
 
 # ── Step 3b: Pre-flight assertions ───────────────────────────────────
@@ -588,6 +635,8 @@ docker run -d \
   -e SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY}" \
   -e SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY}" \
   -e SUPABASE_URL="${SUPABASE_URL_VALUE}" \
+  -e APNS_KEY_ID -e APNS_TEAM_ID -e APNS_PRIVATE_KEY \
+  -e APNS_BUNDLE_ID -e APNS_PRODUCTION \
   -e IMAGE_SHA="${IMAGE_SHA_META}" \
   -e COMMIT_SHA="${COMMIT_SHA_META}" \
   -e NODE_ENV=production \

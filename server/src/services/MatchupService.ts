@@ -1452,7 +1452,7 @@ export class MatchupService {
       .select(
         'player_id, projection_date, total_projected_points, projected_goals, projected_assists, ' +
         'projected_sog, projected_blocks, projected_hits, projected_pim, projected_ppp, projected_shp, ' +
-        'projected_wins, projected_saves, projected_shutouts, projected_gaa, projected_save_pct, ' +
+        'projected_wins, projected_saves, projected_shutouts, projected_goals_against, projected_gaa, projected_save_pct, ' +
         'is_goalie, opponent_abbrev, is_home_game, ' +
         // THE RANGE (2026-09-05). The card's "likely range" column read
         // likely_low/likely_high, which this SELECT never carried, and which

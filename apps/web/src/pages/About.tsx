@@ -88,7 +88,7 @@ export default function About() {
             </h2>
             <p className="text-[16px] text-white/70 leading-relaxed">
               We're building the platform we actually want to use. Fast. Clean. Smart. No ads
-              cluttering your dashboard. No features you'll never touch. No premium tier hiding
+              cluttering your dashboard. No features you'll never touch. No clutter hiding
               the analytics you need. Just the tools to dominate your league and chirp your group
               chat.
             </p>
@@ -138,7 +138,7 @@ export default function About() {
               Built different. <span className="text-pastel-orange">Play different.</span>
             </>
           }
-          sub="Free during launch · Founders pricing locked in for early users"
+          sub="Free to play · No credit card required"
           ctaLabel="Create your league"
           ctaHref="/create-league"
         />

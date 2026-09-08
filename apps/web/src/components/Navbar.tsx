@@ -1,3 +1,4 @@
+import { DesktopProduct } from '@/components/DesktopProduct';
 
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -182,7 +183,7 @@ const Navbar = () => {
         ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 w-full z-app-nav lg:block max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-pastel-surface/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-white/10">
+    <header className="fixed top-0 left-0 right-0 w-full z-app-nav lg:block lg:pt-safe lg:bg-pastel-surface max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-pastel-surface/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-white/10">
       {/* ===== ROW 1: Brand bar ===== */}
       <div className="hidden lg:block bg-pastel-surface border-b border-white/5">
         <div className="w-full px-6 h-12 flex items-center justify-between">
@@ -350,7 +351,7 @@ const Navbar = () => {
                 row is a fixed six at lg and a seventh would push it past the
                 container at 1024px. */}
             <div className="ml-auto flex items-center gap-0">
-              <Link
+              <DesktopProduct><Link
                 to="/draft-kit"
                 className={cn(
                   "flex items-center gap-2 px-4 h-11 text-[13px] font-bold transition-all border-b-2 whitespace-nowrap",
@@ -361,7 +362,7 @@ const Navbar = () => {
               >
                 <ClipboardList className="h-4 w-4" />
                 Draft Kit
-              </Link>
+              </Link></DesktopProduct>
               <Link
                 to="/news"
                 className={cn(
@@ -559,10 +560,10 @@ const Navbar = () => {
                 <Radio className="h-4 w-4" />
                 <span className="text-[13px] font-bold">Scores</span>
               </Link>
-              <Link to="/draft-kit" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-md text-white/55 hover:text-pastel-cream hover:bg-white/5 transition-all">
+              <DesktopProduct><Link to="/draft-kit" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-md text-white/55 hover:text-pastel-cream hover:bg-white/5 transition-all">
                 <ClipboardList className="h-4 w-4" />
                 <span className="text-[13px] font-bold">Draft Kit</span>
-              </Link>
+              </Link></DesktopProduct>
               <Link to="/news" onClick={closeMobileMenu} className="flex items-center gap-3 px-3 py-2.5 rounded-md text-white/55 hover:text-pastel-cream hover:bg-white/5 transition-all">
                 <Newspaper className="h-4 w-4" />
                 <span className="text-[13px] font-bold">News</span>
@@ -641,7 +642,7 @@ const Navbar = () => {
       )}
 
       <style>
-        {`:root { --header-height: 92px; }`}
+        {`:root { --header-height: calc(92px + env(safe-area-inset-top)); }`}
       </style>
     </header>
   );

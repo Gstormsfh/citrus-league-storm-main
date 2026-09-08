@@ -1,3 +1,4 @@
+import { DesktopProduct } from '@/components/DesktopProduct';
 import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -853,6 +854,25 @@ const LeagueDashboard = () => {
     },
     staleTime: 60_000,
   });
+  // A completed league does not necessarily have a saved draft board. The
+  // reviewer league, for example, was populated directly into rosters and has
+  // no draft_events or pick projection to render. Linking every completed
+  // league to DraftRoomV2 left those leagues on an endless "Loading final
+  // board" screen. The existing era endpoint is the authoritative, cheap
+  // signal that durable v2 draft history exists.
+  const draftHistoryQuery = useQuery({
+    queryKey: ['league-draft-history-available', leagueId],
+    enabled: !!leagueId && league?.draft_status === 'completed',
+    queryFn: async () => {
+      const { apiClient } = await import('@/api/client');
+      const response = await apiClient.get<{ v2Era?: boolean }>(
+        `/api/draft/v2/league/${encodeURIComponent(leagueId!)}/era`,
+      );
+      const payload = response.data ?? (response as unknown as { v2Era?: boolean });
+      return payload.v2Era === true;
+    },
+    staleTime: 60_000,
+  });
   const standingsStat = useMemo(
     () => (standingsQuery.data && userTeam ? standingsLine(standingsQuery.data, userTeam.id) : null),
     [standingsQuery.data, userTeam],
@@ -1014,7 +1034,7 @@ const LeagueDashboard = () => {
               stat: userTeam ? (myRosterCount !== null && myRosterCount > 0 ? `${myRosterCount} players` : userTeam.team_name) : null,
             },
             { title: 'GM office', to: '/gm-office', Icon: Briefcase },
-            ...(league.draft_status === 'completed'
+            ...(league.draft_status === 'completed' && draftHistoryQuery.data === true
               ? [{
                   title: 'Draft results',
                   to: `/draft-v2/${leagueId}`,
@@ -1086,13 +1106,13 @@ const LeagueDashboard = () => {
       )}
       <main className="hidden lg:block w-full lg:pt-24 lg:pb-8">
         <div className="w-full m-0 p-0">
-          <div className="flex flex-col lg:grid lg:grid-cols-[200px_1fr_260px] xl:grid-cols-[220px_1fr_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
+          <div className="flex flex-col lg:grid lg:grid-cols-[200px_minmax(0,1fr)_260px] xl:grid-cols-[220px_minmax(0,1fr)_280px] lg:gap-4 xl:gap-6 lg:px-4 xl:px-6 lg:mx-0 lg:w-screen lg:relative lg:left-1/2 lg:-translate-x-1/2">
             <div className="min-w-0 px-2 lg:px-6 order-1 lg:order-2 pt-3 sm:pt-0">
 
               {/* Header */}
           <div className="mb-5 sm:mb-8">
-            <div className="flex items-center justify-between mb-4 gap-3">
-              <div className="min-w-0">
+            <div className="flex flex-col items-start 2xl:flex-row 2xl:justify-between mb-4 gap-3">
+              <div className="min-w-0 w-full 2xl:w-auto 2xl:flex-1">
                 <div className="hidden sm:flex font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1.5 items-center gap-2">
                   <CupIcon className="w-3.5 h-3.5" strokeWidth={2} aria-hidden="true" />
                   ✦ League HQ
@@ -1134,7 +1154,7 @@ const LeagueDashboard = () => {
               {/* INVITE REACH (2026-09-01): inviting was buried inside the
                   settings dialog's rosters tab. Every member now gets the
                   share-sheet-first invite affordance at the top of HQ. */}
-              <div className="flex gap-2 items-start">
+              <div className="flex flex-wrap gap-2 items-start shrink-0 max-w-full">
                 {league.join_code && (
                   <InvitePlayersButton joinCode={league.join_code} leagueName={league.name} />
                 )}
@@ -2428,7 +2448,7 @@ const LeagueDashboard = () => {
                   <div className="space-y-1.5">
                     <Link to="/standings" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> Standings</Link>
                     {inOffseason ? (
-                      <Link to="/draft-kit" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> Draft Kit</Link>
+                      <DesktopProduct><Link to="/draft-kit" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> Draft Kit</Link></DesktopProduct>
                     ) : (
                       <Link to="/matchup" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> This week's matchup</Link>
                     )}
@@ -2460,4 +2480,3 @@ const LeagueDashboard = () => {
 };
 
 export default LeagueDashboard;
-

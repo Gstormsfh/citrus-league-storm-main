@@ -131,10 +131,23 @@ beforeEach(() => {
   // The transcript is persisted, so a leftover from the previous test would
   // decide the greeting assertions instead of the code under test.
   localStorage.clear();
+  USER.id = 'user-1';
 });
 
 describe('StormyAssistant — the offseason', () => {
   beforeEach(() => seasonStatus.mockReturnValue(OFFSEASON));
+
+  it('drops the previous account transcript when the signed-in account changes', async () => {
+    localStorage.setItem('citrus:stormy:user-1:stormyMessages', JSON.stringify([
+      { id: 'private', text: 'Private first account question', sender: 'user', timestamp: new Date().toISOString() },
+    ]));
+    const view = mount();
+    expect(await screen.findByText('Private first account question')).toBeInTheDocument();
+    USER.id = 'user-2';
+    view.rerender(<MemoryRouter><StormyAssistant /></MemoryRouter>);
+    expect(screen.queryByText('Private first account question')).toBeNull();
+    expect(localStorage.getItem('citrus:stormy:user-2:stormyMessages')).not.toContain('Private first account question');
+  });
 
   it('swaps the starter chips for questions that have answers today', async () => {
     mount();
@@ -179,7 +192,7 @@ describe('StormyAssistant — the offseason', () => {
     // The guard is "exactly one message, id '1', from Stormy". Anything else is
     // the reader's conversation, and this must not edit it under them.
     localStorage.setItem(
-      'stormyMessages',
+      'citrus:stormy:user-1:stormyMessages',
       JSON.stringify([
         { id: '1', text: 'Stormy here. I already have your league, your roster and picks, and the live playoff bracket in front of me.', sender: 'stormy', timestamp: new Date().toISOString() },
         { id: '2', text: 'Who should I keep?', sender: 'user', timestamp: new Date().toISOString() },
