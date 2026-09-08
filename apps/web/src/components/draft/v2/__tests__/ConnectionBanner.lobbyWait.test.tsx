@@ -94,10 +94,12 @@ describe('ConnectionBanner — waitingForStart is the lobby’s job, not the ban
 });
 
 describe('ConnectionBanner — real connection problems are untouched', () => {
-  it('a real disconnect still renders the destructive "Connection lost" alert', () => {
+  it('a real disconnect still renders the destructive "Connection lost" alert once it persists', () => {
+    // 2026-09-08 (#5): attempts 1-2 are the routine reload/backgrounding case and
+    // render a calm status; a disconnect that survives to attempt 3 is real.
     setStateTo({
       kind: 'reconnecting',
-      attempt: 1,
+      attempt: 3,
       nextAttemptAt: Date.now() + 3000,
       lastError: 'WebSocket dropped',
     });

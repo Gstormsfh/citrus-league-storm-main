@@ -55,12 +55,12 @@ export function ReportContentDialog({ items, triggerClassName }: { items: Report
     });
     setBusy(false);
     if (error) {
-      toast({ title: 'Could not send the report', description: 'Please try again in a moment.', variant: 'destructive' });
+      toast({ title: 'Report not sent', description: 'Please try again in a moment.', variant: 'destructive' });
       return;
     }
     setOpen(false);
     setDetails('');
-    toast({ title: 'Report sent', description: 'Thanks — we review every report.' });
+    toast({ title: 'Report sent', description: 'Thanks. We review every report.' });
   };
 
   if (!items.length) return null;

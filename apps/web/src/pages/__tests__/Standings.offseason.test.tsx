@@ -46,6 +46,8 @@ vi.mock('react-router-dom', async (importOriginal) => {
 vi.mock('@/components/Navbar', () => ({ default: () => <nav data-testid="navbar" /> }));
 vi.mock('@/components/LeagueCreationCTA', () => ({ LeagueCreationCTA: () => null }));
 vi.mock('@/components/matchup/LeagueNotifications', () => ({ default: () => null }));
+// The Report-a-name dialog imports the Supabase client, which throws without env in tests.
+vi.mock('@/components/moderation/ReportContentDialog', () => ({ default: () => null }));
 // A STABLE `toast`, not a fresh spy per render. Standings' load effect lists
 // `toast` in its dependency array, and the real hook exports a module-level
 // function, so its identity never changes. A `vi.fn()` created inside the hook
