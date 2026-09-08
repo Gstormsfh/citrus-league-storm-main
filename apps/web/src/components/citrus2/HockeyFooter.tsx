@@ -19,6 +19,8 @@ const DEFAULT_COLUMNS: FooterColumn[] = [
     title: 'Play',
     links: [
       { label: 'Create a League', to: '/create-league' },
+      { label: 'Bring Your League', to: '/bring-your-league' },
+      { label: "Opening Night Pick'em", to: '/opening-night' },
       { label: 'Daily Pickem', to: '/pool/pickem' },
       { label: 'Survivor', to: '/pool/survivor' },
       { label: 'Confidence Pool', to: '/pool/confidence' },

@@ -1,5 +1,6 @@
 // Standalone Waitlist Page - Shareable link for social media signups
 import { Link } from 'react-router-dom';
+import { usePageMeta } from '@/lib/pageMeta';
 import { ArrowRight, BarChart3, Zap, Trophy, Users, Star } from 'lucide-react';
 import WaitlistSignup from '@/components/WaitlistSignup';
 import Navbar from '@/components/Navbar';
@@ -14,6 +15,7 @@ import {
 } from '@/components/citrus2';
 
 const Waitlist = () => {
+  usePageMeta({ title: 'Join the Waitlist', description: 'Be first in line when Citrus Fantasy Sports launches on iOS. One launch email, no spam.', path: '/waitlist' });
   return (
     <DarkLayout>
       <Navbar />

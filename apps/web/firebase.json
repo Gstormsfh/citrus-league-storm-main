@@ -22,6 +22,10 @@
         "destination": "/robots.txt"
       },
       {
+        "source": "/sitemap.xml",
+        "destination": "/sitemap.xml"
+      },
+      {
         "source": "/api/**",
         "run": {
           "serviceId": "citrus-api",

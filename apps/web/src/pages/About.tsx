@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { usePageMeta } from '@/lib/pageMeta';
 import Navbar from '@/components/Navbar';
 import { ArrowRight } from 'lucide-react';
 import {
@@ -11,6 +12,7 @@ import {
 import { MASCOT_LIST } from '@/constants/mascots';
 
 export default function About() {
+  usePageMeta({ title: 'About Citrus Fantasy Sports', description: 'Fantasy hockey built by a former pro and a CPA: a live draft room, Stormy the AI assistant GM, and analytics on expected goals.', path: '/about' });
   return (
     <DarkLayout>
 

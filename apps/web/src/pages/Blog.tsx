@@ -19,10 +19,12 @@
  * there aren't any.
  */
 import { PenLine } from 'lucide-react';
+import { usePageMeta } from '@/lib/pageMeta';
 import Navbar from '@/components/Navbar';
 import { DarkLayout, HockeyFooter, GlowCard, MascotPeek, CtaBanner } from '@/components/citrus2';
 
 const Blog = () => {
+  usePageMeta({ title: 'Blog', description: 'Building Citrus in the open: product notes, model updates and fantasy hockey thinking.', path: '/blog' });
   return (
     <DarkLayout>
       <Navbar />

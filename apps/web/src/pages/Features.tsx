@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { usePageMeta } from '@/lib/pageMeta';
 import { ArrowRight, Shield, Users, CheckCircle } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import {
@@ -122,6 +123,7 @@ const FORMATS: Array<{
 ];
 
 export default function Features() {
+  usePageMeta({ title: 'Features', description: 'Live draft room, Stormy AI assistant GM, expected-goals player analytics, custom scoring, keepers, waivers and trades. See what a Citrus league gets.', path: '/features' });
   return (
     <DarkLayout>
       <Navbar />

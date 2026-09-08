@@ -19,6 +19,7 @@
  * data. Until then it says so.
  */
 import { Headphones } from 'lucide-react';
+import { usePageMeta } from '@/lib/pageMeta';
 import Navbar from '@/components/Navbar';
 import {
   DarkLayout,
@@ -29,6 +30,7 @@ import {
 } from '@/components/citrus2';
 
 const Podcasts = () => {
+  usePageMeta({ title: 'Podcasts', description: 'Fantasy hockey podcasts worth your commute, picked by the Citrus team.', path: '/podcasts' });
   return (
     <DarkLayout>
       <Navbar />

@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://www.citrusfantasysports.com/sitemap.xml
+Sitemap: https://citrusfantasysports.com/sitemap.xml
