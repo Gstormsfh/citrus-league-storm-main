@@ -117,7 +117,8 @@ async function registerDeviceForPush(
       {
         user_id: userId,
         token,
-        platform: 'ios',
+        // 'ios' or 'android'; PushService picks APNs or FCM from it.
+        platform: Capacitor.getPlatform(),
         last_seen_at: new Date().toISOString(),
       },
       { onConflict: 'token' },

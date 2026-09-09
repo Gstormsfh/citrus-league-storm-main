@@ -56,8 +56,20 @@ import {
  * without Apple is the arrangement 4.8 forbids.
  */
 const OAUTH_SIGN_IN_ENABLED = true;
+/**
+ * Google leads on Android; Apple leads everywhere else (Apple's HIG requires
+ * its button never be less prominent than another provider's, which is an
+ * iOS rule, not an Android one).
+ *
+ * Read inside the component rather than at module scope: an import-time
+ * platform read couples every consumer of this module to a fully-formed
+ * Capacitor, which is a needless failure mode under test and prerender.
+ */
+const providerOrderClass = (platform: string) =>
+  platform === 'android' ? 'flex flex-col-reverse gap-4' : 'space-y-4';
 
 const Auth = () => {
+  const PROVIDER_ORDER_CLASS = providerOrderClass(Capacitor.getPlatform());
   const navigate = useNavigate();
   const { user, loading: authLoading, signIn, signUp, resetPassword, signInWithOAuth } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -419,6 +431,10 @@ const Auth = () => {
                     than other providers, hence first + brand-white style. */}
                 {OAUTH_SIGN_IN_ENABLED && (
                   <>
+                {/* PROVIDER ORDER BY PLATFORM (2026-09-09, Play prep). Apple's HIG
+                    wants its button first on iOS; on Android the Google button
+                    leads and Apple (a web OAuth flow there) sits second. */}
+                <div className={PROVIDER_ORDER_CLASS}>
                 <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('apple')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'apple'} className="bg-white text-[#111111] ring-white/80 hover:bg-white/90 hover:text-black hover:ring-white max-lg:h-12 max-lg:rounded-[12px] max-lg:ring-0 max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.06em]">
                   {oauthLoading !== 'apple' && <Apple className="w-4 h-4 fill-current" />}
                   Continue with Apple
@@ -428,6 +444,7 @@ const Auth = () => {
                   {oauthLoading !== 'google' && <Chrome className="w-4 h-4" />}
                   Continue with Google
                 </CitrusButton>
+                </div>
 
                 <p className="text-[11px] leading-snug text-center text-white/55 px-2 max-lg:font-barlow max-lg:text-[12px] max-lg:text-pressbox-text/55" data-testid="oauth-consent-line">
                   By continuing you agree to the{' '}
@@ -533,6 +550,10 @@ const Auth = () => {
               <TabsContent value="signup" className="space-y-4 mt-0">
                 {OAUTH_SIGN_IN_ENABLED && (
                   <>
+                {/* PROVIDER ORDER BY PLATFORM (2026-09-09, Play prep). Apple's HIG
+                    wants its button first on iOS; on Android the Google button
+                    leads and Apple (a web OAuth flow there) sits second. */}
+                <div className={PROVIDER_ORDER_CLASS}>
                 <CitrusButton type="button" variant="secondary" size="lg" fullWidth onClick={() => handleOAuthSignIn('apple')} disabled={loading || oauthLoading !== null} loading={oauthLoading === 'apple'} className="bg-white text-[#111111] ring-white/80 hover:bg-white/90 hover:text-black hover:ring-white max-lg:h-12 max-lg:rounded-[12px] max-lg:ring-0 max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.06em]">
                   {oauthLoading !== 'apple' && <Apple className="w-4 h-4 fill-current" />}
                   Continue with Apple
@@ -542,6 +563,7 @@ const Auth = () => {
                   {oauthLoading !== 'google' && <Chrome className="w-4 h-4" />}
                   Continue with Google
                 </CitrusButton>
+                </div>
 
                 <p className="text-[11px] leading-snug text-center text-white/55 px-2 max-lg:font-barlow max-lg:text-[12px] max-lg:text-pressbox-text/55" data-testid="oauth-consent-line">
                   By continuing you agree to the{' '}

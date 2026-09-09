@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "86158604477",
+    "project_id": "citrus-fantasy-prod",
+    "storage_bucket": "citrus-fantasy-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:86158604477:android:ed43798c5fd275350ddfd4",
+        "android_client_info": {
+          "package_name": "com.citrussports.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA3TBoLD1y3KXWMd7ULIBgjMhhH6aDXVeY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

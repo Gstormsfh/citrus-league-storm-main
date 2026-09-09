@@ -88,11 +88,23 @@ const corsOrigins: string[] = [
   //
   // Custom schemes only. A page in a normal browser cannot claim an Origin
   // of capacitor:// or ionic://, so these do not widen the web surface.
-  // Android's shell uses http(s)://localhost and is deliberately NOT added
-  // here — that origin IS reachable from an ordinary local page, so it
-  // should be a considered decision when Android ships, not a freebie now.
+  // Android's shell uses http(s)://localhost and was deliberately NOT added
+  // until Android shipped, because that origin IS reachable from an
+  // ordinary local page.
+  //
+  // ANDROID SHIPS (2026-09-09). Considered, and added. The API authenticates
+  // with a Bearer JWT in the Authorization header and never with a cookie,
+  // so CORS is not the authentication boundary here: a page served from
+  // https://localhost on someone's machine can be answered by this API only
+  // with a token it already holds, which it cannot obtain through CORS.
+  // What the entry buys is every /api call from the Play build, which the
+  // emulator showed refused wholesale ("We couldn't load your leagues")
+  // with sign-in working, since Supabase auth is a direct call.
+  // Capacitor's default Android scheme is https, so only that form is
+  // listed; http://localhost stays out.
   'capacitor://localhost',
   'ionic://localhost',
+  'https://localhost',
 ];
 if (!isProduction) {
   corsOrigins.push('http://localhost:8080', 'http://localhost:5173');
