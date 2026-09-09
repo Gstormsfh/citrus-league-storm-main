@@ -35,7 +35,7 @@ import { getTeamColor } from '@/utils/teamColors';
 import { PB_TYPE, PB_ROW_META, PB_ROW_NAME } from './rowScale';
 
 /** What tapping the action does. The glyph and tint follow the meaning. */
-export type PressBoxPlayerAction = 'add' | 'claim' | 'swap' | 'none';
+export type PressBoxPlayerAction = 'add' | 'claim' | 'swap' | 'claimed' | 'none';
 
 export interface PressBoxPlayerRowPlayer extends MugPlayer {
   id: string | number;
@@ -108,6 +108,7 @@ const ACTION_GLYPH: Record<PressBoxPlayerAction, string> = {
   add: '+',
   claim: 'W',
   swap: '⇄',
+  claimed: '✓',
   none: '',
 };
 
@@ -280,6 +281,7 @@ export function PressBoxPlayerRow({
           aria-label={
             action === 'add' ? `Add ${player.name}`
             : action === 'claim' ? `Claim ${player.name} on waivers`
+            : action === 'claimed' ? `Claim filed for ${player.name}. Tap to cancel`
             : `Swap for ${player.name}`
           }
           className={cn(
@@ -289,6 +291,7 @@ export function PressBoxPlayerRow({
             'font-plex font-semibold text-[16px] disabled:opacity-40',
             action === 'add' && 'bg-pressbox-orange/[0.15] border-pressbox-orange/[0.45] text-pressbox-orange-soft',
             action === 'claim' && 'bg-pressbox-sage/[0.15] border-pressbox-sage/40 text-pressbox-sage',
+            action === 'claimed' && 'bg-pressbox-sage/40 border-pressbox-sage text-pressbox-text',
             action === 'swap' && 'bg-white/[0.06] border-white/10 text-pressbox-text',
           )}
         >

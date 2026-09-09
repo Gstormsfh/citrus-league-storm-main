@@ -109,7 +109,9 @@ export function FreeAgentRow({
   const clears = action === 'claim' ? waiverClearsLabel(player.waiver_clears_at) : null;
 
   const actionLabel =
-    action === 'claim'
+    action === 'claimed'
+      ? `Claim filed for ${player.full_name}. Tap to cancel`
+      : action === 'claim'
       ? `Claim ${player.full_name}${clears ? `, ${clears}` : ''}`
       : action === 'swap'
         ? `Add ${player.full_name} with a drop`
@@ -238,7 +240,9 @@ export function FreeAgentRow({
           // the number the row exists to show. The affordance still reads —
           // it is the only ringed, coloured control on the row — and the
           // hierarchy goes back to number first, action second.
-          action === 'claim'
+          action === 'claimed'
+            ? 'bg-pastel-sage/40 ring-1 ring-pastel-sage text-pastel-cream px-2'
+            : action === 'claim'
             ? 'bg-pastel-sage/15 ring-1 ring-pastel-sage/45 text-pastel-sage-soft px-2'
             : action === 'swap'
               ? 'bg-white/5 ring-1 ring-white/20 text-pastel-cream'

@@ -295,7 +295,12 @@ describe('freeAgentAction — which transaction a tap would be', () => {
   });
 
   it('the glyph for each state is the one the row prints', () => {
-    expect(ACTION_GLYPH).toEqual({ add: '+', claim: 'W', swap: '⇄' });
+    expect(ACTION_GLYPH).toEqual({ add: '+', claim: 'W', swap: '⇄', claimed: '✓' });
+  });
+
+  it('a filed claim wins over everything: the tap withdraws it', () => {
+    expect(freeAgentAction({ is_on_waivers: true }, true, true)).toBe('claimed');
+    expect(freeAgentAction({}, false, true)).toBe('claimed');
   });
 });
 

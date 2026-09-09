@@ -43,9 +43,9 @@ const TILES = strip(read('leagueMenuTiles.ts'));
 const TILE = strip(read('Tile.tsx'));
 
 describe('app-level nav and league-level nav stay separate', () => {
-  it('the bottom nav is exactly the five app destinations', () => {
+  it('the bottom nav is exactly the four app destinations (Players lives in the league strip)', () => {
     const tos = [...NAV.matchAll(/to: '([^']+)'/g)].map((m) => m[1]);
-    expect(tos).toEqual(['/', '/scores', '/players', '/news', '/profile']);
+    expect(tos).toEqual(['/', '/scores', '/news', '/profile']);
   });
 
   it('the bottom nav carries no league-scoped route', () => {
@@ -125,7 +125,7 @@ describe('fixed chrome heights', () => {
     expect(CHATBAR_H).toBe(40);
     expect(BOTTOMNAV_H).toBe(76);
     expect(BOTTOM_CHROME_H).toBe(116);
-    expect(HEADER_H).toBe(86);
+    expect(HEADER_H).toBe(96);
   });
 
   it('the chat bar sits above the nav, including the safe area', () => {

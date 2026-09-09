@@ -18,8 +18,10 @@
 
 /** Row 1 of LeagueHeader: crest, league name, week label, settings. */
 export const HEADER_ROW1_H = 52;
-/** Row 2: the four-column sub-tab strip. */
-export const HEADER_SUBTAB_H = 34;
+/** Row 2: the four-column sub-tab strip. 34 in the reference; raised to 44
+ * (the iOS tap minimum) on 2026-09-09 so the league bar reads as the
+ * primary way around a league now that the bottom nav is app-only. */
+export const HEADER_SUBTAB_H = 44;
 /** Both header rows. Screens offset their sticky sub-headers by this. */
 export const HEADER_H = HEADER_ROW1_H + HEADER_SUBTAB_H;
 

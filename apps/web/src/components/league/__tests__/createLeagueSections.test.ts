@@ -229,6 +229,18 @@ describe('the rules under the rows', () => {
     expect(roster?.callout).toBe(warning);
   });
 
+  it('rounds default to "match roster" and the roster group counts draftable spots (IR excluded)', () => {
+    const f = form({ draftRounds: 'match' });
+    const sections = buildCreateLeagueSections(f);
+    const rounds = field(f, 'draft', 'rounds');
+    expect(rounds.kind).toBe('select');
+    if (rounds.kind === 'select') {
+      expect(rounds.options[0]).toMatchObject({ value: 'match', label: 'Match roster (19 rounds)' });
+    }
+    const slots = sections.find((s) => s.key === 'roster')?.groups.find((g) => g.key === 'slots');
+    expect(slots?.label).toBe('SLOTS · 19 TOTAL');
+  });
+
   it('every select offers the value it currently holds', () => {
     for (const s of buildCreateLeagueSections(form())) {
       for (const f of s.groups.flatMap((g) => g.fields)) {

@@ -113,7 +113,7 @@ describe('every phone list is the shared row', () => {
     // The phone rows share one prop bag, and it derives the same state.
     const common = blockFrom('const common = {', 500);
     expect(common).toContain('projection: player.weeklyProjection');
-    expect(common).toContain('action: freeAgentAction(player, rosterFull)');
+    expect(common).toContain('action: freeAgentAction(player, rosterFull, hasPendingClaim(player))');
     expect(common).toContain('todayStr,');
     expect(common).toContain('onAction: () => handleRowAction(player)');
   });

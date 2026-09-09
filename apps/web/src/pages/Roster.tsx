@@ -443,8 +443,19 @@ const Roster = () => {
         setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
       }
         // Get all players from our pipeline tables (player_directory + player_season_stats)
-        // PlayerService.getAllPlayers() is the ONLY source for player data
-        const allPlayers = await PlayerService.getAllPlayers();
+        // PlayerService.getAllPlayers() is the ONLY source for player data.
+        //
+        // LOAD PATH (2026-09-09, TestFlight): this is the heaviest read on the
+        // page (the whole directory with stats and talent metrics) and it was
+        // awaited FIRST, before the page had asked which team or league it was
+        // on, so on a phone the roster sat behind one big fetch plus four
+        // serial ones. It now starts here and is awaited only where a branch
+        // actually needs the list, so the team/league/roster-id reads overlap
+        // it instead of queueing behind it.
+        const allPlayersPromise = PlayerService.getAllPlayers();
+        // A branch that returns early never awaits it; keep a rejection from
+        // surfacing as an unhandled promise. The awaiting branches still throw.
+        allPlayersPromise.catch(() => undefined);
         
         let dbPlayers: Player[] = [];
         // The league's roster slots as THIS load read them (the state copy
@@ -505,6 +516,7 @@ const Roster = () => {
           }
           // CRITICAL FIX: playerIds are STRINGS from DB, but p.id is a NUMBER
           const playerIdsAsNumbers = playerIds.map((id: any) => typeof id === 'string' ? parseInt(id) : id);
+          const allPlayers = await allPlayersPromise;
           const teamPlayers = allPlayers.filter(p => playerIdsAsNumbers.includes(p.id));
           
           if (teamPlayers.length === 0) {
@@ -594,6 +606,7 @@ const Roster = () => {
 
             // CRITICAL: player_id is TEXT in DB, and p.id is STRING in allPlayers (PlayerService line 287)
             // Compare strings to strings directly — ensure both sides are strings
+            const allPlayers = await allPlayersPromise;
             dbPlayers = allPlayers.filter(p => playerIds.includes(String(p.id)));
 
             if (dbPlayers.length < playerIds.length) {

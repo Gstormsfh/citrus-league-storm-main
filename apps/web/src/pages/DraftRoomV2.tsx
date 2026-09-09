@@ -92,6 +92,7 @@ import {
 } from '@/lib/draftClient/toasts';
 import { usePreloadedPlayers } from '@/hooks/usePreloadedPlayers';
 import { usePlayerDashboardIndex } from '@/hooks/usePlayerDashboardIndex';
+import { useLeague } from '@/contexts/LeagueContext';
 import {
   buildDraftProjectionMap,
   buildQualityScales,
@@ -126,6 +127,24 @@ export default function DraftRoomV2() {
 
   const runnerRef = useRef<DraftClientRunner | null>(null);
   const store = useDraftClientStore();
+
+  /**
+   * ACTIVE-LEAGUE OWNERSHIP (2026-09-09, TestFlight). The room reads its
+   * league from the path and never told LeagueContext, so every
+   * league-scoped page a manager opened after the draft (Roster, Trade, the
+   * mobile nav) still pointed at whatever league was active before, and a
+   * commissioner in thirty leagues finished a draft and landed on somebody
+   * else's empty roster. The room now claims the active league once, on
+   * entry, when it differs; membership was already established to be here.
+   */
+  const { activeLeagueId, setActiveLeagueId, loading: leaguesLoading } = useLeague();
+  const claimedLeagueRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!leagueId || leaguesLoading) return;
+    if (activeLeagueId === leagueId || claimedLeagueRef.current === leagueId) return;
+    claimedLeagueRef.current = leagueId;
+    setActiveLeagueId(leagueId);
+  }, [leagueId, activeLeagueId, leaguesLoading, setActiveLeagueId]);
   const { offsetMs: clockOffsetMs, updateOffset } = useClockOffsetEstimator();
 
   // DR-2 (2026-07-29) — fetch the caller's teamId. Non-fatal on
