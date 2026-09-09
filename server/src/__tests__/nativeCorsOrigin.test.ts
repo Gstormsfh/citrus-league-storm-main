@@ -46,17 +46,20 @@ describe('CORS allowlist — native shell', () => {
     expect(originsBlock).toContain("'https://www.citrusfantasysports.com'");
   });
 
-  it('does NOT bake a bare localhost origin into the production list', () => {
-    // http(s)://localhost IS reachable from an ordinary page in a desktop
-    // browser, unlike the custom schemes above. Android's shell will need one
-    // of these one day; that should be a deliberate decision at the time, not
-    // something that drifts in alongside the iOS entries. localhost is still
-    // pushed for non-production builds below this array, which is fine.
+  it('allows the Android shell origin, https://localhost, and only that form', () => {
+    // ANDROID SHIPS (2026-09-09). The August version of this test refused any
+    // localhost origin so the Android entry would be a decision, not drift.
+    // The decision: the API authenticates with a Bearer JWT, never a cookie,
+    // so CORS is not the auth boundary and https://localhost (Capacitor's
+    // default androidScheme) is safe to answer. Plain http://localhost stays
+    // out of the production list; it is still pushed for non-production
+    // builds below the array.
     const productionEntries = originsBlock
       .split('\n')
       .filter((l) => !l.trim().startsWith('//'))
       .join('\n');
-    expect(productionEntries).not.toMatch(/'https?:\/\/localhost/);
+    expect(productionEntries).toContain("'https://localhost'");
+    expect(productionEntries).not.toMatch(/'http:\/\/localhost/);
   });
 
   it('credentials mode is on, so the allowlist must stay explicit (never "*")', () => {

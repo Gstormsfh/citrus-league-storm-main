@@ -5,7 +5,10 @@ const push = vi.hoisted(() => ({
   checkPermissions: vi.fn(), requestPermissions: vi.fn(), addListener: vi.fn(),
   register: vi.fn(), unregister: vi.fn(), removeAllListeners: vi.fn(),
 }));
-vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true } }));
+// The double carries getPlatform because the real Capacitor always does, and
+// the token row records it (2026-09-09): a half-stubbed Capacitor made the
+// upsert throw silently and the row never landed.
+vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true, getPlatform: () => 'android' } }));
 vi.mock('@capacitor/push-notifications', () => ({ PushNotifications: push }));
 let listeners: Map<string, (value: unknown) => void>;
 let removers: Map<string, ReturnType<typeof vi.fn>>;
@@ -36,6 +39,17 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe('device push lifecycle', () => {
+  it('records which platform the token came from, not a hardcoded ios', async () => {
+    // PushService picks APNs or FCM off this column, so a row that always
+    // said 'ios' would route every Android device to Apple and drop it.
+    const api = await import('../pushNotifications');
+    await api.registerForPush(client, 'owner');
+    expect(upsert).toHaveBeenCalled();
+    expect(rows).toEqual([
+      expect.objectContaining({ user_id: 'owner', token: 'this-phone', platform: 'android' }),
+    ]);
+  });
+
   it('keeps other phones and the tap listener working after sign-out and sign-in', async () => {
     const api = await import('../pushNotifications');
     const navigate = vi.fn();

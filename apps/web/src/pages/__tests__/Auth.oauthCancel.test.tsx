@@ -70,7 +70,7 @@ const {
 }));
 
 vi.mock('@capacitor/core', () => ({
-  Capacitor: { isNativePlatform: isNativeMock },
+  Capacitor: { isNativePlatform: isNativeMock, getPlatform: () => 'ios' },
 }));
 vi.mock('@capacitor/app', () => ({
   App: { addListener: appAddListenerMock },
