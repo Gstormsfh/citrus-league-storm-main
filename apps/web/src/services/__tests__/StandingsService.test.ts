@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // =============================================================================
 
 const mockGetLeagueMatchups = vi.fn();
+const mockGetPPGStandings = vi.fn();
 const mockGetLeagueRosters = vi.fn();
 const mockGetLeague = vi.fn();
 const mockGetPlayersByIds = vi.fn();
@@ -12,6 +13,7 @@ const mockGetPlayersByIds = vi.fn();
 vi.mock('@/api/matchups', () => ({
   matchupApi: {
     getLeagueMatchups: (...args: unknown[]) => mockGetLeagueMatchups(...args),
+    getPPGStandings: (...args: unknown[]) => mockGetPPGStandings(...args),
   },
 }));
 
@@ -394,71 +396,43 @@ describe('StandingsService.calculateTeamStandings', () => {
 });
 
 // =============================================================================
-// calculateSeasonPointsStandings
+// calculateSeasonTotalsStandings (2026-09-09)
 // =============================================================================
 
-describe('StandingsService.calculateSeasonPointsStandings', () => {
-  it('returns initialized stats for all teams', async () => {
-    mockGetLeagueRosters.mockResolvedValue({ data: [] });
-    mockGetLeagueMatchups.mockResolvedValue({ data: [] });
+describe('StandingsService.calculateSeasonTotalsStandings', () => {
+  it('returns initialized stats for all teams when the RPC has nothing', async () => {
+    mockGetPPGStandings.mockResolvedValue({ data: [] });
 
     const teams = makeTeams(['team-1', 'team-2']);
-    const result = await StandingsService.calculateSeasonPointsStandings('league-1', teams, [], []);
+    const result = await StandingsService.calculateSeasonTotalsStandings('league-1', teams);
 
-    expect(result['team-1']).toBeDefined();
-    expect(result['team-1'].pointsFor).toBe(0);
-    expect(result['team-1'].gamesPlayed).toBe(0);
+    expect(result['team-1']).toEqual(expect.objectContaining({ pointsFor: 0, gamesPlayed: 0 }));
     expect(result['team-2']).toBeDefined();
   });
 
-  it('sums player points per team from roster assignments', async () => {
-    mockGetLeagueRosters.mockResolvedValue({
+  it('reads each team\'s scored weeks from calculate_ppg_standings, never from season stats', async () => {
+    mockGetPPGStandings.mockResolvedValue({
       data: [
-        { player_id: '101', team_id: 'team-1' },
-        { player_id: '102', team_id: 'team-1' },
-        { player_id: '201', team_id: 'team-2' },
+        { team_id: 'team-1', team_name: 'A', total_points: '123.45', games_played: 3, ppg: 41.15, rank: 1 },
+        { team_id: 'team-2', team_name: 'B', total_points: 98, games_played: 3, ppg: 32.67, rank: 2 },
+        { team_id: 'ghost', team_name: 'gone', total_points: 500, games_played: 9, ppg: 55, rank: 0 },
       ],
     });
-    mockGetLeagueMatchups.mockResolvedValue({ data: [] });
 
     const teams = makeTeams(['team-1', 'team-2']);
-    const allPlayers = [
-      { id: '101', points: 50 },
-      { id: '102', points: 30 },
-      { id: '201', points: 70 },
-    ];
-    const result = await StandingsService.calculateSeasonPointsStandings('league-1', teams, [], allPlayers);
+    const result = await StandingsService.calculateSeasonTotalsStandings('league-1', teams);
 
-    expect(result['team-1'].pointsFor).toBe(80); // 50 + 30
-    expect(result['team-2'].pointsFor).toBe(70);
-  });
-
-  it('falls back to draftPicks when roster API returns empty', async () => {
-    mockGetLeagueRosters.mockResolvedValue({ data: [] });
-    mockGetLeagueMatchups.mockResolvedValue({ data: [] });
-
-    const teams = makeTeams(['team-1']);
-    const draftPicks = [{ team_id: 'team-1', player_id: '101' }];
-    const allPlayers = [{ id: '101', points: 42 }];
-    const result = await StandingsService.calculateSeasonPointsStandings('league-1', teams, draftPicks, allPlayers);
-
-    expect(result['team-1'].pointsFor).toBe(42);
-  });
-
-  it('counts games played from past matchup weeks', async () => {
-    mockGetLeagueRosters.mockResolvedValue({ data: [] });
-    mockGetLeagueMatchups.mockResolvedValue({
-      data: [
-        { week_number: 1, week_end_date: '2026-03-01' },
-        { week_number: 2, week_end_date: '2026-03-07' },
-        { week_number: 3, week_end_date: '2026-03-07' },
-      ],
-    });
-
-    const teams = makeTeams(['team-1']);
-    const result = await StandingsService.calculateSeasonPointsStandings('league-1', teams, [], []);
-
+    expect(result['team-1'].pointsFor).toBeCloseTo(123.45);
     expect(result['team-1'].gamesPlayed).toBe(3);
+    expect(result['team-2'].pointsFor).toBe(98);
+    expect(result['ghost']).toBeUndefined();
+    expect(mockGetLeagueRosters).not.toHaveBeenCalled();
+  });
+
+  it('keeps zeros when the RPC fails', async () => {
+    mockGetPPGStandings.mockRejectedValue(new Error('rpc down'));
+    const result = await StandingsService.calculateSeasonTotalsStandings('league-1', makeTeams(['team-1']));
+    expect(result['team-1'].pointsFor).toBe(0);
   });
 });
 

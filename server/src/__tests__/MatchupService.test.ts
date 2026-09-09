@@ -257,6 +257,57 @@ describe('MatchupService', () => {
 
       expect(result.error).toBeNull();
     });
+
+    // SEASON-LONG FORMATS (2026-09-09): see the note on generateMatchupsForLeague.
+    function tables(scoringFormat: string | null, existing: unknown[] = []) {
+      const leagues = createChain({ data: scoringFormat ? { settings: { scoringFormat } } : null, error: null });
+      const matchups = createChain({ data: existing, error: null });
+      mockSupabase.from = vi.fn((table: string) => (table === 'leagues' ? leagues : matchups));
+      return { leagues, matchups };
+    }
+    const inserted = (chain: any) => chain.insert.mock.calls[0][0] as Array<{ week_number: number; team1_id: string; team2_id: string | null }>;
+
+    it('gives a total-points league a solo row per team per week, no opponents', async () => {
+      const { matchups } = tables('total-points');
+      const teams = [{ id: 't1' }, { id: 't2' }, { id: 't3' }];
+      const weeks = [
+        { week_number: 1, start_date: '2026-10-04', end_date: '2026-10-10' },
+        { week_number: 2, start_date: '2026-10-11', end_date: '2026-10-17' },
+      ];
+      const result = await service.generateMatchupsForLeague('league-1', teams, weeks);
+      expect(result.error).toBeNull();
+      const rows = inserted(matchups);
+      expect(rows).toHaveLength(6);
+      expect(rows.every((r) => r.team2_id === null)).toBe(true);
+      expect(rows.filter((r) => r.week_number === 1).map((r) => r.team1_id).sort()).toEqual(['t1', 't2', 't3']);
+    });
+
+    it('does the same for points-per-game and roto', async () => {
+      for (const fmt of ['points-per-game', 'roto']) {
+        const { matchups } = tables(fmt);
+        await service.generateMatchupsForLeague('league-1', [{ id: 'a' }, { id: 'b' }], [{ week_number: 1, start_date: '2026-10-04', end_date: '2026-10-10' }]);
+        expect(inserted(matchups).map((r) => r.team2_id)).toEqual([null, null]);
+      }
+    });
+
+    it('keeps head-to-head pairings for h2h-points and writes the bye as a row', async () => {
+      const { matchups } = tables('h2h-points');
+      const teams = [{ id: 't1' }, { id: 't2' }, { id: 't3' }];
+      const weeks = [{ week_number: 1, start_date: '2026-10-04', end_date: '2026-10-10' }];
+      await service.generateMatchupsForLeague('league-1', teams, weeks);
+      const rows = inserted(matchups);
+      // one pairing plus one bye: every team appears exactly once
+      expect(rows).toHaveLength(2);
+      expect(rows.filter((r) => r.team2_id === null)).toHaveLength(1);
+      const seen = rows.flatMap((r) => [r.team1_id, r.team2_id]).filter(Boolean).sort();
+      expect(seen).toEqual(['t1', 't2', 't3']);
+    });
+
+    it('falls back to head-to-head when the league cannot be read', async () => {
+      const { matchups } = tables(null);
+      await service.generateMatchupsForLeague('league-1', [{ id: 'a' }, { id: 'b' }], [{ week_number: 1, start_date: '2026-10-04', end_date: '2026-10-10' }]);
+      expect(inserted(matchups)).toEqual([expect.objectContaining({ team1_id: 'a', team2_id: 'b' })]);
+    });
   });
 
   describe('deleteAllMatchupsForLeague', () => {

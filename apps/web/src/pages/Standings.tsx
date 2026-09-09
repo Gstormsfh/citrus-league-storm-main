@@ -311,13 +311,14 @@ const Standings = () => {
                   categoryMeta
                 );
               } else if (isNonMatchup) {
-                // Total Points / PPG: no matchups, just cumulative points
-                teamStats = await LeagueService.calculateSeasonPointsStandings(
-                  leagueToUse,
-                  leagueTeamsData,
-                  draftPicks,
-                  allPlayers
-                );
+                // Total Points / PPG (2026-09-09): the sum of the team's
+                // scored weeks, from the same engine that scores every
+                // matchup. Each of these leagues has a solo row per team per
+                // week; calculate_ppg_standings sums the completed ones.
+                // The previous path summed each rostered player's raw NHL
+                // points from the season stats table, which is not league
+                // scoring and not from the draft forward.
+                teamStats = await LeagueService.calculateSeasonTotalsStandings(leagueToUse, leagueTeamsData);
               } else {
                 // H2H Points / Best Ball: use matchup-based standings
                 teamStats = await LeagueService.calculateTeamStandings(

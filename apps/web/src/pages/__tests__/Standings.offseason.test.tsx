@@ -104,7 +104,7 @@ vi.mock('@/services/LeagueService', () => ({
     calculateTeamStandings: vi.fn(async () => ({})),
     calculateCategoryStandings: vi.fn(async () => ({})),
     calculateRotoStandingsFromDB: vi.fn(async () => ({})),
-    calculateSeasonPointsStandings: vi.fn(async () => ({})),
+    calculateSeasonTotalsStandings: vi.fn(async () => ({})),
   },
   getLeagueFormat: () => ({ leagueType: 'fantasy', scoringFormat: 'h2h-points' }),
   LEAGUE_TEAMS_DATA: [],

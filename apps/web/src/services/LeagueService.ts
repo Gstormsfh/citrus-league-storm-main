@@ -1317,7 +1317,7 @@ async joinLeagueByCode(
 
   // ─── Standings methods (delegated to StandingsService) ─────────
   calculateTeamStandings: StandingsService.calculateTeamStandings.bind(StandingsService),
-  calculateSeasonPointsStandings: StandingsService.calculateSeasonPointsStandings.bind(StandingsService),
+  calculateSeasonTotalsStandings: StandingsService.calculateSeasonTotalsStandings.bind(StandingsService),
   calculateCategoryStandings: StandingsService.calculateCategoryStandings.bind(StandingsService),
   calculateRotoStandingsFromDB: StandingsService.calculateRotoStandingsFromDB.bind(StandingsService),
 

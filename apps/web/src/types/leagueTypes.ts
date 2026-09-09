@@ -68,6 +68,11 @@ export const SCORING_FORMAT_DESCRIPTIONS: Record<ScoringFormat, string> = {
 };
 
 // Which scoring formats need weekly matchups vs. season-long
+// "Has an opponent each week." Every format gets a weekly schedule and is
+// scored by the matchup engine (2026-09-09); the season-long formats below
+// get a solo row per team per week (team2_id null) instead of pairings. This
+// flag now only decides whether there is an opponent to show, playoff
+// settings to offer, and a head-to-head record to keep.
 export const FORMAT_HAS_MATCHUPS: Record<ScoringFormat, boolean> = {
   'h2h-points': true,
   'h2h-categories': true,
