@@ -10,6 +10,7 @@
  */
 
 import { defaultLeagueStats } from '@citrus/shared';
+export { draftableRosterSize, DRAFT_ROUNDS_MATCH_ROSTER, NON_DRAFTABLE_SLOTS } from '@citrus/shared';
 
 // ============================================================================
 // LEAGUE TYPE - The fundamental format of the league

@@ -35,6 +35,8 @@ import {
   AVAILABLE_CATEGORIES,
   DEFAULT_ROSTER_SLOTS,
   DEFAULT_FDG_ROSTER_SLOTS,
+  draftableRosterSize,
+  DRAFT_ROUNDS_MATCH_ROSTER,
 } from '@/types/leagueTypes';
 import { processTimeLabel, type SettingField, type SettingOption, type SettingSection } from './leagueSettingsSections';
 
@@ -181,6 +183,8 @@ export function statPointOptions(stat: LeagueStatSetting): SettingOption[] {
 }
 
 const DRAFT_ROUNDS = opts([['14', '14 rounds'], ['16', '16 rounds'], ['18', '18 rounds'], ['21', '21 rounds'], ['24', '24 rounds'], ['30', '30 rounds']]);
+const draftRoundOptions = (draftable: number) =>
+  [{ value: DRAFT_ROUNDS_MATCH_ROSTER, label: `Match roster (${draftable} rounds)` }, ...DRAFT_ROUNDS];
 const PICK_CLOCKS = opts([['30', '30s'], ['60', '60s'], ['90', '90s'], ['120', '120s'], ['180', '3 min'], ['300', '5 min']]);
 const NOMINATION_CLOCKS = opts([['15', '15s'], ['30', '30s'], ['45', '45s'], ['60', '60s']]);
 const BID_CLOCKS = opts([['10', '10s'], ['15', '15s'], ['20', '20s'], ['30', '30s'], ['45', '45s']]);
@@ -436,7 +440,7 @@ export function buildCreateLeagueSections(f: CreateLeagueForm): SettingSection[]
         label: 'Rounds',
         help: f.draftType === 'offline' ? 'Sizes the results grid the commissioner fills in' : null,
         value: f.draftRounds,
-        options: DRAFT_ROUNDS,
+        options: draftRoundOptions(draftableRosterSize(f.rosterSlots)),
         onChange: f.setDraftRounds,
       },
     ];
@@ -773,7 +777,7 @@ export function buildCreateLeagueSections(f: CreateLeagueForm): SettingSection[]
   // ── ROSTER ──
   if (f.isFantasy) {
     const slots = f.positionType === 'forward' ? DEFAULT_FDG_ROSTER_SLOTS : DEFAULT_ROSTER_SLOTS;
-    const total = Object.values(f.rosterSlots).reduce((a, b) => a + (b || 0), 0);
+    const total = draftableRosterSize(f.rosterSlots);
     sections.push({
       key: 'roster',
       label: 'ROSTER',

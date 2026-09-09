@@ -241,6 +241,36 @@ export class WaiverService {
     return { claims: enriched, error: null };
   }
 
+  /**
+   * CLAIM-TIME ROSTER CHECK (2026-09-09, TestFlight). A claim with no drop on
+   * a full roster used to be accepted and then fail at the 02:00 processing
+   * run, so the manager found out the next day. The free-agent add already
+   * refused this at request time; claims now do too.
+   *
+   * Returns null when the claim may proceed, else the message to return.
+   */
+  private async rosterFullReason(
+    leagueId: string,
+    teamId: string,
+    dropPlayerId: number | null,
+  ): Promise<string | null> {
+    if (dropPlayerId) return null;
+    const admin = getSupabaseAdmin();
+    const [{ count }, { data: league }] = await Promise.all([
+      admin
+        .from('roster_assignments')
+        .select('id', { count: 'exact', head: true })
+        .eq('league_id', leagueId)
+        .eq('team_id', teamId),
+      admin.from('leagues').select('roster_size').eq('id', leagueId).maybeSingle(),
+    ]);
+    const maxRoster = (league as { roster_size?: number } | null)?.roster_size || 21;
+    if (count !== null && count >= maxRoster) {
+      return `Roster is full (${count}/${maxRoster}). Pick a player to drop with this claim.`;
+    }
+    return null;
+  }
+
   /** Submit a waiver claim */
   async submitWaiverClaim(
     leagueId: string,
@@ -252,6 +282,11 @@ export class WaiverService {
     const limits = await this.checkTransactionLimits(leagueId, teamId);
     if (!limits.allowed) {
       return { success: false, error: limits.reason };
+    }
+
+    const full = await this.rosterFullReason(leagueId, teamId, dropPlayerId);
+    if (full) {
+      return { success: false, error: full };
     }
 
     // Get waiver priority
@@ -302,6 +337,11 @@ export class WaiverService {
     const budget = await this.getFAABBudget(leagueId, teamId);
     if (budget !== null && bidAmount > budget) {
       return { success: false, error: `Bid exceeds remaining budget ($${budget})` };
+    }
+
+    const full = await this.rosterFullReason(leagueId, teamId, dropPlayerId);
+    if (full) {
+      return { success: false, error: full };
     }
 
     // Check for existing bid on same player

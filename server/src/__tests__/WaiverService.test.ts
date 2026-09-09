@@ -72,6 +72,48 @@ describe('WaiverService', () => {
       expect(result.success).toBe(true);
       expect(result.claimId).toBe('claim-1');
     });
+
+    // CLAIM-TIME ROSTER CHECK (2026-09-09): a 21/21 roster filed a no-drop
+    // claim on TestFlight night and only found out at processing time.
+    it('refuses a no-drop claim when the roster is full', async () => {
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'leagues') return createChain({ data: { settings: {} }, error: null });
+        if (table === 'transaction_ledger') return createChain({ count: 0, error: null });
+        return createChain();
+      });
+      mockAdminClient = {
+        from: vi.fn((table: string) => {
+          if (table === 'roster_assignments') return createChain({ count: 21, error: null });
+          if (table === 'leagues') return createChain({ data: { roster_size: 21 }, error: null });
+          return createChain();
+        }),
+      };
+
+      const result = await service.submitWaiverClaim('league-1', 'team-1', 100);
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/Roster is full \(21\/21\)/);
+    });
+
+    it('accepts a claim on a full roster when a drop is attached', async () => {
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'leagues') return createChain({ data: { settings: {} }, error: null });
+        if (table === 'transaction_ledger') return createChain({ count: 0, error: null });
+        if (table === 'waiver_priority') return createChain({ data: { priority: 3 }, error: null });
+        if (table === 'waiver_claims') return createChain({ data: { id: 'claim-2' }, error: null });
+        return createChain();
+      });
+      mockAdminClient = {
+        from: vi.fn((table: string) => {
+          if (table === 'roster_assignments') return createChain({ count: 21, error: null });
+          if (table === 'leagues') return createChain({ data: { roster_size: 21 }, error: null });
+          return createChain();
+        }),
+      };
+
+      const result = await service.submitWaiverClaim('league-1', 'team-1', 100, 555);
+      expect(result.success).toBe(true);
+      expect(result.claimId).toBe('claim-2');
+    });
   });
 
   describe('submitFAABBid', () => {
@@ -92,6 +134,26 @@ describe('WaiverService', () => {
       const result = await service.submitFAABBid('league-1', 'team-1', 100, 75);
       expect(result.success).toBe(false);
       expect(result.error).toContain('budget');
+    });
+
+    it('refuses a no-drop bid when the roster is full', async () => {
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'leagues') return createChain({ data: { settings: {} }, error: null });
+        if (table === 'faab_budgets') return createChain({ data: { remaining_budget: 100 }, error: null });
+        if (table === 'transaction_ledger') return createChain({ count: 0, error: null });
+        return createChain();
+      });
+      mockAdminClient = {
+        from: vi.fn((table: string) => {
+          if (table === 'roster_assignments') return createChain({ count: 19, error: null });
+          if (table === 'leagues') return createChain({ data: { roster_size: 19 }, error: null });
+          return createChain();
+        }),
+      };
+
+      const result = await service.submitFAABBid('league-1', 'team-1', 100, 10);
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/Roster is full \(19\/19\)/);
     });
   });
 

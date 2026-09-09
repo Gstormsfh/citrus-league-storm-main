@@ -75,6 +75,8 @@ import {
   hasWaivers,
   DEFAULT_ROSTER_SLOTS,
   DEFAULT_FDG_ROSTER_SLOTS,
+  draftableRosterSize,
+  DRAFT_ROUNDS_MATCH_ROSTER,
 } from "@/types/leagueTypes";
 
 // ============================================================================
@@ -149,7 +151,8 @@ const CreateLeague = () => {
   const [scoringFormat, setScoringFormat] = useState<ScoringFormat>("h2h-points");
   const [draftType, setDraftType] = useState<DraftType>("snake");
   const [teamsCount, setTeamsCount] = useState("12");
-  const [draftRounds, setDraftRounds] = useState("21");
+  // "match": one round per draftable roster spot, whatever the slots say.
+  const [draftRounds, setDraftRounds] = useState<string>(DRAFT_ROUNDS_MATCH_ROSTER);
   const [pickTimeLimit, setPickTimeLimit] = useState("90");
 
   // ---- Auction Draft Settings ----
@@ -354,10 +357,11 @@ const CreateLeague = () => {
   // Divergence is a legal choice — plenty of leagues draft short and fill
   // the last spots off waivers — so this warns, it does not clamp. What is
   // not acceptable is that it happened silently.
-  const totalRosterSlots = Object.values(rosterSlots).reduce((sum, n) => sum + (n || 0), 0);
+  const totalRosterSlots = draftableRosterSize(rosterSlots);
+  const resolvedDraftRounds = draftRounds === DRAFT_ROUNDS_MATCH_ROSTER ? totalRosterSlots : parseInt(draftRounds, 10);
   const roundsVsRoster = (() => {
     if (!isFantasy) return null;
-    const rounds = parseInt(draftRounds, 10);
+    const rounds = resolvedDraftRounds;
     if (Number.isNaN(rounds)) return null;
     if (rounds <= 0 || totalRosterSlots <= 0 || rounds === totalRosterSlots) return null;
     const gap = Math.abs(rounds - totalRosterSlots);
@@ -622,16 +626,14 @@ const CreateLeague = () => {
         }
       } : undefined;
 
-      // Calculate roster size from slot configuration
-      const rosterSize = isFantasy
-        ? Object.values(rosterSlots).reduce((sum, count) => sum + count, 0)
-        : 0;
+      // Draftable roster size: every slot except IR (shared draftableRosterSize).
+      const rosterSize = isFantasy ? draftableRosterSize(rosterSlots) : 0;
 
       const { league, team, error: createError } = await LeagueService.createLeague(
         leagueName.trim(),
         user.id,
         isFantasy ? rosterSize : 0,
-        isFantasy ? (parseInt(draftRounds) || rosterSize || 21) : 0,
+        isFantasy ? (resolvedDraftRounds || rosterSize || 19) : 0,
         settings,
         scoringSettings,
         // Mirror the FAAB self-heal into the dedicated-column payload so
@@ -1461,6 +1463,7 @@ const CreateLeague = () => {
                             <Select value={draftRounds} onValueChange={setDraftRounds}>
                               <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
                               <SelectContent>
+                                <SelectItem value={DRAFT_ROUNDS_MATCH_ROSTER}>Match roster ({totalRosterSlots} rounds)</SelectItem>
                                 <SelectItem value="14">14 Rounds</SelectItem>
                                 <SelectItem value="16">16 Rounds</SelectItem>
                                 <SelectItem value="18">18 Rounds</SelectItem>

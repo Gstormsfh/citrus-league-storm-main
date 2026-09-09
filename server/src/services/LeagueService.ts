@@ -8,6 +8,7 @@ import {
   getTodayMST,
   type StandingsMatchup,
   type StandingsTeamRef,
+  draftableRosterSize,
 } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { LeagueMembershipService } from './LeagueMembershipService';
@@ -493,8 +494,9 @@ export class LeagueService {
     const currentSettings = league?.settings || {};
     const updatedSettings = { ...currentSettings, rosterSlots };
 
-    // Calculate new roster size from slots
-    const newRosterSize = Object.values(rosterSlots).reduce((sum: number, v: number) => sum + (v || 0), 0);
+    // Draftable roster size: every slot except IR (shared draftableRosterSize).
+    // IR is capacity for injured players, not a roster spot a claim can fill.
+    const newRosterSize = draftableRosterSize(rosterSlots);
 
     const { error } = await this.supabase
       .from('leagues')

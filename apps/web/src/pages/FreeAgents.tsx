@@ -80,7 +80,9 @@ import { ArrowLeftRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 // Returns extra Tailwind classes for the +Add button based on waiver state.
-const addBtnColorCls = (p: Player) => p.is_on_waivers
+const addBtnColorCls = (p: Player, claimed = false) => claimed
+  ? 'bg-emerald-900 hover:bg-emerald-800 text-emerald-200 border-emerald-500'
+  : p.is_on_waivers
   ? 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600'
   : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700';
 
@@ -174,6 +176,34 @@ const FreeAgents = () => {
    * never a broken transaction.
    */
   const [rosterFull, setRosterFull] = useState(false);
+
+  /**
+   * PENDING CLAIMS ON THE ROW (2026-09-09, TestFlight). Nothing on this page
+   * knew which claims the team had already filed: the W button stayed a W
+   * after the tap, so managers filed the same claim three and four times
+   * (the server collapses them, but the UI never said so), and the only place
+   * to cancel was /waiver-wire. player_id -> claim id for the team's pending
+   * claims; the row wears a check and the same tap withdraws the claim.
+   */
+  const [pendingClaims, setPendingClaims] = useState<Map<number, string>>(new Map());
+  const hasPendingClaim = useCallback(
+    (player: { id: string | number }) => pendingClaims.has(toNumericId(player.id)),
+    [pendingClaims],
+  );
+  const loadPendingClaims = useCallback(async (lid: string) => {
+    try {
+      const myTeam = (await leagueApi.getMyTeam(lid)).data as { id: string } | undefined;
+      if (!myTeam) { setPendingClaims(new Map()); return; }
+      const claims = await WaiverService.getTeamWaiverClaims(lid, myTeam.id);
+      const next = new Map<number, string>();
+      for (const c of claims) {
+        if (c.status === 'pending') next.set(Number(c.player_id), c.id);
+      }
+      setPendingClaims(next);
+    } catch {
+      /* non-critical: the row falls back to the plain W */
+    }
+  }, []);
 
   /**
    * PRESS BOX (2026-09-04): the phone's own controls. The three VIEWS map
@@ -406,6 +436,7 @@ const FreeAgents = () => {
 
       // Fetch waiver settings for this league (for dynamic toast messages)
       if (currentLeagueId && user) {
+        void loadPendingClaims(currentLeagueId);
         WaiverService.getLeagueWaiverSettings(currentLeagueId, user.id)
           .then(settings => { if (settings) setWaiverProcessTime(settings.waiver_process_time); })
           .catch(() => { /* non-critical */ });
@@ -840,6 +871,24 @@ const FreeAgents = () => {
       return;
     }
 
+    // A filed claim: this tap withdraws it instead of filing it again.
+    const pendingClaimId = pendingClaims.get(playerIdNum);
+    if (pendingClaimId) {
+      setAddingPlayerId(playerIdNum);
+      try {
+        const cancelled = await WaiverService.cancelWaiverClaim(pendingClaimId);
+        if (cancelled.success) {
+          toast({ title: 'Claim Cancelled', description: `Your claim on ${player.full_name} has been withdrawn.` });
+          await loadPendingClaims(leagueId);
+        } else {
+          toast({ title: 'Cancellation Failed', description: userMessage(cancelled.error, 'Could not cancel this claim. Try again in a moment.'), variant: 'destructive' });
+        }
+      } finally {
+        setAddingPlayerId(null);
+      }
+      return;
+    }
+
     // Set loading state immediately
     setAddingPlayerId(playerIdNum);
 
@@ -944,6 +993,7 @@ const FreeAgents = () => {
             title: "Waiver Claim Submitted",
             description: `${player.full_name} is on waivers. Your claim will process at ${formatWaiverProcessTime(waiverProcessTime)}.`,
           });
+          void loadPendingClaims(leagueId);
         }
         // Refresh the free agents list to remove the added player
         await fetchPlayers();
@@ -1052,7 +1102,7 @@ const FreeAgents = () => {
    * instead of being sent there by a "+" that lied.
    */
   const handleRowAction = (player: Player) => {
-    if (freeAgentAction(player, rosterFull) === 'swap') {
+    if (freeAgentAction(player, rosterFull, hasPendingClaim(player)) === 'swap') {
       void handleAddWithDrop(player);
       return;
     }
@@ -1556,7 +1606,7 @@ const FreeAgents = () => {
       // aggregate; absent until it exists.
       rosteredPct: own?.rosteredPct ?? null,
       startedPct: own?.startedPct ?? null,
-      action: freeAgentAction(player, rosterFull),
+      action: freeAgentAction(player, rosterFull, hasPendingClaim(player)),
       pending: addingPlayerId === toNumericId(player.id),
       disabled: addingPlayerId !== null,
       onOpen: () => handlePlayerClick(player),
@@ -1845,7 +1895,7 @@ const FreeAgents = () => {
                               projection={player.weeklyProjection}
                               games={player.games}
                               todayStr={todayStr}
-                              action={freeAgentAction(player, rosterFull)}
+                              action={freeAgentAction(player, rosterFull, hasPendingClaim(player))}
                               subLabel={`${player.adds.toLocaleString()} adds`}
                               pending={addingPlayerId === toNumericId(player.id)}
                               disabled={addingPlayerId !== null}
@@ -1897,8 +1947,8 @@ const FreeAgents = () => {
                                     >
                                       <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                     </Button>
-                                    <Button size="default" variant="default" className={`h-10 w-10 font-bold text-xl border shadow-sm disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
+                                    <Button size="default" variant="default" className={`h-10 w-10 font-bold text-xl border shadow-sm disabled:opacity-50 ${addBtnColorCls(player, hasPendingClaim(player))}`} title={hasPendingClaim(player) ? 'Claim filed. Click to cancel' : player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : (hasPendingClaim(player) ? '✓' : player.is_on_waivers ? 'W' : '+')}
                                     </Button>
                                   </div>
                                 </TableCell>
@@ -1970,7 +2020,7 @@ const FreeAgents = () => {
                               projection={player.weeklyProjection}
                               games={player.games}
                               todayStr={todayStr}
-                              action={freeAgentAction(player, rosterFull)}
+                              action={freeAgentAction(player, rosterFull, hasPendingClaim(player))}
                               subLabel={`${player.gamesThisWeek || 0} game${(player.gamesThisWeek || 0) === 1 ? '' : 's'}`}
                               pending={addingPlayerId === toNumericId(player.id)}
                               disabled={addingPlayerId !== null}
@@ -2054,8 +2104,8 @@ const FreeAgents = () => {
                                     >
                                       <Star className={`h-4 w-4 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                     </Button>
-                                    <Button size="sm" variant="default" className={`h-8 w-8 font-bold border shadow-sm p-0 disabled:opacity-50 ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
+                                    <Button size="sm" variant="default" className={`h-8 w-8 font-bold border shadow-sm p-0 disabled:opacity-50 ${addBtnColorCls(player, hasPendingClaim(player))}`} title={hasPendingClaim(player) ? 'Claim filed. Click to cancel' : player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (hasPendingClaim(player) ? '✓' : player.is_on_waivers ? 'W' : '+')}
                                     </Button>
                                   </div>
                                 </TableCell>
@@ -2104,7 +2154,7 @@ const FreeAgents = () => {
                             projection={player.weeklyProjection}
                             games={player.games}
                             todayStr={todayStr}
-                            action={freeAgentAction(player, rosterFull)}
+                            action={freeAgentAction(player, rosterFull, hasPendingClaim(player))}
                             subLabel={`${player.gamesThisWeek || 0} game${(player.gamesThisWeek || 0) === 1 ? '' : 's'}`}
                             pending={addingPlayerId === toNumericId(player.id)}
                             disabled={addingPlayerId !== null}
@@ -2313,8 +2363,8 @@ const FreeAgents = () => {
                                       <Button size="icon" variant="ghost" className="h-9 w-9 text-white/55 touch-manipulation" onClick={() => handlePlayerClick(player)}>
                                         <Info className="h-3.5 w-3.5" />
                                       </Button>
-                                      <Button size="sm" variant="default" className={`h-9 w-9 font-bold text-base border shadow-sm p-0 disabled:opacity-50 touch-manipulation ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                        {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
+                                      <Button size="sm" variant="default" className={`h-9 w-9 font-bold text-base border shadow-sm p-0 disabled:opacity-50 touch-manipulation ${addBtnColorCls(player, hasPendingClaim(player))}`} title={hasPendingClaim(player) ? 'Claim filed. Click to cancel' : player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                        {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (hasPendingClaim(player) ? '✓' : player.is_on_waivers ? 'W' : '+')}
                                       </Button>
                                     </div>
                                   </TableCell>
@@ -2587,7 +2637,7 @@ const FreeAgents = () => {
                                    >
                                      <Star className={`h-3.5 w-3.5 ${watchlist.has(player.id) ? 'fill-current' : ''}`} />
                                    </Button>
-                                   <Button size="sm" variant="default" className={`h-9 px-3 text-xs font-bold border shadow-sm disabled:opacity-50 touch-manipulation ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                   <Button size="sm" variant="default" className={`h-9 px-3 text-xs font-bold border shadow-sm disabled:opacity-50 touch-manipulation ${addBtnColorCls(player, hasPendingClaim(player))}`} title={hasPendingClaim(player) ? 'Claim filed. Click to cancel' : player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
                                      {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : '+ Add'}
                                    </Button>
                                    <Button
@@ -2849,8 +2899,8 @@ const FreeAgents = () => {
                                 <Button size="icon" variant="ghost" className="h-9 w-9 text-white/55 touch-manipulation" onClick={() => handlePlayerClick(player)}>
                                   <Info className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button size="sm" variant="default" className={`h-9 w-9 font-bold text-base border shadow-sm p-0 disabled:opacity-50 touch-manipulation ${addBtnColorCls(player)}`} title={player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
-                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (player.is_on_waivers ? 'W' : '+')}
+                                <Button size="sm" variant="default" className={`h-9 w-9 font-bold text-base border shadow-sm p-0 disabled:opacity-50 touch-manipulation ${addBtnColorCls(player, hasPendingClaim(player))}`} title={hasPendingClaim(player) ? 'Claim filed. Click to cancel' : player.is_on_waivers ? 'Submit waiver claim' : 'Add to roster'} disabled={addingPlayerId !== null} onClick={() => handleAddPlayer(player)}>
+                                  {addingPlayerId === (typeof player.id === 'string' ? parseInt(player.id, 10) : player.id) ? <Loader2 className="h-3 w-3 animate-spin" /> : (hasPendingClaim(player) ? '✓' : player.is_on_waivers ? 'W' : '+')}
                                 </Button>
                               </div>
                             </TableCell>
@@ -2881,10 +2931,12 @@ const FreeAgents = () => {
           onClose={() => setIsPlayerDialogOpen(false)}
           action={selectedSourcePlayer ? (() => {
             const source = selectedSourcePlayer;
-            const act = freeAgentAction(source, rosterFull);
+            const act = freeAgentAction(source, rosterFull, hasPendingClaim(source));
             const clears = act === 'claim' ? waiverClearsLabel(source.waiver_clears_at) : null;
             return {
-              label: act === 'claim'
+              label: act === 'claimed'
+                ? 'Claim filed · tap to cancel'
+                : act === 'claim'
                 ? `Claim on waivers${clears ? ` · ${clears}` : ''}`
                 : act === 'swap'
                   ? 'Add with a drop'

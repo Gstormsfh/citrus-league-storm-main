@@ -497,7 +497,10 @@ jobs:
           # The AASA is the one static file the iOS app depends on. Fail the
           # deploy loudly if production is not serving the repo's file.
           # Crawlable text: /about must carry its headline in the raw HTML.
-          about=$(curl -s "https://citrusfantasysports.com/about" --max-time 10) || true
+          # -L: with trailingSlash=false Hosting answers /about/ with a 301 to
+          # /about; without the flag Hosting sent /about to /about/ and a bare
+          # curl saw the empty redirect body (deploy #542, 2026-09-09).
+          about=$(curl -sL "https://citrusfantasysports.com/about" --max-time 10) || true
           if echo "$about" | grep -q 'data-prerendered="/about"'; then
             echo "Prerender check passed"
           else

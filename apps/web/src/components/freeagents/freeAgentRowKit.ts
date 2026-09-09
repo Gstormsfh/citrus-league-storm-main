@@ -59,13 +59,16 @@ import { ROW_HEADLINE, ROW_MICRO, ROW_NAME } from '@/components/phoneRowScale';
  *           BEFORE the tap is the whole point: the old flow let a manager
  *           press "+" and get a modal they did not ask for.
  */
-export type FreeAgentAction = 'add' | 'claim' | 'swap';
+export type FreeAgentAction = 'add' | 'claim' | 'swap' | 'claimed';
 
-/** The glyph each action wears. `W` is the waiver-wire convention. */
+/** The glyph each action wears. `W` is the waiver-wire convention; a filed
+ * claim wears a check and the tap withdraws it (2026-09-09: managers were
+ * re-filing the same claim because nothing on the row said it existed). */
 export const ACTION_GLYPH: Record<FreeAgentAction, string> = {
   add: '+',
   claim: 'W',
   swap: '⇄',
+  claimed: '✓',
 };
 
 /**
@@ -77,7 +80,9 @@ export const ACTION_GLYPH: Record<FreeAgentAction, string> = {
 export function freeAgentAction(
   player: { is_on_waivers?: boolean },
   rosterFull = false,
+  hasPendingClaim = false,
 ): FreeAgentAction {
+  if (hasPendingClaim) return 'claimed';
   if (player.is_on_waivers) return 'claim';
   return rosterFull ? 'swap' : 'add';
 }

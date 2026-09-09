@@ -262,6 +262,18 @@ describe('the browser is allowed to open the socket the deploy points it at', ()
   // deploys and it had none of it. Invite links opened Safari instead of the
   // app. Every one of these is required in BOTH files, so the deploy that
   // actually runs serves the file the repo carries.
+  // PRERENDER ROUTES (2026-09-09, deploy #542). dist/about/index.html was
+  // built and uploaded, and the post-deploy check still failed: with
+  // trailingSlash unset Hosting answers /about with a 301 to /about/, so a
+  // bare curl saw an empty redirect body. Both files pin it off so the
+  // canonical, sitemap'd /about serves the prerendered page directly.
+  describe('both firebase.json files serve prerendered /route paths without a trailing slash', () => {
+    it.each(CSP_FILES)('%s', (rel) => {
+      const hosting = JSON.parse(read(rel)).hosting as { trailingSlash?: boolean };
+      expect(hosting.trailingSlash, `${rel}: trailingSlash must be false or /about 301s to /about/`).toBe(false);
+    });
+  });
+
   describe('both firebase.json files serve the repo AASA, not the auto-generated stub', () => {
     it.each(CSP_FILES)('%s', (rel) => {
       const hosting = JSON.parse(read(rel)).hosting as {

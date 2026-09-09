@@ -243,8 +243,12 @@ export function LeagueHeader({
               aria-current={active ? 'page' : undefined}
               className={cn(
                 'focus-citrus relative flex items-center justify-center font-condensed font-bold',
-                'text-[13px] uppercase tracking-[0.14em]',
-                active ? 'text-pressbox-text' : 'text-pressbox-text/45',
+                // 2026-09-09: the strip is the league's primary nav now that
+                // the bottom bar is app-only. Bigger type, brighter idle
+                // state, and the active tab wears a sage tint, not only the
+                // hairline underline.
+                'text-[15px] uppercase tracking-[0.12em] transition-colors duration-150',
+                active ? 'text-pressbox-text bg-pressbox-sage/[0.14]' : 'text-pressbox-text/60',
               )}
             >
               {tab.label}
@@ -252,7 +256,7 @@ export function LeagueHeader({
               <span
                 aria-hidden="true"
                 className={cn(
-                  'absolute bottom-0 left-0 right-0 h-[2px] bg-pressbox-sage origin-center',
+                  'absolute bottom-0 left-0 right-0 h-[3px] bg-pressbox-sage origin-center',
                   'transition-transform duration-200 ease-[cubic-bezier(.2,.7,.2,1)] motion-reduce:transition-none',
                   active ? 'scale-x-100' : 'scale-x-0',
                 )}

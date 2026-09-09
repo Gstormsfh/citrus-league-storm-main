@@ -130,6 +130,26 @@ export interface RosterSlotConfig {
   count: number;
 }
 
+/**
+ * ROSTER GEOMETRY (2026-09-09, TestFlight). IR is capacity for injured
+ * players, not a draftable spot. `roster_size` and the default number of
+ * draft rounds are the DRAFTABLE count: every slot except IR. Counting IR
+ * put 21 healthy players on a 19-spot roster after every default draft, and
+ * let a 21/21 team sit two over the lineup.
+ */
+export const NON_DRAFTABLE_SLOTS: ReadonlySet<string> = new Set(['IR']);
+
+export function draftableRosterSize(slots: Record<string, number | undefined | null> | null | undefined): number {
+  if (!slots) return 0;
+  return Object.entries(slots).reduce(
+    (sum, [slot, count]) => (NON_DRAFTABLE_SLOTS.has(slot.toUpperCase()) ? sum : sum + (Number(count) || 0)),
+    0,
+  );
+}
+
+/** Sentinel for the rounds picker: "as many rounds as draftable spots". */
+export const DRAFT_ROUNDS_MATCH_ROSTER = 'match';
+
 export const DEFAULT_ROSTER_SLOTS: RosterSlotConfig[] = [
   { slot: 'C', label: 'Center', count: 2 },
   { slot: 'LW', label: 'Left Wing', count: 2 },

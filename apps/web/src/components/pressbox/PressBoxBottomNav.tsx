@@ -1,5 +1,8 @@
 /**
- * PRESS BOX BOTTOM NAV — app-level, five tabs (2026-09-04).
+ * PRESS BOX BOTTOM NAV — app-level, four tabs (2026-09-04; Players removed
+ * 2026-09-09 on founder direction after the TestFlight night: the league
+ * strip already carries Players, and two tabs with the same word pointing
+ * at two different screens read as one bug).
  *
  * Replaces the current five-tab league nav. The split is the point: this bar
  * moves you around the APP; `LeagueHeader`'s sub-tab strip moves you around a
@@ -16,7 +19,7 @@
  * dependency risk at 4am. Same silhouette at 20px. Logged in PROGRESS.md.
  */
 import { NavLink, useLocation } from 'react-router-dom';
-import { Trophy, Calendar, TrendingUp, BarChart3, CircleUser } from 'lucide-react';
+import { Trophy, Calendar, BarChart3, CircleUser } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BOTTOMNAV_H } from './chromeMetrics';
 import { PB_TYPE } from './rowScale';
@@ -24,7 +27,6 @@ import { PB_TYPE } from './rowScale';
 const TABS = [
   { to: '/', label: 'Leagues', Icon: Trophy, end: true },
   { to: '/scores', label: 'Scores', Icon: Calendar, end: false },
-  { to: '/players', label: 'Players', Icon: TrendingUp, end: false },
   { to: '/news', label: 'News', Icon: BarChart3, end: false },
   { to: '/profile', label: 'Account', Icon: CircleUser, end: false },
 ] as const;
@@ -55,7 +57,7 @@ export function PressBoxBottomNav({ className }: { className?: string }) {
         className,
       )}
     >
-      <ul className="grid grid-cols-5" style={{ height: BOTTOMNAV_H }}>
+      <ul className="grid grid-cols-4" style={{ height: BOTTOMNAV_H }}>
         {TABS.map(({ to, label, Icon, end }) => (
           <li key={to} className="contents">
             <NavLink
