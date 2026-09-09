@@ -74,7 +74,7 @@ function sealAdminAuth(client: SupabaseClient): void {
       writable: false,
       value: () => {
         throw new Error(
-          `admin client: auth.${name}() is forbidden on the shared service-role client — use createServiceClient() for a per-request session`,
+          `admin client: auth.${name}() is forbidden on the shared service-role client. Use createServiceClient() for a per-request session.`,
         );
       },
     });
