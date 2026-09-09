@@ -115,6 +115,44 @@ export function getProjectionsSeason(d: Date = new Date()): number {
 }
 
 /**
+ * Days of play a new season needs before its OWN stats are worth showing as
+ * "the metrics". Three weeks is roughly ten games a player: enough for a
+ * games-played line, not enough for a percentile.
+ */
+export const METRICS_SEASON_GRACE_DAYS = 21;
+
+/**
+ * The season whose STATS a player card, the draft kit and the player pool
+ * should describe: the last season with a meaningful sample.
+ *
+ * Why this exists (found 2026-09-09, draft-kit audit): `player_season_stats`,
+ * `player_talent_metrics` and `player_xg_season` for a new season have ZERO
+ * rows until the pipeline writes them after games are played (the 2025 rows
+ * were first written 2026-09-08). Every reader keyed those tables on
+ * getCurrentSeason(), which flips on the opener, so from 2026-09-29 the draft
+ * kit's percentile cards, the player card's season block and the draft room's
+ * PTS/G/A columns would have gone blank or zero for exactly the two weeks
+ * most leagues draft in.
+ *
+ * Rule: the projections season minus one until the projections season has
+ * had METRICS_SEASON_GRACE_DAYS of play; then the projections season.
+ *   - Jul 1 -> Sep 28 2026: 2025 (offseason: last completed season)
+ *   - Sep 29 -> Oct 19 2026: 2025 (new season too thin to judge)
+ *   - Oct 20 2026 onward:    2026
+ *   - Apr-Jun 2027:          2026 (projections season is still 2026)
+ * A season the start-date map does not know falls back to the October
+ * calendar rule, so the function never returns a season with no rows for
+ * lack of a map entry.
+ */
+export function getMetricsSeason(d: Date = new Date()): number {
+  const projections = getProjectionsSeason(d);
+  const start = SEASON_START_DATES[projections] ?? `${projections}-10-01`;
+  const graceEnd = new Date(`${start}T00:00:00`);
+  graceEnd.setDate(graceEnd.getDate() + METRICS_SEASON_GRACE_DAYS);
+  return d < graceEnd ? projections - 1 : projections;
+}
+
+/**
  * The NHL season whose PLAYOFF RUN is the current one at a given date.
  *
  * This is a different question from getSeasonYearForDate, and the two

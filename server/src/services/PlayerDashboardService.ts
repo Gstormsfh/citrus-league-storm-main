@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import {
   getCurrentSeason,
   getProjectionsSeason,
+  getMetricsSeason,
   logger,
   type DashboardIndexEntry,
   type PlayerXgHistoryPayload,
@@ -644,6 +645,7 @@ export function parsePlayerDashboardRequest(
   seasonRaw: string | undefined,
   gameTypeRaw: string | undefined,
   currentSeason: number = getCurrentSeason(),
+  defaultSeason: number = getMetricsSeason(),
 ): PlayerDashboardRequestParse {
   // NHL player ids are 7-digit integers. The SHAPE is checked before the
   // value, because `parseInt` alone happily turns "8478402 or 1=1" into
@@ -661,7 +663,12 @@ export function parsePlayerDashboardRequest(
   // cannot hold a season that has not been played, and an unbounded season
   // param is a free full-table probe.
   const maxSeason = Math.max(currentSeason, MIN_DASHBOARD_SEASON);
-  let season = maxSeason;
+  // DEFAULT vs CEILING (2026-09-09, draft-kit audit). The default is the
+  // METRICS season (last season with a real sample), because from the opener
+  // until three weeks in the new season's stat rows are empty and a card
+  // that defaulted to it was blank. The ceiling stays the season being
+  // played, so a caller can still ask for it explicitly once it has games.
+  let season = Math.min(Math.max(defaultSeason, MIN_DASHBOARD_SEASON), maxSeason);
   if (seasonRaw !== undefined && seasonRaw !== '') {
     if (!/^\d{4}$/.test(seasonRaw)) {
       return { value: null, message: 'season must be a four-digit year' };
@@ -736,7 +743,13 @@ export class PlayerDashboardService {
    * curated directory, ~1–2k rows, and cached).
    */
   async getDashboardIndex(): Promise<{ players: DashboardIndexEntry[]; error: Error | null }> {
-    const season = getCurrentSeason();
+    // The index describes the METRICS season (see getMetricsSeason): the
+    // last season with a real sample. From the 2026-09-29 opener until
+    // three weeks in that is still 2025; the directory read below follows
+    // the same key so a player who changed clubs is shown at the club of
+    // the season the numbers describe. The projection join is on its own
+    // key already.
+    const season = getMetricsSeason();
 
     if (indexCache && indexCache.season === season && Date.now() - indexCache.timestamp < CACHE_TTL_MS) {
       return { players: indexCache.data, error: null };
@@ -927,7 +940,6 @@ export class PlayerDashboardService {
       return { payload: cached.data, error: null };
     }
 
-    const currentSeason = getCurrentSeason();
     const shotsClient = this.elevated ?? null;
 
     const [shotsRes, seasonsRes, gsaxRes, talentRes, identityRes] = await Promise.all([
@@ -973,23 +985,24 @@ export class PlayerDashboardService {
       pagedSelect<Record<string, unknown>>(this.supabase, {
         table: 'player_talent_metrics',
         columns: TALENT_DETAIL_COLS,
-        // Talent metrics are only maintained for the current season; asking
-        // for a 2019 row returns nothing rather than a stale row wearing a
-        // 2019 label.
+        // Talent metrics are only maintained for the newest season with a
+        // sample (the metrics season); asking for a 2019 row returns nothing
+        // rather than a stale row wearing a 2019 label.
         filters: [
           ['player_id', playerId],
-          ['season', currentSeason],
+          ['season', getMetricsSeason()],
         ],
         orderBy: ['player_id'],
       }),
+      // IDENTITY: every season row for the id, newest last. Pinning this to
+      // the current season made a player with no row in the new directory
+      // (retired, unsigned, or simply not yet re-indexed on flip day) lose
+      // his name; the newest row he has is the right identity.
       pagedSelect<Record<string, unknown>>(this.supabase, {
         table: 'player_directory',
         columns: IDENTITY_COLS,
-        filters: [
-          ['player_id', playerId],
-          ['season', currentSeason],
-        ],
-        orderBy: ['player_id'],
+        filters: [['player_id', playerId]],
+        orderBy: ['season'],
       }),
     ]);
 
@@ -1083,7 +1096,7 @@ export class PlayerDashboardService {
         }
       : null;
 
-    const identityRow = identityRes.error ? undefined : identityRes.data[0];
+    const identityRow = identityRes.error ? undefined : identityRes.data[identityRes.data.length - 1];
     const player: DashboardIdentity | null = identityRow
       ? {
           player_id: Number(identityRow.player_id),

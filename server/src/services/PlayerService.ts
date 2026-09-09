@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, getCurrentSeason, parseEligiblePositions, type EligiblePositionsRaw } from '@citrus/shared';
+import { COLUMNS, getCurrentSeason, getMetricsSeason, parseEligiblePositions, type EligiblePositionsRaw } from '@citrus/shared';
 import { readAllPaged } from '../lib/pagedRead';
 
 /**
@@ -261,7 +261,15 @@ export class PlayerService {
     // one row per player per season in the three season-scoped tables,
     // and `goalie_gsax_primary.goalie_id` is that table's PRIMARY KEY
     // (migration 20250114000001).
+    // TWO SEASONS, ON PURPOSE (2026-09-09, draft-kit audit). The DIRECTORY
+    // is the season being played: from the opener the pool must carry every
+    // player on a 2026-27 roster, rookies included. The STATS describe the
+    // last season with a real sample (getMetricsSeason): the new season's
+    // stat rows do not exist until games are played, and keying the stat
+    // reads on the current season put a 0/0/0 line beside every name for
+    // the two weeks most leagues draft in.
     const season = getCurrentSeason();
+    const metricsSeason = getMetricsSeason();
 
     const { data: directory, error: dirError } = await readAllPaged<PlayerDirectoryRow>(
       this.supabase,
@@ -291,13 +299,13 @@ export class PlayerService {
       readAllPaged<PlayerStatsRow>(this.supabase, {
         table: 'player_season_stats',
         columns: COLUMNS.PLAYER_STATS,
-        filters: [['season', season]],
+        filters: [['season', metricsSeason]],
         orderBy: ['player_id'],
       }),
       readAllPaged<TalentMetricsRow>(this.supabase, {
         table: 'player_talent_metrics',
         columns: COLUMNS.PLAYER_TALENT_METRICS,
-        filters: [['season', season]],
+        filters: [['season', metricsSeason]],
         orderBy: ['player_id'],
       }),
       readAllPaged<GoalieGsaxRow>(this.supabase, {
@@ -360,15 +368,16 @@ export class PlayerService {
     const dirIds = ((directory || []) as unknown as PlayerDirectoryRow[]).map((p) => p.player_id);
 
     const [{ data: stats }, { data: talents }, { data: gsax }] = await Promise.all([
+      // Stats at the metrics season, same rule as getAllPlayers().
       this.supabase
         .from('player_season_stats')
         .select(COLUMNS.PLAYER_STATS)
-        .eq('season', getCurrentSeason())
+        .eq('season', getMetricsSeason())
         .in('player_id', dirIds),
       this.supabase
         .from('player_talent_metrics')
         .select(COLUMNS.PLAYER_TALENT_METRICS)
-        .eq('season', getCurrentSeason())
+        .eq('season', getMetricsSeason())
         .in('player_id', dirIds),
       this.supabase
         .from('goalie_gsax_primary')
