@@ -20,9 +20,15 @@
  *      the reason people reach for a JWT library. The signature must be 64 bytes.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateKeyPairSync } from 'node:crypto';
-import { PushService, loadApnsConfigFromEnv, type ApnsConfig } from '../services/PushService';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createPublicKey, createVerify, generateKeyPairSync } from 'node:crypto';
+import {
+  PushService,
+  loadApnsConfigFromEnv,
+  loadFcmConfigFromEnv,
+  type ApnsConfig,
+  type FcmConfig,
+} from '../services/PushService';
 import { createChain } from './helpers';
 
 vi.mock('@citrus/shared', async (importOriginal) => {
@@ -41,6 +47,16 @@ function testConfig(): ApnsConfig {
     bundleId: 'com.citrussports.app',
     privateKeyPem: privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(),
     production: false,
+  };
+}
+
+/** A real RSA service-account key, so the assertion below is genuinely verified. */
+function testFcmConfig(): FcmConfig {
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  return {
+    projectId: 'citrus-fantasy-prod',
+    clientEmail: 'push@citrus-fantasy-prod.iam.gserviceaccount.com',
+    privateKeyPem: privateKey.export({ type: 'pkcs8', format: 'pem' }).toString(),
   };
 }
 
@@ -292,5 +308,181 @@ describe('loadApnsConfigFromEnv', () => {
     expect(loadApnsConfigFromEnv()?.production).toBe(false);
     process.env.APNS_PRODUCTION = 'true';
     expect(loadApnsConfigFromEnv()?.production).toBe(true);
+  });
+});
+
+/**
+ * ANDROID (2026-09-09). Apple will not deliver to a Pixel, so the token's
+ * `platform` column picks the transport. What is pinned here is that routing
+ * and the independence of the two roads: an iOS-only deploy must not start
+ * failing because an Android device registered, and vice versa.
+ */
+describe('PushService — transport routing by platform', () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  function androidDevices(rows: Array<{ token: string; platform?: string }>) {
+    return makeSupabase({ device_tokens: createChain({ data: rows, error: null }) });
+  }
+
+  it('sends an Android token through FCM, not APNs', async () => {
+    const calls: Array<{ url: string; body: unknown }> = [];
+    globalThis.fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const href = String(url);
+      if (href.includes('oauth2.googleapis.com')) {
+        return new Response(JSON.stringify({ access_token: 'ya29.test' }), { status: 200 });
+      }
+      calls.push({ url: href, body: JSON.parse(String(init?.body)) });
+      return new Response(JSON.stringify({ name: 'projects/p/messages/1' }), { status: 200 });
+    }) as typeof fetch;
+
+    const service = new PushService(
+      androidDevices([{ token: 'pixel-token', platform: 'android' }]),
+      testConfig(),
+      testFcmConfig(),
+    );
+    const result = await service.notifyOnTheClock(input);
+
+    expect(result).toMatchObject({ sent: 1, failed: 0, skipped: false });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toContain('/v1/projects/citrus-fantasy-prod/messages:send');
+    const message = (calls[0].body as { message: Record<string, unknown> }).message;
+    expect(message).toMatchObject({ token: 'pixel-token' });
+    // FCM 400s the whole send if any data value is not a string.
+    for (const value of Object.values((message as { data: Record<string, unknown> }).data)) {
+      expect(typeof value).toBe('string');
+    }
+  });
+
+  it('skips an Android device when only APNs is configured, and does not call it a failure', async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error('fetch must not be called without FCM credentials');
+    }) as typeof fetch;
+
+    const service = new PushService(
+      androidDevices([{ token: 'pixel-token', platform: 'android' }]),
+      testConfig(),
+      null,
+    );
+    const result = await service.notifyOnTheClock(input);
+    expect(result).toMatchObject({ sent: 0, failed: 0, skipped: false });
+  });
+
+  it('skips an iPhone when only FCM is configured, so one credential cannot disable the other', async () => {
+    const service = new PushService(
+      androidDevices([{ token: 'iphone-token', platform: 'ios' }]),
+      null,
+      testFcmConfig(),
+    );
+    expect(service.isConfigured()).toBe(true);
+    expect(service.isApnsConfigured()).toBe(false);
+    const result = await service.notifyOnTheClock(input);
+    expect(result).toMatchObject({ sent: 0, failed: 0, skipped: false });
+  });
+
+  it('reads a legacy row with no platform as iOS, never as Android', async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error('a legacy token must not be mailed to Google');
+    }) as typeof fetch;
+    // No APNs config, so the send is skipped before any socket opens; what is
+    // being pinned is which road it was NOT put on.
+    const service = new PushService(androidDevices([{ token: 'legacy' }]), null, testFcmConfig());
+    const result = await service.notifyOnTheClock(input);
+    expect(result).toMatchObject({ sent: 0, failed: 0 });
+  });
+
+  it('prunes an UNREGISTERED Android token, the FCM equivalent of APNs 410', async () => {
+    const deleted: string[] = [];
+    const supabase = makeSupabase({
+      device_tokens: createChain({ data: [{ token: 'dead-pixel', platform: 'android' }], error: null }),
+    });
+    (supabase as unknown as { from: (t: string) => unknown }).from = vi.fn((table: string) => {
+      if (table === 'device_tokens') {
+        return {
+          select: () => ({ eq: async () => ({ data: [{ token: 'dead-pixel', platform: 'android' }], error: null }) }),
+          delete: () => ({ eq: async (_col: string, value: string) => { deleted.push(value); return { error: null }; } }),
+        };
+      }
+      return (supabase as unknown as { _tables: Record<string, unknown> })._tables[table] ?? createChain();
+    });
+
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes('oauth2.googleapis.com')) {
+        return new Response(JSON.stringify({ access_token: 'ya29.test' }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ error: { status: 'UNREGISTERED' } }), { status: 404 });
+    }) as typeof fetch;
+
+    const service = new PushService(supabase, testConfig(), testFcmConfig());
+    const result = await service.notifyOnTheClock(input);
+    expect(result).toMatchObject({ sent: 0, failed: 1 });
+    expect(deleted).toEqual(['dead-pixel']);
+  });
+
+  it('mints a verifiable RS256 assertion and caches the access token', async () => {
+    const config = testFcmConfig();
+    let assertion = '';
+    let tokenExchanges = 0;
+    globalThis.fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).includes('oauth2.googleapis.com')) {
+        tokenExchanges += 1;
+        assertion = new URLSearchParams(String(init?.body)).get('assertion') ?? '';
+        return new Response(JSON.stringify({ access_token: 'ya29.test' }), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    }) as typeof fetch;
+
+    const service = new PushService(
+      androidDevices([{ token: 'pixel-token', platform: 'android' }]),
+      null,
+      config,
+    );
+    await service.notifyOnTheClock(input);
+    await service.notifyOnTheClock({ ...input, pickNumber: 5 });
+
+    // One mint for two picks: Google rate-limits the exchange, which is the
+    // whole reason the token is cached.
+    expect(tokenExchanges).toBe(1);
+
+    const [header, claims, signature] = assertion.split('.');
+    expect(JSON.parse(Buffer.from(header, 'base64url').toString())).toMatchObject({ alg: 'RS256' });
+    expect(JSON.parse(Buffer.from(claims, 'base64url').toString())).toMatchObject({
+      iss: config.clientEmail,
+      aud: 'https://oauth2.googleapis.com/token',
+      scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    });
+    const verifier = createVerify('sha256');
+    verifier.update(`${header}.${claims}`);
+    expect(
+      verifier.verify(createPublicKey(config.privateKeyPem), Buffer.from(signature, 'base64url')),
+    ).toBe(true);
+  });
+});
+
+describe('loadFcmConfigFromEnv', () => {
+  const saved = { ...process.env };
+  beforeEach(() => {
+    process.env = { ...saved };
+    delete process.env.FCM_PROJECT_ID;
+    delete process.env.FCM_CLIENT_EMAIL;
+    delete process.env.FCM_PRIVATE_KEY;
+  });
+
+  it('returns null when any required variable is missing', () => {
+    expect(loadFcmConfigFromEnv()).toBeNull();
+    process.env.FCM_PROJECT_ID = 'p';
+    process.env.FCM_CLIENT_EMAIL = 'e';
+    expect(loadFcmConfigFromEnv()).toBeNull();
+  });
+
+  it('un-escapes \\n in the service-account key, same as the APNs one', () => {
+    process.env.FCM_PROJECT_ID = 'citrus-fantasy-prod';
+    process.env.FCM_CLIENT_EMAIL = 'push@example.iam.gserviceaccount.com';
+    process.env.FCM_PRIVATE_KEY = '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----';
+    const config = loadFcmConfigFromEnv();
+    expect(config?.privateKeyPem).toContain('\n');
+    expect(config?.privateKeyPem).not.toContain('\\n');
   });
 });

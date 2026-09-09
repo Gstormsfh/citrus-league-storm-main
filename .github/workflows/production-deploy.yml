@@ -267,6 +267,21 @@ jobs:
           # and loadApnsConfigFromEnv treats empty as absent and returns
           # null. Same dormant state as today, no startup failure.
           #
+          # Chunk: FCM (2026-09-09, Play build). Exactly the same shape as
+          # the APNs block above, for the other store. loadFcmConfigFromEnv()
+          # returns null unless FCM_PROJECT_ID, FCM_CLIENT_EMAIL and
+          # FCM_PRIVATE_KEY are all present, and a null config leaves ANDROID
+          # push dormant while iOS keeps sending: the two transports are
+          # independent by construction, so merging this before the secrets
+          # exist changes nothing. The project id is a literal for the same
+          # reason DRAFT_WS_HOST is: a missing `secrets.*` renders as the
+          # empty string, and an empty project id would be a 404 on every
+          # send rather than a clean dormant state.
+          #
+          # The two secrets are fields of a Firebase service-account JSON:
+          # console > Project settings > Service accounts > Generate new
+          # private key. client_email and private_key, verbatim.
+          #
           # APNS_PRODUCTION=true selects api.push.apple.com. TestFlight and
           # App Store builds carry production device tokens; a build
           # installed straight from Xcode carries a sandbox token, which
@@ -320,6 +335,9 @@ jobs:
             APPLE_CLIENT_SECRET=${{ secrets.APPLE_CLIENT_SECRET }}
             APPLE_TOKEN_ENCRYPTION_KEY=${{ secrets.APPLE_TOKEN_ENCRYPTION_KEY }}
             APNS_PRODUCTION=true
+            FCM_PROJECT_ID=citrus-fantasy-prod
+            FCM_CLIENT_EMAIL=${{ secrets.FCM_CLIENT_EMAIL }}
+            FCM_PRIVATE_KEY=${{ secrets.FCM_PRIVATE_KEY }}
             DRAFT_WS_HOST=draft.citrusfantasysports.com
             DRAFT_WS_PORT=443
           # ── Cloud Run scaling config ────────────────────────────────

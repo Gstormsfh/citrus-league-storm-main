@@ -129,6 +129,35 @@ describe('the deploy declares where the draft engine lives', () => {
    * hostname and a port are not secrets; indirection bought nothing here and
    * cost the one guarantee worth having.
    */
+  /**
+   * PUSH CREDENTIALS REACH CLOUD RUN (2026-09-09, Play build).
+   *
+   * PushService is dormant per-transport: absent APNs vars mean no iOS push,
+   * absent FCM vars mean no Android push, and neither errors. That posture is
+   * deliberate and it is also why a missing variable is invisible — the only
+   * symptom is a notification nobody receives. So the names are pinned here.
+   *
+   * FCM_PROJECT_ID is a literal for the DRAFT_WS_HOST reason above: a missing
+   * secret renders empty, and an empty project id would put a 404 on every
+   * send instead of leaving the transport cleanly dormant.
+   */
+  it('ships both push transports to Cloud Run, with the FCM project id as a literal', () => {
+    const env = withoutComments(read('.github/workflows/production-deploy.yml'));
+    const assigned = (name: string) =>
+      env.split('\n').find((l) => l.trim().startsWith(`${name}=`));
+
+    for (const name of ['APNS_KEY_ID', 'APNS_TEAM_ID', 'APNS_PRIVATE_KEY']) {
+      expect(assigned(name), `${name} is not in the env_vars block`).toBeTruthy();
+    }
+    for (const name of ['FCM_PROJECT_ID', 'FCM_CLIENT_EMAIL', 'FCM_PRIVATE_KEY']) {
+      expect(assigned(name), `${name} is not in the env_vars block; Android push stays dormant`).toBeTruthy();
+    }
+
+    const projectId = (assigned('FCM_PROJECT_ID') as string).split('=').slice(1).join('=').trim();
+    expect(projectId.includes('${{'), 'FCM_PROJECT_ID must be a literal, not an expression').toBe(false);
+    expect(projectId).toBe('citrus-fantasy-prod');
+  });
+
   it.each(REQUIRED_IN_DEPLOY)('%s has a literal value, not an interpolation that can render empty', (name) => {
     const wf = read('.github/workflows/production-deploy.yml');
     const line = withoutComments(wf)

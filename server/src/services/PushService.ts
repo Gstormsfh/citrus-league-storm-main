@@ -4,7 +4,8 @@ import { createPrivateKey, sign as cryptoSign, type KeyObject } from 'node:crypt
 import { connect as http2Connect, constants as H2, type ClientHttp2Session } from 'node:http2';
 
 /**
- * PushService — APNs sender for draft-turn alerts ("you're on the clock").
+ * PushService — push sender for draft-turn alerts ("you're on the clock"),
+ * over APNs for iOS devices and FCM for Android ones.
  *
  * WHY THIS EXISTS, beyond the obvious: App Store guideline 4.2 rejects apps that
  * are "just a website in a box". A Capacitor shell needs at least one capability
@@ -23,13 +24,35 @@ import { connect as http2Connect, constants as H2, type ClientHttp2Session } fro
  * caller is the draft engine's pick-deadline arm path — a push failure must never
  * be able to delay or break a pick.
  *
- * REQUIRED ENV (all four, or the service stays dormant):
+ * TWO TRANSPORTS, ONE CONTRACT (FCM added 2026-09-09 for the Play build).
+ * Apple will not deliver to an Android device and Google will not deliver to an
+ * iPhone, so the token's `platform` column picks the road. The transports are
+ * configured INDEPENDENTLY: iOS-only credentials keep working exactly as they
+ * did, Android tokens are then skipped with a reason rather than failing, and
+ * the reverse holds too. Neither can break the other, and neither can break a
+ * pick.
+ *
+ * APNs ENV (all three, or iOS push stays dormant):
  *   APNS_KEY_ID       10-char Key ID from the .p8 filename
  *   APNS_TEAM_ID      10-char Apple Team ID
  *   APNS_PRIVATE_KEY  contents of AuthKey_XXXXXXXXXX.p8 (PEM, \n-escaped is fine)
  * Optional:
  *   APNS_BUNDLE_ID    defaults to com.citrussports.app
  *   APNS_PRODUCTION   'true' -> api.push.apple.com, else sandbox host
+ *
+ * FCM ENV (all three, or Android push stays dormant). These are three fields
+ * of a Firebase service-account JSON: Firebase console > Project settings >
+ * Service accounts > Generate new private key.
+ *   FCM_PROJECT_ID    e.g. citrus-fantasy-prod
+ *   FCM_CLIENT_EMAIL  ...@....iam.gserviceaccount.com
+ *   FCM_PRIVATE_KEY   the service account's PEM (\n-escaped is fine)
+ *
+ * STILL ZERO DEPENDENCIES. FCM's HTTP v1 API wants a Google OAuth access token,
+ * which the firebase-admin SDK exists to fetch. That is an RS256 JWT and one
+ * form POST: `node:crypto` signs it and the global `fetch` sends it, in about
+ * thirty lines, against a lockfile the server workspace deliberately does not
+ * have. The legacy FCM server key would have been one header and no JWT, and it
+ * was turned off in 2024.
  */
 
 const PROD_HOST = 'api.push.apple.com';
@@ -44,12 +67,39 @@ const DEFAULT_EXPIRY_SECONDS = 120;
 
 const REQUEST_TIMEOUT_MS = 5_000;
 
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
+/** Google's access tokens live an hour; refresh at 50m, same margin as APNs. */
+const FCM_TOKEN_TTL_MS = 50 * 60 * 1000;
+
+/**
+ * The token's `platform` column, whose CHECK constraint is
+ * ('ios','android','web'). Rows written before 2026-09-09 all say 'ios'
+ * (the column defaults to it and the client hardcoded it), and every one of
+ * them IS an iPhone because the Play build did not exist: reading a legacy row
+ * as iOS is correct, not a guess. 'web' has no push transport here and is
+ * skipped rather than mailed to Apple, which would fail and then prune a token
+ * that was never Apple's.
+ */
+type DevicePlatform = 'ios' | 'android' | 'web';
+
+interface DeviceToken {
+  token: string;
+  platform: DevicePlatform;
+}
+
 export interface ApnsConfig {
   keyId: string;
   teamId: string;
   bundleId: string;
   privateKeyPem: string;
   production: boolean;
+}
+
+export interface FcmConfig {
+  projectId: string;
+  clientEmail: string;
+  privateKeyPem: string;
 }
 
 export interface OnTheClockInput {
@@ -88,14 +138,34 @@ export function loadApnsConfigFromEnv(): ApnsConfig | null {
   };
 }
 
+export function loadFcmConfigFromEnv(): FcmConfig | null {
+  const projectId = process.env.FCM_PROJECT_ID;
+  const clientEmail = process.env.FCM_CLIENT_EMAIL;
+  const raw = process.env.FCM_PRIVATE_KEY;
+  if (!projectId || !clientEmail || !raw) {
+    return null;
+  }
+  // Same flattening as APNS_PRIVATE_KEY: a service-account PEM pasted into a
+  // secret manager comes back with literal backslash-n.
+  const privateKeyPem = raw.includes('\\n') ? raw.replace(/\\n/g, '\n') : raw;
+  return { projectId, clientEmail, privateKeyPem };
+}
+
 export class PushService {
   private supabase: SupabaseClient;
   private config: ApnsConfig | null;
   private signingKey: KeyObject | null = null;
   private cachedJwt: { token: string; mintedAt: number } | null = null;
   private session: ClientHttp2Session | null = null;
+  private fcmConfig: FcmConfig | null;
+  private fcmSigningKey: KeyObject | null = null;
+  private cachedFcmToken: { token: string; mintedAt: number } | null = null;
 
-  constructor(supabase: SupabaseClient, config: ApnsConfig | null = loadApnsConfigFromEnv()) {
+  constructor(
+    supabase: SupabaseClient,
+    config: ApnsConfig | null = loadApnsConfigFromEnv(),
+    fcmConfig: FcmConfig | null = loadFcmConfigFromEnv(),
+  ) {
     this.supabase = supabase;
     this.config = config;
     if (config) {
@@ -110,10 +180,32 @@ export class PushService {
         this.config = null;
       }
     }
+    this.fcmConfig = fcmConfig;
+    if (fcmConfig) {
+      try {
+        this.fcmSigningKey = createPrivateKey(fcmConfig.privateKeyPem);
+      } catch (err) {
+        // Same posture as the APNs key: Android push goes dormant, iOS is
+        // untouched. One broken credential must not disable the other.
+        structuredLogger.error(
+          `[push] FCM_PRIVATE_KEY could not be parsed — Android push disabled: ${(err as Error).message}`,
+        );
+        this.fcmConfig = null;
+      }
+    }
   }
 
+  /** True when at least one transport can send. */
   isConfigured(): boolean {
+    return this.isApnsConfigured() || this.isFcmConfigured();
+  }
+
+  isApnsConfigured(): boolean {
     return this.config !== null && this.signingKey !== null;
+  }
+
+  isFcmConfigured(): boolean {
+    return this.fcmConfig !== null && this.fcmSigningKey !== null;
   }
 
   /**
@@ -148,21 +240,37 @@ export class PushService {
       const payload = this.buildPayload(input);
       let sent = 0;
       let failed = 0;
+      let skippedNoTransport = 0;
 
-      for (const token of tokens) {
-        const result = await this.sendToToken(token, payload);
+      for (const device of tokens) {
+        const android = device.platform === 'android';
+        // A device whose transport has no credentials is SKIPPED, not failed:
+        // iOS-only credentials plus an Android tester is a deploy that has not
+        // finished, and counting it as a failure would hide real ones. A 'web'
+        // row has no transport at all.
+        if (
+          device.platform === 'web' ||
+          (android ? !this.isFcmConfigured() : !this.isApnsConfigured())
+        ) {
+          skippedNoTransport += 1;
+          continue;
+        }
+        const result = android
+          ? await this.sendToFcmToken(device.token, input)
+          : await this.sendToToken(device.token, payload);
         if (result.ok) {
           sent += 1;
         } else {
           failed += 1;
           if (result.prune) {
-            await this.pruneToken(token, result.reason);
+            await this.pruneToken(device.token, result.reason);
           }
         }
       }
 
       structuredLogger.info(
-        `[push] on_the_clock leagueId=${input.leagueId} pick=${input.pickNumber} sent=${sent} failed=${failed}`,
+        `[push] on_the_clock leagueId=${input.leagueId} pick=${input.pickNumber} ` +
+          `sent=${sent} failed=${failed} no_transport=${skippedNoTransport}`,
       );
       return { sent, failed, skipped: false };
     } catch (err) {
@@ -206,8 +314,8 @@ export class PushService {
     return Array.isArray(data) && data.length > 0;
   }
 
-  /** The owner's device tokens, or `'opted_out'` when the owner turned the push off. */
-  private async tokensForTeamOwner(teamId: string): Promise<string[] | 'opted_out'> {
+  /** The owner's devices, or `'opted_out'` when the owner turned the push off. */
+  private async tokensForTeamOwner(teamId: string): Promise<DeviceToken[] | 'opted_out'> {
     const { data: team, error: teamError } = await this.supabase
       .from('teams')
       .select('owner_id')
@@ -236,13 +344,21 @@ export class PushService {
 
     const { data, error } = await this.supabase
       .from('device_tokens')
-      .select('token')
+      .select('token, platform')
       .eq('user_id', team.owner_id);
 
     if (error || !data) {
       return [];
     }
-    return data.map((row: { token: string }) => row.token).filter(Boolean);
+    return (data as Array<{ token: string; platform?: string | null }>)
+      .filter((row) => Boolean(row.token))
+      .map((row) => ({
+        token: row.token,
+        // Only the two explicit values move off the APNs default; see
+        // DevicePlatform for why an unrecognised value reads as iOS.
+        platform:
+          row.platform === 'android' ? 'android' : row.platform === 'web' ? 'web' : 'ios',
+      }));
   }
 
   private async pruneToken(token: string, reason?: string): Promise<void> {
@@ -382,6 +498,138 @@ export class PushService {
         done({ ok: false, reason: (err as Error).message });
       }
     });
+  }
+
+  /**
+   * FCM HTTP v1 send. Mirrors `sendToToken`'s contract exactly, so the loop
+   * above does not care which road a device is on.
+   *
+   * The payload is built here rather than shared with APNs because the two
+   * wire formats disagree about everything except the words: APNs nests the
+   * alert under `aps`, FCM under `message.notification`, and FCM requires
+   * every `data` value to be a STRING (a number silently 400s the whole send).
+   */
+  private async sendToFcmToken(
+    token: string,
+    input: OnTheClockInput,
+  ): Promise<{ ok: boolean; status?: number; reason?: string; prune?: boolean }> {
+    const config = this.fcmConfig;
+    if (!config) {
+      return { ok: false, reason: 'fcm_not_configured' };
+    }
+    try {
+      const accessToken = await this.currentFcmAccessToken();
+      const league = input.leagueName?.trim();
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      let res: Response;
+      try {
+        res = await fetch(
+          `https://fcm.googleapis.com/v1/projects/${config.projectId}/messages:send`,
+          {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${accessToken}`,
+              'content-type': 'application/json',
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              message: {
+                token,
+                notification: {
+                  title: "You're on the clock",
+                  body: league ? `It's your pick in ${league}.` : 'It’s your turn to pick.',
+                },
+                // Strings only. The tap handler parses pickNumber back.
+                data: {
+                  leagueId: input.leagueId,
+                  pickNumber: String(input.pickNumber),
+                  deadline: input.deadlineIso ?? '',
+                  type: 'draft_on_the_clock',
+                },
+                android: {
+                  priority: 'HIGH',
+                  // Same reasoning as apns-expiration: a nudge that outlives
+                  // the pick clock is noise.
+                  ttl: `${DEFAULT_EXPIRY_SECONDS}s`,
+                  notification: { sound: 'default' },
+                },
+              },
+            }),
+          },
+        );
+      } finally {
+        clearTimeout(timer);
+      }
+
+      if (res.ok) {
+        return { ok: true, status: res.status };
+      }
+      const raw = await res.text();
+      let reason = raw;
+      try {
+        reason = (JSON.parse(raw) as { error?: { status?: string; message?: string } }).error?.status ?? raw;
+      } catch {
+        /* keep the raw body */
+      }
+      // UNREGISTERED (404) is FCM's 410: the app was uninstalled. INVALID_ARGUMENT
+      // on a send this simple means the token itself is malformed. Both are dead
+      // for good, so stop paying for them on every pick.
+      const prune = res.status === 404 || reason === 'UNREGISTERED' || reason === 'INVALID_ARGUMENT';
+      return { ok: false, status: res.status, reason, prune };
+    } catch (err) {
+      return { ok: false, reason: (err as Error).message };
+    }
+  }
+
+  /**
+   * A Google OAuth access token for FCM, minted from the service account with
+   * an RS256 assertion and cached for 50 minutes.
+   *
+   * This is the whole of what firebase-admin would have been added for.
+   */
+  private async currentFcmAccessToken(): Promise<string> {
+    const now = Date.now();
+    if (this.cachedFcmToken && now - this.cachedFcmToken.mintedAt < FCM_TOKEN_TTL_MS) {
+      return this.cachedFcmToken.token;
+    }
+    const config = this.fcmConfig;
+    const key = this.fcmSigningKey;
+    if (!config || !key) {
+      throw new Error('fcm not configured');
+    }
+
+    const iat = Math.floor(now / 1000);
+    const header = { alg: 'RS256', typ: 'JWT' };
+    const claims = {
+      iss: config.clientEmail,
+      scope: FCM_SCOPE,
+      aud: GOOGLE_TOKEN_URL,
+      iat,
+      exp: iat + 3600,
+    };
+    const signingInput = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(claims))}`;
+    // RS256 is PKCS#1 v1.5 over SHA-256, which is `sign`'s default padding for
+    // an RSA key, so unlike the APNs ES256 case no encoding option is needed.
+    const assertion = `${signingInput}.${cryptoSign('sha256', Buffer.from(signingInput), key).toString('base64url')}`;
+
+    const res = await fetch(GOOGLE_TOKEN_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion,
+      }).toString(),
+    });
+    if (!res.ok) {
+      throw new Error(`google token exchange ${res.status}: ${await res.text()}`);
+    }
+    const body = (await res.json()) as { access_token?: string };
+    if (!body.access_token) {
+      throw new Error('google token exchange returned no access_token');
+    }
+    this.cachedFcmToken = { token: body.access_token, mintedAt: now };
+    return body.access_token;
   }
 
   /** Release the HTTP/2 session. Call on graceful shutdown. */

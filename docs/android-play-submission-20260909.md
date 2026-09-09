@@ -128,11 +128,32 @@ Left nav > Production > Create new release > pick the same bundle from the
 library > Review > Start rollout. Review normally completes in under seven
 days; new apps can take a little longer on the first submission.
 
+## Push notifications on Android
+
+Done in code (2026-09-09): `google-services.json` is in the project, so
+`PushNotifications.register()` no longer kills the process, the token row
+records `platform: 'android'`, and `PushService` sends to Android through FCM
+HTTP v1 while iOS keeps going through APNs. The two transports are configured
+independently, so a missing FCM credential leaves Android push dormant and
+touches nothing on iOS.
+
+What remains is two GitHub secrets. Firebase console > citrus-fantasy-prod >
+Project settings > **Service accounts** > **Generate new private key**. That
+downloads a JSON file; open it and copy two fields:
+
+- `client_email` into the repo secret `FCM_CLIENT_EMAIL`
+- `private_key` (the whole `-----BEGIN PRIVATE KEY-----...` string, newlines
+  and all) into `FCM_PRIVATE_KEY`
+
+Repo secrets live at github.com/Gstormsfh/citrus-league-storm-main >
+Settings > Secrets and variables > Actions > New repository secret. The next
+production deploy passes them to Cloud Run; `FCM_PROJECT_ID` is already a
+literal in the workflow. Treat that JSON like the APNs `.p8`: it is a server
+credential, not app config, and it never belongs in the repo.
+
 ## Known gaps to close before Production
 
-- Push notifications: `google-services.json` is not in the Android project,
-  so `@capacitor/push-notifications` is inert on Android. Firebase console >
-  Project settings > Add Android app (`com.citrussports.app`) > download
-  `google-services.json` into `apps/web/android/app/`. Not a review blocker.
 - Real device pass on a modern Android phone (gesture nav, keyboard,
   universal links after step 6).
+- Android push cannot be verified on the emulator without Play services; test
+  it on a real device once the two secrets are set.
