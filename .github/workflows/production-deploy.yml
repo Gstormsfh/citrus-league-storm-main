@@ -267,6 +267,24 @@ jobs:
           # and loadApnsConfigFromEnv treats empty as absent and returns
           # null. Same dormant state as today, no startup failure.
           #
+          # Chunk: FCM (2026-09-09, Play build). Android push, and ONE
+          # variable, because there is no credential to ship.
+          #
+          # The obvious shape was the APNs one: a service-account key in two
+          # more secrets. The organization forbids creating one
+          # (constraints/iam.disableServiceAccountKeyCreation) and that policy
+          # is right, so PushService asks Cloud Run's metadata server for a
+          # token for the service account the revision already runs as.
+          # Nothing to store, rotate, or leak. The setup is an IAM grant, not
+          # a secret: the runtime service account needs Firebase Cloud
+          # Messaging API Admin.
+          #
+          # A literal for the DRAFT_WS_HOST reason: a missing `secrets.*`
+          # renders as the empty string, and an empty project id would put a
+          # 404 on every send instead of leaving the transport cleanly
+          # dormant. FCM_CLIENT_EMAIL / FCM_PRIVATE_KEY are read if present
+          # (the off-Cloud-Run path) and are deliberately not set here.
+          #
           # APNS_PRODUCTION=true selects api.push.apple.com. TestFlight and
           # App Store builds carry production device tokens; a build
           # installed straight from Xcode carries a sandbox token, which
@@ -320,6 +338,7 @@ jobs:
             APPLE_CLIENT_SECRET=${{ secrets.APPLE_CLIENT_SECRET }}
             APPLE_TOKEN_ENCRYPTION_KEY=${{ secrets.APPLE_TOKEN_ENCRYPTION_KEY }}
             APNS_PRODUCTION=true
+            FCM_PROJECT_ID=citrus-fantasy-prod
             DRAFT_WS_HOST=draft.citrusfantasysports.com
             DRAFT_WS_PORT=443
           # ── Cloud Run scaling config ────────────────────────────────
