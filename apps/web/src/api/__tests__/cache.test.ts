@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createApiCache, CACHE_TTL } from '../cache';
+import { createApiCache, CACHE_TTL, clearAllApiCaches } from '../cache';
 import type { ApiCache } from '../cache';
 
 describe('createApiCache', () => {
@@ -269,5 +269,53 @@ describe('createApiCache', () => {
       await expect(promise2).rejects.toThrow('server error');
       expect(fetcher).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+// ACCOUNT SWITCH (2026-09-09): signing out and back in as another user on
+// the same device served the first user's 'leagues:user' entry for the full
+// TTL, because nothing flushed the module-level api caches. Every cache made
+// by createApiCache() must be reachable from one call.
+describe('clearAllApiCaches', () => {
+  it('flushes every cache created by createApiCache, not only the one in hand', async () => {
+    const a = createApiCache();
+    const b = createApiCache();
+    const fetchA = vi.fn().mockResolvedValue('user-1 leagues');
+    const fetchB = vi.fn().mockResolvedValue('user-1 team');
+
+    await a.cached('leagues:user', fetchA, CACHE_TTL.MEDIUM);
+    await b.cached('leagues:L1:my-team', fetchB, CACHE_TTL.MEDIUM);
+    expect(fetchA).toHaveBeenCalledTimes(1);
+    expect(fetchB).toHaveBeenCalledTimes(1);
+
+    // Same keys again inside the TTL: served from cache, no network.
+    await a.cached('leagues:user', fetchA, CACHE_TTL.MEDIUM);
+    await b.cached('leagues:L1:my-team', fetchB, CACHE_TTL.MEDIUM);
+    expect(fetchA).toHaveBeenCalledTimes(1);
+    expect(fetchB).toHaveBeenCalledTimes(1);
+
+    // The user changes. One call must empty both.
+    clearAllApiCaches();
+    fetchA.mockResolvedValue('user-2 leagues');
+    fetchB.mockResolvedValue('user-2 team');
+    await expect(a.cached('leagues:user', fetchA, CACHE_TTL.MEDIUM)).resolves.toBe('user-2 leagues');
+    await expect(b.cached('leagues:L1:my-team', fetchB, CACHE_TTL.MEDIUM)).resolves.toBe('user-2 team');
+    expect(fetchA).toHaveBeenCalledTimes(2);
+    expect(fetchB).toHaveBeenCalledTimes(2);
+  });
+
+  it('also drops in-flight requests so a late response cannot repopulate the cache for the new user', async () => {
+    const c = createApiCache();
+    let resolveFirst!: (v: string) => void;
+    const slow = vi.fn(() => new Promise<string>((r) => { resolveFirst = r; }));
+    const pending = c.cached('leagues:user', slow, CACHE_TTL.MEDIUM);
+
+    clearAllApiCaches();
+    resolveFirst('user-1 leagues');
+    await pending;
+
+    const fresh = vi.fn().mockResolvedValue('user-2 leagues');
+    await expect(c.cached('leagues:user', fresh, CACHE_TTL.MEDIUM)).resolves.toBe('user-2 leagues');
+    expect(fresh).toHaveBeenCalledTimes(1);
   });
 });

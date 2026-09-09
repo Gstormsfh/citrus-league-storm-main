@@ -29,11 +29,30 @@ export interface ApiCache {
   invalidate(prefix: string): void;
 }
 
+// ACCOUNT SWITCH (2026-09-09): every module-level cache created here lives
+// for the life of the page, and several keys are not scoped to a user
+// ('leagues:user', `leagues:${id}:my-team`). Signing out and back in as
+// someone else on the same device served the previous person's leagues for
+// the full TTL. AuthContext calls clearAllApiCaches() on SIGNED_OUT and
+// whenever the signed-in user id changes; this registry is what makes that a
+// single call instead of one per module.
+const registry = new Set<ApiCache>();
+
+/** Flush every cache created by createApiCache(). Call when the user changes. */
+export function clearAllApiCaches(): void {
+  for (const c of registry) c.clearCache();
+}
+
+/** Test-only: how many caches are registered. */
+export function registeredApiCacheCount(): number {
+  return registry.size;
+}
+
 export function createApiCache(): ApiCache {
   const cache = new Map<string, CacheEntry<unknown>>();
   const inflight = new Map<string, Promise<unknown>>();
 
-  return {
+  const api: ApiCache = {
     async cached<T>(key: string, fetcher: () => Promise<T>, ttl: number): Promise<T> {
       // 1) Cache hit?
       const hit = cache.get(key);
@@ -45,15 +64,20 @@ export function createApiCache(): ApiCache {
       const pending = inflight.get(key);
       if (pending) return pending as Promise<T>;
 
-      // 3) Fresh fetch
-      const promise = fetcher()
+      // 3) Fresh fetch. Only commit the result if this promise is still the
+      // registered in-flight request for the key: clearCache()/invalidate()
+      // may have dropped it mid-flight (account switch), and a late response
+      // must not repopulate the cache with the previous user's data.
+      const promise: Promise<T> = fetcher()
         .then((result) => {
-          cache.set(key, { data: result, expiresAt: Date.now() + ttl });
-          inflight.delete(key);
+          if (inflight.get(key) === promise) {
+            cache.set(key, { data: result, expiresAt: Date.now() + ttl });
+            inflight.delete(key);
+          }
           return result;
         })
         .catch((err) => {
-          inflight.delete(key);
+          if (inflight.get(key) === promise) inflight.delete(key);
           throw err;
         });
 
@@ -75,4 +99,7 @@ export function createApiCache(): ApiCache {
       }
     },
   };
+
+  registry.add(api);
+  return api;
 }
