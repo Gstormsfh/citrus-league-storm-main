@@ -22,7 +22,11 @@ export class SeasonStateService {
     try {
       const { data: league, error: leagueErr } = await this.supabase
         .from('leagues')
-        .select('id, settings, league_type')
+        // `leagues.league_type` does not exist (checked against the live
+        // catalog 2026-09-09); selecting it made PostgREST answer 400 on every
+        // lineup save, which this method swallowed as "season not complete".
+        // Pool vs fantasy lives in settings.
+        .select('id, settings')
         .eq('id', leagueId)
         .maybeSingle();
 
@@ -31,7 +35,9 @@ export class SeasonStateService {
       }
 
       // Only fantasy leagues use the roster/trade lock logic here.
-      const leagueType = (league as any).league_type ?? 'fantasy';
+      const settingsObj = ((league as any).settings ?? {}) as Record<string, unknown>;
+      const leagueType =
+        (settingsObj.leagueType as string | undefined) ?? (settingsObj.poolType ? 'pool' : 'fantasy');
       if (leagueType && leagueType !== 'fantasy') {
         return { complete: false };
       }
