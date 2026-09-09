@@ -13,6 +13,16 @@ import {
   authRedirectUrl,
 } from '@/lib/nativeAuth';
 import { registerForPush, unregisterDeviceToken } from '@/lib/pushNotifications';
+import { readAcquisition } from '@/lib/acquisition';
+
+// Campaign attribution (2026-09-09): the source this browser first arrived
+// from (e.g. steve-dangle) becomes an Analytics user property at sign-in, so
+// sign-ups and leagues can be counted per campaign.
+function attributeAcquisition(): void {
+  const acquisition = readAcquisition();
+  if (!acquisition) return;
+  analyticsService.setUserProperties({ acquisition_source: acquisition.source, acquisition_landing: acquisition.landing });
+}
 import { reportBootStage } from '@/lib/bootStages';
 import { useNotificationStore } from '@/stores/notificationStore';
 import { useDraftClientStore } from '@/stores/draftClientStore';
@@ -151,6 +161,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           initialSessionHandled = true;
           clearTimeout(timeout);
           analyticsService.setUserId(session.user.id);
+          attributeAcquisition();
           setSentryUser({ id: session.user.id, email: session.user.email });
           queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
           // PUSH (2026-08-18) — register this device for draft-turn alerts.
@@ -171,6 +182,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(session.user);
           clearTimeout(timeout);
           analyticsService.setUserId(session.user.id);
+          attributeAcquisition();
           setSentryUser({ id: session.user.id, email: session.user.email });
           queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
           if (mounted) setLoading(false);
