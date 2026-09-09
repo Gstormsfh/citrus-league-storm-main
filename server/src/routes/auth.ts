@@ -3,7 +3,7 @@ import type { Env } from '../app';
 import { z } from 'zod';
 import { validateBody, getValidatedBody } from '../middleware/validate';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
-import { getSupabaseAdmin } from '../lib/supabase';
+import { getSupabaseAdmin, createServiceClient } from '../lib/supabase';
 import { AppError } from '../lib/errors';
 import { ok, created, fail } from '../lib/responses';
 
@@ -36,8 +36,13 @@ authRoutes.post('/signup', validateBody(signupSchema), async (c) => {
 
     // Sign in server-side so the client gets session tokens without
     // hitting Supabase's IP-level rate limiter on signInWithPassword.
-    // The admin client uses the service role key → no user-facing throttle.
-    const { data: signInData, error: signInError } = await admin.auth.signInWithPassword({
+    // A service-role client has no user-facing throttle.
+    //
+    // This MUST be a per-request client, never the shared admin singleton:
+    // signing in stores the user's session on the client object, and the
+    // singleton would then send that user's JWT on every admin query the
+    // instance makes afterwards (see sealAdminAuth in lib/supabase.ts).
+    const { data: signInData, error: signInError } = await createServiceClient().auth.signInWithPassword({
       email: body.email,
       password: body.password,
     });
