@@ -128,11 +128,40 @@ Left nav > Production > Create new release > pick the same bundle from the
 library > Review > Start rollout. Review normally completes in under seven
 days; new apps can take a little longer on the first submission.
 
+## Push notifications on Android
+
+Done in code (2026-09-09): `google-services.json` is in the project, so
+`PushNotifications.register()` no longer kills the process, the token row
+records `platform: 'android'`, and `PushService` sends to Android through FCM
+HTTP v1 while iOS keeps going through APNs. The transports are configured
+independently, so a missing FCM setup leaves Android dormant and touches
+nothing on iOS.
+
+There is no secret to add. The documented FCM setup is a downloaded
+service-account JSON, and the organization forbids creating one
+(`constraints/iam.disableServiceAccountKeyCreation`). That policy is right, so
+the server asks Cloud Run's metadata server for a token for the service account
+the revision already runs as: nothing stored, nothing to rotate, nothing to
+leak. `FCM_PROJECT_ID` is already a literal in the deploy workflow.
+
+The one setup step is an IAM grant, in the Google Cloud console (not Firebase):
+
+1. console.cloud.google.com, project **citrus-fantasy-prod**.
+2. **IAM and Admin** > **IAM**.
+3. Find the principal the Cloud Run service runs as. With no service account
+   set on the service it is the default compute one,
+   `<project-number>-compute@developer.gserviceaccount.com`. The project number
+   is on the Cloud console home page, or in Cloud Run > citrus-api > the
+   Security tab, which names the service account outright.
+4. Click the pencil on that row > **Add another role** > search for and select
+   **Firebase Cloud Messaging API Admin** > **Save**.
+
+Without the grant, sends return 403 and are logged; nothing else breaks. With
+it, Android devices receive on-the-clock pushes on the next deploy.
+
 ## Known gaps to close before Production
 
-- Push notifications: `google-services.json` is not in the Android project,
-  so `@capacitor/push-notifications` is inert on Android. Firebase console >
-  Project settings > Add Android app (`com.citrussports.app`) > download
-  `google-services.json` into `apps/web/android/app/`. Not a review blocker.
 - Real device pass on a modern Android phone (gesture nav, keyboard,
   universal links after step 6).
+- Android push cannot be verified on the emulator without Play services; test
+  it on a real device once the two secrets are set.
