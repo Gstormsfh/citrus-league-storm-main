@@ -39,6 +39,40 @@ waiverRoutes.get('/league/:leagueId', membershipMiddleware, async (c) => {
   return ok(c, claims);
 });
 
+/**
+ * GET /api/waivers/league/:leagueId/pending-count — commissioner-only COUNT.
+ *
+ * WAIVER PRIVACY (2026-09-09): `waiver_claims` SELECT RLS is now own-team or
+ * status='successful', so a pending claim is invisible to everyone but the
+ * manager who made it — deliberately including the commissioner, who could
+ * otherwise read the league's bids before running the processor and outbid
+ * them. That closed the leak but broke the "N claims are still inside the
+ * waiver window" message on League HQ, which counted rows the commissioner
+ * can no longer see.
+ *
+ * A count is not a leak: it says how much work the processor has, not who
+ * wants whom for how much. So this route runs on the admin client and returns
+ * ONLY integers — never claim rows. Adding claim payloads here would hand
+ * the commissioner back exactly what the RLS change took away.
+ */
+waiverRoutes.get('/league/:leagueId/pending-count', commissionerMiddleware, async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const admin = getSupabaseAdmin();
+
+  const { count, error } = await admin
+    .from('waiver_claims')
+    .select('id', { count: 'exact', head: true })
+    .eq('league_id', leagueId)
+    .eq('status', 'pending');
+
+  if (error) {
+    logger.error('[waivers.pending-count] failed:', JSON.stringify(error));
+    return handleError(c, error, 'Failed to count pending waiver claims');
+  }
+
+  return ok(c, { pending: count ?? 0 });
+});
+
 // GET /api/waivers/league/:leagueId/team/:teamId — Get team waiver claims
 waiverRoutes.get('/league/:leagueId/team/:teamId', membershipMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');

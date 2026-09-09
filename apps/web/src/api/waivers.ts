@@ -11,6 +11,15 @@ export const waiverApi = {
     return apiClient.get(`/api/waivers/league/${leagueId}${qs}`);
   },
 
+  /**
+   * Commissioner-only count of pending claims. Returns `{ pending }` and no
+   * claim rows — see the route comment: claim payloads are private to the
+   * claiming manager, the count is not.
+   */
+  getPendingClaimCount(leagueId: string) {
+    return apiClient.get(`/api/waivers/league/${leagueId}/pending-count`);
+  },
+
   /** Get team-specific waiver claims */
   getTeamWaivers(leagueId: string, teamId: string) {
     return apiClient.get(`/api/waivers/league/${leagueId}/team/${teamId}`);

@@ -121,6 +121,30 @@ export const leagueSwitchDestination = (
   return `/league/${leagueId}?league=${leagueId}`;
 };
 
+/**
+ * WHERE THE APP OPENS A LEAGUE (2026-09-09).
+ *
+ * The default flow is selector → league → MATCHUP, so the league selector's
+ * cards and the app-open redirect both land here rather than on League HQ.
+ * (The in-app switcher in the Navbar deliberately still opens HQ: switching
+ * leagues mid-session is a "show me that league" gesture, not "show me my
+ * score", and HQ is that league's front door.)
+ *
+ * A pool has no matchup, so it keeps its pool route.
+ *
+ * `?league=` is not decoration: LeagueContext resolves the active league from
+ * that query param and never from the path segment, so a bare
+ * `/matchup/:id` leaves the context pointed at the PREVIOUS league and the
+ * chrome names the wrong one. Same trap `leagueSwitchDestination` documents.
+ */
+export const leagueOpenDestination = (
+  leagueId: string,
+  leagueType: string | undefined | null,
+): string => {
+  if (isPoolLeague(leagueType)) return getPoolRoute(leagueType as string, leagueId);
+  return `/matchup/${leagueId}?league=${leagueId}`;
+};
+
 /** Returns a display label for the pool type */
 export const getPoolLabel = (leagueType: string): string => {
   const labels: Record<string, string> = {

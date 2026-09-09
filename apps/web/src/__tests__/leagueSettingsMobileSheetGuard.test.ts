@@ -41,11 +41,31 @@ describe('one settings surface per viewport', () => {
     const at = HQ.indexOf('<LeagueSettingsPhone');
     expect(at).toBeGreaterThan(-1);
     const block = HQ.slice(at, HQ.indexOf('/>', at));
-    expect(block).toContain('sections={buildLeagueSettingsSections({');
+    // 2026-09-09: the fields are built ONCE into `settingsFieldSections` and
+    // drawn by two screens — the commissioner's editable sheet and the
+    // members' read-only one — so a member can never be shown a rule the
+    // commissioner's screen does not have.
+    expect(block).toContain('sections={settingsFieldSections}');
+    expect(HQ).toContain('const settingsFieldSections = buildLeagueSettingsSections({');
     expect(block).toContain('activeKey={activeSettingsTab}');
     expect(block).toContain('onSectionChange={setActiveSettingsTab}');
     expect(block).toContain('onSave={handleSaveSettings}');
     expect(HQ.slice(at - 200, at)).toContain('isCommissioner &&');
+  });
+
+  it('members get the same screen, read-only (2026-09-09)', () => {
+    // Before this, League Settings rendered ONLY for the commissioner, so a
+    // member had no way to look up their own league's waiver period, trade
+    // veto rule or keeper count anywhere in the app.
+    const at = HQ.indexOf('<LeagueSettingsPhone\n          readOnly');
+    expect(at, 'members have no read-only settings sheet').toBeGreaterThan(-1);
+    expect(HQ.slice(at - 400, at)).toContain('!isCommissioner &&');
+    // Desktop members get a dialog rather than the full-screen phone sheet.
+    expect(HQ).toContain('League Rules');
+    expect(HQ).toContain('<SettingFieldRows fields={g.fields} onPick={() => {}} readOnly />');
+    // Read-only means read-only: no picker, no save bar, no commissioner tools.
+    expect(PHONE).toContain('{!readOnly && section?.saveable && (');
+    expect(PHONE).toContain('readOnly={readOnly}');
   });
 
   it('the desktop dialog carries no phone sheet classes and no phone dropdown any more', () => {
@@ -94,8 +114,11 @@ describe('the phone screen is the artboard', () => {
     const FIELDS = read('../components/league/SettingFields.tsx');
     expect(FIELDS).toContain("onPick({ kind: 'select', key: f.key })");
     expect(FIELDS).toContain("onPick({ kind: 'number', key: f.key })");
-    expect(PHONE).toContain('<SettingFieldRows fields={g.fields} onPick={setPicker} />');
-    expect(PHONE).toContain('<SettingPicker picker={picker} fields={fields} onClose={() => setPicker(null)} />');
+    // 2026-09-09: the same rows serve members read-only, so the renderer
+    // takes a readOnly flag and the picker is not mounted at all when set —
+    // a picker a member could open but never commit is worse than no picker.
+    expect(PHONE).toContain('<SettingFieldRows fields={g.fields} onPick={setPicker} readOnly={readOnly} />');
+    expect(PHONE).toContain('{!readOnly && <SettingPicker picker={picker} fields={fields} onClose={() => setPicker(null)} />}');
     expect(PHONE).toContain("saveLabel={(section.saving ?? saving) ? 'SAVING…' : 'SAVE & NOTIFY LEAGUE'}");
   });
 });

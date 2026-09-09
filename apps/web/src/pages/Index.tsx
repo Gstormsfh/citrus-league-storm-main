@@ -8,6 +8,8 @@ import { useSeasonStatus } from '@/hooks/useSeasonStatus';
 import { PressBoxHome } from '@/components/home/PressBoxHome';
 import { Navigate, useLocation } from 'react-router-dom';
 import LoadingScreen from '@/components/LoadingScreen';
+import { isLeagueVisitFresh, markLeagueVisit } from '@/lib/leagueStickiness';
+import { leagueOpenDestination, getLeagueTypeFromSettings } from '@/utils/leagueTypeHelpers';
 
 /**
  * Production homepage. Renders the Citrus 2.0 Homepage composition (dark
@@ -71,16 +73,32 @@ const Index = () => {
   // with the app's chrome around it. PressBoxHome has its own no-leagues
   // state (`No leagues yet · + League`) and that is the screen.
   if (auth?.user && (native || isMobile)) {
-    // LEAGUE HQ IS HOME (2026-09-05). "I want to see LEAGUE HQ when I log
-    // in; it adds a lot more value, like a main menu." With an active league
-    // the app opens on its HQ; the league list is one tap away (`?all=1`,
-    // which is where SWITCH in the league menu and a second tap on LEAGUES
-    // go). A manager with leagues but no active one still gets the list.
+    // THE DEFAULT APP FLOW (2026-09-09). Open → league selector → pick a
+    // league → its MATCHUP tab; then reopens land straight back on that
+    // matchup for twelve hours, after which the selector is the front door
+    // again. See `leagueStickiness.ts` for why the window slides.
+    //
+    // This supersedes LEAGUE HQ IS HOME (2026-09-05), which redirected to
+    // `/league/:id` on every open with no expiry. Two changes: the landing
+    // surface is the matchup rather than HQ (a manager opening the app wants
+    // their score, and HQ is a menu), and the redirect now expires, so a
+    // manager coming back after a few days picks their league instead of
+    // being dropped into whichever one they opened last. HQ is still one tap
+    // from the matchup's league bar, and `?all=1` still forces the list —
+    // that is where SWITCH and a second tap on LEAGUES go.
     const wantsList = new URLSearchParams(location.search).get('all') === '1';
     const activeId = league?.activeLeagueId;
-    const hasLeagues = (league?.userLeagues?.length ?? 0) > 0;
-    if (!wantsList && hasLeagues && activeId && league?.userLeagues?.some((l) => l.id === activeId)) {
-      return <Navigate to={`/league/${activeId}`} replace />;
+    const activeLeague = activeId ? league?.userLeagues?.find((l) => l.id === activeId) : undefined;
+    const sticky = isLeagueVisitFresh(auth.user.id);
+    if (!wantsList && activeLeague && sticky) {
+      // Slide the window: continued daily use never sees the selector.
+      markLeagueVisit(auth.user.id);
+      return (
+        <Navigate
+          to={leagueOpenDestination(activeLeague.id, getLeagueTypeFromSettings(activeLeague.settings))}
+          replace
+        />
+      );
     }
     return <PressBoxHome inOffseason={seasonStatus.isDormant && seasonStatus.phase === 'offseason'} />;
   }

@@ -30,9 +30,11 @@ import { LEAGUE_TYPE_LABELS } from '@citrus/shared';
 import { scoresApi } from '@/api/scores';
 import { leagueApi } from '@/api/leagues';
 import { matchupApi } from '@/api/matchups';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
+import { markLeagueVisit } from '@/lib/leagueStickiness';
 import { getLeagueFormat } from '@/services/LeagueService';
-import { isPoolLeague, leagueSwitchDestination } from '@/utils/leagueTypeHelpers';
+import { isPoolLeague, leagueOpenDestination } from '@/utils/leagueTypeHelpers';
 import { getTodayMST } from '@/utils/timezoneUtils';
 import { isBye, scoreOf, teamNameOf, winChanceOf, type WeekMatchupRow } from '@/components/matchup/scoreboard';
 import { placeOf, type StandingsLineRow } from '@/components/league/hqLines';
@@ -54,6 +56,7 @@ export interface PressBoxHomeProps {
 
 export function PressBoxHome({ inOffseason, className }: PressBoxHomeProps) {
   const navigate = useNavigate();
+  const auth = useAuth();
   const league = useLeague();
   const userLeagues = league?.userLeagues;
   const leagues = useMemo(() => userLeagues ?? [], [userLeagues]);
@@ -190,13 +193,20 @@ export function PressBoxHome({ inOffseason, className }: PressBoxHomeProps) {
               ]
                 .filter(Boolean)
                 .join(' · ');
-              // THE ONE SWITCH RULE (2026-09-04). This card IS the phone's league
-              // switcher, and it goes through `leagueSwitchDestination` like
-              // the Navbar's: `/league/:id` alone leaves LeagueContext on the
-              // previous league (it reads only `?league=`), and the header
-              // over the next screen names the wrong league. A pool goes to
-              // its pool route inside the same helper.
-              const to = leagueSwitchDestination(l.id, fmt.leagueType, '/');
+              // THE DEFAULT APP FLOW (2026-09-09). This card is the app's
+              // opening gesture, and what a manager opens the app for is their
+              // score — so it opens the league's MATCHUP. It supersedes THE ONE
+              // SWITCH RULE (2026-09-04), which sent the card through
+              // `leagueSwitchDestination` to League HQ; that helper still
+              // governs the in-app switcher, where opening a league's front
+              // door is the right answer.
+              //
+              // `leagueOpenDestination` keeps the part of the old rule that
+              // mattered: `?league=` is carried, because LeagueContext reads the
+              // active league from that query param and never from the path, so
+              // a bare route leaves the chrome naming the previous league. A
+              // pool has no matchup and keeps its pool route.
+              const to = leagueOpenDestination(l.id, fmt.leagueType);
 
               const rows = weekQueries[i]?.data;
               const mine = myId && rows ? rows.find((r) => r.team1_id === myId || r.team2_id === myId) : undefined;
@@ -214,6 +224,7 @@ export function PressBoxHome({ inOffseason, className }: PressBoxHomeProps) {
                   crest={crestOf(l.name)}
                   metaLine={metaLine || null}
                   to={to}
+                  onOpen={() => markLeagueVisit(auth?.user?.id)}
                   badge={l.draft_status === 'in_progress' ? 'DRAFT LIVE' : live ? 'LIVE' : null}
                   badgeTone={l.draft_status === 'in_progress' ? 'due' : 'live'}
                   you={
