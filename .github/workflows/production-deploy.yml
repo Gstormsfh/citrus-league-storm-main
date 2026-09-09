@@ -89,8 +89,45 @@ jobs:
 
       # PRERENDER (2026-09-09): the marketing routes ship as static HTML so
       # crawlers get real text. Chromium is only needed for this step.
+      #
+      # HARDENED (2026-09-10) after a deploy died on `apt-get update` hitting
+      # a stale index on Google's chrome-stable mirror ("Hash Sum mismatch",
+      # run 34383401881). Three changes, in order of how much failure they
+      # remove:
+      #   1. The browser binary is cached on the Playwright version, so a
+      #      repeat deploy makes no network call for it at all.
+      #   2. `playwright install chromium` (no --with-deps) fetches only from
+      #      Playwright's CDN, retried three times. apt is never in that path.
+      #   3. System libs come from `install-deps`, which is the only apt step
+      #      and is allowed to fail: ubuntu-latest already ships what Chromium
+      #      needs, and if it ever does not, the prerender launch fails loudly
+      #      and the "/about is not serving prerendered HTML" check catches it
+      #      downstream. A flaky mirror no longer decides whether we deploy.
+      - name: Playwright version
+        id: pw
+        run: echo "version=$(cd apps/web && node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Chromium for prerender
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
       - name: Install Chromium for prerender
-        run: cd apps/web && npx playwright install --with-deps chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: |
+          cd apps/web
+          for attempt in 1 2 3; do
+            npx playwright install chromium && exit 0
+            echo "playwright install failed (attempt $attempt), retrying in 20s"
+            sleep 20
+          done
+          echo "playwright install failed after 3 attempts"
+          exit 1
+
+      - name: Install Chromium system deps (best effort)
+        run: cd apps/web && npx playwright install-deps chromium || echo "::warning::install-deps failed (apt); relying on runner image libraries"
 
       - name: Build web
         env:
