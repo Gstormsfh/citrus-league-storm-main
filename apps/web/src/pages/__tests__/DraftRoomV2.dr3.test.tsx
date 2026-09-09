@@ -40,6 +40,12 @@ const subscribeMock = runnerHandles.subscribe;
 // CARD UNIFICATION (2026-09-01): the room now renders the shared
 // PlayerStatsModal, whose real module pulls service singletons that
 // need env vars — stub it out; card behavior is tested elsewhere.
+// ACTIVE-LEAGUE OWNERSHIP (2026-09-09): the room now reads LeagueContext to
+// claim the active league. The real provider drags in the supabase client
+// and every service; the room under test only needs the hook's shape.
+vi.mock('@/contexts/LeagueContext', () => ({
+  useLeague: () => ({ activeLeagueId: null, setActiveLeagueId: () => {}, loading: true }),
+}));
 vi.mock('@/components/PlayerStatsModal', () => ({ default: () => null }));
 vi.mock('@/lib/draftClient/runner', () => ({
   DraftClientRunner: MockDraftClientRunner,
