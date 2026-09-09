@@ -5,7 +5,7 @@
  * LeagueHeader (crest, name, the week, the sliders, the four sub-tabs)
  * and the LeagueMenu the sliders open. Five pages had assembled the pair
  * by hand — the menu's open state, the profile read for its footer, the
- * `pt-[env(safe-area-inset-top)]` wrapper — and the pages the league menu
+ * `pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]` wrapper — and the pages the league menu
  * itself leads to (Waivers, Trades, Schedule, the GM office, another
  * manager's team, the bracket, analytics) still wore the 09-01 chrome: a
  * centred title over a hamburger that opened the OLD menu sheet. Two
@@ -104,7 +104,7 @@ export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, .
           under the clock. Sticky here, with the safe-area padding painted in
           surface, keeps the league name and the four tabs on screen. */}
       <div
-        className={cn(PB_TYPE, 'lg:hidden sticky top-0 z-app-nav bg-pressbox-surface pt-[env(safe-area-inset-top)]', className)}
+        className={cn(PB_TYPE, 'lg:hidden sticky top-0 z-app-nav bg-pressbox-surface pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]', className)}
         data-testid="pb-league-chrome"
       >
         <LeagueHeader

@@ -122,7 +122,7 @@ const Contact = () => {
     <DarkLayout>
 
 
-      <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Contact" logoSrc="/favicon.svg" /></div>
+      <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]"><PressBoxAppHeader title="Contact" logoSrc="/favicon.svg" /></div>
       <main className="relative max-w-[1100px] mx-auto px-6 pt-16 pb-24 max-lg:pt-3 max-lg:px-3 pb-app-chrome">
         <div className="text-center mb-12">
           <div className="font-jbmono max-lg:font-plex text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft max-lg:text-pressbox-orange-soft mb-3 font-bold">

@@ -109,7 +109,7 @@ export function LeagueSettingsPhone({
             saveDisabled={!!(section.saving ?? saving) || !!section.saveDisabled}
             onDiscard={onDiscard}
             onSave={section.onSave ?? onSave}
-            className="flex-none px-3.5 pt-2 pb-[max(env(safe-area-inset-bottom),22px)] border-t border-white/[0.06] bg-pressbox-surface"
+            className="flex-none px-3.5 pt-2 pb-[max(var(--safe-area-inset-bottom,env(safe-area-inset-bottom)),22px)] border-t border-white/[0.06] bg-pressbox-surface"
           />
         )}
       </div>

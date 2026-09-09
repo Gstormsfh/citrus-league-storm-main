@@ -104,7 +104,7 @@ export default function Scores() {
      */
     <div className={cn(PB_TYPE, 'min-h-screen bg-pressbox-surface text-pressbox-text')}>
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]">
         <PressBoxAppHeader
           title="Scores"
           logoSrc="/favicon.svg"

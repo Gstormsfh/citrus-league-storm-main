@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Press Box surface (tailwind pressbox-surface). Behind the system bars. -->
+    <color name="pressboxSurface">#0C1811</color>
+</resources>

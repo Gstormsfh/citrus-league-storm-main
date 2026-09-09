@@ -81,7 +81,7 @@ export function PressBoxDraftPickBar({
         <div className="h-full bg-pressbox-sage" style={{ width: `${pct}%` }} />
       </div>
 
-      <div className={cn('flex items-center gap-3 px-3.5 pt-3', children ? 'pb-2' : 'pb-[max(26px,env(safe-area-inset-bottom))]')}>
+      <div className={cn('flex items-center gap-3 px-3.5 pt-3', children ? 'pb-2' : 'pb-[max(26px,var(--safe-area-inset-bottom,env(safe-area-inset-bottom)))]')}>
         <div>
           <p className="font-condensed font-bold text-[10px] uppercase tracking-[0.14em] text-pressbox-orange-soft">
             {eyebrow}
@@ -122,7 +122,7 @@ export function PressBoxDraftPickBar({
           </button>
         )}
       </div>
-      {children && <div className="px-3.5 pb-[max(26px,env(safe-area-inset-bottom))]">{children}</div>}
+      {children && <div className="px-3.5 pb-[max(26px,var(--safe-area-inset-bottom,env(safe-area-inset-bottom)))]">{children}</div>}
     </div>
   );
 }

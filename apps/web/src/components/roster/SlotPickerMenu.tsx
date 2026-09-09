@@ -252,7 +252,7 @@ export function SlotPickerMenu({
         </div>
 
         {/* ── Destinations ───────────────────────────────────────────── */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(env(safe-area-inset-bottom),12px)]">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(var(--safe-area-inset-bottom,env(safe-area-inset-bottom)),12px)]">
           {groups.length === 0 ? (
             // Reachable: a locked player, or one whose only legal spot is the
             // one he already fills. Saying so beats an empty box.

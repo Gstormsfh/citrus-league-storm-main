@@ -355,7 +355,7 @@ const StormyChatBubbleSession = () => {
         className="fixed h-14 w-14 rounded-full bg-pastel-orange ring-2 ring-pastel-orange/30 shadow-[0_24px_60px_-20px_rgba(255,107,26,0.4)] hover:scale-105 hover:-translate-y-1 transition-all z-overlay p-0 overflow-hidden"
         style={{
           position: 'fixed',
-          bottom: isMobile ? 'calc(5rem + env(safe-area-inset-bottom) + 4rem)' : '1.5rem',
+          bottom: isMobile ? 'calc(5rem + var(--safe-area-inset-bottom,env(safe-area-inset-bottom)) + 4rem)' : '1.5rem',
           // MOBILE FIX (2026-08-23, found in the 390px sweep): on the RIGHT
           // edge the FAB sat directly on top of right-aligned row actions —
           // the Free Agents "+" add buttons and Trade Center info buttons —
@@ -391,10 +391,10 @@ const StormyChatBubbleSession = () => {
     left: 0,
     right: 0,
     bottom: 0,
-    top: 'max(env(safe-area-inset-top), 8vh)',
+    top: 'max(var(--safe-area-inset-top,env(safe-area-inset-top)), 8vh)',
     width: '100vw',
     zIndex: 110,
-    paddingBottom: 'env(safe-area-inset-bottom)',
+    paddingBottom: 'var(--safe-area-inset-bottom,env(safe-area-inset-bottom))',
   };
   const desktopCardStyle: CSSProperties = {
     position: 'fixed',

@@ -112,7 +112,7 @@ export default function InviteAccept() {
     <DarkLayout>
       <div className="hidden lg:block"><Navbar /></div>
       <main
-        className="pb-type-phone relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)] max-lg:min-h-screen max-lg:bg-pressbox-surface max-lg:text-pressbox-text max-lg:px-5 max-lg:pt-[calc(2.5rem+env(safe-area-inset-top))]"
+        className="pb-type-phone relative flex items-center justify-center p-4 py-12 min-h-[calc(100vh-68px)] max-lg:min-h-screen max-lg:bg-pressbox-surface max-lg:text-pressbox-text max-lg:px-5 max-lg:pt-[calc(2.5rem+var(--safe-area-inset-top,env(safe-area-inset-top)))]"
         data-testid="invite-accept"
       >
         <Card className="w-full max-w-md bg-pastel-surface-tile border-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)] max-lg:bg-transparent max-lg:border-0 max-lg:ring-0 max-lg:shadow-none max-lg:rounded-none">

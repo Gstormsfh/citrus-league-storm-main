@@ -925,7 +925,7 @@ const CreateLeague = () => {
       {/* PRESS BOX (2026-09-04): the app header in place of the 09-01 title
           bar and its hamburger, which opened the old menu sheet. The app
           nav is the way around; the header names the screen. */}
-      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]">
         <PressBoxAppHeader title="New league" logoSrc="/favicon.svg" />
       </div>
       {isMobile && (

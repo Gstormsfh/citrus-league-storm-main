@@ -299,7 +299,7 @@ describe('CitrusToaster — surface and placement', () => {
     expect(vp.className).not.toMatch(/z-\[\d+\]/);
     // The notch. `pt-safe` alone is a bare padding-top: env(...) that
     // resolves to 0 on a non-notch phone and would beat the container pad.
-    expect(vp.className).toContain('pt-[calc(env(safe-area-inset-top)+0.5rem)]');
+    expect(vp.className).toContain('pt-[calc(var(--safe-area-inset-top,env(safe-area-inset-top))+0.5rem)]');
     // sm: and up it narrows and centres — top-right is already Sonner's.
     expect(vp.className).toContain('sm:w-[420px]');
     expect(vp.className).toContain('sm:left-1/2');

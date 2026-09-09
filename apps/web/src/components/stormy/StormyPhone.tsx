@@ -82,7 +82,7 @@ export function StormyPhone({
   const viewport = useVisualViewport();
   const layerStyle: React.CSSProperties = viewport.keyboardOpen && viewport.height
     ? { top: viewport.offsetTop, height: viewport.height, bottom: 'auto' }
-    : { bottom: `calc(${BOTTOMNAV_H}px + env(safe-area-inset-bottom))` };
+    : { bottom: `calc(${BOTTOMNAV_H}px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom)))` };
 
   return (
     /* The layer owns the viewport above the nav: header, control, the
@@ -92,7 +92,7 @@ export function StormyPhone({
     <div
       className={cn(
         PB_TYPE,
-        'lg:hidden fixed inset-x-0 top-0 flex flex-col bg-pressbox-surface text-pressbox-text pt-[env(safe-area-inset-top)]',
+        'lg:hidden fixed inset-x-0 top-0 flex flex-col bg-pressbox-surface text-pressbox-text pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]',
         className,
       )}
       style={layerStyle}

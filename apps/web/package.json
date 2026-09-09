@@ -20,6 +20,8 @@
     "test:coverage": "vitest run --coverage",
     "ios:sync": "npm run build:native && npx cap sync ios",
     "ios:open": "npx cap open ios",
+    "android:sync": "npm run build:native && node scripts/android-version.mjs && npx cap sync android",
+    "android:open": "npx cap open android",
     "build:native": "node scripts/build-native.mjs",
     "predeploy": "node -e \"console.error('BLOCKED: bare deploy targets PROD via .firebaserc default. Use npm run deploy:staging (or deliberately remove predeploy for a prod release).'); process.exit(1)\""
   },

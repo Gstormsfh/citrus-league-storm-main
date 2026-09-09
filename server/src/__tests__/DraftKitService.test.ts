@@ -20,6 +20,7 @@ import {
   PREVIEW_CARDS_PER_COHORT,
 } from '../services/DraftKitService';
 import { clearDashboardIndexCache } from '../services/PlayerDashboardService';
+import { getMetricsSeason, getProjectionsSeason } from '@citrus/shared';
 import { createChain, createMockSupabase } from './helpers';
 
 // ── Fixture ──────────────────────────────────────────────────────────
@@ -267,6 +268,27 @@ describe('tierAtLeast', () => {
 });
 
 // ── The cohort rule ──────────────────────────────────────────────────
+
+describe('DraftKitService.getBoard — the metrics season is the last one with a sample', () => {
+  // SEASON FLIP (2026-09-09). getCurrentSeason() flips on the opener; the kit
+  // must keep describing the last completed season through the opener and
+  // the three-week grace window, or every percentile card goes blank in the
+  // two weeks most leagues draft. The board reports getMetricsSeason(), and
+  // the two are only equal once the new season has a sample.
+  it('reports getMetricsSeason(), never a season the stat tables have no rows for', async () => {
+    const service = new DraftKitService(mockTables(ENTITLED));
+    const { board } = await service.getBoard();
+    expect(board!.metricsSeason).toBe(getMetricsSeason());
+    expect(board!.projectionSeason).toBe(getProjectionsSeason());
+    expect(board!.metricsSeason).toBeLessThanOrEqual(board!.projectionSeason);
+  });
+
+  it('through the 2026 opener and grace window the kit still describes 2025', () => {
+    expect(getMetricsSeason(new Date(2026, 8, 29))).toBe(2025);
+    expect(getMetricsSeason(new Date(2026, 9, 12))).toBe(2025);
+    expect(getMetricsSeason(new Date(2026, 9, 20))).toBe(2026);
+  });
+});
 
 describe('DraftKitService.getBoard — percentiles stay inside the position cohort', () => {
   it('ranks the top defenceman against defencemen, not against forwards', async () => {

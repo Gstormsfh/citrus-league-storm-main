@@ -191,7 +191,7 @@ const MobileBottomNav = () => {
         "shadow-[0_-8px_32px_-8px_rgba(0,0,0,0.4)]"
       )}
       style={{
-        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingBottom: 'var(--safe-area-inset-bottom,env(safe-area-inset-bottom))',
         backfaceVisibility: 'hidden',
         WebkitBackfaceVisibility: 'hidden',
       }}

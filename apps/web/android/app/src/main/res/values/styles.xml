@@ -13,6 +13,12 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Press Box surface behind the system bars while the WebView is
+             edge to edge (Capacitor 8); the app paints its own insets from
+             the injected safe-area variables. Light icons on the dark bar. -->
+        <item name="android:statusBarColor">@color/pressboxSurface</item>
+        <item name="android:navigationBarColor">@color/pressboxSurface</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 
 

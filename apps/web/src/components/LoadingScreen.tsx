@@ -38,7 +38,7 @@ interface LoadingScreenProps {
 /** The league header's silhouette: crest, name, four tabs. */
 function LeagueChromeSilhouette() {
   return (
-    <div aria-hidden="true" className="pt-[env(safe-area-inset-top)]" data-testid="pb-skeleton-league-chrome">
+    <div aria-hidden="true" className="pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]" data-testid="pb-skeleton-league-chrome">
       <div className="flex items-center gap-2.5 px-4 pt-2.5 pb-2">
         <span className="w-[30px] h-[30px] rounded-[8px] pb-shimmer flex-none" />
         <PressBoxSkeletonBar className="h-[15px] w-[140px]" />
@@ -57,7 +57,7 @@ function LeagueChromeSilhouette() {
 /** The app header's silhouette: a 24px condensed title and two squares. */
 function AppChromeSilhouette() {
   return (
-    <div aria-hidden="true" className="pt-[env(safe-area-inset-top)]" data-testid="pb-skeleton-app-chrome">
+    <div aria-hidden="true" className="pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]" data-testid="pb-skeleton-app-chrome">
       <div className="flex items-center justify-between pl-4 pr-4 pt-2 pb-1.5">
         <PressBoxSkeletonBar className="h-[22px] w-[110px]" />
         <div className="flex gap-1.5">

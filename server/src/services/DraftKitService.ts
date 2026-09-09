@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getCurrentSeason, getProjectionsSeason, logger } from '@citrus/shared';
+import { getMetricsSeason, getProjectionsSeason, logger } from '@citrus/shared';
 import { PlayerDashboardService, type DashboardIndexEntry } from './PlayerDashboardService';
 
 /**
@@ -468,7 +468,10 @@ export class DraftKitService {
    */
   async getBoard(): Promise<{ board: DraftKitBoard | null; error: Error | null }> {
     const tier = await this.getTier();
-    const metricsSeason = getCurrentSeason();
+    // The interface has always said "last completed season"; the code read
+    // getCurrentSeason(), which flips on the opener to a season with no stat
+    // rows. getMetricsSeason() is that rule made real (2026-09-09).
+    const metricsSeason = getMetricsSeason();
     const projectionSeason = getProjectionsSeason();
     const entitled = tierAtLeast(tier, 'kit');
 

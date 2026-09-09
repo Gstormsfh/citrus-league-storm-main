@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getSeasonYearForDate, getProjectionsSeason, getUpcomingSeasonStartDate, getPlayoffSeasonForDate, keeperSeasonYear } from '../season';
+import { getSeasonYearForDate, getProjectionsSeason, getUpcomingSeasonStartDate, getPlayoffSeasonForDate, keeperSeasonYear, getMetricsSeason, METRICS_SEASON_GRACE_DAYS } from '../season';
 
 // Local-time constructor: month is 1-based here for readability.
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day, 12, 0, 0);
@@ -111,5 +111,35 @@ describe('keeperSeasonYear (keepers are for the next draft, 2026-09-05)', () => 
     expect(keeperSeasonYear(true, d(2026, 9, 5))).toBe(2027);
     // Mid-season January, drafted: next season.
     expect(keeperSeasonYear(true, d(2027, 1, 15))).toBe(2027);
+  });
+});
+
+describe('getMetricsSeason (draft kit / player card stats season, 2026-09-09)', () => {
+  it('offseason run-up describes the last completed season', () => {
+    expect(getMetricsSeason(new Date(2026, 6, 15))).toBe(2025);
+    expect(getMetricsSeason(new Date(2026, 8, 9))).toBe(2025);
+    expect(getMetricsSeason(new Date(2026, 8, 28))).toBe(2025);
+  });
+
+  it('holds the last completed season through the opener and the grace window', () => {
+    expect(METRICS_SEASON_GRACE_DAYS).toBe(21);
+    expect(getMetricsSeason(new Date(2026, 8, 29))).toBe(2025); // opener
+    expect(getMetricsSeason(new Date(2026, 9, 19))).toBe(2025); // day 20
+  });
+
+  it('flips to the season being played once it has three weeks of games', () => {
+    expect(getMetricsSeason(new Date(2026, 9, 20))).toBe(2026);
+    expect(getMetricsSeason(new Date(2027, 0, 15))).toBe(2026);
+  });
+
+  it('keeps the just-finished season through its playoffs and early offseason', () => {
+    expect(getMetricsSeason(new Date(2027, 4, 1))).toBe(2026);
+    expect(getMetricsSeason(new Date(2027, 5, 30))).toBe(2026);
+  });
+
+  it('a season with no explicit start date uses the October rule, never an empty season', () => {
+    expect(getMetricsSeason(new Date(2027, 8, 15))).toBe(2026); // Jul-Sep 2027 run-up
+    expect(getMetricsSeason(new Date(2027, 9, 10))).toBe(2026); // Oct 10: 9 days in
+    expect(getMetricsSeason(new Date(2027, 9, 25))).toBe(2027); // Oct 25: past grace
   });
 });

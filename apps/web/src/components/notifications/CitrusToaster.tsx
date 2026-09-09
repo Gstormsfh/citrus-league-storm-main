@@ -331,11 +331,11 @@ export function CitrusToaster() {
           // re-deriving it.
           //
           // pt is calc(env() + 0.5rem), not the `pt-safe` utility: pt-safe is
-          // a bare `padding-top: env(safe-area-inset-top)`, which resolves to
+          // a bare `padding-top: var(--safe-area-inset-top,env(safe-area-inset-top))`, which resolves to
           // 0 on every non-notch phone and in the browser — it would beat the
           // container padding and leave the card flush against the top edge.
           'fixed inset-x-0 top-0 z-toast flex w-full flex-col gap-2 px-3 pb-3 outline-none',
-          'pt-[calc(env(safe-area-inset-top)+0.5rem)]',
+          'pt-[calc(var(--safe-area-inset-top,env(safe-area-inset-top))+0.5rem)]',
           // sm: and up, centre it at 420px rather than top-right. Top-right
           // is taken twice over: <Sonner position="top-right" /> is mounted
           // beside this in App.tsx, and the desktop Free Agents grid

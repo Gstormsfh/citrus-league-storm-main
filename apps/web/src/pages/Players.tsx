@@ -468,7 +468,7 @@ const Players = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden relative min-h-screen bg-pressbox-surface pt-[env(safe-area-inset-top)] pb-app-chrome">
+      <div className="lg:hidden relative min-h-screen bg-pressbox-surface pt-[var(--safe-area-inset-top,env(safe-area-inset-top))] pb-app-chrome">
         {/* QA PASS 1 (2026-09-09): opened from a league's Players tab
             (Leaders), this page keeps the league's name and a way back
             instead of dropping into the global tab with no context. */}

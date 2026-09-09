@@ -15,6 +15,10 @@
         "destination": "/.well-known/apple-app-site-association"
       },
       {
+        "source": "/.well-known/assetlinks.json",
+        "destination": "/.well-known/assetlinks.json"
+      },
+      {
         "source": "/ads.txt",
         "destination": "/ads.txt"
       },
@@ -39,6 +43,19 @@
       }
     ],
     "headers": [
+      {
+        "source": "/.well-known/assetlinks.json",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=3600"
+          }
+        ]
+      },
       {
         "source": "/.well-known/apple-app-site-association",
         "headers": [
