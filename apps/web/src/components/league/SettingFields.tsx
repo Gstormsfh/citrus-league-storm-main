@@ -85,7 +85,7 @@ export function SettingFieldRows({
                   key={f.key}
                   label={f.label}
                   help={f.help}
-                  value={f.value || '—'}
+                  value={f.value || 'Not set'}
                   last={last}
                 />
               );

@@ -49,11 +49,21 @@ describe('the homepage is the app home on a phone, the storefront everywhere els
     expect(SOURCE).not.toMatch(/auth\?\.user && hasLeagues/);
   });
 
-  it('League HQ is home (2026-09-05): the active league\'s HQ, unless ?all=1 asks for the list — which is how the LEAGUES tab comes back here', () => {
+  it('the matchup is home (2026-09-09), and only inside the sticky window', () => {
+    // Supersedes LEAGUE HQ IS HOME (2026-09-05). Two things changed and both
+    // are pinned here: the destination is the league's MATCHUP rather than its
+    // HQ, and the redirect EXPIRES, so a manager returning days later picks a
+    // league instead of being dropped into whichever one they opened last.
     expect(SOURCE).toMatch(/get\('all'\) === '1'/);
-    expect(SOURCE).toMatch(/<Navigate to=\{`\/league\/\$\{activeId\}`\} replace \/>/);
-    // Only when that league is one of the manager's; a stale active id shows the list.
-    expect(SOURCE).toMatch(/userLeagues\?\.some\(\(l\) => l\.id === activeId\)/);
+    expect(SOURCE).toMatch(/leagueOpenDestination\(/);
+    expect(SOURCE).toMatch(/isLeagueVisitFresh\(/);
+    // The window slides on each open, or daily use would eventually see the
+    // selector for no reason.
+    expect(SOURCE).toMatch(/markLeagueVisit\(/);
+    // HQ is no longer an app-open destination.
+    expect(SOURCE).not.toMatch(/<Navigate to=\{`\/league\/\$\{activeId\}`\} replace \/>/);
+    // Only a league the manager is actually in; a stale active id shows the list.
+    expect(SOURCE).toMatch(/userLeagues\?\.find\(\(l\) => l\.id === activeId\)/);
   });
 
   it('the native shell signed out opens on the door, not the storefront', () => {

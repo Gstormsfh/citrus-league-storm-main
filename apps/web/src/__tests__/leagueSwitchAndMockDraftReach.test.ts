@@ -108,8 +108,14 @@ describe('switching leagues out of the playoff section', () => {
     expect(src).toContain('leagueSwitchDestination(l.id, lType, location.pathname)');
   });
 
-  it('the home league cards route through the same helper', () => {
-    expect(HOME).toContain("leagueSwitchDestination(l.id, fmt.leagueType, '/')");
+  it('the home league cards route through the OPEN helper, not the switch one', () => {
+    // 2026-09-09: opening the app is a "what is my score" gesture, so a home
+    // card goes to the league's matchup via `leagueOpenDestination`.
+    // `leagueSwitchDestination` still governs switching leagues mid-session,
+    // which is a "show me that league" gesture and lands on its front door.
+    // Both carry `?league=`, which is the part of the old rule that mattered.
+    expect(HOME).toContain('leagueOpenDestination(l.id, fmt.leagueType)');
+    expect(HOME).not.toContain("leagueSwitchDestination(l.id, fmt.leagueType, '/')");
   });
 
   it.each(SWITCHERS)('%s no longer carries the self-pin branch', (_name, src) => {

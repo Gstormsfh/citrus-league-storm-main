@@ -95,7 +95,15 @@ describe('the phone switcher is the home league list', () => {
     expect(header).toBeLessThan(list);
   });
 
-  it('every card switches through the shared helper', () => {
-    expect(HOME).toContain("leagueSwitchDestination(l.id, fmt.leagueType, '/')");
+  it('every card opens through the shared helper', () => {
+    // 2026-09-09: the home cards are the app's OPENING gesture, so they go
+    // through `leagueOpenDestination` (the league's matchup) rather than
+    // `leagueSwitchDestination` (a league's front door), which still governs
+    // the in-app switcher. Both helpers carry `?league=` for the same reason:
+    // LeagueContext reads the active league from the query, never the path.
+    expect(HOME).toContain('leagueOpenDestination(l.id, fmt.leagueType)');
+    // And the pick is remembered, or the next open would land on the selector
+    // again and the stickiness would do nothing.
+    expect(HOME).toContain('markLeagueVisit(');
   });
 });
