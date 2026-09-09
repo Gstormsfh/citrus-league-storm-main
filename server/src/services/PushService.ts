@@ -1,5 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { structuredLogger } from '@citrus/shared';
+import {
+  structuredLogger,
+  isCategoryEnabled,
+  type NotificationCategory,
+  type NotificationPreferences,
+} from '@citrus/shared';
 import { createPrivateKey, sign as cryptoSign, type KeyObject } from 'node:crypto';
 import { connect as http2Connect, constants as H2, type ClientHttp2Session } from 'node:http2';
 
@@ -141,6 +146,36 @@ export interface PushResult {
   failed: number;
   skipped: boolean;
   reason?: string;
+}
+
+/**
+ * Everything that is not the draft clock.
+ *
+ * `notifyOnTheClock` above stays as it is: it is the one push that has run in
+ * production, it has its own dedupe table keyed on the pick, and a draft is
+ * the worst possible place to discover a refactor. This is the general path
+ * every other notification uses.
+ */
+export interface NotifyInput {
+  /** Who to tell. Deduplicated; an empty list is a no-op, not an error. */
+  userIds: string[];
+  /** Which switch decides. See packages/shared notificationCategories. */
+  category: NotificationCategory;
+  title: string;
+  body: string;
+  /**
+   * Natural key for exactly-once delivery, e.g. `trade_offer:<offerId>`.
+   * Built from ids the caller already has. Omit ONLY when the event has no
+   * stable identity and a duplicate is harmless.
+   *
+   * The key covers the EVENT, so a fan-out to eight managers must include the
+   * recipient (`roster_league:<txId>:<userId>`) or seven of them get nothing.
+   */
+  dedupeKey?: string;
+  /** Deep-link payload. Values are stringified for FCM; keep it small. */
+  data?: Record<string, string | number | null | undefined>;
+  /** Interrupts a Focus mode. True only when missing it costs the manager. */
+  timeSensitive?: boolean;
 }
 
 export function loadApnsConfigFromEnv(): ApnsConfig | null {
@@ -315,6 +350,244 @@ export class PushService {
         `[push] on_the_clock threw leagueId=${input.leagueId} pick=${input.pickNumber}: ${(err as Error).message}`,
       );
       return { sent: 0, failed: 0, skipped: true, reason: 'error' };
+    }
+  }
+
+  /**
+   * Send one notification to one or more managers.
+   *
+   * Four gates, in this order and for this reason:
+   *   1. transport configured — nothing to send with;
+   *   2. dedupe claim — a retry, a replayed webhook or a second instance must
+   *      not double-send. Claimed BEFORE the per-user work so the losers do no
+   *      database reads at all;
+   *   3. master switch (profiles.push_notifications) — off means silence;
+   *   4. the category switch — on by the category's own default unless the
+   *      manager overrode it.
+   *
+   * Total by contract, like notifyOnTheClock: a trade must not fail because a
+   * push did. Every path returns a PushResult and nothing throws out of here.
+   */
+  async notify(input: NotifyInput): Promise<PushResult> {
+    if (!this.isConfigured()) {
+      return { sent: 0, failed: 0, skipped: true, reason: 'not_configured' };
+    }
+
+    const userIds = Array.from(new Set(input.userIds.filter(Boolean)));
+    if (userIds.length === 0) {
+      return { sent: 0, failed: 0, skipped: true, reason: 'no_recipients' };
+    }
+
+    try {
+      if (input.dedupeKey) {
+        const claimed = await this.claimKey(input.dedupeKey);
+        if (!claimed) {
+          return { sent: 0, failed: 0, skipped: true, reason: 'already_delivered' };
+        }
+      }
+
+      const recipients = await this.recipientsFor(userIds, input.category);
+      if (recipients.length === 0) {
+        structuredLogger.info(
+          `[push] ${input.category} no eligible devices for ${userIds.length} user(s)`,
+        );
+        return { sent: 0, failed: 0, skipped: true, reason: 'no_devices' };
+      }
+
+      const apnsPayload = this.buildGenericApnsPayload(input);
+      let sent = 0;
+      let failed = 0;
+      let skippedNoTransport = 0;
+
+      for (const device of recipients) {
+        const android = device.platform === 'android';
+        // Same posture as the draft sender: a device whose transport has no
+        // credentials is SKIPPED, not failed, so a half-finished deploy does
+        // not look like a delivery bug.
+        if (
+          device.platform === 'web' ||
+          (android ? !this.isFcmConfigured() : !this.isApnsConfigured())
+        ) {
+          skippedNoTransport += 1;
+          continue;
+        }
+        const result = android
+          ? await this.sendGenericToFcmToken(device.token, input)
+          : await this.sendToToken(device.token, apnsPayload);
+        if (result.ok) {
+          sent += 1;
+        } else {
+          failed += 1;
+          if (result.prune) {
+            await this.pruneToken(device.token, result.reason);
+          }
+        }
+      }
+
+      structuredLogger.info(
+        `[push] ${input.category} users=${userIds.length} devices=${recipients.length} ` +
+          `sent=${sent} failed=${failed} no_transport=${skippedNoTransport}`,
+      );
+      return { sent, failed, skipped: false };
+    } catch (err) {
+      structuredLogger.error(
+        `[push] ${input.category} threw: ${(err as Error).message}`,
+      );
+      return { sent: 0, failed: 0, skipped: true, reason: 'error' };
+    }
+  }
+
+  /**
+   * Claim the right to send for this key. True only for the caller that
+   * actually inserted, so concurrent senders cannot double-deliver.
+   *
+   * A claim that ERRORS returns false — we would rather drop a notification
+   * than send it twice, because the duplicate is the one the manager notices.
+   */
+  private async claimKey(key: string): Promise<boolean> {
+    const { data, error } = await this.supabase
+      .from('push_dedupe')
+      .upsert({ key }, { onConflict: 'key', ignoreDuplicates: true })
+      .select('key');
+
+    if (error) {
+      structuredLogger.warn(`[push] dedupe claim failed key=${key}: ${error.message}`);
+      return false;
+    }
+    return Array.isArray(data) && data.length > 0;
+  }
+
+  /**
+   * The devices of every manager in `userIds` who wants this category.
+   *
+   * One `profiles` read and one `device_tokens` read for the whole batch, not
+   * per user: a league-wide notification is twelve managers, and twenty-four
+   * round trips per roster move is how draft night falls over.
+   *
+   * A profile that cannot be read is treated as opted IN, matching the draft
+   * sender: the columns default to on, and a nudge nobody asked to stop is
+   * the smaller failure.
+   */
+  private async recipientsFor(
+    userIds: string[],
+    category: NotificationCategory,
+  ): Promise<DeviceToken[]> {
+    const { data: profiles, error: profileError } = await this.supabase
+      .from('profiles')
+      .select('id, push_notifications, push_categories')
+      .in('id', userIds);
+
+    let eligible = userIds;
+    if (!profileError && Array.isArray(profiles)) {
+      const rows = profiles as Array<{
+        id: string;
+        push_notifications: boolean | null;
+        push_categories: NotificationPreferences | null;
+      }>;
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      eligible = userIds.filter((id) => {
+        const row = byId.get(id);
+        if (!row) return true; // unreadable → opted in, see above
+        if (row.push_notifications === false) return false;
+        return isCategoryEnabled(category, row.push_categories);
+      });
+      const off = userIds.length - eligible.length;
+      if (off > 0) {
+        structuredLogger.info(`[push] ${category} skipped ${off} user(s) reason=category_off_or_opted_out`);
+      }
+    }
+
+    if (eligible.length === 0) return [];
+
+    const { data, error } = await this.supabase
+      .from('device_tokens')
+      .select('token, platform')
+      .in('user_id', eligible);
+
+    if (error || !data) return [];
+    return (data as Array<{ token: string; platform?: string | null }>)
+      .filter((row) => Boolean(row.token))
+      .map((row) => ({
+        token: row.token,
+        platform:
+          row.platform === 'android' ? 'android' : row.platform === 'web' ? 'web' : 'ios',
+      }));
+  }
+
+  /** APNs body for the general path. */
+  private buildGenericApnsPayload(input: NotifyInput): Record<string, unknown> {
+    const data: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(input.data ?? {})) {
+      if (v !== undefined && v !== null) data[k] = v;
+    }
+    return {
+      aps: {
+        alert: { title: input.title, body: input.body },
+        sound: 'default',
+        // Only the draft clock and a trade you must answer earn a Focus
+        // interruption; everything else waits for the manager to look.
+        'interruption-level': input.timeSensitive ? 'time-sensitive' : 'active',
+      },
+      ...data,
+      type: input.category,
+    };
+  }
+
+  /** FCM body for the general path. FCM data values must be strings. */
+  private async sendGenericToFcmToken(
+    token: string,
+    input: NotifyInput,
+  ): Promise<{ ok: boolean; status?: number; reason?: string; prune?: boolean }> {
+    const config = this.fcmConfig;
+    if (!config) return { ok: false, reason: 'fcm_not_configured' };
+    try {
+      const accessToken = await this.currentFcmAccessToken();
+      const data: Record<string, string> = { type: input.category };
+      for (const [k, v] of Object.entries(input.data ?? {})) {
+        if (v !== undefined && v !== null) data[k] = String(v);
+      }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      let res: Response;
+      try {
+        res = await fetch(
+          `https://fcm.googleapis.com/v1/projects/${config.projectId}/messages:send`,
+          {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${accessToken}`,
+              'content-type': 'application/json',
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              message: {
+                token,
+                notification: { title: input.title, body: input.body },
+                data,
+                android: {
+                  priority: input.timeSensitive ? 'HIGH' : 'NORMAL',
+                  notification: { sound: 'default' },
+                },
+              },
+            }),
+          },
+        );
+      } finally {
+        clearTimeout(timer);
+      }
+
+      if (res.ok) return { ok: true, status: res.status };
+      const raw = await res.text();
+      let reason = raw;
+      try {
+        reason = (JSON.parse(raw) as { error?: { status?: string; message?: string } }).error?.status ?? raw;
+      } catch {
+        /* keep the raw body */
+      }
+      const prune = res.status === 404 || reason === 'UNREGISTERED' || reason === 'INVALID_ARGUMENT';
+      return { ok: false, status: res.status, reason, prune };
+    } catch (err) {
+      return { ok: false, reason: (err as Error).message };
     }
   }
 
