@@ -53,7 +53,7 @@ export function PressBoxBottomNav({ className }: { className?: string }) {
         PB_TYPE,
         'fixed bottom-0 left-0 right-0 z-app-nav lg:hidden',
         'bg-pressbox-surface border-t border-white/[0.08]',
-        'pb-[env(safe-area-inset-bottom)]',
+        'pb-[var(--safe-area-inset-bottom,env(safe-area-inset-bottom))]',
         className,
       )}
     >

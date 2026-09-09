@@ -135,7 +135,7 @@ export function FillSlotSheet({
         </div>
 
         {/* ── Candidates ──────────────────────────────────────────────── */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(env(safe-area-inset-bottom),12px)]">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(var(--safe-area-inset-bottom,env(safe-area-inset-bottom)),12px)]">
           {candidates.length === 0 ? (
             <p className="px-4 py-6 text-center text-xs font-display text-white/55">
               No one on your bench can play {label} right now. Check the free agents.

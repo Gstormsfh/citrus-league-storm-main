@@ -113,7 +113,7 @@ export default function DraftKit() {
 
   return (
     <DarkLayout>
-      <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Draft kit" logoSrc="/favicon.svg" /></div>
+      <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]"><PressBoxAppHeader title="Draft kit" logoSrc="/favicon.svg" /></div>
 
       <main className="mx-auto w-full max-w-[1180px] px-4 pb-24 pt-24 sm:px-6 max-lg:pt-3 max-lg:px-3 pb-app-chrome">
         {/* Hero.

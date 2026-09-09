@@ -21,6 +21,6 @@ describe('mobile menu safe-area guard', () => {
   });
 
   it('subtracts the top inset from the panel height so the bottom row stays reachable', () => {
-    expect(NAVBAR).toMatch(/h-\[calc\(100dvh-56px-env\(safe-area-inset-top\)-env\(safe-area-inset-bottom\)[^\]]*\]/);
+    expect(NAVBAR).toMatch(/h-\[calc\(100dvh-56px-var\(--safe-area-inset-top,env\(safe-area-inset-top\)\)-var\(--safe-area-inset-bottom,env\(safe-area-inset-bottom\)\)[^\]]*\]/);
   });
 });

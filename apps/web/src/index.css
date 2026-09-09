@@ -53,27 +53,27 @@
   
   /* Safe area padding utilities */
   .pt-safe {
-    padding-top: env(safe-area-inset-top);
+    padding-top: var(--safe-area-inset-top,env(safe-area-inset-top));
   }
   .pb-safe {
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: var(--safe-area-inset-bottom,env(safe-area-inset-bottom));
   }
   .pl-safe {
-    padding-left: env(safe-area-inset-left);
+    padding-left: var(--safe-area-inset-left,env(safe-area-inset-left));
   }
   .pr-safe {
-    padding-right: env(safe-area-inset-right);
+    padding-right: var(--safe-area-inset-right,env(safe-area-inset-right));
   }
   .px-safe {
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+    padding-left: var(--safe-area-inset-left,env(safe-area-inset-left));
+    padding-right: var(--safe-area-inset-right,env(safe-area-inset-right));
   }
   .py-safe {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-top: var(--safe-area-inset-top,env(safe-area-inset-top));
+    padding-bottom: var(--safe-area-inset-bottom,env(safe-area-inset-bottom));
   }
   .p-safe {
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    padding: var(--safe-area-inset-top,env(safe-area-inset-top)) var(--safe-area-inset-right,env(safe-area-inset-right)) var(--safe-area-inset-bottom,env(safe-area-inset-bottom)) var(--safe-area-inset-left,env(safe-area-inset-left));
   }
   
   /* iOS-style scroll container */
@@ -214,7 +214,7 @@
   }
 
   .pb-app-chrome {
-    padding-bottom: calc(116px + env(safe-area-inset-bottom));
+    padding-bottom: calc(116px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom)));
   }
 
   /* PRESS BOX skeleton shimmer (PR3, motion board 2b): the tile colour
@@ -1000,7 +1000,7 @@
      desktop has the fixed navbar the page clears with lg:pt-24. top:0 would
      park this underneath both. */
   position: sticky;
-  top: calc(3.5rem + env(safe-area-inset-top));
+  top: calc(3.5rem + var(--safe-area-inset-top,env(safe-area-inset-top)));
   z-index: 20;
 }
 

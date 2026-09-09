@@ -3746,17 +3746,17 @@ const DraftRoomInner = () => {
           drops so users know their draft isn't silently stalled.
           'connected' is the quiescent state; we don't render anything. */}
       {realtimeStatus === 'reconnecting' && (
-        <div className="sticky top-0 z-app-nav bg-amber-500 text-black text-sm font-semibold px-4 py-2 text-center shadow-md pt-[env(safe-area-inset-top)]">
+        <div className="sticky top-0 z-app-nav bg-amber-500 text-black text-sm font-semibold px-4 py-2 text-center shadow-md pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]">
           Reconnecting to draft. Your picks may be delayed for a few seconds.
         </div>
       )}
       {realtimeStatus === 'disconnected' && (
-        <div className="sticky top-0 z-app-nav bg-red-600 text-white text-sm font-semibold px-4 py-2 text-center shadow-md pt-[env(safe-area-inset-top)]">
+        <div className="sticky top-0 z-app-nav bg-red-600 text-white text-sm font-semibold px-4 py-2 text-center shadow-md pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]">
           Lost connection to draft. Refresh the page to reconnect. Your picks will not arrive in real time until you do.
         </div>
       )}
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden sticky top-0 z-page-header bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden sticky top-0 z-page-header bg-pastel-surface/95 backdrop-blur-xl border-b border-white/10 pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]">
         <div className="flex items-center justify-center h-12 px-4">
           <h1 className="text-lg font-bold text-pastel-cream">Draft Room</h1>
         </div>
@@ -4690,7 +4690,7 @@ const DraftRoomInner = () => {
             {isCommissioner && draftPhase === DraftPhase.ACTIVE && (draftHistory?.length || 0) > 0 && (
               <>
                 {/* Mobile: Fixed bottom bar spanning full width */}
-                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-app-nav bg-pastel-surface-tile border-t border-white/10 shadow-[0_-2px_10px_rgba(0,0,0,0.5)] px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+                <div className="sm:hidden fixed bottom-0 left-0 right-0 z-app-nav bg-pastel-surface-tile border-t border-white/10 shadow-[0_-2px_10px_rgba(0,0,0,0.5)] px-3 py-2 pb-[max(0.5rem,var(--safe-area-inset-bottom,env(safe-area-inset-bottom)))]">
                   <div className="flex items-center justify-center gap-2">
                     <span className="text-[10px] font-semibold text-destructive uppercase tracking-wide flex-shrink-0">Commish</span>
                     {/* Undo Last Pick */}

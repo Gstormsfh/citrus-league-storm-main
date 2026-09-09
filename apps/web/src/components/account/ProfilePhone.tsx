@@ -598,7 +598,7 @@ export function ProfilePhone({ tab, onTabChange, hero, identity, stats, activity
             </p>
 
             <PressBoxSheet open={confirmDelete} onOpenChange={(o) => { if (!o) { setConfirmDelete(false); settings.onDeleteConfirmation(''); } }} title="Delete account" shape="bottom">
-              <div className="px-3.5 pt-3 pb-[max(env(safe-area-inset-bottom),22px)]" data-testid="delete-account-sheet">
+              <div className="px-3.5 pt-3 pb-[max(var(--safe-area-inset-bottom,env(safe-area-inset-bottom)),22px)]" data-testid="delete-account-sheet">
                 <p className="font-condensed font-bold text-[18px] uppercase tracking-[0.02em]">Delete your account?</p>
                 <p className="mt-1.5 font-barlow text-[13px] leading-[1.45] text-pressbox-text/70">
                   Your account, sign-in and teams are deleted. Shared leagues pass to another manager; leagues with no managers

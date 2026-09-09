@@ -100,7 +100,7 @@ export function HockeyFooter({
      * PHONE: THE APP FOOTER DOES NOT RENDER (2026-09-02).
      *
      * Under `lg` every in-app page carries a fixed bottom tab bar, and the
-     * pages reserve room for it with `pb-[calc(5rem+env(safe-area-inset-bottom))]`
+     * pages reserve room for it with `pb-[calc(5rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom)))]`
      * on <main>. This footer sits OUTSIDE that padding, so on a phone its
      * last ~80px — the squad row and the whole legal line, Privacy and
      * Terms included — rendered underneath the tab bar and could not be

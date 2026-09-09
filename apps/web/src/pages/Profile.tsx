@@ -1175,7 +1175,7 @@ const Profile = () => {
       <div className="min-h-screen bg-pressbox-surface text-pastel-cream">
         {/* MOBILE CHROME (2026-09-01): Profile was the last core page on the
             old shell — global fixed Navbar + a hard pt-16. The fixed bar
-            grows by env(safe-area-inset-top) on notched phones while pt-16
+            grows by var(--safe-area-inset-top,env(safe-area-inset-top)) on notched phones while pt-16
             doesn't, so in the native app the page's first ~50px rendered
             UNDERNEATH the translucent bar ("settings page appears to be
             desktop version"). Every other core page hides the Navbar below
@@ -1185,7 +1185,7 @@ const Profile = () => {
         {/* PRESS BOX (2026-09-04): the app header in place of the 09-01 title
             bar and its hamburger, which opened the old menu sheet. The app
             nav is the way around; the header names the screen. */}
-        <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+        <div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]">
           <PressBoxAppHeader title="Account" logoSrc="/favicon.svg" />
         </div>
         {isMobile && (
@@ -1241,7 +1241,7 @@ const Profile = () => {
       {/* PRESS BOX (2026-09-04): the app header in place of the 09-01 title
           bar and its hamburger, which opened the old menu sheet. The app
           nav is the way around; the header names the screen. */}
-      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]">
         <PressBoxAppHeader title="Account" logoSrc="/favicon.svg" />
       </div>
       {isMobile && (

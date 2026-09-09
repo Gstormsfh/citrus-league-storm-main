@@ -47,7 +47,7 @@ export interface CreateLeaguePhoneProps {
 
 /** The foot bar sticks just above the app chrome; a spacer after it clears the chrome at the end. */
 const BAR = 'sticky z-sticky-base flex-none px-3.5 py-2.5 border-t border-white/[0.06] bg-pressbox-surface';
-const ABOVE_CHROME = { bottom: `calc(${BOTTOM_CHROME_H}px + env(safe-area-inset-bottom))` } as const;
+const ABOVE_CHROME = { bottom: `calc(${BOTTOM_CHROME_H}px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom)))` } as const;
 const PRIMARY =
   'focus-citrus w-full h-11 rounded-[10px] bg-pressbox-orange text-pressbox-orange-ink font-condensed font-bold text-[15px] uppercase tracking-[0.06em] disabled:opacity-40';
 const SECONDARY =
@@ -86,7 +86,7 @@ export function CreateLeaguePhone({
   return (
     <div
       className={cn(PB_TYPE, 'lg:hidden flex flex-col bg-pressbox-surface text-pressbox-text', className)}
-      style={{ minHeight: 'calc(100dvh - env(safe-area-inset-top))' }}
+      style={{ minHeight: 'calc(100dvh - var(--safe-area-inset-top,env(safe-area-inset-top)))' }}
       data-testid="create-league-phone"
     >
       <div className="px-3.5 pt-1">

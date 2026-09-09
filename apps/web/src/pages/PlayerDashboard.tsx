@@ -209,7 +209,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <DarkLayout>
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden pt-[env(safe-area-inset-top)]">
+      <div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]">
         <PressBoxAppHeader title="Player" logoSrc="/favicon.svg" onBack={goBack} backLabel="Back to players" />
       </div>
       <main className={cn(PB_TYPE, 'relative pt-20 max-lg:pt-3 pb-12 pb-app-chrome max-lg:font-barlow')}>{children}</main>
@@ -1102,7 +1102,7 @@ export default function PlayerDashboard() {
 
       {/* QA PASS 1 (2026-09-09): room under the last link so it clears the
           tab bar and the home indicator on the phone. */}
-      <div className="mx-auto mt-12 max-w-[1280px] px-4 sm:px-6 max-lg:pb-[calc(2.5rem+env(safe-area-inset-bottom))]">
+      <div className="mx-auto mt-12 max-w-[1280px] px-4 sm:px-6 max-lg:pb-[calc(2.5rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom)))]">
         <Link
           to="/players"
           className="font-jbmono max-lg:font-plex text-[10px] font-bold uppercase tracking-[0.22em] text-white/70 transition-colors hover:text-pastel-orange-soft hover:max-lg:text-pressbox-orange-soft"

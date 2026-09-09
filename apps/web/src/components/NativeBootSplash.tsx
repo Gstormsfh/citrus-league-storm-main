@@ -147,7 +147,7 @@ export function BootSplashView({ pct, tip, stageName, fading }: BootSplashViewPr
         </p>
       </div>
 
-      <div className="absolute bottom-[max(env(safe-area-inset-bottom),24px)] left-0 right-0 flex items-center justify-center gap-3">
+      <div className="absolute bottom-[max(var(--safe-area-inset-bottom,env(safe-area-inset-bottom)),24px)] left-0 right-0 flex items-center justify-center gap-3">
         <img
           src="/mascots/mascot-stormy.webp"
           alt=""

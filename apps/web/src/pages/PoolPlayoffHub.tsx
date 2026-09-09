@@ -421,13 +421,13 @@ export default function PoolPlayoffHub() {
   };
 
   if (loading) {
-    return <><div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div><div className="min-h-screen pt-24 flex items-center justify-center text-white/55">Loading pool...</div></>;
+    return <><div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div><div className="min-h-screen pt-24 flex items-center justify-center text-white/55">Loading pool...</div></>;
   }
 
   if (!league) {
     return (
       <>
-        <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div>
+        <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div>
         <div className="min-h-screen pt-24 flex items-center justify-center">
           <Card className="p-6 text-center">
             <p className="text-sm">Pool not found.</p>
@@ -440,7 +440,7 @@ export default function PoolPlayoffHub() {
 
   return (
     <>
-      <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div>
+      <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div>
       <div className="min-h-screen bg-[#0F1F15] max-lg:bg-pressbox-surface text-pastel-cream max-lg:text-pressbox-text pt-24 pb-12 px-4">
         <div className="max-w-7xl mx-auto">
           {/* Hero */}

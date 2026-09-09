@@ -213,7 +213,7 @@ export default function PoolPlayoffConfidence() {
   if (loading) {
     return (
       <div className="min-h-screen bg-pastel-surface max-lg:bg-pressbox-surface">
-        <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div>
+        <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div>
         <div className="flex items-center justify-center pt-32 text-white/55">Loading...</div>
       </div>
     );
@@ -221,7 +221,7 @@ export default function PoolPlayoffConfidence() {
 
   return (
     <>
-    <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div>
+    <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]"><PressBoxAppHeader title="Playoff pool" logoSrc="/favicon.svg" /></div>
     <div className="min-h-screen bg-[#0F1F15] max-lg:bg-pressbox-surface text-pastel-cream max-lg:text-pressbox-text py-6 px-4 pt-24">
       <div className="max-w-5xl mx-auto mb-3">
         <Link to={`/pool/playoff-hub?league=${leagueId}`} className="text-sm text-pastel-sage-soft hover:text-pastel-cream hover:max-lg:text-pressbox-text inline-flex items-center gap-1">

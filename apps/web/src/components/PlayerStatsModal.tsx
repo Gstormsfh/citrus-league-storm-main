@@ -25,7 +25,7 @@ import { NewsItemRow } from '@/components/news/NewsItemRow';
 import { buildAdvancedCardData, type CardEntry } from '@/components/player/playerAdvancedMetrics';
 import { usePlayerXgHistory } from '@/components/player/usePlayerXgHistory';
 import { projectionFraming } from '@/components/player/projectionFraming';
-import { getCurrentSeason, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
+import { getMetricsSeason, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
 import { PlayerAdvancedCard } from '@/components/player/PlayerAdvancedCard';
 import {
@@ -822,7 +822,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
              artboard draws it — no centred modal with the team colour cut
              off at the rounded corners. Same sheet mechanics the league
              settings dialog uses; the body flexes to fill. */
-          'max-sm:inset-0 max-sm:top-0 max-sm:left-0 max-sm:translate-x-0 max-sm:translate-y-0 max-sm:max-w-none max-sm:w-full max-sm:h-full max-sm:max-h-none max-sm:rounded-none max-sm:flex max-sm:flex-col max-sm:pt-[env(safe-area-inset-top)]',
+          'max-sm:inset-0 max-sm:top-0 max-sm:left-0 max-sm:translate-x-0 max-sm:translate-y-0 max-sm:max-w-none max-sm:w-full max-sm:h-full max-sm:max-h-none max-sm:rounded-none max-sm:flex max-sm:flex-col max-sm:pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]',
         )}
       >
 
@@ -944,7 +944,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
             underline, condensed caps — and it drives the same three panes.
             `max-h-[55vh] overflow-y-auto` stays for the modal; on the phone
             sheet the body takes what the hero and the footer leave. */}
-        <div className={cn(PB_TYPE, 'px-4 pt-1 pb-4 max-h-[55vh] overflow-y-auto max-sm:max-h-none max-sm:flex-1 max-sm:min-h-0 max-sm:pb-[calc(2rem+env(safe-area-inset-bottom))]')}>
+        <div className={cn(PB_TYPE, 'px-4 pt-1 pb-4 max-h-[55vh] overflow-y-auto max-sm:max-h-none max-sm:flex-1 max-sm:min-h-0 max-sm:pb-[calc(2rem+var(--safe-area-inset-bottom,env(safe-area-inset-bottom)))]')}>
           <Tabs value={cardTab} onValueChange={(v) => setCardTab(v as CardTab)}>
             <PressBoxTabs
               className="px-0 gap-4 mb-3 border-white/10"
@@ -1001,9 +1001,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                   data-testid="overview-season-label"
                   className="font-plex font-medium text-[10px] uppercase tracking-[0.1em] text-pressbox-text/45"
                 >
-                  {seasonLabel(getCurrentSeason())} season
+                  {seasonLabel(getMetricsSeason())} season
                 </span>
-                {openerLabel && getProjectionsSeason() !== getCurrentSeason() && (
+                {openerLabel && getProjectionsSeason() !== getMetricsSeason() && (
                   <span className="font-plex font-medium text-[10px] text-pressbox-text/45">
                     {seasonLabel(getProjectionsSeason())} starts {openerLabel}
                   </span>
@@ -1102,7 +1102,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                 data-testid="advanced-season-label"
                 className="block font-plex font-medium text-[10px] uppercase tracking-[0.1em] text-pressbox-text/45 -mb-1"
               >
-                {seasonLabel(getCurrentSeason())} season
+                {seasonLabel(getMetricsSeason())} season
               </span>
               {/* PWS-1 ADVANCED CARD (2026-09-02) — the highest-leverage
                   single integration of the player-dashboard design system,
@@ -1136,7 +1136,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
             {/* ─── Splits Tab: every season number the directory holds ─── */}
             <TabsContent value="splits" className="mt-0 space-y-4">
               <span className="block font-plex font-medium text-[10px] uppercase tracking-[0.1em] text-pressbox-text/45 -mb-1">
-                {seasonLabel(getCurrentSeason())} season
+                {seasonLabel(getMetricsSeason())} season
               </span>
               {isGoalie ? (
                 <>
@@ -1452,7 +1452,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
 
         {/* ═══ Footer Actions ═══ */}
         {action && (
-          <div className={cn(PB_TYPE, 'px-4 py-3 border-t border-white/[0.08] bg-pressbox-surface pb-[max(0.75rem,env(safe-area-inset-bottom))]')}>
+          <div className={cn(PB_TYPE, 'px-4 py-3 border-t border-white/[0.08] bg-pressbox-surface pb-[max(0.75rem,var(--safe-area-inset-bottom,env(safe-area-inset-bottom)))]')}>
             <button
               type="button"
               onClick={action.onClick}

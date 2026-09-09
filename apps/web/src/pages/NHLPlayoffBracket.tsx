@@ -144,7 +144,7 @@ export default function NHLPlayoffBracket() {
   if (loading) {
     return (
       <DarkLayout>
-        <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff bracket" logoSrc="/favicon.svg" /></div>
+        <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]"><PressBoxAppHeader title="Playoff bracket" logoSrc="/favicon.svg" /></div>
         <StormyLoading message="Loading the playoff bracket..." />
       </DarkLayout>
     );
@@ -154,7 +154,7 @@ export default function NHLPlayoffBracket() {
     <DarkLayout>
 
 
-      <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[env(safe-area-inset-top)]"><PressBoxAppHeader title="Playoff bracket" logoSrc="/favicon.svg" /></div>
+      <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]"><PressBoxAppHeader title="Playoff bracket" logoSrc="/favicon.svg" /></div>
       <main className="relative max-w-[1280px] mx-auto px-6 pt-24 pb-16 max-lg:pt-3 max-lg:px-3 pb-app-chrome">
         {/* Hero — Pineapple lifting the Cup scene banner */}
         <div className="relative mb-8 w-full aspect-[21/9] sm:aspect-[24/9] rounded-2xl max-lg:rounded-[12px] overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">

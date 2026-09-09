@@ -143,7 +143,7 @@ describe('fixed chrome heights', () => {
     // number in the stylesheet cannot drift from the number the chrome is
     // built to, or the Stormy bar covers the last row on every page again.
     const css = readFileSync(resolve(here, '..', 'index.css'), 'utf-8');
-    const rule = /\.pb-app-chrome\s*\{\s*padding-bottom:\s*calc\((\d+)px \+ env\(safe-area-inset-bottom\)\)/.exec(css);
+    const rule = /\.pb-app-chrome\s*\{\s*padding-bottom:\s*calc\((\d+)px \+ var\(--safe-area-inset-bottom,env\(safe-area-inset-bottom\)\)\)/.exec(css);
     expect(rule, '.pb-app-chrome rule in index.css').not.toBeNull();
     expect(Number(rule![1])).toBe(BOTTOM_CHROME_H);
     const pages = readdirSync(resolve(here, '..', 'pages')).filter((f) => f.endsWith('.tsx'));

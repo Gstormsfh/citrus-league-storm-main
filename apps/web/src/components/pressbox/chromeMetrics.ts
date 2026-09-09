@@ -32,7 +32,7 @@ export const BOTTOMNAV_H = 76;
 
 /**
  * What a scrolling league page must leave at the bottom so its final row
- * clears both bars. Safe area is added in CSS (`env(safe-area-inset-bottom)`)
+ * clears both bars. Safe area is added in CSS (`var(--safe-area-inset-bottom,env(safe-area-inset-bottom))`)
  * rather than here, because it is a runtime value and this file is static.
  */
 export const BOTTOM_CHROME_H = CHATBAR_H + BOTTOMNAV_H;

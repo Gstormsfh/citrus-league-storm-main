@@ -183,7 +183,7 @@ const Navbar = () => {
         ];
 
   return (
-    <header className="fixed top-0 left-0 right-0 w-full z-app-nav lg:block lg:pt-safe lg:bg-pastel-surface max-lg:py-2 max-lg:pt-[calc(0.5rem+env(safe-area-inset-top))] max-lg:bg-pastel-surface/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-white/10">
+    <header className="fixed top-0 left-0 right-0 w-full z-app-nav lg:block lg:pt-safe lg:bg-pastel-surface max-lg:py-2 max-lg:pt-[calc(0.5rem+var(--safe-area-inset-top,env(safe-area-inset-top)))] max-lg:bg-pastel-surface/95 max-lg:backdrop-blur-lg max-lg:border-b max-lg:border-white/10">
       {/* ===== ROW 1: Brand bar ===== */}
       <div className="hidden lg:block bg-pastel-surface border-b border-white/5">
         <div className="w-full px-6 h-12 flex items-center justify-between">
@@ -445,7 +445,7 @@ const Navbar = () => {
           live (computed height 4px, top:56px inside a 60px box).
           Portaling to <body> restores true viewport positioning.
           SAFE-AREA FIX (2026-09-09, TestFlight 16): the header is
-          56px + env(safe-area-inset-top) tall on phones, and this panel
+          56px + var(--safe-area-inset-top,env(safe-area-inset-top)) tall on phones, and this panel
           sits ABOVE it in z-order (nav-panel 70 vs app-nav 45). Anchoring
           at a bare 56px put the panel's top edge ~59px inside the header
           on notched iPhones and painted over the X button, so the menu
@@ -454,8 +454,8 @@ const Navbar = () => {
         // SWEEP FIX (2026-08-16): bg-pastel-surface/98 — /98 is not a
         // generated opacity step, so the class silently produced NO
         // background and the menu rendered transparent over page content.
-        <div className="lg:hidden fixed inset-0 top-[calc(56px+env(safe-area-inset-top))] z-nav-panel bg-pastel-surface backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10">
-          <div className="flex flex-col h-[calc(100dvh-56px-env(safe-area-inset-top)-env(safe-area-inset-bottom)-4.5rem)] px-4 py-3">
+        <div className="lg:hidden fixed inset-0 top-[calc(56px+var(--safe-area-inset-top,env(safe-area-inset-top)))] z-nav-panel bg-pastel-surface backdrop-blur-xl animate-in fade-in slide-in-from-top duration-200 shadow-2xl border-t border-white/10">
+          <div className="flex flex-col h-[calc(100dvh-56px-var(--safe-area-inset-top,env(safe-area-inset-top))-var(--safe-area-inset-bottom,env(safe-area-inset-bottom))-4.5rem)] px-4 py-3">
             {/* League context + switcher */}
             {user && !leagueLoading && userLeagues.length === 0 && (
               <div className="mb-3">
@@ -648,7 +648,7 @@ const Navbar = () => {
       )}
 
       <style>
-        {`:root { --header-height: calc(92px + env(safe-area-inset-top)); }`}
+        {`:root { --header-height: calc(92px + var(--safe-area-inset-top,env(safe-area-inset-top))); }`}
       </style>
     </header>
   );

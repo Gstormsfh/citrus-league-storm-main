@@ -390,7 +390,7 @@ const TradeAnalyzer = () => {
       <div className="min-h-screen bg-pressbox-surface text-pressbox-text flex flex-col">
         <div className="hidden lg:block"><Navbar /></div>
         <main
-          className="flex-1 flex items-center justify-center px-6 pt-[calc(2.5rem+env(safe-area-inset-top))] pb-app-chrome"
+          className="flex-1 flex items-center justify-center px-6 pt-[calc(2.5rem+var(--safe-area-inset-top,env(safe-area-inset-top)))] pb-app-chrome"
           data-testid="trade-analyzer-no-league"
         >
           <div className="w-full max-w-md text-center">

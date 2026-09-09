@@ -36,6 +36,36 @@
                 <data android:scheme="citrussports" />
             </intent-filter>
 
+            <!-- ANDROID APP LINKS (2026-09-09, Play Store prep). The Android
+                 leg of the iOS universal links in
+                 public/.well-known/apple-app-site-association: the same
+                 invite, league and draft paths open the app instead of the
+                 browser once /.well-known/assetlinks.json on
+                 citrusfantasysports.com carries this app's signing
+                 certificate fingerprint (Play App Signing key, copied from
+                 Play Console > Setup > App signing after the first upload).
+                 autoVerify makes Android check that file at install.
+                 /auth is exact (the invite redirect) so /auth/callback and
+                 /reset-password stay on the citrussports:// scheme and the
+                 browser, as on iOS. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="citrusfantasysports.com" />
+                <data android:host="www.citrusfantasysports.com" />
+                <data android:path="/auth" />
+                <data android:path="/create-league" />
+                <data android:path="/join" />
+                <data android:pathPrefix="/join/" />
+                <data android:path="/joined" />
+                <data android:pathPrefix="/league/" />
+                <data android:path="/draft-room" />
+                <data android:path="/draft" />
+                <data android:path="/draft-kit" />
+            </intent-filter>
+
         </activity>
 
         <provider

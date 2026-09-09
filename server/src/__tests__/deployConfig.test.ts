@@ -288,6 +288,23 @@ describe('the browser is allowed to open the socket the deploy points it at', ()
       expect(rewrite?.destination, `${rel}: the AASA rewrite must sit ahead of the SPA catch-all`).toBe('/.well-known/apple-app-site-association');
       const header = (hosting.headers ?? []).find((h) => h.source === '/.well-known/apple-app-site-association');
       expect(header?.headers?.find((h) => h.key === 'Content-Type')?.value, `${rel}: AASA must be served as JSON`).toBe('application/json');
+      // ANDROID APP LINKS (2026-09-09): the same treatment for assetlinks.json,
+      // or Play's install-time verification reads the SPA shell and every
+      // invite link opens the browser on Android.
+      const alRewrite = (hosting.rewrites ?? []).find((r) => r.source === '/.well-known/assetlinks.json');
+      expect(alRewrite?.destination, `${rel}: assetlinks.json rewrite must sit ahead of the SPA catch-all`).toBe('/.well-known/assetlinks.json');
+      const alHeader = (hosting.headers ?? []).find((h) => h.source === '/.well-known/assetlinks.json');
+      expect(alHeader?.headers?.find((h) => h.key === 'Content-Type')?.value, `${rel}: assetlinks.json must be served as JSON`).toBe('application/json');
+    });
+  });
+
+  describe('assetlinks.json names the Play package and a real fingerprint slot', () => {
+    it('is valid JSON for com.citrussports.app with handle_all_urls', () => {
+      const raw = read('apps/web/public/.well-known/assetlinks.json');
+      const links = JSON.parse(raw) as Array<{ relation: string[]; target: { package_name: string; sha256_cert_fingerprints: string[] } }>;
+      expect(links[0].relation).toContain('delegate_permission/common.handle_all_urls');
+      expect(links[0].target.package_name).toBe('com.citrussports.app');
+      expect(links[0].target.sha256_cert_fingerprints.length).toBeGreaterThan(0);
     });
   });
 

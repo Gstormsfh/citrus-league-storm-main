@@ -61,10 +61,10 @@ describe('one settings surface per viewport', () => {
 describe('the phone screen is the artboard', () => {
   it('is a full sheet under the status bar with the save bar over the home indicator', () => {
     expect(SHEET).toContain("shape === 'full'");
-    expect(SHEET).toContain('inset-0 pt-[env(safe-area-inset-top)]');
+    expect(SHEET).toContain('inset-0 pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]');
     expect(SHEET).toContain('z-sheet');
     expect(PHONE).toContain('shape="full"');
-    expect(PHONE).toContain('pb-[max(env(safe-area-inset-bottom),22px)]');
+    expect(PHONE).toContain('pb-[max(var(--safe-area-inset-bottom,env(safe-area-inset-bottom)),22px)]');
   });
 
   it('navigates by a chip row that keeps the active section on screen', () => {

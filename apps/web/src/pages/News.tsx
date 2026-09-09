@@ -194,7 +194,7 @@ const News = () => {
       {/* PRESS BOX (2026-09-04): the NEWS tab of the app nav. Below lg the
           app header and NewsPhone; the desktop page from lg, untouched. */}
       <div className="hidden lg:block"><Navbar /></div>
-      <div className="lg:hidden relative min-h-screen bg-pressbox-surface pt-[env(safe-area-inset-top)] pb-app-chrome">
+      <div className="lg:hidden relative min-h-screen bg-pressbox-surface pt-[var(--safe-area-inset-top,env(safe-area-inset-top))] pb-app-chrome">
         <PressBoxAppHeader
           title={roomOn ? 'News Room' : 'News'}
           logoSrc="/favicon.svg"

@@ -61,7 +61,7 @@ export function ChatBar({
         'flex items-center gap-2.5 px-4',
         className,
       )}
-      style={{ height: CHATBAR_H, bottom: `calc(${BOTTOMNAV_H}px + env(safe-area-inset-bottom))` }}
+      style={{ height: CHATBAR_H, bottom: `calc(${BOTTOMNAV_H}px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom)))` }}
     >
       <button
         type="button"

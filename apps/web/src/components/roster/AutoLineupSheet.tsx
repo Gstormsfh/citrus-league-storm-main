@@ -371,7 +371,7 @@ export function AutoLineupSheet({
         </div>
 
         {/* ── Apply / keep ──────────────────────────────────────────── */}
-        <div className="shrink-0 space-y-2 border-t border-white/10 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)]">
+        <div className="shrink-0 space-y-2 border-t border-white/10 px-4 pt-3 pb-[max(var(--safe-area-inset-bottom,env(safe-area-inset-bottom)),12px)]">
           {!ready && !failed ? (
             <button
               type="button"

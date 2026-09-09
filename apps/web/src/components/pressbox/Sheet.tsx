@@ -53,12 +53,12 @@ export function PressBoxSheet({ open, onOpenChange, title, shape = 'full', child
             'data-[state=open]:animate-in data-[state=closed]:animate-out duration-200',
             shape === 'full'
               ? cn(
-                  'inset-0 pt-[env(safe-area-inset-top)]',
+                  'inset-0 pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]',
                   'data-[state=open]:slide-in-from-right-full data-[state=closed]:slide-out-to-right-full',
                 )
               : cn(
                   'inset-x-0 bottom-0 max-h-[85vh] rounded-t-[16px] border-t border-white/[0.08]',
-                  'pb-[max(env(safe-area-inset-bottom),16px)]',
+                  'pb-[max(var(--safe-area-inset-bottom,env(safe-area-inset-bottom)),16px)]',
                   'data-[state=open]:slide-in-from-bottom-full data-[state=closed]:slide-out-to-bottom-full',
                 ),
             className,
