@@ -46,6 +46,13 @@ export interface LeagueSettingsPhoneProps {
   onDiscard: () => void;
   /** `SAVED` after a save, in sage; nothing otherwise. */
   status?: string | null;
+  /**
+   * A member who is not the commissioner. The same screen, stated rather
+   * than editable: no pickers, no toggles, no save bar, no commissioner
+   * action rows. Added 2026-09-09 — before it, non-commissioners had no way
+   * to read their own league's rules at all.
+   */
+  readOnly?: boolean;
 }
 
 export function LeagueSettingsPhone({
@@ -59,6 +66,7 @@ export function LeagueSettingsPhone({
   saving,
   onDiscard,
   status,
+  readOnly = false,
 }: LeagueSettingsPhoneProps) {
   const [picker, setPicker] = useState<SettingPickerState>(null);
   const section = sections.find((s) => s.key === activeKey) ?? sections[0];
@@ -72,11 +80,11 @@ export function LeagueSettingsPhone({
   const fields = section ? section.groups.flatMap((g) => g.fields) : [];
 
   return (
-    <PressBoxSheet open={open} onOpenChange={onOpenChange} title="League settings" shape="full">
+    <PressBoxSheet open={open} onOpenChange={onOpenChange} title={readOnly ? 'League rules' : 'League settings'} shape="full">
       <div data-testid="league-settings-phone" className="flex flex-col flex-1 min-h-0">
         <PressBoxSettingsHeader
-          title="League settings"
-          eyebrow={`COMMISSIONER · ${leagueName.toUpperCase()}`}
+          title={readOnly ? 'League rules' : 'League settings'}
+          eyebrow={`${readOnly ? 'LEAGUE RULES' : 'COMMISSIONER'} · ${leagueName.toUpperCase()}`}
           status={status}
           onBack={() => onOpenChange(false)}
         />
@@ -96,14 +104,14 @@ export function LeagueSettingsPhone({
           {section?.groups.map((g) =>
             g.fields.length === 0 ? null : (
               <PressBoxSettingGroup key={g.key} label={g.label}>
-                <SettingFieldRows fields={g.fields} onPick={setPicker} />
+                <SettingFieldRows fields={g.fields} onPick={setPicker} readOnly={readOnly} />
               </PressBoxSettingGroup>
             ),
           )}
           {section?.callout && <PressBoxCallout>{section.callout}</PressBoxCallout>}
         </div>
 
-        {section?.saveable && (
+        {!readOnly && section?.saveable && (
           <PressBoxSaveBar
             saveLabel={(section.saving ?? saving) ? 'SAVING…' : 'SAVE & NOTIFY LEAGUE'}
             saveDisabled={!!(section.saving ?? saving) || !!section.saveDisabled}
@@ -114,7 +122,7 @@ export function LeagueSettingsPhone({
         )}
       </div>
 
-      <SettingPicker picker={picker} fields={fields} onClose={() => setPicker(null)} />
+      {!readOnly && <SettingPicker picker={picker} fields={fields} onClose={() => setPicker(null)} />}
     </PressBoxSheet>
   );
 }

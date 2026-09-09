@@ -34,6 +34,7 @@ import { PressBoxPageLoading } from '@/components/pressbox/PageLoading';
 import { LeagueHQPhone, type LeagueHQMatchup } from '@/components/league/LeagueHQPhone';
 import { LeagueSettingsPhone } from '@/components/league/LeagueSettingsPhone';
 import { buildLeagueSettingsSections } from '@/components/league/leagueSettingsSections';
+import { SettingFieldRows } from '@/components/league/SettingFields';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useScoringRules } from '@/components/league/useScoringRules';
 import { matchupApi } from '@/api/matchups';
@@ -697,8 +698,12 @@ const LeagueDashboard = () => {
         // submitted claims were lost. Check and say what actually happened.
         let stillWaiting = 0;
         try {
-          const { data: pendingClaims } = await waiverApi.getLeagueWaivers(leagueId, 'pending');
-          stillWaiting = Array.isArray(pendingClaims) ? pendingClaims.length : 0;
+          // Count-only commissioner route. getLeagueWaivers() runs under the
+          // user client and, since the 2026-09-09 waiver-privacy RLS change,
+          // returns only the commissioner's OWN pending claims — which made
+          // this message undercount the league.
+          const { data } = await waiverApi.getPendingClaimCount(leagueId);
+          stillWaiting = Number((data as { pending?: number } | null)?.pending ?? 0);
         } catch { /* fall through to the generic message */ }
         if (stillWaiting > 0) {
           toast({
@@ -993,6 +998,35 @@ const LeagueDashboard = () => {
     );
   }
 
+  // READ-ONLY SETTINGS (2026-09-09): the fields are built once and drawn
+  // twice — the commissioner's editable screen and the members' read-only
+  // one. Same source, so a member can never be shown a rule the
+  // commissioner's screen does not have.
+  const settingsFieldSections = buildLeagueSettingsSections({
+    draftCompleted: league.draft_status === 'completed',
+    teamCount: teams.length,
+    isCategoryLeague,
+    waiver: waiverSettings,
+    setWaiver: setWaiverSettings,
+    draft: draftSettings,
+    setDraft: setDraftSettings,
+    trade: tradeSettings,
+    setTrade: setTradeSettings,
+    keeper: keeperSettings,
+    setKeeper: setKeeperSettings,
+    categories: categorySettings,
+    setCategories: setCategorySettings,
+    rosterSlots: rosterSlotSettings,
+    setRosterSlots: setRosterSlotSettings,
+    playoff: playoffSettings,
+    setPlayoff: setPlayoffSettings,
+    processWaivers: { onPress: handleProcessWaivers, busy: processingWaivers },
+    syncRosters: { onPress: handleSyncRosters, busy: syncingRosters },
+    rosters: teams.map((t) => ({ name: t.team_name, count: rosterCounts[t.id] ?? null })),
+    rostersLoading: loadingRosterCounts,
+    scoring: scoringRules,
+  });
+
   return (
     <div className="min-h-screen bg-[#0F1F15] text-pastel-cream flex flex-col">
       <div className="hidden lg:block"><Navbar /></div>
@@ -1081,30 +1115,7 @@ const LeagueDashboard = () => {
           open={settingsOpen && isMobile}
           onOpenChange={setSettingsOpen}
           leagueName={league.name}
-          sections={buildLeagueSettingsSections({
-            draftCompleted: league.draft_status === 'completed',
-            teamCount: teams.length,
-            isCategoryLeague,
-            waiver: waiverSettings,
-            setWaiver: setWaiverSettings,
-            draft: draftSettings,
-            setDraft: setDraftSettings,
-            trade: tradeSettings,
-            setTrade: setTradeSettings,
-            keeper: keeperSettings,
-            setKeeper: setKeeperSettings,
-            categories: categorySettings,
-            setCategories: setCategorySettings,
-            rosterSlots: rosterSlotSettings,
-            setRosterSlots: setRosterSlotSettings,
-            playoff: playoffSettings,
-            setPlayoff: setPlayoffSettings,
-            processWaivers: { onPress: handleProcessWaivers, busy: processingWaivers },
-            syncRosters: { onPress: handleSyncRosters, busy: syncingRosters },
-            rosters: teams.map((t) => ({ name: t.team_name, count: rosterCounts[t.id] ?? null })),
-            rostersLoading: loadingRosterCounts,
-            scoring: scoringRules,
-          })}
+          sections={settingsFieldSections}
           activeKey={activeSettingsTab}
           onSectionChange={setActiveSettingsTab}
           onSave={handleSaveSettings}
@@ -1116,6 +1127,25 @@ const LeagueDashboard = () => {
             loadLeagueData();
             setSettingsOpen(false);
           }}
+        />
+      )}
+      {/* MEMBERS READ THE RULES (2026-09-09): before this, `League Settings`
+          rendered only for the commissioner, so a member had no way to look
+          up their own league's waiver period, trade veto rule or keeper
+          count anywhere in the app. Same screen, same fields, stated rather
+          than editable. The server was already safe — every write is behind
+          commissionerMiddleware — so this is presentation only. */}
+      {!isCommissioner && (
+        <LeagueSettingsPhone
+          readOnly
+          open={settingsOpen && isMobile}
+          onOpenChange={setSettingsOpen}
+          leagueName={league.name}
+          sections={settingsFieldSections}
+          activeKey={activeSettingsTab}
+          onSectionChange={setActiveSettingsTab}
+          onSave={() => {}}
+          onDiscard={() => setSettingsOpen(false)}
         />
       )}
       <main className="hidden lg:block w-full lg:pt-24 lg:pb-8">
@@ -1171,6 +1201,59 @@ const LeagueDashboard = () => {
               <div className="flex flex-wrap gap-2 items-start shrink-0 max-w-full">
                 {league.join_code && (
                   <InvitePlayersButton joinCode={league.join_code} leagueName={league.name} />
+                )}
+                {/* Members get the same button; it opens the read-only
+                    dialog below (desktop) or the read-only sheet (phone). */}
+                {!isCommissioner && (
+                  <Dialog open={settingsOpen && !isMobile} onOpenChange={setSettingsOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold shrink-0 px-3 sm:px-4"
+                        onClick={() => setSettingsOpen(true)}
+                      >
+                        <Settings className="h-4 w-4 sm:mr-2" aria-hidden="true" />
+                        <span className="hidden sm:inline">League Rules</span>
+                        <span className="sr-only sm:hidden">League Rules</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto bg-[#1A2A20] border-0 ring-1 ring-white/15 text-pastel-cream">
+                      <DialogHeader className="text-left pr-8 max-w-full">
+                        <div className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-pastel-orange-soft font-bold mb-1">
+                          ✦ League rules
+                        </div>
+                        <DialogTitle className="flex items-center gap-2 font-calistoga text-pastel-cream">
+                          <Settings className="h-5 w-5 text-pastel-orange" aria-hidden="true" />
+                          {league.name}
+                        </DialogTitle>
+                        <DialogDescription className="text-white/55">
+                          How this league is set up. Only the commissioner can change these.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="flex flex-col gap-5 pt-1">
+                        {settingsFieldSections.map((sec) => {
+                          const groups = sec.groups.filter((g) =>
+                            g.fields.some((f) => f.kind !== 'action'),
+                          );
+                          if (groups.length === 0) return null;
+                          return (
+                            <div key={sec.key}>
+                              <div className="font-jbmono text-[10px] tracking-[0.28em] uppercase text-pastel-orange-soft font-bold mb-2">
+                                {sec.label}
+                              </div>
+                              <div className="flex flex-col gap-3">
+                                {groups.map((g) => (
+                                  <div key={g.key} className="rounded-xl ring-1 ring-white/10 overflow-hidden bg-black/15">
+                                    <SettingFieldRows fields={g.fields} onPick={() => {}} readOnly />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 )}
                 {isCommissioner && (
                   <Dialog open={settingsOpen && !isMobile} onOpenChange={setSettingsOpen}>

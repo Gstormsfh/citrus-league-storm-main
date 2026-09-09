@@ -48,6 +48,8 @@ export interface PressBoxLeagueCardProps {
   /** Present renders the expanded live scoreboard and the rail. */
   you?: PressBoxLeagueCardScore | null;
   them?: PressBoxLeagueCardScore | null;
+  /** Fired on tap, before navigation. The selector stamps the sticky window here. */
+  onOpen?: () => void;
   className?: string;
 }
 
@@ -96,6 +98,7 @@ export function PressBoxLeagueCard({
   statNoteTone = 'muted',
   you,
   them,
+  onOpen,
   className,
 }: PressBoxLeagueCardProps) {
   const live = !!(you && them);
@@ -105,6 +108,7 @@ export function PressBoxLeagueCard({
   return (
     <Link
       to={to}
+      onClick={onOpen}
       className={cn(
         PB_TYPE,
         'focus-citrus block relative overflow-hidden p-3 rounded-[14px] bg-pressbox-tile border border-white/[0.08]',

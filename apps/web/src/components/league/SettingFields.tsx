@@ -18,17 +18,79 @@ import { optionLabel, type SettingField } from './leagueSettingsSections';
 
 export type SettingPickerState = { kind: 'select' | 'number'; key: string } | null;
 
+/**
+ * READ-ONLY (2026-09-09): every league member can now open the settings; only
+ * the commissioner can change them. `readOnly` turns each interactive row
+ * into a statement of the rule — the value still shows on the right, the help
+ * line still explains it, but nothing opens a picker and no toggle moves.
+ *
+ * `action` rows are DROPPED rather than disabled: they are commissioner tools
+ * (recalculate waiver priority, and friends), not settings, and a greyed-out
+ * button a member can never press is worse than no button.
+ */
 export function SettingFieldRows({
   fields,
   onPick,
+  readOnly = false,
 }: {
   fields: SettingField[];
   onPick: (picker: SettingPickerState) => void;
+  readOnly?: boolean;
 }) {
   return (
     <>
       {fields.map((f, i) => {
         const last = i === fields.length - 1;
+        if (readOnly) {
+          switch (f.kind) {
+            case 'select':
+              return (
+                <PressBoxSettingRow
+                  key={f.key}
+                  label={f.label}
+                  help={f.help ?? f.options.find((o) => o.value === f.value)?.help ?? null}
+                  value={optionLabel(f.options, f.value)}
+                  last={last}
+                />
+              );
+            case 'number':
+              return (
+                <PressBoxSettingRow
+                  key={f.key}
+                  label={f.label}
+                  help={f.help}
+                  value={f.unit === '$' ? `$${f.value}` : f.unit ? `${f.value}${f.unit}` : String(f.value)}
+                  last={last}
+                />
+              );
+            case 'toggle':
+              // A statement, not a switch: a disabled toggle still reads as
+              // something you could flip if you had permission.
+              return (
+                <PressBoxSettingRow
+                  key={f.key}
+                  label={f.label}
+                  help={f.help}
+                  value={f.checked ? 'On' : 'Off'}
+                  last={last}
+                />
+              );
+            case 'action':
+              return null;
+            case 'info':
+              return <PressBoxSettingRow key={f.key} label={f.label} help={f.help} value={f.value} last={last} />;
+            case 'text':
+              return (
+                <PressBoxSettingRow
+                  key={f.key}
+                  label={f.label}
+                  help={f.help}
+                  value={f.value || '—'}
+                  last={last}
+                />
+              );
+          }
+        }
         switch (f.kind) {
           case 'select':
             return (
