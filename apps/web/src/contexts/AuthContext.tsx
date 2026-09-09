@@ -28,6 +28,21 @@ import { useNotificationStore } from '@/stores/notificationStore';
 import { useDraftClientStore } from '@/stores/draftClientStore';
 import { retainAppleCleanupToken } from '@/lib/appleAccountCleanup';
 import { clearAccountContent } from '@/lib/accountCleanup';
+import { clearAllApiCaches } from '@/api/cache';
+import { PlayerService } from '@/services/PlayerService';
+import { RosterCacheService } from '@/services/RosterCacheService';
+
+// ACCOUNT SWITCH (2026-09-09): queryClient.clear() only empties react-query.
+// The api/* modules keep their own TTL caches (leagues, rosters, players,
+// scores, schedule, season, public) and two services keep more on top. None
+// of them were touched on sign-out, and 'leagues:user' is not keyed by user,
+// so switching accounts on one device showed the previous person's leagues
+// until the app was killed. One sweep, called from both reset points below.
+function clearAllClientCaches(): void {
+  clearAllApiCaches();
+  PlayerService.clearCache();
+  RosterCacheService.clearCache();
+}
 
 /** Returns true if JWT is expired or within 30s of expiry. */
 function isTokenExpired(token: string | undefined): boolean {
@@ -138,6 +153,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         useDraftClientStore.getState().reset();
         clearAccountContent();
         queryClient.clear();
+        clearAllClientCaches();
       }
       activeAccountId = nextAccountId;
       setSession(session);
@@ -195,6 +211,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         useDraftClientStore.getState().reset();
         clearAccountContent();
         queryClient.clear();
+        clearAllClientCaches();
         setLoading(false);
       }
     });
