@@ -3,7 +3,7 @@
  *
  * Contains all standings calculation methods:
  * - calculateTeamStandings (H2H Points)
- * - calculateSeasonPointsStandings (Roto, Total Points, PPG)
+ * - calculateSeasonTotalsStandings (Total Points, PPG)
  * - calculateCategoryStandings (H2H Categories)
  * - calculateRotoStandingsFromDB (Rotisserie)
  *
@@ -96,13 +96,17 @@ export const StandingsService = {
   },
 
   /**
-   * Calculate standings for non-matchup formats (Roto, Total Points, PPG).
+   * Total Points / Points-Per-Game standings (2026-09-09): the sum of each
+   * team's scored weeks, read through the calculate_ppg_standings RPC. Every
+   * season-long league carries a solo matchup row per team per week (server
+   * MatchupService.generateMatchupsForLeague), scored by the same engine as
+   * a head-to-head week, so `total_points` here is league scoring applied to
+   * the lineups the team actually iced, from the draft forward. Nothing here
+   * reads season stats.
    */
-  async calculateSeasonPointsStandings(
+  async calculateSeasonTotalsStandings(
     leagueId: string,
-    teams: Team[],
-    draftPicks: Array<{ team_id: string; player_id: string }>,
-    allPlayers: Array<{ id: string; points: number }>
+    teams: Team[]
   ): Promise<Record<string, {
     pointsFor: number;
     pointsAgainst: number;
@@ -130,41 +134,17 @@ export const StandingsService = {
     });
 
     try {
-      const playerPointsMap = new Map<string, number>();
-      allPlayers.forEach(p => playerPointsMap.set(p.id, p.points || 0));
-
-      // Use roster API for current roster assignments
-      const { rosterApi } = await import('@/api/rosters');
-      const assignmentsResult = await rosterApi.getLeagueRosters(leagueId);
-      const assignments = (assignmentsResult.data ?? []) as Array<{ team_id: string; player_id: string }>;
-
-      const rosterData = assignments.length > 0
-        ? assignments.map(r => ({ team_id: r.team_id, player_id: String(r.player_id) }))
-        : draftPicks;
-
-      rosterData.forEach((pick: { team_id: string; player_id: string }) => {
-        if (result[pick.team_id]) {
-          const pts = playerPointsMap.get(pick.player_id) || 0;
-          result[pick.team_id].pointsFor += pts;
+      const { matchupApi } = await import('@/api/matchups');
+      const res = await matchupApi.getPPGStandings(leagueId);
+      const rows = ((res as { data?: unknown }).data ?? []) as Array<{ team_id: string; total_points: number | string; games_played: number }>;
+      rows.forEach(row => {
+        if (result[row.team_id]) {
+          result[row.team_id].pointsFor = Number(row.total_points) || 0;
+          result[row.team_id].gamesPlayed = Number(row.games_played) || 0;
         }
       });
-
-      // Estimate games played from past matchup weeks
-      const { matchupApi } = await import('@/api/matchups');
-      const matchupsResult = await matchupApi.getLeagueMatchups(leagueId);
-      const allMatchupData = (matchupsResult.data ?? []) as Array<{ week_number: number; week_end_date: string }>;
-      const pastMatchups = allMatchupData.filter(m => m.week_end_date < getTodayMST());
-
-      if (pastMatchups.length > 0) {
-        const maxWeek = Math.max(...pastMatchups.map(m => m.week_number));
-        teams.forEach(team => {
-          if (result[team.id]) {
-            result[team.id].gamesPlayed = maxWeek;
-          }
-        });
-      }
     } catch (error) {
-      logger.error('[StandingsService] Exception calculating season points standings:', error);
+      logger.error('[StandingsService] Exception reading season totals standings:', error);
     }
 
     return result;

@@ -98,10 +98,13 @@ async function main() {
   for (const route of PRERENDER_ROUTES) {
     const page = await context.newPage();
     try {
-      await page.goto(`${origin}${route}`, { waitUntil: 'networkidle', timeout: 45_000 });
-      // The page has rendered when the shell's #root has a heading in it.
-      await page.waitForSelector('#root h1', { timeout: 30_000 });
-      await page.waitForTimeout(250);
+      // 'load', not 'networkidle': a page that polls or keeps a socket open
+      // never goes idle and would time out for no reason. The page has
+      // rendered when the shell's #root has a heading in it (attached, not
+      // necessarily visible: some pages hide the desktop heading below lg).
+      await page.goto(`${origin}${route}`, { waitUntil: 'load', timeout: 45_000 });
+      await page.waitForSelector('#root h1', { state: 'attached', timeout: 30_000 });
+      await page.waitForTimeout(400);
       let html = await page.content();
       // Mark the document so main.tsx knows which route it carries.
       html = html.replace('<html', `<html data-prerendered="${route}"`);

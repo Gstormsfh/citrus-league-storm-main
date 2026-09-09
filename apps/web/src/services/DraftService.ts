@@ -267,9 +267,16 @@ export const DraftService = {
             const { league } = await LS.getLeague(leagueId);
             if (league) {
               const fmt = getLeagueFormat(league);
-              const needsMatchups = FORMAT_HAS_MATCHUPS[fmt.scoringFormat] ?? true;
+              // SEASON-LONG FORMATS (2026-09-09): every league gets a
+              // schedule. Total Points, PPG and Roto used to be skipped here
+              // ("no matchups"), which meant the scoring engine never scored
+              // them and Standings fell back to raw NHL points. The server
+              // now writes those leagues a solo row per team per week (see
+              // server MatchupService.generateMatchupsForLeague); the only
+              // thing that differs here is that they have no playoff split.
+              const hasOpponents = FORMAT_HAS_MATCHUPS[fmt.scoringFormat] ?? true;
 
-              if (needsMatchups) {
+              {
                 const completionDate = new Date(draftCompletedAt);
                 const firstWeekStart = getFirstWeekStartDate(completionDate);
                 const { teams } = await LS.getLeagueTeams(leagueId);
@@ -281,7 +288,9 @@ export const DraftService = {
                 const cfgRegularWeeks = Number((fmt as any).regularSeasonWeeks ?? 0) || 0;
 
                 let regularSeasonWeeks: number | undefined;
-                if (cfgRegularWeeks > 0) {
+                if (!hasOpponents) {
+                  regularSeasonWeeks = undefined; // the whole season counts
+                } else if (cfgRegularWeeks > 0) {
                   regularSeasonWeeks = cfgRegularWeeks;
                 } else if (playoffTeams >= 4 && playoffWeeks > 0 && totalWeeks > playoffWeeks) {
                   regularSeasonWeeks = totalWeeks - playoffWeeks;

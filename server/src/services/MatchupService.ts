@@ -313,6 +313,9 @@ export function projectLeagueWeek(input: ScoreboardProjectionInput): Map<string,
  * Complex roster building and score calculation stays here;
  * pure transform functions stay in the web app.
  */
+/** Scoring formats with no opponent: one solo matchup row per team per week. */
+export const SOLO_SCHEDULE_FORMATS = new Set(['total-points', 'points-per-game', 'roto']);
+
 export class MatchupService {
   private supabase: SupabaseClient;
 
@@ -591,27 +594,51 @@ export class MatchupService {
       await this.supabase.from('matchups').delete().eq('league_id', leagueId);
     }
 
+    // SEASON-LONG FORMATS (2026-09-09). Total Points, Points-Per-Game and
+    // Roto never had a schedule: FORMAT_HAS_MATCHUPS said "no matchups", the
+    // draft-completion hook skipped generation, and because the scoring
+    // engine only scores matchup rows those teams were never scored at all.
+    // The Standings page then fell back to summing each rostered player's
+    // raw NHL points from the season stats table: not league scoring, not
+    // from the draft forward, and last season's numbers in September.
+    //
+    // The engine already understands a one-sided week: update_all_matchup_
+    // scores, auto_complete_matchups, ensureMatchupRosters and the daily
+    // snapshot all treat team2_id IS NULL as a bye. So a season-long league
+    // gets a SOLO schedule, one row per team per week with no opponent, and
+    // its weeks are scored by the same code path as everyone else's. The
+    // calculate_ppg_standings / calculate_roto_standings RPCs then read real
+    // numbers. The format is read here, from the league, so every caller
+    // (draft completion, the Matchup page's self-heal, the commissioner
+    // button) gets the right shape without knowing about it.
+    const mode = await this.scheduleModeForLeague(leagueId);
+
     const numTeams = teams.length;
     const numRounds = numTeams % 2 === 0 ? numTeams - 1 : numTeams;
     const matchups: Array<{
       league_id: string;
       week_number: number;
       team1_id: string;
-      team2_id: string;
+      team2_id: string | null;
       week_start_date: string;
       week_end_date: string;
       status: string;
     }> = [];
 
     for (const week of fantasyWeeks) {
-      const pairings = this.getRoundRobinPairings(week.week_number, teams, numRounds);
+      const pairings = mode === 'solo'
+        ? teams.map((team) => ({ team1: team, team2: null }))
+        : this.getRoundRobinPairings(week.week_number, teams, numRounds);
       for (const pair of pairings) {
-        if (!pair.team2) continue; // Skip bye weeks
+        // A bye is a row too (team2_id null): the team's week still gets a
+        // lineup snapshot and a score, so its points reach the season total.
+        // Skipping it (the previous behaviour) dropped one week per team per
+        // rotation from every odd-sized league's standings.
         matchups.push({
           league_id: leagueId,
           week_number: week.week_number,
           team1_id: pair.team1.id,
-          team2_id: pair.team2.id,
+          team2_id: pair.team2 ? pair.team2.id : null,
           week_start_date: week.start_date,
           week_end_date: week.end_date,
           status: 'scheduled',
@@ -644,6 +671,21 @@ export class MatchupService {
 
     const { error } = await this.supabase.from('matchups').insert(newMatchups);
     return { error };
+  }
+
+  /**
+   * 'solo' for the season-long formats (every team plays its own week, no
+   * opponent), 'h2h' for everything else. Unknown or unreadable settings
+   * fall back to 'h2h', which is what every league had before.
+   */
+  async scheduleModeForLeague(leagueId: string): Promise<'h2h' | 'solo'> {
+    const { data } = await this.supabase
+      .from('leagues')
+      .select('settings')
+      .eq('id', leagueId)
+      .maybeSingle();
+    const format = (data as { settings?: { scoringFormat?: string } } | null)?.settings?.scoringFormat;
+    return SOLO_SCHEDULE_FORMATS.has(format ?? '') ? 'solo' : 'h2h';
   }
 
   /** Circle Method round-robin scheduling */
