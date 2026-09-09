@@ -10,6 +10,7 @@ import { createUserClient } from '../lib/supabase';
 import { WaiverService } from '../services/WaiverService';
 import { SeasonStateService } from '../services/SeasonStateService';
 import { AuditService } from '../services/AuditService';
+import { getNotificationDispatch } from '../services/NotificationDispatch';
 import { AppError, getErrorMessage } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
 import { logger } from '@citrus/shared';
@@ -205,6 +206,16 @@ waiverRoutes.post('/league/:leagueId/add-free-agent', membershipMiddleware, vali
   const audit = new AuditService(supabase);
   audit.logRosterMove(leagueId, { addPlayerId: String(body.playerId), dropPlayerId: body.dropPlayerId ? String(body.dropPlayerId) : undefined, teamId: String(body.teamId) });
 
+  // The manager who tapped Add already knows; the league does not.
+  void getNotificationDispatch(getSupabaseAdmin()).rosterMove({
+    leagueId,
+    teamId: String(body.teamId),
+    eventId: `fa:${leagueId}:${body.teamId}:${body.playerId}:${Date.now()}`,
+    addedPlayerId: Number(body.playerId),
+    droppedPlayerId: body.dropPlayerId ? Number(body.dropPlayerId) : null,
+    actorUserId: userId,
+  });
+
   return ok(c, { success: true });
 });
 
@@ -257,6 +268,14 @@ waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, validat
   const audit = new AuditService(supabase);
   audit.logRosterMove(leagueId, { dropPlayerId: String(body.playerId), teamId: String(body.teamId) });
 
+  void getNotificationDispatch(getSupabaseAdmin()).rosterMove({
+    leagueId,
+    teamId: String(body.teamId),
+    eventId: `drop:${leagueId}:${body.teamId}:${body.playerId}:${Date.now()}`,
+    droppedPlayerId: Number(body.playerId),
+    actorUserId: userId,
+  });
+
   return ok(c, { success: true });
 });
 
@@ -279,6 +298,11 @@ waiverRoutes.post('/league/:leagueId/drop-player', membershipMiddleware, validat
 waiverRoutes.post('/league/:leagueId/process-all', commissionerMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
   const admin = getSupabaseAdmin();
+  // Taken BEFORE the processor runs so the announcement below cannot miss a
+  // claim that settled while the RPC was still going. A generous margin is
+  // safe: every notification is keyed on the claim id, so an overlap with a
+  // previous run re-reads rows it has already announced and sends nothing.
+  const runStartedAt = new Date(Date.now() - 60_000);
 
   const { data: league, error: leagueErr } = await admin
     .from('leagues')
@@ -328,6 +352,12 @@ waiverRoutes.post('/league/:leagueId/process-all', commissionerMiddleware, async
   }
 
   logger.info('[waivers.process-all] complete:', responseBody);
+
+  // Tell each claiming manager whether they won, and the league about the
+  // players that moved. Driven by the claim rows, not the RPC's return value
+  // — see NotificationDispatch.waiverRunCompleted.
+  void getNotificationDispatch(admin).waiverRunCompleted({ leagueId, since: runStartedAt });
+
   return ok(c, responseBody);
 });
 

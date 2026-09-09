@@ -4,16 +4,59 @@ import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
 import { z } from 'zod';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
-import { createUserClient } from '../lib/supabase';
+import { createUserClient, getSupabaseAdmin } from '../lib/supabase';
 import { TradeService } from '../services/TradeService';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { SeasonStateService } from '../services/SeasonStateService';
 import { AuditService } from '../services/AuditService';
+import { getNotificationDispatch } from '../services/NotificationDispatch';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
 import { logger } from '@citrus/shared';
 
 const tradeRoutes = new Hono<Env>();
+
+/**
+ * Push the outcome of a trade to the two managers involved, and — for an
+ * accepted trade only — to the rest of the league.
+ *
+ * The accept/reject/cancel routes hold a tradeId and nothing else, so the
+ * offer row is re-read here for its league and its two teams. That is one
+ * admin read on a path that just wrote several, and it keeps the routes from
+ * having to thread team ids they never needed before.
+ *
+ * NOT awaited by callers: a manager tapping Accept should see their roster
+ * update at the speed of the write, not the speed of APNs. Failures are
+ * logged inside NotificationDispatch and can never reach the response.
+ */
+async function notifyTradeResolved(
+  tradeId: string,
+  outcome: 'accepted' | 'rejected' | 'cancelled' | 'vetoed' | 'countered',
+  actorUserId: string | null,
+): Promise<void> {
+  try {
+    const admin = getSupabaseAdmin();
+    const { data } = await admin
+      .from('trade_offers')
+      .select('id, league_id, from_team_id, to_team_id')
+      .eq('id', tradeId)
+      .maybeSingle();
+    const offer = data as
+      | { id: string; league_id: string; from_team_id: string; to_team_id: string }
+      | null;
+    if (!offer) return;
+    await getNotificationDispatch(admin).tradeResolved({
+      leagueId: offer.league_id,
+      tradeId: offer.id,
+      fromTeamId: offer.from_team_id,
+      toTeamId: offer.to_team_id,
+      outcome,
+      actorUserId,
+    });
+  } catch (err) {
+    logger.warn('[trades] notify failed', { tradeId, outcome, error: (err as Error).message });
+  }
+}
 
 tradeRoutes.use('*', authMiddleware);
 
@@ -116,6 +159,15 @@ tradeRoutes.post('/league/:leagueId', membershipMiddleware, validateBody(schemas
   const audit = new AuditService(supabase);
   audit.log('TRADE_OFFER', leagueId, { tradeId, fromTeamId: body.fromTeamId, toTeamId: body.toTeamId });
 
+  if (tradeId) {
+    void getNotificationDispatch(getSupabaseAdmin()).tradeOffered({
+      leagueId,
+      tradeId: String(tradeId),
+      fromTeamId: String(body.fromTeamId),
+      toTeamId: String(body.toTeamId),
+    });
+  }
+
   return created(c, { tradeId });
 });
 
@@ -145,6 +197,8 @@ tradeRoutes.put('/:tradeId/accept', async (c) => {
   const audit = new AuditService(supabase);
   audit.log('TRADE_ACCEPT', null, { tradeId });
 
+  void notifyTradeResolved(tradeId, 'accepted', userId);
+
   return ok(c, { success: true });
 });
 
@@ -166,6 +220,8 @@ tradeRoutes.put('/:tradeId/reject', async (c) => {
   const audit = new AuditService(supabase);
   audit.log('TRADE_REJECT', null, { tradeId });
 
+  void notifyTradeResolved(tradeId, 'rejected', userId);
+
   return ok(c, { success: true });
 });
 
@@ -183,6 +239,8 @@ tradeRoutes.put('/:tradeId/cancel', async (c) => {
   if (!success) {
     return fail(c, AppError.badRequest(typeof error === 'string' ? error : 'Failed to cancel trade'));
   }
+
+  void notifyTradeResolved(tradeId, 'cancelled', userId);
 
   return ok(c, { success: true });
 });
@@ -315,6 +373,14 @@ tradeRoutes.put('/:tradeId/commissioner-decision', validateBody(schemas.commissi
 
     const audit = new AuditService(supabase);
     audit.log('ADMIN_ACTION', body.leagueId, { action: 'commissioner_trade_decision', tradeId, decision: body.decision });
+
+    // Both managers hear the outcome; on an approval the league hears it too.
+    // The commissioner is the actor, so they are not told what they just did.
+    void notifyTradeResolved(
+      tradeId,
+      body.decision === 'approve' ? 'accepted' : 'vetoed',
+      userId,
+    );
 
     return ok(c, { success: true });
   } catch (err) {

@@ -3,10 +3,12 @@ import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
-import { createUserClient } from '../lib/supabase';
+import { createUserClient, getSupabaseAdmin } from '../lib/supabase';
 import { NotificationService } from '../services/NotificationService';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { AuditService } from '../services/AuditService';
+import { getNotificationDispatch } from '../services/NotificationDispatch';
+import { createHash } from 'node:crypto';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
 
@@ -140,6 +142,25 @@ notificationRoutes.post('/chat', validateBody(schemas.notificationChat), async (
   if (data && !data.success) {
     return fail(c, AppError.badRequest(data.error || 'Failed to send message'));
   }
+
+  // PUSH (2026-09-09). `send_league_chat_message` returns a row count, not an
+  // id, so the dedupe key is derived from what identifies the message anyway:
+  // league, sender, text, and the minute. A retried request inside the same
+  // minute therefore pushes once — which is the failure worth guarding, since
+  // the alternative is a manager's phone buzzing twice for one message.
+  // Deliberately not awaited: chat should send at the speed of the insert.
+  const messageId = createHash('sha256')
+    .update(`${body.leagueId}|${userId}|${body.message.trim()}|${Math.floor(Date.now() / 60_000)}`)
+    .digest('hex')
+    .slice(0, 32);
+
+  void getNotificationDispatch(getSupabaseAdmin()).chatMessage({
+    leagueId: body.leagueId,
+    messageId,
+    senderUserId: userId,
+    senderName: body.senderName || null,
+    message: body.message.trim(),
+  });
 
   return ok(c, { success: true });
 });
