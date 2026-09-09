@@ -133,23 +133,31 @@ days; new apps can take a little longer on the first submission.
 Done in code (2026-09-09): `google-services.json` is in the project, so
 `PushNotifications.register()` no longer kills the process, the token row
 records `platform: 'android'`, and `PushService` sends to Android through FCM
-HTTP v1 while iOS keeps going through APNs. The two transports are configured
-independently, so a missing FCM credential leaves Android push dormant and
-touches nothing on iOS.
+HTTP v1 while iOS keeps going through APNs. The transports are configured
+independently, so a missing FCM setup leaves Android dormant and touches
+nothing on iOS.
 
-What remains is two GitHub secrets. Firebase console > citrus-fantasy-prod >
-Project settings > **Service accounts** > **Generate new private key**. That
-downloads a JSON file; open it and copy two fields:
+There is no secret to add. The documented FCM setup is a downloaded
+service-account JSON, and the organization forbids creating one
+(`constraints/iam.disableServiceAccountKeyCreation`). That policy is right, so
+the server asks Cloud Run's metadata server for a token for the service account
+the revision already runs as: nothing stored, nothing to rotate, nothing to
+leak. `FCM_PROJECT_ID` is already a literal in the deploy workflow.
 
-- `client_email` into the repo secret `FCM_CLIENT_EMAIL`
-- `private_key` (the whole `-----BEGIN PRIVATE KEY-----...` string, newlines
-  and all) into `FCM_PRIVATE_KEY`
+The one setup step is an IAM grant, in the Google Cloud console (not Firebase):
 
-Repo secrets live at github.com/Gstormsfh/citrus-league-storm-main >
-Settings > Secrets and variables > Actions > New repository secret. The next
-production deploy passes them to Cloud Run; `FCM_PROJECT_ID` is already a
-literal in the workflow. Treat that JSON like the APNs `.p8`: it is a server
-credential, not app config, and it never belongs in the repo.
+1. console.cloud.google.com, project **citrus-fantasy-prod**.
+2. **IAM and Admin** > **IAM**.
+3. Find the principal the Cloud Run service runs as. With no service account
+   set on the service it is the default compute one,
+   `<project-number>-compute@developer.gserviceaccount.com`. The project number
+   is on the Cloud console home page, or in Cloud Run > citrus-api > the
+   Security tab, which names the service account outright.
+4. Click the pencil on that row > **Add another role** > search for and select
+   **Firebase Cloud Messaging API Admin** > **Save**.
+
+Without the grant, sends return 403 and are logged; nothing else breaks. With
+it, Android devices receive on-the-clock pushes on the next deploy.
 
 ## Known gaps to close before Production
 

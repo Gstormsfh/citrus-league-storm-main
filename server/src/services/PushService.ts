@@ -40,19 +40,34 @@ import { connect as http2Connect, constants as H2, type ClientHttp2Session } fro
  *   APNS_BUNDLE_ID    defaults to com.citrussports.app
  *   APNS_PRODUCTION   'true' -> api.push.apple.com, else sandbox host
  *
- * FCM ENV (all three, or Android push stays dormant). These are three fields
- * of a Firebase service-account JSON: Firebase console > Project settings >
- * Service accounts > Generate new private key.
- *   FCM_PROJECT_ID    e.g. citrus-fantasy-prod
- *   FCM_CLIENT_EMAIL  ...@....iam.gserviceaccount.com
- *   FCM_PRIVATE_KEY   the service account's PEM (\n-escaped is fine)
+ * FCM ENV:
+ *   FCM_PROJECT_ID    required, e.g. citrus-fantasy-prod
+ *   FCM_CLIENT_EMAIL  optional, ...@....iam.gserviceaccount.com
+ *   FCM_PRIVATE_KEY   optional, that account's PEM (\n-escaped is fine)
  *
- * STILL ZERO DEPENDENCIES. FCM's HTTP v1 API wants a Google OAuth access token,
- * which the firebase-admin SDK exists to fetch. That is an RS256 JWT and one
- * form POST: `node:crypto` signs it and the global `fetch` sends it, in about
- * thirty lines, against a lockfile the server workspace deliberately does not
- * have. The legacy FCM server key would have been one header and no JWT, and it
- * was turned off in 2024.
+ * NO KEY FILE IN PRODUCTION (2026-09-09). FCM's HTTP v1 API wants a Google
+ * OAuth access token, and the documented way to get one is a downloaded
+ * service-account JSON. Citrus cannot download one: the organization enforces
+ * `constraints/iam.disableServiceAccountKeyCreation`, and that policy is
+ * RIGHT — a downloaded key is a permanent credential with no expiry that leaks
+ * through a laptop backup or a CI log and cannot be noticed missing.
+ *
+ * So this uses the identity the code already runs as. Every Cloud Run instance
+ * has a metadata server that mints an access token for its own service
+ * account, scoped and short-lived, with nothing to store, rotate, or leak. The
+ * only setup is an IAM role grant on the runtime service account. Cloud Run
+ * sets K_SERVICE, so the presence of that variable is the (documented,
+ * synchronous) signal that this road is available.
+ *
+ * The explicit-key path is kept because it is the only way to exercise Android
+ * push OFF Cloud Run — a local run, or a future non-GCP host. If the two
+ * optional variables are set they win; otherwise the runtime identity is used.
+ *
+ * STILL ZERO DEPENDENCIES either way. The JWT path is an RS256 signature and a
+ * form POST; the metadata path is one GET. `firebase-admin` is a large
+ * dependency tree for those thirty lines, against a lockfile the server
+ * workspace deliberately does not have. (The legacy FCM server key would have
+ * been one header and no token at all, and Google turned it off in 2024.)
  */
 
 const PROD_HOST = 'api.push.apple.com';
@@ -68,6 +83,9 @@ const DEFAULT_EXPIRY_SECONDS = 120;
 const REQUEST_TIMEOUT_MS = 5_000;
 
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+/** Cloud Run's metadata server. Reachable only from inside an instance. */
+const METADATA_TOKEN_URL =
+  'http://metadata.google.internal/computeMetadata/v1/instance/service-account/token';
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 /** Google's access tokens live an hour; refresh at 50m, same margin as APNs. */
 const FCM_TOKEN_TTL_MS = 50 * 60 * 1000;
@@ -98,8 +116,13 @@ export interface ApnsConfig {
 
 export interface FcmConfig {
   projectId: string;
-  clientEmail: string;
-  privateKeyPem: string;
+  /**
+   * An explicit service-account key, or null to use the identity the process
+   * already runs as (Cloud Run's metadata server). Null is the production
+   * shape; see the header note on why no key file exists.
+   */
+  clientEmail: string | null;
+  privateKeyPem: string | null;
 }
 
 export interface OnTheClockInput {
@@ -140,15 +163,25 @@ export function loadApnsConfigFromEnv(): ApnsConfig | null {
 
 export function loadFcmConfigFromEnv(): FcmConfig | null {
   const projectId = process.env.FCM_PROJECT_ID;
-  const clientEmail = process.env.FCM_CLIENT_EMAIL;
-  const raw = process.env.FCM_PRIVATE_KEY;
-  if (!projectId || !clientEmail || !raw) {
+  if (!projectId) {
     return null;
   }
-  // Same flattening as APNS_PRIVATE_KEY: a service-account PEM pasted into a
-  // secret manager comes back with literal backslash-n.
-  const privateKeyPem = raw.includes('\\n') ? raw.replace(/\\n/g, '\n') : raw;
-  return { projectId, clientEmail, privateKeyPem };
+  const clientEmail = process.env.FCM_CLIENT_EMAIL;
+  const raw = process.env.FCM_PRIVATE_KEY;
+  if (clientEmail && raw) {
+    // Same flattening as APNS_PRIVATE_KEY: a PEM pasted into a secret manager
+    // comes back with literal backslash-n.
+    const privateKeyPem = raw.includes('\\n') ? raw.replace(/\\n/g, '\n') : raw;
+    return { projectId, clientEmail, privateKeyPem };
+  }
+  // No key: use the runtime's own identity, which exists only on Cloud Run.
+  // K_SERVICE is set by Cloud Run on every instance. Without it there is no
+  // metadata server to ask, and claiming to be configured would turn a clean
+  // dormant state into a DNS failure on every pick.
+  if (process.env.K_SERVICE) {
+    return { projectId, clientEmail: null, privateKeyPem: null };
+  }
+  return null;
 }
 
 export class PushService {
@@ -181,7 +214,7 @@ export class PushService {
       }
     }
     this.fcmConfig = fcmConfig;
-    if (fcmConfig) {
+    if (fcmConfig?.privateKeyPem) {
       try {
         this.fcmSigningKey = createPrivateKey(fcmConfig.privateKeyPem);
       } catch (err) {
@@ -205,7 +238,10 @@ export class PushService {
   }
 
   isFcmConfigured(): boolean {
-    return this.fcmConfig !== null && this.fcmSigningKey !== null;
+    if (this.fcmConfig === null) return false;
+    // Either an explicit key was parsed, or there is no key to parse because
+    // the runtime identity is being used.
+    return this.fcmSigningKey !== null || this.fcmConfig.clientEmail === null;
   }
 
   /**
@@ -583,8 +619,8 @@ export class PushService {
   }
 
   /**
-   * A Google OAuth access token for FCM, minted from the service account with
-   * an RS256 assertion and cached for 50 minutes.
+   * A Google OAuth access token for FCM, cached for 50 minutes because Google
+   * rate-limits minting and a 12-round draft would otherwise ask 200 times.
    *
    * This is the whole of what firebase-admin would have been added for.
    */
@@ -593,9 +629,48 @@ export class PushService {
     if (this.cachedFcmToken && now - this.cachedFcmToken.mintedAt < FCM_TOKEN_TTL_MS) {
       return this.cachedFcmToken.token;
     }
+    const token = this.fcmSigningKey
+      ? await this.mintFcmTokenFromKey(now)
+      : await this.mintFcmTokenFromMetadata();
+    this.cachedFcmToken = { token, mintedAt: now };
+    return token;
+  }
+
+  /**
+   * The production path: ask Cloud Run's metadata server for a token for the
+   * service account this instance already runs as. No credential is stored
+   * anywhere, which is the point.
+   *
+   * The runtime service account needs a role carrying
+   * `cloudmessaging.messages.create` (Firebase Cloud Messaging API Admin). A
+   * missing grant surfaces as a 403 from the send, not from here.
+   */
+  private async mintFcmTokenFromMetadata(): Promise<string> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const res = await fetch(METADATA_TOKEN_URL, {
+        headers: { 'Metadata-Flavor': 'Google' },
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        throw new Error(`metadata token ${res.status}: ${await res.text()}`);
+      }
+      const body = (await res.json()) as { access_token?: string };
+      if (!body.access_token) {
+        throw new Error('metadata server returned no access_token');
+      }
+      return body.access_token;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /** The off-Cloud-Run path: an RS256 assertion exchanged for a token. */
+  private async mintFcmTokenFromKey(now: number): Promise<string> {
     const config = this.fcmConfig;
     const key = this.fcmSigningKey;
-    if (!config || !key) {
+    if (!config?.clientEmail || !key) {
       throw new Error('fcm not configured');
     }
 
@@ -628,7 +703,6 @@ export class PushService {
     if (!body.access_token) {
       throw new Error('google token exchange returned no access_token');
     }
-    this.cachedFcmToken = { token: body.access_token, mintedAt: now };
     return body.access_token;
   }
 

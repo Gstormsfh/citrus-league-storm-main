@@ -149,9 +149,15 @@ describe('the deploy declares where the draft engine lives', () => {
     for (const name of ['APNS_KEY_ID', 'APNS_TEAM_ID', 'APNS_PRIVATE_KEY']) {
       expect(assigned(name), `${name} is not in the env_vars block`).toBeTruthy();
     }
-    for (const name of ['FCM_PROJECT_ID', 'FCM_CLIENT_EMAIL', 'FCM_PRIVATE_KEY']) {
-      expect(assigned(name), `${name} is not in the env_vars block; Android push stays dormant`).toBeTruthy();
-    }
+    expect(
+      assigned('FCM_PROJECT_ID'),
+      'FCM_PROJECT_ID is not in the env_vars block; Android push stays dormant',
+    ).toBeTruthy();
+    // No key secrets by design: the org forbids creating one, so the runtime
+    // service account's own identity is used. If these ever appear here it
+    // means someone reintroduced a downloadable credential.
+    expect(assigned('FCM_CLIENT_EMAIL'), 'a service-account key crept back into the deploy').toBeFalsy();
+    expect(assigned('FCM_PRIVATE_KEY'), 'a service-account key crept back into the deploy').toBeFalsy();
 
     const projectId = (assigned('FCM_PROJECT_ID') as string).split('=').slice(1).join('=').trim();
     expect(projectId.includes('${{'), 'FCM_PROJECT_ID must be a literal, not an expression').toBe(false);

@@ -468,12 +468,48 @@ describe('loadFcmConfigFromEnv', () => {
     delete process.env.FCM_PROJECT_ID;
     delete process.env.FCM_CLIENT_EMAIL;
     delete process.env.FCM_PRIVATE_KEY;
+    delete process.env.K_SERVICE;
   });
 
-  it('returns null when any required variable is missing', () => {
+  it('returns null without a project id, whatever else is set', () => {
     expect(loadFcmConfigFromEnv()).toBeNull();
-    process.env.FCM_PROJECT_ID = 'p';
-    process.env.FCM_CLIENT_EMAIL = 'e';
+    process.env.K_SERVICE = 'citrus-api';
+    expect(loadFcmConfigFromEnv()).toBeNull();
+  });
+
+  /**
+   * The org forbids service-account key creation
+   * (constraints/iam.disableServiceAccountKeyCreation), so production has no
+   * key to give. On Cloud Run the project id alone is enough: the instance
+   * mints its own token. OFF Cloud Run there is no metadata server, and
+   * claiming to be configured would turn a clean dormant state into a DNS
+   * failure on every pick.
+   */
+  it('needs only the project id on Cloud Run, and refuses to pretend off it', () => {
+    process.env.FCM_PROJECT_ID = 'citrus-fantasy-prod';
+    expect(loadFcmConfigFromEnv()).toBeNull();
+
+    process.env.K_SERVICE = 'citrus-api';
+    expect(loadFcmConfigFromEnv()).toEqual({
+      projectId: 'citrus-fantasy-prod',
+      clientEmail: null,
+      privateKeyPem: null,
+    });
+  });
+
+  it('prefers an explicit key when one is supplied, on or off Cloud Run', () => {
+    process.env.FCM_PROJECT_ID = 'citrus-fantasy-prod';
+    process.env.FCM_CLIENT_EMAIL = 'push@example.iam.gserviceaccount.com';
+    process.env.FCM_PRIVATE_KEY = 'pem';
+    expect(loadFcmConfigFromEnv()).toMatchObject({
+      clientEmail: 'push@example.iam.gserviceaccount.com',
+      privateKeyPem: 'pem',
+    });
+  });
+
+  it('ignores a half-supplied key rather than half-configuring', () => {
+    process.env.FCM_PROJECT_ID = 'citrus-fantasy-prod';
+    process.env.FCM_CLIENT_EMAIL = 'push@example.iam.gserviceaccount.com';
     expect(loadFcmConfigFromEnv()).toBeNull();
   });
 
@@ -484,5 +520,55 @@ describe('loadFcmConfigFromEnv', () => {
     const config = loadFcmConfigFromEnv();
     expect(config?.privateKeyPem).toContain('\n');
     expect(config?.privateKeyPem).not.toContain('\\n');
+  });
+});
+
+describe('PushService — FCM credentials', () => {
+  const realFetch = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+  });
+
+  it('mints from the Cloud Run metadata server when no key is supplied', async () => {
+    let metadataCalls = 0;
+    let sendAuth = '';
+    globalThis.fetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const href = String(url);
+      if (href.startsWith('http://metadata.google.internal/')) {
+        metadataCalls += 1;
+        // The header is not optional: the metadata server refuses without it.
+        expect((init?.headers as Record<string, string>)['Metadata-Flavor']).toBe('Google');
+        return new Response(JSON.stringify({ access_token: 'metadata-token' }), { status: 200 });
+      }
+      sendAuth = (init?.headers as Record<string, string>).authorization;
+      return new Response('{}', { status: 200 });
+    }) as typeof fetch;
+
+    const service = new PushService(
+      makeSupabase({ device_tokens: createChain({ data: [{ token: 'pixel', platform: 'android' }], error: null }) }),
+      null,
+      { projectId: 'citrus-fantasy-prod', clientEmail: null, privateKeyPem: null },
+    );
+    expect(service.isFcmConfigured()).toBe(true);
+
+    const result = await service.notifyOnTheClock(input);
+    expect(result).toMatchObject({ sent: 1, failed: 0 });
+    expect(metadataCalls).toBe(1);
+    expect(sendAuth).toBe('Bearer metadata-token');
+
+    // Cached, like the assertion path.
+    await service.notifyOnTheClock({ ...input, pickNumber: 6 });
+    expect(metadataCalls).toBe(1);
+  });
+
+  it('a malformed explicit key disables Android push and leaves iOS alone', () => {
+    const service = new PushService(makeSupabase(), testConfig(), {
+      projectId: 'p',
+      clientEmail: 'push@example.iam.gserviceaccount.com',
+      privateKeyPem: 'not a pem',
+    });
+    expect(service.isFcmConfigured()).toBe(false);
+    expect(service.isApnsConfigured()).toBe(true);
+    expect(service.isConfigured()).toBe(true);
   });
 });
