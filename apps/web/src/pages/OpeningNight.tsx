@@ -18,6 +18,7 @@ import { PressBoxTeamMark } from '@/components/pressbox/TeamMark';
 import { publicApi } from '@/api/public';
 import { WaitlistService } from '@/services/WaitlistService';
 import { usePageMeta } from '@/lib/pageMeta';
+import { readAcquisition } from '@/lib/acquisition';
 import { getTeamColor } from '@/utils/teamColors';
 import { cn } from '@/lib/utils';
 
@@ -45,7 +46,7 @@ function localTime(iso: string | null): string | null {
 export default function OpeningNight() {
   usePageMeta({
     title: "Opening Night Pick'em",
-    description: 'Pick the winner of every NHL opening-night game. Free to enter, and you are first in line when Citrus goes live.',
+    description: 'Pick the winner of every NHL opening-night game. Free to enter.',
     path: '/opening-night',
   });
 
@@ -89,7 +90,8 @@ export default function OpeningNight() {
     const metadata = slateReady
       ? { date, picks: games.map((g) => ({ game_id: g.game_id, away: g.away_team, home: g.home_team, pick: picks[g.game_id] })) }
       : { date: null, picks: [] as unknown[], note: 'entered before the slate was published' };
-    const result = await WaitlistService.addToWaitlist(email, OPENING_NIGHT_SOURCE, metadata);
+    const acquisition = readAcquisition();
+    const result = await WaitlistService.addToWaitlist(email, OPENING_NIGHT_SOURCE, acquisition ? { ...metadata, acquisition } : metadata);
     setMessage(result.message);
     setStatus(result.success ? 'done' : 'error');
   };
@@ -109,17 +111,17 @@ export default function OpeningNight() {
                 Free to enter · No app needed
               </span>
             </div>
-            <h1 className="font-sans font-black text-[2.6rem] md:text-[4rem] leading-[0.95] tracking-[-0.035em] text-pastel-cream mb-5">
-              Opening Night <span className="text-pastel-orange">Pick'em</span>
+            <h1 className="font-condensed font-extrabold uppercase text-[2.6rem] md:text-[4rem] leading-[0.95] tracking-[-0.01em] text-pressbox-text mb-5">
+              Opening Night <span className="text-pressbox-orange">Pick'em</span>
             </h1>
-            <p className="text-[17px] md:text-[19px] leading-relaxed text-white/65 max-w-xl mx-auto mb-3">
+            <p className="font-barlow font-normal text-[17px] md:text-[19px] leading-relaxed text-pressbox-text/75 max-w-xl mx-auto mb-3">
               Call the winner of every game on the NHL's opening night. Perfect slate takes the bragging rights;
               everyone who enters is first in line the hour Citrus goes live.
             </p>
             {slateReady ? (
-              <p className="text-[14px] text-white/55">{longDate(date as string)} · {games.length} games</p>
+              <p className="text-[14px] text-pressbox-text/60">{longDate(date as string)} · {games.length} games</p>
             ) : (
-              !loading && <p className="text-[14px] text-white/55">The slate is not published yet. Leave your email and we will send it to you the day it drops.</p>
+              !loading && <p className="text-[14px] text-pressbox-text/60">The slate is not published yet. Leave your email and we will send it to you the day it drops.</p>
             )}
           </div>
 
@@ -136,7 +138,7 @@ export default function OpeningNight() {
                   <li key={g.game_id} className="rounded-2xl bg-[#1A2A20] ring-1 ring-white/10 p-3 md:p-4">
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                       <TeamPick team={g.away_team} selected={picks[g.game_id] === g.away_team} onPick={() => setPicks((p) => ({ ...p, [g.game_id]: g.away_team }))} />
-                      <span className="font-jbmono text-[10px] tracking-[0.18em] uppercase text-white/55 px-1 text-center">
+                      <span className="font-jbmono text-[10px] tracking-[0.18em] uppercase text-pressbox-text/60 px-1 text-center">
                         {localTime(g.game_time) ?? 'TBD'}
                       </span>
                       <TeamPick team={g.home_team} selected={picks[g.game_id] === g.home_team} onPick={() => setPicks((p) => ({ ...p, [g.game_id]: g.home_team }))} home />
@@ -151,8 +153,8 @@ export default function OpeningNight() {
                 <div className="p-6 md:p-8">
                   {status === 'done' ? (
                     <div className="text-center" role="status">
-                      <p className="font-sans font-black text-[1.4rem] text-pastel-cream mb-2">You're in.</p>
-                      <p className="text-[14px] text-white/65 mb-6">{message}</p>
+                      <p className="font-condensed font-extrabold uppercase text-[1.4rem] text-pastel-cream mb-2">You're in.</p>
+                      <p className="text-[14px] text-pressbox-text/70 mb-6">{message}</p>
                       <Link to="/features" className="inline-flex items-center gap-2 text-pastel-orange font-bold">
                         See what Citrus does <ArrowRight className="h-4 w-4" aria-hidden="true" />
                       </Link>
@@ -160,11 +162,11 @@ export default function OpeningNight() {
                   ) : (
                     <>
                       {slateReady && (
-                        <p className="font-jbmono text-[11px] tracking-[0.18em] uppercase text-white/55 mb-3" data-testid="opening-night-progress">
+                        <p className="font-jbmono text-[11px] tracking-[0.18em] uppercase text-pressbox-text/60 mb-3" data-testid="opening-night-progress">
                           {picked} of {games.length} picked
                         </p>
                       )}
-                      <label htmlFor="opening-night-email" className="block text-[13px] text-white/65 mb-2">
+                      <label htmlFor="opening-night-email" className="block text-[13px] text-pressbox-text/70 mb-2">
                         Where should we send the results and your launch invite?
                       </label>
                       <div className="flex flex-col sm:flex-row gap-2">
@@ -176,7 +178,7 @@ export default function OpeningNight() {
                           placeholder="you@example.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="flex-1 h-12 rounded-xl bg-white/5 border border-white/10 px-4 text-pastel-cream placeholder:text-white/55 focus:outline-none focus:ring-2 focus:ring-pastel-orange/40"
+                          className="flex-1 h-12 rounded-xl bg-white/5 border border-white/10 px-4 text-pastel-cream placeholder:text-pressbox-text/60 focus:outline-none focus:ring-2 focus:ring-pastel-orange/40"
                         />
                         <button
                           type="submit"
@@ -189,7 +191,7 @@ export default function OpeningNight() {
                       {status === 'error' && message && (
                         <p role="alert" className="mt-3 text-sm text-red-300">{message}</p>
                       )}
-                      <p className="mt-3 text-[12px] text-white/55">No spam. Results after the games, one launch email, that's it.</p>
+                      <p className="mt-3 text-[12px] text-pressbox-text/60">No spam. Results after the games, one launch email, that's it.</p>
                     </>
                   )}
                 </div>

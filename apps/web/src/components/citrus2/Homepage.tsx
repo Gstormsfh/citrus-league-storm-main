@@ -41,6 +41,7 @@ import {
   RangeIcon,
 } from './HockeyIcons';
 import type { AccentName } from './tokens';
+import { OPENING_NIGHT_LABEL } from '@/lib/season';
 
 // =============================================================================
 // HERO
@@ -63,7 +64,7 @@ function SceneVisual({ src, alt }: { src: string; alt: string }) {
 // verified (the "31-feature" claim is gone until the model artifact confirms
 // it). Opening night is the first scheduled row in `nhl_games` as of
 // 2026-09-09: 2026-09-29, five games.
-export const OPENING_NIGHT_LABEL = 'Puck drops Sep 29';
+export { OPENING_NIGHT_LABEL };
 
 function getHeroSlides(): HeroSlide[] {
   return [

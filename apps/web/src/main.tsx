@@ -24,6 +24,17 @@ if (!rootElement) {
   throw new Error("Root element not found! Make sure index.html has <div id='root'></div>");
 }
 
+// PRERENDER (2026-09-09): the marketing routes ship as static HTML with the
+// page already in #root (scripts/prerender.mjs). When the document was
+// prerendered for a DIFFERENT route (the SPA fallback and the service
+// worker's navigateFallback both hand out the homepage document for deep
+// links), clear it so React mounts on an empty root and a league link never
+// flashes the storefront first.
+const prerenderedFor = document.documentElement.getAttribute('data-prerendered');
+if (prerenderedFor && prerenderedFor.replace(/\/$/, '') !== window.location.pathname.replace(/\/$/, '')) {
+  rootElement.innerHTML = '';
+}
+
 // Clear loading screen inline styles so the app can scroll normally
 rootElement.removeAttribute('style');
 

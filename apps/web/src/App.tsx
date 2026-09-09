@@ -106,6 +106,7 @@ const CreateLeague = lazyWithErrorHandling(() => import("./pages/CreateLeague"))
 const InviteAccept = lazyWithErrorHandling(() => import("./pages/InviteAccept"));
 const OpeningNight = lazyWithErrorHandling(() => import("./pages/OpeningNight"));
 const BringYourLeague = lazyWithErrorHandling(() => import("./pages/BringYourLeague"));
+const Dangle = lazyWithErrorHandling(() => import("./pages/Dangle"));
 const Features = lazyWithErrorHandling(() => import("./pages/Features"));
 const Pricing = lazyWithErrorHandling(() => import("./pages/Pricing"));
 const About = lazyWithErrorHandling(() => import("./pages/About"));
@@ -298,6 +299,8 @@ const App = () => {
                 {/* 2026-09-09: lead gen that needs no app: the opening-night pick'em and the concierge league move. */}
                 <Route path="/opening-night" element={<ErrorBoundary><OpeningNight /></ErrorBoundary>} />
                 <Route path="/bring-your-league" element={<ErrorBoundary><BringYourLeague /></ErrorBoundary>} />
+                {/* Campaign door (2026-09-09): the URL read on the Steve Dangle Podcast. */}
+                <Route path="/dangle" element={<ErrorBoundary><Dangle /></ErrorBoundary>} />
                 <Route path="/game-day" element={<ErrorBoundary><GameDay /></ErrorBoundary>} />
                 <Route path="/game-day/daily-player" element={<ErrorBoundary><GameDayDailyPlayer /></ErrorBoundary>} />
                 <Route path="/pool/pickem" element={<ProtectedRoute><ErrorBoundary><PoolPickem /></ErrorBoundary></ProtectedRoute>} />

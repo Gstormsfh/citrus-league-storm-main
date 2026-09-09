@@ -87,6 +87,11 @@ jobs:
       - name: Compute web release tag
         run: echo "VITE_APP_VERSION=$(node -p "require('./apps/web/package.json').version")+${GITHUB_SHA::7}" >> "$GITHUB_ENV"
 
+      # PRERENDER (2026-09-09): the marketing routes ship as static HTML so
+      # crawlers get real text. Chromium is only needed for this step.
+      - name: Install Chromium for prerender
+        run: cd apps/web && npx playwright install --with-deps chromium
+
       - name: Build web
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -98,7 +103,14 @@ jobs:
           # VITE_API_URL intentionally omitted — Firebase Hosting rewrites
           # /api/* to Cloud Run, so the frontend uses same-origin requests.
           # Setting this to a separate domain would bypass the rewrite.
-        run: npm run build --workspace=apps/web
+        run: npm run build:web --workspace=apps/web
+
+      - name: Assert prerendered marketing pages
+        run: |
+          for f in apps/web/dist/index.html apps/web/dist/about/index.html apps/web/dist/features/index.html apps/web/dist/opening-night/index.html apps/web/dist/bring-your-league/index.html apps/web/dist/dangle/index.html; do
+            if ! grep -q 'data-prerendered=' "$f"; then echo "::error::$f is not prerendered"; exit 1; fi
+          done
+          echo "prerendered pages present"
 
       - name: Build server
         run: npm run build --workspace=server
@@ -484,6 +496,14 @@ jobs:
           fi
           # The AASA is the one static file the iOS app depends on. Fail the
           # deploy loudly if production is not serving the repo's file.
+          # Crawlable text: /about must carry its headline in the raw HTML.
+          about=$(curl -s "https://citrusfantasysports.com/about" --max-time 10) || true
+          if echo "$about" | grep -q 'data-prerendered="/about"'; then
+            echo "Prerender check passed"
+          else
+            echo "::error::/about is not serving prerendered HTML"
+            exit 1
+          fi
           aasa=$(curl -s "https://citrusfantasysports.com/.well-known/apple-app-site-association" --max-time 10) || true
           if echo "$aasa" | grep -q "TFMG57326Z.com.citrussports.app"; then
             echo "AASA check passed"
