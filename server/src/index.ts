@@ -42,10 +42,25 @@ if (proxyUrl) {
 
 import { serve } from '@hono/node-server';
 import { app } from './app';
-import { logger, createConsoleLogger } from '@citrus/shared';
+import {
+  logger,
+  createConsoleLogger,
+  structuredLogger,
+  createConsoleStructuredLogger,
+} from '@citrus/shared';
 
 // Enable real console logging on the server (default logger is silent)
 Object.assign(logger, createConsoleLogger());
+
+// THE PUSH LOGGER WAS SILENT HERE (2026-09-09). `structuredLogger` is a
+// no-op until something swaps the console implementation in, and the only
+// place that did was the draft engine's entry point. PushService — which
+// runs in THIS process for every trade, waiver, roster move and chat push —
+// logs exclusively through structuredLogger, so every `[push] … sent=N
+// failed=N reason=…` line went nowhere. Two nights of "the notification
+// never arrived" with an empty Cloud Logging query is what that costs.
+// Single-line JSON to stdout/stderr; Cloud Run parses it as jsonPayload.
+Object.assign(structuredLogger, createConsoleStructuredLogger());
 
 const port = parseInt(process.env.PORT || '3001', 10);
 

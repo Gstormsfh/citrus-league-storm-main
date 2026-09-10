@@ -434,6 +434,15 @@ export class PushService {
           sent += 1;
         } else {
           failed += 1;
+          // Every refusal is logged with Apple's/Google's own reason, not
+          // only the ones that prune. A 403 InvalidProviderToken or a 400
+          // TopicDisallowed keeps the token and, without this line, looks
+          // identical to a delivery that simply never showed on the phone.
+          structuredLogger.warn(
+            `[push] ${input.category} send failed platform=${device.platform} ` +
+              `status=${result.status ?? 'n/a'} reason=${result.reason ?? 'unknown'} ` +
+              `token=${device.token.slice(0, 8)}…`,
+          );
           if (result.prune) {
             await this.pruneToken(device.token, result.reason);
           }
