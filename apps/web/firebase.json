@@ -9,6 +9,18 @@
       "**/.DS_Store",
       "**/.env*"
     ],
+    "redirects": [
+      {
+        "source": "/go/:handle",
+        "destination": "/?ref=:handle",
+        "type": 302
+      },
+      {
+        "source": "/go",
+        "destination": "/",
+        "type": 302
+      }
+    ],
     "rewrites": [
       {
         "source": "/.well-known/apple-app-site-association",
