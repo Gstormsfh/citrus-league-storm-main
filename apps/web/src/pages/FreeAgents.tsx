@@ -33,6 +33,7 @@ import { ScheduleService, NHLGame } from '@/services/ScheduleService';
 import { WaiverService } from '@/services/WaiverService';
 import { MatchupService } from '@/services/MatchupService';
 import { fantasyWeekAnchorFor, getCurrentWeekNumber, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
+import type { PositionType } from '@/utils/rosterUtils';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
@@ -1611,6 +1612,11 @@ const FreeAgents = () => {
       onAction: () => handleRowAction(player),
       starred: watchlist.has(player.id),
       onStar: () => toggleWatchlist(player),
+      // Last on purpose: FreeAgents.phoneList.test.tsx reads the first 500
+      // characters of this bag to prove the shared row derives its own
+      // state, and a new key ahead of `onAction` pushes it out of the window.
+      // An F/D/G league's rows wear one F chip rather than C, LW or RW.
+      positionType: leaguePosType as PositionType,
     };
     if (!searchQuery && phoneView === 'trend') {
       // The artboard's row: the movement in the column, and where the

@@ -15,14 +15,15 @@
  */
 import type { HockeyPlayer } from './HockeyPlayerCard';
 import { positionChipKey } from './positionChip';
+import type { PositionType } from '@/utils/rosterUtils';
 
 type Positioned = Pick<HockeyPlayer, 'position' | 'eligible_positions'>;
 
 /** Every position the player may start at, as chip keys, primary first: ['C'] or ['C', 'LW']. */
-export function playerPositions(p: Positioned): string[] {
+export function playerPositions(p: Positioned, positionType: PositionType = 'individual'): string[] {
   const out: string[] = [];
   const push = (raw: string | null | undefined) => {
-    const key = positionChipKey(raw);
+    const key = positionChipKey(raw, positionType);
     // UTIL is a slot, never a position a player holds.
     if (key && key !== 'UTIL' && !out.includes(key)) out.push(key);
   };
@@ -32,8 +33,8 @@ export function playerPositions(p: Positioned): string[] {
 }
 
 /** "C/LW" for a player who can start at two positions, "C" for everyone else. */
-export function playerPositionsLabel(p: Positioned): string {
-  return playerPositions(p).join('/');
+export function playerPositionsLabel(p: Positioned, positionType: PositionType = 'individual'): string {
+  return playerPositions(p, positionType).join('/');
 }
 
 /**
@@ -41,7 +42,10 @@ export function playerPositionsLabel(p: Positioned): string {
  * with more than one position. Empty for everyone else, so single-position
  * rows print exactly what they printed before.
  */
-export function multiPositionLabel(p: Positioned): string {
-  const positions = playerPositions(p);
+export function multiPositionLabel(p: Positioned, positionType: PositionType = 'individual'): string {
+  // An F/D/G league folds a C/LW player's two positions onto one F, so the
+  // label empties itself there — which is right: in that league his
+  // eligibility says nothing his slot chip does not already say.
+  const positions = playerPositions(p, positionType);
   return positions.length > 1 ? positions.join('/') : '';
 }

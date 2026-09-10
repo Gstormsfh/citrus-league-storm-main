@@ -149,6 +149,8 @@ const GameStatusBadge = ({ status, score }: { status?: string; score?: string })
 // ─── Single Row ──────────────────────────────────────────────────────
 interface PlayerRowProps {
   player: HockeyPlayer | null;
+  /** The league's position format: an F/D/G league prints one F, not C/LW. */
+  positionType?: PositionType;
   slotId: string;
   slotPosition: string;
   isLocked?: boolean;
@@ -159,7 +161,7 @@ interface PlayerRowProps {
   onEmptySlotTap?: () => void;
 }
 
-const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isEligibleTarget, onPositionTap, onNameTap, onEmptySlotTap }: PlayerRowProps) => {
+const PlayerRow = ({ player, positionType = 'individual', slotId, slotPosition, isLocked, isSwapSelected, isEligibleTarget, onPositionTap, onNameTap, onEmptySlotTap }: PlayerRowProps) => {
   const isGoalie = player ? (player.position === 'Goalie' || player.position === 'G') : slotPosition === 'G';
   const gameStatus = player?.nextGame?.gameStatus;
   const isLiveOrFinal = gameStatus === 'live' || gameStatus === 'intermission' || gameStatus === 'final';
@@ -184,7 +186,7 @@ const PlayerRow = ({ player, slotId, slotPosition, isLocked, isSwapSelected, isE
   // in UTIL or on the bench never said he could play LW. His own positions
   // lead line 2, and only when there is more than one, so a single-position
   // row prints exactly what it printed before.
-  const positionsLabel = player ? multiPositionLabel(player) : '';
+  const positionsLabel = player ? multiPositionLabel(player, positionType) : '';
   // ILLEGAL IR OCCUPANT (2026-09-03, gap B). The NHL no longer lists him
   // IR/LTIR; the server tolerates him where he is but the roster is not
   // legal until he moves. Say so on the row, not only in a one-time toast.
@@ -538,6 +540,7 @@ const MobileRosterList = ({
 
       const row = (
         <PlayerRow
+          positionType={positionType}
           key={slotId}
           player={player}
           slotId={slotId}
@@ -631,10 +634,11 @@ const MobileRosterList = ({
           </div>
         )}
         {bench.map(player => {
-          const pos = positionChipKey(player.position);
+          const pos = positionChipKey(player.position, positionType);
           const isSelected = player.id === tapSelectedPlayerId;
           const row = (
             <PlayerRow
+              positionType={positionType}
               key={player.id}
               player={player}
               slotId="bench-grid"
@@ -664,10 +668,11 @@ const MobileRosterList = ({
             icon={<Skull className="w-4 h-4 text-red-400" />}
           />
           {ir.map(player => {
-            const pos = positionChipKey(player.position);
+            const pos = positionChipKey(player.position, positionType);
             const irSlot = slotAssignments[player.id] || 'ir-slot-1';
             const row = (
               <PlayerRow
+                positionType={positionType}
                 key={player.id}
                 player={player}
                 slotId={irSlot}

@@ -3,6 +3,8 @@ import { cn } from '@/lib/utils';
 // By file, never the `@/components/pressbox` barrel — it reaches LeagueContext
 // and the Supabase client at module scope.
 import { PB_TYPE } from '@/components/pressbox/rowScale';
+import { positionChipKey } from '@/components/roster/positionChip';
+import type { PositionType } from '@/utils/rosterUtils';
 
 /*
  * THE BOARD, PRESS BOX (2026-09-04) — artboard 4b.
@@ -71,6 +73,8 @@ interface Team {
 }
 
 interface DraftBoardProps {
+  /** The league's position format: an F/D/G board prints F under a forward. */
+  positionType?: PositionType;
   teams: Team[];
   draftHistory: DraftPick[];
   currentPick: number;
@@ -89,15 +93,20 @@ interface DraftBoardProps {
   keeperSlots?: ReadonlyMap<string, string>;
 }
 
-const normalizePosition = (pos: string): string => {
-  if (!pos) return '';
-  const upper = pos.toUpperCase();
-  if (upper === 'L' || upper === 'LEFT' || upper === 'LEFTWING') return 'LW';
-  if (upper === 'R' || upper === 'RIGHT' || upper === 'RIGHTWING') return 'RW';
-  return upper;
-};
+/**
+ * THE LETTER UNDER A NAME (2026-09-10). This was a third private copy of
+ * "what is this position called", and like the other two it only knew the
+ * individual codes: an F/D/G board printed `C · EDM` under a player whose
+ * slot is F. It now defers to `positionChipKey`, the one the chips read,
+ * with the league's format passed in. No colour here on purpose — the board
+ * cell is an 8px line on a Press Box surface, where orange means "your
+ * pick" and nothing else.
+ */
+const normalizePosition = (pos: string, positionType: PositionType): string =>
+  positionChipKey(pos, positionType);
 
 export const DraftBoard = ({
+  positionType = 'individual',
   teams,
   draftHistory,
   currentPick,
@@ -275,7 +284,7 @@ export const DraftBoard = ({
                           {surname(pick.playerName)}
                         </span>
                         <span className="block mt-[3px] font-plex font-medium text-[8px] text-pressbox-text/50 truncate">
-                          {normalizePosition(pick.position)}
+                          {normalizePosition(pick.position, positionType)}
                           {pick.playerTeam ? ` · ${pick.playerTeam}` : ''}
                         </span>
                       </button>
@@ -346,7 +355,7 @@ export const DraftBoard = ({
                 <span className="flex-1 min-w-0 truncate">
                   <b>{surname(pick.playerName)}</b>{' '}
                   <span className="font-plex font-medium text-[10px] text-pressbox-text/50">
-                    {normalizePosition(pick.position)}
+                    {normalizePosition(pick.position, positionType)}
                     {pick.playerTeam ? ` · ${pick.playerTeam}` : ''} · {teamNameById.get(pick.teamId) ?? pick.teamName}
                   </span>
                 </span>

@@ -28,12 +28,15 @@ import type { FetchedTeam } from '@/lib/draftClient/v1Adapters';
 import { Mug } from '@/components/roster/Mug';
 import { mugFromDirectory } from '@/components/roster/headshot';
 import { positionChipKey } from '@/components/roster/positionChip';
+import type { PositionType } from '@/utils/rosterUtils';
 import { pressBoxPositionChipClasses } from '@/components/pressbox/positionChip';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { getTeamColor } from '@/utils/teamColors';
 import { DEFAULT_TIERS, minimumNextBid, type BidIncrementTier } from '@/lib/draftClient/auctionRules';
 
 interface AuctionPanelProps {
+  /** The league's position format: an F/D/G league's lot chip reads F. */
+  positionType?: PositionType;
   leagueId: string;
   teams: FetchedTeam[];
   playersById: ReadonlyMap<string, Player>;
@@ -69,6 +72,7 @@ function useCountdownSeconds(deadlineIso: string | null): number | null {
 }
 
 export function AuctionPanel({
+  positionType = 'individual',
   leagueId,
   teams,
   playersById,
@@ -262,7 +266,7 @@ export function AuctionPanel({
               </div>
               <div className="mt-1.5 flex items-center gap-1.5 font-plex text-[10px] text-pressbox-text/55">
                 {lotPlayer && (
-                  <span className={cn(pressBoxPositionChipClasses(positionChipKey(lotPlayer.position)), 'text-[9px]')}>
+                  <span className={cn(pressBoxPositionChipClasses(positionChipKey(lotPlayer.position, positionType)), 'text-[9px]')}>
                     {lotPlayer.position}
                   </span>
                 )}

@@ -2,6 +2,8 @@ import { cn } from '@/lib/utils';
 // By file, never the `@/components/pressbox` barrel — it reaches LeagueContext
 // and the Supabase client at module scope.
 import { PB_TYPE } from '@/components/pressbox/rowScale';
+import { positionChipKey } from '@/components/roster/positionChip';
+import type { PositionType } from '@/utils/rosterUtils';
 
 /*
  * PRESS BOX (2026-09-04). Artboard 4a's MY TEAM tab, which it names and does
@@ -33,20 +35,30 @@ interface Team {
 }
 
 interface TeamRostersProps {
+  /** The league's position format: an F/D/G league's rail counts F, D, G. */
+  positionType?: PositionType;
   teams: Team[];
   draftHistory: DraftPick[];
   userTeamId?: string | null;
   onPlayerClick?: (playerId: string) => void;
 }
 
-export const TeamRosters = ({ teams, draftHistory, userTeamId, onPlayerClick }: TeamRostersProps) => {
+export const TeamRosters = ({ positionType = 'individual', teams, draftHistory, userTeamId, onPlayerClick }: TeamRostersProps) => {
   const getTeamPicks = (teamId: string) => {
     return draftHistory.filter(pick => pick.teamId === teamId);
   };
 
-  const getPositionCount = (picks: DraftPick[], position: string) => {
-    return picks.filter(pick => pick.position === position).length;
-  };
+  /**
+   * THE LEAGUE'S GROUPS, NOT FIVE FIXED ONES (2026-09-10). This counted an
+   * exact string match against a hardcoded C/LW/RW/D/G literal, so the rail
+   * of an F/D/G league — which starts 6 F, 4 D, 2 G — reported its manager
+   * "C 5 · LW 2 · RW 1 · D 4 · G 2" against slots that do not exist. Both
+   * the buckets and the letters now come from the league's position format,
+   * through the same `positionChipKey` every other surface reads.
+   */
+  const positionKeys = positionType === 'forward' ? ['F', 'D', 'G'] : ['C', 'LW', 'RW', 'D', 'G'];
+  const getPositionCount = (picks: DraftPick[], position: string) =>
+    picks.filter(pick => positionChipKey(pick.position, positionType) === position).length;
 
   // Separate user team from others
   const userTeam = userTeamId ? teams.find(t => t.id === userTeamId) : null;
@@ -54,13 +66,9 @@ export const TeamRosters = ({ teams, draftHistory, userTeamId, onPlayerClick }: 
 
   const TeamRosterCard = ({ team, onPlayerClick }: { team: Team; onPlayerClick?: (playerId: string) => void }) => {
     const picks = getTeamPicks(team.id);
-    const positionCounts = {
-      C: getPositionCount(picks, 'C'),
-      LW: getPositionCount(picks, 'LW'),
-      RW: getPositionCount(picks, 'RW'),
-      D: getPositionCount(picks, 'D'),
-      G: getPositionCount(picks, 'G'),
-    };
+    const positionCounts = positionKeys.map(
+      (key) => [key, getPositionCount(picks, key)] as const,
+    );
 
     const mine = team.id === userTeamId;
     return (
@@ -97,7 +105,7 @@ export const TeamRosters = ({ teams, draftHistory, userTeamId, onPlayerClick }: 
             old 5-col grid + viewport-based lg:grid-cols-4 wrapper crushed
             these cards to ~60px inside the 300px sidebar). */}
         <div className="flex flex-wrap gap-1 mt-2">
-          {Object.entries(positionCounts).map(([position, count]) => (
+          {positionCounts.map(([position, count]) => (
             <span
               key={position}
               className={cn(
@@ -132,7 +140,7 @@ export const TeamRosters = ({ teams, draftHistory, userTeamId, onPlayerClick }: 
                   {pick.playerName}
                 </span>
                 <span className="flex-none font-plex font-bold text-[10px] text-pressbox-text/70">
-                  {pick.position}
+                  {positionChipKey(pick.position, positionType)}
                 </span>
               </div>
             ))
