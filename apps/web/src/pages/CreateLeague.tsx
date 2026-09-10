@@ -28,7 +28,8 @@ import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { CreateLeaguePhone } from '@/components/league/CreateLeaguePhone';
-import { buildCreateLeagueSections } from '@/components/league/createLeagueSections';
+import { buildCreateLeagueSections, WEEK_START_OPTIONS } from '@/components/league/createLeagueSections';
+import type { WeekStartDay } from '@/utils/weekCalculator';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -168,6 +169,9 @@ const CreateLeague = () => {
   const [playoffTeams, setPlayoffTeams] = useState("6");
   const [playoffWeeks, setPlayoffWeeks] = useState("3");
   const [tradeDeadlineWeek, setTradeDeadlineWeek] = useState("0");
+  // WEEK START (2026-09-10): Sunday to Saturday by default; Monday to Sunday
+  // if the commissioner wants it. Locked once the draft is complete.
+  const [weekStartDay, setWeekStartDay] = useState<WeekStartDay>('sunday');
 
   // ---- Keeper / Dynasty Settings ----
   const [keeperEnabled, setKeeperEnabled] = useState(false);
@@ -512,6 +516,7 @@ const CreateLeague = () => {
           ? Math.min(Math.max(num(playoffWeeks, playoffRounds(effectivePlayoffTeams)), 1), 4)
           : 0;
         settings.tradeDeadlineWeek = num(tradeDeadlineWeek, 0);
+        settings.weekStartDay = weekStartDay;
 
         // Keeper / Dynasty
         settings.keeperEnabled = keeperEnabled;
@@ -882,6 +887,7 @@ const CreateLeague = () => {
         playoffOptions,
         playoffWeeks, setPlayoffWeeks,
         tradeDeadlineWeek, setTradeDeadlineWeek,
+        weekStartDay, setWeekStartDay,
         keeperEnabled, setKeeperEnabled,
         keeperCount, setKeeperCount,
         keeperPenalty, setKeeperPenalty,
@@ -1460,18 +1466,39 @@ const CreateLeague = () => {
                         {(
                           <div className="space-y-3">
                             <Label>Draft Rounds</Label>
-                            <Select value={draftRounds} onValueChange={setDraftRounds}>
-                              <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value={DRAFT_ROUNDS_MATCH_ROSTER}>Match roster ({totalRosterSlots} rounds)</SelectItem>
-                                <SelectItem value="14">14 Rounds</SelectItem>
-                                <SelectItem value="16">16 Rounds</SelectItem>
-                                <SelectItem value="18">18 Rounds</SelectItem>
-                                <SelectItem value="21">21 Rounds</SelectItem>
-                                <SelectItem value="24">24 Rounds</SelectItem>
-                                <SelectItem value="30">30 Rounds</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            {/* ROUNDS FOLLOW THE ROSTER (2026-09-10). This was a fixed menu
+                                (14, 16, 18, 21, 24, 30) beside a roster that could be any size,
+                                so the two drifted and nothing said so. Now the field shows the
+                                draftable roster count and tracks it as the slots change. Typing
+                                a different number is a deliberate short or long draft and keeps
+                                the warning below; typing the roster number again hands tracking
+                                back. There is no menu to be one step off from. */}
+                            <Input
+                              type="number"
+                              min={1}
+                              max={40}
+                              value={Number.isNaN(resolvedDraftRounds) ? '' : resolvedDraftRounds}
+                              onChange={(e) => {
+                                const n = parseInt(e.target.value, 10);
+                                setDraftRounds(n === totalRosterSlots ? DRAFT_ROUNDS_MATCH_ROSTER : e.target.value);
+                              }}
+                              className="h-12 font-mono"
+                              data-testid="create-league-rounds"
+                            />
+                            {draftRounds === DRAFT_ROUNDS_MATCH_ROSTER ? (
+                              <p className="text-xs text-pastel-cream/60 leading-relaxed" data-testid="create-league-rounds-tracking">
+                                Matches your roster: {totalRosterSlots} spots to draft, {totalRosterSlots} rounds.
+                              </p>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setDraftRounds(DRAFT_ROUNDS_MATCH_ROSTER)}
+                                className="text-xs text-pastel-orange-soft underline-offset-2 hover:underline"
+                                data-testid="create-league-rounds-match"
+                              >
+                                Match roster ({totalRosterSlots} rounds)
+                              </button>
+                            )}
                             {roundsVsRoster && (
                               <p
                                 className="text-xs text-pastel-orange-soft leading-relaxed"
@@ -1853,6 +1880,24 @@ const CreateLeague = () => {
                             No trades allowed after this week.
                           </p>
                         </div>
+
+                        {/* Week start (2026-09-10) */}
+                        {showMatchupSettings && (
+                          <div className="space-y-3">
+                            <Label>Week Runs</Label>
+                            <Select value={weekStartDay} onValueChange={(v) => setWeekStartDay(v as WeekStartDay)}>
+                              <SelectTrigger data-testid="create-league-week-start"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {WEEK_START_OPTIONS.map((o) => (
+                                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-white/55">
+                              Matchup weeks start on this day. Fixed once the draft is done.
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Advanced: Keeper / Dynasty */}
@@ -2166,9 +2211,21 @@ const CreateLeague = () => {
                           title="Roster Slots"
                           subtitle="Customize how many of each position slot"
                           badge={
-                            <Badge variant="secondary" className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft border-0">
-                              {Object.values(rosterSlots).reduce((a, b) => a + b, 0)} Total
-                            </Badge>
+                            <span className="flex items-center gap-2">
+                              {/* IR IS NOT A ROSTER SPOT (2026-09-10). The old badge summed every
+                                  slot, IR included, so adding an IR slot read as a bigger roster.
+                                  You draft the starters and the bench; IR is where an injured
+                                  player goes afterwards. Count the draftable spots, name the IR
+                                  slots beside them, and the number stops moving when IR does. */}
+                              <Badge variant="secondary" className="bg-pastel-orange/20 ring-1 ring-pastel-orange/40 text-pastel-orange-soft border-0" data-testid="create-league-roster-draftable">
+                                {totalRosterSlots} to draft
+                              </Badge>
+                              {(rosterSlots.IR ?? 0) > 0 && (
+                                <Badge variant="secondary" className="bg-white/5 ring-1 ring-white/15 text-pastel-cream/70 border-0" data-testid="create-league-roster-ir">
+                                  {rosterSlots.IR} IR
+                                </Badge>
+                              )}
+                            </span>
                           }
                         />
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

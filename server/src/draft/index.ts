@@ -93,7 +93,7 @@ import {
   DEFAULT_BID_INCREMENT_TIERS,
   validateBidIncrementTiers,
 } from './auctionBidIncrement';
-import { assignKeeperSlots, keeperEffectiveRound, type KeeperSlot } from './keeperSlots';
+import { assignKeeperSlots, keeperEffectiveRound, keeperPenaltyFor, type KeeperSlot } from './keeperSlots';
 
 // Enable real console logging on the server (default logger is silent).
 Object.assign(logger, createConsoleLogger());
@@ -1004,7 +1004,7 @@ async function loadKeeperSlots(
       .eq('season_year', season)
       .eq('status', 'locked');
     if (error) throw new Error(error.message);
-    const penalty = typeof settings?.keeperPenalty === 'string' ? (settings.keeperPenalty as string) : 'none';
+    const penalty = keeperPenaltyFor(settings);
     const locked = ((data ?? []) as Array<{
       team_id: string;
       player_id: string | number;

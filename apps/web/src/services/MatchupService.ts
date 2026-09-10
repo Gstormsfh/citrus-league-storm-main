@@ -4,7 +4,7 @@ import { League, Team, LeagueService } from './LeagueService';
 import { PlayerService, Player } from './PlayerService';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from './DemoLeagueService';
 import { MatchupPlayer, StatBreakdown } from '@/components/matchup/types';
-import { clampToSeasonStart, getFirstWeekStartDate, getWeekStartDate, getWeekEndDate, getAvailableWeeks, getScheduleLength } from '@/utils/weekCalculator';
+import { clampToSeasonStart, fantasyWeekAnchorFor, weekStartDowFor, getWeekStartDate, getWeekEndDate, getAvailableWeeks, getScheduleLength } from '@/utils/weekCalculator';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { ScheduleService, NHLGame, GameInfo } from './ScheduleService';
 import { withTimeout } from '@/utils/promiseUtils';
@@ -324,12 +324,25 @@ export const MatchupService = {
         return { error: new Error('Cannot generate matchups: Duplicate team IDs found') };
       }
 
+      // The league row, read FIRST: the week-start day (2026-09-10) and the
+      // playoff reservation below both come off it. FAIL-OPEN to the
+      // defaults (Sunday weeks, 3-week reserve) on any fetch error.
+      let leagueRowForRules: { settings?: unknown } | null = null;
+      try {
+        const { league: leagueRow } = await LeagueService.getLeague(leagueId);
+        leagueRowForRules = leagueRow ?? null;
+      } catch { /* fail-open */ }
+
       // SCHEDULE-GEN (2026-08-16) — clamp the anchor to the season FIRST.
       // Every caller (draft-completion hook, Matchup-page self-heal, the
       // commissioner button) funnels through here, so this one line fixes
       // "offseason draft → zero weeks → zero matchups" everywhere. See
       // clampToSeasonStart in weekCalculator.ts for the full account.
-      const effectiveFirstWeekStart = clampToSeasonStart(firstWeekStart);
+      // 2026-09-10: clamped to the LEAGUE'S week-start day. A Monday league
+      // clamped with the Sunday default would have had its Monday anchor
+      // walked back to a Sunday here and every matchup row written a day
+      // early.
+      const effectiveFirstWeekStart = clampToSeasonStart(firstWeekStart, weekStartDowFor(leagueRowForRules));
 
       // Build fantasy weeks from available weeks. If regularSeasonWeeks is
       // provided (commissioner-configured), truncate so playoff weeks are NOT
@@ -377,8 +390,7 @@ export const MatchupService = {
       // FAIL-OPEN: any fetch error falls back to the proven 3-week reserve.
       let reserveWeeks = 3;
       try {
-        const { league: leagueRow } = await LeagueService.getLeague(leagueId);
-        const ls = (leagueRow?.settings ?? {}) as Record<string, unknown>;
+        const ls = (leagueRowForRules?.settings ?? {}) as Record<string, unknown>;
         const pt = Number(ls.playoffTeams);
         const pw = Number(ls.playoffWeeks);
         if (Number.isFinite(pt) && pt <= 0) {
@@ -496,8 +508,11 @@ export const MatchupService = {
 
       // Get first week start date
       // WEEK-MATH FIX (2026-08-22): clamp to season start like generation does
-      const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
-      const firstWeekStart = clampToSeasonStart(getFirstWeekStartDate(draftCompletionDate));
+      // 2026-09-10: the one league-aware anchor; updated_at stays the fallback.
+      const firstWeekStart = fantasyWeekAnchorFor(
+        league as unknown as import('./LeagueService').League,
+        league.updated_at ? new Date(league.updated_at) : new Date(),
+      ) as Date;
       const scheduleLength = getScheduleLength(firstWeekStart);
       const isPlayoffWeek = matchup.week_number > scheduleLength;
 
@@ -684,9 +699,12 @@ export const MatchupService = {
         return { data: null, error: new Error('League not found') };
       }
 
-      // Get first week start date
-      const draftCompletionDate = league.updated_at ? new Date(league.updated_at) : new Date();
-      const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
+      // Get first week start date. Was the one caller in the app that skipped
+      // clampToSeasonStart; through the shared anchor now (2026-09-10).
+      const firstWeekStart = fantasyWeekAnchorFor(
+        league as unknown as import('./LeagueService').League,
+        league.updated_at ? new Date(league.updated_at) : new Date(),
+      ) as Date;
       const scheduleLength = getScheduleLength(firstWeekStart);
       const isPlayoffWeek = weekNumber > scheduleLength;
 

@@ -55,6 +55,8 @@ const form = (over: Partial<CreateLeagueForm> = {}): CreateLeagueForm => ({
   setPlayoffWeeks: noop,
   tradeDeadlineWeek: '0',
   setTradeDeadlineWeek: noop,
+  weekStartDay: 'sunday',
+  setWeekStartDay: noop,
   keeperEnabled: false,
   setKeeperEnabled: noop,
   keeperCount: '3',
@@ -229,16 +231,51 @@ describe('the rules under the rows', () => {
     expect(roster?.callout).toBe(warning);
   });
 
-  it('rounds default to "match roster" and the roster group counts draftable spots (IR excluded)', () => {
+  it('rounds are a number that tracks the draftable roster, and the roster group counts draftable spots (IR excluded)', () => {
     const f = form({ draftRounds: 'match' });
     const sections = buildCreateLeagueSections(f);
     const rounds = field(f, 'draft', 'rounds');
-    expect(rounds.kind).toBe('select');
-    if (rounds.kind === 'select') {
-      expect(rounds.options[0]).toMatchObject({ value: 'match', label: 'Match roster (19 rounds)' });
+    expect(rounds.kind).toBe('number');
+    if (rounds.kind === 'number') {
+      expect(rounds.value).toBe(19);
+      expect(rounds.help).toBe('Matches your roster: 19 spots to draft');
     }
     const slots = sections.find((s) => s.key === 'roster')?.groups.find((g) => g.key === 'slots');
-    expect(slots?.label).toBe('SLOTS · 19 TOTAL');
+    expect(slots?.label).toBe('SLOTS · 19 TO DRAFT');
+  });
+
+  it('typing the roster number hands rounds back to tracking; any other number is an explicit choice', () => {
+    const setDraftRounds = vi.fn();
+    const f = form({ draftRounds: '16', setDraftRounds });
+    const rounds = field(f, 'draft', 'rounds');
+    expect(rounds.kind).toBe('number');
+    if (rounds.kind === 'number') {
+      expect(rounds.value).toBe(16);
+      expect(rounds.help).toBe('Your roster has 19 spots to draft');
+      rounds.onChange(19);
+      expect(setDraftRounds).toHaveBeenLastCalledWith('match');
+      rounds.onChange(14);
+      expect(setDraftRounds).toHaveBeenLastCalledWith('14');
+    }
+  });
+
+  it('the IR slot says it is not a roster spot; nothing else moves the draftable count', () => {
+    const f = form({ rosterSlots: { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 2, BN: 5, IR: 3 } });
+    const sections = buildCreateLeagueSections(f);
+    const slots = sections.find((s) => s.key === 'roster')?.groups.find((g) => g.key === 'slots');
+    expect(slots?.label).toBe('SLOTS · 19 TO DRAFT');
+    const ir = slots?.fields.find((x) => x.key === 'slot:IR');
+    expect(ir?.help).toBe('IR · not drafted, not a roster spot');
+  });
+
+  it('the week-start day is a season setting for matchup leagues only, Sunday by default', () => {
+    const f = field(form(), 'season', 'weekStartDay');
+    expect(f.kind).toBe('select');
+    if (f.kind !== 'select') return;
+    expect(f.value).toBe('sunday');
+    expect(f.options.map((o) => o.value)).toEqual(['sunday', 'monday']);
+    const noMatchups = buildCreateLeagueSections(form({ showMatchupSettings: false })).find((x) => x.key === 'season');
+    expect(noMatchups?.groups.flatMap((g) => g.fields).some((x) => x.key === 'weekStartDay')).toBe(false);
   });
 
   it('every select offers the value it currently holds', () => {

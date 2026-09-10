@@ -5,7 +5,7 @@
  */
 import type { ScoreboardGame, ScoresDayResponse } from '@citrus/shared';
 import type { League } from '@/services/LeagueService';
-import { clampToSeasonStart, getCurrentWeekNumber, getDraftCompletionDate, getFirstWeekStartDate } from '@/utils/weekCalculator';
+import { fantasyWeekAnchorFor, getCurrentWeekNumber } from '@/utils/weekCalculator';
 import { rowStatusText } from '@/components/scores/scoresFormat';
 import type { PressBoxTickerGame } from '@/components/pressbox/ScoreTicker';
 import type { PressBoxTonightPlayer } from '@/components/pressbox/TonightCard';
@@ -42,9 +42,9 @@ function gameStatus(g: ScoreboardGame): string {
 /** The fantasy week a league is in, or null before its draft / in the offseason. */
 export function weekOf(league: League, inOffseason: boolean): number | null {
   if (inOffseason) return null;
-  const done = getDraftCompletionDate(league);
-  if (!done || Number.isNaN(done.getTime())) return null;
-  return getCurrentWeekNumber(clampToSeasonStart(getFirstWeekStartDate(done)));
+  const first = fantasyWeekAnchorFor(league);
+  if (!first || Number.isNaN(first.getTime())) return null;
+  return getCurrentWeekNumber(first);
 }
 
 /** `EDM 3 · TOR 2` + `3rd 4:12`, or `COL · LAK` + `8:00 PM`. */

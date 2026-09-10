@@ -146,6 +146,8 @@ export interface KeeperState {
 export interface PlayoffState {
   playoffTeams: number;
   playoffWeeks: number;
+  /** Which day the matchup week starts (2026-09-10). Locked after the draft. */
+  weekStartDay: 'sunday' | 'monday';
 }
 
 type Set<T> = (update: (prev: T) => T) => void;
@@ -640,6 +642,19 @@ export function buildLeagueSettingsSections(input: LeagueSettingsInput): Setting
                 },
               ] as SettingField[])
             : []),
+          {
+            kind: 'select',
+            key: 'weekStartDay',
+            label: 'Week runs',
+            help: input.draftCompleted ? 'Fixed once the draft is complete' : 'Matchup weeks start on this day',
+            value: input.playoff.weekStartDay,
+            options: [
+              { value: 'sunday', label: 'Sunday to Saturday' },
+              { value: 'monday', label: 'Monday to Sunday' },
+            ],
+            disabled: input.draftCompleted,
+            onChange: (v) => input.setPlayoff((p) => ({ ...p, weekStartDay: v === 'monday' ? 'monday' : 'sunday' })),
+          },
         ],
       },
       ...(BRACKETS[input.playoff.playoffTeams]

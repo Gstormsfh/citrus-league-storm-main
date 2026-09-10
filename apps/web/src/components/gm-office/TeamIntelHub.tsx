@@ -20,6 +20,7 @@ import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import { waiverApi } from '@/api/waivers';
 import { logger } from '@/utils/logger';
+import { calculateStrength, depthPositionsFor, isForward } from './teamIntelDepth';
 
 interface PositionDepth {
   position: string;
@@ -42,19 +43,13 @@ const normalizePosition = (pos: string): string => {
   return '';
 };
 
-// Calculate strength and grade based on projected points (relative to league average)
-const calculateStrength = (position: string, projectedPoints: number, leagueAverage: number): { strength: 'Elite' | 'Good' | 'Average' | 'Weak'; grade: string } => {
-  const ratio = projectedPoints / Math.max(leagueAverage, 1);
-  
-  if (ratio >= 1.25) return { strength: 'Elite', grade: 'A+' };
-  if (ratio >= 1.0) return { strength: 'Good', grade: 'A' };
-  if (ratio >= 0.75) return { strength: 'Average', grade: 'B' };
-  return { strength: 'Weak', grade: 'C' };
-};
+// Depth grading lives in ./teamIntelDepth so it can be unit tested without
+// mounting the hub (contexts, services, three fetches).
 
 // Get position color
 const getPositionColor = (position: string, strength: string): string => {
   const baseColors: Record<string, string> = {
+    'F': '#F9E076',   // forwards as one group (F/D/G leagues)
     'C': '#F9E076',   // Bright Lemon Peel
     'LW': '#459345',  // Deep Lime Green
     'RW': '#F9A436',  // Zesty Tangerine
@@ -223,9 +218,24 @@ export const TeamIntelHub = () => {
         const leagueAvgs = await getLeagueAverageProjections(activeLeagueId, start, end);
         setLeagueAverages(leagueAvgs);
 
+        // F/D/G or individual positions: read it off the league row (cached
+        // client-side, so this is the same fetch the Roster page already made).
+        let positionType: unknown = 'individual';
+        try {
+          const { data: leagueRow } = await leagueApi.getLeague(activeLeagueId) as {
+            data?: { settings?: { positionType?: unknown } | null };
+          };
+          positionType = leagueRow?.settings?.positionType ?? 'individual';
+        } catch (err) {
+          logger.warn('[TeamIntelHub] league row unavailable, grading individual positions', err);
+        }
+
         // Calculate projected points for gap analysis using REAL projections
-        const positionDepths: PositionDepth[] = ['C', 'LW', 'RW', 'D', 'G'].map(pos => {
-          const posPlayers = players.filter(p => normalizePosition(p.position) === pos);
+        const positionDepths: PositionDepth[] = depthPositionsFor(positionType).map(pos => {
+          const posPlayers = players.filter(p => {
+            const norm = normalizePosition(p.position);
+            return pos === 'F' ? isForward(norm) : norm === pos;
+          });
           const count = posPlayers.length;
           
           // Calculate projected points for this position using real projections
@@ -236,10 +246,11 @@ export const TeamIntelHub = () => {
             projectedPoints += weeklyPoints;
           });
 
-          // Get league average for this position
+          // Get league average for this position (per player)
           const leagueAvgProjected = leagueAvgs.get(pos) || 0;
+          const teamPerPlayer = count > 0 ? projectedPoints / count : 0;
 
-          const { strength, grade } = calculateStrength(pos, projectedPoints, leagueAvgProjected);
+          const { strength, grade } = calculateStrength(pos, teamPerPlayer, leagueAvgProjected);
           const color = getPositionColor(pos, strength);
 
           return {

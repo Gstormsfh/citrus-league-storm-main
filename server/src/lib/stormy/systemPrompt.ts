@@ -369,7 +369,7 @@ ${describeScoringDefaults()}
 - When you discuss any player, ground the analysis in current-season stats and Citrus xG. Never fall back on general recollection when real data is in front of you.
 
 ## Week Structure
-- Fantasy weeks run **Sunday through Saturday**.
+- Fantasy weeks run **Sunday through Saturday** unless the league's context block says otherwise; a commissioner can set a league to Monday through Sunday, and the week dates in the context are the authority.
 
 ## SEASON STATUS. READ THIS BEFORE USING ANY TIME-BASED LANGUAGE
 

@@ -11,7 +11,9 @@ import {
   draftableRosterSize,
 } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
+import { AppError } from '../lib/errors';
 import { LeagueMembershipService } from './LeagueMembershipService';
+import { lockedSettingChange } from '../lib/leagueRules';
 
 // Demo league IDs that should never appear in user league lists
 const DEMO_LEAGUE_IDS = new Set([
@@ -666,6 +668,26 @@ export class LeagueService {
   /** Update league settings (generic) */
   async updateSettings(leagueId: string, userId: string, settings: Record<string, any>, scoringSettings?: Record<string, any>) {
     await this.membership.requireCommissioner(leagueId, userId);
+
+    // POST-DRAFT LOCK (2026-09-10): the week-start day and the position
+    // format shape every matchup row and slot assignment; the UI greys them
+    // out after the draft, and this is the server saying the same thing to
+    // a direct API call.
+    if (settings !== undefined) {
+      const { data: current } = await this.supabase
+        .from('leagues')
+        .select('draft_status, settings')
+        .eq('id', leagueId)
+        .maybeSingle();
+      const refusal = lockedSettingChange(
+        (current?.settings ?? null) as Record<string, unknown> | null,
+        settings,
+        current?.draft_status === 'completed',
+      );
+      if (refusal) {
+        throw AppError.conflict(refusal);
+      }
+    }
 
     const updatePayload: Record<string, any> = {
       updated_at: new Date().toISOString(),

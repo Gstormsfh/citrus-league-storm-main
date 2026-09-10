@@ -115,6 +115,10 @@ vi.mock('@/utils/weekCalculator', () => ({
   // the fetcher; the fetcher's own try/catch would have swallowed the
   // resulting throw and returned an almost empty context.
   clampToSeasonStart: vi.fn((d: Date) => d),
+  // WEEK START (2026-09-10): fetchLeagueContext now asks for the league's
+  // anchor in one call instead of clamping the draft date itself.
+  fantasyWeekAnchorFor: vi.fn().mockReturnValue(new Date('2024-10-06')),
+  weekStartDowFor: vi.fn().mockReturnValue(0),
 }));
 
 vi.mock('@/utils/scheduleMaximizer', () => ({
@@ -314,6 +318,7 @@ describe('StormyService', () => {
         getFirstWeekStartDate: vi.fn(), getCurrentWeekNumber: vi.fn(),
         getWeekStartDate: vi.fn(), getWeekEndDate: vi.fn(),
         getWeekLabel: vi.fn(), getScheduleLength: vi.fn(),
+        fantasyWeekAnchorFor: vi.fn(), weekStartDowFor: vi.fn(),
       }));
       vi.doMock('@/utils/scheduleMaximizer', () => ({
         fetchGamesForTeams: vi.fn().mockResolvedValue(new Map()),

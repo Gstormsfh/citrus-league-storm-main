@@ -472,7 +472,7 @@ export function AuctionPanel({
             <span className={cn(EYEBROW, 'text-pressbox-text/55')}>Recent results</span>
             <span className={cn(EYEBROW, 'text-pressbox-text/45 tabular-nums')}>{soldCount} sold</span>
           </div>
-          <ul className="divide-y divide-white/[0.06] max-h-[224px] overflow-y-auto">
+          <ul className="divide-y divide-white/[0.06] max-h-[224px] overflow-y-auto scrollbar-pressbox">
             {auction.history.slice(0, 12).map((h) => {
               const p = h.playerId ? playersById.get(h.playerId) ?? null : null;
               const name = h.playerName || p?.full_name || (h.playerId ? `#${h.playerId}` : 'Player');

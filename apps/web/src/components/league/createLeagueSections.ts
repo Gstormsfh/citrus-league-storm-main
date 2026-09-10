@@ -39,6 +39,7 @@ import {
   DRAFT_ROUNDS_MATCH_ROSTER,
 } from '@/types/leagueTypes';
 import { processTimeLabel, type SettingField, type SettingOption, type SettingSection } from './leagueSettingsSections';
+import type { WeekStartDay } from '@/utils/weekCalculator';
 
 export type KeeperPenalty = 'none' | 'round-cost' | 'round-escalation';
 export type PickDeadline = 'per-game' | 'first-game';
@@ -99,6 +100,8 @@ export interface CreateLeagueForm {
   setPlayoffWeeks: (v: string) => void;
   tradeDeadlineWeek: string;
   setTradeDeadlineWeek: (v: string) => void;
+  weekStartDay: WeekStartDay;
+  setWeekStartDay: (v: WeekStartDay) => void;
   keeperEnabled: boolean;
   setKeeperEnabled: (v: boolean) => void;
   keeperCount: string;
@@ -182,14 +185,16 @@ export function statPointOptions(stat: LeagueStatSetting): SettingOption[] {
   return [{ value: 'off', label: 'Off', help: 'Not counted' }, ...all.map((v) => ({ value: String(v), label: pointsLabel(v) }))];
 }
 
-const DRAFT_ROUNDS = opts([['14', '14 rounds'], ['16', '16 rounds'], ['18', '18 rounds'], ['21', '21 rounds'], ['24', '24 rounds'], ['30', '30 rounds']]);
-const draftRoundOptions = (draftable: number) =>
-  [{ value: DRAFT_ROUNDS_MATCH_ROSTER, label: `Match roster (${draftable} rounds)` }, ...DRAFT_ROUNDS];
 const PICK_CLOCKS = opts([['30', '30s'], ['60', '60s'], ['90', '90s'], ['120', '120s'], ['180', '3 min'], ['300', '5 min']]);
 const NOMINATION_CLOCKS = opts([['15', '15s'], ['30', '30s'], ['45', '45s'], ['60', '60s']]);
 const BID_CLOCKS = opts([['10', '10s'], ['15', '15s'], ['20', '20s'], ['30', '30s'], ['45', '45s']]);
 const PLAYOFF_WEEKS = opts([['1', '1 week'], ['2', '2 weeks'], ['3', '3 weeks'], ['4', '4 weeks']]);
 const TRADE_DEADLINES = opts([['0', 'None'], ['8', 'Week 8'], ['10', 'Week 10'], ['12', 'Week 12'], ['14', 'Week 14'], ['16', 'Week 16']]);
+/** Which day a fantasy week starts (2026-09-10). Sunday is the house default. */
+export const WEEK_START_OPTIONS = opts([
+  ['sunday', 'Sunday to Saturday', 'Weeks end on the biggest slate of the schedule'],
+  ['monday', 'Monday to Sunday', 'Calendar weeks'],
+]);
 const KEEPER_COUNTS = opts([['0', 'Unlimited', 'Dynasty: the whole roster is kept'], ['1', '1 keeper'], ['2', '2 keepers'], ['3', '3 keepers'], ['5', '5 keepers'], ['8', '8 keepers'], ['10', '10 keepers']]);
 const KEEPER_PENALTIES = opts([
   ['none', 'None', 'No round cost: a keeper takes the team’s last-round pick'],
@@ -420,6 +425,7 @@ export function buildCreateLeagueSections(f: CreateLeagueForm): SettingSection[]
   // ── DRAFT ──
   if (f.showDraftSettings) {
     const isAuction = f.draftType === 'auction';
+    const draftable = draftableRosterSize(f.rosterSlots);
     const draft: SettingField[] = [
       {
         kind: 'select',
@@ -434,14 +440,26 @@ export function buildCreateLeagueSections(f: CreateLeagueForm): SettingSection[]
         })),
         onChange: (v) => f.setDraftType(v as DraftType),
       },
+      // ROUNDS FOLLOW THE ROSTER (2026-09-10). A fixed menu of round counts
+      // sat beside a roster of any size and the two drifted; the desktop form
+      // had the same menu. The field now shows the draftable roster count and
+      // tracks it. A different number is a deliberate short or long draft and
+      // keeps the callout under the roster group; entering the roster number
+      // again hands tracking back.
       {
-        kind: 'select',
+        kind: 'number',
         key: 'rounds',
         label: 'Rounds',
-        help: f.draftType === 'offline' ? 'Sizes the results grid the commissioner fills in' : null,
-        value: f.draftRounds,
-        options: draftRoundOptions(draftableRosterSize(f.rosterSlots)),
-        onChange: f.setDraftRounds,
+        help:
+          f.draftType === 'offline'
+            ? 'Sizes the results grid the commissioner fills in'
+            : f.draftRounds === DRAFT_ROUNDS_MATCH_ROSTER
+              ? `Matches your roster: ${draftable} spots to draft`
+              : `Your roster has ${draftable} spots to draft`,
+        value: f.draftRounds === DRAFT_ROUNDS_MATCH_ROSTER ? draftable : num(f.draftRounds, draftable),
+        min: 1,
+        max: 40,
+        onChange: (n) => f.setDraftRounds(n === draftable ? DRAFT_ROUNDS_MATCH_ROSTER : String(n)),
       },
     ];
     if (f.draftType === 'snake' || f.draftType === 'linear') {
@@ -624,6 +642,17 @@ export function buildCreateLeagueSections(f: CreateLeagueForm): SettingSection[]
       options: TRADE_DEADLINES,
       onChange: f.setTradeDeadlineWeek,
     });
+    if (f.showMatchupSettings) {
+      season.push({
+        kind: 'select',
+        key: 'weekStartDay',
+        label: 'Week runs',
+        help: 'Fixed once the draft is done',
+        value: f.weekStartDay,
+        options: WEEK_START_OPTIONS,
+        onChange: (v) => f.setWeekStartDay(v as WeekStartDay),
+      });
+    }
     const keepers: SettingField[] = [
       {
         kind: 'toggle',
@@ -799,12 +828,12 @@ export function buildCreateLeagueSections(f: CreateLeagueForm): SettingSection[]
         },
         {
           key: 'slots',
-          label: `SLOTS · ${total} TOTAL`,
+          label: `SLOTS · ${total} TO DRAFT`,
           fields: slots.map((s) => ({
             kind: 'number',
             key: `slot:${s.slot}`,
             label: s.label,
-            help: s.slot,
+            help: s.slot === 'IR' ? 'IR · not drafted, not a roster spot' : s.slot,
             value: f.rosterSlots[s.slot] ?? s.count,
             min: 0,
             max: 10,

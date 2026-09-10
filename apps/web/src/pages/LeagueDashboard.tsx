@@ -40,7 +40,8 @@ import { useScoringRules } from '@/components/league/useScoringRules';
 import { matchupApi } from '@/api/matchups';
 import { gamesLeftOf, isBye, scoreOf, teamNameOf, winChanceOf, type WeekMatchupRow } from '@/components/matchup/scoreboard';
 import { standingsLine, type StandingsLineRow } from '@/components/league/hqLines';
-import { clampToSeasonStart, getCurrentWeekNumber, getDraftCompletionDate, getFirstWeekStartDate } from '@/utils/weekCalculator';
+import { fantasyWeekAnchorFor, getCurrentWeekNumber, type WeekStartDay } from '@/utils/weekCalculator';
+import { WEEK_START_OPTIONS } from '@/components/league/createLeagueSections';
 import { LeagueTimelineCard } from '@/components/dashboard/LeagueTimelineCard';
 import { FEATURE_PRACTICE_DRAFT } from '@/lib/featureFlags';
 import { Button } from '@/components/ui/button';
@@ -64,6 +65,7 @@ import { KeeperPanel } from '@/components/league/KeeperPanel';
 import { TradeService } from '@/services/TradeService';
 import { extractFormatSettings, AVAILABLE_CATEGORIES, DEFAULT_ROSTER_SLOTS, type LeagueSettings } from '@/types/leagueTypes';
 import { logger } from '@/utils/logger';
+import { cn } from '@/lib/utils';
 
 const LeagueDashboard = () => {
   const { leagueId } = useParams<{ leagueId: string }>();
@@ -135,6 +137,8 @@ const LeagueDashboard = () => {
   const [playoffSettings, setPlayoffSettings] = useState({
     playoffTeams: 6 as number,
     playoffWeeks: 3 as number,
+    // WEEK START (2026-09-10): saved with the playoff shape; locked after the draft.
+    weekStartDay: 'sunday' as WeekStartDay,
   });
 
   // Active settings tab
@@ -275,6 +279,7 @@ const LeagueDashboard = () => {
       setPlayoffSettings({
         playoffTeams: (fmt.playoffTeams as number) ?? 6,
         playoffWeeks: (fmt.playoffWeeks as number) ?? 3,
+        weekStartDay: fmt.weekStartDay === 'monday' ? 'monday' : 'sunday',
       });
 
       // Update roster slot settings
@@ -565,6 +570,7 @@ const LeagueDashboard = () => {
               ...currentSettings,
               playoffTeams: playoffSettings.playoffTeams,
               playoffWeeks: playoffSettings.playoffWeeks,
+              weekStartDay: playoffSettings.weekStartDay,
             },
           });
           saved = !playoffErr;
@@ -793,9 +799,9 @@ const LeagueDashboard = () => {
    */
   const currentWeek = useMemo(() => {
     if (!league || inOffseason) return null;
-    const done = getDraftCompletionDate(league);
-    if (!done || Number.isNaN(done.getTime())) return null;
-    return getCurrentWeekNumber(clampToSeasonStart(getFirstWeekStartDate(done)));
+    const first = fantasyWeekAnchorFor(league);
+    if (!first || Number.isNaN(first.getTime())) return null;
+    return getCurrentWeekNumber(first);
   }, [league, inOffseason]);
 
   const weekMatchupsQuery = useQuery({
@@ -1974,6 +1980,28 @@ const LeagueDashboard = () => {
                               </div>
                             )}
 
+                            {/* WEEK START (2026-09-10) */}
+                            <div className="space-y-2">
+                              <Label>Week Runs</Label>
+                              <Select
+                                value={playoffSettings.weekStartDay}
+                                onValueChange={(val) => setPlayoffSettings(prev => ({ ...prev, weekStartDay: val as WeekStartDay }))}
+                                disabled={league?.draft_status === 'completed'}
+                              >
+                                <SelectTrigger data-testid="league-settings-week-start"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {WEEK_START_OPTIONS.map((o) => (
+                                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-white/55">
+                                {league?.draft_status === 'completed'
+                                  ? 'Fixed once the draft is complete. The schedule was built on it.'
+                                  : 'Matchup weeks start on this day.'}
+                              </p>
+                            </div>
+
                             {playoffSettings.playoffTeams > 0 && (
                               <div className="rounded-xl ring-1 ring-white/10 bg-white/5 p-4 space-y-2">
                                 <h4 className="text-sm font-semibold">Bracket Preview</h4>
@@ -2148,7 +2176,16 @@ const LeagueDashboard = () => {
           </div>
 
           {/* Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5 sm:gap-4 sm:mb-8">
+          {/* Two columns only while the Draft Room card is here; once the
+              draft is complete the squad card is the only child, and a lone
+              card in a two-column grid left the right half of the page
+              empty on desktop (production, 2026-09-10). */}
+          <div
+            className={cn(
+              'grid grid-cols-1 gap-3 mb-5 sm:gap-4 sm:mb-8',
+              league.draft_status !== 'completed' && 'md:grid-cols-2',
+            )}
+          >
             {/* Draft Room - visible to ALL league members based on draft status */}
             {league.draft_status !== 'completed' && (
               <Card className={

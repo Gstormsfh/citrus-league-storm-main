@@ -437,7 +437,7 @@ export const PlayerPool = memo(({
         )}
         onClick={() => !isDrafted && onPlayerSelect(player)}
       >
-        <td className="px-1.5 py-2 text-center w-[44px] bg-pastel-surface-tile text-pastel-cream">
+        <td className="px-1.5 py-2 text-center w-[44px] sticky left-0 z-sticky-base bg-pastel-surface-tile text-pastel-cream">
           <span className="text-xs font-mono text-pastel-cream font-bold">
             {displayRank}
           </span>
@@ -469,6 +469,10 @@ export const PlayerPool = memo(({
         </td>
         <td className="px-2 py-1.5 text-xs text-pastel-cream/70">{player.team}</td>
         <td className="px-2 py-1.5 text-xs text-center font-medium text-pastel-cream">{player.games_played}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-bold text-sky-300 bg-sky-500/10" title={`${projectedFptsMap.get(player.id)?.gamesRemaining || 0} games remaining`}>{(projectedFptsMap.get(player.id)?.total || 0) > 0 ? (projectedFptsMap.get(player.id)!.total).toFixed(1) : '-'}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-semibold text-sky-300 bg-sky-500/10">{(projectedFptsMap.get(player.id)?.perGp || 0) > 0 ? (projectedFptsMap.get(player.id)!.perGp).toFixed(2) : '-'}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-bold text-emerald-300 bg-emerald-500/10">{(fptsMap.get(player.id) || 0).toFixed(1)}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-semibold text-emerald-300 bg-emerald-500/10">{player.games_played ? ((fptsMap.get(player.id) || 0) / player.games_played).toFixed(2) : '-'}</td>
         {player.position === 'G' ? (
           <>
             <td className="px-2 py-1.5 text-xs text-center font-semibold text-pastel-cream">{player.wins || 0}</td>
@@ -494,11 +498,7 @@ export const PlayerPool = memo(({
             <td className="px-2 py-1.5 text-xs text-center text-pastel-cream/70">{player.xGoals.toFixed(2)}</td>
           </>
         )}
-        <td className="px-2 py-1.5 text-xs text-center font-bold text-emerald-300 bg-emerald-500/10">{(fptsMap.get(player.id) || 0).toFixed(1)}</td>
-        <td className="px-2 py-1.5 text-xs text-center font-semibold text-emerald-300 bg-emerald-500/10">{player.games_played ? ((fptsMap.get(player.id) || 0) / player.games_played).toFixed(2) : '-'}</td>
-        <td className="px-2 py-1.5 text-xs text-center font-bold text-sky-300 bg-sky-500/10" title={`${projectedFptsMap.get(player.id)?.gamesRemaining || 0} games remaining`}>{(projectedFptsMap.get(player.id)?.total || 0) > 0 ? (projectedFptsMap.get(player.id)!.total).toFixed(1) : '-'}</td>
-        <td className="px-2 py-1.5 text-xs text-center font-semibold text-sky-300 bg-sky-500/10">{(projectedFptsMap.get(player.id)?.perGp || 0) > 0 ? (projectedFptsMap.get(player.id)!.perGp).toFixed(2) : '-'}</td>
-        <td className="px-2 py-1.5 text-pastel-cream">
+        <td className="px-2 py-1.5 text-pastel-cream sticky right-0 z-sticky-base bg-pastel-surface-tile shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.6)]">
           <div className="flex items-center gap-1 relative z-10" onClick={(e) => e.stopPropagation()}>
             {onShowCard && (
               <Button
@@ -945,11 +945,11 @@ export const PlayerPool = memo(({
             real second column there, so pinning the pool to the
             viewport keeps the board and the queue in view instead of
             pushing them off-screen. */}
-        <div className="overflow-auto scrollbar-styled lg:max-h-[calc(100dvh-18rem)]" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="overflow-auto scrollbar-pressbox lg:max-h-[calc(100dvh-18rem)]" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="w-full min-w-[1400px] text-sm border-collapse">
             <thead className="bg-pastel-surface-high sticky top-0 z-sticky-raised border-b border-white/10">
               <tr>
-                <th className="px-1.5 py-2 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs w-[44px]"
+                <th className="px-1.5 py-2 text-center font-semibold text-pastel-cream cursor-pointer hover:bg-white/5 transition-colors select-none text-xs w-[44px] sticky left-0 z-sticky-base bg-pastel-surface-high"
                   onClick={() => handleHeaderClick('projRank')}
                 >
                   <div className="flex items-center justify-center gap-0.5">
@@ -964,6 +964,55 @@ export const PlayerPool = memo(({
                 <th className="px-2 py-2 text-left font-semibold text-pastel-cream">Pos</th>
                 <th className="px-2 py-2 text-left font-semibold text-pastel-cream">Team</th>
                 <th className="px-2 py-2 text-center font-semibold text-pastel-cream">GP</th>
+                {/* DESKTOP POOL (2026-09-10): the decision columns lead. Before this the
+                    projection, fantasy-point and Actions columns sat 1,000px+ to the right
+                    in a 1400px table inside a ~990px pane, so on a 1512px MacBook the
+                    Draft button was off-screen until the manager scrolled the table
+                    sideways. Projection first, then season FPTS, then the raw stats. */}
+                <th className="px-2 py-1.5 text-center font-bold text-sky-300 bg-sky-500/10 cursor-pointer hover:bg-sky-500/20 transition-colors select-none text-xs"
+                  onClick={() => handleHeaderClick('projFpts')}
+                >
+                  <div className="flex items-center justify-center gap-1" title="Rest-of-season projected fantasy points (from last pipeline run)">
+                    Proj ROS
+                    {sortBy === 'projFpts' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'projFpts' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-2 py-1.5 text-center font-bold text-sky-300 bg-sky-500/10 cursor-pointer hover:bg-sky-500/20 transition-colors select-none text-xs"
+                  onClick={() => handleHeaderClick('projFptsPerGp')}
+                >
+                  <div className="flex items-center justify-center gap-1" title="Projected fantasy points per game (rest of season, from last pipeline run)">
+                    Proj/GP
+                    {sortBy === 'projFptsPerGp' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'projFptsPerGp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-2 py-1.5 text-center font-bold text-emerald-300 bg-emerald-500/10 cursor-pointer hover:bg-emerald-500/20 transition-colors select-none text-xs"
+                  onClick={() => handleHeaderClick('fpts')}
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    FPTS
+                    {sortBy === 'fpts' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'fpts' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-2 py-1.5 text-center font-bold text-emerald-300 bg-emerald-500/10 cursor-pointer hover:bg-emerald-500/20 transition-colors select-none text-xs"
+                  onClick={() => handleHeaderClick('fptsPerGp')}
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    FPTS/GP
+                    {sortBy === 'fptsPerGp' && (
+                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
+                    )}
+                    {sortBy !== 'fptsPerGp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                  </div>
+                </th>
                 {/* Conditionally show goalie or skater stats based on filter */}
                 {selectedPosition === 'G' ? (
                   <>
@@ -1170,51 +1219,7 @@ export const PlayerPool = memo(({
                 </th>
                   </>
                 )}
-                <th className="px-2 py-1.5 text-center font-bold text-emerald-300 bg-emerald-500/10 cursor-pointer hover:bg-emerald-500/20 transition-colors select-none text-xs"
-                  onClick={() => handleHeaderClick('fpts')}
-                >
-                  <div className="flex items-center justify-center gap-1">
-                    FPTS
-                    {sortBy === 'fpts' && (
-                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
-                    )}
-                    {sortBy !== 'fpts' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
-                  </div>
-                </th>
-                <th className="px-2 py-1.5 text-center font-bold text-emerald-300 bg-emerald-500/10 cursor-pointer hover:bg-emerald-500/20 transition-colors select-none text-xs"
-                  onClick={() => handleHeaderClick('fptsPerGp')}
-                >
-                  <div className="flex items-center justify-center gap-1">
-                    FPTS/GP
-                    {sortBy === 'fptsPerGp' && (
-                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
-                    )}
-                    {sortBy !== 'fptsPerGp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
-                  </div>
-                </th>
-                <th className="px-2 py-1.5 text-center font-bold text-sky-300 bg-sky-500/10 cursor-pointer hover:bg-sky-500/20 transition-colors select-none text-xs"
-                  onClick={() => handleHeaderClick('projFpts')}
-                >
-                  <div className="flex items-center justify-center gap-1" title="Rest-of-season projected fantasy points (from last pipeline run)">
-                    Proj ROS
-                    {sortBy === 'projFpts' && (
-                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
-                    )}
-                    {sortBy !== 'projFpts' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
-                  </div>
-                </th>
-                <th className="px-2 py-1.5 text-center font-bold text-sky-300 bg-sky-500/10 cursor-pointer hover:bg-sky-500/20 transition-colors select-none text-xs"
-                  onClick={() => handleHeaderClick('projFptsPerGp')}
-                >
-                  <div className="flex items-center justify-center gap-1" title="Projected fantasy points per game (rest of season, from last pipeline run)">
-                    Proj/GP
-                    {sortBy === 'projFptsPerGp' && (
-                      sortDirection === 'desc' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />
-                    )}
-                    {sortBy !== 'projFptsPerGp' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
-                  </div>
-                </th>
-                <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream text-xs">Actions</th>
+                <th className="px-2 py-1.5 text-center font-semibold text-pastel-cream text-xs sticky right-0 z-sticky-base bg-pastel-surface-high shadow-[-8px_0_12px_-8px_rgba(0,0,0,0.6)]">Actions</th>
               </tr>
             </thead>
             <tbody>

@@ -1,7 +1,7 @@
 import { ScheduleService, NHLGame } from '@/services/ScheduleService';
 import { LeagueService } from '@/services/LeagueService';
 import { Player } from '@/services/PlayerService';
-import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getWeekStartDate, getWeekEndDate } from './weekCalculator';
+import { fantasyWeekAnchorFor, getCurrentWeekNumber, getWeekStartDate, getWeekEndDate } from './weekCalculator';
 import { DEFAULT_TEST_DATE } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
 
@@ -65,9 +65,8 @@ export async function calculateWeekDates(
     try {
       const { league: leagueData, error: leagueError } = await LeagueService.getLeague(leagueId, userId);
       if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
-        const draftCompletionDate = getDraftCompletionDate(leagueData);
-        if (draftCompletionDate) {
-          const firstWeekStart = getFirstWeekStartDate(draftCompletionDate);
+        const firstWeekStart = fantasyWeekAnchorFor(leagueData);
+        if (firstWeekStart) {
           const currentWeek = getCurrentWeekNumber(firstWeekStart);
           weekStart = getWeekStartDate(currentWeek, firstWeekStart);
           weekEnd = getWeekEndDate(currentWeek, firstWeekStart);

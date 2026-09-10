@@ -383,7 +383,7 @@ export function OfflineDraftRoom({
                 Results were imported. See team rosters on the league page.
               </div>
             ) : (
-              <div className="max-h-[28rem] overflow-y-auto rounded-lg ring-1 ring-white/10 divide-y divide-white/5">
+              <div className="max-h-[28rem] overflow-y-auto scrollbar-pressbox rounded-lg ring-1 ring-white/10 divide-y divide-white/5">
                 {importedPicks.map((p) => (
                   <div
                     key={p.pickNumber}
@@ -536,7 +536,7 @@ export function OfflineDraftRoom({
         {/* Slot board side */}
         <Card className="border-0 bg-pastel-surface-tile ring-1 ring-white/10">
           <CardContent className="p-2 sm:p-3">
-            <div className="max-h-[36rem] overflow-y-auto divide-y divide-white/5">
+            <div className="max-h-[36rem] overflow-y-auto scrollbar-pressbox divide-y divide-white/5">
               {Array.from({ length: slotCount }, (_, i) => {
                 const teamId = slotTeam(i);
                 const playerKey = entries[i];

@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { MatchupPlayer } from "./types";
 import { MatchupPositionGroup } from "./MatchupPositionGroup";
 import { organizeMatchupData } from "./matchupUtils";
+import type { PositionType } from "@/utils/rosterUtils";
 import { ScoringCalculator, ScoringSettings } from "@/utils/scoringUtils";
 import { NEUTRAL_CHIP, POSITION_CHIP_BASE } from "@/components/roster/positionChip";
 import { isMobileViewport } from "@/hooks/useIsMobile";
@@ -61,6 +62,9 @@ interface MatchupComparisonProps {
   weeklyOpponentTotal?: number;
   // League scoring settings for dynamic calculations
   scoringSettings?: ScoringSettings;
+  /** The league's slot plan (2026-09-10): F/D/G or individual, and starter counts. */
+  positionType?: PositionType;
+  rosterSlots?: Record<string, number>;
   // Team identity for the sticky column header (2026-08-25). Before this,
   // team names appeared ONLY in the ScoreCard at the top of the page — scroll
   // down into the lineup and both columns were anonymous, so "which side is
@@ -100,6 +104,8 @@ export const MatchupComparison = ({
   weeklyUserTotal,
   weeklyOpponentTotal,
   scoringSettings,
+  positionType = 'individual',
+  rosterSlots,
   userTeamName,
   opponentTeamName,
   isOwnTeam = false,
@@ -114,7 +120,9 @@ export const MatchupComparison = ({
     userStarters,
     opponentStarters,
     userSlotAssignments,
-    opponentSlotAssignments
+    opponentSlotAssignments,
+    positionType,
+    rosterSlots,
   );
 
   // Flatten all players into one continuous list, tracking which are UTIL

@@ -31,7 +31,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { PB_LOADING_MIN_MS, useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { useSeasonStatus } from '@/hooks/useSeasonStatus';
-import { clampToSeasonStart, getCurrentWeekNumber, getDraftCompletionDate, getFirstWeekStartDate, getScheduleLength } from '@/utils/weekCalculator';
+import { fantasyWeekAnchorFor, getCurrentWeekNumber, getScheduleLength } from '@/utils/weekCalculator';
 import { shortDateLabel } from '@/components/scores/scoresFormat';
 
 import { PlayoffService, type PlayoffPictureTeam, type PlayoffBracket as BracketType } from '@/services/PlayoffService';
@@ -89,9 +89,8 @@ const Standings = () => {
    */
   const weekOfSeason = useMemo(() => {
     if (!activeLeague || !hasMatchups) return null;
-    const done = getDraftCompletionDate(activeLeague);
-    if (!done || Number.isNaN(done.getTime())) return null;
-    const first = clampToSeasonStart(getFirstWeekStartDate(done));
+    const first = fantasyWeekAnchorFor(activeLeague);
+    if (!first || Number.isNaN(first.getTime())) return null;
     const week = getCurrentWeekNumber(first);
     const length = getScheduleLength(first);
     return week >= 1 && week <= length ? { week, length } : null;
@@ -726,7 +725,7 @@ const Standings = () => {
             </div>
 
             {/* Main Content */}
-            <div className="min-w-0 lg:col-start-2 lg:row-start-2 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-3 lg:px-6 order-1 lg:order-2">
+            <div className="min-w-0 lg:col-start-2 lg:row-start-2 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto scrollbar-pressbox px-3 lg:px-6 order-1 lg:order-2">
           
           {userLeagueState === 'logged-in-no-league' && (
             <div className="max-w-3xl mx-auto mb-12">

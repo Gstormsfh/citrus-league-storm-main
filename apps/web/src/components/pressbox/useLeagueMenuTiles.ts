@@ -18,7 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { getLeagueFormat, type League } from '@/services/LeagueService';
-import { clampToSeasonStart, getCurrentWeekNumber, getDraftCompletionDate, getFirstWeekStartDate, getScheduleLength } from '@/utils/weekCalculator';
+import { fantasyWeekAnchorFor, getCurrentWeekNumber, getScheduleLength } from '@/utils/weekCalculator';
 import { isBye, teamNameOf, type WeekMatchupRow } from '@/components/matchup/scoreboard';
 import type { StandingsLineRow } from '@/components/league/hqLines';
 import { leagueMenuTiles, type LeagueMenuTile } from './leagueMenuTiles';
@@ -35,9 +35,8 @@ const rowsOf = <T,>(res: unknown): T[] => {
 /** The fantasy week by the Matchup page's arithmetic, or null when there is none. */
 function weekOf(league: League | null): { week: number; length: number } | null {
   if (!league || league.draft_status !== 'completed') return null;
-  const done = getDraftCompletionDate(league);
-  if (!done || Number.isNaN(done.getTime())) return null;
-  const first = clampToSeasonStart(getFirstWeekStartDate(done));
+  const first = fantasyWeekAnchorFor(league);
+  if (!first || Number.isNaN(first.getTime())) return null;
   const week = getCurrentWeekNumber(first);
   const length = getScheduleLength(first);
   return week >= 1 && week <= length ? { week, length } : null;

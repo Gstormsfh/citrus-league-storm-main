@@ -69,12 +69,12 @@ import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSel
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
 import { getTodayMST, getTodayMSTDate, formatWaiverProcessTime, formatMoment, computeNextWaiverProcessMoment } from '@/utils/timezoneUtils';
 import { getCurrentSeason, getProjectionsSeason } from '@/utils/seasonConstants';
-import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate, clampToSeasonStart } from '@/utils/weekCalculator';
+import { fantasyWeekAnchorFor, weekStartDowFor, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
 import { logger } from '@/utils/logger';
 import { clearRosterCaches, notifyRosterChanged } from '@/utils/rosterRefresh';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
-import { resolveFantasyPosition, type PositionType, getRosterSlots, DEFAULT_ROSTER_SLOTS, DEFAULT_FDG_ROSTER_SLOTS, getSlotPositions } from '@/utils/rosterUtils';
+import { resolveFantasyPosition, type PositionType, getRosterSlots, getSlotPositions } from '@/utils/rosterUtils';
 
 // Plain array move — inlined so this page no longer depends on @dnd-kit at
 // all (2026-08-25 drag-and-drop removal). @dnd-kit/sortable itself is still
@@ -1314,13 +1314,12 @@ const Roster = () => {
     if (userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league') return;
 
     const initWeeks = async () => {
-      const draftCompletionDate = getDraftCompletionDate(activeLeague);
-      if (!draftCompletionDate) return;
-
       // WEEK-MATH FIX (2026-08-22): clamp to the season start like matchup
       // generation does — an offseason draft otherwise anchors week labels/
       // dates at an Aug/Sep calendar week that contradicts the schedule.
-      const firstWeek = clampToSeasonStart(getFirstWeekStartDate(draftCompletionDate));
+      // 2026-09-10: one league-aware anchor (settings.weekStartDay).
+      const firstWeek = fantasyWeekAnchorFor(activeLeague);
+      if (!firstWeek) return;
       setFirstWeekStart(firstWeek);
 
       // Fetch all matchups to determine available weeks and find current week by date
@@ -3537,7 +3536,7 @@ const Roster = () => {
               : "lg:grid-cols-[200px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)]"
           )}>
             {/* Main Content - MOBILE: Full width / DESKTOP: Scrollable panel */}
-            <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-3 lg:px-0 order-1 lg:order-2">
+            <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto scrollbar-pressbox px-3 lg:px-0 order-1 lg:order-2">
               {/* Fantasy Team Header — Citrus 2.0 dark surface.
 
                   ONE LINE ON PHONES (2026-09-01, audit R4). Below lg the card
@@ -3695,11 +3694,13 @@ const Roster = () => {
                 {/* PRESS BOX (2026-09-04): a segmented control below lg — the
                     #16241B well, 2px of padding, cream on the active pill —
                     and the underline strip from lg, where the header's
-                    sub-tabs are not drawn. Still four equal columns. */}
+                    sub-tabs are not drawn. Still four equal columns: the
+                    lg:grid-cols-2 that used to sit here until 2xl stacked the
+                    four views two-by-two in an 860px pane (2026-09-10). */}
                 {/* PHONE (2026-09-05): the artboard has no view switcher
                     under the team card; LOG opens Transactions and the
                     other two views are the desktop's. Hidden below lg. */}
-                <TabsList className="max-lg:hidden w-full grid grid-cols-4 gap-0.5 p-0.5 h-auto rounded-[8px] bg-pressbox-tile mx-3 max-lg:w-[calc(100%-24px)] mt-2 lg:mx-0 lg:mt-0 lg:w-full lg:grid-cols-2 2xl:grid-cols-4 lg:p-0 lg:gap-0 lg:h-auto lg:rounded-none lg:bg-transparent lg:border-b lg:border-white/[0.08]">
+                <TabsList className="max-lg:hidden w-full grid grid-cols-4 gap-0.5 p-0.5 h-auto rounded-[8px] bg-pressbox-tile mx-3 max-lg:w-[calc(100%-24px)] mt-2 lg:mx-0 lg:mt-0 lg:w-full lg:grid-cols-4 lg:p-0 lg:gap-0 lg:h-auto lg:rounded-none lg:bg-transparent lg:border-b lg:border-white/[0.08]">
                 <TabsTrigger
                   value="roster"
                   className={ROSTER_VIEW_TAB}
@@ -3788,6 +3789,7 @@ const Roster = () => {
                           }}
                           selectedDate={selectedDate}
                           hideScores={true}
+                          weekStartDow={weekStartDowFor(activeLeague)}
                         />
                         {selectedDate && (
                           <div className="mt-3 text-sm text-white/55">
