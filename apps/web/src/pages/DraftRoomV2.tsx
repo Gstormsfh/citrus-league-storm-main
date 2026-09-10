@@ -96,6 +96,7 @@ import { useLeague } from '@/contexts/LeagueContext';
 import {
   buildDraftProjectionMap,
   buildQualityScales,
+  capKeyFor,
   normalizeDraftPosition,
   picksUntilNextTurn,
   qualitySignalFor,
@@ -1924,8 +1925,14 @@ function MainTabs({
           ?.settings?.rosterSlots;
         if (cancelled) return;
         if (raw && typeof raw === 'object') {
+          // F/D/G LEAGUES (2026-09-10). Their settings carry `F`, not
+          // C/LW/RW. Reading only the five individual keys left such a
+          // league with caps for D and G alone: no forward cap, so the
+          // scarcity strip, the autodraft guard and the need line all went
+          // silent on forwards. `F` is read here; draftDecision.ts folds
+          // C/LW/RW picks onto it wherever a cap is compared.
           const caps: Record<string, number> = {};
-          for (const pos of ['C', 'LW', 'RW', 'D', 'G']) {
+          for (const pos of ['C', 'LW', 'RW', 'F', 'D', 'G']) {
             const n = Number(raw[pos]);
             if (Number.isFinite(n) && n > 0) caps[pos] = n;
           }
@@ -2384,13 +2391,17 @@ function MainTabs({
           for (const entry of myEntries) {
             const owned = playersById.get(String(entry.playerId));
             const pos = owned?.position;
-            if (pos) counts[pos] = (counts[pos] ?? 0) + 1;
+            if (pos) {
+              const key = capKeyFor(pos, rosterCaps);
+              counts[key] = (counts[key] ?? 0) + 1;
+            }
           }
           underCap = scored.find(({ p }) => {
-            const cap = rosterCaps[p.position];
+            const key = capKeyFor(p.position, rosterCaps);
+            const cap = rosterCaps[key];
             // Positions outside the cap map never block a pick.
             if (cap === undefined) return true;
-            return (counts[p.position] ?? 0) < cap;
+            return (counts[key] ?? 0) < cap;
           });
         }
         target = (underCap ?? scored[0])?.p;
@@ -2402,6 +2413,105 @@ function MainTabs({
     }, 1500);
     return () => clearTimeout(timer);
   }, [autodraftOn, amIOnClock, isSubmitPending, isMyKeeperSlot, derived?.currentPickNumber, availablePlayers, queue, handleDraftFromPool, rosterCaps, myTeamId, playersById, leagueScoring]);
+
+  /*
+   * THE BOARD IS NOT A TAB ON DESKTOP (2026-09-10).
+   *
+   * The room shipped five phone tabs and reused three of them at every
+   * width, so a 1440px monitor showed one pane at a time and the board only
+   * when you asked for it. The Sleeper reference keeps the board on screen
+   * permanently with the pool beneath it and the queue and rosters in a
+   * right rail, and reading the shape of the draft while you shop is the
+   * whole reason a board exists.
+   *
+   * The pane is defined ONCE here and placed twice: above the tab strip on
+   * desktop, inside `TabsContent value="board"` on a phone. Never both at
+   * once, because `DraftBoard` owns a scroll effect keyed to the live pick
+   * and two mounted copies would fight over it.
+   */
+  const boardPane = (
+    <>
+          {/* AUCTION BOARD (2026-09-05): a lot has no pick number a team was
+              owed, so the snake matrix ("1.01 ON THE CLOCK") is the wrong
+              picture. Each team's column fills from the top with what it
+              bought, price under the name, budget in the head. */}
+          {snapshot?.format === 'auction' && derived ? (
+            <AuctionBoard
+              teams={teams}
+              derived={derived}
+              auction={auctionDerived}
+              playersById={playersById}
+              myTeamId={myTeamId}
+              slotsPerTeam={
+                teams.length > 0 && derived.totalPicks > 0
+                  ? Math.round(derived.totalPicks / teams.length)
+                  : 0
+              }
+              onPlayerClick={(playerId) => {
+                const picked = playersById.get(playerId);
+                if (picked) setCardPlayer(picked);
+              }}
+            />
+          ) : (
+          <>
+          {/* DR-4 (2026-07-30) — pre-draft board copy. */}
+          {derived?.draftStatus === 'not_started' && (
+            <div
+              className="mb-3 rounded border border-dashed border-muted-foreground/40 bg-muted/30 p-4 text-sm text-muted-foreground"
+              data-testid="board-pre-draft-copy"
+            >
+              Draft hasn’t started yet. The board will fill in live as
+              picks land.
+            </div>
+          )}
+          <DraftBoard
+            teams={v1Teams}
+            draftHistory={draftHistory}
+            currentPick={derived?.currentPickNumber ?? 0}
+            currentRound={derived?.currentRoundNumber ?? 0}
+            /*
+             * ARCHITECT 2026-08-12 (BOARD-ROUNDS / inbox E129). This prop was
+             * dropped in the v1 -> v2 port. `DraftBoard`'s signature defaults
+             * `totalRounds = 16` (DraftBoard.tsx:57) and computes
+             * `totalPicks = teams.length * totalRounds`, so without it the v2
+             * board showed EVERY league as a 16-round draft. Observed live on
+             * a 12x21 league that had finished: the board header read
+             * "252 of 192 picks made" — a denominator smaller than the
+             * numerator. In a live 21-round draft it would read
+             * "192 of 192 picks made" around pick 192 and stay there for the
+             * remaining 60 picks, which reads as "the draft is over" three
+             * quarters of the way through. v1 has always passed this
+             * (DraftRoom.tsx:4574, `league?.draft_rounds || ... || 21`).
+             *
+             * Deriving it from `derived.totalPicks` rather than from a league
+             * settings field is deliberate: `totalPicks` comes straight from
+             * `DraftSnapshot.stateSnapshot.totalPicks`, i.e. the ENGINE's own
+             * authoritative count, and it is the same value the header two
+             * hundred lines up already renders. Computing the board's
+             * denominator from it makes the two numbers agree by construction
+             * instead of by coincidence. `Math.round` (not ceil/floor) because
+             * totalPicks is always teams x rounds exactly; rounding only
+             * guards float noise. Falls back to the old 16 only when there are
+             * no teams to divide by, which is the pre-snapshot render.
+             */
+            totalRounds={
+              v1Teams.length > 0 && derived && derived.totalPicks > 0
+                ? Math.round(derived.totalPicks / v1Teams.length)
+                : undefined
+            }
+            draftType="snake"
+            keeperSlots={keeperSlotNames}
+            /* PRESS BOX (2026-09-04): the outlined column and the card on tap. */
+            userTeamId={myTeamId}
+            onPlayerClick={(playerId) => {
+              const picked = playersById.get(playerId);
+              if (picked) setCardPlayer(picked);
+            }}
+          />
+          </>
+          )}
+    </>
+  );
 
   return (
     <div className="space-y-3">
@@ -2556,6 +2666,14 @@ function MainTabs({
         )}
       </div>
 
+      {/* Desktop: the board sits above the strip and stays there. The pool,
+          history and the right rail read around it rather than replacing it. */}
+      {!isMobile && (
+        <section className="mb-5" aria-label="Draft board" data-testid="draft-board-desktop">
+          {boardPane}
+        </section>
+      )}
+
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
         {/* PRESS BOX (2026-09-04): artboard 4a's strip — four centred
             columns in Barlow Condensed at .14em, an orange rule under the
@@ -2576,8 +2694,9 @@ function MainTabs({
                   { key: 'history', label: 'History' },
                 ]
               : [
+                  // No Board trigger: the board is rendered above this strip
+                  // at every desktop width and never hides behind a tab.
                   { key: 'players', label: 'Players' },
-                  { key: 'board', label: 'Board' },
                   { key: 'history', label: 'History' },
                 ]
           }
@@ -2678,87 +2797,11 @@ function MainTabs({
           )}
         </TabsContent>
 
-        <TabsContent value="board" className="mt-4">
-          {/* AUCTION BOARD (2026-09-05): a lot has no pick number a team was
-              owed, so the snake matrix ("1.01 ON THE CLOCK") is the wrong
-              picture. Each team's column fills from the top with what it
-              bought, price under the name, budget in the head. */}
-          {snapshot?.format === 'auction' && derived ? (
-            <AuctionBoard
-              teams={teams}
-              derived={derived}
-              auction={auctionDerived}
-              playersById={playersById}
-              myTeamId={myTeamId}
-              slotsPerTeam={
-                teams.length > 0 && derived.totalPicks > 0
-                  ? Math.round(derived.totalPicks / teams.length)
-                  : 0
-              }
-              onPlayerClick={(playerId) => {
-                const picked = playersById.get(playerId);
-                if (picked) setCardPlayer(picked);
-              }}
-            />
-          ) : (
-          <>
-          {/* DR-4 (2026-07-30) — pre-draft board copy. */}
-          {derived?.draftStatus === 'not_started' && (
-            <div
-              className="mb-3 rounded border border-dashed border-muted-foreground/40 bg-muted/30 p-4 text-sm text-muted-foreground"
-              data-testid="board-pre-draft-copy"
-            >
-              Draft hasn’t started yet. The board will fill in live as
-              picks land.
-            </div>
-          )}
-          <DraftBoard
-            teams={v1Teams}
-            draftHistory={draftHistory}
-            currentPick={derived?.currentPickNumber ?? 0}
-            currentRound={derived?.currentRoundNumber ?? 0}
-            /*
-             * ARCHITECT 2026-08-12 (BOARD-ROUNDS / inbox E129). This prop was
-             * dropped in the v1 -> v2 port. `DraftBoard`'s signature defaults
-             * `totalRounds = 16` (DraftBoard.tsx:57) and computes
-             * `totalPicks = teams.length * totalRounds`, so without it the v2
-             * board showed EVERY league as a 16-round draft. Observed live on
-             * a 12x21 league that had finished: the board header read
-             * "252 of 192 picks made" — a denominator smaller than the
-             * numerator. In a live 21-round draft it would read
-             * "192 of 192 picks made" around pick 192 and stay there for the
-             * remaining 60 picks, which reads as "the draft is over" three
-             * quarters of the way through. v1 has always passed this
-             * (DraftRoom.tsx:4574, `league?.draft_rounds || ... || 21`).
-             *
-             * Deriving it from `derived.totalPicks` rather than from a league
-             * settings field is deliberate: `totalPicks` comes straight from
-             * `DraftSnapshot.stateSnapshot.totalPicks`, i.e. the ENGINE's own
-             * authoritative count, and it is the same value the header two
-             * hundred lines up already renders. Computing the board's
-             * denominator from it makes the two numbers agree by construction
-             * instead of by coincidence. `Math.round` (not ceil/floor) because
-             * totalPicks is always teams x rounds exactly; rounding only
-             * guards float noise. Falls back to the old 16 only when there are
-             * no teams to divide by, which is the pre-snapshot render.
-             */
-            totalRounds={
-              v1Teams.length > 0 && derived && derived.totalPicks > 0
-                ? Math.round(derived.totalPicks / v1Teams.length)
-                : undefined
-            }
-            draftType="snake"
-            keeperSlots={keeperSlotNames}
-            /* PRESS BOX (2026-09-04): the outlined column and the card on tap. */
-            userTeamId={myTeamId}
-            onPlayerClick={(playerId) => {
-              const picked = playersById.get(playerId);
-              if (picked) setCardPlayer(picked);
-            }}
-          />
-          </>
-          )}
-        </TabsContent>
+        {isMobile && (
+          <TabsContent value="board" className="mt-4">
+            {boardPane}
+          </TabsContent>
+        )}
 
         <TabsContent value="history" className="mt-2">
           {/* PRESS BOX (2026-09-04): `round.pick` labels, the face, your

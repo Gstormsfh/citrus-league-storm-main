@@ -95,6 +95,19 @@ export function keeperSlotKey(teamId: string, round: number): string {
 }
 
 /**
+ * The penalty a league actually applies (2026-09-10). Dynasty keeps the whole
+ * roster and every keeper is free, whatever `keeperPenalty` says: with 21 of
+ * 21 kept every round is consumed regardless, and a player with no recorded
+ * original round would COALESCE to round 1 and collide with every other one.
+ * `get_keeper_draft_costs` returns a null effective_round for dynasty; this
+ * is the engine's side of that same rule, so the panel and the board agree.
+ */
+export function keeperPenaltyFor(settings: Record<string, unknown> | null | undefined): string {
+  if (settings?.dynastyMode === true) return 'none';
+  return typeof settings?.keeperPenalty === 'string' ? (settings.keeperPenalty as string) : 'none';
+}
+
+/**
  * The round a locked keeper costs, mirroring `get_keeper_draft_costs`
  * (the SQL the keeper panel reads) so the engine and the panel show the
  * same round. Null is "free" (penalty none or unknown).

@@ -9,6 +9,26 @@ const pool = ['d1', 'c1', 'd2', 'lw1', 'd3', 'g1', 'rw1', 'd4', 'd5', 'd6', 'd7'
 const positionOf = (id: string) => (id.startsWith('lw') ? 'LW' : id.startsWith('rw') ? 'RW' : id[0].toUpperCase());
 
 describe('draftNeedLine', () => {
+  describe('an F/D/G league (2026-09-10)', () => {
+    const fdgCaps = { F: 6, D: 4, G: 2 };
+
+    it('counts a centre and two wingers against F, so the need is 3 not 6', () => {
+      const line = draftNeedLine({ caps: fdgCaps, myPositions: ['C', 'LW', 'RW'], orderedIds: pool, positionOf, picksAway: 3 });
+      expect(line?.position).toBe('D');
+      // D needs 4 (none drafted) > F needs 3: D wins. Prove F was reduced by
+      // asking again with D filled.
+      const line2 = draftNeedLine({ caps: fdgCaps, myPositions: ['C', 'LW', 'RW', 'D', 'D', 'D', 'D'], orderedIds: pool, positionOf, picksAway: 3 });
+      expect(line2).toMatchObject({ position: 'F', need: 3 });
+    });
+
+    it('the best available at F is the first C/LW/RW in pool order', () => {
+      const line = draftNeedLine({ caps: { F: 6, D: 1, G: 1 }, myPositions: ['D', 'G'], orderedIds: pool, positionOf, picksAway: 0 });
+      expect(line?.position).toBe('F');
+      // pool order: d1, c1, ... -> c1 is the first forward
+      expect(line?.text).toContain('F');
+    });
+  });
+
   it('names the position with the most open slots and counts its top eight inside the picks ahead', () => {
     // Drafted 2 C, 1 D, 1 G: D needs 3, the most. 11 picks before my turn:
     // of the top-8 D (d1..d8, at pool indexes 0,2,4,7,8,9,10,11), those under 11 are d1,d2,d3,d4,d5,d6,d7 = 7.

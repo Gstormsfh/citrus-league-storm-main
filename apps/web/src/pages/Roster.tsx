@@ -74,7 +74,7 @@ import { Matchup as MatchupType } from '@/services/MatchupService';
 import { logger } from '@/utils/logger';
 import { clearRosterCaches, notifyRosterChanged } from '@/utils/rosterRefresh';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
-import { resolveFantasyPosition, type PositionType, getRosterSlots, DEFAULT_ROSTER_SLOTS, DEFAULT_FDG_ROSTER_SLOTS, getSlotPositions } from '@/utils/rosterUtils';
+import { resolveFantasyPosition, type PositionType, getRosterSlots, getSlotPositions } from '@/utils/rosterUtils';
 
 // Plain array move — inlined so this page no longer depends on @dnd-kit at
 // all (2026-08-25 drag-and-drop removal). @dnd-kit/sortable itself is still

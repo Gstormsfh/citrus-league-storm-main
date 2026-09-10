@@ -10,6 +10,7 @@
  * the picks ahead of you, which is the honest form of that warning.
  */
 import { positionChipKey } from '@/components/roster/positionChip';
+import { capKeyFor } from './draftDecision';
 
 export interface DraftNeedInput {
   /** Roster slots per position, e.g. `{ C: 2, LW: 2, RW: 2, D: 4, G: 2 }`. */
@@ -46,9 +47,17 @@ const TOP = 8;
 
 export function draftNeedLine(input: DraftNeedInput): DraftNeed | null {
   if (!input.caps) return null;
+  // F/D/G leagues cap forwards as one group (2026-09-10): the cap map says
+  // `F`, the picks say C/LW/RW. Fold every position onto the cap vocabulary
+  // before comparing, or a forward league reports an F need that no pick can
+  // ever satisfy.
+  const keyOf = (p: string | null | undefined) => {
+    const chip = positionChipKey(p);
+    return chip ? capKeyFor(chip, input.caps) : '';
+  };
   const filled = new Map<string, number>();
   for (const p of input.myPositions) {
-    const key = positionChipKey(p);
+    const key = keyOf(p);
     if (key) filled.set(key, (filled.get(key) ?? 0) + 1);
   }
   let best: { position: string; need: number } | null = null;
@@ -64,7 +73,7 @@ export function draftNeedLine(input: DraftNeedInput): DraftNeed | null {
     let seen = 0;
     let gone = 0;
     for (let i = 0; i < input.orderedIds.length && seen < TOP; i++) {
-      if (positionChipKey(input.positionOf(input.orderedIds[i])) !== best.position) continue;
+      if (keyOf(input.positionOf(input.orderedIds[i])) !== best.position) continue;
       seen += 1;
       if (i < input.picksAway) gone += 1;
     }
@@ -80,11 +89,11 @@ export function draftNeedLine(input: DraftNeedInput): DraftNeed | null {
         : `${topEightGone} of the top-${TOP} ${best.position} go before your next pick`;
 
   // Best available at the needed position, and best overall, by the pool's order.
-  const bestAtPositionId = input.orderedIds.find((id) => positionChipKey(input.positionOf(id)) === best!.position) ?? null;
+  const bestAtPositionId = input.orderedIds.find((id) => keyOf(input.positionOf(id)) === best!.position) ?? null;
   const name = (id: string | null) => (id && input.nameOf ? shortName(input.nameOf(id)) : null);
   const bestAtPosition = name(bestAtPositionId);
   const bestOverall = name(input.orderedIds[0] ?? null);
-  const bestOverallPos = input.orderedIds[0] ? positionChipKey(input.positionOf(input.orderedIds[0])) : null;
+  const bestOverallPos = input.orderedIds[0] ? keyOf(input.positionOf(input.orderedIds[0])) : null;
 
   let urgency: 'now' | 'wait' | 'open';
   let phoneText: string;

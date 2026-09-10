@@ -21,8 +21,19 @@ export type FantasyPosition = IndividualPosition | ForwardPosition;
 // Default Roster Slot Configurations
 // ============================================================================
 
-/** Default roster slots for individual (C/LW/RW/D/G) leagues */
-export const DEFAULT_ROSTER_SLOTS: Record<string, number> = {
+/*
+ * STARTING LINEUP DEFAULTS, NOT ROSTER DEFAULTS (2026-09-10).
+ *
+ * These two maps hold the slots a lineup FILLS: starters plus UTIL, no bench,
+ * no IR. `@/types/leagueTypes` exports the full-roster lists League Create
+ * draws from (starters, bench and IR), and until today both files exported
+ * them under the same names. Same name, two answers, one of them wrong in
+ * any file that imported the other. The roster page reads these; league
+ * creation reads leagueTypes; the names now say which is which.
+ */
+
+/** Default STARTING slots for individual (C/LW/RW/D/G) leagues */
+export const DEFAULT_STARTER_SLOTS: Record<string, number> = {
   C: 2,
   LW: 2,
   RW: 2,
@@ -31,8 +42,8 @@ export const DEFAULT_ROSTER_SLOTS: Record<string, number> = {
   UTIL: 1,
 };
 
-/** Default roster slots for F/D/G leagues */
-export const DEFAULT_FDG_ROSTER_SLOTS: Record<string, number> = {
+/** Default STARTING slots for F/D/G leagues */
+export const DEFAULT_FDG_STARTER_SLOTS: Record<string, number> = {
   F: 6,
   D: 4,
   G: 2,
@@ -40,7 +51,7 @@ export const DEFAULT_FDG_ROSTER_SLOTS: Record<string, number> = {
 };
 
 // Keep backward-compatible reference
-const ROSTER_SLOTS = DEFAULT_ROSTER_SLOTS;
+const ROSTER_SLOTS = DEFAULT_STARTER_SLOTS;
 
 /**
  * Build a roster slots config from league settings, falling back to defaults.
@@ -53,7 +64,7 @@ export function getRosterSlots(
   if (leagueRosterSlots && Object.keys(leagueRosterSlots).length > 0) {
     return leagueRosterSlots;
   }
-  return positionType === 'forward' ? DEFAULT_FDG_ROSTER_SLOTS : DEFAULT_ROSTER_SLOTS;
+  return positionType === 'forward' ? DEFAULT_FDG_STARTER_SLOTS : DEFAULT_STARTER_SLOTS;
 }
 
 // ============================================================================
@@ -161,7 +172,7 @@ export function calculateEligibleGamesRemaining(
   rosterSlots?: Record<string, number>
 ): number {
   const todayStr = getTodayMST();
-  const slots = rosterSlots || (positionType === 'forward' ? DEFAULT_FDG_ROSTER_SLOTS : ROSTER_SLOTS);
+  const slots = rosterSlots || (positionType === 'forward' ? DEFAULT_FDG_STARTER_SLOTS : ROSTER_SLOTS);
 
   // Group games by date
   const gamesByDate = new Map<string, MatchupPlayer[]>();

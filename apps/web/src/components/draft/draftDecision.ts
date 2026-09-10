@@ -63,16 +63,53 @@ export interface DraftProjection {
 }
 
 /**
- * The five starting positions a fantasy roster names. UTIL, BENCH and IR are
+ * The starting positions a fantasy roster can name. UTIL, BENCH and IR are
  * deliberately absent — see `startersLeft` for what that costs and why it is
  * the safe direction to be wrong in.
+ *
+ * `F` (2026-09-10): an F/D/G league caps forwards as one group, so its
+ * settings carry `F` and no `C`/`LW`/`RW`. Before today the room read only
+ * the five individual keys, found no forward cap at all in such a league, and
+ * the scarcity strip, the autodraft guard and Stormy's need line all went
+ * quiet on forwards -- the position group that decides most drafts. A strip
+ * row only renders for a position with slots, so an individual league never
+ * shows F and a forward league never shows C/LW/RW.
  */
-export const DRAFT_POSITIONS = ['C', 'LW', 'RW', 'D', 'G'] as const;
+export const DRAFT_POSITIONS = ['C', 'LW', 'RW', 'F', 'D', 'G'] as const;
 export type DraftPosition = (typeof DRAFT_POSITIONS)[number];
 
-/** `L` → `LW`, `Centre` → `C`, anything unrecognised → `''`. */
+/** True when the league caps forwards as a group: `F` present, `C/LW/RW` absent. */
+export function capsGroupForwards(caps: Record<string, number> | null | undefined): boolean {
+  if (!caps) return false;
+  return 'F' in caps && !('C' in caps) && !('LW' in caps) && !('RW' in caps);
+}
+
+/** The cap key a player counts against: `C/LW/RW` fold onto `F` in a forward league. */
+export function capKeyFor(position: string, caps: Record<string, number> | null | undefined): string {
+  const u = position.trim().toUpperCase();
+  if (capsGroupForwards(caps) && (u === 'C' || u === 'LW' || u === 'RW')) return 'F';
+  return u;
+}
+
+/** Fold a by-position count map onto the cap vocabulary the league actually uses. */
+export function foldForwards<T extends string>(
+  byPosition: Partial<Record<T | DraftPosition, number>>,
+  caps: Record<string, number> | null | undefined,
+): Partial<Record<DraftPosition, number>> {
+  if (!capsGroupForwards(caps)) return byPosition as Partial<Record<DraftPosition, number>>;
+  const out: Partial<Record<DraftPosition, number>> = {};
+  for (const [pos, n] of Object.entries(byPosition) as [string, number | undefined][]) {
+    if (n === undefined) continue;
+    const key = capKeyFor(pos, caps) as DraftPosition;
+    out[key] = (out[key] ?? 0) + n;
+  }
+  return out;
+}
+
+/** `L` → `LW`, `Centre` → `C`, `F` → `F`, anything unrecognised → `''`. */
 export function normalizeDraftPosition(raw: string | null | undefined): DraftPosition | '' {
   const u = (raw ?? '').trim().toUpperCase();
+  if (u === 'F' || u === 'FORWARD') return 'F';
   if (u === 'C' || u === 'CENTRE' || u === 'CENTER') return 'C';
   if (u === 'LW' || u === 'L' || u === 'LEFT' || u === 'LEFTWING') return 'LW';
   if (u === 'RW' || u === 'R' || u === 'RIGHT' || u === 'RIGHTWING') return 'RW';
@@ -264,14 +301,14 @@ export function scarcityStrip(input: {
   myFilledByPosition: Partial<Record<DraftPosition, number>>;
   picksUntilNextTurn: number | null;
 }): PositionScarcity[] {
-  const {
-    teamCount,
-    startingSlots,
-    availableByPosition,
-    draftedByPosition,
-    myFilledByPosition,
-    picksUntilNextTurn,
-  } = input;
+  const { teamCount, picksUntilNextTurn } = input;
+  // A forward league names one F cap; the pool and the picks still arrive as
+  // C/LW/RW. Fold those onto F here so every caller counts the same way.
+  const caps = input.startingSlots as Record<string, number>;
+  const startingSlots = input.startingSlots;
+  const availableByPosition = foldForwards(input.availableByPosition, caps);
+  const draftedByPosition = foldForwards(input.draftedByPosition, caps);
+  const myFilledByPosition = foldForwards(input.myFilledByPosition, caps);
 
   const rows: PositionScarcity[] = [];
   for (const position of DRAFT_POSITIONS) {

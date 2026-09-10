@@ -22,7 +22,24 @@ import { PB_TYPE } from '@/components/pressbox/rowScale';
  *     orange-soft.
  *
  * The grid scrolls sideways with the round rail pinned, four teams to a
- * phone width. Under it, LAST PICKS: the newest three, `round.pick` in mono,
+ * phone width.
+ *
+ * DESKTOP (2026-09-10). At `lg` and up the same grid stops forcing its
+ * max-content width and lets every team share the row instead: `min-w-max`
+ * is dropped and the tracks fall to `minmax(56px, 1fr)`. A 14-team league in
+ * the room's main column lands near 65px per cell, which holds a surname at
+ * the current 12px type. Reading the whole board at once is the entire point
+ * of a board, and four columns of it was a phone layout being stretched.
+ *
+ * The scroller itself is UNCHANGED at every width. `overflow-x` stays `auto`
+ * rather than becoming `visible` on desktop, for two reasons: a league wide
+ * enough to defeat the 56px floor still scrolls instead of overflowing its
+ * container, and `overflow-x` on this element decides whether it is a scroll
+ * container at all, which is what every `position: sticky` inside it resolves
+ * against (see `__tests__/stickyScrollContainerGuard.test.ts`). Nothing about
+ * the round rail's pinning changes.
+ *
+ * Under it, LAST PICKS: the newest three, `round.pick` in mono,
  * the name in bold, `pos · team · who`. The artboard prints ADP and a
  * REACH / VALUE / EVEN verdict beside each; this codebase carries no ADP,
  * so that column is omitted rather than invented.
@@ -140,6 +157,11 @@ export const DraftBoard = ({
      padded scroll container scrolls its padding away and Chrome then pins
      a `sticky; left:0` rail 14px off the screen. */
   const columns = `42px repeat(${teams.length}, minmax(80px, 1fr))`;
+  /* Desktop drops the 80px floor to 56px so the tracks can divide the width
+     they are given rather than demanding more than there is. The floor is not
+     removed entirely: at `minmax(0, 1fr)` a 20-team league would squeeze to
+     unreadable slivers instead of scrolling. */
+  const columnsWide = `42px repeat(${teams.length}, minmax(56px, 1fr))`;
 
   /* The board opens on the pick that is live. Four columns fit a phone and
      the clock may be in the eleventh; scrolling to it — the on-clock cell,
@@ -175,7 +197,23 @@ export const DraftBoard = ({
             never leave its containing block's box — so it stuck at the
             box's far edge, 56px off screen. The grid must be as wide as its
             tracks for `left:0` to mean the screen edge. */}
-        <div className="grid gap-1 pr-3.5 min-w-max" style={{ gridTemplateColumns: columns }}>
+        <div
+          className={cn(
+            'grid gap-1 pr-3.5',
+            // `min-w-max` is what makes the phone board wider than its
+            // scroller (and what lets `left:0` mean the screen edge). On
+            // desktop that is exactly what has to go.
+            'min-w-max lg:min-w-0',
+            '[grid-template-columns:var(--board-cols)]',
+            'lg:[grid-template-columns:var(--board-cols-wide)]',
+          )}
+          style={
+            {
+              '--board-cols': columns,
+              '--board-cols-wide': columnsWide,
+            } as React.CSSProperties
+          }
+        >
           {/* Column heads. The round rail's corner is sticky too, so the
               heads never slide under a floating label. */}
           <div className="sticky left-0 z-sticky-base bg-pressbox-surface pl-3.5" />
@@ -282,7 +320,7 @@ export const DraftBoard = ({
       </div>
 
       {teams.length > 4 && (
-        <p className="mt-2 text-center font-plex font-medium text-[9px] text-pressbox-text/40">
+        <p className="mt-2 text-center font-plex font-medium text-[9px] text-pressbox-text/40 lg:hidden">
           SWIPE FOR ALL {teams.length} TEAMS{onPlayerClick ? ' · TAP A PICK FOR THE CARD' : ''}
         </p>
       )}

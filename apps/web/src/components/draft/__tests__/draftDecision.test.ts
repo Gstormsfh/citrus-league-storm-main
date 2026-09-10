@@ -87,7 +87,7 @@ function entry(over: Partial<DashboardIndexEntry> = {}): DashboardIndexEntry {
 const DEFAULT_SCORER = new ScoringCalculator(null);
 
 describe('normalizeDraftPosition', () => {
-  it('folds the wire spellings onto the five roster positions', () => {
+  it('folds the wire spellings onto the roster positions', () => {
     expect(normalizeDraftPosition('L')).toBe('LW');
     expect(normalizeDraftPosition('Right')).toBe('RW');
     expect(normalizeDraftPosition('centre')).toBe('C');
@@ -95,10 +95,18 @@ describe('normalizeDraftPosition', () => {
     expect(normalizeDraftPosition('goaltender')).toBe('G');
   });
 
+  it('recognises the F/D/G forward group as its own position', () => {
+    // F/D/G leagues cap forwards as one bucket; the cap key must survive
+    // normalisation or the scarcity strip silently drops every forward.
+    expect(normalizeDraftPosition('F')).toBe('F');
+    expect(normalizeDraftPosition('forward')).toBe('F');
+  });
+
   it('returns empty for anything it does not recognise, never a guess', () => {
     // A garbled position must drop out of the scarcity counts rather than
     // land in one of them and skew a number a manager drafts on.
-    expect(normalizeDraftPosition('F')).toBe('');
+    expect(normalizeDraftPosition('X')).toBe('');
+    expect(normalizeDraftPosition('UTIL')).toBe('');
     expect(normalizeDraftPosition('')).toBe('');
     expect(normalizeDraftPosition(null)).toBe('');
     expect(normalizeDraftPosition(undefined)).toBe('');
@@ -332,6 +340,38 @@ describe('scarcityStrip', () => {
   it('drops positions the league does not start', () => {
     const rows = scarcityStrip({ ...base, startingSlots: { C: 2, G: 1 } });
     expect(rows.map((r) => r.position).sort()).toEqual(['C', 'G']);
+  });
+
+  describe('an F/D/G league caps forwards as one group (2026-09-10)', () => {
+    // The league's slots say F; the pool and the picks still say C/LW/RW.
+    const fdg = {
+      ...base,
+      startingSlots: { F: 6, D: 4, G: 2 },
+    };
+
+    it('shows one F row, never C/LW/RW, and folds the forward counts onto it', () => {
+      const rows = scarcityStrip(fdg);
+      const positions = rows.map((r) => r.position);
+      expect(positions).toContain('F');
+      expect(positions).not.toContain('C');
+      expect(positions).not.toContain('LW');
+      expect(positions).not.toContain('RW');
+      const f = rows.find((r) => r.position === 'F')!;
+      // 12 teams x 6 F = 72 demanded, 14 forwards drafted, 270 available: 58 starters still to come.
+      expect(f.startersLeft).toBe(58);
+      expect(f.openSlots).toBe(6);
+    });
+
+    it('a centre, a winger and a winger on my roster all fill F', () => {
+      const rows = scarcityStrip({ ...fdg, myFilledByPosition: { C: 2, LW: 3, RW: 1 } });
+      // 6 F minus 6 forwards drafted: F is full and drops off the strip.
+      expect(rows.map((r) => r.position)).not.toContain('F');
+    });
+
+    it('an individual league is untouched: F never appears', () => {
+      const rows = scarcityStrip(base);
+      expect(rows.map((r) => r.position)).not.toContain('F');
+    });
   });
 
   it('reports open slots net of what the manager already has', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { assignKeeperSlots, keeperEffectiveRound } from '../keeperSlots';
+import { assignKeeperSlots, keeperEffectiveRound, keeperPenaltyFor } from '../keeperSlots';
 
 const T1 = 'team-1';
 const T2 = 'team-2';
@@ -80,5 +80,26 @@ describe('keeperEffectiveRound mirrors get_keeper_draft_costs', () => {
     expect(keeperEffectiveRound('round-escalation', 2, 4)).toBe(1);
     expect(keeperEffectiveRound('none', 5, 2)).toBeNull();
     expect(keeperEffectiveRound(undefined, 5, 2)).toBeNull();
+  });
+});
+
+describe('keeperPenaltyFor: dynasty keeps the roster and every keeper is free (2026-09-10)', () => {
+  it('reads keeperPenalty for an ordinary keeper league', () => {
+    expect(keeperPenaltyFor({ keeperEnabled: true, keeperPenalty: 'round-cost' })).toBe('round-cost');
+    expect(keeperPenaltyFor({ keeperEnabled: true, keeperPenalty: 'round-escalation' })).toBe('round-escalation');
+    expect(keeperPenaltyFor({ keeperEnabled: true })).toBe('none');
+  });
+
+  it('is none for a dynasty league whatever keeperPenalty says', () => {
+    expect(keeperPenaltyFor({ dynastyMode: true, keeperPenalty: 'round-cost' })).toBe('none');
+    expect(keeperPenaltyFor({ dynastyMode: true, keeperPenalty: 'round-escalation' })).toBe('none');
+  });
+
+  it('a full dynasty roster seats from the last pick back and leaves the open spots up front', () => {
+    // 21 rounds, 19 kept: rounds 3..21 are the keepers, 1 and 2 are live picks.
+    const kept = Array.from({ length: 19 }, (_, i) => ({ teamId: 't1', playerId: 100 + i, effectiveRound: null }));
+    const slots = assignKeeperSlots(kept, 21);
+    const rounds = slots.map((k) => k.round).sort((a, b) => a - b);
+    expect(rounds).toEqual(Array.from({ length: 19 }, (_, i) => i + 3));
   });
 });
