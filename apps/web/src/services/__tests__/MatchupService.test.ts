@@ -194,6 +194,10 @@ vi.mock('@/utils/weekCalculator', () => ({
   // weekCalculator.test.ts; here the mock controls week output directly.
   clampToSeasonStart: vi.fn((d: Date) => d),
   getFirstWeekStartDate: vi.fn().mockReturnValue(new Date('2025-01-05')),
+  // WEEK START (2026-09-10): the service reads the league's week-start day
+  // and goes through the one anchor. Same fixed week 1 as before.
+  fantasyWeekAnchorFor: vi.fn().mockReturnValue(new Date('2025-01-05')),
+  weekStartDowFor: vi.fn().mockReturnValue(0),
   getWeekStartDate: vi.fn((weekNum: number, firstWeek: Date) => {
     const d = new Date(firstWeek);
     d.setDate(d.getDate() + (weekNum - 1) * 7);

@@ -255,7 +255,7 @@ export const DraftService = {
             logger.log('Generating matchups for the entire season...');
             const { MatchupService } = await import('./MatchupService');
             const { LeagueService: LS } = await import('./LeagueService');
-            const { getFirstWeekStartDate } = await import('@/utils/weekCalculator');
+            const { getFirstWeekStartDate, weekStartDowFor } = await import('@/utils/weekCalculator');
             const { getLeagueFormat } = await import('./LeagueService');
             const { FORMAT_HAS_MATCHUPS } = await import('@/types/leagueTypes');
 
@@ -278,7 +278,9 @@ export const DraftService = {
 
               {
                 const completionDate = new Date(draftCompletedAt);
-                const firstWeekStart = getFirstWeekStartDate(completionDate);
+                // 2026-09-10: the league's week-start day (Sunday or Monday).
+                // generateMatchupsForLeague clamps with the same day.
+                const firstWeekStart = getFirstWeekStartDate(completionDate, weekStartDowFor(league));
                 const { teams } = await LS.getLeagueTeams(leagueId);
 
                 const { getScheduleLength } = await import('@/utils/weekCalculator');

@@ -19,35 +19,63 @@ export function getDraftCompletionDate(league: League): Date | null {
 }
 
 /**
- * Get the test first week start date.
- * Finds the first Sunday on or after the DEFAULT_TEST_DATE.
+ * WHICH DAY A LEAGUE'S WEEK STARTS (2026-09-10).
+ *
+ * `settings.weekStartDay` is the commissioner's choice: 'sunday' (the
+ * default, and what every league before today is) or 'monday'. It is read
+ * in exactly one place, here, and every week computation in the app goes
+ * through `fantasyWeekAnchorFor(league)` below so the twelve call sites
+ * that used to compose clampToSeasonStart(getFirstWeekStartDate(...)) by
+ * hand cannot disagree with the schedule generator again.
+ *
+ * Locked once the draft is complete: the matchup rows carry their dates,
+ * and flipping the day after generation would orphan every one of them.
  */
-export function getTestFirstWeekStartDate(): Date {
+export type WeekStartDay = 'sunday' | 'monday';
+
+export const WEEK_START_DAY_DOW: Record<WeekStartDay, number> = { sunday: 0, monday: 1 };
+
+export function weekStartDayFor(
+  league: { settings?: unknown } | null | undefined,
+): WeekStartDay {
+  const s = (league?.settings ?? null) as Record<string, unknown> | null;
+  return s?.weekStartDay === 'monday' ? 'monday' : 'sunday';
+}
+
+export function weekStartDowFor(league: { settings?: unknown } | null | undefined): number {
+  return WEEK_START_DAY_DOW[weekStartDayFor(league)];
+}
+
+/**
+ * Get the test first week start date.
+ * Finds the first `startDow` on or after the DEFAULT_TEST_DATE.
+ */
+export function getTestFirstWeekStartDate(startDow: number = FANTASY_WEEK_START_DOW): Date {
   const testDate = new Date(DEFAULT_TEST_DATE + 'T00:00:00');
   testDate.setHours(0, 0, 0, 0);
-  // Advance to Sunday if not already Sunday
   const dow = testDate.getDay();
-  if (dow !== 0) {
-    testDate.setDate(testDate.getDate() + (7 - dow));
-  }
+  testDate.setDate(testDate.getDate() + ((startDow - dow + 7) % 7));
   return testDate;
 }
 
 /**
- * Get the Sunday of the first week after draft completion
- * If draft completes on Sunday, that Sunday is the start
- * Otherwise, it's the next Sunday
+ * Get the first week-start day on or after draft completion: the Sunday
+ * for a Sunday league, the Monday for a Monday league. If the draft
+ * completes on that day, that day is the start.
  *
  * For testing: If today is past the test anchor date and draft was completed before/on that date,
- * use the test anchor Sunday as the first week start
+ * use the test anchor as the first week start
  */
-export function getFirstWeekStartDate(draftCompletionDate: Date): Date {
+export function getFirstWeekStartDate(
+  draftCompletionDate: Date,
+  startDow: number = FANTASY_WEEK_START_DOW,
+): Date {
   // Use MST-based today for consistency with game dates
   const todayStr = getTodayMST();
   const today = new Date(todayStr + 'T00:00:00');
   today.setHours(0, 0, 0, 0);
 
-  const testAnchor = getTestFirstWeekStartDate();
+  const testAnchor = getTestFirstWeekStartDate(startDow);
 
   // If today is past the test anchor and draft was completed on or before it,
   // pin to the test anchor Sunday
@@ -60,25 +88,34 @@ export function getFirstWeekStartDate(draftCompletionDate: Date): Date {
     }
   }
 
-  // Normal logic: calculate Sunday after draft completion
+  // Normal logic: walk forward to the league's week-start day (0 days if
+  // the draft completed on it).
   const date = new Date(draftCompletionDate);
   date.setHours(0, 0, 0, 0);
-
-  // Get day of week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
   const dayOfWeek = date.getDay();
-
-  // Calculate days to add to get to Sunday
-  // If it's Sunday (0), add 0 days
-  // If it's Saturday (6), add 1 day
-  // Otherwise, add (7 - dayOfWeek) days to get to next Sunday
-  const daysToAdd = dayOfWeek === 0 ? 0 : (dayOfWeek === 6 ? 1 : (7 - dayOfWeek));
-
-  date.setDate(date.getDate() + daysToAdd);
+  date.setDate(date.getDate() + ((startDow - dayOfWeek + 7) % 7));
   return date;
 }
 
 /**
- * Get the Sunday date for a given week number (1-based)
+ * THE ONE ENTRY POINT for "when does this league's week 1 start". Reads the
+ * league's week-start day and its draft-completion date, snaps to that
+ * weekday, and clamps into the season. Null while the draft is not
+ * complete, unless a fallback completion date is supplied (the Matchup
+ * service uses the league row's updated_at there, as it always has).
+ */
+export function fantasyWeekAnchorFor(
+  league: League,
+  fallbackCompletion?: Date | null,
+): Date | null {
+  const done = getDraftCompletionDate(league) ?? fallbackCompletion ?? null;
+  if (!done) return null;
+  const dow = weekStartDowFor(league);
+  return clampToSeasonStart(getFirstWeekStartDate(done, dow), dow);
+}
+
+/**
+ * Get the start date for a given week number (1-based)
  */
 export function getWeekStartDate(weekNumber: number, firstWeekStart: Date): Date {
   const date = new Date(firstWeekStart);
@@ -88,12 +125,12 @@ export function getWeekStartDate(weekNumber: number, firstWeekStart: Date): Date
 }
 
 /**
- * Get the Saturday date for a given week number (1-based)
+ * Get the end date (start + 6) for a given week number (1-based)
  */
 export function getWeekEndDate(weekNumber: number, firstWeekStart: Date): Date {
   const startDate = getWeekStartDate(weekNumber, firstWeekStart);
   const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + 6); // Saturday is 6 days after Sunday
+  endDate.setDate(endDate.getDate() + 6); // a week is seven days whichever day it starts
   return endDate;
 }
 

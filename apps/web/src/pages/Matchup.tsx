@@ -33,13 +33,13 @@ import { LeagueService, League, Team } from '@/services/LeagueService';
 import { MatchupService, Matchup as MatchupType } from '@/services/MatchupService';
 import { PlayerService, Player } from '@/services/PlayerService';
 import { ScheduleService } from '@/services/ScheduleService';
-import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate, clampToSeasonStart } from '@/utils/weekCalculator';
+import { getDraftCompletionDate, fantasyWeekAnchorFor, weekStartDowFor, getCurrentWeekNumber, getAvailableWeeks, getWeekLabel, getWeekDateLabel, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
 import { DemoMatchupCacheService, type DemoMatchupPayload } from '@/services/DemoMatchupCacheService';
 import { PB_LOADING_MIN_MS, useMinimumLoadingTime } from '@/hooks/useMinimumLoadingTime';
 import { MatchupScoreJobService } from '@/services/MatchupScoreJobService';
 import { DataCacheService, TTL } from '@/services/DataCacheService';
-import { calculateEligibleGamesRemaining } from '@/utils/rosterUtils';
+import { calculateEligibleGamesRemaining, type PositionType } from '@/utils/rosterUtils';
 import { collectRemainingGames, computeWinProbability, enumerateWeekDates } from '@/utils/winProbability';
 import { ScoringCalculator, DEFAULT_SCORING } from '@/utils/scoringUtils';
 import { logger } from '@/utils/logger';
@@ -290,6 +290,27 @@ const Matchup = () => {
 
   // Real data state
   const [league, setLeague] = useState<League | null>(null);
+
+  /**
+   * THE LEAGUE'S SLOT PLAN (2026-09-10). Position type and starter counts
+   * from the league row, handed to every slot-shaped read on this page:
+   * the comparison rows, the per-day totals and the games-remaining count.
+   * Until today none of them received it, so an F/D/G league's matchup drew
+   * the individual C/LW/RW rows with nobody in them.
+   */
+  const leagueSlotPlan = useMemo(() => {
+    const settings = (league?.settings ?? null) as
+      | { positionType?: unknown; rosterSlots?: unknown }
+      | null;
+    const rosterSlots =
+      settings?.rosterSlots && typeof settings.rosterSlots === 'object'
+        ? (settings.rosterSlots as Record<string, number>)
+        : undefined;
+    return {
+      positionType: (settings?.positionType === 'forward' ? 'forward' : 'individual') as PositionType,
+      rosterSlots,
+    };
+  }, [league]);
   const [userTeam, setUserTeam] = useState<Team | null>(null);
   const [opponentTeam, setOpponentTeam] = useState<Team | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
@@ -675,10 +696,9 @@ const Matchup = () => {
           const demoLeague = cachedPayload.league as any;
           setLeague(demoLeague as League);
 
-          const { getDraftCompletionDate: gDCD, getFirstWeekStartDate: gFWSD, getAvailableWeeks: gAW, getWeekStartDate: gWSD, getWeekEndDate: gWED, clampToSeasonStart: gCTS } = await import('@/utils/weekCalculator');
-          const draftDate = gDCD(demoLeague as any);
+          const { fantasyWeekAnchorFor: gFWA, getAvailableWeeks: gAW, getWeekStartDate: gWSD, getWeekEndDate: gWED } = await import('@/utils/weekCalculator');
           // WEEK-MATH FIX (2026-08-22): clamp to season start like generation does
-          const firstWeek = gCTS(draftDate ? gFWSD(draftDate) : getTodayMSTDate());
+          const firstWeek = gFWA(demoLeague as League, getTodayMSTDate()) as Date;
           setFirstWeekStart(firstWeek);
 
           const weeks = cachedPayload.availableWeeks.length > 0 ? cachedPayload.availableWeeks : gAW(firstWeek);
@@ -781,7 +801,7 @@ const Matchup = () => {
 
         // Get first week start date from league (uses updated_at when draft_status is 'completed')
         // Use same logic as logged-in users
-        const { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate, clampToSeasonStart } = await import('@/utils/weekCalculator');
+        const { getDraftCompletionDate, fantasyWeekAnchorFor, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } = await import('@/utils/weekCalculator');
         const draftCompletionDate = getDraftCompletionDate(demoLeague as any);
         if (!draftCompletionDate) {
           throw new Error('Demo league has no draft completion date (updated_at is missing)');
@@ -789,7 +809,7 @@ const Matchup = () => {
 
         // Calculate first week start (same as logged-in users)
         // WEEK-MATH FIX (2026-08-22): clamp to season start like generation does
-        const firstWeek = clampToSeasonStart(getFirstWeekStartDate(draftCompletionDate));
+        const firstWeek = fantasyWeekAnchorFor(demoLeague as League) as Date;
         setFirstWeekStart(firstWeek);
 
         // Get available weeks (same as logged-in users)
@@ -2431,7 +2451,14 @@ const Matchup = () => {
       }
       
       // Use organizeMatchupData (same as MatchupComparison line 33-38)
-      const organizedData = organizeMatchupData(dayMyStarters, dayOppStarters, dayMySlots, dayOppSlots);
+      const organizedData = organizeMatchupData(
+        dayMyStarters,
+        dayOppStarters,
+        dayMySlots,
+        dayOppSlots,
+        leagueSlotPlan.positionType,
+        leagueSlotPlan.rosterSlots,
+      );
       
       // Flatten players (same as MatchupComparison lines 40-53)
       const allUserPlayers: (MatchupPlayer | null)[] = [];
@@ -2512,6 +2539,7 @@ const Matchup = () => {
     demoOpponentTeamSlotAssignments,
     userLeagueState,
     handleTotalsCalculated,
+    leagueSlotPlan,
   ]);
 
   const handlePlayerClick = useCallback(async (player: MatchupPlayer) => {
@@ -3274,12 +3302,20 @@ const Matchup = () => {
 
   // Calculate total games remaining for each team (position-aware, respects roster slots)
   const myTeamGamesRemaining = useMemo(() => {
-    return calculateEligibleGamesRemaining(myStarters as MatchupPlayer[]);
-  }, [myStarters]);
+    return calculateEligibleGamesRemaining(
+      myStarters as MatchupPlayer[],
+      leagueSlotPlan.positionType,
+      leagueSlotPlan.rosterSlots,
+    );
+  }, [myStarters, leagueSlotPlan]);
 
   const opponentTeamGamesRemaining = useMemo(() => {
-    return calculateEligibleGamesRemaining(opponentStarters as MatchupPlayer[]);
-  }, [opponentStarters]);
+    return calculateEligibleGamesRemaining(
+      opponentStarters as MatchupPlayer[],
+      leagueSlotPlan.positionType,
+      leagueSlotPlan.rosterSlots,
+    );
+  }, [opponentStarters, leagueSlotPlan]);
 
   // YAHOO/SLEEPER DISPLAY: Use frozen lineup for past days, current for today/future
   // This ensures when clicking on past day, we show WHO was actually playing
@@ -4011,7 +4047,9 @@ const Matchup = () => {
         // schedule's real week 1 (Sep 28), and (b) collapses
         // getAvailableWeeks to a single week ("WEEK 1/1" for a 27-week
         // season) because an Aug anchor's season-end lands in the past.
-        const firstWeek = clampToSeasonStart(getFirstWeekStartDate(draftCompletionDate));
+        // 2026-09-10: through the one league-aware anchor (Sunday or Monday
+        // weeks per settings.weekStartDay).
+        const firstWeek = fantasyWeekAnchorFor(currentLeague) as Date;
         setFirstWeekStart(firstWeek);
 
         // Get available weeks
@@ -5604,7 +5642,7 @@ const Matchup = () => {
               : "lg:grid-cols-[200px_1fr] xl:grid-cols-[220px_1fr]"
           )}>
             {/* Main Content - MOBILE: Full width, full height / DESKTOP: Scrollable panel */}
-            <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto px-0 lg:px-4 order-1 lg:order-2">
+            <div className="min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto scrollbar-pressbox px-0 lg:px-4 order-1 lg:order-2">
               {/* Playoff status banner — only for fantasy leagues with a generated bracket */}
               {(league?.id || activeLeagueId) && playoffChampion.status === 'completed' && (
                 <Card className="mb-4 border-amber-700/60 bg-gradient-to-br from-amber-950/40 via-yellow-950/40 to-orange-950/40">
@@ -5880,6 +5918,7 @@ const Matchup = () => {
                 team2Name={userLeagueState === 'active-user' ? (viewingOpponentTeamName || undefined) : 'Thunder Titans'}
                 calculatedDailyTotals={calculatedDailyTotals}
                 compact
+                weekStartDow={weekStartDowFor(league)}
               />
             </div>
           )}
@@ -5964,6 +6003,8 @@ const Matchup = () => {
                   opponentBench={opponentBench as MatchupPlayer[]}
                   userSlotAssignments={displayMyTeamSlotAssignments}
                   opponentSlotAssignments={displayOpponentTeamSlotAssignments}
+                  positionType={leagueSlotPlan.positionType}
+                  rosterSlots={leagueSlotPlan.rosterSlots}
                   onPlayerClick={handlePlayerClick}
                   selectedDate={selectedDate}
                   dailyStatsMap={(selectedDate ? dailyStatsByDate.get(selectedDate) : dailyStatsMap) as any}

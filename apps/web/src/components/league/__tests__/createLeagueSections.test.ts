@@ -55,6 +55,8 @@ const form = (over: Partial<CreateLeagueForm> = {}): CreateLeagueForm => ({
   setPlayoffWeeks: noop,
   tradeDeadlineWeek: '0',
   setTradeDeadlineWeek: noop,
+  weekStartDay: 'sunday',
+  setWeekStartDay: noop,
   keeperEnabled: false,
   setKeeperEnabled: noop,
   keeperCount: '3',
@@ -264,6 +266,16 @@ describe('the rules under the rows', () => {
     expect(slots?.label).toBe('SLOTS · 19 TO DRAFT');
     const ir = slots?.fields.find((x) => x.key === 'slot:IR');
     expect(ir?.help).toBe('IR · not drafted, not a roster spot');
+  });
+
+  it('the week-start day is a season setting for matchup leagues only, Sunday by default', () => {
+    const f = field(form(), 'season', 'weekStartDay');
+    expect(f.kind).toBe('select');
+    if (f.kind !== 'select') return;
+    expect(f.value).toBe('sunday');
+    expect(f.options.map((o) => o.value)).toEqual(['sunday', 'monday']);
+    const noMatchups = buildCreateLeagueSections(form({ showMatchupSettings: false })).find((x) => x.key === 'season');
+    expect(noMatchups?.groups.flatMap((g) => g.fields).some((x) => x.key === 'weekStartDay')).toBe(false);
   });
 
   it('every select offers the value it currently holds', () => {

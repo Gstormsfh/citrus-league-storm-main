@@ -264,6 +264,8 @@ describe('getLeagueAverageProjections', () => {
     // C: (10 + 8) / 2 = 9, D: 6 / 1 = 6
     expect(result.get('C')).toBe(9);
     expect(result.get('D')).toBe(6);
+    // F is every forward, per player, for F/D/G leagues: (10 + 8) / 2
+    expect(result.get('F')).toBe(9);
   });
 
   it('handles lineups with null starters/bench', async () => {

@@ -8,8 +8,8 @@ import { logger } from '@/utils/logger';
 import { useIsMobile } from '@/hooks/useIsMobile';
 
 interface WeeklyScheduleProps {
-  weekStart: string; // Sunday date (YYYY-MM-DD)
-  weekEnd: string; // Saturday date (YYYY-MM-DD)
+  weekStart: string; // first day of the fantasy week (YYYY-MM-DD)
+  weekEnd: string; // last day of the fantasy week (YYYY-MM-DD)
   onDayClick: (date: string | null) => void; // null clears selection (returns to full week view)
   selectedDate: string | null;
   team1Name?: string; // Team 1 name for display
@@ -37,6 +37,12 @@ interface WeeklyScheduleProps {
    * selected. Desktop keeps the header row exactly as it was.
    */
   compact?: boolean;
+  /**
+   * The league's week-start weekday (2026-09-10): 0 Sunday, 1 Monday, from
+   * weekStartDowFor(league). Only the sanity warnings read it; the columns
+   * are drawn from the real dates either way.
+   */
+  weekStartDow?: number;
 }
 
 export const WeeklySchedule = ({
@@ -50,6 +56,7 @@ export const WeeklySchedule = ({
   hideScores = false,
   compact = false,
   chips = false,
+  weekStartDow = FANTASY_WEEK_START_DOW,
 }: WeeklyScheduleProps) => {
   const todayStr = getTodayMST(); // Get today's date string in MST (YYYY-MM-DD)
   // Below the lg breakpoint — the same line index.css's mobile block draws.
@@ -74,10 +81,9 @@ export const WeeklySchedule = ({
   // correctly either way -- it labels each column with that date's real
   // weekday, so a Monday-anchored week draws Mon..Sun and looks right.
   //
-  // Now read from the one place that defines a fantasy week. When the
-  // per-league week-start setting lands this takes a prop and passes it in;
-  // until then every league uses the default.
-  const expectedStartDow = FANTASY_WEEK_START_DOW;
+  // Now read from the one place that defines a fantasy week, passed in as
+  // the league's own day (settings.weekStartDay) since 2026-09-10.
+  const expectedStartDow = weekStartDow;
   const expectedEndDow = weekEndDow(expectedStartDow);
   const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 

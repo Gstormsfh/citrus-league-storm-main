@@ -32,7 +32,7 @@ import { LeagueService, League } from '@/services/LeagueService';
 import { ScheduleService, NHLGame } from '@/services/ScheduleService';
 import { WaiverService } from '@/services/WaiverService';
 import { MatchupService } from '@/services/MatchupService';
-import { getDraftCompletionDate, getFirstWeekStartDate, getCurrentWeekNumber, getWeekStartDate, getWeekEndDate, clampToSeasonStart } from '@/utils/weekCalculator';
+import { fantasyWeekAnchorFor, getCurrentWeekNumber, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
@@ -576,9 +576,8 @@ const FreeAgents = () => {
           try {
             const { league: leagueData, error: leagueError } = await LeagueService.getLeague(effectiveLeagueId, user?.id);
             if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
-              const draftCompletionDate = getDraftCompletionDate(leagueData);
-              if (draftCompletionDate) {
-                const firstWeekStart = clampToSeasonStart(getFirstWeekStartDate(draftCompletionDate)); // WEEK-MATH FIX 2026-08-22: align with schedule generation
+              const firstWeekStart = fantasyWeekAnchorFor(leagueData); // WEEK-MATH FIX 2026-08-22: align with schedule generation; 2026-09-10: league-aware week day
+              if (firstWeekStart) {
                 const currentWeek = getCurrentWeekNumber(firstWeekStart);
                 weekStart = getWeekStartDate(currentWeek, firstWeekStart);
                 weekEnd = getWeekEndDate(currentWeek, firstWeekStart);
@@ -739,9 +738,8 @@ const FreeAgents = () => {
           try {
             const { league: leagueData, error: leagueError } = await LeagueService.getLeague(effectiveLeagueId, user?.id);
             if (!leagueError && leagueData && leagueData.draft_status === 'completed') {
-              const draftCompletionDate = getDraftCompletionDate(leagueData);
-              if (draftCompletionDate) {
-                const firstWeekStart = clampToSeasonStart(getFirstWeekStartDate(draftCompletionDate)); // WEEK-MATH FIX 2026-08-22: align with schedule generation
+              const firstWeekStart = fantasyWeekAnchorFor(leagueData); // WEEK-MATH FIX 2026-08-22: align with schedule generation; 2026-09-10: league-aware week day
+              if (firstWeekStart) {
                 const currentWeek = getCurrentWeekNumber(firstWeekStart);
                 weekStart = getWeekStartDate(currentWeek, firstWeekStart);
                 weekEnd = getWeekEndDate(currentWeek, firstWeekStart);

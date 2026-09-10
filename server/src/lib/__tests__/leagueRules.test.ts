@@ -14,6 +14,9 @@ import {
   isPastTradeDeadline,
   evaluateGameLock,
   lockedTeamForTrade,
+  resolveWeekStartDow,
+  currentWeekStart,
+  lockedSettingChange,
 } from '../leagueRules';
 
 describe('resolveSlotConfig — the league shape, not a literal', () => {
@@ -98,6 +101,36 @@ describe('validateSlotAssignments — the 8-centers hole is closed', () => {
   it('ir slots beyond the configured count strip', () => {
     const v = validateSlotAssignments({ p1: 'ir-slot-4' }, cfg);
     expect(v.strip).toEqual(['p1']);
+  });
+});
+
+describe('the week-start day — a league setting, Sunday by default (2026-09-10)', () => {
+  it('reads settings.weekStartDay and defaults to Sunday', () => {
+    expect(resolveWeekStartDow(null)).toBe(0);
+    expect(resolveWeekStartDow({})).toBe(0);
+    expect(resolveWeekStartDow({ weekStartDay: 'sunday' })).toBe(0);
+    expect(resolveWeekStartDow({ weekStartDay: 'monday' })).toBe(1);
+    expect(resolveWeekStartDow({ weekStartDay: 'friday' })).toBe(0);
+  });
+
+  it('currentWeekStart walks back to the league\'s day, at local midnight', () => {
+    const wed = new Date(2026, 9, 14, 15, 30); // Wed Oct 14 2026
+    expect(currentWeekStart({}, wed).getDay()).toBe(0);
+    expect(currentWeekStart({}, wed).getDate()).toBe(11); // Sun Oct 11
+    expect(currentWeekStart({ weekStartDay: 'monday' }, wed).getDate()).toBe(12); // Mon Oct 12
+    expect(currentWeekStart({ weekStartDay: 'monday' }, wed).getHours()).toBe(0);
+    // On the day itself, it is the day itself.
+    const mon = new Date(2026, 9, 12, 9);
+    expect(currentWeekStart({ weekStartDay: 'monday' }, mon).getDate()).toBe(12);
+  });
+
+  it('lockedSettingChange refuses a week-day or position-format flip only after the draft', () => {
+    expect(lockedSettingChange({}, { weekStartDay: 'monday' }, false)).toBeNull();
+    expect(lockedSettingChange({}, { weekStartDay: 'monday' }, true)).toMatch(/week start day/i);
+    expect(lockedSettingChange({ weekStartDay: 'monday' }, { weekStartDay: 'monday', playoffTeams: 4 }, true)).toBeNull();
+    expect(lockedSettingChange({}, { weekStartDay: 'sunday' }, true)).toBeNull();
+    expect(lockedSettingChange({ positionType: 'forward' }, { positionType: 'individual' }, true)).toMatch(/position format/i);
+    expect(lockedSettingChange({ positionType: 'individual' }, {}, true)).toBeNull();
   });
 });
 

@@ -258,6 +258,49 @@ export function resolveAddLimits(settings: Record<string, unknown> | null | unde
 }
 
 /**
+ * WHICH DAY THE LEAGUE'S WEEK STARTS (2026-09-10). `settings.weekStartDay`
+ * is 'sunday' (default, every league before today) or 'monday'. Returns
+ * Date.getDay() numbering: 0 Sunday, 1 Monday. The web app's
+ * weekCalculator.ts reads the same key.
+ */
+export function resolveWeekStartDow(settings: Record<string, unknown> | null | undefined): number {
+  const s = (settings ?? {}) as Record<string, unknown>;
+  return s.weekStartDay === 'monday' ? 1 : 0;
+}
+
+/** Local midnight of the most recent week-start day on or before `now`. */
+export function currentWeekStart(settings: Record<string, unknown> | null | undefined, now: Date = new Date()): Date {
+  const dow = resolveWeekStartDow(settings);
+  const start = new Date(now);
+  start.setDate(start.getDate() - ((start.getDay() - dow + 7) % 7));
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+/**
+ * Settings a commissioner may not change once the draft is complete: the
+ * matchup rows and every slot assignment carry the shape these two chose.
+ * Returns the plain-language refusal, or null when the change is fine.
+ */
+export function lockedSettingChange(
+  current: Record<string, unknown> | null | undefined,
+  next: Record<string, unknown> | null | undefined,
+  draftCompleted: boolean,
+): string | null {
+  if (!draftCompleted) return null;
+  const a = (current ?? {}) as Record<string, unknown>;
+  const b = (next ?? {}) as Record<string, unknown>;
+  const norm = (v: unknown, dflt: string) => (typeof v === 'string' && v ? v : dflt);
+  if (norm(a.weekStartDay, 'sunday') !== norm(b.weekStartDay, 'sunday')) {
+    return 'The week start day is fixed once the draft is complete. The schedule was built on it.';
+  }
+  if (norm(a.positionType, 'individual') !== norm(b.positionType, 'individual')) {
+    return 'The position format is fixed once the draft is complete. Every lineup was built on it.';
+  }
+  return null;
+}
+
+/**
  * Trade-deadline check. The server historically enforced
  * `settings.trade_deadline` (a date nothing writes); CreateLeague writes
  * `settings.tradeDeadlineWeek` (a matchup week number). Enforce BOTH:

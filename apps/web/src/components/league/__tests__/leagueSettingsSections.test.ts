@@ -41,7 +41,7 @@ const base = (over: Partial<LeagueSettingsInput> = {}): LeagueSettingsInput => (
   setCategories: noop,
   rosterSlots: {},
   setRosterSlots: noop,
-  playoff: { playoffTeams: 6, playoffWeeks: 3 },
+  playoff: { playoffTeams: 6, playoffWeeks: 3, weekStartDay: 'sunday' },
   setPlayoff: noop,
   processWaivers: { onPress: noop, busy: false },
   syncRosters: { onPress: noop, busy: false },
@@ -143,14 +143,24 @@ describe('buildLeagueSettingsSections', () => {
   });
 
   it('playoffs: no weeks row and no bracket without playoffs; the bracket reads as rounds', () => {
-    const none = base({ playoff: { playoffTeams: 0, playoffWeeks: 3 } });
-    expect(keys(fields(none, 'playoffs'))).toEqual(['playoffTeams']);
+    const none = base({ playoff: { playoffTeams: 0, playoffWeeks: 3, weekStartDay: 'sunday' } });
+    expect(keys(fields(none, 'playoffs'))).toEqual(['playoffTeams', 'weekStartDay']);
     expect(section(none, 'playoffs').groups.map((g) => g.key)).toEqual(['bracket']);
     const six = section(base(), 'playoffs');
     expect(six.groups.map((g) => g.key)).toEqual(['bracket', 'preview']);
     const rounds = six.groups[1].fields;
     expect(rounds).toHaveLength(3);
     expect(rounds[0]).toMatchObject({ kind: 'info', label: 'Wild card', value: 'RD 1' });
+  });
+
+  it('playoffs: the week-start day is a select, Sunday by default, locked once the draft is complete', () => {
+    const open = fields(base({ draftCompleted: false }), 'playoffs').find((f) => f.key === 'weekStartDay');
+    expect(open).toMatchObject({ kind: 'select', value: 'sunday', disabled: false });
+    const locked = fields(base({ draftCompleted: true }), 'playoffs').find((f) => f.key === 'weekStartDay');
+    expect(locked).toMatchObject({ kind: 'select', disabled: true });
+    expect(locked?.help).toMatch(/fixed/i);
+    const monday = fields(base({ playoff: { playoffTeams: 6, playoffWeeks: 3, weekStartDay: 'monday' } }), 'playoffs').find((f) => f.key === 'weekStartDay');
+    expect(monday).toMatchObject({ value: 'monday' });
   });
 
   it('scoring: one number row per catalog stat, Off and New called out, saving through the hook', async () => {

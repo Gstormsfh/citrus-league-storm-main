@@ -219,6 +219,7 @@ export interface LeagueFormatSettings {
   playoffWeeks?: number;         // Weeks for playoffs (default: 3)
   tradeDeadlineWeek?: number;    // Week number trade deadline (0 = no deadline)
   regularSeasonWeeks?: number;   // Override auto-calculated season length
+  weekStartDay?: 'sunday' | 'monday'; // Which day a matchup week starts (default sunday); fixed once the draft is complete
 
   // === Keeper / Dynasty ===
   keeperEnabled?: boolean;       // Keep players between seasons
@@ -446,6 +447,7 @@ export function extractFormatSettings(settings: Record<string, unknown>): Partia
     playoffWeeks: (settings.playoffWeeks as number) ?? 3,
     tradeDeadlineWeek: (settings.tradeDeadlineWeek as number) ?? 0,
     regularSeasonWeeks: (settings.regularSeasonWeeks as number) || undefined,
+    weekStartDay: settings.weekStartDay === 'monday' ? 'monday' : 'sunday',
 
     // Keeper / Dynasty
     keeperEnabled: (settings.keeperEnabled as boolean) || false,

@@ -1,5 +1,6 @@
 import { MatchupPlayer } from "./types";
 import { resolveFantasyPosition, type PositionType } from "@/utils/rosterUtils";
+import { buildSlotConfig } from "@/components/roster/slotConfig";
 
 export interface PositionGroup {
   position: string;
@@ -8,46 +9,30 @@ export interface PositionGroup {
   scoreDiffs: (number | undefined)[];
 }
 
-// Standard slot order: 2C, 2RW, 2LW, 4D, 2G, 1UTIL — the row order of the
-// comparison view (MatchupComparison → MatchupPositionGroup).
-const INDIVIDUAL_SLOT_ORDER: Array<{ slot: string; position: string }> = [
-  { slot: 'slot-C-1', position: 'C' },
-  { slot: 'slot-C-2', position: 'C' },
-  { slot: 'slot-RW-1', position: 'RW' },
-  { slot: 'slot-RW-2', position: 'RW' },
-  { slot: 'slot-LW-1', position: 'LW' },
-  { slot: 'slot-LW-2', position: 'LW' },
-  { slot: 'slot-D-1', position: 'D' },
-  { slot: 'slot-D-2', position: 'D' },
-  { slot: 'slot-D-3', position: 'D' },
-  { slot: 'slot-D-4', position: 'D' },
-  { slot: 'slot-G-1', position: 'G' },
-  { slot: 'slot-G-2', position: 'G' },
-  { slot: 'slot-UTIL', position: 'UTIL' },
-];
-
-const FDG_SLOT_ORDER: Array<{ slot: string; position: string }> = [
-  { slot: 'slot-F-1', position: 'F' },
-  { slot: 'slot-F-2', position: 'F' },
-  { slot: 'slot-F-3', position: 'F' },
-  { slot: 'slot-F-4', position: 'F' },
-  { slot: 'slot-F-5', position: 'F' },
-  { slot: 'slot-F-6', position: 'F' },
-  { slot: 'slot-D-1', position: 'D' },
-  { slot: 'slot-D-2', position: 'D' },
-  { slot: 'slot-D-3', position: 'D' },
-  { slot: 'slot-D-4', position: 'D' },
-  { slot: 'slot-G-1', position: 'G' },
-  { slot: 'slot-G-2', position: 'G' },
-  { slot: 'slot-UTIL', position: 'UTIL' },
-];
-
-function getSlotOrder(positionType: PositionType = 'individual') {
-  return positionType === 'forward' ? FDG_SLOT_ORDER : INDIVIDUAL_SLOT_ORDER;
+/**
+ * THE LEAGUE'S SLOTS, NOT A FIXED LIST (2026-09-10). Until today this file
+ * carried its own two slot lists (2C/2LW/2RW/4D/2G/UTIL and 6F/4D/2G/UTIL)
+ * and Matchup.tsx never passed a position type, so every matchup rendered
+ * the individual-position list: an F/D/G league saw C, C, LW, LW, RW rows
+ * with "No player assigned" under every one of them while its Roster page
+ * showed a full F/D/G lineup for the same day. The slot plan now comes from
+ * buildSlotConfig, the one definition the roster surfaces already share, so
+ * a commissioner's roster settings (3 C, 5 D, 2 UTIL, whatever they set)
+ * shape the comparison too.
+ */
+function getSlotOrder(
+  positionType: PositionType = 'individual',
+  rosterSlots?: Record<string, number>,
+): Array<{ slot: string; position: string }> {
+  const config = buildSlotConfig(positionType, rosterSlots);
+  return config.allSlots.map((slot) => ({ slot, position: config.labels[slot] }));
 }
 
 // Helper to normalize position for grouping
 const normalizePosition = (position: string, positionType: PositionType = 'individual'): string => {
+  // The slot label 'F' is a real position in an F/D/G league; the shared
+  // resolver only knows the five NHL codes and would file it under OTHER.
+  if (positionType === 'forward' && (position || '').toUpperCase() === 'F') return 'F';
   const result = resolveFantasyPosition(position, positionType);
   return result === 'OTHER' ? 'UTIL' : result;
 };
@@ -73,23 +58,30 @@ const formatPositionForDisplay = (position: string): string => {
  */
 const autoAssignSlots = (
   starters: MatchupPlayer[],
-  positionType: PositionType = 'individual'
+  positionType: PositionType = 'individual',
+  rosterSlots?: Record<string, number>,
 ): Record<string, string> => {
-  const slotsNeeded: Record<string, number> = positionType === 'forward'
-    ? { F: 6, D: 4, G: 2, UTIL: 1 }
-    : { C: 2, LW: 2, RW: 2, D: 4, G: 2, UTIL: 1 };
-  const slotsFilled: Record<string, number> = {};
-  for (const k of Object.keys(slotsNeeded)) slotsFilled[k] = 0;
+  const config = buildSlotConfig(positionType, rosterSlots);
+  // Open slot ids per position, in render order; UTIL keeps its own list
+  // because its ids are `slot-UTIL` or `slot-UTIL-n` (see slotConfig.ts).
+  const open = new Map<string, string[]>();
+  for (const slot of config.allSlots) {
+    const label = config.labels[slot];
+    if (!open.has(label)) open.set(label, []);
+    open.get(label)!.push(slot);
+  }
   const assignments: Record<string, string> = {};
 
   starters.forEach(player => {
     const pos = normalizePosition(player.position, positionType);
-    if (pos !== 'UTIL' && slotsFilled[pos] < (slotsNeeded[pos] || 0)) {
-      slotsFilled[pos]++;
-      assignments[String(player.id)] = `slot-${pos}-${slotsFilled[pos]}`;
-    } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
-      slotsFilled['UTIL']++;
-      assignments[String(player.id)] = 'slot-UTIL';
+    const own = pos !== 'UTIL' ? open.get(pos) : undefined;
+    if (own && own.length > 0) {
+      assignments[String(player.id)] = own.shift()!;
+      return;
+    }
+    const util = open.get('UTIL');
+    if (pos !== 'G' && util && util.length > 0) {
+      assignments[String(player.id)] = util.shift()!;
     }
   });
 
@@ -104,18 +96,19 @@ export const organizeMatchupData = (
   opponentStarters: MatchupPlayer[],
   userSlotAssignments: Record<string, string>,
   opponentSlotAssignments: Record<string, string>,
-  positionType: PositionType = 'individual'
+  positionType: PositionType = 'individual',
+  rosterSlots?: Record<string, number>,
 ): PositionGroup[] => {
   // Auto-assign slots when assignments are missing/empty but starters exist.
   const effectiveUserSlots = (
     userStarters.length > 0 &&
     !userStarters.some(p => userSlotAssignments[String(p.id)])
-  ) ? autoAssignSlots(userStarters, positionType) : userSlotAssignments;
+  ) ? autoAssignSlots(userStarters, positionType, rosterSlots) : userSlotAssignments;
 
   const effectiveOpponentSlots = (
     opponentStarters.length > 0 &&
     !opponentStarters.some(p => opponentSlotAssignments[String(p.id)])
-  ) ? autoAssignSlots(opponentStarters, positionType) : opponentSlotAssignments;
+  ) ? autoAssignSlots(opponentStarters, positionType, rosterSlots) : opponentSlotAssignments;
 
   // Create maps of slot -> player for both teams
   const userSlotToPlayer = new Map<string, MatchupPlayer>();
@@ -136,7 +129,7 @@ export const organizeMatchupData = (
   });
 
   // Group slots by position
-  const slotOrder = getSlotOrder(positionType);
+  const slotOrder = getSlotOrder(positionType, rosterSlots);
   const positionGroups = new Map<string, Array<{ slot: string; position: string }>>();
 
   slotOrder.forEach(({ slot, position }) => {

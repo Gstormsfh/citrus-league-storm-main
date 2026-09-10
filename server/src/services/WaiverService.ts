@@ -1,6 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS, logger, getCurrentSeason } from '@citrus/shared';
-import { resolveAddLimits, evaluateGameLock } from '../lib/leagueRules';
+import { resolveAddLimits, evaluateGameLock, currentWeekStart } from '../lib/leagueRules';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { LeagueMembershipService } from './LeagueMembershipService';
 
@@ -93,9 +93,9 @@ export class WaiverService {
       }
 
       if (weeklyLimit) {
-        const weekStart = new Date();
-        weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Sunday
-        weekStart.setHours(0, 0, 0, 0);
+        // The league's own week (2026-09-10): Sunday- or Monday-anchored per
+        // settings.weekStartDay. Was hard-coded to Sunday.
+        const weekStart = currentWeekStart(settings);
 
         const { count: weekCount, error: weekErr } = await this.supabase
           .from('transaction_ledger')

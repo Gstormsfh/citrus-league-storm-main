@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { MatchupService } from '@/services/MatchupService';
-import { getCurrentWeekNumber, getFirstWeekStartDate, getWeekStartDate, getWeekEndDate, clampToSeasonStart } from '@/utils/weekCalculator';
+import { fantasyWeekAnchorFor, getCurrentWeekNumber, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { leagueApi } from '@/api/leagues';
 import { matchupApi } from '@/api/matchups';
 import { AlertCircle, Clock, TrendingUp, TrendingDown } from 'lucide-react';
@@ -39,13 +39,18 @@ export const HeadlinesBanner = () => {
 
         // 1. Check for upcoming matchup
         try {
-          const draftCompletionDate = activeLeague.updated_at ? new Date(activeLeague.updated_at) : new Date();
           // WEEK-MATH FIX (2026-08-22): clamp the anchor to the season start,
           // exactly like matchup GENERATION does. Without it an offseason
           // draft yields an Aug/Sep anchor and this banner reports the
           // calendar week ("Starts in 1 day") while the real week 1 is the
           // schedule's (e.g. Sep 28) — contradicting the matchup page.
-          const firstWeekStart = clampToSeasonStart(getFirstWeekStartDate(draftCompletionDate));
+          // 2026-09-10: one anchor for the whole app, league-aware
+          // (Sunday or Monday weeks), with updated_at as the fallback this
+          // banner always used before the draft-completion stamp existed.
+          const firstWeekStart = fantasyWeekAnchorFor(
+            activeLeague,
+            activeLeague.updated_at ? new Date(activeLeague.updated_at) : new Date(),
+          ) as Date;
           const currentWeek = getCurrentWeekNumber(firstWeekStart);
 
           if (userTeam) {

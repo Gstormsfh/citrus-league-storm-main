@@ -39,6 +39,7 @@ import {
   DRAFT_ROUNDS_MATCH_ROSTER,
 } from '@/types/leagueTypes';
 import { processTimeLabel, type SettingField, type SettingOption, type SettingSection } from './leagueSettingsSections';
+import type { WeekStartDay } from '@/utils/weekCalculator';
 
 export type KeeperPenalty = 'none' | 'round-cost' | 'round-escalation';
 export type PickDeadline = 'per-game' | 'first-game';
@@ -99,6 +100,8 @@ export interface CreateLeagueForm {
   setPlayoffWeeks: (v: string) => void;
   tradeDeadlineWeek: string;
   setTradeDeadlineWeek: (v: string) => void;
+  weekStartDay: WeekStartDay;
+  setWeekStartDay: (v: WeekStartDay) => void;
   keeperEnabled: boolean;
   setKeeperEnabled: (v: boolean) => void;
   keeperCount: string;
@@ -187,6 +190,11 @@ const NOMINATION_CLOCKS = opts([['15', '15s'], ['30', '30s'], ['45', '45s'], ['6
 const BID_CLOCKS = opts([['10', '10s'], ['15', '15s'], ['20', '20s'], ['30', '30s'], ['45', '45s']]);
 const PLAYOFF_WEEKS = opts([['1', '1 week'], ['2', '2 weeks'], ['3', '3 weeks'], ['4', '4 weeks']]);
 const TRADE_DEADLINES = opts([['0', 'None'], ['8', 'Week 8'], ['10', 'Week 10'], ['12', 'Week 12'], ['14', 'Week 14'], ['16', 'Week 16']]);
+/** Which day a fantasy week starts (2026-09-10). Sunday is the house default. */
+export const WEEK_START_OPTIONS = opts([
+  ['sunday', 'Sunday to Saturday', 'Weeks end on the biggest slate of the schedule'],
+  ['monday', 'Monday to Sunday', 'Calendar weeks'],
+]);
 const KEEPER_COUNTS = opts([['0', 'Unlimited', 'Dynasty: the whole roster is kept'], ['1', '1 keeper'], ['2', '2 keepers'], ['3', '3 keepers'], ['5', '5 keepers'], ['8', '8 keepers'], ['10', '10 keepers']]);
 const KEEPER_PENALTIES = opts([
   ['none', 'None', 'No round cost: a keeper takes the team’s last-round pick'],
@@ -634,6 +642,17 @@ export function buildCreateLeagueSections(f: CreateLeagueForm): SettingSection[]
       options: TRADE_DEADLINES,
       onChange: f.setTradeDeadlineWeek,
     });
+    if (f.showMatchupSettings) {
+      season.push({
+        kind: 'select',
+        key: 'weekStartDay',
+        label: 'Week runs',
+        help: 'Fixed once the draft is done',
+        value: f.weekStartDay,
+        options: WEEK_START_OPTIONS,
+        onChange: (v) => f.setWeekStartDay(v as WeekStartDay),
+      });
+    }
     const keepers: SettingField[] = [
       {
         kind: 'toggle',

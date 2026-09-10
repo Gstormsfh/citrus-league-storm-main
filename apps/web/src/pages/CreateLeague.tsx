@@ -28,7 +28,8 @@ import { supabase } from "@/integrations/supabase/client";
 import Navbar from "@/components/Navbar";
 import { PressBoxAppHeader } from '@/components/pressbox/AppHeader';
 import { CreateLeaguePhone } from '@/components/league/CreateLeaguePhone';
-import { buildCreateLeagueSections } from '@/components/league/createLeagueSections';
+import { buildCreateLeagueSections, WEEK_START_OPTIONS } from '@/components/league/createLeagueSections';
+import type { WeekStartDay } from '@/utils/weekCalculator';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -168,6 +169,9 @@ const CreateLeague = () => {
   const [playoffTeams, setPlayoffTeams] = useState("6");
   const [playoffWeeks, setPlayoffWeeks] = useState("3");
   const [tradeDeadlineWeek, setTradeDeadlineWeek] = useState("0");
+  // WEEK START (2026-09-10): Sunday to Saturday by default; Monday to Sunday
+  // if the commissioner wants it. Locked once the draft is complete.
+  const [weekStartDay, setWeekStartDay] = useState<WeekStartDay>('sunday');
 
   // ---- Keeper / Dynasty Settings ----
   const [keeperEnabled, setKeeperEnabled] = useState(false);
@@ -512,6 +516,7 @@ const CreateLeague = () => {
           ? Math.min(Math.max(num(playoffWeeks, playoffRounds(effectivePlayoffTeams)), 1), 4)
           : 0;
         settings.tradeDeadlineWeek = num(tradeDeadlineWeek, 0);
+        settings.weekStartDay = weekStartDay;
 
         // Keeper / Dynasty
         settings.keeperEnabled = keeperEnabled;
@@ -882,6 +887,7 @@ const CreateLeague = () => {
         playoffOptions,
         playoffWeeks, setPlayoffWeeks,
         tradeDeadlineWeek, setTradeDeadlineWeek,
+        weekStartDay, setWeekStartDay,
         keeperEnabled, setKeeperEnabled,
         keeperCount, setKeeperCount,
         keeperPenalty, setKeeperPenalty,
@@ -1874,6 +1880,24 @@ const CreateLeague = () => {
                             No trades allowed after this week.
                           </p>
                         </div>
+
+                        {/* Week start (2026-09-10) */}
+                        {showMatchupSettings && (
+                          <div className="space-y-3">
+                            <Label>Week Runs</Label>
+                            <Select value={weekStartDay} onValueChange={(v) => setWeekStartDay(v as WeekStartDay)}>
+                              <SelectTrigger data-testid="create-league-week-start"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {WEEK_START_OPTIONS.map((o) => (
+                                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-white/55">
+                              Matchup weeks start on this day. Fixed once the draft is done.
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Advanced: Keeper / Dynasty */}

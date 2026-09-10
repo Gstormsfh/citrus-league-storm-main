@@ -140,6 +140,12 @@ export async function getLeagueAverageProjections(
         total: current.total + projectedPoints,
         count: current.count + 1
       });
+      // F/D/G leagues grade forwards as one group, so the map also carries
+      // an 'F' average over every C, LW and RW (per player, like the rest).
+      if (normalizedPos === 'C' || normalizedPos === 'LW' || normalizedPos === 'RW') {
+        const fwd = positionTotals.get('F') || { total: 0, count: 0 };
+        positionTotals.set('F', { total: fwd.total + projectedPoints, count: fwd.count + 1 });
+      }
     });
 
     // Calculate averages

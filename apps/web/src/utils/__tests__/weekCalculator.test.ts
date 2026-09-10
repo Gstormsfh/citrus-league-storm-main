@@ -7,7 +7,62 @@ import {
   getScheduleLength,
   getWeekLabel,
   getWeekDateLabel,
+  fantasyWeekAnchorFor,
+  weekStartDayFor,
+  weekStartDowFor,
 } from '../weekCalculator';
+import type { League } from '@/services/LeagueService';
+
+const leagueWith = (settings: Record<string, unknown>, draftCompletedAt = '2026-09-06T20:00:00Z'): League =>
+  ({
+    id: 'l1',
+    draft_status: 'completed',
+    created_at: '2026-08-01T00:00:00Z',
+    settings: { draftCompletedAt, ...settings },
+  } as unknown as League);
+
+describe('the week-start day is a league setting (2026-09-10)', () => {
+  it('reads settings.weekStartDay, Sunday by default', () => {
+    expect(weekStartDayFor(leagueWith({}))).toBe('sunday');
+    expect(weekStartDayFor(leagueWith({ weekStartDay: 'monday' }))).toBe('monday');
+    expect(weekStartDayFor(leagueWith({ weekStartDay: 'tuesday' }))).toBe('sunday');
+    expect(weekStartDayFor(null)).toBe('sunday');
+    expect(weekStartDowFor(leagueWith({ weekStartDay: 'monday' }))).toBe(1);
+  });
+
+  it('getFirstWeekStartDate walks forward to the league\'s day', () => {
+    const wed = new Date(2026, 9, 14); // Wed Oct 14 2026
+    expect(getFirstWeekStartDate(wed, 1).getDay()).toBe(1);
+    expect(getFirstWeekStartDate(wed, 1).getDate()).toBe(19); // Mon Oct 19
+    expect(getFirstWeekStartDate(new Date(2026, 9, 12), 1).getDate()).toBe(12); // a Monday stays
+    expect(getFirstWeekStartDate(new Date(2026, 9, 11), 1).getDate()).toBe(12); // Sunday -> next day
+  });
+
+  it('clampToSeasonStart walks back to the league\'s day on or before Oct 1', () => {
+    const sep = new Date(2026, 8, 13); // an offseason anchor
+    expect(clampToSeasonStart(sep, 0).getDay()).toBe(0);
+    expect(clampToSeasonStart(sep, 1).getDay()).toBe(1);
+    // Oct 1 2026 is a Thursday: Sunday Sep 27 / Monday Sep 28.
+    expect(clampToSeasonStart(sep, 0).getDate()).toBe(27);
+    expect(clampToSeasonStart(sep, 1).getDate()).toBe(28);
+  });
+
+  it('fantasyWeekAnchorFor is the one entry point: Monday league lands on Mon Sep 28, Sunday league on Sun Sep 27', () => {
+    const sun = fantasyWeekAnchorFor(leagueWith({}))!;
+    const mon = fantasyWeekAnchorFor(leagueWith({ weekStartDay: 'monday' }))!;
+    expect([sun.getMonth(), sun.getDate(), sun.getDay()]).toEqual([8, 27, 0]);
+    expect([mon.getMonth(), mon.getDate(), mon.getDay()]).toEqual([8, 28, 1]);
+    // A week is seven days from the anchor whichever day it starts.
+    expect(getWeekEndDate(1, mon).getDay()).toBe(0);
+    expect(getWeekEndDate(1, mon).getDate()).toBe(4);
+  });
+
+  it('fantasyWeekAnchorFor is null before the draft unless a fallback completion is given', () => {
+    const pending = { ...leagueWith({}), draft_status: 'in_progress' } as League;
+    expect(fantasyWeekAnchorFor(pending)).toBeNull();
+    expect(fantasyWeekAnchorFor(pending, new Date(2026, 9, 14))?.getDay()).toBe(0);
+  });
+});
 
 describe('getFirstWeekStartDate', () => {
   it('returns the same Sunday if draft completes on Sunday', () => {

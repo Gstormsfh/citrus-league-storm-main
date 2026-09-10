@@ -357,7 +357,7 @@ const LeagueNotificationsSession: React.FC<LeagueNotificationsProps> = ({ league
       </div>
 
       {/* Notifications List - Scrollable */}
-      <div className="flex-1 overflow-y-auto px-2 py-2">
+      <div className="flex-1 overflow-y-auto scrollbar-pressbox px-2 py-2">
         {leagueNotifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4 relative">
             <CitrusLeaf className="w-20 h-20 text-pastel-sage opacity-20 mb-4" />
