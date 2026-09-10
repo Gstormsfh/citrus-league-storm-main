@@ -193,15 +193,122 @@ export interface NotifyInput {
   expirySeconds?: number;
 }
 
+/**
+ * Rebuild a PEM whose line breaks did not survive the journey here.
+ *
+ * TWO FAILURES, BOTH REAL, BOTH SILENT (2026-09-09):
+ *   1. A multi-line secret through `gcloud --set-env-vars` arrived as
+ *      `-----BEGIN PRIVATE KEY-----` and nothing else: 27 bytes. That flag
+ *      is newline-delimited, so the key was cut at the first line break.
+ *   2. Re-saved as one line with escaped `\n`, the BACKSLASHES were eaten
+ *      between the GitHub secret and the container, leaving a bare `n` at
+ *      every break: `-----BEGIN PRIVATE KEY-----nMIGT…`.
+ *
+ * Both produce `DECODER routines::unsupported`, which reads as "your key is
+ * broken" rather than "your deploy mangled it".
+ *
+ * WHY THIS VERIFIES INSTEAD OF GUESSING. The first version of this function
+ * stripped every `n` that preceded a base64 character — and base64 contains
+ * the letter `n`, so it deleted real key material and produced a
+ * plausible-looking PEM that was silently wrong. A unit test caught it. The
+ * shape a mangled key takes cannot be known from the text alone, so each
+ * candidate repair is handed to `createPrivateKey` and only a candidate that
+ * PARSES is returned. A wrong reconstruction cannot survive that check:
+ * an EC key has structure, and corrupted DER does not decode.
+ *
+ * Prefer APNS_PRIVATE_KEY_B64 regardless — base64 contains nothing any
+ * shell, YAML parser or secret store rewrites, so none of this runs.
+ */
+function pemCandidates(raw: string): string[] {
+  const trimmed = raw.trim();
+  const out: string[] = [trimmed];
+
+  // (a) escaped newlines, the documented secret-manager form
+  if (trimmed.includes('\\n')) out.push(trimmed.replace(/\\n/g, '\n'));
+
+  const body = trimmed
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----/g, '')
+    .replace(/-----END [A-Z ]*PRIVATE KEY-----/g, '')
+    .replace(/\s/g, '');
+  const wrap = (b: string): string =>
+    `-----BEGIN PRIVATE KEY-----\n${(b.match(/.{1,64}/g) ?? [b]).join('\n')}\n-----END PRIVATE KEY-----\n`;
+
+  // (b) armour present, separators gone entirely
+  if (body) out.push(wrap(body));
+
+  // (c) the eaten-backslash form. PEM bodies wrap at 64 characters, so a
+  //     stray separator sits at every 65th position. Stripping the armour
+  //     also leaves the separator that followed BEGIN at the FRONT and the
+  //     one that followed END at the back, so both offsets are tried.
+  //     Nothing here is trusted: `createPrivateKey` decides which guess was
+  //     right, and base64's own `n` characters make guessing unsafe without
+  //     that check.
+  if (body.includes('n')) {
+    for (const lead of [1, 0]) {
+      for (const dropTrailing of [true, false]) {
+        let b = body.slice(lead);
+        if (dropTrailing) b = b.replace(/n+$/, '');
+        let rebuilt = '';
+        let i = 0;
+        while (i < b.length) {
+          rebuilt += b.slice(i, i + 64);
+          i += 64;
+          if (b[i] === 'n') i += 1;
+        }
+        if (rebuilt) out.push(wrap(rebuilt));
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The first candidate that PARSES, or — when none does — the historical
+ * behaviour of simply un-escaping `\n`.
+ *
+ * The fallback matters: a key that cannot be parsed is going to be reported
+ * either way, and a value that at least LOOKS like a PEM makes that report
+ * legible. It also keeps the contract this function had before verification
+ * was added, which a test pins with a placeholder key.
+ */
+export function normalizeApnsPem(raw: string): string {
+  for (const candidate of pemCandidates(raw)) {
+    try {
+      createPrivateKey(candidate);
+      return candidate;
+    } catch {
+      /* try the next shape */
+    }
+  }
+  const trimmed = raw.trim();
+  return trimmed.includes('\\n') ? trimmed.replace(/\\n/g, '\n') : trimmed;
+}
+
 export function loadApnsConfigFromEnv(): ApnsConfig | null {
   const keyId = process.env.APNS_KEY_ID;
   const teamId = process.env.APNS_TEAM_ID;
+  // Base64 first: it is the only form nothing in the chain can rewrite.
+  const b64 = process.env.APNS_PRIVATE_KEY_B64;
   const raw = process.env.APNS_PRIVATE_KEY;
-  if (!keyId || !teamId || !raw) {
+  if (!keyId || !teamId || (!b64 && !raw)) {
     return null;
   }
-  // Secret managers routinely flatten newlines; accept both forms.
-  const privateKeyPem = raw.includes('\\n') ? raw.replace(/\\n/g, '\n') : raw;
+  let privateKeyPem: string;
+  if (b64) {
+    try {
+      privateKeyPem = Buffer.from(b64.replace(/\s/g, ''), 'base64').toString('utf8');
+    } catch {
+      privateKeyPem = '';
+    }
+    if (!privateKeyPem.includes('PRIVATE KEY')) {
+      structuredLogger.error(
+        '[push] APNS_PRIVATE_KEY_B64 did not decode to a PEM — check the secret was base64 of the .p8',
+      );
+      return null;
+    }
+  } else {
+    privateKeyPem = normalizeApnsPem(raw as string);
+  }
   return {
     keyId,
     teamId,
@@ -257,8 +364,19 @@ export class PushService {
       } catch (err) {
         // A malformed key is a deploy-time misconfiguration, not a runtime
         // condition. Log once and stay dormant rather than throwing on every pick.
+        //
+        // LOUD, NOT QUIET (2026-09-09). This line existed and said exactly
+        // the right thing for days, into a structuredLogger nobody had
+        // activated in the API process. It now names the two shapes a
+        // mangled key arrives in, because "could not be parsed" sent us
+        // looking at Apple and the phones instead of at the deploy.
+        const len = config.privateKeyPem.length;
+        const breaks = (config.privateKeyPem.match(/\n/g) ?? []).length;
         structuredLogger.error(
-          `[push] APNS_PRIVATE_KEY could not be parsed — push disabled: ${(err as Error).message}`,
+          `[push] APNS key could not be parsed — iOS push DISABLED: ${(err as Error).message} ` +
+            `(pem_len=${len} line_breaks=${breaks}). ` +
+            'A key under 200 chars was truncated by the deploy; a key with zero line breaks ' +
+            'had its newlines eaten. Set APNS_PRIVATE_KEY_B64 to base64 of the .p8 instead.',
         );
         this.config = null;
       }
@@ -453,6 +571,18 @@ export class PushService {
         `[push] ${input.category} users=${userIds.length} devices=${recipients.length} ` +
           `sent=${sent} failed=${failed} no_transport=${skippedNoTransport}`,
       );
+      // EVERY device skipped is not a half-finished deploy, it is a broken
+      // one. `no_transport` was designed not to count as a failure so that
+      // iOS-only credentials plus an Android tester would not look like a
+      // delivery bug — right for a temporary state, wrong for a permanent
+      // one, and it hid a dead APNs transport for days.
+      if (sent === 0 && failed === 0 && skippedNoTransport > 0) {
+        structuredLogger.warn(
+          `[push] ${input.category} reached NOBODY: all ${skippedNoTransport} device(s) had no ` +
+            `usable transport (apns=${this.isApnsConfigured()} fcm=${this.isFcmConfigured()}). ` +
+            'This is a configuration failure, not a delivery one.',
+        );
+      }
       return { sent, failed, skipped: false };
     } catch (err) {
       structuredLogger.error(
