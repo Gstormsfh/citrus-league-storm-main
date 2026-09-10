@@ -28,7 +28,7 @@
  * imported anywhere.
  */
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { ChevronDown, MessageCircle, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { HEADER_ROW1_H, HEADER_SUBTAB_H, SCANLINE } from './chromeMetrics';
 import { PB_TYPE } from './rowScale';
@@ -61,6 +61,21 @@ export interface LeagueHeaderProps {
    * else the icon takes the manager to League HQ, where the sheet lives.
    */
   onSettingsPress?: () => void;
+  /**
+   * CHAT HAS A DOOR (2026-09-09). Until now the only way into league chat
+   * was the bell in the desktop Navbar, and every Press Box league page
+   * wraps that Navbar in `hidden lg:block` — so on a phone, league chat was
+   * unreachable. Not hidden: unreachable. The chrome that replaced the old
+   * navbar kept the sliders and dropped the bell.
+   *
+   * This is the icon the founder pointed at in Yahoo's header: a chat
+   * bubble with the unread count on it, one tap from every league screen.
+   * Rendered only when an opener is passed, so a header outside a league
+   * (no chat to open) draws nothing and the guards for those screens hold.
+   */
+  onChatPress?: () => void;
+  /** Unread count for the badge. Drawn only above zero; capped at 9+. */
+  chatUnread?: number;
   /**
    * THE LEAGUE NAME IS THE SWITCHER (2026-09-05). Reported from the phone:
    * "the league drop down doesn't work any longer with the new visuals —
@@ -110,6 +125,8 @@ export function LeagueHeader({
   onWeekPrev,
   onWeekNext,
   onSettingsPress,
+  onChatPress,
+  chatUnread = 0,
   onLeaguePress,
   showSubTabs = true,
   leagueId: leagueIdProp,
@@ -215,6 +232,26 @@ export function LeagueHeader({
               </button>
             )}
           </span>
+        )}
+
+        {onChatPress && (
+          <button
+            type="button"
+            onClick={onChatPress}
+            className="focus-citrus relative min-w-[44px] min-h-[44px] flex items-center justify-center text-pressbox-text/55"
+            aria-label={chatUnread > 0 ? `League chat, ${chatUnread} unread` : 'League chat'}
+            data-testid="league-chat-button"
+          >
+            <MessageCircle className="w-[18px] h-[18px]" strokeWidth={2} aria-hidden="true" />
+            {chatUnread > 0 && (
+              <span
+                className="absolute top-[7px] right-[5px] min-w-[16px] h-[16px] px-1 rounded-full bg-pressbox-orange text-pressbox-orange-ink font-plex font-bold text-[9px] leading-[16px] text-center ring-2 ring-pressbox-surface"
+                aria-hidden="true"
+              >
+                {chatUnread > 9 ? '9+' : chatUnread}
+              </span>
+            )}
+          </button>
         )}
 
         <button

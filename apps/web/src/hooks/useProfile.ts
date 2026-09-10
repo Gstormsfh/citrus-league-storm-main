@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { NotificationPreferences } from '@citrus/shared';
 import { accountApi } from '@/api/account';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -18,8 +19,14 @@ export interface Profile {
   default_team_name: string | null;
   timezone: string | null;
   avatar_url: string | null;
-  /** The on-the-clock APNs opt-in (profiles.push_notifications). Defaults true. */
+  /** The MASTER push switch (profiles.push_notifications). Defaults true. */
   push_notifications?: boolean;
+  /**
+   * Per-category overrides (profiles.push_categories, 2026-09-09). Holds only
+   * the categories the manager changed; an absent key is that category's
+   * default. Resolve with `resolvePreferences` from @citrus/shared.
+   */
+  push_categories?: NotificationPreferences;
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +43,7 @@ export type ProfileUpdateFields = {
   timezone?: string;
   avatar_url?: string;
   push_notifications?: boolean;
+  push_categories?: NotificationPreferences;
 };
 
 // ============================================================================

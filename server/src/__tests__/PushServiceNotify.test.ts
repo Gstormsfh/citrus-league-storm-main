@@ -127,6 +127,30 @@ describe('notify — dormancy and totality', () => {
   });
 });
 
+describe('notify — expiry', () => {
+  it('gives a general notification a day, not the pick clock’s two minutes', async () => {
+    const supabase = makeSupabase();
+    svc = new PushService(supabase, testConfig(), null);
+    const spy = vi.spyOn(
+      PushService.prototype as unknown as { sendToToken: () => Promise<unknown> },
+      'sendToToken',
+    ).mockResolvedValue({ ok: true, status: 200 });
+    await svc.notify(base);
+    // (token, payload, expirySeconds)
+    expect(spy).toHaveBeenCalledWith('tok-a', expect.any(Object), 24 * 60 * 60);
+  });
+
+  it('honours an explicit short expiry for something worthless once stale', async () => {
+    svc = new PushService(makeSupabase(), testConfig(), null);
+    const spy = vi.spyOn(
+      PushService.prototype as unknown as { sendToToken: () => Promise<unknown> },
+      'sendToToken',
+    ).mockResolvedValue({ ok: true, status: 200 });
+    await svc.notify({ ...base, expirySeconds: 300 });
+    expect(spy).toHaveBeenCalledWith('tok-a', expect.any(Object), 300);
+  });
+});
+
 describe('notify — dedupe', () => {
   it('sends when it wins the claim', async () => {
     svc = new PushService(makeSupabase(), testConfig(), null);

@@ -43,6 +43,23 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 // Chrome. Each of these drags the auth/league/supabase shell in behind it, so
 // a failure here would be a failure of the shell and not of the standings.
+// The chat door in the league chrome (2026-09-09) reads the unread count
+// from the notification store; the real store reaches NotificationService ->
+// api/notifications -> api/client -> the Supabase client, which throws at
+// module scope under the hermetic env. Same reason useProfile is mocked.
+vi.mock('@/stores/notificationStore', () => {
+  const state = {
+    unreadCounts: new Map<string, number>(),
+    loadNotifications: () => Promise.resolve(),
+    subscribe: () => {},
+    unsubscribe: () => {},
+  };
+  const useNotificationStore = Object.assign(
+    (selector?: (s: typeof state) => unknown) => (selector ? selector(state) : state),
+    { getState: () => state },
+  );
+  return { useNotificationStore };
+});
 vi.mock('@/components/Navbar', () => ({ default: () => <nav data-testid="navbar" /> }));
 vi.mock('@/components/LeagueCreationCTA', () => ({ LeagueCreationCTA: () => null }));
 vi.mock('@/components/matchup/LeagueNotifications', () => ({ default: () => null }));

@@ -65,7 +65,7 @@ export const NOTIFICATION_CATEGORIES: readonly NotificationCategoryDef[] = [
   {
     key: 'draft_pick',
     label: 'Every pick made',
-    help: 'Someone in your league picks. Loud by design — a 12-team draft is 180 of these.',
+    help: 'Someone in your league picks. Loud by design: a 12-team draft is 180 of these.',
     group: 'Draft',
     defaultOn: false,
   },

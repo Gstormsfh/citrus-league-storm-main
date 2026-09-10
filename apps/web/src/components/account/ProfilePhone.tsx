@@ -135,10 +135,14 @@ export interface ProfilePhoneProps {
       onWithdraw: (row: ConsentStatus) => void;
       onRetry: () => void;
     };
-    /** The on-the-clock push opt-in: the app's one push, stored on the profile. */
+    /** The MASTER push switch (profiles.push_notifications). */
     pushEnabled: boolean;
     pushSaving: boolean;
     onPushToggle: (on: boolean) => void;
+    /** Opens the per-category sheet (2026-09-09): what, not whether. */
+    onOpenNotificationPrefs: () => void;
+    /** One line summarising the current mix, e.g. `The usual` or `Custom`. */
+    notificationSummary: string;
     exporting: boolean;
     onExport: () => void;
     deleteConfirmation: string;
@@ -516,10 +520,17 @@ export function ProfilePhone({ tab, onTabChange, hero, identity, stats, activity
 
             <PressBoxSettingGroup label="ALERTS">
               <PressBoxSettingRow
-                label="On-the-clock push"
-                help="A push the moment a draft pick is yours. iOS app only"
+                label="Push notifications"
+                help="The master switch. Off means nothing is sent."
                 checked={settings.pushEnabled}
                 onToggle={settings.pushSaving ? undefined : settings.onPushToggle}
+              />
+              <PressBoxSettingRow
+                label="What to send"
+                help="Your turn, trades, roster moves, waivers, league chat, and more."
+                value={settings.notificationSummary}
+                onPress={settings.onOpenNotificationPrefs}
+                disabled={!settings.pushEnabled}
                 last
               />
             </PressBoxSettingGroup>
