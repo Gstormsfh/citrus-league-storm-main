@@ -66,6 +66,7 @@ import { PressBoxTabs } from '@/components/pressbox/Tabs';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import type { PositionType } from '@/utils/rosterUtils';
 import { Card } from '@/components/ui/card';
 import { DraftClientRunner } from '@/lib/draftClient/runner';
 import { fetchDraftOrderMatrix } from '@/lib/draftClient/fetchDraftOrderMatrix';
@@ -289,6 +290,17 @@ export default function DraftRoomV2() {
    */
   const [leagueSettingsForRules, setLeagueSettingsForRules] = useState<unknown>(null);
   const auctionMoney = useMemo(() => auctionRules(leagueSettingsForRules), [leagueSettingsForRules]);
+  /**
+   * F/D/G OR INDIVIDUAL POSITIONS (2026-09-10). Off the same settings
+   * document the auction rules come from, so the draft room never asks
+   * LeagueContext (which may point at another league for the whole draft,
+   * ARCHITECT 2026-08-12). It decides which letter a position chip wears:
+   * a centre in an F/D/G league is an F, the same as his slot.
+   */
+  const leaguePositionType: PositionType =
+    (leagueSettingsForRules as { positionType?: unknown } | null)?.positionType === 'forward'
+      ? 'forward'
+      : 'individual';
   const [offlineMeta, setOfflineMeta] = useState<
     | { kind: 'live' }
     | {
@@ -670,6 +682,7 @@ export default function DraftRoomV2() {
         onRetryPlayers={reloadPlayers}
         clockOffsetMs={clockOffsetMs}
         auctionMoney={auctionMoney}
+        positionType={leaguePositionType}
       />
     </div>
   );
@@ -1652,9 +1665,12 @@ interface DraftRoomBodyProps {
    * separate EMA that never receives updateOffset frames.
    */
   clockOffsetMs: number;
+  /** The league's position format: chips read F/D/G or C/LW/RW/D/G from it. */
+  positionType: PositionType;
 }
 
 function DraftRoomBody({
+  positionType,
   leagueId,
   teams,
   playersById,
@@ -1768,6 +1784,7 @@ function DraftRoomBody({
             myTeamId={myTeamId}
             minBid={money.minBid}
             bidIncrementTiers={money.tiers}
+            positionType={positionType}
           />
         )}
         <MainTabs
@@ -1783,6 +1800,7 @@ function DraftRoomBody({
           onQueueChange={setQueue}
           isMobile={isMobile}
           auctionMoney={money}
+          positionType={positionType}
         />
       </div>
       {/* QUEUE-REACH (2026-08-13) — was `hidden lg:block`.
@@ -1812,6 +1830,7 @@ function DraftRoomBody({
             myTeamId={myTeamId}
             queue={queue}
             onQueueChange={setQueue}
+            positionType={positionType}
           />
         </div>
       )}
@@ -1833,6 +1852,8 @@ interface MainTabsProps {
   /** QUEUE-REACH (2026-08-13) — owned by DraftRoomBody, shared with the sidebar. */
   queue: string[];
   onQueueChange: (next: string[]) => void;
+  /** The league's position format, for the pool's position chips. */
+  positionType: PositionType;
   /** Below lg: the rail's halves become the QUEUE and MY TEAM tabs. */
   isMobile: boolean;
   /** The league's auction money rules (auctionRules.ts): the pool nominates at the league's minimum. */
@@ -1840,6 +1861,7 @@ interface MainTabsProps {
 }
 
 function MainTabs({
+  positionType,
   leagueId,
   teams,
   playersById,
@@ -2465,6 +2487,7 @@ function MainTabs({
             </div>
           )}
           <DraftBoard
+            positionType={positionType}
             teams={v1Teams}
             draftHistory={draftHistory}
             currentPick={derived?.currentPickNumber ?? 0}
@@ -2721,6 +2744,7 @@ function MainTabs({
                 myTeamId={myTeamId}
                 queue={queue}
                 onQueueChange={onQueueChange}
+                positionType={positionType}
                 onDraftFromQueue={(playerId) => {
                   const picked = playersById.get(playerId);
                   if (picked) void handleDraftFromPool(picked);
@@ -2736,6 +2760,7 @@ function MainTabs({
                 myTeamId={myTeamId}
                 queue={queue}
                 onQueueChange={onQueueChange}
+                positionType={positionType}
               />
             </TabsContent>
           </>
@@ -2748,6 +2773,7 @@ function MainTabs({
             </Card>
           ) : (
             <PlayerPool
+              positionType={positionType}
               onPlayerSelect={setSelectedPlayer}
               onPlayerDraft={isAuctionRoom ? handleNominateFromPool : handleDraftFromPool}
               selectedPlayer={selectedPlayer}
@@ -2877,9 +2903,12 @@ interface SidebarPanelProps {
    * ruling 1c's status quo, unchanged.
    */
   onDraftFromQueue?: (playerId: string) => void;
+  /** The league's position format, for the queue's and rosters' chips. */
+  positionType?: PositionType;
 }
 
 function SidebarPanel({
+  positionType = 'individual',
   leagueId,
   teams,
   playersById,
@@ -2942,6 +2971,7 @@ function SidebarPanel({
       {showQueue && (
         <div>
           <DraftQueue
+            positionType={positionType}
             queue={queue}
             players={allPlayers}
             draftedPlayers={draftedIds}
@@ -2984,6 +3014,7 @@ function SidebarPanel({
             </div>
           )}
           <TeamRosters
+            positionType={positionType}
             teams={v1Teams}
             draftHistory={draftHistory}
             userTeamId={myTeamId}

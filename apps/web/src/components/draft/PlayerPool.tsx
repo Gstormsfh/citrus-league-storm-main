@@ -2,7 +2,6 @@ import { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, Star, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown, Clock, Info } from 'lucide-react';
 import { Label } from '@/components/ui/label';
@@ -21,10 +20,19 @@ import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { PressBoxChips } from '@/components/pressbox/Chips';
 import { PB_SORT_TRIGGER, PressBoxDraftSearchRow } from '@/components/pressbox/DraftSearchRow';
 import { Mug } from '@/components/roster/Mug';
+import { positionChipClasses, positionChipKey } from '@/components/roster/positionChip';
+import { playerPositions } from '@/components/roster/positions';
+import type { PositionType } from '@/utils/rosterUtils';
 import { mugFromDirectory } from '@/components/roster/headshot';
 import type { DraftProjection, QualitySignal } from './draftDecision';
 
 interface PlayerPoolProps {
+  /**
+   * The league's position format (2026-09-10). An F/D/G league's pool shows
+   * one F chip per forward rather than C/LW/RW, matching the slots those
+   * players will actually fill. Defaults to individual positions.
+   */
+  positionType?: PositionType;
   onPlayerSelect: (player: Player) => void;
   onPlayerDraft: (player: Player) => void;
   selectedPlayer: Player | null;
@@ -127,6 +135,7 @@ const normalizePosition = (pos: string): string => {
 };
 
 export const PlayerPool = memo(({
+  positionType = 'individual',
   onPlayerSelect,
   onPlayerDraft,
   selectedPlayer,
@@ -427,6 +436,9 @@ export const PlayerPool = memo(({
     const isSelected = selectedPlayer?.id === player.id;
     const isDrafted = draftedSet.has(player.id);
     const isInQueue = queue.includes(player.id);
+    const posKey = positionChipKey(player.position, positionType);
+    const eligible = playerPositions(player, positionType);
+    const eligibleLabel = eligible.length > 1 ? eligible.join('/') : '';
 
     return (
       <tr
@@ -463,9 +475,20 @@ export const PlayerPool = memo(({
           </div>
         </td>
         <td className="px-2 py-1.5 text-pastel-cream">
-          <Badge variant="outline" className="text-[10px] px-1">
-            {player.eligible_positions && player.eligible_positions.length > 1 ? player.eligible_positions.join('/') : normalizePosition(player.position)}
-          </Badge>
+          {/* POSITION CHIP (2026-09-10). Was a `variant="outline"` Badge:
+              the same grey box for a centre, a defenceman and a goalie, in
+              the one table a manager reads for two hours straight. It now
+              wears the roster's position colours, and in an F/D/G league it
+              says F, because F is the slot the player will fill. Dual
+              eligibility still prints as `C/LW` beside the chip when the
+              league distinguishes them; a forward league folds both onto F,
+              so the extra label disappears on its own. */}
+          <div className="flex items-center gap-1.5">
+            <span className={cn(positionChipClasses(posKey), 'w-7 h-7 text-[10px]')}>{posKey}</span>
+            {eligibleLabel && (
+              <span className="font-mono text-[10px] text-pastel-cream/55">{eligibleLabel}</span>
+            )}
+          </div>
         </td>
         <td className="px-2 py-1.5 text-xs text-pastel-cream/70">{player.team}</td>
         <td className="px-2 py-1.5 text-xs text-center font-medium text-pastel-cream">{player.games_played}</td>
@@ -564,7 +587,7 @@ export const PlayerPool = memo(({
   });
     Row.displayName = 'PlayerRow';
     return Row;
-  }, [selectedPlayer?.id, draftedSet, isDraftActive, isYourTurn, isSubmitPending, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, onShowCard, fptsMap, projectedFptsMap]);
+  }, [selectedPlayer?.id, draftedSet, isDraftActive, isYourTurn, isSubmitPending, queue, onPlayerSelect, onPlayerDraft, onAddToQueue, onShowCard, fptsMap, projectedFptsMap, positionType]);
 
   /**
    * THE PHONE POOL, PRESS BOX (2026-09-04) — artboard 4a.
@@ -698,6 +721,7 @@ export const PlayerPool = memo(({
               key={player.id}
               rank={index + 1}
               player={player}
+              positionType={positionType}
               seasonFpts={fptsMap.get(player.id) || 0}
               projection={projectedFptsMap.get(player.id) ?? null}
               signal={qualitySignals.get(player.id) ?? null}

@@ -3,6 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { Mug } from '@/components/roster/Mug';
 import { mugFromDirectory } from '@/components/roster/headshot';
 import { positionChipClasses, positionChipKey } from '@/components/roster/positionChip';
+import type { PositionType } from '@/utils/rosterUtils';
 import type { NHLGame } from '@/services/ScheduleService';
 import { ROW_META, ROW_MICRO } from '@/components/phoneRowScale';
 import {
@@ -42,6 +43,8 @@ export interface FreeAgentRowProps {
   /** 1-based position in the list. Printed, because a pool is a ranking. */
   rank: number;
   player: FreeAgentRowPlayer;
+  /** The league's position format: an F/D/G league's chip reads F. */
+  positionType?: PositionType;
   /**
    * The league-scored projection for the rest of the week — the row's
    * headline number. The caller computes it through the page's own
@@ -92,6 +95,7 @@ export interface FreeAgentRowProps {
 export function FreeAgentRow({
   rank,
   player,
+  positionType = 'individual',
   projection,
   games,
   todayStr,
@@ -105,7 +109,7 @@ export function FreeAgentRow({
 }: FreeAgentRowProps) {
   const game = nextGameLine(games, player.team, todayStr);
   const status = statusChipFor(player.status);
-  const posKey = positionChipKey(player.position);
+  const posKey = positionChipKey(player.position, positionType);
   const clears = action === 'claim' ? waiverClearsLabel(player.waiver_clears_at) : null;
 
   const actionLabel =

@@ -43,7 +43,7 @@ const EXPECTED_POS_COLOR: Record<string, string> = {
   D: 'bg-white/10 text-pastel-cream',
   G: 'bg-pastel-sage/15 text-pastel-cream',
   UTIL: 'bg-pastel-sage text-pastel-forest',
-  F: 'bg-emerald-600 text-white',
+  F: 'bg-pastel-orange text-white',
 };
 
 const EXPECTED_POS_RING_COLOR: Record<string, string> = {
@@ -53,7 +53,7 @@ const EXPECTED_POS_RING_COLOR: Record<string, string> = {
   D: 'ring-white/30',
   G: 'ring-pastel-sage/50',
   UTIL: 'ring-pastel-sage/30',
-  F: 'ring-emerald-600/30',
+  F: 'ring-pastel-orange/30',
 };
 
 // This test reads the shipped source to verify the maps match. If someone

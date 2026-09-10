@@ -22,6 +22,7 @@ import { Player } from '@/services/PlayerService';
 import { Mug } from '@/components/roster/Mug';
 import { mugFromDirectory } from '@/components/roster/headshot';
 import { positionChipKey } from '@/components/roster/positionChip';
+import type { PositionType } from '@/utils/rosterUtils';
 // By file, never the `@/components/pressbox` barrel — it reaches LeagueContext
 // and the Supabase client at module scope, and this panel has its own client.
 import { PB_TYPE } from '@/components/pressbox/rowScale';
@@ -80,6 +81,8 @@ const queueClient = supabase as unknown as {
 const QUEUE_SAVE_DEBOUNCE_MS = 600;
 
 interface DraftQueueProps {
+  /** The league's position format: an F/D/G league's chips read F. */
+  positionType?: PositionType;
   queue: string[]; // Array of player IDs
   players: Player[];
   draftedPlayers: string[];
@@ -117,6 +120,8 @@ interface DraftQueueProps {
 
 interface SortableQueueItemProps {
   player: Player;
+  /** The league's position format: an F/D/G league's rows read F. */
+  positionType: PositionType;
   index: number;
   isDrafted: boolean;
   onRemove: () => void;
@@ -128,6 +133,7 @@ interface SortableQueueItemProps {
 
 function SortableQueueItem({ 
   player, 
+  positionType,
   index, 
   isDrafted, 
   onRemove, 
@@ -150,7 +156,7 @@ function SortableQueueItem({
   };
 
   const onDeck = index === 0 && isYourTurn && !isDrafted;
-  const posKey = positionChipKey(player.position);
+  const posKey = positionChipKey(player.position, positionType);
 
   return (
     <div
@@ -228,6 +234,7 @@ function SortableQueueItem({
 }
 
 export const DraftQueue = ({
+  positionType = 'individual',
   queue,
   players,
   draftedPlayers,
@@ -493,6 +500,7 @@ export const DraftQueue = ({
                 <SortableQueueItem
                   key={player.id}
                   player={player}
+                  positionType={positionType}
                   index={index}
                   isDrafted={false}
                   onRemove={() => handleRemove(player.id)}

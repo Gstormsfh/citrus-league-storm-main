@@ -41,12 +41,19 @@
  * accent, it is legible at this weight, and inverting it would be a visual
  * redesign rather than a legibility fix. Flagged, not touched.
  *
+ * F (2026-09-10) — was `bg-emerald-600`, the one colour in this map that
+ * came from Tailwind's palette rather than Citrus's, and in an F/D/G league
+ * it is the chip a manager sees most (six of thirteen starting slots). It
+ * now wears RW's brand orange at the same 2.85:1, which is safe because the
+ * two never co-occur: `positionChipKey` folds C, LW and RW onto F for a
+ * forward league, so a league renders one family or the other, never both.
+ *
  * MobileRosterList.positionRing.test.tsx parses these maps out of this file's
  * source, so keep the `const name: Record<string, string> = {` shape and one
  * `KEY: 'classes',` entry per line.
  */
 import { cn } from '@/lib/utils';
-import { resolveFantasyPosition } from '@/utils/rosterUtils';
+import { resolveFantasyPosition, type PositionType } from '@/utils/rosterUtils';
 
 export const posColor: Record<string, string> = {
   LW: 'bg-pastel-sage-soft text-pastel-forest',
@@ -55,7 +62,7 @@ export const posColor: Record<string, string> = {
   D: 'bg-white/10 text-pastel-cream',
   G: 'bg-pastel-sage/15 text-pastel-cream',
   UTIL: 'bg-pastel-sage text-pastel-forest',
-  F: 'bg-emerald-600 text-white',
+  F: 'bg-pastel-orange text-white',
 };
 
 export const posRingColor: Record<string, string> = {
@@ -65,7 +72,7 @@ export const posRingColor: Record<string, string> = {
   D: 'ring-white/30',
   G: 'ring-pastel-sage/50',
   UTIL: 'ring-pastel-sage/30',
-  F: 'ring-emerald-600/30',
+  F: 'ring-pastel-orange/30',
 };
 
 /**
@@ -97,11 +104,34 @@ export const NEUTRAL_CHIP = 'bg-white/10 text-white/55 ring-white/20';
  * Anything unrecognised passes through as its first two letters, upper-cased:
  * a slot scheme this does not know about should render something wrong-looking
  * that can be reported, not a blank chip. Empty input stays empty.
+ *
+ * THE LEAGUE DECIDES WHICH LETTERS EXIST (2026-09-10). An F/D/G league caps
+ * forwards as one group and starts them in F slots, so a centre's chip reads
+ * F there, the same letter his slot wears — and the map's F entry, which had
+ * shipped months earlier, was unreachable until this argument existed because
+ * every caller passed a raw position and nothing passed the league's format.
+ * Individual-position leagues are unchanged: they get C, LW, RW, D, G.
+ *
+ * The fold runs BEFORE the exact-key lookup on purpose. 'C' is a key in
+ * `posColor`, so checking the map first would short-circuit and hand a
+ * forward league a C chip.
  */
-export function positionChipKey(position: string | null | undefined): string {
+export function positionChipKey(
+  position: string | null | undefined,
+  positionType: PositionType = 'individual',
+): string {
   const raw = (position ?? '').trim().toUpperCase();
   if (!raw) return '';
   if (raw === 'UTILITY') return 'UTIL';
+  // The word, not the letter: `normalizePosition` in rosterUtils knows the
+  // five NHL codes and nothing else, so 'Forward' would fall through to the
+  // two-letter passthrough and render 'FO'. `normalizeDraftPosition` in
+  // draftDecision.ts accepts the same spelling; these two agree on purpose.
+  if (raw === 'FORWARD') return 'F';
+  if (positionType === 'forward') {
+    const folded = resolveFantasyPosition(raw, 'forward');
+    if (folded !== 'OTHER') return folded;
+  }
   if (Object.prototype.hasOwnProperty.call(posColor, raw)) return raw;
   const resolved = resolveFantasyPosition(raw);
   if (resolved !== 'OTHER') return resolved;
