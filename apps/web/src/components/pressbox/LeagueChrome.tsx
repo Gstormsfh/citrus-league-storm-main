@@ -19,9 +19,13 @@
  * wrapper of the page's own: the menu is a fixed overlay and takes care
  * of its own breakpoint.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
+import { useNotificationStore } from '@/stores/notificationStore';
+import LeagueNotifications from '@/components/matchup/LeagueNotifications';
+import { PressBoxSheet } from './Sheet';
 import { useProfile } from '@/hooks/useProfile';
 import { teamCrestUrl } from '@/components/roster/headshot';
 import { getLeagueTypeFromSettings, leagueSwitchDestination } from '@/utils/leagueTypeHelpers';
@@ -51,6 +55,8 @@ export interface PressBoxLeagueChromeProps extends Omit<LeagueHeaderProps, 'onSe
 export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, ...header }: PressBoxLeagueChromeProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const auth = useAuth();
   const league = useLeague();
   const params = useParams<{ leagueId?: string }>();
   const navigate = useNavigate();
@@ -87,6 +93,20 @@ export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, .
     const lType = getLeagueTypeFromSettings((l.settings as Record<string, unknown> | null | undefined) ?? null);
     navigate(leagueSwitchDestination(l.id, lType, location.pathname));
   };
+  // CHAT HAS A DOOR (2026-09-09). The unread count and the live channel come
+  // from the same store the desktop Navbar uses; subscribe() is ref-counted,
+  // so a page that also mounts the (hidden) Navbar shares one channel rather
+  // than opening two. Guarded on user + league so a page that resolves no
+  // league never touches the API.
+  const userId = auth?.user?.id ?? null;
+  const unread = useNotificationStore((s) => (resolvedId ? s.unreadCounts.get(resolvedId) || 0 : 0));
+  useEffect(() => {
+    if (!userId || !resolvedId) return;
+    const store = useNotificationStore.getState();
+    store.loadNotifications(resolvedId, userId);
+    store.subscribe(resolvedId, userId);
+    return () => { store.unsubscribe(resolvedId); };
+  }, [userId, resolvedId]);
   const onCreateLeague = () => {
     setSwitcherOpen(false);
     navigate('/create-league');
@@ -114,8 +134,33 @@ export function PressBoxLeagueChrome({ tiles, leagueId, leagueName, className, .
           crestSrc={crestSrc}
           onSettingsPress={() => setMenuOpen(true)}
           onLeaguePress={() => setSwitcherOpen(true)}
+          onChatPress={resolvedId && userId ? () => setChatOpen(true) : undefined}
+          chatUnread={unread}
         />
       </div>
+      {/* The chat sheet exists only while open, like the menu: LeagueNotifications
+          reads the store and the profile, and nothing about it needs to mount
+          under every league page's tests. */}
+      {chatOpen && resolvedId && (
+        <PressBoxSheet open onOpenChange={setChatOpen} title="League chat" shape="full">
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="flex items-center justify-between px-4 h-12 border-b border-white/[0.08] flex-none">
+              <span className="font-condensed font-bold text-[15px] uppercase tracking-[0.06em] text-pressbox-text">League chat</span>
+              <button
+                type="button"
+                onClick={() => setChatOpen(false)}
+                className="focus-citrus min-w-[44px] min-h-[44px] -mr-3 flex items-center justify-center font-plex text-[12px] text-pressbox-text/60"
+                aria-label="Close league chat"
+              >
+                Done
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <LeagueNotifications leagueId={resolvedId} />
+            </div>
+          </div>
+        </PressBoxSheet>
+      )}
       {switcherOpen && (
         <PressBoxLeagueSwitcher
           open

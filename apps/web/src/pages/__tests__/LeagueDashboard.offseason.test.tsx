@@ -34,6 +34,23 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { SeasonStatus } from '@citrus/shared';
 
+// The chat door in the league chrome (2026-09-09) reads the unread count
+// from the notification store; the real store reaches NotificationService ->
+// api/notifications -> api/client -> the Supabase client, which throws at
+// module scope under the hermetic env. Same reason useProfile is mocked.
+vi.mock('@/stores/notificationStore', () => {
+  const state = {
+    unreadCounts: new Map<string, number>(),
+    loadNotifications: () => Promise.resolve(),
+    subscribe: () => {},
+    unsubscribe: () => {},
+  };
+  const useNotificationStore = Object.assign(
+    (selector?: (s: typeof state) => unknown) => (selector ? selector(state) : state),
+    { getState: () => state },
+  );
+  return { useNotificationStore };
+});
 vi.mock('@/components/Navbar', () => ({ default: () => <nav data-testid="navbar" /> }));
 vi.mock('@/components/matchup/LeagueNotifications', () => ({ default: () => null }));
 // The Report-a-name dialog imports the Supabase client, which throws without env in tests.

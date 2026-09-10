@@ -1,5 +1,8 @@
 import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect } from 'react';
+import { NOTIFICATION_PRESETS, type NotificationPresetKey } from '@citrus/shared';
+import { overridesFor } from '@/components/account/NotificationPrefsSheet';
+import type { ProfileUpdateFields } from '@/hooks/useProfile';
 import Navbar from '@/components/Navbar';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +26,11 @@ const ProfileSetup = () => {
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
+  // NOTIFICATIONS AT SETUP (2026-09-09). One of three presets, chosen here
+  // once so a manager never has to find the account screen to stop the app
+  // buzzing. "The usual" is every category at its default and writes an
+  // EMPTY overrides object, which is what makes this step safe to skip.
+  const [notifPreset, setNotifPreset] = useState<NotificationPresetKey>('balanced');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(true);
@@ -79,7 +87,7 @@ const ProfileSetup = () => {
       }
 
       // Save the username along with any optional fields in a single call
-      const profileFields: Record<string, string> = {
+      const profileFields: ProfileUpdateFields = {
         username: username.trim(),
       };
       if (firstName.trim()) profileFields.first_name = firstName.trim();
@@ -92,6 +100,9 @@ const ProfileSetup = () => {
       if (displayParts.length > 0) {
         profileFields.display_name = displayParts.join(' ');
       }
+
+      const chosen = NOTIFICATION_PRESETS.find((p) => p.key === notifPreset);
+      if (chosen) profileFields.push_categories = overridesFor(chosen);
 
       // mutateAsync triggers optimistic update + background refetch
       await updateProfile.mutateAsync(profileFields);
@@ -243,6 +254,42 @@ const ProfileSetup = () => {
                   </div>
                 </div>
               </div>
+
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium max-lg:font-plex max-lg:font-medium max-lg:text-[10px] max-lg:tracking-[0.06em] max-lg:uppercase max-lg:text-pressbox-text/55">
+                  Notifications
+                </legend>
+                <p className="text-xs text-muted-foreground max-lg:font-barlow max-lg:text-[11px] max-lg:text-pressbox-text/50">
+                  Pick how much the app tells you. You can change any of it later under Account.
+                </p>
+                <div className="grid gap-2" role="radiogroup" aria-label="Notification preset">
+                  {NOTIFICATION_PRESETS.map((preset) => {
+                    const active = preset.key === notifPreset;
+                    return (
+                      <button
+                        key={preset.key}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => setNotifPreset(preset.key)}
+                        className={[
+                          'w-full text-left rounded-[12px] px-3.5 py-3 ring-1 transition-colors',
+                          active
+                            ? 'bg-pastel-orange/15 ring-pastel-orange/60 max-lg:bg-pressbox-orange/15 max-lg:ring-pressbox-orange/60'
+                            : 'bg-white/5 ring-white/10 hover:bg-white/[0.07] max-lg:bg-pressbox-tile max-lg:ring-white/[0.08]',
+                        ].join(' ')}
+                      >
+                        <span className="block text-sm font-bold text-pastel-cream max-lg:font-barlow max-lg:font-semibold max-lg:text-[14px] max-lg:text-pressbox-text">
+                          {preset.label}
+                        </span>
+                        <span className="block text-xs text-white/55 max-lg:font-barlow max-lg:text-[11px] max-lg:text-pressbox-text/50">
+                          {preset.help}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
 
               <Button type="submit" className="w-full max-lg:h-12 max-lg:rounded-[12px] max-lg:border-0 max-lg:outline-none max-lg:shadow-none max-lg:bg-pressbox-orange max-lg:text-pressbox-orange-ink max-lg:font-plex max-lg:font-semibold max-lg:text-[12px] max-lg:tracking-[0.08em] max-lg:uppercase" disabled={loading}>
                 {loading ? (

@@ -5,6 +5,8 @@ import { SITE_ORIGIN } from '@/utils/inviteShare';
 import { AnalyticsPreference } from '@/components/AnalyticsPreference';
 import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useRef } from 'react';
+import { NOTIFICATION_PRESETS, type NotificationPreferences } from '@citrus/shared';
+import { NotificationPrefsSheet, presetOf } from '@/components/account/NotificationPrefsSheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useProfile, useUpdateProfile } from '@/hooks/useProfile';
@@ -805,12 +807,32 @@ const Profile = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // PER-CATEGORY PUSH (2026-09-09). The sheet writes the overrides object
+  // whole; the toast copy is the sheet's job, since it shows SAVING inline.
+  const [notifPrefsOpen, setNotifPrefsOpen] = useState(false);
+  const notificationSummary = (() => {
+    const key = presetOf(profile?.push_categories);
+    const preset = NOTIFICATION_PRESETS.find((p) => p.key === key);
+    return preset ? preset.label : 'Custom';
+  })();
+  const handlePrefsChange = async (next: NotificationPreferences) => {
+    try {
+      await updateProfile.mutateAsync({ push_categories: next });
+    } catch (error: unknown) {
+      toast({
+        title: 'Could not save that',
+        description: userMessage(error, 'Try the switch again in a moment.'),
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handlePushToggle = async (value: boolean) => {
     try {
       await updateProfile.mutateAsync({ push_notifications: value });
       toast({
-        title: value ? 'On-the-clock alerts on' : 'On-the-clock alerts off',
-        description: value ? "We'll push when a pick is yours." : 'No push when a pick is yours.',
+        title: value ? 'Push notifications on' : 'Push notifications off',
+        description: value ? 'Pick what arrives under What to send.' : 'Nothing will be sent until this is back on.',
       });
     } catch (error: unknown) {
       toast({
@@ -1319,6 +1341,8 @@ const Profile = () => {
             pushEnabled,
             pushSaving: updateProfile.isPending,
             onPushToggle: (on) => void handlePushToggle(on),
+            onOpenNotificationPrefs: () => setNotifPrefsOpen(true),
+            notificationSummary,
             exporting: exportLoading,
             onExport: handleExportData,
             deleteConfirmation,
@@ -1326,6 +1350,22 @@ const Profile = () => {
             deleting: deleteAccountLoading,
             onDelete: handleDeleteAccount,
           }}
+        />
+      )}
+      {/* Mounted only while open, like the league sheets: the sheet reads
+          nothing on its own, but a portal under every account render is
+          weight the tab does not need. Both viewports use it — the desktop
+          ALERTS card below opens the same sheet, so the two screens can
+          never disagree about what is on. */}
+      {notifPrefsOpen && (
+        <NotificationPrefsSheet
+          open
+          onOpenChange={setNotifPrefsOpen}
+          masterOn={pushEnabled}
+          prefs={profile?.push_categories}
+          saving={updateProfile.isPending}
+          onMasterChange={(on) => void handlePushToggle(on)}
+          onPrefsChange={(next) => void handlePrefsChange(next)}
         />
       )}
       {!isMobile && <main className="w-full pt-6 lg:pt-24 pb-app-chrome lg:pb-16">
@@ -2385,14 +2425,16 @@ const Profile = () => {
                       <CardDescription className="text-white/55">The alerts the app sends</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      {/* One switch, because the app sends one push: the draft
-                          engine's "You're on the clock". The email switch that
-                          stood beside it had no sender behind it. */}
+                      {/* The master switch (2026-09-09: no longer the only
+                          one). The per-category mix lives in the sheet the
+                          row below opens, shared with the phone screen. The
+                          email switch that once stood here had no sender
+                          behind it and is still gone. */}
                       <div className="flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl">
                         <div className="space-y-0.5">
-                          <Label className="text-sm font-bold text-pastel-cream">On-the-clock push</Label>
+                          <Label className="text-sm font-bold text-pastel-cream">Push notifications</Label>
                           <p className="text-xs text-white/55">
-                            A push the moment a draft pick is yours. iOS app only.
+                            The master switch. Off means nothing is sent.
                           </p>
                         </div>
                         <Switch
@@ -2401,6 +2443,20 @@ const Profile = () => {
                           onCheckedChange={(c) => void handlePushToggle(c)}
                         />
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setNotifPrefsOpen(true)}
+                        disabled={!pushEnabled}
+                        className="w-full flex items-center justify-between p-3 bg-white/5 ring-1 ring-white/10 rounded-xl text-left hover:bg-white/[0.07] hover:ring-pastel-orange/30 transition-all disabled:opacity-50 disabled:hover:bg-white/5 disabled:hover:ring-white/10"
+                      >
+                        <div className="space-y-0.5">
+                          <span className="block text-sm font-bold text-pastel-cream">What to send</span>
+                          <span className="block text-xs text-white/55">
+                            Your turn, trades, roster moves, waivers, league chat, and more.
+                          </span>
+                        </div>
+                        <span className="font-jbmono text-xs text-pastel-orange-soft shrink-0 ml-3">{notificationSummary}</span>
+                      </button>
                     </CardContent>
                   </Card>
 

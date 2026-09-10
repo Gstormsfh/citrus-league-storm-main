@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { moderationError } from '@citrus/shared';
+import { moderationError, isNotificationCategory } from '@citrus/shared';
 import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
@@ -173,6 +173,29 @@ accountRoutes.put('/profile', async (c) => {
         return fail(c, AppError.badRequest('push_notifications must be a boolean'));
       }
       fields.push_notifications = body.push_notifications;
+    }
+
+    // PER-CATEGORY PUSH (2026-09-09). Stored as OVERRIDES only: the object
+    // holds the categories the manager changed, and an absent key means the
+    // category's own default. Every key must be a real category and every
+    // value a boolean — a stray key would sit in the row forever and a
+    // non-boolean would read as "on" to the sender.
+    if ('push_categories' in body) {
+      const raw = body.push_categories;
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return fail(c, AppError.badRequest('push_categories must be an object'));
+      }
+      const clean: Record<string, boolean> = {};
+      for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+        if (!isNotificationCategory(key)) {
+          return fail(c, AppError.badRequest(`Unknown notification category: ${key}`));
+        }
+        if (typeof value !== 'boolean') {
+          return fail(c, AppError.badRequest(`push_categories.${key} must be a boolean`));
+        }
+        clean[key] = value;
+      }
+      fields.push_categories = clean;
     }
 
     if (Object.keys(fields).length === 0) {

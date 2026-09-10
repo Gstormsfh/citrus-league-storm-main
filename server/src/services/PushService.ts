@@ -84,6 +84,16 @@ const JWT_TTL_MS = 50 * 60 * 1000;
 
 /** A push that arrives after the pick clock expired is noise, not a nudge. */
 const DEFAULT_EXPIRY_SECONDS = 120;
+/**
+ * A day. The 120s above is the pick clock's: a "you're on the clock" that
+ * arrives after the pick auto-drafted is noise. Nothing else in the app has
+ * that shape. A trade offer is worth reading tomorrow morning; a waiver
+ * result is worth reading whenever the phone next wakes. Found 2026-09-09
+ * when two trade offers claimed their dedupe rows, went to APNs, and never
+ * reached phones that had been asleep for three hours — a 120s window is
+ * shorter than an idle iPhone's reconnect.
+ */
+const GENERAL_EXPIRY_SECONDS = 24 * 60 * 60;
 
 const REQUEST_TIMEOUT_MS = 5_000;
 
@@ -176,6 +186,11 @@ export interface NotifyInput {
   data?: Record<string, string | number | null | undefined>;
   /** Interrupts a Focus mode. True only when missing it costs the manager. */
   timeSensitive?: boolean;
+  /**
+   * How long APNs/FCM keep trying if the device is unreachable. Defaults to
+   * a day. Set short ONLY for something that is worthless once stale.
+   */
+  expirySeconds?: number;
 }
 
 export function loadApnsConfigFromEnv(): ApnsConfig | null {
@@ -411,9 +426,10 @@ export class PushService {
           skippedNoTransport += 1;
           continue;
         }
+        const expiry = input.expirySeconds ?? GENERAL_EXPIRY_SECONDS;
         const result = android
-          ? await this.sendGenericToFcmToken(device.token, input)
-          : await this.sendToToken(device.token, apnsPayload);
+          ? await this.sendGenericToFcmToken(device.token, input, expiry)
+          : await this.sendToToken(device.token, apnsPayload, expiry);
         if (result.ok) {
           sent += 1;
         } else {
@@ -537,6 +553,7 @@ export class PushService {
   private async sendGenericToFcmToken(
     token: string,
     input: NotifyInput,
+    expirySeconds: number = GENERAL_EXPIRY_SECONDS,
   ): Promise<{ ok: boolean; status?: number; reason?: string; prune?: boolean }> {
     const config = this.fcmConfig;
     if (!config) return { ok: false, reason: 'fcm_not_configured' };
@@ -566,6 +583,7 @@ export class PushService {
                 data,
                 android: {
                   priority: input.timeSensitive ? 'HIGH' : 'NORMAL',
+                  ttl: `${expirySeconds}s`,
                   notification: { sound: 'default' },
                 },
               },
@@ -744,6 +762,7 @@ export class PushService {
   private sendToToken(
     token: string,
     payload: Record<string, unknown>,
+    expirySeconds: number = DEFAULT_EXPIRY_SECONDS,
   ): Promise<{ ok: boolean; status?: number; reason?: string; prune?: boolean }> {
     return new Promise((resolve) => {
       let settled = false;
@@ -763,7 +782,7 @@ export class PushService {
           'apns-topic': this.config?.bundleId ?? DEFAULT_BUNDLE_ID,
           'apns-push-type': 'alert',
           'apns-priority': '10',
-          'apns-expiration': String(Math.floor(Date.now() / 1000) + DEFAULT_EXPIRY_SECONDS),
+          'apns-expiration': String(Math.floor(Date.now() / 1000) + expirySeconds),
           'content-type': 'application/json',
           'content-length': body.length,
         });
