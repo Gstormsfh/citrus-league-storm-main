@@ -4,6 +4,7 @@ import { useSearchParams, useLocation, Navigate, Link } from 'react-router-dom';
 import { HockeyFooter, StormyLoading } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
+import { useTradesWaitingOnMe } from '@/hooks/useTradesWaitingOnMe';
 import { useSeasonStatus } from '@/hooks/useSeasonStatus';
 import { useLeague, isDemoLeague } from '@/contexts/LeagueContext';
 import { DEMO_LEAGUE_ID_FOR_GUESTS } from '@/services/DemoLeagueService';
@@ -320,6 +321,8 @@ const Roster = () => {
   const [analyticsLoaded, setAnalyticsLoaded] = useState(false);
   const [userTeamId, setUserTeamId] = useState<string | number | null>(null);
   const [userTeam, setUserTeam] = useState<{ id: string; league_id: string; team_name: string } | null>(null);
+  // Offers waiting on this manager, for the TRADE action's badge (2026-09-09).
+  const tradesWaiting = useTradesWaitingOnMe(userTeam?.league_id, userTeam?.id);
   const [bestBallEnabled, setBestBallEnabled] = useState(false);
   const [leagueRosterSlots, setLeagueRosterSlots] = useState<Record<string, number> | null>(null);
   const [leaguePositionType, setLeaguePositionType] = useState<PositionType>('individual');
@@ -3572,7 +3575,7 @@ const Roster = () => {
                     ...(userLeagueState === 'active-user'
                       ? [{ glyph: '⚡', label: 'Optimize', primary: true, onPress: handleAutoLineup }]
                       : []),
-                    { glyph: '⇄', label: 'Trade', to: `/trade-analyzer${userTeam?.league_id ? `?league=${userTeam.league_id}` : ''}` },
+                    { glyph: '⇄', label: 'Trade', to: `/trade-analyzer${userTeam?.league_id ? `?league=${userTeam.league_id}` : ''}`, badge: tradesWaiting },
                     { glyph: '+', label: 'Add', to: `/free-agents${userTeam?.league_id ? `?league=${userTeam.league_id}` : ''}` },
                     { glyph: '☰', label: 'Log', onPress: () => setActiveTab('transactions') },
                   ]}

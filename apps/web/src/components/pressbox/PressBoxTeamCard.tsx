@@ -48,6 +48,13 @@ export interface PressBoxTeamAction {
   onPress?: () => void;
   /** The one orange action. Exactly one per card, by contract. */
   primary?: boolean;
+  /**
+   * A count on the corner of the action (2026-09-09). Drawn only above
+   * zero. Added when a manager with a trade offer waiting had no way to
+   * know it: the push had not arrived and nothing on the Team screen said
+   * so. The app must not rely on push for anything with a clock on it.
+   */
+  badge?: number;
 }
 
 export interface PressBoxTeamCardProps {
@@ -132,17 +139,28 @@ export function PressBoxTeamCard({
       {actions.length > 0 && (
         <div className="flex gap-1.5 mt-2.5">
           {actions.map((a) => {
+            const badge = a.badge && a.badge > 0 ? a.badge : 0;
             const cls = cn(
-              'flex-1 h-8 rounded-[8px] flex items-center justify-center gap-1.5',
+              'relative flex-1 h-8 rounded-[8px] flex items-center justify-center gap-1.5',
               'font-plex font-semibold text-[10px] uppercase tracking-[0.08em]',
               a.primary
                 ? 'bg-pressbox-orange text-pressbox-orange-ink'
-                : 'bg-white/[0.06] border border-white/10 text-pressbox-text',
+                : badge > 0
+                  ? 'bg-white/[0.06] border border-pressbox-orange/60 text-pressbox-text'
+                  : 'bg-white/[0.06] border border-white/10 text-pressbox-text',
             );
             const body = (
               <>
                 <span aria-hidden="true">{a.glyph}</span>
                 {a.label}
+                {badge > 0 && (
+                  <span
+                    className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-pressbox-orange text-pressbox-orange-ink font-plex font-bold text-[9px] leading-[16px] text-center ring-2 ring-pressbox-surface"
+                    aria-label={`${badge} waiting`}
+                  >
+                    {badge > 9 ? '9+' : badge}
+                  </span>
+                )}
               </>
             );
             return a.to ? (

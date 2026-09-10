@@ -32,3 +32,19 @@ describe('the native shell paints the same ground as the page', () => {
     expect(config.backgroundColor.toUpperCase()).toBe(m![1].toUpperCase());
   });
 });
+
+describe('a push shows while the app is open', () => {
+  // FOREGROUND PUSH (2026-09-09). iOS hands a push that arrives while the
+  // app is in the foreground to the app silently, and shows a banner only
+  // if the app declares it wants one. Nothing declared it, so two trade
+  // offers sent to managers who were testing with the app OPEN produced
+  // nothing on screen. Native config: baked in at `cap sync`, so this is a
+  // build, not a deploy.
+  const config = JSON.parse(readFileSync(resolve(here, '../../capacitor.config.json'), 'utf-8'));
+
+  it('declares presentationOptions with an alert', () => {
+    const opts: string[] = config.plugins?.PushNotifications?.presentationOptions ?? [];
+    expect(opts).toContain('alert');
+    expect(opts).toContain('sound');
+  });
+});
