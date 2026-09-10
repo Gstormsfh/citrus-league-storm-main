@@ -238,16 +238,20 @@ function pemCandidates(raw: string): string[] {
 
   // (c) the eaten-backslash form. PEM bodies wrap at 64 characters, so a
   //     stray separator sits at every 65th position. Stripping the armour
-  //     also leaves the separator that followed BEGIN at the FRONT and the
-  //     one that followed END at the back, so both offsets are tried.
-  //     Nothing here is trusted: `createPrivateKey` decides which guess was
-  //     right, and base64's own `n` characters make guessing unsafe without
-  //     that check.
+  //     also leaves the separator that followed BEGIN at the FRONT, and at
+  //     the BACK the one that preceded END plus, when the secret kept its
+  //     final newline, the one that followed it: zero, one or two trailing
+  //     separators. They are removed by COUNT, never by pattern -- a greedy
+  //     `n+$` also ate the key's own last character whenever that character
+  //     was an `n`, which is one key in sixty-four and the reason this test
+  //     was flaky in CI. Nothing here is trusted: `createPrivateKey` decides
+  //     which guess was right, and base64's own `n` characters make guessing
+  //     unsafe without that check.
   if (body.includes('n')) {
     for (const lead of [1, 0]) {
-      for (const dropTrailing of [true, false]) {
+      for (const trailing of [1, 2, 0]) {
         let b = body.slice(lead);
-        if (dropTrailing) b = b.replace(/n+$/, '');
+        for (let k = 0; k < trailing && b.endsWith('n'); k += 1) b = b.slice(0, -1);
         let rebuilt = '';
         let i = 0;
         while (i < b.length) {

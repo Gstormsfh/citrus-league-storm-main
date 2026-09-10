@@ -165,6 +165,25 @@ describe('the APNs key survives a mangled secret round-trip', () => {
     expect(parses(normalizeApnsPem(eaten))).toBe(true);
   });
 
+  it('rebuilds an eaten key whose LAST base64 character is itself an n', () => {
+    // One key in sixty-four ends in `n`. The first repair stripped trailing
+    // `n`s greedily and ate that character with the separator, so this test
+    // file was green 63 runs out of 64 and red on the 64th. The separators
+    // are now removed by count. Both the trimmed and the untrimmed shape,
+    // because the secret store keeps the final newline and the test above
+    // does not.
+    let pem = '';
+    for (let i = 0; i < 2000 && !pem; i += 1) {
+      const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+      const candidate = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+      const body = candidate.replace(/-----[A-Z ]*-----/g, '').replace(/\s/g, '');
+      if (body.endsWith('n')) pem = candidate;
+    }
+    expect(pem).not.toBe('');
+    expect(parses(normalizeApnsPem(pem.trim().replace(/\n/g, 'n')))).toBe(true);
+    expect(parses(normalizeApnsPem(pem.replace(/\n/g, 'n')))).toBe(true);
+  });
+
   it('rebuilds a key with no separators at all', () => {
     const flat = REAL_PEM.trim().replace(/\n/g, '');
     expect(parses(normalizeApnsPem(flat))).toBe(true);
