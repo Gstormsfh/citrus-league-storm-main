@@ -22,8 +22,13 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { generateKeyPairSync } from 'node:crypto';
-import { PushService, type ApnsConfig } from '../services/PushService';
+import { createPrivateKey, generateKeyPairSync } from 'node:crypto';
+import {
+  PushService,
+  loadApnsConfigFromEnv,
+  normalizeApnsPem,
+  type ApnsConfig,
+} from '../services/PushService';
 import { createChain } from './helpers';
 
 vi.mock('@citrus/shared', async (importOriginal) => {
@@ -124,6 +129,67 @@ describe('notify — dormancy and totality', () => {
     const profiles = (supabase as never as { _tables: Record<string, { in: ReturnType<typeof vi.fn> }> })
       ._tables.profiles;
     expect(profiles.in).toHaveBeenCalledWith('id', ['user-1']);
+  });
+});
+
+describe('the APNs key survives a mangled secret round-trip', () => {
+  // Both shapes are REAL: production shipped each of them on 2026-09-09 and
+  // iOS push went silently dormant both times.
+  const REAL_PEM = (() => {
+    const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+    return privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+  })();
+
+  const parses = (pem: string): boolean => {
+    try {
+      createPrivateKey(pem);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  it('passes a well-formed PEM through untouched', () => {
+    expect(normalizeApnsPem(REAL_PEM).trim()).toBe(REAL_PEM.trim());
+    expect(parses(normalizeApnsPem(REAL_PEM))).toBe(true);
+  });
+
+  it('rebuilds a key whose newlines became escaped \\n', () => {
+    const escaped = REAL_PEM.trim().replace(/\n/g, '\\n');
+    expect(parses(normalizeApnsPem(escaped))).toBe(true);
+  });
+
+  it('rebuilds a key whose BACKSLASHES were eaten, leaving a bare n', () => {
+    // `-----BEGIN PRIVATE KEY-----nMIGT…n-----END PRIVATE KEY-----n`
+    const eaten = REAL_PEM.trim().replace(/\n/g, 'n');
+    expect(parses(normalizeApnsPem(eaten))).toBe(true);
+  });
+
+  it('rebuilds a key with no separators at all', () => {
+    const flat = REAL_PEM.trim().replace(/\n/g, '');
+    expect(parses(normalizeApnsPem(flat))).toBe(true);
+  });
+
+  it('prefers APNS_PRIVATE_KEY_B64 and decodes it', () => {
+    const prev = { ...process.env };
+    process.env.APNS_KEY_ID = 'ABCDE12345';
+    process.env.APNS_TEAM_ID = 'TEAM123456';
+    process.env.APNS_PRIVATE_KEY_B64 = Buffer.from(REAL_PEM).toString('base64');
+    process.env.APNS_PRIVATE_KEY = 'garbage-that-must-be-ignored';
+    const cfg = loadApnsConfigFromEnv();
+    expect(cfg).not.toBeNull();
+    expect(parses(cfg!.privateKeyPem)).toBe(true);
+    process.env = prev;
+  });
+
+  it('returns null rather than a broken config when the b64 is not a PEM', () => {
+    const prev = { ...process.env };
+    process.env.APNS_KEY_ID = 'ABCDE12345';
+    process.env.APNS_TEAM_ID = 'TEAM123456';
+    process.env.APNS_PRIVATE_KEY_B64 = Buffer.from('not a key at all').toString('base64');
+    delete process.env.APNS_PRIVATE_KEY;
+    expect(loadApnsConfigFromEnv()).toBeNull();
+    process.env = prev;
   });
 });
 

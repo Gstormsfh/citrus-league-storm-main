@@ -261,6 +261,40 @@ jobs:
           docker push "$LATEST"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
 
+      # ── APNs key sanity, BEFORE it reaches Cloud Run ─────────────
+      # Twice on 2026-09-09 a mangled key shipped and iOS push went
+      # silently dormant: once truncated to the 27-byte BEGIN line by the
+      # newline-delimited env_vars block below, once with its escaped
+      # backslashes eaten, leaving a bare `n` at every line break. Both
+      # produce `DECODER routines::unsupported` at runtime, which reads as
+      # a broken key rather than a broken deploy.
+      #
+      # Advisory, not blocking: a deploy that also carries a Supabase fix
+      # must not be held up by a push credential. It fails LOUD in the run
+      # summary instead, which is the part that was missing.
+      - name: Check the APNs key survived the secret round-trip
+        if: steps.check-gcp.outputs.has_creds == 'true'
+        env:
+          B64: ${{ secrets.APNS_PRIVATE_KEY_B64 }}
+          RAW: ${{ secrets.APNS_PRIVATE_KEY }}
+        run: |
+          if [ -n "$B64" ]; then
+            if printf '%s' "$B64" | base64 -d 2>/dev/null | grep -q 'END PRIVATE KEY'; then
+              echo "::notice::APNS_PRIVATE_KEY_B64 decodes to a complete PEM."
+              exit 0
+            fi
+            echo "::error::APNS_PRIVATE_KEY_B64 is set but does not decode to a PEM. iOS push will be DISABLED."
+            exit 0
+          fi
+          LEN=$(printf '%s' "$RAW" | wc -c | tr -d ' ')
+          if [ "$LEN" -lt 200 ]; then
+            echo "::error::APNS_PRIVATE_KEY is ${LEN} bytes — truncated. iOS push will be DISABLED. Set APNS_PRIVATE_KEY_B64 to: base64 -i AuthKey_XXXX.p8"
+          elif ! printf '%s' "$RAW" | grep -q 'END PRIVATE KEY'; then
+            echo "::error::APNS_PRIVATE_KEY has no END marker. iOS push will be DISABLED. Set APNS_PRIVATE_KEY_B64 instead."
+          else
+            echo "::warning::APNS_PRIVATE_KEY is present in plain form (${LEN} bytes). Prefer APNS_PRIVATE_KEY_B64 — the plain form has been mangled twice by this block."
+          fi
+
       - name: Deploy to Cloud Run
         if: steps.check-gcp.outputs.has_creds == 'true'
         uses: google-github-actions/deploy-cloudrun@v2
@@ -371,6 +405,7 @@ jobs:
             APNS_KEY_ID=${{ secrets.APNS_KEY_ID }}
             APNS_TEAM_ID=${{ secrets.APNS_TEAM_ID }}
             APNS_PRIVATE_KEY=${{ secrets.APNS_PRIVATE_KEY }}
+            APNS_PRIVATE_KEY_B64=${{ secrets.APNS_PRIVATE_KEY_B64 }}
             APPLE_CLIENT_ID=${{ secrets.APPLE_CLIENT_ID }}
             APPLE_CLIENT_SECRET=${{ secrets.APPLE_CLIENT_SECRET }}
             APPLE_TOKEN_ENCRYPTION_KEY=${{ secrets.APPLE_TOKEN_ENCRYPTION_KEY }}
