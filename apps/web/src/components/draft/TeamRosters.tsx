@@ -114,7 +114,7 @@ export const TeamRosters = ({ teams, draftHistory, userTeamId, onPlayerClick }: 
             nested scroller fought the page scroll and slid picks under the
             position chips. Phone = one scroller (the page); the 240px cap
             stays only inside the desktop sidebar, where the page cannot grow. */}
-        <div className="mt-1.5 lg:max-h-60 lg:overflow-y-auto lg:overscroll-contain">
+        <div className="mt-1.5 lg:max-h-60 lg:overflow-y-auto lg:overscroll-contain scrollbar-pressbox">
           {picks.length > 0 ? (
             picks.map(pick => (
               <div
