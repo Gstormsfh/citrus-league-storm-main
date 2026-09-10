@@ -364,3 +364,62 @@ describe('the browser is allowed to open the socket the deploy points it at', ()
     }
   });
 });
+
+/**
+ * THE /go/ LINK GUARD (2026-09-10).
+ *
+ * Every tracked outreach link Citrus has sent this launch — 25 email threads
+ * by the time this was found, plus the live Meta/Instagram ad — points at
+ * `citrusfantasysports.com/go/<handle>`. The handle is the attribution: it is
+ * how a reply from a creator is told apart from a cold click.
+ *
+ * Nothing served that path. `rewrites` sends `**` to `/index.html`, the SPA
+ * matches no route for `/go/anything`, and it renders its own 404. So the
+ * request returned HTTP 200, the page painted, and every recipient — a signed
+ * five-figure podcast partner included — was told the page had been called for
+ * a penalty. Hosting logs show a healthy site. The ad account shows delivery.
+ * Nothing anywhere says why nobody arrived.
+ *
+ * A redirect rather than a client route on purpose: the emails are already
+ * delivered and cannot be edited, so the fix has to sit in front of the bundle,
+ * where it also rescues links sent before it existed.
+ *
+ * The destination keeps the handle as `?ref=`. Dropping people on a bare
+ * homepage would fix the 404 and throw away the only reason the links are
+ * per-creator in the first place.
+ */
+describe('the tracked outreach links resolve', () => {
+  const HOSTING_FILES = ['firebase.json', 'apps/web/firebase.json'] as const;
+
+  type Redirect = { source: string; destination: string; type?: number };
+
+  function redirects(rel: string): Redirect[] {
+    const cfg = JSON.parse(read(rel)) as { hosting?: { redirects?: Redirect[] } };
+    return cfg.hosting?.redirects ?? [];
+  }
+
+  it.each(HOSTING_FILES)('%s redirects /go/:handle instead of letting the SPA 404 it', (rel) => {
+    expect(
+      redirects(rel).find((r) => r.source === '/go/:handle'),
+      `${rel} has no /go/:handle redirect. Every link in every pitch email — and any ad ` +
+        `pointed at /go/ — lands on the app's own 404 while returning HTTP 200, so neither ` +
+        `hosting logs nor the ad account will ever report a problem.`,
+    ).toBeTruthy();
+  });
+
+  it.each(HOSTING_FILES)('%s carries the handle through to the landing page', (rel) => {
+    expect(
+      redirects(rel).find((r) => r.source === '/go/:handle')?.destination,
+      `${rel} drops the handle. The point of a per-creator link is knowing which creator ` +
+        `sent the person, and a redirect to bare "/" throws that away silently.`,
+    ).toContain(':handle');
+  });
+
+  // Same reason as the connect-src pair above: root ships production, apps/web
+  // ships staging, and a fix applied to one of them stops existing the moment
+  // someone verifies against the other.
+  it('both hosting files carry the same redirects', () => {
+    const [root, web] = HOSTING_FILES.map(redirects);
+    expect(web, 'apps/web/firebase.json redirects have drifted from the root ones').toEqual(root);
+  });
+});
