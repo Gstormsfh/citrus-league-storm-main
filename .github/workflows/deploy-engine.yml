@@ -360,6 +360,24 @@ jobs:
       rollback: ${{ steps.pin.outputs.rollback }}
       deploy_started_at: ${{ steps.stamp.outputs.deploy_started_at }}
     steps:
+      # CHECKOUT FIRST — never after the auth step (2026-09-11).
+      # google-github-actions/auth writes its credential file INTO the
+      # workspace (gha-creds-*.json). actions/checkout defaults to
+      # `clean: true`, which git-cleans the workspace and deletes that file,
+      # so the next gcloud call dies with "Failed to load credential file".
+      # That is precisely what happened on run 34645789218: the rollback pin
+      # (before checkout) succeeded and the metadata write (after it) failed
+      # — which is why this workflow had never once completed a deploy, and
+      # why the VM sat on a hand-deployed image from 2026-09-05. The `build`
+      # job has always had checkout first; `deploy` did not.
+      #
+      # The ref stays the SHA that was actually built, so the startup script
+      # written to the VM below comes from the built commit rather than from
+      # whatever ref dispatched the run.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.build.outputs.sha }}
+
       # GitHub silently auto-creates an environment the first time a
       # workflow references it — with NO protection rules. Refuse to
       # deploy through an environment that has no required reviewer.
@@ -550,10 +568,6 @@ jobs:
       # Trap 2 (LAUNCH_BUILD_2026-08-24.md §4): the engine's fingerprint
       # echoes these three metadata keys. Writing them in ONE call means the
       # next boot can only ever report all-new or all-old values.
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.build.outputs.sha }}
-
       - name: Point the VM at the new image (ONE add-metadata call)
         env:
           TAG: ${{ needs.build.outputs.tag }}
