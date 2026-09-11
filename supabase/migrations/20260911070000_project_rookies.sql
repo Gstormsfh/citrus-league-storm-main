@@ -93,6 +93,90 @@
 --   Storms, 2026-09-11. Third version; the first two are described above
 --   as the errors they were.
 --
+-- (e) RE-BANDED 2026-09-11 ON RE-AUDIT -- the top bucket was calibrated on
+--     picks 1-5 and applied to pick 15
+--
+--   The first draft of this file carried three rate rows per position group,
+--   keyed on the same three slots as `opportunity`. Re-measuring found its
+--   slot-1 row is byte-identical to the picks 1-5 medians and its slot-2 row
+--   to the picks 16-31 medians. So "top 15" was being paid at the picks-1-5
+--   rate. Every top-15 skater therefore projected to the SAME number -- for
+--   2026 that was seven forwards tied at 143.7 fantasy points, which is both
+--   wrong for picks 6-15 and unreadable on a board that sorts by projection.
+--
+--   OPPORTUNITY AND RATE HAVE DIFFERENT SAMPLE SIZES AND NOW HAVE DIFFERENT
+--   BANDING. This is the whole point and it is why they look inconsistent.
+--
+--     Opportunity (games) can only be measured on a CAMP cohort -- everyone
+--     who was rostered, including those who never played -- and that needs a
+--     player_directory snapshot. The directory holds 2025 and 2026 only, so
+--     there is exactly ONE cohort. Finer bands give n=8..11 and the band
+--     means are not monotonic (picks 6-10 -> 12.5 GP, picks 11-15 -> 32.1).
+--     Three buckets is the honest resolution. Unchanged.
+--
+--     Rate (production per game) is conditional on playing, so it can be
+--     measured on nine seasons of debuts, n=39..125 per cell. Median P/GP is
+--     monotonic across all seven bands: .634 .455 .431 .360 .315 .288 .260.
+--     That signal is real and the three-bucket version was discarding it.
+--
+--   SURVIVORSHIP, AND WHY IT DOES NOT INVALIDATE THIS. Draft position lives
+--   in player_directory.career, which covers 2025-2026 only, so a 2018
+--   debutant who washed out by 2022 has no draft position and drops out of
+--   the rate cohort (933 of 2,179 debutants survive). That bias preferentially
+--   deletes BUSTS among late picks, which ATTENUATES the draft-position
+--   gradient. A gradient that survives it is a lower bound, not an artefact.
+--
+--   ISOTONIC ON SCORING STATS ONLY. G, A, SOG and PPP are pooled-adjacent-
+--   violators fitted (weighted by n) to be non-increasing in draft position;
+--   the adjustments are small and only ever merge adjacent bands. Blocks,
+--   hits and PIM are left RAW and are deliberately not monotone: a fourth-
+--   line rookie hits more than a first-line one, and forcing that curve down
+--   would be imposing a belief the data contradicts.
+--
+--   SOURCE QUERY (run against production 2026-09-11, read-only) -- debut =
+--   min season with a regular-season game; rates are that season's medians,
+--   UNFILTERED by games played, so a three-game call-up counts:
+--
+--     with debut as (select player_id,
+--            min(substring(game_id::text,1,4)::int) s
+--            from player_game_stats
+--            where substring(game_id::text,5,2)='02' group by 1)
+--     ... join player_directory for (career->'draft'->>'overall')
+--     ... group by position group and the seven bands below.
+--
+--   AGE WAS MEASURED AND REJECTED (2026-09-11). The re-banded board puts
+--   Tyler Boucher -- 10th overall in 2021, age 23, never stuck -- level with
+--   Viggo Bjorck, 18 and taken 8th last June. That looks wrong to a hockey
+--   eye, so it was tested twice and the intuition failed both times:
+--
+--     CONDITIONAL (debut-season production by debut age, 2017-2025): round-one
+--     debutants aged 23+ post the HIGHEST median P/GP of any age band, .561
+--     against .349 for the 19-and-unders. That is survivorship -- a first
+--     rounder who finally debuts at 23 did so by becoming good enough, and
+--     the ones who never did are not in the table. Same finding the original
+--     years-to-debut check made, reached from the other direction.
+--
+--     UNCONDITIONAL (2025 camp cohort, zeros included, so no survivorship):
+--     round-2+ camp players aged 23+ played 51%% of the time for 10.3 mean
+--     games, against 13%% and 2.7 games for the under-20s. Undrafted 23+ beat
+--     undrafted under-20s the same way. There is a plain mechanism: a
+--     23-year-old in an NHL camp is on an earned NHL contract, while a
+--     19-year-old is on an entry-level deal and goes back to junior.
+--
+--     And for Boucher's own cell -- round one, 23+ -- the single camp cohort
+--     holds ZERO players. No evidence exists either way.
+--
+--   So no age term. Applying one would mean overriding two measurements with
+--   a hockey feeling, which is the failure this file already exists to avoid.
+--
+--   WHAT THIS DOES NOT FIX. Picks 1-5 still share one number, as do two
+--   players taken 10th. That is honest: nothing in this database
+--   distinguishes them. The real fix is pre-NHL production -- junior, AHL and
+--   European scoring, which the NHL landing endpoint already returns under
+--   seasonTotals and which populate_player_directory.py currently discards --
+--   plus directory backfill for 2017-2024 to get eight camp cohorts instead
+--   of one. Both are post-launch work, in that order.
+--
 -- Reversibility: DROP FUNCTION IF EXISTS public.project_rookies(integer);
 -- Idempotent: CREATE OR REPLACE.
 -- ============================================================================
@@ -116,14 +200,24 @@ AS $function$
     (2, 10.9, 0.0),   -- rest of round 1
     (3,  4.3, 1.5)    -- round 2+, undrafted; starts term is goalies only
   ),
-  -- CONDITIONAL rates: debut-season medians, 2017-2025 debuts.
-  rate(pos_group, slot, g, a, sog, blk, ppp, hits, pim) as (values
-    ('F',1, 0.2703, 0.3871, 2.305, 0.415, 0.1636, 0.700, 0.329),
-    ('F',2, 0.1429, 0.2187, 1.571, 0.378, 0.0287, 0.944, 0.289),
-    ('F',3, 0.0952, 0.1105, 1.013, 0.369, 0.0000, 1.118, 0.250),
-    ('D',1, 0.1098, 0.3333, 1.714, 1.354, 0.0976, 1.025, 0.444),
-    ('D',2, 0.0450, 0.1865, 1.259, 1.000, 0.0169, 0.984, 0.314),
-    ('D',3, 0.0000, 0.1351, 1.000, 1.000, 0.0000, 1.000, 0.253)
+  -- CONDITIONAL rates: debut-season medians, 2017-2025 debuts, by SEVEN draft
+  -- bands rather than the three opportunity slots. See header (b) for why the
+  -- two are banded differently and for the source query.
+  rate(pos_group, band, g, a, sog, blk, ppp, hits, pim) as (values
+    ('F',1, 0.2703, 0.3871, 2.3050, 0.4150, 0.1636, 0.7000, 0.3290),
+    ('F',2, 0.1772, 0.2778, 2.0830, 0.3330, 0.1231, 0.5080, 0.3240),
+    ('F',3, 0.1538, 0.2185, 1.6050, 0.3920, 0.0385, 0.8890, 0.3290),
+    ('F',4, 0.1429, 0.2185, 1.5710, 0.3780, 0.0287, 0.9440, 0.2890),
+    ('F',5, 0.1027, 0.1428, 1.3330, 0.4180, 0.0000, 0.9760, 0.2500),
+    ('F',6, 0.1027, 0.1428, 1.1790, 0.4430, 0.0000, 1.0000, 0.2780),
+    ('F',7, 0.1027, 0.1067, 1.0000, 0.3700, 0.0000, 1.2380, 0.2860),
+    ('D',1, 0.1098, 0.3333, 1.7140, 1.3540, 0.0999, 1.0250, 0.4440),
+    ('D',2, 0.0838, 0.2470, 1.3400, 1.1110, 0.0999, 1.1260, 0.4960),
+    ('D',3, 0.0732, 0.2286, 1.2441, 1.2650, 0.0294, 1.0000, 0.4180),
+    ('D',4, 0.0450, 0.1865, 1.2441, 1.0000, 0.0169, 0.9840, 0.3140),
+    ('D',5, 0.0328, 0.1707, 1.0983, 1.1040, 0.0000, 1.1710, 0.3750),
+    ('D',6, 0.0000, 0.1707, 1.0983, 1.0990, 0.0000, 0.9380, 0.2180),
+    ('D',7, 0.0000, 0.1250, 1.0000, 1.0000, 0.0000, 1.0000, 0.3230)
   ),
   cand as (
     select pd.player_id, pd.position_code, pd.is_goalie, pd.birthdate,
@@ -151,10 +245,21 @@ AS $function$
     select c.*,
       case when c.is_goalie or c.position_code='G' then 'G'
            when c.position_code='D' then 'D' else 'F' end pos_group,
+      -- OPPORTUNITY slot: three buckets, because that is all the one camp
+      -- cohort supports (n=8..11 per finer band, and non-monotonic).
       case when c.overall is null then 3
            when c.overall <= 15 then 1
            when c.overall <= 31 then 2
-           else 3 end slot
+           else 3 end slot,
+      -- RATE band: seven, because nine seasons of debuts do support it.
+      case when c.overall is null then 7
+           when c.overall <=   5 then 1
+           when c.overall <=  10 then 2
+           when c.overall <=  15 then 3
+           when c.overall <=  31 then 4
+           when c.overall <=  62 then 5
+           when c.overall <= 100 then 6
+           else 7 end rate_band
     from cand c
   )
   select
@@ -179,7 +284,7 @@ AS $function$
   from b
   cross join scale s
   join opportunity o on o.slot = b.slot
-  left join rate r on r.pos_group = b.pos_group and r.slot = b.slot;
+  left join rate r on r.pos_group = b.pos_group and r.band = b.rate_band;
 $function$;
 
 -- GRANTS (corrected 2026-09-11 on re-audit). The first draft of this file

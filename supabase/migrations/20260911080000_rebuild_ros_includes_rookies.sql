@@ -165,13 +165,20 @@ begin
                   + r.r_sog*0.9 + r.r_blk*1.0 + r.r_hits*0.0 + r.r_pim*0.0,3) end,
          case when r.is_goalie then 0 else round(r.r_goal,3) end,
          case when r.is_goalie then 0 else round(r.r_a,3) end,
-         i.full_name,
+         -- NAMES (2026-09-11 re-audit): nhl_player_identity is rebuilt from
+         -- players who have APPEARED in an NHL game (cron job 20,
+         -- rebuild_player_identity), so it knows 18 of the 320 rookie
+         -- candidates for 2026. Joining it alone would have written 302 rows
+         -- with a NULL player_name into a table that has zero today --
+         -- 302 nameless players on the draft board. player_directory carries
+         -- full_name for all 320, so it is the fallback.
+         coalesce(i.full_name, pt2.full_name),
          pt2.team_abbrev,
          r.position_code, r.is_goalie, now(), now()
     from r
     left join nhl_player_identity i on i.player_id = r.player_id
     left join lateral (
-      select pd.team_abbrev from player_directory pd
+      select pd.team_abbrev, pd.full_name from player_directory pd
        where pd.player_id = r.player_id order by pd.season desc limit 1
     ) pt2 on true
     where exists (
