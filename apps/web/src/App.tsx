@@ -340,7 +340,26 @@ const App = () => {
             </Suspense>
             <StormyChatBubble />
             <MobileBottomNav />
-            <CookieConsent />
+            {/* WEB ONLY — App Store 5.1.2(i) (2026-09-11).
+                Build 17 was rejected because the app showed a cookie consent
+                prompt and never called App Tracking Transparency. We take
+                Apple's second remedy: we do not collect cookies for tracking
+                on Apple devices, so the prompt goes.
+
+                This is a browser-consent surface that leaked into the
+                Capacitor wrapper. A native app has no browser cookies to
+                consent to, and the analytics toggle in Account is the real
+                control surface there.
+
+                The condition is `import.meta.env.VITE_NATIVE`, matching the
+                `DraftKit` gate above, so esbuild folds it to a constant and
+                STATICALLY ELIMINATES the component — the banner's copy is
+                not in the binary at all, merely unrendered. Assertion 9 in
+                `scripts/build-native.mjs` fails the build if it comes back.
+
+                The WEB app keeps it. It is a website, its cookies are real,
+                and EU visitors need the banner. */}
+            {import.meta.env.VITE_NATIVE !== '1' && <CookieConsent />}
           </LeagueProvider>
         </BrowserRouter>
       </TooltipProvider>
