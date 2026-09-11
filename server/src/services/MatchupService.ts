@@ -809,6 +809,41 @@ export class MatchupService {
     let playerIds: Array<string | number> =
       (assignments || []).map((a: { player_id: string | number }) => a.player_id);
 
+    // DRAFT V2 (2026-09-11): this fallback read ONLY the legacy `draft_picks`
+    // table. The v2 engine -- the one that ships, and the one every league
+    // drafting from 15 Sep uses -- writes `draft_picks_v2` instead. So for a
+    // v2 league the safety net looked in an empty table, returned false, and
+    // the team went into its first matchup with no daily roster and scored
+    // nothing. That is precisely the case this fallback exists to catch: it
+    // only ever runs when `sync_roster_assignments_for_league` has already
+    // failed to seat the roster.
+    //
+    // Measured on prod 2026-09-11: of 180 fantasy teams, 56 have no
+    // roster_assignments; 36 are covered by legacy draft_picks and 1 is
+    // v2-only today. The count is small now because the existing leagues
+    // drafted on v1. It is every league from Monday.
+    //
+    // v2 first (current engine), legacy second (historical leagues). Note
+    // draft_picks_v2 has no deleted_at column -- picks are removed, not
+    // tombstoned -- so no such filter here.
+    if (playerIds.length === 0) {
+      const { data: picksV2, error: picksV2Err } = await admin
+        .from('draft_picks_v2')
+        .select('player_id')
+        .eq('team_id', teamId)
+        .eq('league_id', leagueId);
+
+      if (picksV2Err) {
+        logger.error('[buildDefaultLineup] draft_picks_v2 query error:', picksV2Err);
+        return false;
+      }
+      playerIds = (picksV2 || []).map((d: { player_id: string | number }) => d.player_id);
+      if (playerIds.length > 0) {
+        logger.info('[buildDefaultLineup] team', teamId,
+          'has no roster_assignments; built from', playerIds.length, 'draft_picks_v2');
+      }
+    }
+
     if (playerIds.length === 0) {
       const { data: picks, error: picksErr } = await admin
         .from('draft_picks')
@@ -824,12 +859,12 @@ export class MatchupService {
       playerIds = (picks || []).map((d: { player_id: string | number }) => d.player_id);
       if (playerIds.length > 0) {
         logger.info('[buildDefaultLineup] team', teamId,
-          'has no roster_assignments; built from', playerIds.length, 'draft_picks');
+          'has no roster_assignments; built from', playerIds.length, 'legacy draft_picks');
       }
     }
 
     if (playerIds.length === 0) {
-      logger.error('[buildDefaultLineup] No roster_assignments and no draft_picks for team', teamId);
+      logger.error('[buildDefaultLineup] No roster_assignments and no picks (v2 or legacy) for team', teamId);
       return false;
     }
     logger.info('[buildDefaultLineup] Found', playerIds.length, 'roster players for team', teamId);
