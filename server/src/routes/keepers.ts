@@ -4,7 +4,7 @@ import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
-import { createUserClient } from '../lib/supabase';
+import { createUserClient, supabaseAdmin } from '../lib/supabase';
 import { KeeperService } from '../services/KeeperService';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
@@ -107,9 +107,36 @@ keeperRoutes.get('/league/:leagueId/draft-costs', membershipMiddleware, async (c
 // POST /api/keepers/league/:leagueId/lock
 keeperRoutes.post('/league/:leagueId/lock', membershipMiddleware, validateBody(schemas.lockKeepers), async (c) => {
   const leagueId = c.req.param('leagueId');
+  const userId = c.get('userId');
   const body = getValidatedBody<z.infer<typeof schemas.lockKeepers>>(c);
   const supabase = createUserClient(c.get('userToken'));
-  const service = new KeeperService(supabase);
+
+  // KEEPERS (2026-09-11): this route was membership-only, and it is the one
+  // keeper route with no ownership test at all -- designate and release both
+  // verify team.owner_id, and updateKeeperSettings verifies commissioner_id.
+  // It calls lock_keepers_for_season, which is SECURITY DEFINER, so RLS does
+  // not backstop it either. Locking is league-wide and one-way from the UI's
+  // point of view (KeeperPanel disables designate/release for every manager
+  // once any row reads 'locked'), so an unprivileged member could freeze all
+  // teams' selections before anyone had finished choosing. The button is
+  // already gated on isCommissioner in the client; this is the server saying
+  // the same thing.
+  const { data: league } = await supabase
+    .from('leagues')
+    .select('id, commissioner_id')
+    .eq('id', leagueId)
+    .single();
+  if (!league || league.commissioner_id !== userId) {
+    return fail(c, AppError.forbidden('Only the commissioner can lock keepers'));
+  }
+
+  // GRANTS (2026-09-11): the route has just proved the caller is the
+  // commissioner, so the RPC runs on the admin client. That is what lets
+  // EXECUTE on lock_keepers_for_season be revoked from `authenticated`
+  // (migration 20260911053000) -- otherwise a member could skip this
+  // handler entirely and POST /rest/v1/rpc/lock_keepers_for_season direct
+  // to PostgREST, and the check above would be decoration.
+  const service = new KeeperService(supabaseAdmin);
   const result = await service.lockKeepersForSeason(leagueId, body.seasonYear);
   if (result.error) return fail(c, AppError.badRequest(result.error));
   return ok(c, result);

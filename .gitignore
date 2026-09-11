@@ -121,3 +121,12 @@ __pycache__/
 
 .fuse_hidden*
 Claude outputs/
+
+# Play Store listing assets (generated + raw simulator captures)
+play-assets/
+
+# Python virtualenvs (data-pipeline local dev; CI builds its own)
+.venv/
+**/.venv/
+venv/
+**/venv/

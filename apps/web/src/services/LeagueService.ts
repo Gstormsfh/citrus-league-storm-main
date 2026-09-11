@@ -1013,7 +1013,12 @@ async joinLeagueByCode(
         } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
           slotsFilled['UTIL']++;
           assigned = true;
-          slotAssignments[playerId] = 'slot-UTIL';
+          // UTIL SLOT ID (2026-09-11): the id depends on how many UTIL slots
+          // the league has. This wrote a bare 'slot-UTIL' unconditionally, so
+          // in a UTIL:2 league BOTH utility players landed on ONE slot key --
+          // 22 of 33 fantasy leagues are UTIL:2, and every colliding team in
+          // production is one of them. Same rule as LineupService.ts:983.
+          slotAssignments[playerId] = slotsNeeded['UTIL'] === 1 ? 'slot-UTIL' : `slot-UTIL-${slotsFilled['UTIL']}`;
         }
         
         if (assigned) {

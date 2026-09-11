@@ -603,7 +603,8 @@ export const DemoLeagueService = {
           } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
             slotsFilled['UTIL']++;
             assigned = true;
-            slotAssignments[playerId] = 'slot-UTIL';
+            // UTIL SLOT ID (2026-09-11): id depends on the league's UTIL count.
+            slotAssignments[playerId] = slotsNeeded['UTIL'] === 1 ? 'slot-UTIL' : `slot-UTIL-${slotsFilled['UTIL']}`;
           }
 
           if (assigned) {

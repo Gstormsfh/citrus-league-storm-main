@@ -276,7 +276,10 @@ const OtherTeam = () => {
               } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
                 slotsFilled['UTIL']++;
                 assigned = true;
-                assignments[p.id] = 'slot-UTIL';
+                // UTIL SLOT ID (2026-09-11): id depends on the league's UTIL count. A bare
+                // 'slot-UTIL' puts both utility players on one key in a UTIL:2 league.
+                // Same rule as LineupService.ts:983.
+                assignments[p.id] = slotsNeeded['UTIL'] === 1 ? 'slot-UTIL' : `slot-UTIL-${slotsFilled['UTIL']}`;
               }
               
               if (assigned) {

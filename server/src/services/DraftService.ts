@@ -3,6 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS, logger } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
 import { withResilience } from '../lib/resilientSupabase';
+import { supabaseAdmin } from '../lib/supabase';
 
 /**
  * A fair, uniformly random draft order.
@@ -557,8 +558,13 @@ export class DraftService {
       return { picks: [], error };
     }
 
-    // Sync roster assignments after autopick draft
-    const { error: syncError } = await this.supabase.rpc('sync_roster_assignments_for_league', {
+    // Sync roster assignments after autopick draft.
+    // GRANTS (2026-09-11): admin client, not this.supabase. Every route that
+    // builds a DraftService passes createUserClient(userToken), so this ran
+    // as `authenticated` -- which is why EXECUTE had to stay granted to that
+    // role on a SECURITY DEFINER function that rewrites a whole league's
+    // rosters. Moving the one caller lets migration 20260911053000 revoke it.
+    const { error: syncError } = await supabaseAdmin.rpc('sync_roster_assignments_for_league', {
       p_league_id: leagueId,
     });
 

@@ -44,7 +44,29 @@ interface DirectoryRow {
   team_abbrev: string;
   jersey_number: string | null;
   headshot_url: string | null;
-  eligible_positions: string[] | null;
+  /**
+   * TEXT, NOT AN ARRAY (2026-09-11). player_directory.eligible_positions is a
+   * `text` column holding a single comma-free code -- 'LW', 'RW', 'G', 'D'.
+   * It was declared `string[] | null` here, which is a lie the compiler then
+   * propagates: any consumer that trusts it and calls .map/.join/.some on a
+   * string throws at runtime.
+   *
+   * Nothing is hurt today. This field is selected (line ~783) and never read
+   * into DashboardIndexEntry, so the raw value does not reach a client
+   * through this path, and every consumer elsewhere already defends itself --
+   * PlayerService.mapServerPlayer guards with Array.isArray, BestBallService
+   * splits the string at its own boundary, positions.ts degrades to the
+   * primary position, and the draft surface stopped reading it entirely in
+   * #453. Only 11 of 1,310 rows in the 2026 directory are even non-null
+   * (Kane, Johansson, Bunting, Tolvanen, Tarasenko and six single-character
+   * values that happen to iterate correctly).
+   *
+   * Corrected to the column's real type so the next person to reach for
+   * .map() gets a compiler error instead of a production one. The select can
+   * also simply drop this column -- it is unused -- but that is a separate
+   * change with its own (small) blast radius.
+   */
+  eligible_positions: string | null;
 }
 
 interface StatsRow {

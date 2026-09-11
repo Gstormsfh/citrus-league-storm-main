@@ -45,6 +45,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import _bootstrap  # noqa: F401
 
 from data_pipeline.utils.supabase_rest import SupabaseRest
+from data_pipeline.utils.season_config import current_season as _current_season
 import logging
 
 logger = logging.getLogger(__name__)
@@ -75,7 +76,11 @@ SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 if not SUPABASE_URL or not SUPABASE_KEY:
   raise RuntimeError("Missing VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment.")
 
-DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
+# SEASON (2026-09-11): derived from today's date, env override kept for
+# manual backfills. The former literal '2025' fallback would still say
+# 2025 on 2026-09-29, when current_season() and SQL get_current_season()
+# both flip to 2026 -- stats written under a season the app does not read.
+DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON")) if os.getenv("CITRUS_DEFAULT_SEASON") else _current_season()
 
 
 def supabase_client() -> SupabaseRest:
