@@ -107,8 +107,29 @@ keeperRoutes.get('/league/:leagueId/draft-costs', membershipMiddleware, async (c
 // POST /api/keepers/league/:leagueId/lock
 keeperRoutes.post('/league/:leagueId/lock', membershipMiddleware, validateBody(schemas.lockKeepers), async (c) => {
   const leagueId = c.req.param('leagueId');
+  const userId = c.get('userId');
   const body = getValidatedBody<z.infer<typeof schemas.lockKeepers>>(c);
   const supabase = createUserClient(c.get('userToken'));
+
+  // KEEPERS (2026-09-11): this route was membership-only, and it is the one
+  // keeper route with no ownership test at all -- designate and release both
+  // verify team.owner_id, and updateKeeperSettings verifies commissioner_id.
+  // It calls lock_keepers_for_season, which is SECURITY DEFINER, so RLS does
+  // not backstop it either. Locking is league-wide and one-way from the UI's
+  // point of view (KeeperPanel disables designate/release for every manager
+  // once any row reads 'locked'), so an unprivileged member could freeze all
+  // teams' selections before anyone had finished choosing. The button is
+  // already gated on isCommissioner in the client; this is the server saying
+  // the same thing.
+  const { data: league } = await supabase
+    .from('leagues')
+    .select('id, commissioner_id')
+    .eq('id', leagueId)
+    .single();
+  if (!league || league.commissioner_id !== userId) {
+    return fail(c, AppError.forbidden('Only the commissioner can lock keepers'));
+  }
+
   const service = new KeeperService(supabase);
   const result = await service.lockKeepersForSeason(leagueId, body.seasonYear);
   if (result.error) return fail(c, AppError.badRequest(result.error));
