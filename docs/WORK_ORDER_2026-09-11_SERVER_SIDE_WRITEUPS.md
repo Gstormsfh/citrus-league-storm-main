@@ -331,3 +331,109 @@ moving. Precision matters too — a story attached to the wrong player is worse
 than one attached to none.
 
 Neither 14.1 nor 14.2 requires an app release. Both are server and data work.
+
+---
+
+# Part 2 — App Store rejection 5.1.2(i): the cookie banner
+
+Apple rejected build 17 (1.0 (17), submission d711fe8e-56c8-4b4e-837b-c744d19560b4,
+reviewed 2026-09-11 on iPad Air 11-inch M3) under guideline 5.1.2(i): the app
+shows a cookie consent prompt but never calls App Tracking Transparency.
+
+Apple offered two remedies. **We take the second one: "If you do not collect
+cookies for tracking purposes on Apple devices, remove the cookie prompts."**
+
+## 15. Why we do not implement ATT
+
+Verified in the tree 2026-09-11:
+
+- `apps/web/src/integrations/firebase/config.ts` initialises analytics with
+  `allow_google_signals: false` and `allow_ad_personalization_signals: false`.
+  Both of Google's ad-linkage switches are off.
+- The iOS project links **no** `AppTrackingTransparency` and **no** `AdSupport`;
+  `Info.plist` has no `NSUserTrackingUsageDescription`. The app cannot read the
+  IDFA.
+- No advertising SDK reaches the native bundle — `build-native.mjs` §5 already
+  fails the build if the AdSense loader survives the `VITE_NATIVE` strip.
+
+None of that is tracking as Apple defines it (linking with third-party data for
+advertising, or sharing with a data broker). Requesting a permission we do not
+use invites a reviewer to ask why we asked.
+
+## 16. Strip the banner from the native bundle — at build time
+
+`CookieConsent` is mounted once, `apps/web/src/App.tsx:343`. It is web-consent UI
+that leaked into the Capacitor wrapper; native apps do not use browser cookies
+for this.
+
+- Gate the mount on `!import.meta.env.VITE_NATIVE` so the component is
+  statically eliminated, not merely hidden.
+- Add an assertion to `apps/web/scripts/build-native.mjs` in the style of §5,
+  as a new numbered section: fail if the banner's copy survives into the bundle.
+
+```js
+// --- 7. The web cookie banner must not survive into a native binary -------
+// App Store 5.1.2(i), build 17 rejection: a cookie consent prompt in a native
+// app reads as tracking. Native has no cookies to consent to; the analytics
+// toggle in Account is the control surface. The web app keeps its banner.
+if (blob.includes('We use analytics cookies'))
+  fail('Cookie consent banner survived into the native build — the VITE_NATIVE gate did not run.');
+```
+
+**The web app is unchanged.** It is a website, its cookies are real, and EU
+visitors need that banner.
+
+## 17. Analytics posture on native
+
+With the banner gone, `hasAnalyticsConsent()` is false on iOS and
+`initAnalytics()` never runs, so the iOS build collects nothing unless a user
+opts in. That is the correct posture to hand a reviewer, and it is what ships.
+
+`AnalyticsPreference` already renders in three places — `pages/Profile.tsx`,
+`components/account/ProfilePhone.tsx`, and inside the privacy `LegalDocument` —
+so the control surface exists and needs no new screen.
+
+**Ship the disclosure anyway**, beside that toggle and in the privacy policy
+screen. Suggested copy, adjust to taste:
+
+> Citrus collects anonymous usage data to understand which features are used
+> and to find problems. It is first-party analytics — nothing is shared with
+> advertisers or data brokers, and it is never linked to data from other apps.
+> It is off unless you turn it on here.
+
+**Do NOT put the native analytics default behind a remote-config key until that
+disclosure ships.** A config flag that silently begins collecting data users were
+never told about is a compliance problem, not an Apple one. With the disclosure
+in the binary, flipping the default later is legitimate; without it, it is not.
+
+## 18. Assert the posture so it cannot regress
+
+Same file, same style. A future build that quietly relinks a tracking framework
+or flips an ad-signal flag is exactly how a resubmission gets bounced.
+
+```js
+// --- 8. No tracking frameworks may be linked into the iOS project ---------
+// 5.1.2(i): we tell App Review we cannot track. Keep that true mechanically.
+//   fail if AppTrackingTransparency / AdSupport / NSUserTrackingUsageDescription
+//   appear in ios/App/App.xcodeproj/project.pbxproj or ios/App/App/Info.plist
+
+// --- 9. Analytics ad-linkage stays off ------------------------------------
+//   fail unless the bundle contains allow_google_signals:false and
+//   allow_ad_personalization_signals:false (match on the minified form)
+```
+
+## 19. What Garrett does in App Store Connect
+
+1. **App Privacy → confirm nothing is declared under "Data Used to Track You."**
+   A label contradicting the Review Notes is an instant second rejection, and
+   this is an expedited review.
+2. Paste the Review Notes drafted in the session transcript, which state the
+   banner was web-only UI, that it is removed from the iOS build, that the build
+   fails if it returns, and the four specifics above.
+
+## 20. Ordering
+
+This and the writeup port ship in the **same build**. One `npm run ios:sync`
+after both are merged, confirm the banner reads `VITE_APP_VERSION=1.1.0+18` with
+backend PRODUCTION, then archive. `CURRENT_PROJECT_VERSION` is already 18 —
+do not bump it again.
