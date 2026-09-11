@@ -4,7 +4,7 @@ import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { membershipMiddleware } from '../middleware/membership';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
-import { createUserClient } from '../lib/supabase';
+import { createUserClient, supabaseAdmin } from '../lib/supabase';
 import { KeeperService } from '../services/KeeperService';
 import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
@@ -130,7 +130,13 @@ keeperRoutes.post('/league/:leagueId/lock', membershipMiddleware, validateBody(s
     return fail(c, AppError.forbidden('Only the commissioner can lock keepers'));
   }
 
-  const service = new KeeperService(supabase);
+  // GRANTS (2026-09-11): the route has just proved the caller is the
+  // commissioner, so the RPC runs on the admin client. That is what lets
+  // EXECUTE on lock_keepers_for_season be revoked from `authenticated`
+  // (migration 20260911053000) -- otherwise a member could skip this
+  // handler entirely and POST /rest/v1/rpc/lock_keepers_for_season direct
+  // to PostgREST, and the check above would be decoration.
+  const service = new KeeperService(supabaseAdmin);
   const result = await service.lockKeepersForSeason(leagueId, body.seasonYear);
   if (result.error) return fail(c, AppError.badRequest(result.error));
   return ok(c, result);
