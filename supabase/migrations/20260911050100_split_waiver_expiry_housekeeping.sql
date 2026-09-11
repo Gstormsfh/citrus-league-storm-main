@@ -116,7 +116,15 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.expire_player_waiver_status() FROM PUBLIC;
+-- GRANTS (corrected 2026-09-11 after applying to production and reading the
+-- ACL back). `REVOKE ALL ... FROM PUBLIC` is NOT enough here. Supabase's
+-- default privileges on the public schema grant EXECUTE to `authenticated` on
+-- every newly created function, and revoking from PUBLIC does not remove an
+-- explicit role grant. The first apply therefore left this SECURITY DEFINER
+-- write function reachable at /rest/v1/rpc/expire_player_waiver_status by any
+-- signed-in user -- the exact exposure 20260911053000 exists to close, opened
+-- by this file two steps ahead of it. Named roles must be revoked by name.
+REVOKE EXECUTE ON FUNCTION public.expire_player_waiver_status() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.expire_player_waiver_status() TO service_role;
 
 -- ----------------------------------------------------------------------------
