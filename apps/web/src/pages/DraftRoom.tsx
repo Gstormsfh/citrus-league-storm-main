@@ -853,7 +853,13 @@ const DraftRoomInner = () => {
       // Load available players + ROS projections in parallel
       const [allPlayers, rosProjectionsRes] = await Promise.all([
         PlayerService.getAllPlayers(),
-        playerApi.getRosProjections(500).catch(() => ({ data: [] }))
+        // BOARD COVERAGE (2026-09-11): was 500. The server orders by
+        // total_projected_points, which is baked with DEFAULT scoring, and we
+        // rescore below under this league's settings -- so a row missing from
+        // this fetch has no projection on the board, whatever the league
+        // scores. The table is 1,428 rows and the best rookie ranks 672nd, so
+        // 500 hid all 320 of them. Ask for the whole board.
+        playerApi.getRosProjections(1500).catch(() => ({ data: [] }))
       ]);
       setAvailablePlayers(allPlayers);
 

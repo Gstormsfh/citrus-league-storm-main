@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
 import { createUserClient, getSupabaseAdmin } from '../lib/supabase';
+import { readAllPaged } from '../lib/pagedRead';
 import { PlayerService } from '../services/PlayerService';
 import {
   PlayerDashboardService,
@@ -148,27 +149,61 @@ playerRoutes.get('/ros-projections', authMiddleware, async (c) => {
   const playerIdRaw = c.req.query('playerId');
   const playerId = playerIdRaw !== undefined ? parseInt(playerIdRaw, 10) : null;
 
-  let query = supabase
-    .from('player_ros_projections')
-    // projected_ga_ros (2026-09-01): goalie goals-against over remaining
-    // starts — clients that rescore ROS rows under league settings must
-    // include it, or every goalie is overstated by |GA weight| × GA.
-    .select('player_id, player_name, position, team_abbrev, is_goalie, total_projected_points, avg_points_per_game, games_remaining, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins_ros, projected_saves_ros, projected_shutouts_ros, projected_ga_ros')
-    // Projections are keyed to the season they DESCRIBE (offseason ⇒
-    // upcoming season) — getCurrentSeason() here read zero rows all summer.
-    .eq('season', getProjectionsSeason());
-  if (playerId !== null && Number.isFinite(playerId)) {
-    query = query.eq('player_id', playerId);
-  }
-  const { data, error } = await query
-    .order('total_projected_points', { ascending: false })
-    .limit(playerId !== null && Number.isFinite(playerId) ? 1 : Math.min(limit, 500));
+  // projected_ga_ros (2026-09-01): goalie goals-against over remaining
+  // starts — clients that rescore ROS rows under league settings must
+  // include it, or every goalie is overstated by |GA weight| × GA.
+  const ROS_COLUMNS =
+    'player_id, player_name, position, team_abbrev, is_goalie, total_projected_points, avg_points_per_game, games_remaining, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins_ros, projected_saves_ros, projected_shutouts_ros, projected_ga_ros';
 
+  // Single-player lookup keeps the cheap one-row path.
+  if (playerId !== null && Number.isFinite(playerId)) {
+    const { data, error } = await supabase
+      .from('player_ros_projections')
+      .select(ROS_COLUMNS)
+      // Projections are keyed to the season they DESCRIBE (offseason ⇒
+      // upcoming season) — getCurrentSeason() here read zero rows all summer.
+      .eq('season', getProjectionsSeason())
+      .eq('player_id', playerId)
+      .limit(1);
+    if (error) return handleError(c, error, 'Failed to fetch ROS projections');
+    return ok(c, data || []);
+  }
+
+  // BOARD COVERAGE (2026-09-11). This read was `.order(total_projected_points
+  // desc).limit(min(limit, 500))`, and both halves were wrong.
+  //
+  // The CAP: total_projected_points is baked with DEFAULT scoring, and the
+  // draft room rescores every row under its own league's settings. A row
+  // missing from this response therefore has NO projection on that board,
+  // whatever the league scores. The table is 1,428 rows and the best rookie
+  // ranks 672nd by default scoring, so a 500 cap hid all 320 rookies outright,
+  // plus every specialist a league values and the default does not. A
+  // default-scoring order must not double as a relevance filter for leagues
+  // that do not use default scoring.
+  //
+  // The UNPAGED READ: raising the cap alone would not have worked. PostgREST
+  // silently clamps to db-max-rows (1000) and answers 200 with a truncated
+  // body — no error, no header. `.limit(1500)` would have returned 1,000 rows
+  // and dropped ranks 1001-1428 without a sound, which is the same defect
+  // class this change exists to fix. readAllPaged is the house helper for it.
+  const { data: all, error } = await readAllPaged<Record<string, unknown>>(supabase, {
+    table: 'player_ros_projections',
+    columns: ROS_COLUMNS,
+    filters: [['season', getProjectionsSeason()]],
+    orderBy: ['player_id'],
+  });
   if (error) {
     return handleError(c, error, 'Failed to fetch ROS projections');
   }
 
-  return ok(c, data || []);
+  // readAllPaged pages on a unique ascending key (it has to — a non-unique
+  // sort duplicates rows across windows). Restore the points order callers
+  // have always received, in memory, over a bounded ~1.4k rows.
+  const sorted = (all ?? []).sort(
+    (a, b) => Number(b.total_projected_points ?? 0) - Number(a.total_projected_points ?? 0),
+  );
+
+  return ok(c, sorted.slice(0, Math.min(limit, 2000)));
 });
 
 // GET /api/players/projections/batch — Batch player projections
