@@ -182,7 +182,15 @@ AS $function$
   left join rate r on r.pos_group = b.pos_group and r.slot = b.slot;
 $function$;
 
-REVOKE ALL ON FUNCTION public.project_rookies(integer) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.project_rookies(integer) TO service_role, authenticated, anon;
+-- GRANTS (corrected 2026-09-11 on re-audit). The first draft of this file
+-- granted EXECUTE to authenticated and anon. That is strictly looser than
+-- its sibling project_ros, which 20260901150000 locked to service_role
+-- alone, and it contradicts 20260911053000 in this same batch -- a file
+-- whose entire purpose is revoking `authenticated` from SECURITY DEFINER
+-- functions, because PostgREST publishes every grantable function at
+-- /rest/v1/rpc/<name>. project_rookies has no caller outside
+-- rebuild_ros_projections, which runs as service_role. Matching project_ros.
+REVOKE ALL ON FUNCTION public.project_rookies(integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.project_rookies(integer) TO service_role;
 
 COMMIT;

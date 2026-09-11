@@ -33,19 +33,37 @@
 --   triggers do not consult EXECUTE, so nothing needs the grant.
 --
 -- (c) THE ORDERING THAT MATTERS -- READ BEFORE APPLYING
---   Both revoked functions were, until today, called with a USER client:
---     server/src/routes/keepers.ts      createUserClient(userToken)
---     server/src/services/DraftService  constructed from createUserClient
---                                       in every server/src/routes/draft.ts
+--   THREE server call sites used a USER client, not two. The first pass of
+--   this header listed two and missed the third; it was caught on re-audit
+--   2026-09-11 before this file was applied anywhere. All three are fixed:
+--     server/src/routes/keepers.ts   POST /league/:id/lock
+--                                    createUserClient -> supabaseAdmin,
+--                                    behind a commissioner_id check
+--     server/src/services/DraftService.ts:567
+--                                    createUserClient -> supabaseAdmin
+--     server/src/routes/rosters.ts   POST /league/:leagueId/sync
+--                                    createUserClient -> supabaseAdmin,
+--                                    behind commissionerMiddleware
 --   so they executed as `authenticated`. APPLYING THIS MIGRATION AGAINST
---   THE CURRENTLY DEPLOYED SERVER WOULD BREAK BOTH FEATURES -- keeper
---   locking and post-autopick roster sync would start returning
---   "permission denied for function".
+--   THE CURRENTLY DEPLOYED SERVER WOULD BREAK ALL THREE -- keeper locking,
+--   post-autopick roster sync, and the commissioner roster-sync route would
+--   start returning "permission denied for function".
 --
---   The matching application change moves both callers to supabaseAdmin and
---   ships in the same commit as this file. DEPLOY THE SERVER FIRST, THEN
---   APPLY THIS. Verified read-only: zero browser-side call sites for any of
---   the five (grep over apps/web/src for .rpc('<name>') returns nothing).
+--   rosters.ts carried a second, independent defect found in the same pass:
+--   its comment read "(commissioner only)" while the handler enforced
+--   membershipMiddleware, so ANY league member could rewrite every
+--   roster_assignments row in the league. SECURITY DEFINER meant RLS did
+--   not backstop it. That route now uses commissionerMiddleware. This is
+--   the same shape of bug as the keeper lock route: a comment asserting a
+--   check the code never made.
+--
+--   The matching application changes move all three callers to supabaseAdmin
+--   and ship with this file. DEPLOY THE SERVER FIRST, THEN APPLY THIS.
+--   Verified read-only: zero browser-side call sites for any of the five
+--   (grep over apps/web/src for .rpc('<name>') returns nothing), and
+--   citrus_disk_invariants' only caller,
+--   data-pipeline/monitoring/check_data_invariants.py, hard-exits without
+--   SUPABASE_SERVICE_ROLE_KEY, so the service_role grant it keeps is enough.
 --
 -- (d) WHO / WORKSTREAM
 --   Claude (cloud session 01J7JBu263Ld1ucRRiRxJ2to), directed by Garrett

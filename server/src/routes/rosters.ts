@@ -2,10 +2,10 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
-import { membershipMiddleware } from '../middleware/membership';
+import { membershipMiddleware, commissionerMiddleware } from '../middleware/membership';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
 import { validateBody, schemas, getValidatedBody } from '../middleware/validate';
-import { createUserClient } from '../lib/supabase';
+import { createUserClient, supabaseAdmin } from '../lib/supabase';
 import { MatchupService } from '../services/MatchupService';
 import { LineupService, lockedMoveMessage } from '../services/LineupService';
 import { SeasonStateService } from '../services/SeasonStateService';
@@ -311,11 +311,24 @@ rosterRoutes.post('/league/:leagueId/team/:teamId/initialize', membershipMiddlew
 });
 
 // POST /api/rosters/league/:leagueId/sync — Sync roster_assignments from draft_picks (commissioner only)
-rosterRoutes.post('/league/:leagueId/sync', membershipMiddleware, async (c) => {
+//
+// SECURITY (2026-09-11): the comment above said "commissioner only" and the
+// handler enforced membership only, so any league member could rewrite every
+// roster_assignments row in the league. sync_roster_assignments_for_league is
+// SECURITY DEFINER, so RLS did not backstop it either. commissionerMiddleware
+// is now what the comment always claimed -- same middleware leagues.ts and the
+// v2 draft routes already use.
+//
+// GRANTS (2026-09-11): with the caller proved to be the commissioner, the RPC
+// runs on the admin client. That is the precondition for migration
+// 20260911053000 revoking EXECUTE on sync_roster_assignments_for_league from
+// `authenticated`; otherwise a member could skip this handler entirely and
+// POST /rest/v1/rpc/sync_roster_assignments_for_league to PostgREST direct,
+// and the check above would be decoration.
+rosterRoutes.post('/league/:leagueId/sync', commissionerMiddleware, async (c) => {
   const leagueId = c.req.param('leagueId');
-  const supabase = createUserClient(c.get('userToken'));
 
-  const { data, error } = await (supabase.rpc as any)('sync_roster_assignments_for_league', { p_league_id: leagueId });
+  const { data, error } = await (supabaseAdmin.rpc as any)('sync_roster_assignments_for_league', { p_league_id: leagueId });
 
   if (error) {
     return handleError(c, error, 'Failed to sync rosters');
