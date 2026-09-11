@@ -2,8 +2,13 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vite
 import { createChain, createMockSupabase } from './helpers';
 import { LeagueMembershipService } from '../services/LeagueMembershipService';
 
+// GRANTS (2026-09-11): the lock route runs the RPC on the ADMIN client, not
+// the caller's. That is what allows EXECUTE on lock_keepers_for_season to be
+// revoked from `authenticated` (migration 20260911053000) -- otherwise a
+// member could skip the handler and POST straight to PostgREST. So the admin
+// client needs a real rpc() here, and the success case asserts on IT.
 vi.mock('../lib/supabase', () => ({
-  supabaseAdmin: { from: vi.fn() },
+  supabaseAdmin: { from: vi.fn(), rpc: vi.fn() },
   createUserClient: vi.fn(),
   getSupabaseAdmin: vi.fn(),
 }));
@@ -68,10 +73,13 @@ describe('POST /api/keepers/league/:leagueId/lock — commissioner only', () => 
     const client = createMockSupabase(tables('someone-else'), { data: [], error: null });
     (createUserClient as any).mockReturnValue(client);
 
+    const { supabaseAdmin } = await import('../lib/supabase');
+
     const res = await lock(app);
 
     expect(res.status).toBe(403);
     expect(client.rpc).not.toHaveBeenCalled();
+    expect((supabaseAdmin as unknown as { rpc: ReturnType<typeof vi.fn> }).rpc).not.toHaveBeenCalled();
   });
 
   it('lets the commissioner through to lock_keepers_for_season', async () => {
@@ -83,12 +91,22 @@ describe('POST /api/keepers/league/:leagueId/lock — commissioner only', () => 
     });
     (createUserClient as any).mockReturnValue(client);
 
+    const { supabaseAdmin } = await import('../lib/supabase');
+    const adminRpc = (supabaseAdmin as unknown as { rpc: ReturnType<typeof vi.fn> }).rpc;
+    adminRpc.mockResolvedValue({
+      data: [{ team_id: MY_TEAM, keepers_locked: 3, rounds_consumed: [1, 2, 3] }],
+      error: null,
+    });
+
     const res = await lock(app);
 
     expect(res.status).toBe(200);
-    expect(client.rpc).toHaveBeenCalledWith('lock_keepers_for_season', {
+    // the RPC goes out on the ADMIN client -- that is the whole point of the change
+    expect(adminRpc).toHaveBeenCalledWith('lock_keepers_for_season', {
       p_league_id: LEAGUE,
       p_season_year: 2026,
     });
+    // and NOT on the caller's client, which will lose EXECUTE in 20260911053000
+    expect(client.rpc).not.toHaveBeenCalledWith('lock_keepers_for_season', expect.anything());
   });
 });
