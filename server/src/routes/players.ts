@@ -10,11 +10,20 @@ import {
   parsePlayerDashboardRequest,
 } from '../services/PlayerDashboardService';
 import { NhlPlayoffStateService } from '../services/NhlPlayoffStateService';
+import { PlayerWriteupService } from '../services/PlayerWriteupService';
 import { AppError } from '../lib/errors';
 import { ok, fail, handleError } from '../lib/responses';
 import { logger, getCurrentSeason, getProjectionsSeason } from '@citrus/shared';
 
 const playerRoutes = new Hono<Env>();
+
+/**
+ * A league id is validated before it reaches a query. `leagueId` arrives on
+ * the writeup's query string and is handed to `get_effective_scoring_rules`,
+ * so a caller who is refused here never gets as far as the membership check
+ * that gates it.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // GET /api/players — Get all players with stats (primary endpoint)
 //
@@ -411,10 +420,34 @@ playerRoutes.get('/:playerId/dashboard', authMiddleware, async (c) => {
 // client picks what to plot).
 //
 // Registered ABOVE `/:playerId` with the other literal-suffixed routes.
+//
+// THE SCOUTING WRITEUP RIDES HERE (2026-09-11). Every word a player card
+// shows must be changeable with a server deploy, not an App Store round
+// trip, so `@citrus/shared`'s writeup engine now runs here and the result
+// goes out on `payload.writeup`. It is folded into THIS payload, and not
+// given an endpoint of its own, because the modal already fetches this one:
+// a writeup that arrives on a second round trip, after the card has
+// painted, is worse than one baked into the bundle.
+//
+// `leagueId` is optional and is what licenses the projection sentence. The
+// projection is scored with that league's own `league_scoring_rules`, and
+// there are 16 distinct scoring shapes across the 68 leagues in production,
+// so a request without one gets no projection sentence rather than a
+// league-neutral number that is wrong for everybody.
+//
+// A FAILED WRITEUP IS AN ABSENT FIELD, NEVER A FAILED REQUEST. The service
+// returns null for every error it meets, this route omits the key, and the
+// browser renders the copy still in its bundle. The career arc this
+// endpoint has always served is not allowed to go down because prose did.
 playerRoutes.get('/:playerId/xg-history', authMiddleware, async (c) => {
   const parsed = parsePlayerDashboardRequest(c.req.param('playerId'), undefined, undefined);
   if (!parsed.value) {
     return fail(c, AppError.badRequest(parsed.message || 'Invalid player id'));
+  }
+
+  const leagueId = c.req.query('leagueId');
+  if (leagueId !== undefined && !UUID_RE.test(leagueId)) {
+    return fail(c, AppError.badRequest('leagueId must be a UUID'));
   }
 
   const supabase = createUserClient(c.get('userToken'));
@@ -425,7 +458,15 @@ playerRoutes.get('/:playerId/xg-history', authMiddleware, async (c) => {
     if (error || !payload) {
       return handleError(c, error, 'Failed to fetch player xG history');
     }
-    return ok(c, payload);
+
+    const writeup = await new PlayerWriteupService(supabase, service).getWriteup({
+      playerId: parsed.value.playerId,
+      leagueId: leagueId ?? null,
+      userId: c.get('userId'),
+      xgSeasons: payload.points,
+    });
+
+    return ok(c, writeup ? { ...payload, writeup } : payload);
   } catch (err) {
     logger.error('[players/:id/xg-history] Unexpected error:', err);
     return handleError(c, err, 'Failed to fetch player xG history');

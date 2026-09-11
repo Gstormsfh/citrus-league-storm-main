@@ -25,6 +25,8 @@
  * coalesced zero, for every modelled column below.
  */
 
+import type { PlayerWriteup } from '../playerWriteup';
+
 /**
  * One row of `GET /api/players/dashboard-index`: a directory player for the
  * current season with his season actuals, GAR split, xG talent row, goalie
@@ -203,4 +205,26 @@ export interface PlayerXgHistoryPayload {
   points: XgHistoryPoint[];
   /** Newest `player_xg_season.updated_at` read, or null. Same contract as `as_of` above. */
   as_of: string | null;
+  /**
+   * THE SCOUTING WRITEUP, RENDERED SERVER-SIDE (2026-09-11).
+   *
+   * Folded into this payload rather than given an endpoint of its own
+   * because the player modal already fetches this one: a writeup that
+   * arrives on a second round trip, after the card has painted, is worse
+   * than one baked into the bundle.
+   *
+   * OPTIONAL, AND THE CLIENT MUST TREAT IT AS OPTIONAL. When the read
+   * fails, or when there is no index row for the player, the field is
+   * simply absent and the browser renders the copy still in its bundle
+   * (`PlayerStatsModal`: `data?.writeup ?? generatePlayerWriteup(...)`).
+   * The web app and the API also deploy separately, so for the minutes
+   * between the two an old client is served a new payload and a new client
+   * an old one; both cases are the same absent field.
+   *
+   * The projection sentence is present only when the request named a
+   * `leagueId` the caller is actually a member of, because the number is
+   * scored with that league's own weights and a wrong one is worse than a
+   * missing one.
+   */
+  writeup?: PlayerWriteup;
 }

@@ -12,7 +12,8 @@
     "./utils": "./src/utils/index.ts",
     "./playerWriteup": "./src/playerWriteup/index.ts",
     "./playerPercentiles": "./src/playerPercentiles/index.ts",
-    "./leagueProjection": "./src/leagueProjection/index.ts"
+    "./leagueProjection": "./src/leagueProjection/index.ts",
+    "./playerWriteup/fromIndex": "./src/playerWriteup/fromIndex.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

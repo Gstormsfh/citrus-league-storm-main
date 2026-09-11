@@ -1,0 +1,195 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import type { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import { MemoryRouter } from 'react-router-dom';
+
+/**
+ * THE FALLBACK IS THE CONDITION ON WHICH THE SERVER WRITEUP SHIPPED
+ * (2026-09-11).
+ *
+ * The scouting prose is now rendered by the API server and arrives on
+ * `GET /api/players/:playerId/xg-history`. The engine nevertheless stays in
+ * the bundle, and this file is why: the build it ships in goes to an
+ * expedited Apple review and then into the first real drafts, and a render
+ * path that can go blank under load is not acceptable. A reviewer who opens
+ * a player card must never see an empty summary.
+ *
+ * So every way the server answer can fail to arrive is exercised here
+ * against the REAL engine and the REAL hook, with only the HTTP client
+ * mocked:
+ *
+ *   * the endpoint 500s;
+ *   * the endpoint answers, without a `writeup` key (an older API deploy —
+ *     the web app and the API deploy separately, so this is not
+ *     hypothetical, it is every deploy's first few minutes);
+ *   * the endpoint answers with a malformed `writeup`.
+ *
+ * In all three the card renders exactly what it rendered before any of this
+ * existed. The fourth test is the happy path, and it asserts the server's
+ * words actually win when they are there, so a fallback that silently
+ * swallowed the payload would fail too.
+ */
+
+const mocks = vi.hoisted(() => ({
+  get: vi.fn(),
+  league: vi.fn(),
+  format: vi.fn(),
+  schedule: vi.fn(),
+  log: vi.fn(),
+  leagueId: '11111111-1111-1111-1111-111111111111' as string | null,
+}));
+
+vi.mock('@/contexts/LeagueContext', () => ({ useLeague: () => ({ activeLeagueId: mocks.leagueId }) }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
+vi.mock('@/services/LeagueService', () => ({
+  getLeagueFormat: mocks.format,
+  LeagueService: { getLeague: mocks.league, getWatchlist: () => [] },
+}));
+vi.mock('@/services/ScheduleService', () => ({ ScheduleService: { getGamesForTeam: mocks.schedule } }));
+vi.mock('@/services/MatchupService', () => ({ MatchupService: {} }));
+vi.mock('@/api/matchups', () => ({ matchupApi: { getPlayerGameLog: mocks.log } }));
+vi.mock('@/api/players', () => ({
+  playerApi: {
+    getDirectory: async () => ({ data: [] }),
+    getRosProjectionForPlayer: async () => ({ data: [] }),
+  },
+}));
+vi.mock('@/hooks/usePlayerDashboardIndex', () => ({ usePlayerDashboardIndex: () => ({ players: [] }) }));
+vi.mock('@/hooks/useCitrusPlayerNotes', () => ({ useCitrusPlayerNotes: () => ({ notes: [], items: [] }) }));
+vi.mock('../PlayerAdvancedCard', () => ({ PlayerAdvancedCard: () => null }));
+vi.mock('@/utils/timezoneUtils', () => ({ getTodayMST: () => '2026-09-06' }));
+// The one mock that matters: the HTTP client the real `usePlayerXgHistory`
+// reaches for. Everything above is scaffolding so the modal can mount.
+vi.mock('@/api/client', () => ({ apiClient: { get: mocks.get } }));
+
+import PlayerStatsModal from '@/components/PlayerStatsModal';
+
+/** A season worth writing about, so the local engine has something to say. */
+const STATS = {
+  gamesPlayed: 76,
+  goals: 44,
+  assists: 89,
+  points: 133,
+  shots: 280,
+  hits: 40,
+  blockedShots: 25,
+  powerPlayPoints: 48,
+  plusMinus: 28,
+  toi: '21:30',
+};
+
+/**
+ * A FIXED ID, DELIBERATELY. The engine's voice rotates on a seed built from
+ * `id|name` so two star forwards do not read as the same card with the
+ * numbers swapped, which means a per-test id would hand each test a
+ * different sentence. Pinning it keeps the assertions below about the
+ * fallback and not about which phrasing the seed happened to draw.
+ */
+const PLAYER_ID = '8478402';
+
+function openCard() {
+  const player = {
+    id: PLAYER_ID,
+    name: 'Connor McTest',
+    position: 'C',
+    team: 'Edmonton Oilers',
+    teamAbbreviation: 'EDM',
+    stats: STATS,
+  } as HockeyPlayer;
+  return render(
+    <MemoryRouter>
+      <PlayerStatsModal player={player} isOpen onClose={() => {}} />
+    </MemoryRouter>,
+  );
+}
+
+const SERVER_WRITEUP = {
+  headline: 'Server-rendered headline',
+  summary: 'This sentence came from the API server and nowhere else.',
+  analysis: 'Projects to 999 fantasy points over 80 games for 2026-27 (C1).',
+  tags: [{ label: 'Deployed copy', tone: 'positive' }],
+  hasEnoughData: true,
+  cardNote: 'Star forward',
+  cardTone: 'positive',
+};
+
+/**
+ * A clause only the in-bundle engine can produce for this stat line. The
+ * engine words the lead several ways off its seed; every one of them
+ * carries the split, which is the part no server fixture in this file
+ * says.
+ */
+const LOCAL_SUMMARY = /44 goals and 89 assists/;
+
+function xgHistory(extra: Record<string, unknown> = {}) {
+  return { data: { player_id: Number(PLAYER_ID), points: [], as_of: null, ...extra } };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.leagueId = '11111111-1111-1111-1111-111111111111';
+  mocks.schedule.mockResolvedValue({ games: [], error: null });
+  mocks.log.mockResolvedValue({ data: { games: [], projections: [] } });
+  mocks.league.mockResolvedValue({ league: { scoring_settings: { skater: { goals: 3 } } } });
+  mocks.format.mockReturnValue({ scoringFormat: 'h2h-points' });
+  mocks.get.mockResolvedValue(xgHistory());
+});
+
+describe('the player card falls back to the in-bundle writeup', () => {
+  it('renders the server writeup when the payload carries one', async () => {
+    mocks.get.mockResolvedValue(xgHistory({ writeup: SERVER_WRITEUP }));
+    openCard();
+
+    expect(await screen.findByText('Server-rendered headline')).toBeTruthy();
+    expect(screen.getByText(SERVER_WRITEUP.summary)).toBeTruthy();
+    expect(screen.getByText('Deployed copy')).toBeTruthy();
+    expect(screen.queryByText(LOCAL_SUMMARY)).toBeNull();
+  });
+
+  it('renders the local writeup when the payload omits the field', async () => {
+    mocks.get.mockResolvedValue(xgHistory());
+    openCard();
+
+    expect(await screen.findByText(LOCAL_SUMMARY)).toBeTruthy();
+    expect(screen.queryByText('Server-rendered headline')).toBeNull();
+  });
+
+  it('renders the local writeup when the endpoint 500s', async () => {
+    mocks.get.mockRejectedValue(new Error('Request failed with status 500'));
+    openCard();
+
+    expect(await screen.findByText(LOCAL_SUMMARY)).toBeTruthy();
+    expect(screen.queryByText('Server-rendered headline')).toBeNull();
+  });
+
+  it('renders the local writeup rather than half a card when the field is malformed', async () => {
+    // A `writeup` with no `summary` is not a writeup. Rendering it would
+    // paint a headline over an empty paragraph, which is worse than the
+    // copy we already have.
+    mocks.get.mockResolvedValue(xgHistory({ writeup: { headline: 'Half a card' } }));
+    openCard();
+
+    expect(await screen.findByText(LOCAL_SUMMARY)).toBeTruthy();
+    expect(screen.queryByText('Half a card')).toBeNull();
+  });
+
+  it('asks for the writeup in the active league, so the projection is scored for it', async () => {
+    openCard();
+
+    await waitFor(() => expect(mocks.get).toHaveBeenCalled());
+    const paths = mocks.get.mock.calls.map((c) => String(c[0]));
+    expect(
+      paths.some((p) => p.includes('/xg-history?leagueId=11111111-1111-1111-1111-111111111111')),
+    ).toBe(true);
+  });
+
+  it('asks without a league when there is no active one', async () => {
+    mocks.leagueId = null;
+    openCard();
+
+    await waitFor(() => expect(mocks.get).toHaveBeenCalled());
+    const paths = mocks.get.mock.calls.map((c) => String(c[0]));
+    expect(paths.some((p) => p.endsWith('/xg-history'))).toBe(true);
+    expect(paths.some((p) => p.includes('leagueId'))).toBe(false);
+  });
+});

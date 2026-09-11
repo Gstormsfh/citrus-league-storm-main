@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PlayerXgHistoryPayload, XgHistoryPoint } from '@citrus/shared';
+import type { PlayerWriteup, PlayerXgHistoryPayload, XgHistoryPoint } from '@citrus/shared';
 import { logger } from '@/utils/logger';
 
 /**
@@ -39,20 +39,39 @@ export interface XgHistoryState {
   points: readonly XgHistoryPoint[] | null;
   status: XgHistoryStatus;
   asOf: string | null;
+  /**
+   * THE SERVER-RENDERED SCOUTING WRITEUP (2026-09-11), or null.
+   *
+   * Null covers every way this can be absent and they are all the same
+   * thing to a caller: the request failed, the player has no index row, an
+   * older API is deployed, the response was mocked. The one call site
+   * reads `xgHistory.writeup ?? generatePlayerWriteup(player, extras)`, so
+   * a null renders the copy that is still in the bundle.
+   */
+  writeup: PlayerWriteup | null;
 }
 
 export interface UsePlayerXgHistoryOptions {
   /** False skips the fetch entirely and holds the state at `idle`. */
   enabled?: boolean;
+  /**
+   * The league whose scoring the writeup's projection sentence is scored
+   * with. Omitted, the server sends the writeup WITHOUT that sentence
+   * rather than scoring it league-neutrally: there are 16 distinct scoring
+   * shapes across the leagues in production, and a wrong projection on a
+   * card someone is drafting from is worse than a missing one.
+   */
+  leagueId?: string | null;
 }
 
-const IDLE: XgHistoryState = { points: null, status: 'idle', asOf: null };
+const IDLE: XgHistoryState = { points: null, status: 'idle', asOf: null, writeup: null };
 
 export function usePlayerXgHistory(
   playerId: number | null | undefined,
   options: UsePlayerXgHistoryOptions = {},
 ): XgHistoryState {
   const enabled = options.enabled ?? true;
+  const leagueId = options.leagueId ?? null;
   const [state, setState] = useState<XgHistoryState>(IDLE);
 
   // A player change mid-flight must not let the OLD response win. Every
@@ -67,9 +86,11 @@ export function usePlayerXgHistory(
 
     const token = ++latest.current;
     let cancelled = false;
-    const path = `/api/players/${Number(playerId)}/xg-history`;
+    const path = `/api/players/${Number(playerId)}/xg-history${
+      leagueId ? `?leagueId=${encodeURIComponent(leagueId)}` : ''
+    }`;
 
-    setState({ points: null, status: 'loading', asOf: null });
+    setState({ points: null, status: 'loading', asOf: null, writeup: null });
 
     void import('@/api/client')
       .then(({ apiClient }) => apiClient.get<PlayerXgHistoryPayload>(path))
@@ -86,18 +107,25 @@ export function usePlayerXgHistory(
           points,
           status: 'ready',
           asOf: payload && typeof payload.as_of === 'string' ? payload.as_of : null,
+          // Shape-checked, not trusted: an old API, a mock, or a partial
+          // body must read as "no writeup" and never as a half-rendered
+          // card. `summary` is the field the modal paints first.
+          writeup:
+            payload && payload.writeup && typeof payload.writeup.summary === 'string'
+              ? payload.writeup
+              : null,
         });
       })
       .catch((err: unknown) => {
         if (cancelled || token !== latest.current) return;
         logger.debug('[player-xg-history] unavailable:', path, err);
-        setState({ points: null, status: 'error', asOf: null });
+        setState({ points: null, status: 'error', asOf: null, writeup: null });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [playerId, enabled]);
+  }, [playerId, enabled, leagueId]);
 
   return state;
 }

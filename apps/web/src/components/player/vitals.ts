@@ -3,6 +3,8 @@
  * player card, from player_directory's shoots_catches, height_in, weight_lb
  * and birthdate. Pure, so the formatting is tested once.
  */
+import { ageOn } from '@citrus/shared/playerWriteup/fromIndex';
+
 export interface DirectoryVitalsRow {
   player_id: number | string;
   season?: number | null;
@@ -21,15 +23,13 @@ export interface Vital {
   value: string;
 }
 
-export function ageOn(birthdate: string, today: Date): number | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(birthdate);
-  if (!m) return null;
-  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  let age = today.getFullYear() - y;
-  const beforeBirthday = today.getMonth() + 1 < mo || (today.getMonth() + 1 === mo && today.getDate() < d);
-  if (beforeBirthday) age -= 1;
-  return age >= 0 && age < 70 ? age : null;
-}
+/**
+ * Moved to `@citrus/shared/playerWriteup/fromIndex` on 2026-09-11: the
+ * server-rendered writeup needs a player's age too, and the strip and the
+ * prose must never disagree about how old a man is. Re-exported here so
+ * this module's callers and `__tests__/vitals.test.ts` keep their import.
+ */
+export { ageOn } from '@citrus/shared/playerWriteup/fromIndex';
 
 export function heightLabel(inches: number): string {
   const ft = Math.floor(inches / 12);

@@ -12,5 +12,6 @@ export * from './utils';
  * the old import paths alive.
  */
 export * from './playerWriteup';
+export * from './playerWriteup/fromIndex';
 export * from './playerPercentiles';
 export * from './leagueProjection';
