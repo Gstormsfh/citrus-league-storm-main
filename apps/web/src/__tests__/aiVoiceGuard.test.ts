@@ -677,6 +677,12 @@ const SERVER_SRC = `${REPO}/server/src`;
  * scanned by name through PROSE_FILES.
  */
 const SCANNED_DIRS = [
+  // The writeup engine moved out of `${SRC}/utils` into `@citrus/shared` on
+  // 2026-09-11 so the API server could render it. Keeping the sweep pinned
+  // to `apps/web` would have quietly dropped the most-read prose in the
+  // product out of this guard on the day it moved, which is exactly how a
+  // rule stops being enforced without anyone deciding to stop enforcing it.
+  `${REPO}/packages/shared/src/playerWriteup`,
   `${SRC}/pages`,
   `${SRC}/components`,
   `${SRC}/utils`,

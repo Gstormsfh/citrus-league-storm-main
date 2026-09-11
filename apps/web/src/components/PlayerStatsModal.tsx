@@ -661,7 +661,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
   // one season's box score. Age from the directory strip, the seasons on
   // our books from the xG history, the cohort reads the XG tab draws, and
   // the projection with the framing the card uses. See WriteupExtras.
-  const xgHistory = usePlayerXgHistory(Number(player?.id) || null, { enabled: isOpen });
+  const xgHistory = usePlayerXgHistory(Number(player?.id) || null, { enabled: isOpen, leagueId });
   const positionRank = useMemo(() => {
     if (!indexEntry || !scoringReady || !pointsFormat) return null;
     const cohort = index.players.filter((p) => p.position === indexEntry.position);
@@ -740,7 +740,26 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
       career,
     };
   })();
-  const writeup = generatePlayerWriteup(player, writeupExtras);
+  /**
+   * THE SERVER'S WORDS WHEN THERE ARE ANY, OURS WHEN THERE ARE NOT.
+   *
+   * The scouting prose is rendered by `@citrus/shared`'s engine on the API
+   * server and arrives on the payload this modal already fetches, so
+   * changing a sentence is a server deploy rather than an App Store round
+   * trip. The server's copy is the better one: it computes the cohort
+   * percentiles against the full qualified universe rather than whatever
+   * slice of the index this browser happens to have loaded.
+   *
+   * THE LOCAL ENGINE STAYS IN THE BUNDLE AS THE FALLBACK, and it is not
+   * optional. If the endpoint 500s, times out, is an older deploy, or
+   * simply has no index row for this player, `xgHistory.writeup` is null
+   * and the card renders exactly what it rendered before any of this.
+   * There is no loading state and no spinner by design: a writeup that
+   * arrives after the card has painted is worse than one baked in, so the
+   * local answer paints immediately and the server's replaces it on the
+   * same fetch the sparkline was already waiting on.
+   */
+  const writeup = xgHistory.writeup ?? generatePlayerWriteup(player, writeupExtras);
 
   const posAbbr = getPositionAbbr(player.position);
   const teamAbbr = player.teamAbbreviation || player.team?.split(' ').pop()?.substring(0, 3).toUpperCase() || '';
