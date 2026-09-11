@@ -2100,6 +2100,20 @@ const Roster = () => {
     [selectedWeek],
   );
 
+  /**
+   * `‹ WK 1 ›` in the header. Matchup.tsx has had the chevrons since the
+   * Press Box header landed (its neighbours block, ~5455); this page passed
+   * the label alone, and PressBoxLeagueChrome draws an arrow only where it
+   * is given a handler — so the roster showed a week nobody could change,
+   * which is not what the Match screen promises.
+   */
+  const rosterWeekIndex = availableWeeks.indexOf(selectedWeek);
+  const rosterPrevWeek = rosterWeekIndex > 0 ? availableWeeks[rosterWeekIndex - 1] : null;
+  const rosterNextWeek =
+    rosterWeekIndex >= 0 && rosterWeekIndex < availableWeeks.length - 1
+      ? availableWeeks[rosterWeekIndex + 1]
+      : null;
+
   // OFFSEASON (2026-09-02). The gate below is roster-shaped, so a drafted
   // roster in September rendered the strip and it read "0/13 starters play ·
   // 0 on bench with games · proj 0.0" — with 27 days to the season opener and
@@ -3523,6 +3537,8 @@ const Roster = () => {
           underline strips. */}
       <PressBoxLeagueChrome
         weekLabel={weekLabelForHeader}
+        onWeekPrev={rosterPrevWeek !== null ? () => handleWeekChange(rosterPrevWeek) : null}
+        onWeekNext={rosterNextWeek !== null ? () => handleWeekChange(rosterNextWeek) : null}
       />
       
       {/* MOBILE: Full-screen scrollable content / DESKTOP: Grid layout */}
