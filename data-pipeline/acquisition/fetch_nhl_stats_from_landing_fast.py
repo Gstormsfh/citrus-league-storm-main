@@ -46,6 +46,7 @@ import _bootstrap  # noqa: F401
 
 from data_pipeline.utils.supabase_rest import SupabaseRest
 from data_pipeline.utils.citrus_request import citrus_request
+from data_pipeline.utils.season_config import current_season as _current_season
 import logging
 
 logger = logging.getLogger(__name__)
@@ -69,7 +70,11 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 NHL_API_BASE = "https://api-web.nhle.com/v1"
 STATS_API_BASE = "https://statsapi.web.nhl.com/api/v1"
-DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
+# SEASON (2026-09-11): derived from today's date, env override kept for
+# manual backfills. The former literal '2025' fallback would still say
+# 2025 on 2026-09-29, when current_season() and SQL get_current_season()
+# both flip to 2026 -- stats written under a season the app does not read.
+DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON")) if os.getenv("CITRUS_DEFAULT_SEASON") else _current_season()
 
 
 class SharedRateLimiter:

@@ -59,6 +59,7 @@ from data_pipeline.scoring.scoring_defaults import (
     SKATER_SHORT as DEFAULT_SKATER_SCORING,
     GOALIE as DEFAULT_GOALIE_SCORING,
 )
+from data_pipeline.utils.season_config import current_season as _current_season
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -89,7 +90,11 @@ if _raw_key and '(' in _raw_key and ')' in _raw_key:
 else:
     SUPABASE_KEY = _raw_key
 
-DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
+# SEASON (2026-09-11): derived from today's date, env override kept for
+# manual backfills. The former literal '2025' fallback would still say
+# 2025 on 2026-09-29, when current_season() and SQL get_current_season()
+# both flip to 2026 -- stats written under a season the app does not read.
+DEFAULT_SEASON = int(os.getenv("CITRUS_DEFAULT_SEASON")) if os.getenv("CITRUS_DEFAULT_SEASON") else _current_season()
 
 # ============================================================================
 # SCORING WEIGHTS — DEFAULT_SKATER_SCORING / DEFAULT_GOALIE_SCORING are the

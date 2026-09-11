@@ -37,6 +37,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # acquisition/ d
 import _bootstrap  # noqa: F401
 
 from data_pipeline.utils.citrus_request import citrus_request
+from data_pipeline.utils.season_config import current_season as _current_season
 
 # Resolve script paths relative to the data-pipeline directory
 DATA_PIPELINE_DIR = Path(__file__).resolve().parent.parent
@@ -116,7 +117,11 @@ def _try_self_heal_schedule(today_str: str) -> bool:
         return False
     last_schedule_ingest_time = now
 
-    season = int(os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
+# SEASON (2026-09-11): derived from today's date, env override kept for
+# manual backfills. The former literal '2025' fallback would still say
+# 2025 on 2026-09-29, when current_season() and SQL get_current_season()
+# both flip to 2026 -- stats written under a season the app does not read.
+    season = int(os.getenv("CITRUS_DEFAULT_SEASON")) if os.getenv("CITRUS_DEFAULT_SEASON") else _current_season()
     end_date = (dt.date.fromisoformat(today_str) + dt.timedelta(days=7)).isoformat()
     logger.warning(
         f"[SELF-HEAL] Slate empty for {today_str} — running ingest_playoff_schedule.py "
@@ -591,7 +596,11 @@ def run_unified_loop() -> Tuple[str, int]:
         if has_playoff_game_today:
             logger.info("[PLAYOFFS] Live playoff game detected — running playoff aggregate + scoring RPCs...")
             import os as _os
-            season = int(_os.getenv("CITRUS_DEFAULT_SEASON", "2025"))
+# SEASON (2026-09-11): derived from today's date, env override kept for
+# manual backfills. The former literal '2025' fallback would still say
+# 2025 on 2026-09-29, when current_season() and SQL get_current_season()
+# both flip to 2026 -- stats written under a season the app does not read.
+            season = int(_os.getenv("CITRUS_DEFAULT_SEASON")) if _os.getenv("CITRUS_DEFAULT_SEASON") else _current_season()
             try:
                 db.rpc("aggregate_player_playoff_stats_live", {"p_season": season})
                 logger.info(f"[PLAYOFFS] Aggregated playoff stats for season {season}")
