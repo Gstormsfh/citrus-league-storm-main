@@ -298,6 +298,100 @@ if (devHit)
       'NODE_ENV must be "production" for the vite build (forced in the spawn env in this script).'
   );
 
+// --- 9. The web cookie banner must not survive into a native binary --------
+// App Store 5.1.2(i), build 17 rejection (submission
+// d711fe8e-56c8-4b4e-837b-c744d19560b4, reviewed 2026-09-11): the app showed
+// a cookie consent prompt and never called App Tracking Transparency. Apple
+// offered two remedies and we take the second — we do not collect cookies for
+// tracking on Apple devices, so the prompt goes.
+//
+// `App.tsx` gates the mount on `import.meta.env.VITE_NATIVE !== '1'`, which
+// esbuild folds to a constant so Rollup drops the component entirely. This
+// asserts the drop actually happened: a banner that is merely hidden is still
+// a banner a reviewer can find, and a regression here costs another rejection
+// on an expedited review.
+//
+// The WEB build keeps its banner. It is a website, its cookies are real, and
+// EU visitors need it.
+if (blob.includes('We use analytics cookies'))
+  fail(
+    'the web cookie consent banner survived into the native build — the VITE_NATIVE\n' +
+      'gate in apps/web/src/App.tsx did not run.\n\n' +
+      'App Store guideline 5.1.2(i) rejected build 17 over exactly this prompt. A native\n' +
+      'build must not ship it.'
+  );
+
+// --- 10. No tracking frameworks may be linked into the iOS project ---------
+// We tell App Review the app cannot track: no AppTrackingTransparency, no
+// AdSupport, no NSUserTrackingUsageDescription, and therefore no access to the
+// IDFA. That claim is only as good as the next person's Xcode session, so it
+// is asserted mechanically rather than remembered.
+//
+// If a future feature genuinely needs ATT, this check is the right place to
+// learn that the Review Notes and the App Privacy labels both have to change
+// with it.
+const INFO_PLIST = join(WEB_DIR, 'ios', 'App', 'App', 'Info.plist');
+const TRACKING_SYMBOLS = ['AppTrackingTransparency', 'AdSupport', 'NSUserTrackingUsageDescription'];
+for (const [label, file] of [['Xcode project', PBXPROJ], ['Info.plist', INFO_PLIST]]) {
+  let contents = '';
+  try {
+    contents = readFileSync(file, 'utf8');
+  } catch {
+    fail(`cannot read the ${label} at ${file} to verify the no-tracking posture.`);
+  }
+  const linked = TRACKING_SYMBOLS.filter((sym) => contents.includes(sym));
+  if (linked.length > 0)
+    fail(
+      `tracking framework reference in the ${label}: ${linked.join(', ')}.\n\n` +
+        `  ${file}\n\n` +
+        'The App Review notes for build 18 state this app cannot track, and the App\n' +
+        'Privacy labels declare nothing under "Data Used to Track You". Linking any of\n' +
+        'the above contradicts both. If the link is deliberate, update the labels and\n' +
+        'the review notes first, then relax this check.'
+    );
+}
+
+// --- 11. Analytics ad-linkage stays off ------------------------------------
+// integrations/firebase/config.ts initialises analytics with both of Google's
+// ad-linkage switches off. They are what separates "first-party product
+// analytics" from "tracking" as Apple defines it, and flipping either one
+// silently would make build 18's Review Notes false.
+//
+// ASSERTED AT THE SOURCE, NOT IN THE BUNDLE, and that is deliberate. The
+// obvious check — "both flags must appear false in dist" — fails a perfectly
+// good build: when VITE_FIREBASE_API_KEY is unset, `app` folds to null,
+// Rollup proves `initAnalytics` unreachable and drops the whole call
+// including its config object. The bundle then contains no flags at all,
+// which is not a violation (there is no analytics to link) but would trip a
+// presence check. Measured 2026-09-11 on exactly that build.
+//
+// So the source is the thing asserted, since a regression here is an edit to
+// that file, and the bundle is checked only for the opposite: a flag that
+// made it through switched ON.
+const FIREBASE_CONFIG = join(WEB_DIR, 'src', 'integrations', 'firebase', 'config.ts');
+const AD_LINKAGE_FLAGS = ['allow_google_signals', 'allow_ad_personalization_signals'];
+
+let firebaseSource = '';
+try {
+  firebaseSource = readFileSync(FIREBASE_CONFIG, 'utf8');
+} catch {
+  fail(`cannot read ${FIREBASE_CONFIG} to verify the analytics ad-linkage flags.`);
+}
+
+for (const flag of AD_LINKAGE_FLAGS) {
+  if (!new RegExp(`${flag}\\s*:\\s*false`).test(firebaseSource))
+    fail(
+      `analytics ad-linkage flag "${flag}" is not set to false in\n` +
+        `  ${FIREBASE_CONFIG}\n\n` +
+        'With it on, the app links product analytics to Google advertising signals,\n' +
+        'which IS tracking under App Store 5.1.2(i). That would require App Tracking\n' +
+        'Transparency, new App Privacy labels, and different Review Notes.'
+    );
+  // esbuild writes `true` as `!0`, so both spellings are checked.
+  if (new RegExp(`${flag}\\s*:\\s*(!0|true)`).test(blob))
+    fail(`analytics ad-linkage flag "${flag}" is switched ON in the built bundle.`);
+}
+
 console.log(
   '\n✓ native bundle verified\n' +
     `    backend    : ${dbIsProd ? 'PRODUCTION' : 'NON-PRODUCTION'}\n` +
@@ -306,5 +400,7 @@ console.log(
     `    vite mode  : ${MODE}\n` +
     `    release    : ${SENTRY_RELEASE}\n` +
     '    ads        : stripped\n' +
-    '    sw         : none (VitePWA disabled for native)\n'
+    '    sw         : none (VitePWA disabled for native)\n' +
+    '    cookie UI  : stripped (5.1.2(i))\n' +
+    '    tracking   : no ATT, no AdSupport, ad-linkage off\n'
 );
