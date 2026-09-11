@@ -158,7 +158,24 @@ interface HockeyPlayerCardProps {
 }
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { generatePlayerWriteup } from "@/utils/playerWriteup";
+import { generatePlayerWriteup, type WriteupPlayer } from "@/utils/playerWriteup";
+
+/**
+ * THE CARD'S PROP TYPE STILL SATISFIES THE ENGINE'S (2026-09-11).
+ *
+ * `generatePlayerWriteup` used to take `HockeyPlayer` itself. It now takes
+ * `WriteupPlayer`, a structural type in `@citrus/shared` naming only the
+ * fields the engine reads, so the server can render the same object without
+ * a React component's prop type following it across the wire.
+ *
+ * Structural typing makes every call below compile whether or not the two
+ * shapes still line up in the ways that matter, so the relationship is
+ * asserted ONCE, here, at compile time and at zero runtime cost. Rename
+ * `HockeyPlayer.stats.savePct`, or narrow `status`, and this line fails
+ * instead of a writeup quietly losing a sentence in production.
+ */
+const _hockeyPlayerSatisfiesWriteupPlayer = (p: HockeyPlayer): WriteupPlayer => p;
+void _hockeyPlayerSatisfiesWriteupPlayer;
 
 // Position group accent — the single source of truth for "which slot is this."
 // Applied directly on the card (left spine + badge tint) so it's guaranteed

@@ -1,5 +1,6 @@
 import type { GameLogEntry } from './gameLogRows';
-import { ScoringCalculator, DEFAULT_SCORING, type ScoringSettings } from '@/utils/scoringUtils';
+import { ScoringCalculator } from '@/utils/scoringUtils';
+import { projectionSettings } from '@citrus/shared/leagueProjection';
 
 export function projectionStats(row: Record<string, unknown>): Record<string, number> {
   const fields: Record<string, string[]> = {
@@ -15,17 +16,14 @@ export function projectionStats(row: Record<string, unknown>): Record<string, nu
   }));
 }
 
-/** Missing categories in a configured league are disabled, never default-weighted. */
-export function projectionSettings(raw: unknown): ScoringSettings {
-  if (raw == null) return DEFAULT_SCORING;
-  const source = raw as Record<string, Record<string, unknown>>;
-  return Object.fromEntries(Object.entries(DEFAULT_SCORING).map(([group, defaults]) => [group,
-    Object.fromEntries(Object.keys(defaults).map(stat => {
-      const value = source[group]?.[stat];
-      return [stat, typeof value === 'number' && Number.isFinite(value) ? value : 0];
-    })),
-  ])) as unknown as ScoringSettings;
-}
+/**
+ * Missing categories in a configured league are disabled, never
+ * default-weighted. Moved to `@citrus/shared/leagueProjection` on
+ * 2026-09-11 so the server scores the writeup's projection sentence with
+ * the same normalisation the card displays; re-exported here so this
+ * module's callers keep their import.
+ */
+export { projectionSettings } from '@citrus/shared/leagueProjection';
 
 export function projectedSummary(rows: Record<string, unknown>[], scoring: unknown, goalie: boolean) {
   const stats: Record<string, number> = {};

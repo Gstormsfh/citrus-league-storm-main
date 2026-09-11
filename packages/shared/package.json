@@ -9,7 +9,10 @@
     ".": "./src/index.ts",
     "./types": "./src/types/index.ts",
     "./constants": "./src/constants/index.ts",
-    "./utils": "./src/utils/index.ts"
+    "./utils": "./src/utils/index.ts",
+    "./playerWriteup": "./src/playerWriteup/index.ts",
+    "./playerPercentiles": "./src/playerPercentiles/index.ts",
+    "./leagueProjection": "./src/leagueProjection/index.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

@@ -1,4 +1,5 @@
 import {
+  COHORT_NOUN,
   DISTRIBUTION_MIN_GP,
   buildMetricScale,
   percentileOnScale,
@@ -158,12 +159,13 @@ export function ordinal(n: number): string {
   return `${r}${suffix}`;
 }
 
-/** How the card names a cohort in prose. Canadian spelling, per STYLEGUIDE. */
-export const COHORT_NOUN: Record<PlayerCohort, string> = {
-  F: 'forwards',
-  D: 'defencemen',
-  G: 'goalies',
-};
+/**
+ * How the card names a cohort in prose. Canadian spelling, per STYLEGUIDE.
+ * Moved next to `playerCohort` on 2026-09-11 so the server-rendered writeup
+ * names a cohort with the same word this card does; re-exported here under
+ * the name this module has always exported.
+ */
+export { COHORT_NOUN } from '@/utils/playerPercentiles';
 
 // ── Metric definitions ──────────────────────────────────────────────
 
