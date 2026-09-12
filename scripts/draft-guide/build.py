@@ -7,6 +7,7 @@ from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 from layout import Guide,ROOT,ASSETS,INK,CREAM,ORANGE,MUTED,WHITE,RULE,pdfmetrics
 from scoring import calculate
+from display_notes import availability_note
 
 LABELS={'plus_minus':'Plus/minus','goals':'Goals','assists':'Assists','power_play_points':'Power-play points','short_handed_points':'Short-handed points','shots_on_goal':'Shots on goal','blocks':'Blocks','hits':'Hits','penalty_minutes':'Penalty minutes','wins':'Wins','saves':'Saves','shutouts':'Shutouts','goals_against':'Goals against'}
 def fmt(v,d=1):return '-' if v is None else f'{v:,.{d}f}'
@@ -47,7 +48,15 @@ class LeagueGuide(Guide):
  def card(self,p,y=541):
   assert p['name'] not in self.featured;pname=p['name'];self.featured.add(pname)
   self.rect(36,y,540,199,INK);self.rect(36,y,540,3,ORANGE)
-  self.overlays.append((self.number-1,'photo',self.photos[pname],(36,y+4,183,y+156)))
+  photo=self.photos[pname]
+  if isinstance(photo,int):self.overlays.append((self.number-1,'photo',photo,(36,y+4,183,y+156)))
+  elif isinstance(photo,str):self.photo(photo,36,y+4,147,152,cover=True)
+  else:
+   # Preserve the featured analysis without presenting an unrelated person or
+   # arena as this player's portrait. A replacement needs verified identity.
+   self.rect(36,y+4,147,152,'#294237')
+   self.text(''.join(w[0] for w in pname.split()[:2]),109,y+98,54,'Display',ORANGE,'center')
+   self.text(p['team']+' / '+p['position'],109,y+131,10,'Semi',CREAM,'center')
   self.rect(36,y+156,147,43,INK)
   self.text(pname.upper(),45,y+182,min(18,130/pdfmetrics.stringWidth(pname.upper(),'Display',1)),'Display',CREAM)
   self.text('PLAYER CALL-OUT / '+str(p['source']),198,y+22,8,'Bold',ORANGE)
@@ -140,7 +149,7 @@ class LeagueGuide(Guide):
    notes.append('Unknown availability is not a healthy designation. Forecast coverage and availability are separate. No extra absence multiplier is applied.')
    for p in self.result['players']:
     a=p.get('availability',{})
-    if p['team']==t['team'] and a.get('status','unknown')!='unknown':notes.append(f"{p['name']}: {a['status']} / {a.get('authority','unknown')} / as of {a.get('as_of') or 'unknown'}. {a.get('reason') or ''} Source: {a.get('source') or 'not supplied'}")
+    if p['team']==t['team'] and a.get('status','unknown')!='unknown':notes.append(availability_note(p))
   for start in range(0,len(roster),29):
    chunk=roster[start:start+29];self.heading(t['title'],'Team guide',str(t['intro']))
    rows=[[slot,p['name'],p.get('slotPosition',p['position']),('-' if p['rank'] is None else str(p['rank']))+(' G' if p['isGoalie'] else ''),fmt(p['games'],0),fmt(p['fantasyPoints']),p['source'] or '-',p['line'] or '-',p['powerPlay'] or '-'] for slot,p in chunk]
@@ -192,7 +201,7 @@ class LeagueGuide(Guide):
    ])
   self.notes('EDITION & PHOTOGRAPHY','Credits',[
    (f'Effective runtime input: {self.data["source"]["name"]}. Runtime rates and remaining exposure drive the tables. Parent source full-season exposure and editorial rookie commentary retain their separate source meaning.' if edition else f'Canonical input: {self.data["source"]["name"]}. All canonical players and teams are included. Rates and exposure come only from this revision; editorial rookie commentary retains its separate workbook source. Revision: {self.data["canonicalRevision"]}.' if self.data.get('canonicalRevision') else f'Authoritative source: {self.data["source"]["name"]}. This edition imports every Draft Board and Goalies row, all 32 team tabs, the rookie profiles and rookie commentary. Fantasy scores are regenerated using the selected settings and the workbook’s games-scaling formulas. Source SHA-256: {self.data["source"]["sha256"]}.'),
-   'Orange rows identify the single player featured directly below that table. Each original player photo is featured only once in the guide. All panel statistics and category bars are recalculated. Unhighlighted tables have no callout.',
+   'Orange rows identify the single player featured directly below that table. Featured panels use a player photograph or a branded monogram where the supplied image did not establish the player identity. All panel statistics and category bars are recalculated. Unhighlighted tables have no callout.',
    ('This is a local scoring export of the identified effective runtime snapshot. Its parent source revision is preserved; local export status is independent of runtime activation.' if edition else 'Canonical provenance is retained for every player. Unreviewed roles, unavailable forecasts and publication blockers remain explicit in the canonical source. This local review draft is not an activated production projection run.' if self.data.get('canonicalRevision') else 'The workbook contains MODEL, MANUAL and DEFAULT projections. DEFAULT marks a supplied rookie cohort prior, not an individual player forecast; its games already include cohort availability assumptions. Team assignments, player notes, rookie eligibility and source tiers are supplied editorial data, not newly verified facts. The original PDF and workbook disagree in coverage and some totals; this edition uses the workbook. Internal ADP/value columns are omitted because the workbook labels them INTERNAL.'),
    'Cover: Connor McDavid, Edmonton at Washington, 2 February 2022. Brian Murphy / All-Pro Reels. Source: https://commons.wikimedia.org/wiki/File:Connor_McDavid_of_the_Edmonton_Oilers.jpg',
    'Contents: Vegas at Seattle, 2024 Winter Classic. Jenn G / Jennthulhu Photos. Source: https://www.flickr.com/photos/jennthulhu_photog/53440834756/',

@@ -184,6 +184,12 @@ export function DraftKitPlayerCard({
       )}
 
       {/* Decomposition */}
+      {!locked && card.projectedFantasyPoints == null && (
+        <div className="mx-4 rounded-xl bg-white/[0.03] px-3 py-3 ring-1 ring-white/10">
+          <p className="text-sm font-bold text-pastel-cream">Projection unavailable</p>
+          <p className="mt-1 text-xs leading-relaxed text-white/60">A complete projection is not available for this player with the current scoring settings.</p>
+        </div>
+      )}
       {!locked && card.metrics.length > 0 && (
         <div className="px-4 pt-4">
           <h4 className="font-jbmono text-[10px] font-bold uppercase tracking-[0.22em] text-pastel-orange-soft">

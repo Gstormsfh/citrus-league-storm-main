@@ -102,6 +102,11 @@ describe('ordinal', () => {
 });
 
 describe('DraftKitPlayerCard', () => {
+  it('explains a missing projection rather than leaving the paid headline blank', () => {
+    render(<DraftKitPlayerCard card={{ ...SKATER, projectedFantasyPoints: null }} cohortSize={442} metricsSeason={2025} />);
+    expect(screen.getByText('Projection unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('Projected fantasy points')).not.toBeInTheDocument();
+  });
   it('states the cohort the percentiles were taken against', () => {
     render(<DraftKitPlayerCard card={SKATER} cohortSize={442} metricsSeason={2025} />);
     expect(screen.getByText(/Percentiles vs 442 forwards/i)).toBeInTheDocument();
