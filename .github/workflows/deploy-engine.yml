@@ -539,29 +539,20 @@ jobs:
           if [ "${OVERRIDE_DRAFT_FREEZE:-}" = "1" ]; then
             echo "::warning::OVERRIDE_DRAFT_FREEZE=1 — live-draft and freeze re-checks skipped."
           else
-            # A raw draft_status read, NOT draft_freeze_blockers, and that is
-            # deliberate: the RPC needs a pick (reason 2) or a just-passed
-            # scheduled time (reason 3) before it calls a draft live, so a room
-            # the commissioner opened by hand during the approval wait matches
-            # neither. This closes that one gap.
+            # One decider, in SQL. Until 2026-09-12 this step ALSO made a raw
+            # draft_status=eq.in_progress read, because draft_freeze_blockers
+            # needed a pick or a just-passed scheduled time before it called a
+            # draft live and so missed a room opened by hand. That raw read had
+            # no staleness bound, so a league stuck at in_progress blocked every
+            # deploy until someone edited the row.
             #
-            # It carries no staleness bound, so a draft stuck at in_progress
-            # blocks every deploy until someone edits the row -- three leagues
-            # sat that way from April 2026. That is why it now lives INSIDE the
-            # override with every other freeze rule: the escape hatch is a repo
-            # variable, not a hand-written production UPDATE at 2am. Before
-            # 2026-09-12 this check sat above the override and had none.
-            #
-            # The real fix is a fourth reason in draft_freeze_blockers
-            # (in_progress, no picks, recent pick_deadline) so a single SQL
-            # decider owns liveness instead of two that can disagree. That
-            # needs a migration and does not ship in draft season.
-            LIVE="$(curl -sS --fail-with-body --max-time 20 "${AUTH[@]}" \
-              "${SUPABASE_URL}/rest/v1/leagues?draft_status=eq.in_progress&select=id")"
-            if [ "$(jq 'length' <<<"$LIVE")" != "0" ]; then
-              echo "::error::A league moved to draft_status=in_progress while this run waited for approval: $(jq -r 'map(.id) | join(", ")' <<<"$LIVE"). Nothing was deployed."
-              exit 1
-            fi
+            # Migration 20260912031500 closed the gap properly: the RPC now
+            # unions both pick tables (reason 2 had been reading the legacy one,
+            # empty for every v2 draft) and carries a fourth reason for the
+            # hand-opened room, bounded by pick_deadline so a zombie ages out.
+            # The raw read is therefore redundant AND worse, and is gone. Two
+            # deciders that can disagree about whether a draft is live is the
+            # shape of the bug, not the fix.
             BLOCKERS="$(curl -sS --fail-with-body --max-time 20 "${AUTH[@]}" -X POST \
               -H "Content-Type: application/json" \
               -d '{"p_upcoming_hours":4,"p_live_hours":6}' \
