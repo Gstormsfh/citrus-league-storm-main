@@ -19,17 +19,18 @@ afterEach(() => { vi.useRealTimers(); });
 describe('player editorial refresh lifecycle', () => {
   it('refetches for changed news/settings revisions, but not stable contents', async () => {
     mocks.get.mockResolvedValue(history('First'));
-    const { result, rerender } = renderHook(({ revision }) => usePlayerXgHistory(1, { revision, leagueId: 'a league' }), { initialProps: { revision: JSON.stringify({ news: [], scoring: ['goals'] }) } });
+    const { result, rerender } = renderHook(({ revision }) => usePlayerXgHistory(1, { revision, leagueId: 'a league' }), { initialProps: { revision: JSON.stringify({ news: [], scoring: { goals: 8, assists: 1 } }) } });
     await waitFor(() => expect(result.current.writeup?.headline).toBe('First'));
-    rerender({ revision: JSON.stringify({ news: [], scoring: ['goals'] }) });
+    rerender({ revision: JSON.stringify({ news: [], scoring: { goals: 8, assists: 1 } }) });
     expect(mocks.get).toHaveBeenCalledTimes(1);
     expect(mocks.get).toHaveBeenCalledWith('/api/players/1/xg-history?leagueId=a%20league');
     mocks.get.mockResolvedValue(history('News update'));
-    rerender({ revision: JSON.stringify({ news: ['new'], scoring: ['goals'] }) });
+    rerender({ revision: JSON.stringify({ news: ['new'], scoring: { goals: 8, assists: 1 } }) });
     expect(result.current.writeup).toBeNull();
     await waitFor(() => expect(result.current.writeup?.headline).toBe('News update'));
     mocks.get.mockResolvedValue(history('Settings update'));
-    rerender({ revision: JSON.stringify({ news: ['new'], scoring: ['blocks'] }) });
+    rerender({ revision: JSON.stringify({ news: ['new'], scoring: { goals: 1, assists: 8 } }) });
+    expect(result.current.writeup).toBeNull();
     await waitFor(() => expect(result.current.writeup?.headline).toBe('Settings update'));
     expect(mocks.get).toHaveBeenCalledTimes(3);
   });
@@ -44,6 +45,21 @@ describe('player editorial refresh lifecycle', () => {
     await waitFor(() => expect(result.current.writeup?.headline).toBe('New player'));
     await act(async () => { old.resolve(history('Old player')); });
     expect(result.current.writeup?.headline).toBe('New player');
+  });
+
+  it('masks prior-league copy for the same open player and rejects its late response', async () => {
+    const old = deferred<ReturnType<typeof history>>();
+    mocks.get.mockReturnValueOnce(old.promise).mockResolvedValue(history('New league settings'));
+    const { result, rerender } = renderHook(({ leagueId }) => usePlayerXgHistory(1, { leagueId }), {
+      initialProps: { leagueId: 'goals-league' },
+    });
+    await waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(1));
+    rerender({ leagueId: 'assists-league' });
+    expect(result.current.writeup).toBeNull();
+    await waitFor(() => expect(result.current.writeup?.headline).toBe('New league settings'));
+    expect(mocks.get).toHaveBeenLastCalledWith('/api/players/1/xg-history?leagueId=assists-league');
+    await act(async () => { old.resolve(history('Old league settings')); });
+    expect(result.current.writeup?.headline).toBe('New league settings');
   });
 
   it('retains the server copy during same-context polling and clears on disable', async () => {

@@ -630,6 +630,7 @@ const fixtures: Fixture[] = [
 
 // Browser and server now both pass the enabled scoring categories to the shared policy.
 for (const f of fixtures) {
+  if (f.sources.scoring != null) f.extras.scoringWeights = {"goals": 7, "assists": 5, "power_play_points": 2, "short_handed_points": 0, "shots": 0.9, "blocks": 1, "hits": 0, "penalty_minutes": 0, "plus_minus": 0, "wins": 5, "shutouts": 5, "saves": 0.6, "goals_against": -3};
   if (f.sources.scoring != null) f.extras.scoringCategories = ['goals', 'assists', 'power_play_points', 'shots', 'blocks', 'wins', 'shutouts', 'saves', 'goals_against'];
 }
 

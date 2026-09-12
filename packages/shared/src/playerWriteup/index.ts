@@ -341,6 +341,8 @@ export function generatePlayerWriteup(player: WriteupPlayer | null | undefined, 
   });
   const enriched = applyWriteupExtras(base, player, extras);
   const news = editorialNewsText(player.name, evidence);
+  const profileSummary = (news.summary || canonical.summary) && enriched.summary.startsWith(`${player.name} `)
+    ? `He ${enriched.summary.slice(player.name.length + 1)}` : enriched.summary;
   const writeup: PlayerWriteup = {
     ...enriched,
     editorialVersion: CITRUS_EDITORIAL_VERSION,
@@ -349,7 +351,7 @@ export function generatePlayerWriteup(player: WriteupPlayer | null | undefined, 
     },
     ...(canonical.sources.length ? { canonicalSources: canonical.sources } : {}),
     newsSources: evidence,
-    summary: [news.summary, canonical.summary, enriched.summary].filter(Boolean).join(' '),
+    summary: [news.summary, canonical.summary, profileSummary].filter(Boolean).join(' '),
     analysis: [enriched.analysis, canonical.analysis].filter(Boolean).join(' '),
   };
 

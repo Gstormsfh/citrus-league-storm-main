@@ -46,7 +46,13 @@ try {
   const plain = generatePlayerWriteup(p, { now, projectionSeason: 2026 });
   const withNews = generatePlayerWriteup(p, { now, projectionSeason: 2026, newsItems: news });
   lines.push('## Counterfactual news (synthetic, not reporting)', '', 'This deliberately fictional fixture isolates the effect of one qualifying practice report. Its date and source remain separate from historical actuals.', '', '**Without news**', '', plain.analysis, '', '**With confirmed first-unit practice evidence**', '', withNews.summary, '', withNews.analysis, '', 'Production evidence selection also rejects wrong players, undated/future/stale stories, prompt instructions, conditional or retrospective claims, and superseded health reports. Those cases are behavioral tests, not claims about these six players.', '');
+  const settingsCounterfactual = [
+    { label: 'Goals weighted above assists', scoringWeights: { goals: 8, assists: 1, shots: 0 } },
+    { label: 'Assists weighted above goals', scoringWeights: { goals: 1, assists: 8, shots: 0 } },
+  ].map(setting => ({ ...setting, writeup: generatePlayerWriteup(fixtures[2], { projectionSeason: 2026, scoringWeights: setting.scoringWeights }) }));
+  lines.push('## Same player, different league weights', '', 'Synthetic league settings applied to the same historical Kucherov evidence; these are not projections or saved league settings.', '');
+  for (const setting of settingsCounterfactual) lines.push(`**${setting.label}**`, '', `Weights: ${JSON.stringify(setting.scoringWeights)}`, '', setting.writeup.analysis, '');
   writeFileSync(join(root, 'docs/editorial-evaluation/before-after.md'), lines.join('\n'));
-  writeFileSync(join(root, 'docs/editorial-evaluation/results.json'), JSON.stringify({ baselineRef, metrics, examples, counterfactual: { plain, withNews } }, null, 2) + '\n');
+  writeFileSync(join(root, 'docs/editorial-evaluation/results.json'), JSON.stringify({ baselineRef, metrics, examples, counterfactual: { plain, withNews }, settingsCounterfactual }, null, 2) + '\n');
   console.log(`Wrote ${examples.length} official-stat examples and one synthetic news counterfactual.`);
 } finally { rmSync(temp, { recursive: true, force: true }); }

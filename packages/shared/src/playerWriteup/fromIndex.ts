@@ -221,7 +221,7 @@ export function writeupExtrasFromSources(src: WriteupSources): WriteupExtras {
   const scoring = src.scoring ?? null;
   // Additive active-view context is hydrated by the canonical source owner.
   // The structural cast keeps this consumer compatible with older index types.
-  const canonicalContext = (src.entry as DashboardIndexEntry & { canonical_context?: EditorialCanonicalContext | null }).canonical_context;
+  const canonicalContext = src.entry.canonical_context;
   const projectionSeason = src.entry.projection_season ?? getProjectionsSeason(now);
 
   const goalsBySeason = (src.xgSeasons ?? [])

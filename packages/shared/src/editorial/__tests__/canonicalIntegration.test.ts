@@ -17,7 +17,7 @@ const canonical = {
 };
 
 const sources = (context?: unknown) => ({
-  entry: { ...base, ...(context ? { canonical_context: context } : {}) }, index: [base], now,
+  entry: { ...base, ...(context ? { canonical_context: context } : {}) } as DashboardIndexEntry, index: [base], now,
   scoring: { skater: { goals: 4, assists: 2 } },
 });
 
