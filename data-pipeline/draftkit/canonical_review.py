@@ -60,8 +60,8 @@ def validate(document):
                     raise ContractError(f'{pid}: counts differ from rate times exposure')
             if set(p['rates']) - set(p['counts']):
                 raise ContractError(f'{pid}: missing derived counts')
-        elif p['counts'] is not None:
-            raise ContractError(f'{pid}: unavailable forecasts must not carry counts')
+        elif p['counts'] is not None or used is not None:
+            raise ContractError(f'{pid}: unavailable forecasts must not carry exposure or counts')
         a = p['availability']
         for field in ['as_of', 'reason', 'return_window', 'review_after']:
             if a.get(field) is not None and not isinstance(a[field], str):
@@ -121,7 +121,7 @@ def rebuild(document):
     document['contract']['publication_ready'] = False
 
 
-PLAYER_FIELDS = {'rates', 'exposure', 'availability', 'role', 'status', 'rate_policy', 'exposure_policy'}
+PLAYER_FIELDS = {'rates', 'exposure', 'availability', 'role', 'status', 'rate_policy', 'exposure_policy', 'team', 'team_assignment'}
 TEAM_FIELDS = {'notes', 'lineup_slots', 'special_teams', 'snapshot_status'}
 NESTED_FIELDS = {
     'exposure': {'used', 'roster_probability', 'probability_semantics', 'kind'},
@@ -153,6 +153,12 @@ def apply_patch(document, patch, *, now=None):
                 raise ContractError(f'{identity}: unsupported or empty changes')
             record = records[identity]
             before = deepcopy(record)
+            if key == 'player_id' and ('team' in changes or 'team_assignment' in changes):
+                assignment = changes.get('team_assignment')
+                if not isinstance(assignment, dict) or assignment.get('reviewed') is not True or not isinstance(assignment.get('evidence'), str) or not assignment['evidence'].strip():
+                    raise ContractError('Team assignment requires explicit reviewed evidence')
+                if changes.get('team', record['team']) not in result['schedule']:
+                    raise ContractError('Reviewed team must exist in the season schedule')
             if key == 'team' and 'notes' in changes:
                 notes = changes['notes']
                 old = record['notes']

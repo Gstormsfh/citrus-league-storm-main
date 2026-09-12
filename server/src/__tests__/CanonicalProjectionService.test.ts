@@ -37,12 +37,12 @@ describe('published canonical context read', () => {
   it('rejects identity mismatch, duplicate IDs and mixed revisions', async () => {
     for (const rows of [[{ ...row, player_id: '2' }], [row, row], [{ ...row, revision: 'old' }]]) {
       const db = createMockSupabase({ canonical_published_runs: createChain({ data: run, error: null }), canonical_published_players: createChain({ data: rows, error: null }) });
-      expect((await new CanonicalProjectionService(db).getPublishedContexts(2026)).size).toBe(0);
+      await expect(new CanonicalProjectionService(db).getPublishedContexts(2026)).rejects.toThrow();
     }
   });
   it('does not return previous context when the published view fails', async () => {
     const db = createMockSupabase({ canonical_published_runs: createChain({ data: null, error: { message: 'not deployed' } }) });
-    expect((await new CanonicalProjectionService(db).getPublishedContexts(2026)).size).toBe(0);
+    await expect(new CanonicalProjectionService(db).getPublishedContexts(2026)).rejects.toEqual({ message: 'not deployed' });
   });
   it('pages beyond the API row clamp and pins every page to the same run', async () => {
     const rows = Array.from({ length: 1001 }, (_, id) => ({ ...row, player_id: String(id), payload: { ...row.payload, player_id: String(id) } }));
@@ -57,7 +57,7 @@ describe('published canonical context read', () => {
     const runChain = createChain();
     runChain.maybeSingle.mockResolvedValueOnce({ data: run, error: null }).mockResolvedValueOnce({ data: { ...run, revision: 'rev2' }, error: null });
     const db = createMockSupabase({ canonical_published_runs: runChain, canonical_published_players: createChain({ data: [row], error: null }) });
-    expect((await new CanonicalProjectionService(db).getPublishedContexts(2026)).size).toBe(0);
+    await expect(new CanonicalProjectionService(db).getPublishedContexts(2026)).rejects.toThrow('changed during read');
   });
 
   it('updates context over a cached dashboard without altering historical actuals', async () => {
@@ -83,7 +83,10 @@ describe('published canonical context read', () => {
     expect(first.proj_goals).toBe(10);
     expect(second.proj_goals).toBe(20);
     expect(second.eligible_positions).toEqual(['C', 'LW']);
-    expect(db.from.mock.calls.filter(([table]: [string]) => table === 'player_directory')).toHaveLength(2);
+    active = { ...active, last_refresh_at: '2026-09-13T00:00:00Z' as any };
+    const refreshed = (await service.getDashboardIndex()).players[0];
+    expect(refreshed.canonical_context?.refresh.at).toBe('2026-09-13T00:00:00Z');
+    expect(db.from.mock.calls.filter(([table]: [string]) => table === 'player_directory')).toHaveLength(3);
   });
 
   it('withholds legacy forecast counts beside published context while preserving actuals', async () => {
@@ -102,6 +105,20 @@ describe('published canonical context read', () => {
     expect(player.projection_season).toBeNull();
     expect(player.goals).toBe(2);
     expect(player.gp).toBe(7);
+  });
+
+  it('keeps actuals but never falls back to legacy forecasts on unknown publication', async () => {
+    clearDashboardIndexCache();
+    const db = createMockSupabase({
+      canonical_published_runs: createChain({ data: null, error: { message: 'Offline' } }),
+      player_directory: createChain({ data: [{ player_id: 1, full_name: 'Fixture', position_code: 'C', team_abbrev: 'NYR' }], error: null }),
+      player_season_stats: createChain({ data: [{ player_id: 1, games_played: 7, nhl_goals: 2 }], error: null }),
+      player_ros_projections: createChain({ data: [{ player_id: 1, projected_goals: 999 }], error: null }),
+    });
+    const result = await new PlayerDashboardService(db).getDashboardIndex();
+    expect(result.players[0].goals).toBe(2);
+    expect(result.players[0].proj_goals).toBeNull();
+    expect(result.players[0].canonical_context).toBeNull();
   });
 
 });

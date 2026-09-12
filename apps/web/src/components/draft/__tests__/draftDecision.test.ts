@@ -9,6 +9,18 @@
  */
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_SCORING, ScoringCalculator, type ScoringSettings } from '@citrus/shared';
+import { rankDraftCandidates } from '../draftDecision';
+
+describe('shared draft board and autopick order', () => {
+  it('uses available projections before historical points, including zero and negative forecasts', () => {
+    const players = [{id: 'old', actual: 100}, {id: 'negative', actual: 20}, {id: 'zero', actual: 0}];
+    const projections = new Map([
+      ['negative', {total: -3, perGp: -1, gamesRemaining: 3}],
+      ['zero', {total: 0, perGp: 0, gamesRemaining: 3}],
+    ]);
+    expect(rankDraftCandidates(players, projections, p => p.actual).map(p => p.id)).toEqual(['zero', 'negative', 'old']);
+  });
+});
 import type { DashboardIndexEntry } from '@/hooks/usePlayerDashboardIndex';
 import { leagueDashboardProjection, usesFantasyPoints } from '@/components/player/leagueDashboardProjection';
 import {
@@ -177,12 +189,8 @@ describe('projectionFor — a skater', () => {
     expect(projectionFor(null, DEFAULT_SCORER, null)).toBeNull();
   });
 
-  it('treats a missing projected category as absent, not as an error', () => {
-    // A null column contributes nothing and the rest of the projection still
-    // renders. Returning null for the whole player would hide six good
-    // numbers because one is missing.
-    const p = projectionFor(entry({ proj_hits: null, proj_blocks: null }), DEFAULT_SCORER, null)!;
-    expect(p.total).toBeGreaterThan(0);
+  it('withholds a projection when an enabled category is missing', () => {
+    expect(projectionFor(entry({ proj_hits: null, proj_blocks: null }), DEFAULT_SCORER, null)).toBeNull();
   });
 });
 

@@ -28,7 +28,7 @@ Patch format:
 }
 ```
 
-Player IDs, team identities, source records, imported workbook inputs, exposure units and baseline are immutable. `rates` replaces the full rate map; `exposure`, `availability` and `role` merge only whitelisted fields. Notes belong to `role.notes`. Changing rates establishes a manual rate override, preserving the prior record in history; changing exposure establishes a season exposure override. A note or availability change never scales counts. Roster probability stays explicit metadata and never multiplies exposure again.
+Player IDs, source records, imported workbook inputs, exposure units and baseline are immutable. Changing a team (or accepting its disagreement with the live directory) requires an explicit `team_assignment: {reviewed: true, evidence: "dated source reference"}` in the same player patch; the new team must exist in the schedule and all lineup identities must still reconcile. `rates` replaces the full rate map; `exposure`, `availability` and `role` merge only whitelisted fields. Notes belong to `role.notes`. Changing rates establishes a manual rate override, preserving the prior record in history; changing exposure establishes a season exposure override. A note or availability change never scales counts. Roster probability stays explicit metadata and never multiplies exposure again.
 
 Team notes retain the original ordered note objects, including coordinates and source references; only their `text` may change. Appended notes require `authority: "manual_review"`. The patch carries dated evidence separately. Reviewers must not label an assumed camp lineup or imported injury scenario as verified without supporting evidence.
 

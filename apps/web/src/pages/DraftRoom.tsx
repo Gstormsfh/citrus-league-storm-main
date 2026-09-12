@@ -1,3 +1,7 @@
+import { projectionSettings } from '@citrus/shared';
+import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
+import { usePlayerDashboardIndex } from '@/hooks/usePlayerDashboardIndex';
+import { buildDraftProjectionMap } from '@/components/draft/draftDecision';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
 import { DEFAULT_PICK_TIME_LIMIT_SECONDS } from '@citrus/shared';
@@ -222,7 +226,9 @@ const DraftRoomInner = () => {
   const [availablePlayers, setAvailablePlayers] = useState<Player[]>([]);
   const [draftedPlayerIds, setDraftedPlayerIds] = useState<Set<string>>(new Set());
   // Map of player_id → { projectedFpts, projectedFptsPerGp, gamesRemaining }
-  const [projectedFptsMap, setProjectedFptsMap] = useState<Map<string, { total: number; perGp: number; gamesRemaining: number }>>(new Map());
+  const leagueScoringContext = useLeagueScoringContext(leagueId, league);
+  const { players: canonicalDashboard } = usePlayerDashboardIndex();
+  const projectedFptsMap = useMemo(() => leagueScoringContext.ready ? buildDraftProjectionMap(canonicalDashboard, projectionSettings(leagueScoringContext.scoring)) : new Map(), [canonicalDashboard, leagueScoringContext.scoring, leagueScoringContext.ready]);
   
   const [draftPhase, setDraftPhase] = useState<DraftPhase>(() => {
     // Restore previous phase from sessionStorage on mount so users who refresh
@@ -850,61 +856,7 @@ const DraftRoomInner = () => {
         logger.debug('DraftRoom: Unknown draft status, defaulting to LOBBY');
       }
 
-      // Load available players + ROS projections in parallel
-      const [allPlayers, rosProjectionsRes] = await Promise.all([
-        PlayerService.getAllPlayers(),
-        // BOARD COVERAGE (2026-09-11): was 500. The server orders by
-        // total_projected_points, which is baked with DEFAULT scoring, and we
-        // rescore below under this league's settings -- so a row missing from
-        // this fetch has no projection on the board, whatever the league
-        // scores. The table is 1,428 rows and the best rookie ranks 672nd, so
-        // 500 hid all 320 of them. Ask for the whole board.
-        playerApi.getRosProjections(1500).catch(() => ({ data: [] }))
-      ]);
-      setAvailablePlayers(allPlayers);
-
-      // Build projected FPTS lookup map (keyed by string player_id).
-      // Recalculate using LEAGUE scoring settings instead of the pre-baked
-      // default-scoring totals stored in the DB.
-      const projScorer = new ScoringCalculator(leagueData?.scoring_settings as unknown as ScoringSettings | undefined);
-      const projMap = new Map<string, { total: number; perGp: number; gamesRemaining: number }>();
-      interface RosRow {
-        player_id: number; is_goalie?: boolean; games_remaining: number;
-        projected_goals?: number; projected_assists?: number; projected_sog?: number;
-        projected_blocks?: number; projected_ppp?: number; projected_shp?: number;
-        projected_hits?: number; projected_pim?: number;
-        projected_wins_ros?: number; projected_saves_ros?: number; projected_shutouts_ros?: number;
-        projected_ga_ros?: number;
-        total_projected_points?: number; avg_points_per_game?: number;
-      }
-      const rosData = (rosProjectionsRes as { data?: RosRow[] }).data;
-      if (Array.isArray(rosData)) {
-        rosData.forEach((p) => {
-          const gr = p.games_remaining || 0;
-          let total: number;
-          if (p.is_goalie) {
-            // INDUSTRY-STANDARD SCORING (2026-09-01): goals against was
-            // hard-coded to 0 here, so the board overstated every goalie by
-            // |GA weight| × projected GA — under GA -3 that is ~480 pts on a
-            // 55-start starter, i.e. goalies above elite wingers.
-            total = projScorer.calculatePoints(
-              { wins: p.projected_wins_ros || 0, saves: p.projected_saves_ros || 0, shutouts: p.projected_shutouts_ros || 0, goals_against: p.projected_ga_ros || 0 },
-              true
-            );
-          } else {
-            total = projScorer.calculatePoints(
-              { goals: p.projected_goals || 0, assists: p.projected_assists || 0, shots: p.projected_sog || 0, blocks: p.projected_blocks || 0, hits: p.projected_hits || 0, pim: p.projected_pim || 0, ppp: p.projected_ppp || 0, shp: p.projected_shp || 0 },
-              false
-            );
-          }
-          projMap.set(String(p.player_id), {
-            total,
-            perGp: gr > 0 ? total / gr : 0,
-            gamesRemaining: gr,
-          });
-        });
-      }
-      setProjectedFptsMap(projMap);
+      setAvailablePlayers(await PlayerService.getAllPlayers());
 
       logger.debug('DraftRoom: All data loaded successfully', {
         draftPhase,
@@ -2498,6 +2450,7 @@ const DraftRoomInner = () => {
   };
 
   const handleAutoDraft = async () => {
+    if (!leagueScoringContext.ready) return;
     try {
       if (!leagueId || !draftState || !currentTeam) {
         logger.error('handleAutoDraft: Missing required data');
@@ -2574,10 +2527,12 @@ const DraftRoomInner = () => {
       }
     }
 
+    if (!leagueScoringContext.ready) return;
+
     // Strategy 2: Fantasy points + positional need (applies to ALL teams, not just AI)
     if (!selectedPlayer) {
       // Calculate fantasy points for each undrafted player
-      const scorer = new ScoringCalculator(league?.scoring_settings as unknown as ScoringSettings | undefined);
+      const scorer = new ScoringCalculator(projectionSettings(leagueScoringContext.scoring));
       const calcFpts = (p: Player): number => {
         const isGoalie = p.position === 'G';
         return scorer.calculatePoints(
@@ -2674,7 +2629,12 @@ const DraftRoomInner = () => {
         return { player: p, fpts, score };
       });
 
-      scored.sort((a, b) => b.score - a.score);
+      scored.sort((a, b) => {
+        const ap = projectedFptsMap.get(a.player.id)?.total;
+        const bp = projectedFptsMap.get(b.player.id)?.total;
+        if (ap != null || bp != null) return ap == null ? 1 : bp == null ? -1 : bp - ap;
+        return b.score - a.score;
+      });
       if (scored.length > 0) {
         selectedPlayer = scored[0].player;
         logger.log('handleAutoDraft: Picking by FPTS + positional need', {
@@ -3611,13 +3571,8 @@ const DraftRoomInner = () => {
         teamAbbreviation: player.team,
         status: player.status === 'injured' ? 'IR' : null,
         image: player.headshot_url || undefined,
-        projectedPoints: player.games_played > 0
-          ? new ScoringCalculator().calculatePointsPerGame({
-              goals: player.goals || 0, assists: player.assists || 0, shots: player.shots || 0,
-              blocks: player.blocks || 0, hits: player.hits || 0, pim: player.pim || 0,
-              ppp: player.ppp || 0, shp: player.shp || 0
-            }, false, player.games_played)
-          : 0
+        projectedPoints: projectedFptsMap.get(String(player.id))?.perGp
+
       };
 
       setSelectedPlayerForStats(hockeyPlayer);
@@ -3625,7 +3580,7 @@ const DraftRoomInner = () => {
     } catch (error) {
       logger.error('Error loading player stats:', error);
     }
-  }, [playersById]);
+  }, [playersById, projectedFptsMap]);
 
   // Handle saving/viewing draft snapshot
   const handleViewDraftSnapshot = async () => {
@@ -4356,7 +4311,8 @@ const DraftRoomInner = () => {
                         onToggleWatchlist={handleToggleWatchlist}
                         queue={draftQueue}
                         watchlist={watchlist}
-                        scoringSettings={league?.scoring_settings as unknown as ScoringSettings | undefined}
+                        scoringSettings={projectionSettings(leagueScoringContext.scoring)}
+                        scoringReady={leagueScoringContext.ready}
                         projectedFptsMap={projectedFptsMap}
                       />
                     </TabsContent>

@@ -1,3 +1,4 @@
+import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { seasonProjectionSummary, scoreGameLog } from '@/components/player/projectionScoring';
 import { hasUnprojectedPlusMinus, leagueDashboardProjection, usesFantasyPoints } from '@/components/player/leagueDashboardProjection';
@@ -209,11 +210,10 @@ function seasonWindow(season: number): { start: string; end: string } {
 }
 
 const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId, isOnRoster = false, onPlayerDropped, action }: PlayerStatsModalProps) => {
-  const { activeLeagueId } = useLeague();
+  const { activeLeagueId, activeLeague, userLeagueState } = useLeague();
   const leagueId = suppliedLeagueId ?? activeLeagueId ?? undefined;
-  const [leagueScoring, setLeagueScoring] = useState<unknown>(null);
-  const [scoringReady, setScoringReady] = useState(!leagueId);
-  const [pointsFormat, setPointsFormat] = useState(true);
+  const { scoring: leagueScoring, ready: scoringReady, league: scoringLeague } = useLeagueScoringContext(leagueId, activeLeague, isOpen, userLeagueState === 'guest');
+  const pointsFormat = usesFantasyPoints(scoringLeague ? getLeagueFormat(scoringLeague as import('@/services/LeagueService').League).scoringFormat : undefined);
   const [playerRos, setPlayerRos] = useState<Record<string, unknown> | null>(null);
   const rosRequestVersion = useRef(0);
   const [showProjectionBreakdown, setShowProjectionBreakdown] = useState(false);
@@ -222,18 +222,10 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
   useEffect(() => {
     let cancelled = false;
     setShowProjectionBreakdown(false);
-    setScoringReady(!leagueId);
-    setLeagueScoring(null);
     setPlayerRos(null);
-    if (!isOpen) return;
+    if (!isOpen || !scoringReady) return;
     void (async () => {
       try {
-        const result = leagueId ? await LeagueService.getLeague(leagueId) : null;
-        if (result?.error || (leagueId && !result?.league)) throw new Error('League scoring unavailable');
-        if (cancelled) return;
-        setLeagueScoring(result?.league?.scoring_settings ?? null);
-        setPointsFormat(usesFantasyPoints(result?.league ? getLeagueFormat(result.league).scoringFormat : undefined));
-        setScoringReady(true);
         if (projectionPlayerId) {
           const requestVersion = ++rosRequestVersion.current;
           const response = await playerApi.getRosProjectionForPlayer(Number(projectionPlayerId));
@@ -243,7 +235,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
       } catch (error) { logger.error('[PlayerStatsModal] League projection scoring unavailable:', error); }
     })();
     return () => { cancelled = true; };
-  }, [leagueId, isOpen, projectionPlayerId, projectionGoalie]);
+  }, [leagueId, isOpen, projectionPlayerId, projectionGoalie, scoringReady]);
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();

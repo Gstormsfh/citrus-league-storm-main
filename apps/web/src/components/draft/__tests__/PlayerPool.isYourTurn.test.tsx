@@ -67,6 +67,7 @@ describe('PlayerPool — isYourTurn inline Draft button gate (DR-3.1 F8 fix)', (
   it('renders an inline Draft button on every non-drafted row when isYourTurn=true', () => {
     render(
       <PlayerPool
+      scoringReady={true}
         onPlayerSelect={vi.fn()}
         onPlayerDraft={vi.fn()}
         selectedPlayer={null}
@@ -92,6 +93,7 @@ describe('PlayerPool — isYourTurn inline Draft button gate (DR-3.1 F8 fix)', (
   it('off the turn with nothing selected: every phone row shows a dimmed, inert Draft; the desktop table shows none', () => {
     render(
       <PlayerPool
+      scoringReady={true}
         onPlayerSelect={vi.fn()}
         onPlayerDraft={vi.fn()}
         selectedPlayer={null}
@@ -114,6 +116,7 @@ describe('PlayerPool — isYourTurn inline Draft button gate (DR-3.1 F8 fix)', (
     const selected = POOL[1];
     render(
       <PlayerPool
+      scoringReady={true}
         onPlayerSelect={vi.fn()}
         onPlayerDraft={vi.fn()}
         selectedPlayer={selected}
@@ -131,6 +134,7 @@ describe('PlayerPool — isYourTurn inline Draft button gate (DR-3.1 F8 fix)', (
   it('with the draft not active nothing is live, on either layout', () => {
     render(
       <PlayerPool
+      scoringReady={true}
         onPlayerSelect={vi.fn()}
         onPlayerDraft={vi.fn()}
         selectedPlayer={null}
@@ -148,6 +152,7 @@ describe('PlayerPool — isYourTurn inline Draft button gate (DR-3.1 F8 fix)', (
   it('disables inline Draft buttons and shows "Submitting…" when isSubmitPending=true', () => {
     render(
       <PlayerPool
+      scoringReady={true}
         onPlayerSelect={vi.fn()}
         onPlayerDraft={vi.fn()}
         selectedPlayer={null}
@@ -171,6 +176,7 @@ describe('PlayerPool — isYourTurn inline Draft button gate (DR-3.1 F8 fix)', (
   it('does NOT render Draft button on drafted rows even when isYourTurn=true', () => {
     render(
       <PlayerPool
+      scoringReady={true}
         onPlayerSelect={vi.fn()}
         onPlayerDraft={vi.fn()}
         selectedPlayer={null}

@@ -67,7 +67,7 @@ describe('computeTodaySummary — the numbers', () => {
     expect(s.emptySlots).toBe(0);
   });
 
-  it('treats a missing or non-finite projection as zero rather than NaN', () => {
+  it('withholds a partial total when any starter projection is missing or non-finite', () => {
     const s = computeTodaySummary({
       starters: [
         mk('1', { projectedPoints: undefined, nextGame: { opponent: 'x', isToday: true } }),
@@ -77,7 +77,7 @@ describe('computeTodaySummary — the numbers', () => {
       bench: [],
       starterSlots: 3,
     });
-    expect(s.projected).toBeCloseTo(2.5, 5);
+    expect(s.projected).toBeNull();
   });
 
   it('counts locked players across starters, bench and IR, and only those on the roster', () => {
@@ -144,4 +144,10 @@ describe('computeTodaySummary — when the strip turns amber', () => {
       needsAttention: false,
     });
   });
+  it('retains real zero and negative totals but gates unloaded scoring', () => {
+    const input = { starters: [plays('1', 0), plays('2', -2)], bench: [], starterSlots: 2 };
+    expect(computeTodaySummary(input).projected).toBe(-2);
+    expect(computeTodaySummary({ ...input, projectionsReady: false }).projected).toBeNull();
+  });
+
 });

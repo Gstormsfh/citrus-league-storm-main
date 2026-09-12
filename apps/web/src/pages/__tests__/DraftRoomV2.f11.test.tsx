@@ -1,3 +1,4 @@
+vi.mock('@/hooks/useLeagueScoringContext', () => ({ useLeagueScoringContext: () => ({ scoring: null, ready: true }) }));
 // DR-4 (2026-07-30) — F11 fix (layer 2 DISAMBIGUATE) integration test.
 //
 // The submitPick.ts error taxonomy translates the server's

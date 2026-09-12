@@ -34,7 +34,7 @@ beforeEach(() => {
   mocks.schedule.mockResolvedValue({ games: [scheduled()], error: null });
   mocks.log.mockResolvedValue(payload(20));
   mocks.ros.mockResolvedValue({ data: [{ games_remaining: 40, projected_goals: 2 }] });
-  mocks.league.mockResolvedValue({ league: { scoring_settings: { skater: { goals: 10 } } } });
+  mocks.league.mockResolvedValue({ league: { id: mocks.leagueId, scoring_settings: { skater: { goals: 10 } } } });
   mocks.format.mockReturnValue({ scoringFormat: 'h2h-points' });
 });
 
@@ -43,7 +43,7 @@ describe('player-card projection availability and request recovery', () => {
     const { rerender, player } = openCard();
     await waitFor(() => expect(screen.getByRole('button', { name: 'PROJECTION breakdown' })).toHaveTextContent('20'));
     mocks.leagueId = 'second-league';
-    mocks.league.mockResolvedValue({ league: { scoring_settings: { skater: { goals: 1 } } } });
+    mocks.league.mockResolvedValue({ league: { id: mocks.leagueId, scoring_settings: { skater: { goals: 1 } } } });
     rerender(<MemoryRouter><PlayerStatsModal player={player} isOpen onClose={() => {}} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByRole('button', { name: 'PROJECTION breakdown' })).toHaveTextContent(/^2$/));
     expect(mocks.log).toHaveBeenCalledTimes(1);
@@ -150,7 +150,7 @@ describe('player-card projection availability and request recovery', () => {
     expect(await screen.findByRole('button', { name: 'PROJECTION breakdown' })).toHaveTextContent('0');
   });
   it('discloses the missing plus/minus projection when that category is scored', async () => {
-    mocks.league.mockResolvedValue({ league: { scoring_settings: { skater: { goals: 1, plus_minus: 1 } } } });
+    mocks.league.mockResolvedValue({ league: { id: mocks.leagueId, scoring_settings: { skater: { goals: 1, plus_minus: 1 } } } });
     openCard();
     fireEvent.click(await screen.findByRole('button', { name: 'PROJECTION breakdown' }));
     expect(screen.getByText('Plus/minus isn’t projected; this total excludes it.')).toBeTruthy();

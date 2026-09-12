@@ -1,3 +1,4 @@
+import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 import { actualsSeasonLabel, actualsCohortLabel } from '@citrus/shared';
 import { summarizeWeeklyProjection, weeklyPointsLabel, weeklyProjectionOrder, weeklyExposureLabel, freeAgentMatchupWeek } from '@/components/freeagents/weeklyProjection';
 import { userMessage } from '@/lib/userMessage';
@@ -52,7 +53,6 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { GameLogosBar } from '@/components/matchup/GameLogosBar';
 import { logger } from '@/utils/logger';
 import { notifyRosterChanged } from '@/utils/rosterRefresh';
-import { ScoringCalculator } from '@/utils/scoringUtils';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { DropPlayerForAddDialog } from '@/components/freeagents/DropPlayerForAddDialog';
 import { FreeAgentRowPressBox } from '@/components/freeagents/FreeAgentRowPressBox';
@@ -221,13 +221,10 @@ const FreeAgents = () => {
   const [availableMode, setAvailableMode] = useState<PlayersAvailableMode>('proj');
   const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
 
-  // SETTINGS-ENFORCEMENT (2026-08-16) — league scoring for FPTS
-  // display. Undefined → DEFAULT_SCORING inside ScoringCalculator, so
-  // default leagues render identical numbers (pinned by scoringUtils
-  // equivalence test).
-  const [leagueScoring, setLeagueScoring] = useState<import('@citrus/shared').ScoringSettings | undefined>(undefined);
-  const [scoringReady, setScoringReady] = useState(false);
-  const scoringLeagueRef = useRef<string | null>(null);
+  // Forecasts require loaded league settings; only explicit previews use defaults.
+  const { scoring: leagueScoring, ready: scoringReady } = useLeagueScoringContext(
+    isGuestMode(userLeagueState) ? null : activeLeagueId ?? leagueId, activeLeague, !isChangingLeague, isGuestMode(userLeagueState),
+  );
 
   // Waiver process time from league settings (for toast messages)
   const [waiverProcessTime, setWaiverProcessTime] = useState<string | null>(null);
@@ -407,9 +404,6 @@ const FreeAgents = () => {
 
       // DEMO MODE: For guests, show all players as free agents (no league filtering)
       if (isGuestMode(userLeagueState)) {
-        setLeagueScoring(undefined);
-        setScoringReady(true);
-        scoringLeagueRef.current = null;
         try {
           const allPlayers = await PlayerService.getAllPlayers();
           if (requestVersion !== poolRequestVersion.current) return;
@@ -460,9 +454,6 @@ const FreeAgents = () => {
       
       if (requestVersion !== poolRequestVersion.current) return;
       setLeagueId(currentLeagueId || null);
-      scoringLeagueRef.current = currentLeagueId || null;
-      setLeagueScoring(undefined);
-      setScoringReady(!currentLeagueId);
 
       // Fetch waiver settings for this league (for dynamic toast messages)
       if (currentLeagueId && user) {
@@ -470,17 +461,7 @@ const FreeAgents = () => {
         WaiverService.getLeagueWaiverSettings(currentLeagueId, user.id)
           .then(settings => { if (requestVersion === poolRequestVersion.current && settings) setWaiverProcessTime(settings.waiver_process_time); })
           .catch(() => { /* non-critical */ });
-        // League scoring for FPTS columns — one fetch, display-only.
-        supabase
-          .from('leagues')
-          .select('scoring_settings')
-          .eq('id', currentLeagueId)
-          .single()
-          .then(({ data, error }) => {
-            if (requestVersion !== poolRequestVersion.current || scoringLeagueRef.current !== currentLeagueId || error || !data) return;
-            setLeagueScoring(data.scoring_settings as unknown as import('@citrus/shared').ScoringSettings ?? undefined);
-            setScoringReady(true);
-          });
+
       }
 
       // Get all players from our pipeline tables (player_directory + player_season_stats)
@@ -1379,7 +1360,6 @@ const FreeAgents = () => {
 
   // Raw weekly counts are scored with this league's weights. A conditional
   // goalie row is weighted once by its explicit expected-start probability.
-  const projectionScorer = useMemo(() => new ScoringCalculator(leagueScoring), [leagueScoring]);
   const weeklySummaries = useMemo(() => {
     const goalieIds = new Set(players.filter(p => p.position === 'G').map(p => Number(p.id)));
     const schedules = new Map(scheduleMaximizers.map(p => [Number(p.id), p]));
@@ -1414,13 +1394,7 @@ const FreeAgents = () => {
       const scheduleData = scheduleById.get(p.id);
       const gamesThisWeek = scheduleData?.gamesThisWeek ?? weeklyRawProjections.get(numericId)?.length ?? 0;
       const isGoalie = p.position === 'G';
-      const estimatedFantasyPPG = !isGoalie && p.games_played > 0
-        ? projectionScorer.calculatePointsPerGame({
-            goals: p.goals || 0, assists: p.assists || 0, ppp: p.ppp || 0, shp: p.shp || 0,
-            sog: p.shots || 0, blocks: p.blocks || 0, hits: p.hits || 0, pim: p.pim || 0,
-          }, false, p.games_played)
-        : null;
-      const weeklyProjection = !scoringReady || !scheduleData ? null : scheduleData?.gamesThisWeek === 0 ? 0 : summary?.points ?? (isGoalie ? null : estimatedFantasyPPG == null ? null : estimatedFantasyPPG * gamesThisWeek);
+      const weeklyProjection = !scoringReady || !scheduleData ? null : scheduleData.gamesThisWeek === 0 ? 0 : summary?.points ?? null;
       const expectedStarts = isGoalie ? (scheduleData?.gamesThisWeek === 0 ? 0 : summary?.expectedStarts ?? null) : null;
 
       return {
@@ -1432,7 +1406,7 @@ const FreeAgents = () => {
         games: scheduleData?.games || [],
       };
     },
-    [projectionScorer, weeklySummaries, weeklyRawProjections, scheduleById, scoringReady],
+    [weeklySummaries, weeklyRawProjections, scheduleById, scoringReady],
   );
 
   /**

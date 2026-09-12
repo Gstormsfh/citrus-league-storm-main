@@ -1,3 +1,4 @@
+import { ScoringCalculator, projectionSettings } from '@citrus/shared';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -466,10 +467,10 @@ describe('StormyService', () => {
       expect(Impl.gsaxToken(undefined)).toBe('');
     });
 
-    it('rosToken mirrors the free-agent list shape', () => {
+    it('rosToken withholds stored default totals without components', () => {
       expect(
-        Impl.rosToken({ player_id: 1, player_name: 'x', position: 'C', team_abbrev: 'NJD', total_projected_points: 412.49, avg_points_per_game: 5.1, games_remaining: 61 }),
-      ).toBe(' ROS:412.5pts 61GR');
+        Impl.rosToken({ player_id: 1, player_name: 'x', position: 'C', team_abbrev: 'NJD', total_projected_points: 412.49, avg_points_per_game: 5.1, games_remaining: 61 }, new ScoringCalculator(projectionSettings(null))),
+      ).toBe('');
       expect(Impl.rosToken(undefined)).toBe('');
     });
 
@@ -515,7 +516,7 @@ describe('StormyService', () => {
       });
       mockLeagueApi.getLeague.mockResolvedValue({
         data: {
-          draft_status: 'completed', updated_at: '2024-10-01T00:00:00Z',
+          draft_status: 'completed', updated_at: '2024-10-01T00:00:00Z', scoring_settings: null,
           roster_slots: { C: 2, G: 1 }, league_size: 2, roster_size: 3,
         },
       });
@@ -569,7 +570,7 @@ describe('StormyService', () => {
       const ctx = await fetchLeagueContext('L1', 'auth-user-1');
 
       expect(ctx.rosterSummary).toContain(
-        'START C Marchetti (NJD) 62GP 30G 40A 70PTS 1.1PPG 20PPP 210SOG 15HIT 20BLK 12PIM xG:21.4 G-xG:+8.6 TOI/GP:18.4 xG/60:1.42[Elite] 3GP/wk[Mon,Wed,Sat] wkProj:8.4 ROS:412.5pts 61GR',
+        'START C Marchetti (NJD) 62GP 30G 40A 70PTS 1.1PPG 20PPP 210SOG 15HIT 20BLK 12PIM xG:21.4 G-xG:+8.6 TOI/GP:18.4 xG/60:1.42[Elite] 3GP/wk[Mon,Wed,Sat] wkProj:8.4',
       );
       expect(ctx.rosterSummary).toContain(
         'START G Brannigan (NJD) 41GP 20W 1100SV 98GA 2SO 0.912SV% GSAx:-4.8[primary shots:1204 xGA:92.4 GA:98] 3GP/wk[Mon,Wed,Sat] wkProj:4.2',
@@ -607,7 +608,7 @@ describe('StormyService', () => {
     it('keeps the free-agent list, so a roster ROS can be read against a free agent ROS', async () => {
       const ctx = await fetchLeagueContext('L1', 'auth-user-1');
 
-      expect(ctx.extra).toContain('Top Available Free Agents:\nG Reyes (SEA) ROS:168.4pts 3.2PPG 52GR');
+      expect(ctx.extra).toContain('Top Available Free Agents:\nG Reyes (SEA) ROS:unavailablepts 52GR');
       expect(ctx.extra).not.toContain('Marchetti');
       expect(ctx.extra).toContain('Roster slots: C:2 G:1 (3 total)');
     });

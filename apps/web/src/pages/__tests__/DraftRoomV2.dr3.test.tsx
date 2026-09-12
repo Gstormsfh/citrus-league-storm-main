@@ -1,3 +1,4 @@
+vi.mock('@/hooks/useLeagueScoringContext', () => ({ useLeagueScoringContext: () => ({ scoring: null, ready: true }) }));
 // DR-3 (2026-07-29) — invariant I5 tests: per-event fold re-renders
 // stay scoped. Two things asserted:
 //

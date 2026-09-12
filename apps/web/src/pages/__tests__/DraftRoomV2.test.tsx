@@ -1,3 +1,4 @@
+vi.mock('@/hooks/useLeagueScoringContext', () => ({ useLeagueScoringContext: () => ({ scoring: null, ready: true }) }));
 // Phase 4.5 chunk 11g.5b — DraftRoomV2 integration test.
 // DR-1b (2026-07-28) — extended for the derived-state cards + gap-
 // triggered resync + matrix-fetch wiring.

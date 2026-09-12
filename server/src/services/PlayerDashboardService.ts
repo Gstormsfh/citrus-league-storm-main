@@ -773,29 +773,35 @@ export class PlayerDashboardService {
    * curated directory, ~1–2k rows, and cached).
    */
   async getDashboardIndex(): Promise<{ players: DashboardIndexEntry[]; error: Error | null }> {
-    const canonical = new CanonicalProjectionService(this.supabase);
-    let lastIndex: { players: DashboardIndexEntry[]; error: Error | null } = { players: [], error: null };
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const contexts = await canonical.getPublishedContexts(getProjectionsSeason());
-      const first = contexts.values().next().value;
-      const revisionKey = first ? `${first.run_id}:${first.revision}` : '';
-      if (indexRevisionKey !== revisionKey) {
-        clearDashboardIndexCache();
-        indexRevisionKey = revisionKey;
+    try {
+      const canonical = new CanonicalProjectionService(this.supabase);
+      let lastIndex: { players: DashboardIndexEntry[]; error: Error | null } = { players: [], error: null };
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const contexts = await canonical.getPublishedContexts(getProjectionsSeason());
+        const first = contexts.values().next().value;
+        const revisionKey = first ? `${first.run_id}:${first.revision}:${first.refresh.at ?? first.activated_at}` : '';
+        if (indexRevisionKey !== revisionKey) {
+          clearDashboardIndexCache();
+          indexRevisionKey = revisionKey;
+        }
+        const index = await this.getBaseDashboardIndex(Boolean(revisionKey));
+        lastIndex = index;
+        const after = await canonical.getPublishedContexts(getProjectionsSeason());
+        const published = after.values().next().value;
+        if ((published ? `${published.run_id}:${published.revision}:${published.refresh.at ?? published.activated_at}` : '') !== revisionKey) continue;
+        return { ...index, players: index.players.map(player => {
+          const context = contexts.get(String(player.id)) ?? null;
+          const matches = context && context.status === 'projected' && player.projection_run_id === context.run_id && player.projection_revision === context.revision;
+          return { ...(revisionKey && !matches ? withoutForecast(player) : player), canonical_context: context };
+        }) };
       }
-      const index = await this.getBaseDashboardIndex(Boolean(revisionKey));
-      lastIndex = index;
-      const after = await canonical.getPublishedContexts(getProjectionsSeason());
-      const published = after.values().next().value;
-      if ((published ? `${published.run_id}:${published.revision}` : '') !== revisionKey) continue;
-      return { ...index, players: index.players.map(player => {
-        const context = contexts.get(String(player.id)) ?? null;
-        const matches = context && context.status === 'projected' && player.projection_run_id === context.run_id && player.projection_revision === context.revision;
-        return { ...(revisionKey && !matches ? withoutForecast(player) : player), canonical_context: context };
-      }) };
+      // Activation raced both reads. Actuals stay visible; forecasts wait for a stable revision.
+      return { ...lastIndex, players: lastIndex.players.map(player => ({ ...withoutForecast(player), canonical_context: null })) };
+    } catch (error) {
+      logger.warn('[PlayerDashboardService] Canonical publication unknown; forecasts withheld', error);
+      const index = await this.getBaseDashboardIndex(false);
+      return { ...index, players: index.players.map(player => ({ ...withoutForecast(player), canonical_context: null })) };
     }
-    // Activation raced both reads. Actuals stay visible; forecasts wait for a stable revision.
-    return { ...lastIndex, players: lastIndex.players.map(player => ({ ...withoutForecast(player), canonical_context: null })) };
   }
 
   private async getBaseDashboardIndex(canonicalPublished: boolean): Promise<{ players: DashboardIndexEntry[]; error: Error | null }> {

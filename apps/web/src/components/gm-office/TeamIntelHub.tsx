@@ -9,7 +9,7 @@ import { WaiverService, WaiverPriority } from '@/services/WaiverService';
 import { Loader2, Calendar, RefreshCw, TrendingUp, AlertCircle, Clock, Shield, Zap, ArrowRight, Users, Trophy } from 'lucide-react';
 import { usePlayerNews, PlayerNewsItem } from '@/hooks/usePlayerNews';
 import { calculateWeekDates, fetchGamesForTeams, calculatePlayerSchedule, getGamesPerDay, getRosterGamesPerDay, calculateScheduleMaximizers, PlayerWithSchedule } from '@/utils/scheduleMaximizer';
-import { getUpcomingSeasonStartDate } from '@citrus/shared';
+import { getUpcomingSeasonStartDate, ScoringCalculator, projectionSettings } from '@citrus/shared';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
@@ -212,7 +212,10 @@ export const TeamIntelHub = () => {
 
         // Get real weekly projections for roster players
         const playerIds = players.map(p => Number(p.id));
-        const weeklyProjections = await getWeeklyProjections(playerIds, start, end);
+        const { data: scoringLeague } = await leagueApi.getLeague(activeLeagueId) as { data?: { scoring_settings?: unknown } };
+        if (!scoringLeague || !('scoring_settings' in scoringLeague)) throw new Error('League scoring unavailable');
+        const weeklyProjections = await getWeeklyProjections(playerIds, start, end,
+          new ScoringCalculator(projectionSettings(scoringLeague.scoring_settings)));
         
         // Get league average projections for comparison
         const leagueAvgs = await getLeagueAverageProjections(activeLeagueId, start, end);

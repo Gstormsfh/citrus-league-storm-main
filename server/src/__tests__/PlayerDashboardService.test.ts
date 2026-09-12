@@ -155,7 +155,7 @@ function mockTables(supabase: any, overrides: Record<string, { data: unknown; er
     if (table === 'player_talent_metrics') return createChain({ data: TALENT, error: null });
     if (table === 'player_ros_projections') return createChain({ data: ROS, error: null });
     if (table === 'goalie_gsax_primary') return createChain({ data: INDEX_GSAX, error: null });
-    return createChain({ data: [], error: null });
+    return createChain({ data: table === 'canonical_published_runs' ? null : [], error: null });
   });
 }
 
@@ -351,7 +351,7 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
       if (table === 'player_talent_metrics') return createChain({ data: TALENT, error: null });
       if (table === 'player_ros_projections') return createChain({ data: ROS, error: null });
       if (table === 'goalie_gsax_primary') return createChain({ data: INDEX_GSAX, error: null });
-      return createChain({ data: [], error: null });
+      return createChain({ data: table === 'canonical_published_runs' ? null : [], error: null });
     });
 
     // Fifty callers arrive while the first fan-out is still outstanding.
@@ -418,7 +418,7 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
       if (table === 'player_gar_components') return createChain({ data: GAR, error: null });
       if (table === 'player_talent_metrics') return createChain({ data: TALENT, error: null });
       if (table === 'player_ros_projections') return createChain({ data: ROS, error: null });
-      return createChain({ data: [], error: null });
+      return createChain({ data: table === 'canonical_published_runs' ? null : [], error: null });
     });
 
     const { players, error } = await service.getDashboardIndex();
@@ -619,7 +619,7 @@ function userClient(overrides: Record<string, { data: unknown; error: unknown }>
         error: { message: 'permission denied for table nhl_shots' },
       });
     }
-    return createChain({ data: [], error: null });
+    return createChain({ data: table === 'canonical_published_runs' ? null : [], error: null });
   });
   return mock;
 }
@@ -985,7 +985,7 @@ describe('PlayerDashboardService.getXgHistory', () => {
     const mock = createMockSupabase();
     mock.from = vi.fn((table: string) => {
       if (table === 'player_xg_season') return createChain({ data: error ? null : rows, error });
-      return createChain({ data: [], error: null });
+      return createChain({ data: table === 'canonical_published_runs' ? null : [], error: null });
     });
     return mock;
   }

@@ -1,3 +1,4 @@
+import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 import { expectedDailyProjection } from '@citrus/shared';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
@@ -1828,6 +1829,7 @@ const Roster = () => {
     const rangeEnd = inMatchupWeek ? matchupWeekEnd : targetDate;
 
     let cancelled = false;
+    setScheduleByTeam(new Map());
     const fetchSchedule = async () => {
       try {
         const { gamesByTeam } = await ScheduleService.getGamesForTeams(
@@ -1858,7 +1860,7 @@ const Roster = () => {
   // PROJECTION DATA = SOURCE OF TRUTH for "has game" detection
   // If a projection exists for a player on a date, they have a game that day
   // =============================================================================
-  const leagueScoring = (activeLeague as { scoring_settings?: unknown } | null)?.scoring_settings;
+  const { scoring: leagueScoring, ready: scoringReady } = useLeagueScoringContext(activeLeagueId ?? userTeam?.league_id, activeLeague, !isChangingLeague && !leagueLoading, userLeagueState === 'guest');
   const displayRoster = useMemo(() => {
     const targetDate = selectedDate || getTodayMST();
     const todayStr = getTodayMST();
@@ -1879,7 +1881,7 @@ const Roster = () => {
       // forecast for a scheduled player is unavailable, not a known zero.
       const rawProjection = dateProjections?.get(playerId);
       const isGoalie = player.position === 'G' || player.position === 'Goalie';
-      const projection = expectedDailyProjection(rawProjection, leagueScoring, isGoalie);
+      const projection = scoringReady ? expectedDailyProjection(rawProjection, leagueScoring, isGoalie) : null;
 
       // Enrich with actual game stats and game status
       const actualStat = dateActualStats?.get(playerId);
@@ -2007,23 +2009,25 @@ const Roster = () => {
       ir: roster.ir.map(enrichPlayer),
       slotAssignments: roster.slotAssignments
     };
-  }, [roster, projectionsByDate, dailyStatsByDateMap, scheduleByTeam, selectedDate, profile?.timezone, leagueScoring]);
+  }, [roster, projectionsByDate, dailyStatsByDateMap, scheduleByTeam, selectedDate, profile?.timezone, leagueScoring, scoringReady]);
 
   /** Daily lineup planning requires loaded, interpretable forecasts.
    * A scheduled player with missing or unknown exposure cannot be assigned
    * a made-up zero, and a conditional goalie row is not a guaranteed start. */
   const projectionsReadyForSelectedDate = useMemo(
     () => {
+      if (!scoringReady) return false;
       const rows = projectionsByDate.get(selectedDate || getTodayMST());
       if (!rows) return false;
       return [...roster.starters, ...roster.bench].every(player => {
         const row = rows.get(Number(player.id));
+        if (!scheduleByTeam.has((player.teamAbbreviation || '').toUpperCase())) return false;
         const scheduled = gameOnDate(scheduleByTeam.get((player.teamAbbreviation || '').toUpperCase()), selectedDate || getTodayMST());
         if (!row) return !scheduled;
         return expectedDailyProjection(row, leagueScoring, player.position === 'G' || player.position === 'Goalie') != null;
       });
     },
-    [projectionsByDate, selectedDate, roster.starters, roster.bench, leagueScoring, scheduleByTeam],
+    [projectionsByDate, selectedDate, roster.starters, roster.bench, leagueScoring, scheduleByTeam, scoringReady],
   );
 
   // ===========================================================================
@@ -2053,11 +2057,12 @@ const Roster = () => {
         bench: displayRoster.bench,
         ir: displayRoster.ir,
         starterSlots: starterSlotCount,
+        projectionsReady: projectionsReadyForSelectedDate,
         // A past date locks the whole roster and already wears a Read Only
         // badge — "13 locked" on top of that is noise, not information.
         lockedPlayerIds: isPastDate ? undefined : lockedPlayerIds,
       }),
-    [displayRoster, starterSlotCount, lockedPlayerIds, isPastDate],
+    [displayRoster, starterSlotCount, lockedPlayerIds, isPastDate, projectionsReadyForSelectedDate],
   );
 
   const stripDayLabel = useMemo(() => dayLabelFor(selectedDate || getTodayMST()), [selectedDate]);
@@ -2133,7 +2138,7 @@ const Roster = () => {
   );
 
   const rosterWeek = useRosterWeek({
-    enabled: pressBoxOn,
+    enabled: pressBoxOn && scoringReady,
     players: weekPlayers,
     weekStart: currentMatchup?.week_start_date,
     weekEnd: currentMatchup?.week_end_date,
@@ -2191,7 +2196,7 @@ const Roster = () => {
     };
   }, [pressBoxOn, currentMatchup, opponentTeamId]);
   const opponentWeek = useRosterWeek({
-    enabled: pressBoxOn && opponentStarters.length > 0,
+    enabled: pressBoxOn && scoringReady && opponentStarters.length > 0,
     players: opponentStarters,
     weekStart: currentMatchup?.week_start_date,
     weekEnd: currentMatchup?.week_end_date,
@@ -2628,6 +2633,7 @@ const Roster = () => {
   const enrichForDate = (p: HockeyPlayer, date: string, projections: Map<number, ProjectionRowLite> | undefined): HockeyPlayer => {
     const pid = typeof p.id === 'string' ? parseInt(p.id) : p.id;
     const rawProjection = projections?.get(pid);
+    if (!scoringReady) throw new Error('League scoring unavailable');
     const projection = expectedDailyProjection(rawProjection, leagueScoring, p.position === 'G' || p.position === 'Goalie');
     if (rawProjection && !projection) throw new Error('Expected projection unavailable for lineup planning');
     if (!projection) {

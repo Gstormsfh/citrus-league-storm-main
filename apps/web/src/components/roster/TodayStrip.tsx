@@ -95,7 +95,7 @@ export interface TodayStripProps {
   className?: string;
 }
 
-const fmt = (n: number) => (Number.isFinite(n) ? n.toFixed(1) : '0.0');
+const fmt = (n: number | null) => (n != null && Number.isFinite(n) ? n.toFixed(1) : 'Unavailable');
 
 const NUM = 'font-jbmono text-[12px] font-bold tabular-nums';
 const DOT = <span className="text-white/25" aria-hidden="true">· </span>;

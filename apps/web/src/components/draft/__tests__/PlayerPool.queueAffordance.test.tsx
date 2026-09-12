@@ -77,6 +77,7 @@ type Props = React.ComponentProps<typeof PlayerPool>;
 function renderPool(over: Partial<Props> = {}) {
   return render(
     <PlayerPool
+      scoringReady={true}
       onPlayerSelect={vi.fn()}
       onPlayerDraft={vi.fn()}
       selectedPlayer={null}

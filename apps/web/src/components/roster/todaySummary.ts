@@ -10,7 +10,7 @@ import type { HockeyPlayer } from './HockeyPlayerCard';
  * answers it with one row of arithmetic over data the rows already render.
  *
  * Pure: the page's `displayRoster` has already decided who has a game today
- * (`nextGame.isToday`, set only when a projection row exists for the date)
+ * (`nextGame.isToday`, from the selected-date schedule)
  * and what each starter is worth (`projectedPoints`). This module only adds
  * them up, so it can be tested without a render and cannot disagree with
  * the rows beneath it.
@@ -25,6 +25,8 @@ export interface TodaySummaryInput {
   ir?: HockeyPlayer[];
   /** Total starter slots in this league's lineup (UTIL included). */
   starterSlots: number;
+  /** False until league scoring and scheduled forecast coverage are available. */
+  projectionsReady?: boolean;
   /** Players whose games have started. Omit to skip the locked count. */
   lockedPlayerIds?: Set<string>;
 }
@@ -41,7 +43,7 @@ export interface TodaySummary {
   /** Bench players with a game — points sitting on the bench. */
   benchPlaying: number;
   /** Σ starters' projected points for the date. */
-  projected: number;
+  projected: number | null;
   /** Rostered players whose games have started. */
   locked: number;
   /**
@@ -63,13 +65,16 @@ export function computeTodaySummary({
   ir = [],
   starterSlots,
   lockedPlayerIds,
+  projectionsReady = true,
 }: TodaySummaryInput): TodaySummary {
   const slots = Math.max(0, Math.floor(Number(starterSlots) || 0));
   const startersPlaying = starters.filter(playsToday).length;
   const idleStarters = starters.length - startersPlaying;
   const emptySlots = Math.max(0, slots - starters.length);
   const benchPlaying = bench.filter(playsToday).length;
-  const projected = starters.reduce((sum, p) => sum + (Number(p.projectedPoints) || 0), 0);
+  const projected = projectionsReady && starters.every(p => typeof p.projectedPoints === 'number' && Number.isFinite(p.projectedPoints))
+    ? starters.reduce((sum, p) => sum + p.projectedPoints!, 0)
+    : null;
   const locked = lockedPlayerIds
     ? [...starters, ...bench, ...ir].filter((p) => lockedPlayerIds.has(String(p.id))).length
     : 0;

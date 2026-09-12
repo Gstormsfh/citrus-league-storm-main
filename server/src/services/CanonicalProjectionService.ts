@@ -51,7 +51,7 @@ export class CanonicalProjectionService {
       }]));
     } catch (error) {
       logger.warn('[CanonicalProjectionService] Published context unavailable', error);
-      return new Map();
+      throw error;
     }
   }
 
