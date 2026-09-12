@@ -1,3 +1,4 @@
+import { useMatchupRouteLifetime } from '@/hooks/useMatchupRouteLifetime';
 import { expectedDailyProjection } from '@citrus/shared';
 import { expectedMatchupProjections } from '@/utils/matchupExpectedProjections';
 import { userMessage } from '@/lib/userMessage';
@@ -235,6 +236,7 @@ const Matchup = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSwitchingDate, setIsSwitchingDate] = useState(false);
   const loadingRef = useRef(false); // Prevent concurrent loads
+  const loadLifetimeRef = useMatchupRouteLifetime(loadingRef);
   const previousRosterRef = useRef<{ myTeam: MatchupPlayer[]; oppTeam: MatchupPlayer[] } | null>(null);
   // WEEK PROJECTIONS (2026-09-01): per-DATE in-flight guard. The old single
   // boolean meant that when the week's seven dates are requested together
@@ -3408,6 +3410,17 @@ const Matchup = () => {
     };
 
     const loadMatchupData = async () => {
+      const lifetime = loadLifetimeRef.current;
+      // A route remount invalidates this continuation before it can issue a
+      // later mutation, redirect or state update. Already-issued work may finish.
+      const assertCurrentRoute = () => {
+        if (!lifetime.active) throw new Error('Matchup route was left');
+      };
+      const awaitCurrentRoute = async <T,>(work: Promise<T>): Promise<T> => {
+        const result = await work;
+        assertCurrentRoute();
+        return result;
+      };
       // CRITICAL: Prevent concurrent loads AND infinite loops
       if (loadingRef.current) {
         log(' Load already in progress, skipping duplicate call...');
@@ -3435,12 +3448,14 @@ const Matchup = () => {
       
       // Set up timeout to ensure loading completes within 15 seconds (more aggressive)
       let timeoutId: NodeJS.Timeout | null = null;
+      let matchupTimeoutId: NodeJS.Timeout | null = null;
       timeoutId = setTimeout(() => {
         logger.error('[MATCHUP] Load timeout after 15s - FORCING STOP');
         setError('Loading took too long. Please refresh the page or try again later.');
         setLoading(false);
         loadingRef.current = false; // Force release lock
       }, 15000);
+      lifetime.timers.add(timeoutId);
       
       try {
         setLoading(true);
@@ -3473,7 +3488,7 @@ const Matchup = () => {
           
           // Fetch user's leagues if not already cached
           if (!cachedUserLeagues) {
-            const { leagues: userLeagues, error: leaguesError } = await LeagueService.getUserLeagues(user.id);
+            const { leagues: userLeagues, error: leaguesError } = await awaitCurrentRoute(LeagueService.getUserLeagues(user.id));
             cachedUserLeagues = userLeagues || [];
             
             if (leaguesError) {
@@ -3523,7 +3538,7 @@ const Matchup = () => {
           log(' Reusing cached user leagues from validation');
         } else {
           // Fetch leagues if not already cached
-          const result = await LeagueService.getUserLeagues(user.id);
+          const result = await awaitCurrentRoute(LeagueService.getUserLeagues(user.id));
           userLeagues = result.leagues || [];
           leagueError = result.error;
         }
@@ -3574,7 +3589,7 @@ const Matchup = () => {
 
         log(' Getting user team for league:', currentLeague.id);
         // Get user's team — request started above, alongside the leagues read.
-        const { team: userTeamData } = await userTeamPromise;
+        const { team: userTeamData } = await awaitCurrentRoute(userTeamPromise);
         if (!userTeamData) {
           logger.error('[MATCHUP] User team not found');
           setError('You do not have a team in this league');
@@ -3671,11 +3686,11 @@ const Matchup = () => {
           weekNumberType: typeof weekToShow
         });
         
-        const { matchup: existingMatchup } = await MatchupService.getUserMatchup(
+        const { matchup: existingMatchup } = await awaitCurrentRoute(MatchupService.getUserMatchup(
           currentLeague.id,
           user.id,
           weekToShow
-        );
+        ));
         
         // Set user's matchup ID for "(Your Matchup)" label
         if (existingMatchup) {
@@ -3697,13 +3712,13 @@ const Matchup = () => {
           // No matchup found for this week - generate all missing weeks
           log(' No matchup found for week', weekToShow, '- generating matchups...');
           if (!cachedLeagueTeams) {
-            const { teams } = await LeagueService.getLeagueTeams(currentLeague.id);
+            const { teams } = await awaitCurrentRoute(LeagueService.getLeagueTeams(currentLeague.id));
             cachedLeagueTeams = teams;
           }
           const leagueTeams = cachedLeagueTeams;
 
           // Check if ANY matchups exist for this league (via API)
-          const anyMatchupsRes = await matchupApi.getLeagueMatchups(currentLeague.id);
+          const anyMatchupsRes = await awaitCurrentRoute(matchupApi.getLeagueMatchups(currentLeague.id));
           const anyMatchups = (anyMatchupsRes?.data || []) as any[];
           const hasAnyMatchups = anyMatchups.length > 0;
 
@@ -3722,12 +3737,12 @@ const Matchup = () => {
             requestedWeekType: typeof weekToShow
           });
           
-          const { error: genError } = await MatchupService.generateMatchupsForLeague(
+          const { error: genError } = await awaitCurrentRoute(MatchupService.generateMatchupsForLeague(
             currentLeague.id, 
             leagueTeams, 
             firstWeek,
             forceRegenerate
-          );
+          ));
           
           if (genError) {
             const isDuplicateKey = genError.message?.includes('duplicate key');
@@ -3736,12 +3751,12 @@ const Matchup = () => {
               // Force regenerate to ensure all current teams are included.
               log(' Duplicate key during generation, force regenerating with current teams...');
 
-              const { error: regenError } = await MatchupService.generateMatchupsForLeague(
+              const { error: regenError } = await awaitCurrentRoute(MatchupService.generateMatchupsForLeague(
                 currentLeague.id,
                 leagueTeams,
                 firstWeek,
                 true // Force regenerate - deletes and recreates all matchups
-              );
+              ));
 
               if (regenError) {
                 logger.error('[Matchup] Error during forced regeneration:', regenError);
@@ -3761,25 +3776,26 @@ const Matchup = () => {
           
           // Read back what generation produced. Retries rather than sleeps —
           // see utils/readUntilPresent.
-          const weekMatchupsRes = await readUntilPresent(
+          const weekMatchupsRes = await awaitCurrentRoute(readUntilPresent(
             async () => {
+              assertCurrentRoute();
               matchupApi.invalidate(`matchups:league:${currentLeague.id}`);
               return matchupApi.getLeagueMatchups(currentLeague.id, weekToShow);
             },
             (res) => ((res?.data as unknown[]) || []).length > 0,
-          );
+          ));
           const allMatchups = (weekMatchupsRes?.data || []) as any[];
           log(' Debug - All matchups for week', weekToShow, ':', allMatchups);
 
           // Also check ALL weeks via API
-          const allWeeksRes = await matchupApi.getLeagueMatchups(currentLeague.id);
+          const allWeeksRes = await awaitCurrentRoute(matchupApi.getLeagueMatchups(currentLeague.id));
           const allWeeksMatchups = allWeeksRes?.data || [];
           const uniqueWeeks = new Set((allWeeksMatchups as any[])?.map((m: any) => m.week_number) || []);
           log(' Debug - All week numbers in database:', Array.from(uniqueWeeks).sort((a, b) => a - b));
           log(' Debug - Requested week', weekToShow, 'exists in database?', uniqueWeeks.has(weekToShow));
 
           // Also check user's team via API
-          const teamsRes = await leagueApi.getTeams(currentLeague.id);
+          const teamsRes = await awaitCurrentRoute(leagueApi.getTeams(currentLeague.id));
           const allTeamsData = (teamsRes?.data || []) as any[];
           const userTeamData = allTeamsData.find((t: any) => t.owner_id === user.id) || null;
           
@@ -3801,11 +3817,11 @@ const Matchup = () => {
           }
           
           // Verify the matchup was created
-          const { matchup: verifyMatchup } = await MatchupService.getUserMatchup(
+          const { matchup: verifyMatchup } = await awaitCurrentRoute(MatchupService.getUserMatchup(
             currentLeague.id,
             user.id,
             weekToShow
-          );
+          ));
           
           if (!verifyMatchup) {
             logger.error('[Matchup] Matchup still not found after generation for week', weekToShow);
@@ -3823,11 +3839,11 @@ const Matchup = () => {
                 logger.error('[Matchup] FORCING FULL REGENERATION of all matchups...');
                 
                 // Force delete ALL matchups and regenerate
-                await MatchupService.deleteAllMatchupsForLeague(currentLeague.id);
+                await awaitCurrentRoute(MatchupService.deleteAllMatchupsForLeague(currentLeague.id));
                 
                 // Get all teams again to ensure we have the complete list
                 if (!cachedLeagueTeams) {
-                  const { teams } = await LeagueService.getLeagueTeams(currentLeague.id);
+                  const { teams } = await awaitCurrentRoute(LeagueService.getLeagueTeams(currentLeague.id));
                   cachedLeagueTeams = teams;
                 }
                 const allLeagueTeams = cachedLeagueTeams;
@@ -3842,12 +3858,12 @@ const Matchup = () => {
                 }
                 
                 log(' Regenerating ALL matchups with complete team list...');
-                const { error: regenError } = await MatchupService.generateMatchupsForLeague(
+                const { error: regenError } = await awaitCurrentRoute(MatchupService.generateMatchupsForLeague(
                   currentLeague.id,
                   allLeagueTeams,
                   firstWeek,
                   true // Force regenerate
-                );
+                ));
                 
                 if (regenError) {
                   logger.error('[Matchup] Error during forced regeneration:', regenError);
@@ -3857,10 +3873,13 @@ const Matchup = () => {
                 }
                 
                 // Verify again — retrying rather than sleeping.
-                const { matchup: finalMatchup } = await readUntilPresent(
-                  () => MatchupService.getUserMatchup(currentLeague.id, user.id, weekToShow),
+                const { matchup: finalMatchup } = await awaitCurrentRoute(readUntilPresent(
+                  () => {
+                    assertCurrentRoute();
+                    return MatchupService.getUserMatchup(currentLeague.id, user.id, weekToShow);
+                  },
                   (res) => Boolean(res?.matchup),
-                );
+                ));
                 
                 if (!finalMatchup) {
                   logger.error('[Matchup] Still no matchup after forced regeneration!');
@@ -3888,11 +3907,11 @@ const Matchup = () => {
             
             // If we got here after forced regeneration, the matchup should exist now
             // Re-fetch it to continue with normal flow
-            const { matchup: regeneratedMatchup } = await MatchupService.getUserMatchup(
+            const { matchup: regeneratedMatchup } = await awaitCurrentRoute(MatchupService.getUserMatchup(
               currentLeague.id,
               user.id,
               weekToShow
-            );
+            ));
             
             if (!regeneratedMatchup) {
               logger.error('[Matchup] Matchup still not found after forced regeneration!');
@@ -3920,8 +3939,9 @@ const Matchup = () => {
         const matchupIdForEnsure = selectedMatchupId || existingMatchup?.id;
         if (matchupIdForEnsure && currentLeague?.id !== DEMO_LEAGUE_ID_FOR_GUESTS) {
           try {
-            await matchupApi.ensureRosters(matchupIdForEnsure);
+            await awaitCurrentRoute(matchupApi.ensureRosters(matchupIdForEnsure));
           } catch (err) {
+            if (!lifetime.active) return;
             // Non-fatal — roster data may already exist
             logger.error('[Matchup] ensure-rosters pre-load failed:', err);
           }
@@ -3965,15 +3985,16 @@ const Matchup = () => {
         // specific "matchup data" failure. The specific error must be the one
         // that surfaces.
         const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) => {
-          setTimeout(() => {
+          matchupTimeoutId = setTimeout(() => {
             resolve({ data: null, error: new Error('getMatchupData timed out after 12 seconds') });
           }, 12000);
+          lifetime.timers.add(matchupTimeoutId);
         });
         
-        const { data: matchupData, error: matchupError } = await Promise.race([
+        const { data: matchupData, error: matchupError } = await awaitCurrentRoute(Promise.race([
           matchupDataPromise,
           timeoutPromise
-        ]);
+        ]));
 
         if (matchupError) {
           logger.error('[MATCHUP] Error getting matchup data:', matchupError);
@@ -4152,7 +4173,7 @@ const Matchup = () => {
         // Get opponent team object for display
         if (matchupData.opponentTeam) {
           if (!cachedLeagueTeams) {
-            const { teams } = await LeagueService.getLeagueTeams(targetLeagueId);
+            const { teams } = await awaitCurrentRoute(LeagueService.getLeagueTeams(targetLeagueId));
             cachedLeagueTeams = teams;
           }
           const oppTeam = cachedLeagueTeams.find(t => t.id === matchupData.opponentTeam!.id);
@@ -4221,7 +4242,7 @@ const Matchup = () => {
           // Fetch any players in saved rosters who are no longer on the team
           // Query ONLY past dates (not today/future)
           // ============================================================
-          const frozenBatchResponse = await matchupApi.getFrozenRosterBatch(matchupData.matchup.id, datesToLoad);
+          const frozenBatchResponse = await awaitCurrentRoute(matchupApi.getFrozenRosterBatch(matchupData.matchup.id, datesToLoad));
           const allFrozenEntries = frozenBatchResponse.data as any[] | null;
 
           if (allFrozenEntries && allFrozenEntries.length > 0) {
@@ -4256,7 +4277,7 @@ const Matchup = () => {
               log(' Found players in frozen rosters missing from enrichment maps:', missingIds.length);
 
               // Fetch missing players from player directory
-              const missingPlayers = await PlayerService.getPlayersByIds(missingIds as string[]);
+              const missingPlayers = await awaitCurrentRoute(PlayerService.getPlayersByIds(missingIds as string[]));
               log(' Fetched', missingPlayers.length, 'missing players for enrichment');
 
               // Transform to MatchupPlayer and add to appropriate lookup map
@@ -4451,6 +4472,7 @@ const Matchup = () => {
         }
 
       } catch (err: any) {
+        if (!lifetime.active) return;
         logger.error('[MATCHUP] CRITICAL ERROR loading matchup data:', err);
         logger.error('[MATCHUP] Error details:', {
           message: err.message,
@@ -4470,11 +4492,18 @@ const Matchup = () => {
         // CRITICAL: Always clear timeout and reset state, even if error occurred
         if (timeoutId) {
           clearTimeout(timeoutId);
+          lifetime.timers.delete(timeoutId);
         }
-        log(' Finally block - clearing loading state');
-        setLoading(false); // Always complete loading
-        hasInitializedRef.current = true; // Mark that initial load is complete
-        loadingRef.current = false; // Release lock - CRITICAL to prevent freeze
+        if (matchupTimeoutId) {
+          clearTimeout(matchupTimeoutId);
+          lifetime.timers.delete(matchupTimeoutId);
+        }
+        if (lifetime.active) {
+          log(' Finally block - clearing loading state');
+          setLoading(false); // Always complete the current route's loading
+          hasInitializedRef.current = true;
+          loadingRef.current = false;
+        }
       }
     };
 
