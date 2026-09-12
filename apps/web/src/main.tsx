@@ -3,6 +3,8 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import { logger } from '@/utils/logger'
+import { watchServiceWorkerUpdates } from './lib/serviceWorkerUpdates'
+import { toast } from 'sonner'
 // The Press Box faces, bundled (PR18): see pressboxFonts.ts. Before index.css.
 import './pressboxFonts'
 import './index.css'
@@ -15,6 +17,17 @@ initSentry();
 // Initialize Core Web Vitals tracking (LCP, FID, CLS, FCP, TTFB, INP)
 import { initWebVitals } from './utils/webVitals'
 initWebVitals();
+
+// Never reload an in-progress draft or form automatically. A changed worker
+// means a fresh application is ready for the user's next explicit reload.
+if (import.meta.env.PROD && import.meta.env.VITE_NATIVE !== '1') {
+  watchServiceWorkerUpdates(() => toast('Update ready', {
+    id: 'citrus-app-update',
+    description: 'Reload when you are ready to use the latest version.',
+    duration: Infinity,
+    action: { label: 'Reload', onClick: () => window.location.reload() },
+  }));
+}
 
 // Ensure root element exists
 const rootElement = document.getElementById("root");
