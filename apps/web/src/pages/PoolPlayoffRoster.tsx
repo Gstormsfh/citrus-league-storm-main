@@ -32,6 +32,7 @@ import { cn } from '@/lib/utils';
 import { ScoringCalculator, type ScoringSettings } from '@/utils/scoringUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/utils/logger';
+import { profileDisplayName } from '@citrus/shared';
 
 /* 2026-08-19 visual audit — muted-text correction.
    text-citrus-charcoal is #5C5C5C, a soft charcoal designed for the
@@ -308,11 +309,11 @@ export default function PoolPlayoffRosterEntry() {
             } else {
               const { data: profile } = await (supabase as any)
                 .from('profiles')
-                .select('username, first_name, last_name')
+                .select('display_name, username, first_name, last_name')
                 .eq('id', viewUserId)
                 .single();
               if (profile) {
-                const name = profile.username || [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Unknown';
+                const name = profileDisplayName(profile, 'Unknown');
                 setViewOwnerName(name);
               }
             }

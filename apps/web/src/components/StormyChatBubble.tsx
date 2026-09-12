@@ -13,6 +13,8 @@ import { StormyService, fetchLeagueContext, type StormyMessage, type StormyConte
 import { useLeague } from '@/contexts/LeagueContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChatBar } from '@/components/pressbox/ChatBar';
+import { useVisualViewport } from '@/hooks/useVisualViewport';
+import { stormySheetGeometry } from '@/components/stormy/sheetGeometry';
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -155,6 +157,12 @@ const StormyChatBubbleSession = () => {
   // Only consulted for the closed FAB below. The open chat card must never
   // hide itself when its OWN input takes focus.
   const textFieldFocused = useTextFieldFocused();
+  // KEYBOARD (2026-09-11): what is actually on screen once iOS raises the
+  // keyboard. useVisualViewport was written for this exact defect on
+  // 2026-09-09 and never wired to the sheet below, which is why the open
+  // chat ran under the keyboard and took the header off the top of the
+  // screen with it.
+  const viewport = useVisualViewport();
   const auth = useAuth();
   const league = useLeague();
   const activeLeague = league?.activeLeague ?? null;
@@ -386,15 +394,26 @@ const StormyChatBubbleSession = () => {
   // On a phone the chat is a full-width bottom sheet with a dimmed backdrop —
   // one clean open from the Stormy bar, composer at the bottom, tap the backdrop
   // or X to close. Desktop keeps the floating card.
+  // SHEET GEOMETRY (2026-09-11). The rule and its history live in
+  // components/stormy/sheetGeometry.ts, which is pure so the sizing can be
+  // pinned in a test. Short version: a bounded bottom sheet measured against
+  // the VISIBLE viewport, so the composer clears the keyboard and the header
+  // stays on screen.
+  const sheet = stormySheetGeometry({
+    layoutHeight: typeof window !== 'undefined' ? window.innerHeight : 0,
+    visibleHeight: viewport.height,
+    offsetTop: viewport.offsetTop,
+    keyboardOpen: viewport.keyboardOpen,
+  });
   const mobileSheetStyle: CSSProperties = {
     position: 'fixed',
     left: 0,
     right: 0,
-    bottom: 0,
-    top: 'max(var(--safe-area-inset-top,env(safe-area-inset-top)), 8vh)',
-    width: '100vw',
+    bottom: sheet.bottom,
+    height: sheet.height,
+    maxHeight: sheet.maxHeight,
+    paddingBottom: sheet.paddingBottom,
     zIndex: 110,
-    paddingBottom: 'var(--safe-area-inset-bottom,env(safe-area-inset-bottom))',
   };
   const desktopCardStyle: CSSProperties = {
     position: 'fixed',

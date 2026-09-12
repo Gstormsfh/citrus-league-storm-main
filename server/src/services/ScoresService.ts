@@ -48,6 +48,10 @@ import {
   type ScoresGameDetailResponse,
   type ScoresPlayerActuals,
   type ScoresPlayerLine,
+  // Root, not the /leagueProjection subpath: the server's vitest alias points
+  // at src/index.ts, so a subpath import resolves to index.ts/leagueProjection.
+  projectedPointsFor,
+  type ProjectedStatRow,
 } from '@citrus/shared';
 import { pagedSelect } from '../lib/pagedSelect';
 
@@ -60,7 +64,12 @@ const GAME_COLUMNS =
 const TEAM_COLUMNS = 'team_id, abbreviation, city, name';
 
 const PROJECTION_COLUMNS =
-  'player_id, game_id, season, is_goalie, total_projected_points, confidence_label, updated_at';
+  'player_id, game_id, season, is_goalie, total_projected_points, confidence_label, updated_at, ' +
+  // The components, so the projection can be scored under the league that is
+  // looking at it rather than under the default the column was baked with.
+  'projected_goals, projected_assists, projected_ppp, projected_shp, projected_sog, ' +
+  'projected_blocks, projected_hits, projected_pim, ' +
+  'projected_wins, projected_saves, projected_shutouts, projected_goals_against';
 
 const DIRECTORY_COLUMNS =
   'player_id, full_name, team_abbrev, position_code, is_goalie, headshot_url';
@@ -117,11 +126,12 @@ interface TeamRow {
   name: string | null;
 }
 
-interface ProjectionRow {
+interface ProjectionRow extends ProjectedStatRow {
   player_id: number;
   game_id: number;
   season: number;
   is_goalie: boolean;
+  /** Baked with DEFAULT scoring. Never read on its own; see the rescore below. */
   total_projected_points: number | string | null;
   confidence_label: string | null;
   updated_at: string | null;
@@ -662,7 +672,11 @@ export class ScoresService {
         position: dir?.position_code ?? null,
         isGoalie: Boolean(proj.is_goalie ?? dir?.is_goalie),
         headshotUrl: dir?.headshot_url ?? null,
-        projectedPoints: toNumberOrNull(proj.total_projected_points),
+        // 2026-09-12: was toNumberOrNull(proj.total_projected_points), which is
+        // baked with default scoring - so this line printed a default-scored
+        // projection directly above an actualPoints computed with the league's
+        // own scorer, two numbers on two scales in one row.
+        projectedPoints: projectedPointsFor(proj, ctx.scorer),
         confidenceLabel: proj.confidence_label ?? null,
         actualPoints: actual
           ? ctx.scorer.calculatePoints(actualsToStatBag(actual), Boolean(actual.is_goalie))

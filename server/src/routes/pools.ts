@@ -7,7 +7,7 @@ import { validateBody, getValidatedBody } from '../middleware/validate';
 import { createUserClient } from '../lib/supabase';
 import { PoolService } from '../services/PoolService';
 import { ok, handleError } from '../lib/responses';
-import { getCurrentSeason } from '@citrus/shared';
+import { getCurrentSeason, profileDisplayName } from '@citrus/shared';
 
 const poolRoutes = new Hono<Env>();
 
@@ -505,9 +505,9 @@ poolRoutes.get('/pickem/:leagueId/standings/weekly', async (c) => {
     // Get display names
     const userIds = [...map.keys()];
     const { data: profiles } = userIds.length > 0
-      ? await supabase.from('profiles').select('id, username, first_name, last_name').in('id', userIds)
+      ? await supabase.from('profiles').select('id, display_name, username, first_name, last_name').in('id', userIds)
       : { data: [] };
-    const nameMap = new Map((profiles ?? []).map((p: any) => [p.id, p.username || [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Unknown']));
+    const nameMap = new Map((profiles ?? []).map((p: any) => [p.id, profileDisplayName(p, 'Unknown')]));
 
     const standings = [...map.entries()]
       .map(([uid, stats]) => ({

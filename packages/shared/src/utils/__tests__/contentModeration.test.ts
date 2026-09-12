@@ -4,12 +4,12 @@ import { moderateText, normalizeForModeration } from '../contentModeration';
 describe('moderateText', () => {
   it('passes ordinary and tricky-but-innocent names', () => {
     for (const name of ['Edmonton Oil Kings', 'Scunthorpe United', 'Assassins', 'Classic Cup', 'Cockburn FC',
-      'Raccoon City', 'Japan Jets', 'Mustard Gas', 'Conspicuous', 'Shiitake Squad', 'Grape Fruits', "Storms' Army", 'JAS', '', 'Dickinson Dynasty', 'Flame Retardant']) {
+      'Raccoon City', 'Japan Jets', 'Mustard Gas', 'Conspicuous', 'Shiitake Squad', 'Grape Fruits', "Storms' Army", 'JAS', '', 'Dickinson Dynasty', 'Flame Retardant', 'The Therapists', 'Sky Scrapers']) {
       expect(moderateText(name).ok, name).toBe(true);
     }
   });
   it('rejects slurs including obfuscated forms', () => {
-    for (const name of ['n1gg3r nation', 'N.I.G.G.E.R', 'the kikes', 'F4ggots', 'Team Retards', 'white power', 'Heil Hitler FC', 'K K K', 'sand n!ggers']) {
+    for (const name of ['n1gg3r nation', 'N.I.G.G.E.R', 'the kikes', 'F4ggots', 'Team Retards', 'white power', 'Heil Hitler FC', 'K K K', 'sand n!ggers', 'Team Rapist']) {
       const r = moderateText(name);
       expect(r.ok, name).toBe(false);
       expect(r.tier, name).toBe('hate');

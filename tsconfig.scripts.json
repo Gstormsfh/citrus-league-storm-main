@@ -1,0 +1,34 @@
+{
+  // Typechecks the repo scripts that CI actually runs as gates.
+  //
+  // Why this file exists: the root tsconfig.json has `"include": []` and no
+  // project references -- it supplies `paths` to editors and compiles nothing.
+  // So scripts/ was typechecked by nobody, and `tsx` strips types without
+  // checking them. scripts/check_draft_freeze.ts can refuse a production
+  // deploy, and it only compiles clean under `strict`: its BlockerResult
+  // discriminated union needs strictNullChecks to narrow on `ok`, and without
+  // it tsc reports two phantom errors on correct code. An untypechecked file
+  // holding that much authority is the gap this closes.
+  //
+  // `include` is deliberately one file rather than scripts/**/*.ts. The other
+  // twelve scripts carry ~12 real strictNullChecks findings (mostly
+  // process.env.X being string|undefined) and scripts/env.ts is missing
+  // dotenv types. Widening this list is a one-line change per script as each
+  // is cleaned -- that ratchet is the point of scoping it here instead of
+  // adding a baseline file nobody lowers.
+  //
+  // Note these are global scripts, not modules: two of them define `main` at
+  // top level, so compiling several together collides on "Duplicate function
+  // implementation". One file per gate keeps that honest.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["scripts/check_draft_freeze.ts"]
+}

@@ -519,7 +519,9 @@ jobs:
       # before mutating so a room that opened (or a draft scheduled) while
       # the run waited still blocks the reset. Mirrors the preflight job;
       # the freeze call is the same RPC scripts/check_draft_freeze.ts uses
-      # (FREEZE_HOURS=24, LIVE_HOURS=6) and honours the same override.
+      # and must stay in step with its HARD_HOURS (4) and LIVE_HOURS (6).
+      # Only the hard window belongs here: this step can refuse a deploy, and
+      # the script's 4-24h band is a warning, which a gate cannot express.
       - name: Last look (re-check live drafts, freeze and daylight after approval)
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -534,18 +536,35 @@ jobs:
             exit 1
           fi
           AUTH=(-H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}")
-          LIVE="$(curl -sS --fail-with-body --max-time 20 "${AUTH[@]}" \
-            "${SUPABASE_URL}/rest/v1/leagues?draft_status=eq.in_progress&select=id")"
-          if [ "$(jq 'length' <<<"$LIVE")" != "0" ]; then
-            echo "::error::A league moved to draft_status=in_progress while this run waited for approval: $(jq -r 'map(.id) | join(", ")' <<<"$LIVE"). Nothing was deployed."
-            exit 1
-          fi
           if [ "${OVERRIDE_DRAFT_FREEZE:-}" = "1" ]; then
-            echo "::warning::OVERRIDE_DRAFT_FREEZE=1 — freeze re-check skipped."
+            echo "::warning::OVERRIDE_DRAFT_FREEZE=1 — live-draft and freeze re-checks skipped."
           else
+            # A raw draft_status read, NOT draft_freeze_blockers, and that is
+            # deliberate: the RPC needs a pick (reason 2) or a just-passed
+            # scheduled time (reason 3) before it calls a draft live, so a room
+            # the commissioner opened by hand during the approval wait matches
+            # neither. This closes that one gap.
+            #
+            # It carries no staleness bound, so a draft stuck at in_progress
+            # blocks every deploy until someone edits the row -- three leagues
+            # sat that way from April 2026. That is why it now lives INSIDE the
+            # override with every other freeze rule: the escape hatch is a repo
+            # variable, not a hand-written production UPDATE at 2am. Before
+            # 2026-09-12 this check sat above the override and had none.
+            #
+            # The real fix is a fourth reason in draft_freeze_blockers
+            # (in_progress, no picks, recent pick_deadline) so a single SQL
+            # decider owns liveness instead of two that can disagree. That
+            # needs a migration and does not ship in draft season.
+            LIVE="$(curl -sS --fail-with-body --max-time 20 "${AUTH[@]}" \
+              "${SUPABASE_URL}/rest/v1/leagues?draft_status=eq.in_progress&select=id")"
+            if [ "$(jq 'length' <<<"$LIVE")" != "0" ]; then
+              echo "::error::A league moved to draft_status=in_progress while this run waited for approval: $(jq -r 'map(.id) | join(", ")' <<<"$LIVE"). Nothing was deployed."
+              exit 1
+            fi
             BLOCKERS="$(curl -sS --fail-with-body --max-time 20 "${AUTH[@]}" -X POST \
               -H "Content-Type: application/json" \
-              -d '{"p_upcoming_hours":24,"p_live_hours":6}' \
+              -d '{"p_upcoming_hours":4,"p_live_hours":6}' \
               "${SUPABASE_URL}/rest/v1/rpc/draft_freeze_blockers")"
             if [ "$(jq 'length' <<<"$BLOCKERS")" != "0" ]; then
               echo "::error::Change freeze became active while this run waited for approval: $(jq -r 'map(.league_id + " (" + .reason + ")") | join(", ")' <<<"$BLOCKERS"). Nothing was deployed."

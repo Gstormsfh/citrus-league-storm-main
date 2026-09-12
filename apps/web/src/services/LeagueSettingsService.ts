@@ -120,6 +120,13 @@ export const LeagueSettingsService = {
     draftSettings: {
       draft_rounds?: number;
       pickTimeLimit?: number;
+      /**
+       * An ISO instant, or null to clear it. The server has accepted this
+       * since February (middleware/validate.ts, LeagueService.updateDraftSettings)
+       * and the type here never listed it, which is part of why nothing in
+       * the app ever set a draft time.
+       */
+      scheduled_draft_time?: string | null;
     }
   ): Promise<{ success: boolean; error: unknown }> {
     try {

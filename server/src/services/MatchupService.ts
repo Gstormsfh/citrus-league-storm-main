@@ -11,6 +11,17 @@ import {
   secondsRemaining,
 } from '@citrus/shared';
 import type { LeagueScoreboardMatchup } from '@citrus/shared';
+// The package ROOT, not the /leagueProjection subpath: server/vitest.config.ts
+// aliases '@citrus/shared' straight at src/index.ts, so a subpath import
+// resolves to `index.ts/leagueProjection` and every suite that reaches this
+// file dies with ENOTDIR. tsc resolves the subpath through package exports
+// and says nothing, which is how it got past a clean typecheck.
+import {
+  ScoringCalculator,
+  projectionSettings,
+  projectedPointsFor,
+  type ProjectedStatRow,
+} from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { pagedSelect } from '../lib/pagedSelect';
 
@@ -53,10 +64,15 @@ export interface ScoreboardGameRow {
 }
 
 /** One `player_projected_stats` row with its `nhl_games` row embedded. */
-export interface ScoreboardProjectionRow {
+export interface ScoreboardProjectionRow extends ProjectedStatRow {
   player_id: number | string;
   /** YYYY-MM-DD */
   projection_date: string;
+  /**
+   * Baked with DEFAULT scoring. Kept on the row for the fallback below and
+   * never read on its own by a league surface: getLeagueScoreboard rescores
+   * every row under the league's own weights before projecting.
+   */
   total_projected_points: number | string | null;
   /** TIMESTAMPTZ of puck drop; the fallback clock when the game row is missing. */
   game_start_time?: string | null;
@@ -442,7 +458,10 @@ export class MatchupService {
     const projectionsRead = await pagedSelect<ScoreboardProjectionRow>(this.supabase, {
       table: 'player_projected_stats',
       columns:
-        'player_id, projection_date, game_id, total_projected_points, game_start_time, ' +
+        'player_id, projection_date, game_id, total_projected_points, game_start_time, is_goalie, ' +
+        'projected_goals, projected_assists, projected_ppp, projected_shp, projected_sog, ' +
+        'projected_blocks, projected_hits, projected_pim, ' +
+        'projected_wins, projected_saves, projected_shutouts, projected_goals_against, ' +
         'game:nhl_games!game_id(status, period, period_time, home_score, away_score)',
       inFilters: [['player_id', Array.from(playerIds)]],
       rangeFilters: [['projection_date', 'gte', firstDay], ['projection_date', 'lte', weekEnd]],
@@ -458,11 +477,30 @@ export class MatchupService {
       return { matchups: withProjections(none), error: null };
     }
 
+    // LEAGUE SCORING (2026-09-12). The projected total on the row is baked
+    // with default scoring, so a league that scores hits, or zeroes blocks,
+    // or pays 6 for a goal was shown a projection on one scale beside a live
+    // score on another. Rescore every row under this league's weights before
+    // any of it is added up. A league with no scoring document of its own
+    // gets the defaults, which is what projectionSettings does.
+    const { data: leagueRow } = await this.supabase
+      .from('leagues')
+      .select('scoring_settings')
+      .eq('id', leagueId)
+      .maybeSingle();
+    const scorer = new ScoringCalculator(
+      projectionSettings((leagueRow as { scoring_settings?: unknown } | null)?.scoring_settings ?? null),
+    );
+    const leagueScored = projectionsRead.data.map((row) => ({
+      ...row,
+      total_projected_points: projectedPointsFor(row, scorer),
+    }));
+
     const totals = projectLeagueWeek({
       matchups: open,
       rosters,
       lineups,
-      projections: projectionsRead.data,
+      projections: leagueScored,
       today,
       nowMs,
     });

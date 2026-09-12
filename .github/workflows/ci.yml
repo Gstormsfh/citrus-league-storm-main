@@ -283,6 +283,13 @@ jobs:
         shell: bash
         run: cd server && npx tsc --noEmit 2>&1 | tee /tmp/tsc-server.log
 
+      # scripts/ is in no other tsconfig: the root one has "include": [] and
+      # tsx strips types without checking them. The freeze gate can refuse a
+      # production deploy, so it gets checked on every PR. See
+      # tsconfig.scripts.json.
+      - name: TypeScript compile check (deploy gate scripts)
+        run: npx tsc -p tsconfig.scripts.json
+
       - name: Report run
         if: always()
         continue-on-error: true

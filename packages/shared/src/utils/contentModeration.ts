@@ -54,7 +54,10 @@ const HATE_TERMS: readonly string[] = [
 // Short hate roots that collide with ordinary words when matched as substrings
 // (e.g. "fag" in "fagus", "jap" in "japan", "coon" in "raccoon", "tard" in
 // "mustard", "spic" in "conspicuous"). These are matched as whole tokens only.
-const HATE_TOKEN_ONLY = new Set(['fag', 'fags', 'jap', 'japs', 'coon', 'coons', 'tard', 'retard', 'retards', 'spic', 'spics', 'paki', 'pakis', 'kkk', '1488', 'negro', 'squaw', 'dyke', 'gook']);
+const HATE_TOKEN_ONLY = new Set(['fag', 'fags', 'jap', 'japs', 'coon', 'coons', 'tard', 'retard', 'retards', 'spic', 'spics', 'paki', 'pakis', 'kkk', '1488', 'negro', 'squaw', 'dyke', 'gook',
+  // 2026-09-12: matched as substrings, these two rejected 'The Therapists'
+  // and 'Sky Scrapers'. Both terms are whole words in every real use.
+  'rapist', 'raper']);
 
 // Ordinary profanity: whole-token match after normalisation.
 const PROFANITY_TERMS: readonly string[] = [

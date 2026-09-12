@@ -3,6 +3,8 @@ import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import { getCurrentSeason, getProjectionsSeason } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
+import { ScoringCalculator } from '@citrus/shared';
+import { projectedPointsFor, type ProjectedStatRow } from '@citrus/shared/leagueProjection';
 
 /**
  * Get weekly projected fantasy points for players
@@ -12,7 +14,14 @@ import { logger } from '@/utils/logger';
 export async function getWeeklyProjections(
   playerIds: number[],
   weekStart: Date,
-  weekEnd: Date
+  weekEnd: Date,
+  /**
+   * The league's scorer. With one, each day is scored from its component
+   * stats under that league's weights; without one, the stored total stands,
+   * which is baked with DEFAULT scoring (routes/players.ts:184). Optional so
+   * the callers that have no league in hand keep working unchanged.
+   */
+  scorer?: ScoringCalculator,
 ): Promise<Map<number, number>> {
   if (!playerIds || playerIds.length === 0) {
     return new Map();
@@ -57,7 +66,9 @@ export async function getWeeklyProjections(
 
     ((data || []) as Record<string, unknown>[]).forEach((projection) => {
       const playerId = Number(projection.player_id);
-      const points = Number(projection.total_projected_points) || 0;
+      const points = scorer
+        ? projectedPointsFor(projection as ProjectedStatRow, scorer)
+        : Number(projection.total_projected_points) || 0;
       const current = weeklyTotals.get(playerId) || 0;
       weeklyTotals.set(playerId, current + points);
     });

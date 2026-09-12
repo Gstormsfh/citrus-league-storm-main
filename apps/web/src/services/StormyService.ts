@@ -24,6 +24,11 @@ import {
 } from "@/utils/weekCalculator";
 import { fetchGamesForTeams } from "@/utils/scheduleMaximizer";
 import { getWeeklyProjections } from "@/utils/projectionHelper";
+import { ScoringCalculator } from '@citrus/shared';
+import { projectionSettings, projectedPointsFor, type ProjectedStatRow } from '@citrus/shared/leagueProjection';
+import { formatLeagueSetup } from './stormy/leagueSetup';
+
+export { formatLeagueSetup };
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -39,6 +44,8 @@ export interface StormyContext {
   teamName?: string;
   /** League-specific scoring weights (JSON) */
   scoringSettings?: string;
+  /** League configuration tokens: format, waivers, limits, deadline, keepers. */
+  leagueSetup?: string;
   /** Compact summary of the user's roster */
   rosterSummary?: string;
   /** Current matchup info */
@@ -88,11 +95,12 @@ interface GsaxSampleRow {
 }
 
 /** player_ros_projections as /api/players/ros-projections returns it. */
-interface RosProjectionRow {
+interface RosProjectionRow extends ProjectedStatRow {
   player_id: number;
   player_name: string;
   position: string | null;
   team_abbrev: string | null;
+  /** Baked with DEFAULT scoring; rescored under the league before Stormy sees it. */
   total_projected_points: number;
   avg_points_per_game: number;
   games_remaining: number;
@@ -210,6 +218,9 @@ class StormyServiceImpl {
     if (ctx.scoringSettings) {
       lines.push(`League scoring: ${ctx.scoringSettings}`);
     }
+    if (ctx.leagueSetup) {
+      lines.push(`League setup: ${ctx.leagueSetup}`);
+    }
     if (ctx.rosterSummary) lines.push(`=== YOUR DRAFTED ROSTER ===\n${ctx.rosterSummary}`);
     if (ctx.matchupSummary) lines.push(`=== CURRENT MATCHUP ===\n${ctx.matchupSummary}`);
     if (ctx.standingsSummary) lines.push(`=== STANDINGS ===\n${ctx.standingsSummary}`);
@@ -291,10 +302,17 @@ class StormyServiceImpl {
     return token;
   }
 
-  /** ` ROS:412.5pts 61GR`, the same shape the free-agent list uses. */
-  static rosToken(row: RosProjectionRow | undefined): string {
+  /**
+   * ` ROS:412.5pts 61GR`, the same shape the free-agent list uses.
+   *
+   * 2026-09-12: scored under the league's own weights. The stored total is
+   * baked with default scoring, so in a league that scores hits or zeroes
+   * blocks Stormy was arguing from one scale while being handed the league's
+   * scoring document in the same context block.
+   */
+  static rosToken(row: RosProjectionRow | undefined, scorer: ScoringCalculator): string {
     if (!row || row.total_projected_points == null) return '';
-    return ` ROS:${Number(row.total_projected_points).toFixed(1)}pts ${row.games_remaining}GR`;
+    return ` ROS:${projectedPointsFor(row, scorer).toFixed(1)}pts ${row.games_remaining}GR`;
   }
 
   /** `Gap: you lead by 15.0`, or null until both sides have a score. */
@@ -346,7 +364,17 @@ class StormyServiceImpl {
       const leagueRow = leagueResult.data as {
         updated_at?: string; draft_status?: string; scoring_settings?: Record<string, unknown>;
         roster_slots?: Record<string, number>; league_size?: number; roster_size?: number;
+        settings?: Record<string, unknown>;
       } | null;
+
+      const leagueSetup = formatLeagueSetup(leagueRow?.settings, leagueRow?.roster_slots, leagueRow?.league_size);
+      if (leagueSetup) ctx.leagueSetup = leagueSetup;
+
+      // Every projection Stormy quotes is scored under THIS league. The
+      // stored totals are baked with default scoring, and a projection on the
+      // wrong scale sitting next to the league's own scoring document is
+      // worse than no projection: he does arithmetic across the two.
+      const leagueScorer = new ScoringCalculator(projectionSettings(leagueRow?.scoring_settings ?? null));
 
       let weekStart: Date | null = null;
       let weekEnd: Date | null = null;
@@ -510,7 +538,7 @@ class StormyServiceImpl {
           )];
 
           const [projResult, gamesResult] = await Promise.allSettled([
-            getWeeklyProjections(allNeededPlayerIds, weekStart, weekEnd),
+            getWeeklyProjections(allNeededPlayerIds, weekStart, weekEnd, leagueScorer),
             fetchGamesForTeams(uniqueTeams, weekStart, weekEnd),
           ]);
 
@@ -586,7 +614,7 @@ class StormyServiceImpl {
             // list's shape so the two can be compared line to line.
             const proj = weeklyProjMap.get(Number(p.id));
             if (proj != null) line += ` wkProj:${proj.toFixed(1)}`;
-            line += StormyServiceImpl.rosToken(rosByPid.get(Number(p.id)));
+            line += StormyServiceImpl.rosToken(rosByPid.get(Number(p.id)), leagueScorer);
 
             return { sortOrder, line };
           }).filter(r => r.line);
@@ -715,7 +743,7 @@ class StormyServiceImpl {
 
           if (freeAgents.length > 0) {
             const faLines = freeAgents.map(p =>
-              `${p.position ?? "?"} ${p.player_name} (${p.team_abbrev ?? "?"}) ROS:${Number(p.total_projected_points).toFixed(1)}pts ${Number(p.avg_points_per_game).toFixed(1)}PPG ${p.games_remaining}GR`
+              `${p.position ?? "?"} ${p.player_name} (${p.team_abbrev ?? "?"}) ROS:${projectedPointsFor(p, leagueScorer).toFixed(1)}pts ${Number(p.avg_points_per_game).toFixed(1)}PPG ${p.games_remaining}GR`
             );
             ctx.extra = (ctx.extra ? ctx.extra + "\n\n" : "") + "Top Available Free Agents:\n" + faLines.join("\n");
           }
