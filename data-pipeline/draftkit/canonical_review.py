@@ -84,11 +84,23 @@ def validate(document):
                 deadline = date.fromisoformat(a['review_after'])
                 reported = date.fromisoformat(source['source_date'])
                 reviewed = date.fromisoformat(source['reviewed_at'])
-                url = urlparse(source['url'])
             except (KeyError, TypeError, ValueError):
                 raise ContractError(f'{pid}: reviewed report requires dated evidence and review deadline') from None
+            if source.get('kind') == 'manual_confirmation':
+                provenance_valid = all(isinstance(source.get(k), str) and source[k].strip()
+                                       for k in ('confirmed_by', 'reference', 'file'))
+                provenance_valid = provenance_valid and not source.get('url')
+                if provenance_valid:
+                    provenance_valid = source['file'] == f"Manual confirmation by {source['confirmed_by']}: {source['reference']}"
+            else:
+                try:
+                    url = urlparse(source['url'])
+                    provenance_valid = url.scheme == 'https' and bool(url.hostname) and not url.username and not url.password
+                except (KeyError, TypeError, ValueError):
+                    provenance_valid = False
             if (reported != observed or reviewed < reported or deadline <= observed
-                    or url.scheme != 'https' or not url.hostname or url.username or url.password
+                    or (source.get('kind') == 'manual_confirmation' and (deadline <= reviewed or reviewed > datetime.now(timezone.utc).date()))
+                    or not provenance_valid
                     or not isinstance(a.get('reason'), str) or not a['reason'].strip()):
                 raise ContractError(f'{pid}: invalid reviewed report provenance or freshness boundary')
         if p.get('rate_policy') not in {'refresh_model', 'refresh_cohort', 'preserve_override'} or p.get('exposure_policy') not in {'preserve_season_override', 'model_remaining', 'unallocated'}:

@@ -84,6 +84,32 @@ class CanonicalReviewTests(unittest.TestCase):
                 'return_window': None, 'source': {'url': 'https://www.nhl.com/example',
                 'source_date': '2026-09-10', 'reviewed_at': '2026-09-12'}}
 
+    def test_manual_confirmation_without_article_preserves_numbers_and_history(self):
+        availability = self.reviewed_report()
+        availability['source'] = {'kind': 'manual_confirmation', 'confirmed_by': 'Garrett Storms',
+            'reference': 'Citrus status review 2026-09-12', 'source_date': '2026-09-10',
+            'reviewed_at': '2026-09-12',
+            'file': 'Manual confirmation by Garrett Storms: Citrus status review 2026-09-12'}
+        result = apply_patch(self.doc, self.patch({'availability': availability}))
+        validate(result)
+        for field in ('rates', 'counts', 'exposure'):
+            self.assertEqual(result['players'][0][field], self.doc['players'][0][field])
+        self.assertEqual(result['players'][0]['availability'], availability)
+        self.assertNotEqual(result['revision'], self.doc['revision'])
+        self.assertEqual(result['review_history'][-1]['updates'][0]['before'], self.doc['players'][0])
+        for key, value in [('confirmed_by', ''), ('reference', ''), ('file', 'Anonymous'),
+                           ('reviewed_at', '2026-09-17'), ('url', 'https://example.com')]:
+            invalid = deepcopy(availability)
+            invalid['source'][key] = value
+            with self.subTest(key=key), self.assertRaises(ContractError):
+                apply_patch(self.doc, self.patch({'availability': invalid}))
+
+        future = deepcopy(availability)
+        future['source']['reviewed_at'] = '2099-01-01'
+        future['review_after'] = '2099-01-03'
+        with self.assertRaises(ContractError):
+            apply_patch(self.doc, self.patch({'availability': future}))
+
     def test_reviewed_report_rejects_missing_or_inconsistent_provenance(self):
         changes = [('review_after', None), ('review_after', 'tomorrow'),
                    ('review_after', '2026-09-10'), ('as_of', '2026-09-11'), ('reason', ''),

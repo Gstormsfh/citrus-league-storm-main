@@ -69,3 +69,16 @@ The server also accepts an explicit exported-view wrapper:
 The atomic `/api/review` response contains `{source, publication_context}`. Edits and patch `base_revision` use only the original source revision. Runtime run/revision and export context remain separate readonly metadata and never enter the strict patch schema. `/api/source` returns the unmodified source document for compatible readers. Derived nightly remaining counts and their PostgreSQL hash are not editable inputs.
 
 A changed source revision blocks patch export. A runtime-only change preserves a valid source patch but warns that publication needs the reconciliation owner's current-active-revision comparison. Activation requires `p_expected_active_revision` whenever a run is already active. This editor neither applies patches nor invokes activation. The source importer/workbook exporter still require a raw source document and label outputs DRAFT; do not substitute a derived runtime payload or infer publication approval from a local file.
+
+
+## Manual injury/status authority
+
+Citrus's owner is the operational source for injury/status updates until another source is adopted. An automated feed is not required for this workflow. Missing or expired evidence remains Unknown; do not infer health, injury, suspension or IR eligibility from games/starts or forecast coverage.
+
+Open the existing local source editor (currently http://127.0.0.1:8766), check the displayed source/runtime identity, select a player, and choose **Record a manual confirmation**. Enter the actual status, evidence date (`as of`), next review date (`review after`), reason, your name, a dated review reference and confirmation date. External reports still require an HTTPS article URL; a manual confirmation does not require one. A review reference can be a dated Citrus review or retained user instruction. Record only facts you are confirming; this button does not confirm every player or turn Unknown into Healthy.
+
+The manual source is a structured `manual_confirmation` record under the existing `reviewed_report` authority. Display provenance reads “Manual confirmation by [name]: [reference]”. Names/references/reason and valid dates are required, confirmation dates cannot be in the future, and the review deadline must follow the confirmation date. Existing external reports retain their HTTPS provenance requirements. This describes attribution of the owner's confirmation, not independent verification by an external publisher.
+
+Review the change set; add the overall reason and evidence reference; download the review patch. This remains an unpublished draft. Use the existing canonical review CLI against the exact base revision, then ordinary reviewed source staging, actual validation and guarded metadata-only runtime activation. Preserve every numerical value and the model-refresh timestamp; never activate old source-number payloads over the effective runtime or run model refresh to change a status. A retained before-image and reasoning log record the old availability. Status changes do not alter rates, workload, scoring, lineup or fantasy IR eligibility.
+
+Reconfirm before the review deadline when warranted. Expiry means Unknown, not recovery. The current baseline must be reconciled against actual owner-confirmed facts; the presence of old workbook notes alone does not make it current.
