@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fixtures from '../../../../../docs/editorial-evaluation/nhl-2025-26-examples.json';
 import { generatePlayerWriteup, type WriteupPlayer } from '../../playerWriteup';
 import { profileWriteup } from '../profile';
-import { editorialScoringCategories, type EditorialNewsEvidence } from '../index';
+import { editorialScoringCategories, editorialScoringWeights, type EditorialNewsEvidence } from '../index';
 const player = (stats: WriteupPlayer['stats'], name = 'Sample Forward', position = 'C'): WriteupPlayer => ({ id: 1, name, position, statsSeason: 2025, stats });
 const sample = { gamesPlayed: 80, goals: 35, assists: 55, points: 90, shots: 320, powerPlayPoints: 25, toi: '21:00' };
 const extras = { projectionSeason: 2026 };
@@ -201,6 +201,89 @@ describe('Citrus evidence-driven editorial profiles', () => {
 
   it('extracts only configured nonzero weights and keeps no-settings unknown', () => {
     expect(editorialScoringCategories(null)).toBeNull();
+    expect(editorialScoringWeights(null)).toBeNull();
+    expect(editorialScoringWeights({ skater: { hits: -1, shots_on_goal: .2, goals: 0 }, goalie: { goals_against: -2 } })).toEqual({ hits: -1, shots: .2, goals: 0, goals_against: -2 });
     expect(editorialScoringCategories({ skater: { hits: 0, shots_on_goal: .2, goals: 4 }, goalie: { goals_against: -2 } })).toEqual(['shots', 'goals', 'goals_against']);
+  });
+});
+
+describe('actual scoring weights', () => {
+  it('the four frozen forwards retain different hockey mechanisms under the same league weights', () => {
+    const scoringWeights = { goals: 3, assists: 2, shots: .2, power_play_points: 1, hits: .1, blocks: .2 };
+    const outputs = fixtures.slice(0, 4).map(p => profileWriteup(p, { ...extras, scoringWeights }));
+    expect(outputs[0].analysis).toContain('comparable workload');
+    expect(outputs[1].analysis).toContain('larger goal return depends on conversion');
+    expect(outputs[2].analysis).toContain('assist weighting reduces how much');
+    expect(outputs[3].analysis).toContain('losing power-play time can affect');
+    for (const out of outputs) {
+      expect(out.analysis).not.toContain('That weighting determines');
+      expect(`${out.summary} ${out.analysis}`.split(/\s+/).length).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it('the same Kucherov evidence gets a different decision when goal/assist weights reverse', () => {
+    const p = real('Nikita Kucherov');
+    const goals = profileWriteup(p, { ...extras, scoringWeights: { goals: 8, assists: 1, shots: 0 } });
+    const assists = profileWriteup(p, { ...extras, scoringWeights: { goals: 1, assists: 8, shots: 0 } });
+    expect(goals.summary).toBe(assists.summary);
+    expect(goals.analysis).toContain('Goals contributed 352 scoring points versus 86 from assists');
+    expect(goals.analysis).toContain('comparable conversion');
+    expect(assists.analysis).toContain('Assists contributed 688 scoring points versus 44 from goals');
+    expect(assists.analysis).toContain('reduces how much the roster decision depends on repeating the shooting percentage');
+  });
+
+  it('negative hits are a scoring penalty, even when categories still list hits', () => {
+    const p = player({ gamesPlayed: 80, goals: 5, assists: 15, points: 20, hits: 300, blockedShots: 20 });
+    const reward = profileWriteup(p, { ...extras, scoringCategories: ['hits'], scoringWeights: { hits: 1 } });
+    const penalty = profileWriteup(p, { ...extras, scoringCategories: ['hits'], scoringWeights: { hits: -1 } });
+    expect(reward.analysis).toContain('Hits and blocks supplied 300 scoring points');
+    expect(penalty.analysis).toContain('Hits cost 300 scoring points');
+    expect(penalty.analysis).toContain('more of that production would hurt');
+    expect(penalty.tags).not.toContainEqual({ label: 'Peripheral value', tone: 'positive' });
+    expect(penalty.cardTone).not.toBe('positive');
+  });
+
+  it('tiny positive physical weights do not imply they outweigh scoring contributions', () => {
+    const p = player({ gamesPlayed: 80, goals: 5, assists: 15, points: 20, hits: 300 });
+    const low = profileWriteup(p, { ...extras, scoringWeights: { hits: .01, goals: 6, assists: 4 } });
+    const high = profileWriteup(p, { ...extras, scoringWeights: { hits: 1, goals: 6, assists: 4 } });
+    expect(low.analysis).toContain('Hits and blocks supplied 3 scoring points against 90');
+    expect(low.tags).not.toContainEqual({ label: 'Peripheral value', tone: 'positive' });
+    expect(high.analysis).toContain('Hits and blocks supplied 300 scoring points against 90');
+    expect(high.tags).toContainEqual({ label: 'Peripheral value', tone: 'positive' });
+  });
+
+  it('uses goal-against penalty and win weight without fabricating a save total', () => {
+    const p = real('Connor Hellebuyck');
+    const a = profileWriteup(p, { ...extras, scoringWeights: { wins: 4, saves: .2, goals_against: -2 } });
+    const b = profileWriteup(p, { ...extras, scoringWeights: { wins: 8, saves: .2, goals_against: -1 } });
+    expect(a.analysis).toContain('each goal allowed costs 2 points');
+    expect(a.analysis).toContain('offsetting 2 goals allowed');
+    expect(b.analysis).toContain('offsetting 8 goals allowed');
+    expect(a.analysis).not.toMatch(/\d+ saves|\d+ goals allowed in/);
+  });
+
+  it('inverted ratio weights cannot receive conventional ratio advice', () => {
+    const p = real('Connor Hellebuyck');
+    const reverse = profileWriteup(p, { ...extras, scoringWeights: { gaa: 1, save_pct: -1 } });
+    expect(reverse.analysis).toContain('reward a higher GAA and a lower save percentage');
+    expect(reverse.analysis).not.toContain('ratio recovery');
+    const negativeWins = profileWriteup(p, { ...extras, scoringWeights: { wins: -3 } });
+    expect(negativeWins.analysis).toContain('each win costs 3 points');
+    expect(negativeWins.analysis).not.toMatch(/wins contributed|each win adds/);
+  });
+
+  it('missing settings keep save-rate value conditional, and zero weights do not imply default rewards', () => {
+    const p = player({ gamesPlayed: 50, savePct: .92 }, 'Sample Goalie', 'G');
+    expect(profileWriteup(p, extras).analysis).toContain('If save percentage counts');
+    const zero = profileWriteup(player(sample), { ...extras, scoringWeights: { goals: 0, assists: 0 } });
+    expect(zero.analysis).toContain('no nonzero contribution under these weights');
+    expect(zero.cardTone).not.toBe('positive');
+  });
+
+  it('PP news cannot turn penalties-only scoring into a positive opportunity recommendation', () => {
+    const out = profileWriteup(real('Leon Draisaitl'), { ...extras, scoringWeights: { goals: -1, assists: -1, power_play_points: -1 }, selectedNews: [evidence('power-play')] });
+    expect(out.analysis).toContain('no positive reward');
+    expect(out.analysis).not.toContain('preserves a major source');
   });
 });
