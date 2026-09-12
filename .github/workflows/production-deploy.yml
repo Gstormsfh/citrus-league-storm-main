@@ -33,6 +33,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
 
       - uses: actions/setup-node@v5
         with:
@@ -240,6 +242,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
 
       # A production deploy that deploys nothing must not be green.
       #
@@ -574,6 +578,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -663,6 +669,8 @@ jobs:
       # This job is always green; the row carries the DEPLOY job's result so
       # "did master ship?" is one query: workflow='Production Deploy', job='notify'.
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
 
       - name: Report run
         if: always()

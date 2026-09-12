@@ -59,7 +59,7 @@ test('production dispatch without exception inputs fails closed', () => {
   assert.equal(run({ ...dispatch, PRODUCTION_DRAFT_EXCEPTION_SHA: '', PRODUCTION_DRAFT_EXCEPTION_LEAGUE: '', PRODUCTION_DRAFT_EXCEPTION_REASON: '' }).code, 2);
 });
 test('additional blocker refuses the entire run', () => {
-  const result = run(dispatch, [blocker, { ...blocker, league_id: 'other-league' }]);
+  const result = run(dispatch, [blocker, { ...blocker, league_id: '00000000-0000-0000-0000-000000000000' }]);
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /Additional draft blocker/);
 });
@@ -72,6 +72,17 @@ test('workflow scopes inputs to dispatch and keeps API-first deployment dependen
   const engine = readFileSync(new URL('../.github/workflows/deploy-engine.yml', import.meta.url), 'utf8');
   assert.equal((workflow.match(/github.event_name == 'workflow_dispatch' && inputs\./g) || []).length, 3);
   assert.match(workflow, /needs: \[gate, deploy-api\]/);
+  assert.equal((workflow.match(/ref: \$\{\{ github\.sha \}\}/g) || []).length, 4);
   assert.match(workflow, /Test draft exception guard/);
   assert.doesNotMatch(engine, /PRODUCTION_DRAFT_EXCEPTION/);
+});
+
+for (const [label, payload] of [
+  ['null', null], ['object instead of array', {}], ['null entry', [null]],
+  ['missing reason', [{ league_id: league }]],
+  ['invalid timestamp', [{ ...blocker, at_time: 'not-a-date' }]],
+]) test(`malformed RPC ${label} fails closed`, () => {
+  const result = run(dispatch, payload);
+  assert.equal(result.code, 2, result.output);
+  assert.match(result.output, /Malformed draft_freeze_blockers response/);
 });

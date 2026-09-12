@@ -130,7 +130,19 @@ async function fetchBlockers(
     };
   }
 
-  return { ok: true, blockers: (await res.json()) as Blocker[] };
+  const payload: unknown = await res.json();
+  if (!Array.isArray(payload) || payload.some((entry: unknown) => {
+    if (!entry || typeof entry !== 'object') return true;
+    const item = entry as Record<string, unknown>;
+    return typeof item.league_id !== 'string'
+      || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(item.league_id)
+      || (item.league_name !== null && typeof item.league_name !== 'string')
+      || typeof item.reason !== 'string' || item.reason.length === 0
+      || (item.at_time !== null && (typeof item.at_time !== 'string' || !Number.isFinite(Date.parse(item.at_time))));
+  })) {
+    return { ok: false, message: 'Malformed draft_freeze_blockers response; refusing to infer clearance' };
+  }
+  return { ok: true, blockers: payload as Blocker[] };
 }
 
 function describe(league: Blocker): string {
