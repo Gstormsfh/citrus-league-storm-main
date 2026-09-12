@@ -110,7 +110,7 @@ const SERVER_WRITEUP = {
 };
 
 /** The local historical stat line is absent from the server fixture. */
-const LOCAL_SUMMARY = /recorded 133 points \(44 goals, 89 assists\).*2024-25/;
+const LOCAL_SUMMARY = /paired 89 assists with .* shots per game in 2024-25/;
 
 function xgHistory(extra: Record<string, unknown> = {}) {
   return { data: { player_id: Number(PLAYER_ID), points: [], as_of: null, ...extra } };
@@ -136,6 +136,15 @@ describe('the player card falls back to the in-bundle writeup', () => {
     expect(screen.getByText(SERVER_WRITEUP.summary)).toBeTruthy();
     expect(screen.getByText('Deployed copy')).toBeTruthy();
     expect(screen.queryByText(LOCAL_SUMMARY)).toBeNull();
+  });
+
+  it('falls back safely when optional server news links are malformed', async () => {
+    mocks.get.mockResolvedValue(xgHistory({ writeup: { ...SERVER_WRITEUP,
+      newsSources: [{ source: 'NHL', url: 'javascript:alert(1)', publishedAt: null }],
+    } }));
+    openCard();
+    expect(await screen.findByText(LOCAL_SUMMARY)).toBeTruthy();
+    expect(screen.queryByText('Server-rendered headline')).toBeNull();
   });
 
   it('renders the local writeup when the payload omits the field', async () => {
@@ -175,7 +184,7 @@ describe('the player card falls back to the in-bundle writeup', () => {
     mocks.get.mockRejectedValue(new Error('Server unavailable'));
     openCard();
     expect(await screen.findByText(/Connor McTest took part in practice or skating/)).toBeTruthy();
-    expect(screen.getByText(/practice is a step to monitor, not game clearance/)).toBeTruthy();
+    expect(screen.getByText(/Practice alone settles neither game clearance/)).toBeTruthy();
     const source = screen.getByRole('link', { name: /nhl.com/ });
     expect(source.getAttribute('href')).toBe('https://www.nhl.com/news/mctest-practice');
   });

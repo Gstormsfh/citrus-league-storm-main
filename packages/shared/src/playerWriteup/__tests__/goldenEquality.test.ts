@@ -663,7 +663,7 @@ describe('server-assembled writeup equals the one the browser used to build', ()
     // instead of a number.
     const thin = buildWriteupFromSources(byLabel('a three-game call-up, below the rate floor').sources);
     expect(thin.hasEnoughData).toBe(false);
-    expect(thin.analysis).toMatch(/cannot establish a sustainable rate/);
+    expect(thin.analysis).toMatch(/larger NHL sample.*dependable rate/);
     expect(thin.analysis).not.toMatch(/percentile|Projects to/);
     expect(thin.summary).not.toMatch(/He is 22|Career:/);
     expect(thin.tags).toContainEqual({ label: 'Limited sample', tone: 'neutral' });

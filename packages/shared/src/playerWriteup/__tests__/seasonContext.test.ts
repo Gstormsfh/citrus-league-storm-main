@@ -11,10 +11,10 @@ const skater: WriteupPlayer = {
 describe('source-season context in generated writeups', () => {
   it('describes completed actuals in past tense even during the next season', () => {
     const result = generatePlayerWriteup(skater, { projectionSeason: 2026 });
-    expect(result.summary).toContain('recorded 80 points (30 goals, 50 assists) in 80 games in 2025-26');
-    expect(result.summary).toContain('He played 21 minutes per game');
+    expect(result.summary).toContain('generated 3 shots per game in 2025-26 and scored 30 goals');
+    expect(result.summary).toContain('converting 12.5%');
     expect(result.summary).not.toMatch(/this season|is at|has put up|keeps handing/);
-    expect(result.analysis).toContain('historical baseline');
+    expect(result.sourceContext?.actualsSeason).toBe(skater.statsSeason);
     expect(result.analysis).not.toMatch(/role is settled|Start him and forget him|current.*secure/);
     expect(result.cardNote).toBe('2025-26 · 1 P/GP');
   });
@@ -43,7 +43,7 @@ describe('source-season context in generated writeups', () => {
       stats: { gamesPlayed: 50, wins: 30, losses: 15, savePct: 0.92, gaa: 2.4, goalsSavedAboveExpected: 8 },
     }, { projectionSeason: 2026 });
     expect(result.summary).toContain('made 50 appearances in 2025-26');
-    expect(result.summary).toContain('His record was 30-15');
+    expect(result.summary).toContain('winning 30');
     expect(result.analysis).toContain('do not establish his current share of starts');
     expect(result.analysis).not.toMatch(/job looks secure|confirm he's carrying/);
     expect(result.headline).toBe('Save-rate strength');
@@ -84,8 +84,15 @@ describe('source-season context in generated writeups', () => {
     const result = generatePlayerWriteup({ ...skater, statsSeason: undefined }, { projectionSeason: 2026 });
     expect(result.summary).toContain('in the available stat record');
     expect(result.summary).not.toMatch(/this season|2025-26|2026-27/);
-    expect(result.analysis).toContain('historical baseline');
+    expect(result.tags).toContainEqual({ label: 'Season unspecified', tone: 'neutral' });
     expect(result.cardNote).toBe('Recorded stats · 1 P/GP');
+  });
+
+  it('preserves source clocks instead of relabeling generation time as data freshness', () => {
+    const entry = { id: 1, name: 'Sample Forward', position: 'C', actuals_season: 2025,
+      projection_season: 2026, as_of: '2026-09-10T08:00:00Z', gp: 80, goals: 30, assists: 50, points: 80 } as DashboardIndexEntry;
+    const result = buildWriteupFromSources({ entry, index: [entry], now: new Date('2026-09-12T12:00:00Z') });
+    expect(result.sourceContext).toEqual({ actualsSeason: 2025, projectionSeason: 2026, indexAsOf: '2026-09-10T08:00:00Z' });
   });
 
   it('names the forecast target before and after its opener', () => {

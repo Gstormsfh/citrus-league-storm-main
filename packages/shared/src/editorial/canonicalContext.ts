@@ -98,6 +98,7 @@ export function canonicalEditorialContext(
   if (!name || name.split(/\s+/).length < 2 || !Number.isFinite(Number(player.id))) return result;
   const revision = text(context.revision, 120);
   const runId = text(context.run_id, 120);
+  if (!revision || !runId) return result;
   if (revision) result.revision = revision;
   if (runId) result.runId = runId;
   const summaries: string[] = [];

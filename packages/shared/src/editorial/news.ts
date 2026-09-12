@@ -110,10 +110,15 @@ export function selectEditorialNews(
   now: Date = new Date(),
 ): EditorialNewsEvidence[] {
   const id = Number(player.id);
+  if (!Number.isSafeInteger(id) || id <= 0 || !Number.isFinite(now.getTime())) return [];
   const seen = new Set<string>();
   const domains = new Set<string>();
   const result: EditorialNewsEvidence[] = [];
-  const sorted = [...(items ?? [])].sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
+  const validItems = (Array.isArray(items) ? items : []).filter(item => item &&
+    typeof item.title === 'string' && typeof item.url === 'string' &&
+    typeof item.source_id === 'string' && typeof item.published_at === 'string' &&
+    (item.snippet == null || typeof item.snippet === 'string') && Array.isArray(item.player_ids));
+  const sorted = [...validItems].sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at));
   for (const item of sorted) {
     const at = Date.parse(item.published_at);
     const age = now.getTime() - at;

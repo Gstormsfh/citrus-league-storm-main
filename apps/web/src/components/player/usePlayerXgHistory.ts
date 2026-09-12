@@ -83,7 +83,15 @@ function completeWriteup(value: unknown): value is PlayerWriteup {
     && typeof w.analysis === 'string' && typeof w.cardNote === 'string'
     && ['positive', 'neutral', 'caution'].includes(w.cardTone ?? '')
     && typeof w.hasEnoughData === 'boolean' && Array.isArray(w.tags)
-    && w.tags.every(t => t && typeof t.label === 'string' && ['positive', 'neutral', 'caution'].includes(t.tone));
+    && w.tags.every(t => t && typeof t.label === 'string' && ['positive', 'neutral', 'caution'].includes(t.tone))
+    && (w.newsSources === undefined || Array.isArray(w.newsSources) && w.newsSources.every(source => {
+      if (!source || typeof source.source !== 'string' || typeof source.publishedAt !== 'string' ||
+        !Number.isFinite(Date.parse(source.publishedAt)) || typeof source.url !== 'string') return false;
+      try {
+        const url = new URL(source.url);
+        return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password;
+      } catch { return false; }
+    }));
 }
 
 export function usePlayerXgHistory(

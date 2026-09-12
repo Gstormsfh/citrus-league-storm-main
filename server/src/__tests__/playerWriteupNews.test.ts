@@ -77,11 +77,11 @@ beforeEach(() => { forPlayer.mockReset(); forPlayer.mockResolvedValue([]); });
 
 describe('PlayerWriteupService attached news integration', () => {
   it.each([
-    ['practice', story(), /practice|skating/i, /not game clearance|not clearance/i],
+    ['practice', story(), /practice|skating/i, /neither game clearance|not game clearance|not clearance/i],
     ['power play', story({
       title: 'Sample Forward practiced with the first power-play unit.',
       snippet: 'Sample Forward practiced with the first power-play unit on Friday.',
-    }), /first power-play unit/i, /if it carries into games|practice deployment/i],
+    }), /first power-play unit/i, /assignment carries into games|if it carries into games|practice deployment/i],
   ])('changes the same profile with a dated %s report and a conditional implication', async (_kind, item, report, implication) => {
     const { read } = setup();
     const baseline = await read();

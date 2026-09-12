@@ -94,3 +94,10 @@ describe('attributed player news selection', () => {
     expect(changed.analysis).toContain('not game clearance');
   });
 });
+
+// Optional publisher evidence must fail closed without taking down a player card.
+it('ignores malformed news rows and an invalid as-of clock', () => {
+  const p = { id: 1, name: 'Sample Forward' };
+  expect(selectEditorialNews(p, [null, {}, { title: 3 }] as never, new Date('2026-09-12T12:00:00Z'))).toEqual([]);
+  expect(selectEditorialNews(p, [], new Date('invalid'))).toEqual([]);
+});

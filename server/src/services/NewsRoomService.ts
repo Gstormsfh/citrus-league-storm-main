@@ -267,7 +267,12 @@ export function buildNameIndex(names: readonly DirectoryName[]): NameIndex {
 export function matchPlayers(text: string, index: NameIndex): number[] {
   const hay = fold(text);
   const out: number[] = [];
+  const counts = new Map<string, number>();
+  for (const entry of index.entries) counts.set(entry.folded, (counts.get(entry.folded) ?? 0) + 1);
   for (const e of index.entries) {
+    // A shared full name is still ambiguous (for example two Sebastian Ahos).
+    // Publisher player-ID tags can resolve it; textual mentions alone cannot.
+    if (counts.get(e.folded) !== 1) continue;
     if (hay.includes(e.folded) && e.re.test(hay)) out.push(e.playerId);
   }
   return Array.from(new Set(out));

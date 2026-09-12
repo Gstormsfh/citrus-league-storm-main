@@ -1,4 +1,4 @@
-import { editorialScoringCategories, type EditorialNewsItem } from '../editorial';
+import { editorialScoringWeights, editorialScoringCategories, type EditorialCanonicalContext, type EditorialNewsItem } from '../editorial';
 /**
  * THE SERVER'S HALF OF THE WRITEUP (2026-09-11).
  *
@@ -219,6 +219,9 @@ export function projectionLabelFor(now: Date, season = getProjectionsSeason(now)
 export function writeupExtrasFromSources(src: WriteupSources): WriteupExtras {
   const now = src.now ?? new Date();
   const scoring = src.scoring ?? null;
+  // Additive active-view context is hydrated by the canonical source owner.
+  // The structural cast keeps this consumer compatible with older index types.
+  const canonicalContext = (src.entry as DashboardIndexEntry & { canonical_context?: EditorialCanonicalContext | null }).canonical_context;
   const projectionSeason = src.entry.projection_season ?? getProjectionsSeason(now);
 
   const goalsBySeason = (src.xgSeasons ?? [])
@@ -239,9 +242,10 @@ export function writeupExtrasFromSources(src: WriteupSources): WriteupExtras {
 
   return {
     ...(src.entry.actuals_season != null || src.entry.projection_season != null ? { projectionSeason } : {}),
+    ...(canonicalContext ? { canonicalContext, now } : {}),
     ...(src.entry.as_of ? { indexAsOf: src.entry.as_of } : {}),
     ...(src.newsItems ? { newsItems: src.newsItems, now } : {}),
-    ...(scoring != null ? { scoringCategories: editorialScoringCategories(scoring) } : {}),
+    ...(scoring != null ? { scoringCategories: editorialScoringCategories(scoring), scoringWeights: editorialScoringWeights(scoring) } : {}),
     age: src.birthdate ? ageOn(src.birthdate, now) : null,
     goalsBySeason,
     ...cohortReads(src.entry, src.index),

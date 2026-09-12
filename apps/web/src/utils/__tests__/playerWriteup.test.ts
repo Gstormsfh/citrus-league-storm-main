@@ -137,7 +137,7 @@ describe('generatePlayerWriteup — evidence selects the hockey profile', () => 
     expect(f.headline).toBe('Balanced scoring profile');
     expect(d.analysis).toMatch(/defence slot/);
     expect(d.summary).toContain('40 came outside the power play');
-    expect(d.analysis).toMatch(/does not identify even-strength production/);
+    expect(d.summary + d.analysis).not.toMatch(/40 (?:even-strength|even strength)|40.*five.on.five/);
     expect(d.summary).not.toMatch(/top.pair|coach.*trust/i);
   });
 

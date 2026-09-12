@@ -359,3 +359,11 @@ describe('stored newsroom summaries', () => {
     expect(result[0].summary).toContain('no timetable');
   });
 });
+
+it('does not assign a shared full-name mention to two different NHL identities', () => {
+  const ambiguous = buildNameIndex([
+    { playerId: 1, fullName: 'Sebastian Aho', teamAbbrev: 'CAR' },
+    { playerId: 2, fullName: 'Sebastian Aho', teamAbbrev: 'NYI' },
+  ]);
+  expect(matchPlayers('Sebastian Aho practiced with the first unit.', ambiguous)).toEqual([]);
+});

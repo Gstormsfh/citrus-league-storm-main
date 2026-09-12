@@ -6,7 +6,7 @@
  */
 import { getProjectionsSeason } from '../constants/season';
 import { profileWriteup } from '../editorial/profile';
-import { CITRUS_EDITORIAL_VERSION, selectEditorialNews, editorialNewsText, type EditorialNewsItem, type EditorialNewsEvidence } from '../editorial';
+import { CITRUS_EDITORIAL_VERSION, canonicalEditorialContext, type EditorialCanonicalContext, selectEditorialNews, editorialNewsText, type EditorialNewsItem, type EditorialNewsEvidence } from '../editorial';
 
 export interface WriteupPlayerStats {
   // Skater
@@ -56,8 +56,11 @@ export interface PlayerWriteup {
     projectionSeason: number | null;
     /** Dashboard's composite newest source timestamp, not a separate model run. */
     indexAsOf: string | null;
+    canonicalRevision?: string;
+    canonicalRunId?: string;
   };
   editorialVersion?: string;
+  canonicalSources?: readonly Record<string, unknown>[];
   newsSources?: readonly EditorialNewsEvidence[];
   /** Short role label, e.g. "Top-line producer". */
   headline: string;
@@ -128,10 +131,15 @@ export interface WriteupExtras {
   /** Raw attached publisher items, not generated news summaries. */
   newsItems?: readonly EditorialNewsItem[] | null;
   indexAsOf?: string | null;
+  canonicalContext?: EditorialCanonicalContext | null;
+  /** Internal validated context, replaced by generatePlayerWriteup before rendering. */
+  selectedNews?: readonly EditorialNewsEvidence[];
+  selectedAvailability?: { status: string; authority: 'verified' | 'imported_scenario'; asOf: string };
   /** Injected as-of for deterministic freshness evaluation. */
   now?: Date;
   /** Enabled scoring categories; absent means recommendations stay conditional. */
   scoringCategories?: readonly string[] | null;
+  scoringWeights?: Readonly<Record<string, number>> | null;
   /** Start year of the forecast being discussed, separate from historical actuals. */
   projectionSeason?: number | null;
   /** From player_directory.birthdate. */
@@ -254,17 +262,20 @@ export function applyWriteupExtras(writeup: PlayerWriteup, player: WriteupPlayer
 
   // The career on record. "Nine straight 30-goal seasons" is a stat; it is
   // the one sentence a legend's card owes him. Plain numbers, no brand.
-  const seasons = (extras.goalsBySeason ?? []).filter((r) => Number.isFinite(r.goals));
+  const seasons = [...new Map((extras.goalsBySeason ?? [])
+    .filter(r => Number.isInteger(r.season) && Number.isFinite(r.goals) && r.goals >= 0)
+    .map(r => [r.season, r])).values()].sort((a, b) => a.season - b.season);
+  const consecutive = seasons.every((r, i) => i === 0 || r.season === seasons[i - 1].season + 1);
   if (!goalie && seasons.length >= 2) {
     const n = seasons.length;
     const minGoals = Math.min(...seasons.map((r) => r.goals));
     const best = seasons.reduce((a, b) => (b.goals > a.goals ? b : a));
     const age = extras.age != null ? `At ${extras.age}, ` : '';
     if (minGoals >= 30) {
-      summary.push(`${age}${age ? 'he' : 'He'} has ${countWord(n)} straight seasons of 30 goals or more on record.`);
-      if (n >= 5) tags.push({ label: `${n} straight 30-goal seasons`, tone: 'positive' });
+      summary.push(`${age}${age ? 'he' : 'He'} has ${countWord(n)} ${consecutive ? 'straight seasons' : 'seasons'} of 30 goals or more on record.`);
+      if (n >= 5 && consecutive) tags.push({ label: `${n} straight 30-goal seasons`, tone: 'positive' });
     } else if (minGoals >= 20) {
-      summary.push(`${age}${age ? 'he' : 'He'} has ${countWord(n)} straight seasons of 20 goals or more on record.`);
+      summary.push(`${age}${age ? 'he' : 'He'} has ${countWord(n)} ${consecutive ? 'straight seasons' : 'seasons'} of 20 goals or more on record.`);
     } else if (best.goals >= 30) {
       summary.push(`${age}${age ? 'his' : 'His'} best season on record is ${best.goals} goals in ${seasonWord(best.season)}.`);
     } else if (age) {
@@ -323,17 +334,23 @@ export function generatePlayerWriteup(player: WriteupPlayer | null | undefined, 
     };
   }
 
-  const base = profileWriteup(player, { ...extras, projectionSeason: extras?.projectionSeason ?? getProjectionsSeason() });
-  const enriched = applyWriteupExtras(base, player, extras);
   const evidence = selectEditorialNews(player, extras?.newsItems, extras?.now);
+  const canonical = canonicalEditorialContext(player, extras?.canonicalContext, extras?.now);
+  const base = profileWriteup(player, { ...extras, projectionSeason: extras?.projectionSeason ?? getProjectionsSeason(),
+    selectedNews: evidence, selectedAvailability: canonical.availability,
+  });
+  const enriched = applyWriteupExtras(base, player, extras);
   const news = editorialNewsText(player.name, evidence);
   const writeup: PlayerWriteup = {
     ...enriched,
     editorialVersion: CITRUS_EDITORIAL_VERSION,
-    sourceContext: { actualsSeason: player.statsSeason ?? null, projectionSeason: extras?.projectionSeason ?? null, indexAsOf: extras?.indexAsOf ?? null },
+    sourceContext: { actualsSeason: player.statsSeason ?? null, projectionSeason: extras?.projectionSeason ?? null, indexAsOf: extras?.indexAsOf ?? null,
+      ...(canonical.revision ? { canonicalRevision: canonical.revision, canonicalRunId: canonical.runId } : {}),
+    },
+    ...(canonical.sources.length ? { canonicalSources: canonical.sources } : {}),
     newsSources: evidence,
-    summary: [news.summary, enriched.summary].filter(Boolean).join(' '),
-    analysis: [news.analysis, enriched.analysis].filter(Boolean).join(' '),
+    summary: [news.summary, canonical.summary, enriched.summary].filter(Boolean).join(' '),
+    analysis: [enriched.analysis, canonical.analysis].filter(Boolean).join(' '),
   };
 
   // Injury status outranks anything the stat line says: a 1.2 PPG winger on IR

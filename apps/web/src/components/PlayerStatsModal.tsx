@@ -26,7 +26,7 @@ import { NewsItemRow } from '@/components/news/NewsItemRow';
 import { buildAdvancedCardData, type CardEntry } from '@/components/player/playerAdvancedMetrics';
 import { usePlayerXgHistory } from '@/components/player/usePlayerXgHistory';
 import { projectionFraming } from '@/components/player/projectionFraming';
-import { editorialScoringCategories, actualsSeasonLabel, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
+import { type EditorialCanonicalContext, editorialScoringCategories, editorialScoringWeights, actualsSeasonLabel, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
 import { citrusNoteContext } from '@/utils/sourceSeasonContext';
 import { PlayerAdvancedCard } from '@/components/player/PlayerAdvancedCard';
@@ -667,7 +667,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
   // one season's box score. Age from the directory strip, the seasons on
   // our books from the xG history, the cohort reads the XG tab draws, and
   // the projection with the framing the card uses. See WriteupExtras.
-  const writeupRevision = JSON.stringify([leagueScoring, indexEntry?.actuals_season, indexEntry?.projection_season, wireItems]);
+  const canonicalContext = (indexEntry as (CardEntry & { canonical_context?: EditorialCanonicalContext | null }) | undefined)?.canonical_context;
+  const writeupRevision = JSON.stringify([leagueScoring, indexEntry?.actuals_season, indexEntry?.projection_season, canonicalContext?.revision, wireItems]);
   const xgHistory = usePlayerXgHistory(Number(player?.id) || null, { enabled: isOpen, leagueId, revision: writeupRevision });
   const positionRank = useMemo(() => {
     if (!indexEntry || !scoringReady || !pointsFormat) return null;
@@ -735,7 +736,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
     const framing = projectionFraming();
     return {
       newsItems: wireItems,
+      canonicalContext,
       indexAsOf: indexEntry?.as_of ?? null,
+      scoringWeights: scoringReady && leagueId ? editorialScoringWeights(leagueScoring) : null,
       scoringCategories: scoringReady && leagueId ? editorialScoringCategories(leagueScoring) : null,
       age: Number.isFinite(age as number) ? age : null,
       projectionSeason: indexEntry?.projection_season ?? getProjectionsSeason(),

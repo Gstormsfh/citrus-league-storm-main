@@ -8,11 +8,11 @@ Names/numbers removed: the four forward examples had 1 distinct analysis before 
 
 | Player | Before | After |
 |---|---|---|
-| Connor McDavid | 2025-26 production | Dual scoring routes |
+| Connor McDavid | 2025-26 production | Playmaking with shot volume |
 | Nathan MacKinnon | 2025-26 production | Volume shooter |
-| Nikita Kucherov | 2025-26 production | Assist-led production |
+| Nikita Kucherov | 2025-26 production | Finishing and playmaking |
 | Leon Draisaitl | 2025-26 production | Power-play exposure |
-| Cale Makar | 2025-26 production | Blue-line playmaking |
+| Cale Makar | 2025-26 production | Scoring beyond the power play |
 | Connor Hellebuyck | 2025-26 goaltending | Ratio recovery needed |
 
 ## Connor McDavid
@@ -25,9 +25,9 @@ The 2025-26 rates provide a historical baseline. Current line assignment, power-
 
 **After assessment**
 
-Connor McDavid paired 90 assists with 3.7 shots per game in 2025-26, combining setup points with his own shooting volume. Connor McDavid recorded 138 points (48 goals, 90 assists) in 82 games in 2025-26. He played 23 minutes per game.
+Connor McDavid paired 90 assists with 3.7 shots per game in 2025-26 while averaging 23 minutes.
 
-Assists supplied 65% of the points, but the 3.7-shot rate adds a separate route to contribution when shots count. A change in teammates' finishing can affect the assists without removing his own attempts. The 2025-26 rates are a historical baseline.
+If shots count, the own-shot contribution covers a different roster need from the assist total; the playmaking does not leave this profile dependent on assists alone. Carrying that pace forward assumes a comparable workload; more minutes would need fresh deployment evidence.
 
 ## Nathan MacKinnon
 
@@ -39,9 +39,9 @@ The 2025-26 rates provide a historical baseline. Current line assignment, power-
 
 **After assessment**
 
-Nathan MacKinnon generated 4.4 shots per game in 2025-26, making shot volume the foundation of this scoring profile. Nathan MacKinnon recorded 127 points (53 goals, 74 assists) in 80 games in 2025-26. He played 22.3 minutes per game.
+Nathan MacKinnon generated 4.4 shots per game in 2025-26 and scored 53 goals, converting 15.1% of his shots.
 
-The 4.4-shot rate offers a contribution in leagues counting shots even when goals dry up. Finishing can move independently of that volume; shot totals alone do not establish where the chances came from. The 2025-26 rates are a historical baseline.
+In leagues counting shots, that volume still contributes when goals dry up. For the goal return, separate maintaining the workload from maintaining conversion; the scoring total depends on both.
 
 ## Nikita Kucherov
 
@@ -53,9 +53,9 @@ The 2025-26 rates provide a historical baseline. Current line assignment, power-
 
 **After assessment**
 
-Nikita Kucherov's 86 assists accounted for 66% of his points in 2025-26. Nikita Kucherov recorded 130 points (44 goals, 86 assists) in 76 games in 2025-26. He played 20.3 minutes per game.
+Nikita Kucherov scored 44 goals on 19% shooting in 2025-26, with 3 shots per game and 86 assists.
 
-This profile contributes most directly through assists. Those points require a teammate to finish the play. Check the shooting contribution separately when the roster needs goals rather than treating all points as interchangeable. The 2025-26 rates are a historical baseline.
+Repeating the goal return at the same shot volume requires that conversion to hold. The assist contribution broadens the scoring case, while one season of high shooting efficiency alone does not establish an impending decline.
 
 ## Leon Draisaitl
 
@@ -67,9 +67,9 @@ The 2025-26 rates provide a historical baseline. Current line assignment, power-
 
 **After assessment**
 
-Leon Draisaitl drew 43% of his points from the power play in 2025-26. Leon Draisaitl recorded 97 points (35 goals, 62 assists) in 65 games in 2025-26. He played 21.6 minutes per game.
+Leon Draisaitl earned 42 of his 97 points on the power play in 2025-26.
 
-That scoring mix makes special-teams opportunity consequential: losing power-play time would remove one of the established scoring routes. The point share does not identify his unit or guarantee the next assignment. The 2025-26 rates are a historical baseline.
+Where power-play points earn extra value, that concentration makes unit retention a central part of the valuation. Reduced special-teams time would require more scoring elsewhere to sustain the same overall return.
 
 ## Cale Makar
 
@@ -81,9 +81,9 @@ The 2025-26 rates provide a historical baseline. Current line assignment, power-
 
 **After assessment**
 
-Cale Makar's 59 assists accounted for 75% of his points in 2025-26. Cale Makar recorded 79 points (20 goals, 59 assists) in 75 games in 2025-26. He played 24.9 minutes per game.
+Cale Makar produced 79 points in 75 games in 2025-26; 50 came outside the power play.
 
-From a defence slot, this profile contributes most directly through assists. Those points require a teammate to finish the play. Check the shooting contribution separately when the roster needs goals rather than treating all points as interchangeable. The 2025-26 rates are a historical baseline.
+Most of the offence came through other scoring situations, broadening the case for a defence slot in points formats. A power-play bonus adds value to only part of that production.
 
 ## Connor Hellebuyck
 
@@ -95,9 +95,9 @@ The 2025-26 results inform his outlook, but recorded appearances do not establis
 
 **After assessment**
 
-Connor Hellebuyck made 57 appearances in 2025-26, with a .895 save percentage and a 2.86 goals-against average. His record was 23-23.
+Connor Hellebuyck made 57 appearances in 2025-26, winning 23, with a .895 save percentage and 2.86 goals-against average.
 
-At .895, adding starts can hurt save-percentage results even when it adds counting stats. A confirmed start is a decision to weigh against the roster's ratio position, not an automatic play. The 2025-26 rates are a historical baseline. Recorded appearances do not establish his current share of starts.
+More appearances offer another chance at wins and saves, but repeating that save rate would work against a ratio roster. A rebound in performance and a larger workload are separate assumptions.
 
 ## Counterfactual news (synthetic, not reporting)
 
@@ -105,12 +105,12 @@ This deliberately fictional fixture isolates the effect of one qualifying practi
 
 **Without news**
 
-That scoring mix makes special-teams opportunity consequential: losing power-play time would remove one of the established scoring routes. The point share does not identify his unit or guarantee the next assignment. The 2025-26 rates are a historical baseline.
+Where power-play points earn extra value, that concentration makes unit retention a central part of the valuation. Reduced special-teams time would require more scoring elsewhere to sustain the same overall return.
 
 **With confirmed first-unit practice evidence**
 
-example.com (2026-09-11): Sample Forward was reported working with the first power-play unit. Sample Forward drew 44% of his points from the power play in 2025-26. Sample Forward recorded 80 points (30 goals, 50 assists) in 80 games in 2025-26.
+example.com (2026-09-11): Sample Forward was reported working with the first power-play unit. Sample Forward earned 35 of his 80 points on the power play in 2025-26.
 
-Citrus read: that assignment creates a path to more power-play scoring if it carries into games. Track whether he keeps the unit; practice deployment alone does not justify raising the projection. That scoring mix makes special-teams opportunity consequential: losing power-play time would remove one of the established scoring routes. The point share does not identify his unit or guarantee the next assignment. The 2025-26 rates are a historical baseline.
+First-unit practice is especially consequential for this scoring mix. If that assignment carries into games, it preserves a major source of his offence; sustained power-play time is the condition to watch.
 
 Production evidence selection also rejects wrong players, undated/future/stale stories, prompt instructions, conditional or retrospective claims, and superseded health reports. Those cases are behavioral tests, not claims about these six players.
