@@ -183,6 +183,8 @@ export const MatchupComparison = ({
   // For weekly view, use weeklyTotalFromDaily if available (even if 0 - it's the calculated value)
   // For daily view, calculate from players
   const sumEarned = (players: typeof allUserPlayers): number => players.reduce((sum, player) => {
+    // Empty roster slots are layout placeholders, not missing player stats.
+    if (!player) return sum;
     const day = dailyStatsMap?.get(Number(player.id));
     const points = scopedEarnedPoints(player, isShowingDailyView, day?.daily_total_points);
     return points === null ? NaN : sum + points;
@@ -396,4 +398,3 @@ export const MatchupComparison = ({
     </div>
   );
 };
-

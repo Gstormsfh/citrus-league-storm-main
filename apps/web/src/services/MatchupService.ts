@@ -1170,15 +1170,24 @@ export const MatchupService = {
    * Deduplicates concurrent requests for the same date.
    */
   async getDailyProjectionsForMatchup(
-    playerIds: number[],
+    playerIds: Array<number | string>,
     targetDate: string
   ): Promise<Map<number, DailyProjectionRow>> {
     if (!playerIds || playerIds.length === 0) {
       return new Map();
     }
 
+    // Roster JSON can retain NHL IDs as strings. Normalize before both the
+    // API's numeric validation and cache lookup, so either representation
+    // reads the same projection without dropping a rostered player.
+    const normalizedIds = [...new Set(playerIds.map(id => typeof id === 'number'
+      ? id : typeof id === 'string' && /^\d+$/.test(id.trim()) ? Number(id) : NaN))];
+    if (normalizedIds.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+      throw new Error('Daily projection player IDs must be positive integers');
+    }
+
     // Dedup key: use date + sorted player IDs for exact match
-    const sortedIds = [...playerIds].sort((a, b) => a - b).join(',');
+    const sortedIds = [...normalizedIds].sort((a, b) => a - b).join(',');
     const dedupKey = `${targetDate}:${sortedIds}`;
 
     // Check result cache first (avoids network call entirely)
@@ -1195,7 +1204,7 @@ export const MatchupService = {
 
     const promise = (async () => {
       try {
-        const response = await matchupApi.getDailyProjections(playerIds, targetDate);
+        const response = await matchupApi.getDailyProjections(normalizedIds, targetDate);
 
         if (!response.data) {
           throw new Error('Daily projection response is unavailable');

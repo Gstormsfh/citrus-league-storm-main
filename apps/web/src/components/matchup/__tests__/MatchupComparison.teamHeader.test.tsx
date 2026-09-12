@@ -12,6 +12,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { DEFAULT_SCORING } from '@/utils/scoringUtils';
 
 // Focus this on the header contract. MatchupPositionGroup pulls in the whole
 // PlayerCard tree (tooltips, projections, scoring) which is irrelevant here
@@ -30,6 +31,14 @@ const baseProps = {
 };
 
 describe('MatchupComparison — lineup team header', () => {
+  it('renders unfilled daily lineup slots with loaded scoring without dereferencing null players', () => {
+    const onTotalsCalculated = vi.fn();
+    render(<MatchupComparison {...baseProps} selectedDate="2026-09-27"
+      scoringSettings={DEFAULT_SCORING}
+      onTotalsCalculated={onTotalsCalculated} />);
+    expect(onTotalsCalculated).toHaveBeenCalledWith(0, 0, '2026-09-27');
+  });
+
   it('renders both team names over the lineup', () => {
     render(<MatchupComparison {...baseProps} userTeamName="Storm" opponentTeamName="Kiwis" />);
     expect(screen.getByText('Storm')).toBeTruthy();
