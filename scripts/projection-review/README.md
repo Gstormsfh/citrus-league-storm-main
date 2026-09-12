@@ -55,3 +55,17 @@ python3 scripts/draft-guide/export_canonical_xlsx.py /path/to/canonical.json --r
 It contains all player rows, 32 team tabs with their actual TEAM NOTES text, source history and editable supported scoring weights. Workbook edits are local preview edits; use the source review patch workflow to change canonical inputs. The initial scoring fingerprint does not claim to track later Excel edits. The exporter uses Codex's bundled Node/artifact-tool runtime. PDF generation and the full Python test suite require the bundled Python runtime with PyMuPDF, reportlab and openpyxl; on this host it is `/Users/gstorms/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3`.
 
 UI boundary regression: `node scripts/projection-review/test_ui.mjs /path/to/canonical.json`. This executes the actual UI script and verifies validation, full rate maps, note preservation, and failed/stale source checks without applying patches.
+
+## Published source lineage
+
+The server also accepts an explicit exported-view wrapper:
+
+```json
+{"publication_view":"canonical_published_runs","run_id":"current derived run ID","revision":"current runtime revision","source_run_id":"original reviewed source run ID","source_revision":"original source SHA-256","source_payload":{},"exported_at":"dated export timestamp"}
+```
+
+`source_payload` must contain the complete original canonical input document, whose `revision` and Python digest match `source_revision`. The marker is added by the exporter; it is not a database column. Optional `exported_at` and `as_of` are displayed when supplied. A marker identifies an exported view snapshot, not a live verification of active publication.
+
+The atomic `/api/review` response contains `{source, publication_context}`. Edits and patch `base_revision` use only the original source revision. Runtime run/revision and export context remain separate readonly metadata and never enter the strict patch schema. `/api/source` returns the unmodified source document for compatible readers. Derived nightly remaining counts and their PostgreSQL hash are not editable inputs.
+
+A changed source revision blocks patch export. A runtime-only change preserves a valid source patch but warns that publication needs the reconciliation owner's current-active-revision comparison. Activation requires `p_expected_active_revision` whenever a run is already active. This editor neither applies patches nor invokes activation. The source importer/workbook exporter still require a raw source document and label outputs DRAFT; do not substitute a derived runtime payload or infer publication approval from a local file.

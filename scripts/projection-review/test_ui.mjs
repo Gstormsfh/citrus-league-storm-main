@@ -31,18 +31,24 @@ function element(id) {
   });
   return elements.get(id);
 }
+let fetchedContext = { kind: 'published_source', runtime_run_id: 'runtime-run', runtime_revision: 'runtime-v1', source_run_id: 'source-run', source_revision: source.revision };
 let fetchedRevision = source.revision, fetchFails = false, downloads = 0, fetches = 0;
 const context = vm.createContext({
   console, Blob, setTimeout() {},
   document: { querySelector: element, createElement: () => ({ click() { downloads++; } }) },
   window: { addEventListener() {} }, confirm: () => true,
   URL: { createObjectURL: () => 'blob:qa', revokeObjectURL() {} },
-  fetch: async () => { fetches++; return { ok: !fetchFails, json: async () => ({ revision: fetchedRevision }) }; },
+  fetch: async (url, options) => { assert.equal(url, '/api/review'); assert.equal(options.cache, 'no-store'); fetches++; return { ok: !fetchFails, json: async () => ({ source: { ...source, revision: fetchedRevision }, publication_context: { ...fetchedContext, source_revision: fetchedRevision } }) }; },
 });
 vm.runInContext(script.slice(0, boot), context, { filename: fileURLToPath(new URL('./index.html', import.meta.url)) });
 const run = code => vm.runInContext(code, context);
 context.fixture = structuredClone(source);
-run('base=copy(fixture);draft=copy(fixture)');
+context.fixtureContext = structuredClone(fetchedContext);
+run('base=copy(fixture);draft=copy(fixture);publicationContext=copy(fixtureContext);showPublicationContext()');
+assert.match(element('#contextLabel').textContent, /unpublished draft/);
+assert.deepEqual(JSON.parse(element('#publicationContext').textContent), fetchedContext);
+assert.throws(() => run("reviewEnvelope({source:fixture,publication_context:{...fixtureContext,source_revision:'mismatch'}})"), /does not match/);
+assert.equal(run("reviewEnvelope({source:fixture,publication_context:{kind:'local_draft'}}).publication_context.kind"), 'local_draft');
 assert.equal(run('validate()'), null, 'valid source must not block all exports');
 const target = source.players.findIndex(p => p.status === 'projected' && Object.keys(p.rates || {}).length && Number.isFinite(source.schedule[p.team]));
 assert.ok(target >= 0, 'test source needs a projected player with scheduled team');
@@ -73,6 +79,7 @@ element('#reason').value = 'Contract QA only';
 element('#evidence').value = 'Local fixture evidence';
 const patch = JSON.parse(run('JSON.stringify(patch())'));
 assert.equal(patch.base_revision, source.revision);
+assert.deepEqual(Object.keys(patch), ['base_revision', 'reason', 'evidence', 'player_updates', 'team_updates'], 'publication context must not change strict patch keys');
 assert.deepEqual(Object.keys(patch.player_updates[0].changes.rates), Object.keys(source.players[target].rates), 'changed rate exports the complete original map');
 assert.equal(patch.player_updates[0].changes.rates[rate], 0);
 assert.deepEqual(Object.keys(patch.player_updates[0].changes), ['rates'], 'unmodified sections must not appear');
@@ -105,5 +112,11 @@ fetchFails = false;
 await element('#download').onclick();
 assert.equal(downloads, 1, 'valid matching revision permits one local download');
 assert.equal(fetches, 3, 'each valid export attempt checks source revision');
+fetchedContext.runtime_revision = 'runtime-v2';
+await element('#download').onclick();
+assert.equal(downloads, 2, 'runtime-only change permits a source-valid patch download');
+assert.match(element('#contextWarning').textContent, /compare-and-swap/);
+assert.equal(run('publicationContext.runtime_revision'), 'runtime-v1', 'loaded runtime context stays immutable');
+assert.equal(JSON.parse(element('#publicationContext').textContent).runtime_revision, 'runtime-v1');
 assert.equal(run('JSON.stringify(base)'), JSON.stringify(source), 'source remains unchanged through all edits/exports');
 console.log('PASS actual UI: validation, null/zero, coverage preview, complete rate map, note preservation, evidence requirements, stale/failed revision and valid download');

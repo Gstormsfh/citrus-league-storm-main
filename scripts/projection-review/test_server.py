@@ -8,7 +8,7 @@ import tempfile
 import threading
 import unittest
 
-from server import SCHEMA, make_handler, read_source
+from server import SCHEMA, make_handler, read_source, read_review
 
 
 def sealed(**updates):
@@ -32,6 +32,30 @@ class ReviewServerTests(unittest.TestCase):
         self.source.write_text(json.dumps(data))
         with self.assertRaisesRegex(ValueError, "hash mismatch"):
             read_source(self.source)
+
+    def test_published_envelope_edits_source_and_preserves_runtime_context(self):
+        original = sealed()
+        envelope = {"publication_view": "canonical_published_runs", "run_id": "nightly-run",
+                    "revision": "postgres-derived-hash", "source_run_id": "reviewed-run",
+                    "source_revision": original["revision"], "source_payload": original,
+                    "payload": {"players": [{"counts": {"goals": 999}}]}}
+        self.source.write_text(json.dumps(envelope))
+        review = read_review(self.source)
+        self.assertEqual(review["source"], original)
+        self.assertEqual(review["publication_context"]["runtime_revision"], "postgres-derived-hash")
+        self.assertEqual(review["publication_context"]["source_revision"], original["revision"])
+        self.assertNotIn("publication_context", read_source(self.source))
+        envelope["source_revision"] = "stale-source"
+        self.source.write_text(json.dumps(envelope))
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            read_review(self.source)
+
+    def test_source_payload_without_view_marker_is_not_publication(self):
+        self.source.write_text(json.dumps({"source_payload": sealed()}))
+        with self.assertRaisesRegex(ValueError, "view marker"):
+            read_review(self.source)
+        self.source.write_text(json.dumps(sealed()))
+        self.assertEqual(read_review(self.source)["publication_context"], {"kind": "local_draft"})
 
     def test_http_rereads_current_source_and_never_applies_patch(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(self.source))
