@@ -235,9 +235,12 @@ describe('GET /api/players/:playerId/xg-history — the server-rendered writeup'
     expect(data.player_id).toBe(MCDAVID);
     expect(data.points).toHaveLength(3);
 
-    expect(data.writeup.headline).toBe('Dual scoring routes');
+    expect(data.writeup.headline).toBe('Playmaking with shot volume');
     expect(data.writeup.summary).toContain('2025-26');
     expect(data.writeup.summary).not.toContain('this season');
+    expect(data.writeup.summary).toContain('89 assists');
+    expect(data.writeup.summary).toContain('3.7 shots per game');
+    expect(data.writeup.analysis).not.toMatch(/will score|guaranteed return|undisputed crease/i);
     expect(data.writeup.hasEnoughData).toBe(true);
     expect(data.writeup.cardNote).toContain('P/GP');
     expect(Array.isArray(data.writeup.tags)).toBe(true);
