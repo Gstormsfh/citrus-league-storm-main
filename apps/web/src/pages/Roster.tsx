@@ -1,3 +1,4 @@
+import { indexRosterRosStats } from '@/components/roster/rosStats';
 import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 import { expectedDailyProjection } from '@citrus/shared';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -70,7 +71,7 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { MatchupScheduleSelector } from "@/components/matchup/MatchupScheduleSelector";
 import { WeeklySchedule } from "@/components/matchup/WeeklySchedule";
 import { getTodayMST, getTodayMSTDate, formatWaiverProcessTime, formatMoment, computeNextWaiverProcessMoment } from '@/utils/timezoneUtils';
-import { getCurrentSeason, getProjectionsSeason } from '@/utils/seasonConstants';
+import { getCurrentSeason } from '@/utils/seasonConstants';
 import { fantasyWeekAnchorFor, weekStartDowFor, getCurrentWeekNumber, getAvailableWeeks, getWeekStartDate, getWeekEndDate } from '@/utils/weekCalculator';
 import { Matchup as MatchupType } from '@/services/MatchupService';
 import { logger } from '@/utils/logger';
@@ -2278,10 +2279,9 @@ const Roster = () => {
 
                     if (!dCurr && !dPrev) return p;
 
-                    // Rest of season projections will be loaded from player_projected_stats
-                    // to match the matchup projection system exactly
+                    // Canonical ROS totals are attached separately after season enrichment.
                     const projections = {
-                        restOfSeason: undefined // Will be populated from player_projected_stats
+                        restOfSeason: undefined
                     };
 
                     return {
@@ -2304,165 +2304,24 @@ const Roster = () => {
                 ir: roster.ir.map(enrichPlayer)
             };
 
-            // Now fetch rest-of-season projections from player_projected_stats (matchup system)
-            const todayStr = getTodayMST();
-            
-            // Get all player IDs from roster
-            const allPlayerIds = [
-                ...enrichedRoster.starters.map(p => {
-                    const id = typeof p.id === 'string' ? parseInt(p.id) : p.id;
-                    return isNaN(id) ? null : id;
-                }),
-                ...enrichedRoster.bench.map(p => {
-                    const id = typeof p.id === 'string' ? parseInt(p.id) : p.id;
-                    return isNaN(id) ? null : id;
-                }),
-                ...enrichedRoster.ir.map(p => {
-                    const id = typeof p.id === 'string' ? parseInt(p.id) : p.id;
-                    return isNaN(id) ? null : id;
-                })
-            ].filter((id): id is number => id !== null);
+            // Read the canonical ROS rows, whose categories already include remaining
+            // exposure. The API pages the active season before applying this limit;
+            // summing the daily batch endpoint silently truncated larger rosters.
+            const projResponse = await playerApi.getRosProjections(2000);
+            if (!Array.isArray(projResponse.data)) throw new Error('Invalid ROS projection response');
+            const rosByPlayer = indexRosterRosStats(projResponse.data);
+            const enrichWithProjections = (p: HockeyPlayer): HockeyPlayer => ({
+                ...enrichPlayer(p),
+                // Explicitly clear a former row if this active source has no projection.
+                rosStats: rosByPlayer.get(Number(p.id)),
+            });
+            setRoster(prevRoster => ({
+                ...prevRoster,
+                starters: prevRoster.starters.map(enrichWithProjections),
+                bench: prevRoster.bench.map(enrichWithProjections),
+                ir: prevRoster.ir.map(enrichWithProjections),
+            }));
 
-            if (allPlayerIds.length > 0) {
-                // Fetch all future projections for these players (all 8 stat categories to match matchup system)
-                const projResponse = await playerApi.getBatchProjections(
-                  allPlayerIds.map(String),
-                  { startDate: todayStr, season: getProjectionsSeason() }
-                );
-                const projectionsData = projResponse.data as any[] | null;
-
-                if (projectionsData) {
-                    // Aggregate projections by player_id (all 8 stat categories)
-                    const aggregatedProjections = new Map<number, {
-                        goals: number;
-                        assists: number;
-                        sog: number;
-                        blocks: number;
-                        ppp: number;
-                        shp: number;
-                        hits: number;
-                        pim: number;
-                        total_points: number;
-                    }>();
-
-                    projectionsData.forEach((proj: any) => {
-                        const playerId = Number(proj.player_id);
-                        if (!aggregatedProjections.has(playerId)) {
-                            aggregatedProjections.set(playerId, {
-                                goals: 0,
-                                assists: 0,
-                                sog: 0,
-                                blocks: 0,
-                                ppp: 0,
-                                shp: 0,
-                                hits: 0,
-                                pim: 0,
-                                total_points: 0
-                            });
-                        }
-                        const agg = aggregatedProjections.get(playerId)!;
-                        agg.goals += Number(proj.projected_goals || 0);
-                        agg.assists += Number(proj.projected_assists || 0);
-                        agg.sog += Number(proj.projected_sog || 0);
-                        agg.blocks += Number(proj.projected_blocks || 0);
-                        agg.ppp += Number(proj.projected_ppp || 0);
-                        agg.shp += Number(proj.projected_shp || 0);
-                        agg.hits += Number(proj.projected_hits || 0);
-                        agg.pim += Number(proj.projected_pim || 0);
-                        agg.total_points += Number(proj.total_projected_points || 0);
-                    });
-
-                    // Update roster with aggregated projections
-                    const enrichWithProjections = (p: HockeyPlayer) => {
-                        const pId = typeof p.id === 'string' ? parseInt(p.id) : p.id;
-                        if (isNaN(pId)) return p;
-                        
-                        const aggregated = aggregatedProjections.get(pId);
-                        if (!aggregated) return p;
-
-                        // Transform aggregated projections to match CitrusPuckPlayerData format
-                        // Using all 8 stat categories from matchup projection system
-                        const restOfSeasonData = {
-                            I_F_goals: aggregated.goals,
-                            I_F_primaryAssists: aggregated.assists * 0.6, // Estimate primary/secondary split
-                            I_F_secondaryAssists: aggregated.assists * 0.4,
-                            I_F_points: aggregated.goals + aggregated.assists,
-                            I_F_shotsOnGoal: aggregated.sog,
-                            I_F_blocks: aggregated.blocks,
-                            // Include all 8 stat categories from matchup system
-                            I_F_powerPlayGoals: aggregated.ppp * 0.4, // Estimate PPG/PPA split
-                            I_F_powerPlayAssists: aggregated.ppp * 0.6,
-                            I_F_shortHandedGoals: aggregated.shp * 0.4, // Estimate SHG/SHA split
-                            I_F_shortHandedAssists: aggregated.shp * 0.6,
-                            I_F_hits: aggregated.hits,
-                            I_F_penaltyMinutes: aggregated.pim,
-                            // Other required fields
-                            I_F_plusMinus: 0, // Not projected in current system
-                            games_played: 0 // Will be calculated from number of games projected
-                        };
-
-                        return {
-                            ...p,
-                            citrusPuckData: {
-                                ...p.citrusPuckData,
-                                projections: {
-                                    ...p.citrusPuckData?.projections,
-                                    restOfSeason: restOfSeasonData
-                                }
-                            }
-                        };
-                    };
-
-                    // Add CitrusPuck data to roster (projections are handled by displayRoster useMemo)
-                    setRoster(prevRoster => ({
-                        ...prevRoster,
-                        starters: prevRoster.starters.map(p => enrichWithProjections(enrichPlayer(p))) as HockeyPlayer[],
-                        bench: prevRoster.bench.map(p => enrichWithProjections(enrichPlayer(p))) as HockeyPlayer[],
-                        ir: prevRoster.ir.map(p => enrichWithProjections(enrichPlayer(p))) as HockeyPlayer[]
-                    }));
-                } else {
-                    // If projections fetch fails, just use enriched roster with CitrusPuck data
-                    setRoster(prevRoster => ({
-                        ...prevRoster,
-                        starters: prevRoster.starters.map(enrichPlayer) as HockeyPlayer[],
-                        bench: prevRoster.bench.map(enrichPlayer) as HockeyPlayer[],
-                        ir: prevRoster.ir.map(enrichPlayer) as HockeyPlayer[]
-                    }));
-                }
-            } else {
-                // No player IDs, just set enriched roster but preserve daily projections
-                setRoster(prevRoster => ({
-                    ...prevRoster,
-                    starters: prevRoster.starters.map(p => {
-                        const enriched = enrichPlayer(p);
-                        return {
-                            ...enriched,
-                            projectedPoints: p.projectedPoints,
-                            daily_projection: (p as any).daily_projection,
-                            goalieProjection: (p as any).goalieProjection
-                        };
-                    }) as HockeyPlayer[],
-                    bench: prevRoster.bench.map(p => {
-                        const enriched = enrichPlayer(p);
-                        return {
-                            ...enriched,
-                            projectedPoints: p.projectedPoints,
-                            daily_projection: (p as any).daily_projection,
-                            goalieProjection: (p as any).goalieProjection
-                        };
-                    }) as HockeyPlayer[],
-                    ir: prevRoster.ir.map(p => {
-                        const enriched = enrichPlayer(p);
-                        return {
-                            ...enriched,
-                            projectedPoints: p.projectedPoints,
-                            daily_projection: (p as any).daily_projection,
-                            goalieProjection: (p as any).goalieProjection
-                        };
-                    }) as HockeyPlayer[]
-                }));
-            }
-            
             setAnalyticsLoaded(true);
             // No toast (2026-09-05). "CitrusPuck Loaded -- Advanced stats and
             // projections ready" fired over the header on every Team visit;

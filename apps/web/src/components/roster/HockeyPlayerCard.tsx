@@ -1,3 +1,4 @@
+import { formatRosCount, type RosterRosStats } from './rosStats';
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -9,6 +10,7 @@ import { playerPositionsLabel } from "./positions";
 
 export interface HockeyPlayer {
   statsSeason?: number | null;
+  rosStats?: RosterRosStats;
   id: number | string;
   name: string;
   position: string; // 'Centre', 'Right Wing', 'Left Wing', 'Defence', 'Goalie', 'C', 'RW', 'LW', 'D', 'G'
@@ -277,9 +279,6 @@ const HockeyPlayerCardContent = ({
     let data: CitrusPuckPlayerData | undefined;
     
     switch (view) {
-      case 'restOfSeason':
-        data = cp?.projections?.restOfSeason;
-        break;
       case 'seasonToDate':
       default:
         data = cp?.currentSeason?.allSituation;
@@ -287,23 +286,6 @@ const HockeyPlayerCardContent = ({
     }
 
     if (!data) {
-        // If we are in a specific analytics view (projections) and have no data, show 0s
-        if (['restOfSeason'].includes(view)) {
-             return {
-                goals: 0,
-                assists: 0,
-                points: 0,
-                plusMinus: 0,
-                shots: 0,
-                gamesPlayed: 0,
-                powerPlayPoints: 0,
-                shortHandedPoints: 0,
-                pim: 0,
-                wins: 0,
-                gaa: 0,
-                savePct: 0
-            };
-        }
         // Fallback to existing stats for seasonToDate or default
         return player.stats;
     }
@@ -501,8 +483,20 @@ const HockeyPlayerCardContent = ({
       <div className="p-2 bg-gradient-to-br from-pastel-sage/10 via-pastel-sage/5 to-pastel-sage/10 flex-1 flex items-center justify-center border-t-2 border-pastel-sage/40 relative before:content-[''] before:absolute before:top-0 before:left-0 before:right-0 before:h-0.5 before:bg-gradient-to-r before:from-pastel-sage/50 before:via-[#7CB518] before:to-pastel-sage/50">
         {(() => {
           const gameStatus = player.nextGame?.gameStatus;
-          const showActuals = hasGameOnSelectedDate && player.daily_actual_stats &&
+          const showActuals = player.statView !== 'restOfSeason' && hasGameOnSelectedDate && player.daily_actual_stats &&
             (gameStatus === 'live' || gameStatus === 'intermission' || gameStatus === 'final');
+
+          if (player.statView === 'restOfSeason') {
+            const stats = player.rosStats;
+            const values = isGoalie
+              ? [{ label: 'W', value: stats?.wins }, { label: 'SV', value: stats?.saves }, { label: 'GA', value: stats?.goalsAgainst }]
+              : [{ label: 'GP', value: stats?.gamesPlayed }, { label: 'G', value: stats?.goals }, { label: 'A', value: stats?.assists }, { label: 'SOG', value: stats?.shots }];
+            return (
+              <div aria-label="Rest of season projections" className={cn('grid gap-0.5 text-center w-full', isGoalie ? 'grid-cols-3' : 'grid-cols-4')}>
+                {values.map(stat => <div key={stat.label}><div className="text-[7px] text-muted-foreground uppercase leading-none mb-0.5">{stat.label}</div><div className="font-bold text-[9px]">{formatRosCount(stat.value)}</div></div>)}
+              </div>
+            );
+          }
 
           if (isGoalie) {
             if (showActuals && player.daily_actual_stats) {
