@@ -1,88 +1,202 @@
 import { describe, expect, it } from 'vitest';
+import fixtures from '../../../../../docs/editorial-evaluation/nhl-2025-26-examples.json';
 import { generatePlayerWriteup, type WriteupPlayer } from '../../playerWriteup';
-import { editorialScoringCategories } from '../index';
-
-const player = (stats: WriteupPlayer['stats'], name = 'Sample Forward', position = 'C'): WriteupPlayer => ({
-  id: 1, name, position, statsSeason: 2025, stats,
-});
+import { profileWriteup } from '../profile';
+import { editorialScoringCategories, type EditorialNewsEvidence } from '../index';
+const player = (stats: WriteupPlayer['stats'], name = 'Sample Forward', position = 'C'): WriteupPlayer => ({ id: 1, name, position, statsSeason: 2025, stats });
 const sample = { gamesPlayed: 80, goals: 35, assists: 55, points: 90, shots: 320, powerPlayPoints: 25, toi: '21:00' };
 const extras = { projectionSeason: 2026 };
+const real = (name: string) => fixtures.find(p => p.name === name)!;
+const evidence = (kind: EditorialNewsEvidence['kind'], publishedAt = '2026-09-12T09:00:00Z'): EditorialNewsEvidence => ({ kind, source: 'example.com', url: 'https://example.com/fixture', publishedAt, report: 'Synthetic test report', implication: 'GENERIC IMPLICATION MUST NOT BE COPIED' });
 
 describe('Citrus evidence-driven editorial profiles', () => {
-  it('four high-scoring forwards have materially different mechanisms without name-driven variation', () => {
-    const fixtures = [
-      player(sample),
-      player({ ...sample, goals: 50, assists: 40, shots: 280 }),
-      player({ ...sample, goals: 20, assists: 70, shots: 190 }),
-      player({ ...sample, goals: 30, assists: 60, shots: 200, powerPlayPoints: 45 }),
-    ];
-    const out = fixtures.map(p => generatePlayerWriteup(p, extras));
-    expect(out.map(w => w.headline)).toEqual(['Volume shooter', 'Goal-led scoring', 'Assist-led production', 'Power-play exposure']);
-    const normalized = out.map(w => w.analysis.replace(/\d+(?:\.\d+)?/g, '#'));
-    expect(new Set(normalized).size).toBe(4);
-    expect(normalized[0]).toContain('Finishing can move independently');
-    expect(normalized[1]).toContain('Goals drove');
-    expect(normalized[2]).toContain('teammate to finish');
-    expect(normalized[3]).toContain('special-teams opportunity');
-    expect(generatePlayerWriteup({ ...fixtures[0], id: 97, name: 'Another Forward' }, extras).analysis).toBe(out[0].analysis);
+  it('explains distinct interactions for the six frozen NHL evidence fixtures', () => {
+    const outputs = fixtures.map(p => profileWriteup(p, extras));
+    const [mcdavid, mackinnon, kucherov, draisaitl, makar, hellebuyck] = outputs;
+    expect(mcdavid.summary).toMatch(/90 assists.*3.7 shots.*2025-26.*23 minutes/);
+    expect(mcdavid.analysis).toContain('comparable workload');
+    expect(mackinnon.summary).toMatch(/4.4 shots.*53 goals.*15.1%/);
+    expect(mackinnon.analysis).toContain('maintaining conversion');
+    expect(kucherov.summary).toMatch(/44 goals.*19%.*3 shots.*86 assists/);
+    expect(kucherov.analysis).toContain('same shot volume');
+    expect(draisaitl.summary).toContain('42 of his 97 points on the power play');
+    expect(draisaitl.analysis).toContain('Reduced special-teams time');
+    expect(makar.summary).toContain('50 came outside the power play');
+    expect(makar.analysis).toContain('defence slot');
+    expect(hellebuyck.summary).toMatch(/57 appearances.*23.*.895.*2.86/);
+    expect(hellebuyck.analysis).toContain('performance and a larger workload are separate');
+    for (let i = 0; i < outputs.length; i++) {
+      const prose = `${outputs[i].summary} ${outputs[i].analysis}`;
+      expect(prose.split(fixtures[i].name)).toHaveLength(2);
+      expect(prose).not.toContain('historical baseline');
+      expect(prose).not.toMatch(/teammate to finish|even-strength points|coach trusts|guaranteed regression/);
+      expect(prose.split(/\s+/).length).toBeLessThan(100);
+    }
   });
 
-  it('recognizes a single known peripheral category without fabricating the missing one', () => {
-    const out = generatePlayerWriteup(player({ gamesPlayed: 80, points: 20, goals: 5, assists: 15, hits: 300 }), extras);
+  it('changing conversion at fixed games and shots changes the argument, not just the goal number', () => {
+    const efficient = real('Nikita Kucherov');
+    const lower = { ...efficient, stats: { ...efficient.stats, goals: 25, points: 111 } };
+    const high = profileWriteup(efficient, extras);
+    const low = profileWriteup(lower, extras);
+    expect(high.headline).toBe('Finishing and playmaking');
+    expect(low.headline).toBe('Volume shooter');
+    expect(high.analysis).toContain('conversion to hold');
+    expect(low.analysis).toContain('volume still contributes');
+    expect(high.analysis).not.toMatch(/will decline|must regress|sell high/);
+  });
+
+  it('changing power-play dependence changes the recommendation while holding total points fixed', () => {
+    const p = real('Leon Draisaitl');
+    const pp = profileWriteup(p, extras);
+    const lessPP = profileWriteup({ ...p, stats: { ...p.stats, powerPlayPoints: 10 } }, extras);
+    expect(pp.analysis).toContain('Reduced special-teams time');
+    expect(lessPP.analysis).not.toContain('Reduced special-teams time');
+    expect(pp.headline).not.toBe(lessPP.headline);
+  });
+
+  it('uses minutes only when they change the supported assessment', () => {
+    const p = real('Connor McDavid');
+    const known = profileWriteup(p, extras);
+    const unknown = profileWriteup({ ...p, stats: { ...p.stats, toi: undefined } }, extras);
+    expect(known.analysis).toContain('comparable workload');
+    expect(unknown.summary).not.toContain('minutes');
+    expect(unknown.analysis).not.toContain('comparable workload');
+    const limited = profileWriteup(player({ gamesPlayed: 40, goals: 3, assists: 5, points: 8, shots: 20, toi: '9:30' }), extras);
+    expect(limited.summary).toContain('9.5 minutes');
+    expect(limited.analysis).toContain('more minutes or more scoring per minute');
+    expect(limited.summary).not.toMatch(/fourth.line|bottom.six|sheltered/);
+  });
+
+  it('supports one known peripheral category without fabricating the missing one', () => {
+    const out = profileWriteup(player({ gamesPlayed: 80, points: 20, goals: 5, assists: 15, hits: 300 }), extras);
     expect(out.headline).toBe('Peripheral specialist');
     expect(out.summary).toContain('3.8 hits');
     expect(out.summary).not.toMatch(/0 blocks|NaN/);
   });
 
-  it('does not award excluded physical production in a blocks-only setup', () => {
+  it('excluded hits cannot compensate for weak scoring in a blocks-only setup', () => {
     const p = player({ gamesPlayed: 80, goals: 5, assists: 15, points: 20, hits: 300, blockedShots: 10 });
-    const withHits = generatePlayerWriteup(p, { ...extras, scoringCategories: ['hits'] });
-    const blocksOnly = generatePlayerWriteup(p, { ...extras, scoringCategories: ['blocks'] });
-    expect(withHits.tags).toContainEqual({ label: 'Peripheral value', tone: 'positive' });
-    expect(blocksOnly.tags).not.toContainEqual({ label: 'Peripheral value', tone: 'positive' });
-    expect(blocksOnly.analysis).toContain('outside the rewarded categories');
+    const hits = profileWriteup(p, { ...extras, scoringCategories: ['hits'] });
+    const blocks = profileWriteup(p, { ...extras, scoringCategories: ['blocks'] });
+    expect(hits.tags).toContainEqual({ label: 'Peripheral value', tone: 'positive' });
+    expect(blocks.tags).not.toContainEqual({ label: 'Peripheral value', tone: 'positive' });
+    expect(blocks.analysis).toContain('outside the rewarded categories');
   });
 
-  it('changes shooter advice when shots stop scoring', () => {
-    const p = player(sample);
-    const withShots = generatePlayerWriteup(p, { ...extras, scoringCategories: ['goals', 'shots'] });
-    const goalsOnly = generatePlayerWriteup(p, { ...extras, scoringCategories: ['goals'] });
-    expect(withShots.analysis).toContain('leagues counting shots');
-    expect(goalsOnly.analysis).toContain('Shots are not rewarded directly');
-    expect(withShots.summary).toBe(goalsOnly.summary);
+  it('shot scoring and assists scoring alter the actual recommendation', () => {
+    const p = real('Connor McDavid');
+    const assists = profileWriteup(p, { ...extras, scoringCategories: ['assists'] });
+    const goals = profileWriteup(p, { ...extras, scoringCategories: ['goals'] });
+    expect(assists.analysis).toContain('assist return carries more');
+    expect(goals.analysis).toContain('assist total is not directly rewarded');
+    const shooter = profileWriteup(real('Nathan MacKinnon'), { ...extras, scoringCategories: ['goals'] });
+    expect(shooter.analysis).toContain('Shots are not rewarded directly');
+    expect(assists.summary).toBe(goals.summary);
   });
 
-  it('distinguishes goalie ratios from wins scoring and never infers a secure job', () => {
-    const p = player({ gamesPlayed: 50, wins: 35, losses: 10, savePct: 0.899, gaa: 3.1 }, 'Sample Goalie', 'G');
-    const wins = generatePlayerWriteup(p, { ...extras, scoringCategories: ['wins'] });
-    const ratios = generatePlayerWriteup(p, { ...extras, scoringCategories: ['save_pct', 'gaa'] });
+  it('keeps a defender non-PP scoring split distinct from even-strength or role evidence', () => {
+    const p = real('Cale Makar');
+    const all = profileWriteup(p, extras);
+    const ppOnly = profileWriteup(p, { ...extras, scoringCategories: ['power_play_points'] });
+    expect(all.summary).toContain('50 came outside the power play');
+    expect(all.analysis).toContain('defence slot');
+    expect(ppOnly.analysis).toContain('does not earn a power-play bonus');
+    expect(`${all.summary} ${all.analysis}`).not.toMatch(/even.strength|PP1|first.unit|top.pair/);
+  });
+
+  it('distinguishes wins, save percentage and GAA scoring for the same goalie', () => {
+    const p = player({ gamesPlayed: 50, wins: 35, losses: 10, savePct: .899, gaa: 3.1 }, 'Sample Goalie', 'G');
+    const wins = profileWriteup(p, { ...extras, scoringCategories: ['wins'] });
+    const ratios = profileWriteup(p, { ...extras, scoringCategories: ['save_pct'] });
+    const gaa = profileWriteup(p, { ...extras, scoringCategories: ['gaa'] });
     expect(wins.analysis).toContain('setup rewards wins');
-    expect(ratios.analysis).toContain('wins do not add direct scoring value');
-    expect(wins.analysis).not.toBe(ratios.analysis);
-    for (const w of [wins, ratios]) expect(w.analysis).not.toMatch(/job looks secure|true starter|weekly starter/);
+    expect(ratios.analysis).toContain('Wins do not add direct scoring value');
+    expect(gaa.analysis).toContain('GAA as the ratio benchmark');
+    expect(gaa.analysis).not.toContain('at that save rate');
+    for (const w of [wins, ratios, gaa]) expect(w.analysis).not.toMatch(/secure|true starter|weekly starter/);
   });
 
-  it('keeps absent appearance data unknown and rejects incomplete point rates', () => {
-    const missingGp = generatePlayerWriteup(player({ points: 80 }), extras);
-    expect(missingGp.summary).toContain('does not include a usable appearance count');
-    expect(missingGp.summary).not.toContain('no NHL appearances');
-    expect(missingGp.hasEnoughData).toBe(false);
-    expect(generatePlayerWriteup(player({ gamesPlayed: 80 }), extras).hasEnoughData).toBe(false);
+  it('current health evidence replaces the statistical recommendation rather than appending boilerplate', () => {
+    const p = real('Connor McDavid');
+    const baseline = profileWriteup(p, extras);
+    const practice = profileWriteup(p, { ...extras, selectedNews: [evidence('practice')] });
+    const out = profileWriteup(p, { ...extras, selectedNews: [evidence('out')] });
+    expect(practice.summary).toBe(baseline.summary);
+    expect(practice.analysis).toContain('assist and shot contribution');
+    expect(practice.analysis).toContain('neither game clearance');
+    expect(practice.analysis).not.toContain(baseline.analysis);
+    expect(out.analysis).toContain('access to games');
+    expect(out.analysis).not.toContain('GENERIC IMPLICATION');
   });
 
-  it('does not infer tracking, teammates, role security or inevitable regression from totals', () => {
-    const w = generatePlayerWriteup(player({ ...sample, xGoals: 20 }), extras);
-    expect(w.analysis).toContain('20 Citrus expected goals');
-    expect(w.analysis).toContain('not proof of luck or a guaranteed reversal');
-    expect(`${w.summary} ${w.analysis}`).not.toMatch(/coach trusts|top.line role|slot access|sell high|buy low|Start him and forget/);
+  it('the same PP news carries a different implication for PP-dependent and diversified scoring', () => {
+    const pp = profileWriteup(real('Leon Draisaitl'), { ...extras, selectedNews: [evidence('power-play')] });
+    const mixed = profileWriteup(real('Nathan MacKinnon'), { ...extras, selectedNews: [evidence('power-play')] });
+    expect(pp.analysis).toContain('preserves a major source');
+    expect(mixed.analysis).toContain('before treating it as additional offence');
+    expect(pp.analysis).not.toBe(mixed.analysis);
+    expect(pp.analysis).not.toMatch(/raise.*projection|guarantee/);
   });
 
-  it('uses goalie starts for forecast workload and never changes the input values', () => {
-    const p = player({ gamesPlayed: 50, savePct: .92 }, 'Sample Goalie', 'G');
+  it('verified availability takes priority only over older health reporting', () => {
+    const p = real('Nikita Kucherov');
+    const context = { status: 'out', authority: 'verified' as const, asOf: '2026-09-12T10:00:00Z' };
+    const newerCanonical = profileWriteup(p, { ...extras, selectedNews: [evidence('cleared')], selectedAvailability: context });
+    expect(newerCanonical.analysis).toContain('dated absence');
+    const newerNews = profileWriteup(p, { ...extras, selectedNews: [evidence('cleared', '2026-09-12T11:00:00Z')], selectedAvailability: context });
+    expect(newerNews.analysis).toContain('question shifts');
+    expect(newerNews.analysis).not.toContain('dated absence');
+  });
+
+  it('imported scenarios remain conditional and active designation is not clearance', () => {
+    const p = real('Nikita Kucherov');
+    const imported = profileWriteup(p, { ...extras, selectedAvailability: { status: 'out', authority: 'imported_scenario', asOf: '2026-09-12' } });
+    expect(imported.analysis).toMatch(/^If the imported availability scenario still applies/);
+    expect(imported.analysis).not.toContain('dated absence');
+    const active = profileWriteup(p, { ...extras, selectedAvailability: { status: 'active', authority: 'verified', asOf: '2026-09-12' } });
+    expect(active.analysis).toContain('not medical clearance');
+  });
+
+  it('missing appearances remain unknown; partial stats do not become a short sample', () => {
+    const missing = profileWriteup(player({ points: 80 }), extras);
+    expect(missing.summary).toContain('does not include a usable appearance count');
+    expect(missing.summary).not.toContain('no NHL appearances');
+    expect(missing.cardNote).toContain('GP unavailable');
+    expect(missing.hasEnoughData).toBe(false);
+    const partial = profileWriteup(player({ gamesPlayed: 80 }), extras);
+    expect(partial.headline).toBe('Incomplete rate data');
+    expect(partial.summary).not.toContain('too small');
+    const short = profileWriteup(player({ gamesPlayed: 2, goals: 2, assists: 1, points: 3 }), extras);
+    expect(short.hasEnoughData).toBe(false);
+    expect(short.summary).not.toContain('1.5 points per game');
+  });
+
+  it('keeps source season and neutral unknown-season wording without stock baseline tails', () => {
+    const historical = profileWriteup(player(sample), { projectionSeason: 2027 });
+    const unknown = profileWriteup({ ...player(sample), statsSeason: undefined }, { projectionSeason: 2027 });
+    expect(historical.summary).toContain('in 2025-26');
+    expect(historical.summary).not.toContain('2027-28');
+    expect(unknown.summary).toContain('in the available stat record');
+    expect(unknown.summary).not.toMatch(/this season|2025-26|2027-28/);
+    expect(historical.cardNote).toBe('2025-26 · 1.13 P/GP');
+  });
+
+  it('uses attributed model evidence conditionally and does not change projection inputs', () => {
+    const p = player({ ...sample, xGoals: 20 });
+    const w = profileWriteup(p, extras);
+    expect(w.analysis).toContain('15 goals above the 20 Citrus expected goals estimate');
+    expect(w.analysis).toContain('A repeat needs');
+    expect(w.analysis).not.toMatch(/will regress|proof of luck|sell high|buy low/);
+    const gp = player({ gamesPlayed: 50, savePct: .92 }, 'Sample Goalie', 'G');
     const settings = Object.freeze({ ...extras, projGp: 58, projFp: 400, projectionLabel: 'for 2026-27' });
-    const w = generatePlayerWriteup(p, settings);
-    expect(w.analysis).toContain('400 fantasy points over 58 starts for 2026-27');
-    expect(p.stats?.gamesPlayed).toBe(50);
+    expect(generatePlayerWriteup(gp, settings).analysis).toContain('400 fantasy points over 58 starts for 2026-27');
+    expect(gp.stats?.gamesPlayed).toBe(50);
+  });
+
+  it('renaming identical evidence cannot change the analytical conclusion', () => {
+    const p = real('Nathan MacKinnon');
+    expect(profileWriteup(p, extras).analysis).toBe(profileWriteup({ ...p, id: 999, name: 'Another Player' }, extras).analysis);
   });
 
   it('extracts only configured nonzero weights and keeps no-settings unknown', () => {
