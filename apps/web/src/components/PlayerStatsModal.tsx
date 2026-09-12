@@ -1431,12 +1431,13 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                         title="Upcoming"
                         action={
                           <span className="font-plex font-medium text-[10px] tabular-nums text-pressbox-text/45 whitespace-nowrap">
-                            {futureGames.length} GAME{futureGames.length === 1 ? '' : 'S'}
+                            {futureGames.length} {isGoalie ? 'TEAM ' : ''}GAME{futureGames.length === 1 ? '' : 'S'}
                             {hasLogProjection ? ` · ${leagueProjection.points.toFixed(1)} PROJ` : ''}
                           </span>
                         }
                       />
                       <PressBoxUpcomingCards games={upcomingCards(gameLog)} />
+                      {isGoalie && <p className="text-xs text-pressbox-text/60">Expected starts and counting stats include the chance of starting. A dash means workload evidence is unavailable.</p>}
                       <PressBoxGameLog
                         showPoints={false}
                         showTail={false}

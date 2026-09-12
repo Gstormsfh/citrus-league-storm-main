@@ -174,9 +174,9 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
   // Zero Projection Logic: If projectedPoints === 0 but hasGameOnDate is true, show "TBD" or "Calculating"
   // For goalies, also check starter_confirmed flag
   // Only applies when game is not final, not live, and not started (show projections until game starts)
-  const hasProjection = dailyProjection && projectedPoints > 0;
-  const isStarterConfirmed = isGoalie ? (player.goalieProjection?.starter_confirmed ?? false) : true;
-  const showTBD = hasGameOnDate && !isGameFinal && !isGameLive && !gameHasStarted && (!hasProjection || (isGoalie && !isStarterConfirmed));
+  const hasProjection = dailyProjection?.total_projected_points != null && Number.isFinite(dailyProjection.total_projected_points);
+  const hasUsableProjection = hasProjection; // Expected workload does not claim a confirmed NHL start.
+  const showTBD = hasGameOnDate && !isGameFinal && !isGameLive && !gameHasStarted && (!hasProjection || (isGoalie && !hasUsableProjection));
 
   // WEEK VIEW (2026-09-01, audit M9). With no day selected the page shows
   // the whole matchup week — the total row sums the week, the ScoreCard
@@ -197,7 +197,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
       : undefined;
   // Tonight's game still to come, with a number on it: shown under the
   // week total as "+4.2" (orange = forecast), tappable for its breakdown.
-  const tonightPending = hasGameOnDate && !isGameFinal && !isGameLive && !gameHasStarted && !!hasProjection && isStarterConfirmed;
+  const tonightPending = hasGameOnDate && !isGameFinal && !isGameLive && !gameHasStarted && !!hasProjection && hasUsableProjection;
   const tonightLive = hasGameOnDate && (isGameLive || (gameHasStarted && !isGameFinal));
 
   // OPPONENT TINT (2026-09-01, audit M10): the model's opponent multiplier
@@ -657,7 +657,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
             </div>
             {/* Centered total above bar - Premium Badge - COMPACT */}
             <div className="flex justify-center items-center gap-1 mb-0.5">
-              {hasProjection && isStarterConfirmed && dailyProjection ? (
+              {hasProjection && hasUsableProjection && dailyProjection ? (
                 isGoalie ? (
                   <GoalieProjectionTooltip projection={player.goalieProjection}>
                     <span className="text-xs font-varsity font-black text-pastel-orange bg-pastel-sage/30 px-1.5 py-0.5 rounded border border-pastel-sage/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] cursor-pointer hover:text-pastel-cream transition-all">
@@ -674,14 +674,14 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               ) : (
                 <span className="text-xs font-varsity font-black text-pastel-orange bg-pastel-sage/30 px-1.5 py-0.5 rounded border border-pastel-sage/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
                   {showTBD
-                    ? (isGoalie && !isStarterConfirmed ? 'Probable' : 'TBD')
+                    ? (isGoalie && !hasUsableProjection ? 'Probable' : 'TBD')
                     : '0.0 pts'
                   }
                 </span>
               )}
             </div>
             {/* Likely Range - "3.2 – 5.8 likely" (50% CI) - HIDDEN ON MOBILE */}
-            {hasProjection && isStarterConfirmed && dailyProjection?.likely_low != null && dailyProjection?.likely_high != null && (
+            {hasProjection && hasUsableProjection && dailyProjection?.likely_low != null && dailyProjection?.likely_high != null && (
               <div className="hidden lg:flex justify-center mb-0.5">
                 <span className="text-[8px] font-display text-white/55">
                   Likely: {dailyProjection.likely_low.toFixed(1)} – {dailyProjection.likely_high.toFixed(1)}
@@ -689,7 +689,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               </div>
             )}
             {/* Confidence Bar - gradient fill matching PlayerStatsModal style */}
-            {hasProjection && isStarterConfirmed && dailyProjection?.dynamic_confidence != null ? (
+            {hasProjection && hasUsableProjection && dailyProjection?.dynamic_confidence != null ? (
               <div className="flex items-center gap-1 w-full">
                 <div className="flex-1 h-1.5 bg-pastel-sage/10 rounded-full overflow-hidden">
                   <div
@@ -701,7 +701,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                   {Math.round(dailyProjection.dynamic_confidence * 100)}%
                 </span>
               </div>
-            ) : hasProjection && isStarterConfirmed ? (
+            ) : hasProjection && hasUsableProjection ? (
               <div className="flex gap-0.5 w-full">
                 {Array.from({ length: maxBarPoints }, (_, i) => {
                   const isFilled = i < projectionFilledChunks;
@@ -874,7 +874,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               </span>
             )}
           </>
-        ) : hasProjection && projectedPoints > 0 ? (
+        ) : hasProjection ? (
           // Yet to play: the forecast, tappable for its breakdown.
           <>
             {isGoalie ? (

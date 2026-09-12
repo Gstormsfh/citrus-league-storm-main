@@ -1,3 +1,4 @@
+import { expectedDailyProjection } from '@citrus/shared';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useSearchParams, useLocation, Navigate, Link } from 'react-router-dom';
@@ -1714,69 +1715,42 @@ const Roster = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- transactions/user/userTeam objects would cause loops; using stable sub-values
   }, [userTeam?.id, user?.id, transactions.length]);
 
-  // Fetch daily projections for selected date (WORLD-CLASS PATTERN - matches Matchup tab)
-  // CRITICAL: Do NOT include projectionsByDate in dependencies - it causes circular triggers
-  const currentFetchDateRef = useRef<string | null>(null);
-  const projectionsLoadingRef = useRef<boolean>(false);
-  
-  // Memoized projection fetch function (matches Matchup.tsx pattern)
+  // Date + player coverage + bounded freshness; failed refreshes retain usable data.
+  const projectionCacheMeta = useRef(new Map<string, { ids: string; at: number }>());
+  const projectionRequests = useRef(new Map<string, number>());
+  const projectionRequestSequence = useRef(0);
+  const projectionPlayerKey = [...roster.starters, ...roster.bench, ...roster.ir]
+    .map(p => Number(p.id)).filter(id => Number.isFinite(id) && id > 0)
+    .sort((a, b) => a - b).join(',');
   const fetchProjectionsForDate = useCallback(async (date: string, playerIds: number[]) => {
-    // Check cache first - if we have projections for this date, don't re-fetch
-    if (projectionsByDate.has(date)) {
-      return;
-    }
-
-    // Prevent concurrent fetches
-    if (projectionsLoadingRef.current) {
-      return;
-    }
-
-    if (playerIds.length === 0) {
-      return;
-    }
-
-    projectionsLoadingRef.current = true;
-    
+    const ids = [...playerIds].sort((a, b) => a - b).join(',');
+    const cached = projectionCacheMeta.current.get(date);
+    if (!ids || (cached?.ids === ids && Date.now() - cached.at < 120_000)) return;
+    const request = ++projectionRequestSequence.current;
+    projectionRequests.current.set(date, request);
     try {
       const projectionMap = await MatchupService.getDailyProjectionsForMatchup(playerIds, date);
-      
-      setProjectionsByDate(prev => {
-        const newMap = new Map(prev);
-        newMap.set(date, projectionMap);
-        return newMap;
-      });
+      if (projectionRequests.current.get(date) !== request) return;
+      projectionCacheMeta.current.set(date, { ids, at: Date.now() });
+      setProjectionsByDate(prev => new Map(prev).set(date, projectionMap));
     } catch (error) {
       logger.error(`[Roster.fetchProjections] Error fetching projections for ${date}:`, error);
-      // Don't cache errors - allow retry
-    } finally {
-      projectionsLoadingRef.current = false;
     }
-  }, [projectionsByDate]);
-  
-  // Main useEffect - triggers projection fetch when roster or date changes
+  }, []);
+
   useEffect(() => {
-    // Collect all player IDs from roster
-    const allPlayerIds: number[] = [];
-    
-    [...roster.starters, ...roster.bench, ...roster.ir].forEach(player => {
-      const playerId = typeof player.id === 'string' ? parseInt(player.id) : player.id;
-      if (!isNaN(playerId) && playerId > 0) {
-        allPlayerIds.push(playerId);
-      }
-    });
-
-    if (allPlayerIds.length === 0) {
-      return;
-    }
-
-    // Use selectedDate or default to today
-    const targetDate = selectedDate || getTodayMST();
-    
-    // Fetch projections for this date
-    fetchProjectionsForDate(targetDate, allPlayerIds);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- roster arrays as deps would cause circular triggers; lengths are sufficient
-  }, [selectedDate, roster.starters.length, roster.bench.length, roster.ir.length, fetchProjectionsForDate]);
+    const ids = projectionPlayerKey.split(',').filter(Boolean).map(Number);
+    const date = selectedDate || getTodayMST();
+    const refresh = () => { void fetchProjectionsForDate(date, ids); };
+    refresh();
+    const timer = window.setInterval(refresh, 120_000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      projectionRequests.current.set(date, ++projectionRequestSequence.current);
+    };
+  }, [selectedDate, projectionPlayerKey, fetchProjectionsForDate]);
 
   // Fetch daily game stats for selected date (actual stats for live/final games)
   const dailyStatsLoadingRef = useRef<boolean>(false);
@@ -1884,6 +1858,7 @@ const Roster = () => {
   // PROJECTION DATA = SOURCE OF TRUTH for "has game" detection
   // If a projection exists for a player on a date, they have a game that day
   // =============================================================================
+  const leagueScoring = (activeLeague as { scoring_settings?: unknown } | null)?.scoring_settings;
   const displayRoster = useMemo(() => {
     const targetDate = selectedDate || getTodayMST();
     const todayStr = getTodayMST();
@@ -1900,9 +1875,11 @@ const Roster = () => {
       if (isNaN(playerId) || playerId <= 0) return player;
 
       // Get projection for this player on selected date
-      // PROJECTION = GAME EXISTS on that date
-      const projection = dateProjections?.get(playerId);
+      // Forecast rows and scheduled opportunities are separate: a missing
+      // forecast for a scheduled player is unavailable, not a known zero.
+      const rawProjection = dateProjections?.get(playerId);
       const isGoalie = player.position === 'G' || player.position === 'Goalie';
+      const projection = expectedDailyProjection(rawProjection, leagueScoring, isGoalie);
 
       // Enrich with actual game stats and game status
       const actualStat = dateActualStats?.get(playerId);
@@ -1921,14 +1898,13 @@ const Roster = () => {
       const fallbackStatus: 'scheduled' | 'final' = targetDate < todayStr ? 'final' : 'scheduled';
 
       if (!projection) {
-        // No projection = no game on this date
-        // Clear any existing nextGame/projection data
+        // Retain known schedule context while withholding unsupported totals.
         return { 
           ...player, 
-          nextGame: undefined,
+          nextGame: gameInfo ? { opponent: gameInfo.opponent, isToday: true, gameTime: gameInfo.gameTime, gameStatus: gameInfo.status } : undefined,
           daily_projection: undefined,
           goalieProjection: undefined,
-          projectedPoints: 0
+          projectedPoints: rawProjection || gameInfo ? undefined : 0
         };
       }
       
@@ -1965,13 +1941,16 @@ const Roster = () => {
         } : undefined,
       };
 
-      const dailyProjectedPoints = Number(projection.total_projected_points || 0);
+      const dailyProjectedPoints = projection.total_projected_points;
       
       if (isGoalie) {
         return {
           ...enrichedPlayer,
           projectedPoints: dailyProjectedPoints,
           goalieProjection: {
+            projection_basis: 'unconditional' as const,
+            expected_starts: projection.projected_gp,
+            availability_source: typeof projection.availability_source === 'string' ? projection.availability_source : undefined,
             total_projected_points: dailyProjectedPoints,
             projected_wins: Number(projection.projected_wins || 0),
             projected_saves: Number(projection.projected_saves || 0),
@@ -1982,7 +1961,7 @@ const Roster = () => {
             projected_gp: Number(projection.projected_gp || 0),
             starter_confirmed: Boolean(projection.starter_confirmed),
             confidence_score: Number(projection.confidence_score || 0),
-            calculation_method: projection.calculation_method || 'probability_based_volume'
+            calculation_method: String(projection.calculation_method || 'probability_based_volume')
           }
         };
       } else {
@@ -2008,12 +1987,12 @@ const Roster = () => {
             b2b_penalty: Number(projection.b2b_penalty || 1),
             home_away_adjustment: Number(projection.home_away_adjustment || 1),
             confidence_score: Number(projection.dynamic_confidence || projection.confidence_score || 0),
-            calculation_method: projection.calculation_method || 'hybrid_bayesian',
+            calculation_method: String(projection.calculation_method || 'hybrid_bayesian'),
             is_goalie: false,
             // Monte Carlo uncertainty (Citrus 3.1)
             likely_low: projection.likely_low != null ? Number(projection.likely_low) : undefined,
             likely_high: projection.likely_high != null ? Number(projection.likely_high) : undefined,
-            confidence_label: projection.confidence_label || undefined,
+            confidence_label: typeof projection.confidence_label === 'string' ? projection.confidence_label : undefined,
             dynamic_confidence: projection.dynamic_confidence != null ? Number(projection.dynamic_confidence) : undefined,
             projection_mean: projection.projection_mean != null ? Number(projection.projection_mean) : undefined,
             projection_std_dev: projection.projection_std_dev != null ? Number(projection.projection_std_dev) : undefined,
@@ -2028,23 +2007,23 @@ const Roster = () => {
       ir: roster.ir.map(enrichPlayer),
       slotAssignments: roster.slotAssignments
     };
-  }, [roster, projectionsByDate, dailyStatsByDateMap, scheduleByTeam, selectedDate, profile?.timezone]);
+  }, [roster, projectionsByDate, dailyStatsByDateMap, scheduleByTeam, selectedDate, profile?.timezone, leagueScoring]);
 
-  /**
-   * Are the daily projections for the selected date actually loaded?
-   *
-   * `displayRoster` treats "no projection row" as "no game" — correct once
-   * the fetch has landed, catastrophic before it. With no entry for the
-   * date, EVERY player enriches to { nextGame: undefined, projectedPoints: 0 },
-   * which makes Auto Lineup's sort a no-op over an all-equal list: Array.sort
-   * is stable, so the existing lineup survives untouched and the button
-   * silently does nothing while reporting success.
-   *
-   * Gate the button on this rather than letting it run against a blank slate.
-   */
+  /** Daily lineup planning requires loaded, interpretable forecasts.
+   * A scheduled player with missing or unknown exposure cannot be assigned
+   * a made-up zero, and a conditional goalie row is not a guaranteed start. */
   const projectionsReadyForSelectedDate = useMemo(
-    () => projectionsByDate.has(selectedDate || getTodayMST()),
-    [projectionsByDate, selectedDate],
+    () => {
+      const rows = projectionsByDate.get(selectedDate || getTodayMST());
+      if (!rows) return false;
+      return [...roster.starters, ...roster.bench].every(player => {
+        const row = rows.get(Number(player.id));
+        const scheduled = gameOnDate(scheduleByTeam.get((player.teamAbbreviation || '').toUpperCase()), selectedDate || getTodayMST());
+        if (!row) return !scheduled;
+        return expectedDailyProjection(row, leagueScoring, player.position === 'G' || player.position === 'Goalie') != null;
+      });
+    },
+    [projectionsByDate, selectedDate, roster.starters, roster.bench, leagueScoring, scheduleByTeam],
   );
 
   // ===========================================================================
@@ -2148,10 +2127,11 @@ const Roster = () => {
       [...roster.starters, ...roster.bench, ...roster.ir].map((p) => ({
         id: p.id,
         isGoalie: p.position === 'Goalie' || p.position === 'G',
+        team: p.teamAbbreviation,
       })),
     [roster.starters, roster.bench, roster.ir],
   );
-  const leagueScoring = (activeLeague as { scoring_settings?: unknown } | null)?.scoring_settings;
+
   const rosterWeek = useRosterWeek({
     enabled: pressBoxOn,
     players: weekPlayers,
@@ -2639,16 +2619,21 @@ const Roster = () => {
 
   /**
    * Projected points + has-a-game for one date, the way `displayRoster` does
-   * it for the selected date: a projection row IS the game. Opponent and
+   * it for the selected date, with expected goalie workload. Opponent and
    * face-off time come from the week's schedule rows (audit R9); when the
    * schedule has no line for that day the sheet says "Has a game" rather
    * than a stand-in word.
    */
-  type ProjectionRowLite = { total_projected_points?: number | string | null };
+  type ProjectionRowLite = Record<string, unknown>;
   const enrichForDate = (p: HockeyPlayer, date: string, projections: Map<number, ProjectionRowLite> | undefined): HockeyPlayer => {
     const pid = typeof p.id === 'string' ? parseInt(p.id) : p.id;
-    const projection = projections?.get(pid);
-    if (!projection) return { ...p, nextGame: undefined, projectedPoints: 0 };
+    const rawProjection = projections?.get(pid);
+    const projection = expectedDailyProjection(rawProjection, leagueScoring, p.position === 'G' || p.position === 'Goalie');
+    if (rawProjection && !projection) throw new Error('Expected projection unavailable for lineup planning');
+    if (!projection) {
+      if (gameOnDate(scheduleByTeam.get((p.teamAbbreviation || '').toUpperCase()), date)) throw new Error('Scheduled player projection unavailable');
+      return { ...p, nextGame: undefined, projectedPoints: 0 };
+    }
     const team = (p.teamAbbreviation || '').toUpperCase();
     const line = rowGameFor(gameOnDate(scheduleByTeam.get(team), date), team, {
       targetDate: date,
@@ -2657,7 +2642,7 @@ const Roster = () => {
     });
     return {
       ...p,
-      projectedPoints: Number(projection.total_projected_points || 0),
+      projectedPoints: projection.total_projected_points,
       nextGame: { opponent: line?.opponent, isToday: true, gameTime: line?.gameTime },
     };
   };
@@ -2688,14 +2673,15 @@ const Roster = () => {
 
       const fetched = await Promise.all(
         dates.map(async (date) => {
-          const have = projectionsByDate.get(date);
-          return [date, have ?? (await MatchupService.getDailyProjectionsForMatchup(ids, date))] as const;
+          return [date, await MatchupService.getDailyProjectionsForMatchup(ids, date)] as const;
         }),
       );
-      const projections = new Map<string, Map<number, ProjectionRowLite>>(fetched);
+      const projections = new Map<string, Map<number, ProjectionRowLite>>(
+        fetched.map(([date, rows]) => [date, new Map([...rows].map(([id, row]) => [id, { ...row }]))]),
+      );
       setProjectionsByDate((prev) => {
         const next = new Map(prev);
-        for (const [date, map] of fetched) if (!next.has(date)) next.set(date, map);
+        for (const [date, map] of fetched) next.set(date, map);
         return next;
       });
 
@@ -2722,6 +2708,7 @@ const Roster = () => {
       for (const date of dates) {
         let current: RosterState;
         if (date === autoTargetDate) {
+          if (!projectionsReadyForSelectedDate) throw new Error('Expected projection unavailable for selected date');
           // The day on screen: its lineup is the page's own, already enriched.
           current = {
             starters: displayRoster.starters,

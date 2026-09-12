@@ -268,6 +268,14 @@ const FreeAgents = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchPlayers/setWatchlist are stable; triggers: URL params, league change, state resolution
   }, [searchParams, activeLeagueId, isChangingLeague, userLeagueState]);
 
+  const [weeklyRefreshEpoch, setWeeklyRefreshEpoch] = useState(0);
+  useEffect(() => {
+    const refresh = () => setWeeklyRefreshEpoch(value => value + 1);
+    const timer = window.setInterval(refresh, 120_000);
+    window.addEventListener('focus', refresh);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, []);
+
   // Load schedule maximizers when players are loaded (needed for Top Projected combined view)
   useEffect(() => {
     if (players.length > 0) {
@@ -275,7 +283,7 @@ const FreeAgents = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh the schedule for the same pool/league as projections
     return () => { scheduleRequestVersion.current++; };
-  }, [players, activeLeagueId]);
+  }, [players, activeLeagueId, weeklyRefreshEpoch]);
 
   // Fetch raw weekly projections for the entire available pool.
   // CRITICAL: Works for BOTH active users AND demo/guest users (EXACT SAME WAY)
@@ -285,7 +293,7 @@ const FreeAgents = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch on pool/league changes; score raw rows locally on scoring changes
     return () => { weeklyRequestVersion.current++; };
-  }, [players, activeLeagueId]);
+  }, [players, activeLeagueId, weeklyRefreshEpoch]);
 
   // Reset visible count when search/position filter changes
   useEffect(() => {

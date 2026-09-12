@@ -1,3 +1,5 @@
+import { expectedDailyProjection } from '@citrus/shared';
+import { expectedMatchupProjections } from '@/utils/matchupExpectedProjections';
 import { userMessage } from '@/lib/userMessage';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useParams, useNavigate, Navigate, Link } from "react-router-dom";
@@ -213,7 +215,7 @@ const Matchup = () => {
   const [matchupReloadNonce, setMatchupReloadNonce] = useState(0);
   const [dailyStatsMap, setDailyStatsMap] = useState<Map<number, DailyPlayerStats>>(new Map()); // For selected date (or today)
   const [dailyStatsByDate, setDailyStatsByDate] = useState<Map<string, Map<number, DailyPlayerStats>>>(new Map()); // For all 7 days
-  const [projectionsByDate, setProjectionsByDate] = useState<Map<string, Map<number, DailyProjection>>>(new Map()); // Cache projections per date
+  const [rawProjectionsByDate, setProjectionsByDate] = useState<Map<string, Map<number, DailyProjection>>>(new Map()); // Cache projections per date
   // Cached daily scores for past days (frozen, won't change when roster changes)
   const [cachedDailyScores, setCachedDailyScores] = useState<Map<string, { 
     myScore: number; 
@@ -238,6 +240,9 @@ const Matchup = () => {
   // most one day. A Set lets distinct dates load in parallel while still
   // deduplicating repeat requests for the same date.
   const projectionsLoadingRef = useRef<Set<string>>(new Set());
+  const projectionFreshnessRef = useRef(new Map<string, { key: string; at: number }>());
+  const projectionLatestRequestRef = useRef(new Map<string, number>());
+  const projectionSequenceRef = useRef(0);
   const hasProcessedNoLeague = useRef(false); // Track if we've processed "no league" state
   const hasInitializedRef = useRef(false); // Track if we've completed initial load
   const statsLoadingRef = useRef(false); // Prevent concurrent stats fetches that cause score flashing
@@ -620,6 +625,12 @@ const Matchup = () => {
       penalty_minutes: number;        // PIM
     };
   } | null>(null);
+
+  const expectedProjectionView = useMemo(
+    () => expectedMatchupProjections(rawProjectionsByDate, scoringSettings),
+    [rawProjectionsByDate, scoringSettings],
+  );
+  const projectionsByDate = expectedProjectionView.projections;
 
   // Demo data - shown to guests and logged-in users without leagues
   // Load from actual demo rosters instead of static data
@@ -1537,17 +1548,6 @@ const Matchup = () => {
   // Fetch projections for a specific date - memoized to prevent recreation
   // CRITICAL: Works for BOTH active users AND demo/guest users
   const fetchProjectionsForDate = useCallback(async (date: string) => {
-    // Check cache first - if we have projections (even if empty), don't re-fetch
-    if (projectionsByDate.has(date)) {
-      return;
-    }
-
-    // Prevent concurrent fetches FOR THE SAME DATE — different dates are
-    // allowed to load in parallel (the week strip needs all seven).
-    if (projectionsLoadingRef.current.has(date)) {
-      return;
-    }
-
     if (!currentMatchup) {
       return;
     }
@@ -1567,11 +1567,19 @@ const Matchup = () => {
       return;
     }
 
-    projectionsLoadingRef.current.add(date);
+    const key = `${currentMatchup.id}:${[...allPlayerIds].sort((a, b) => a - b).join(',')}`;
+    const fresh = projectionFreshnessRef.current.get(date);
+    if (fresh?.key === key && Date.now() - fresh.at < 120_000) return;
+    const requestKey = `${date}:${key}`;
+    if (projectionsLoadingRef.current.has(requestKey)) return;
+    const request = ++projectionSequenceRef.current;
+    projectionLatestRequestRef.current.set(date, request);
+    projectionsLoadingRef.current.add(requestKey);
 
     try {
       const projectionMap = await MatchupService.getDailyProjectionsForMatchup(allPlayerIds, date);
-
+      if (projectionLatestRequestRef.current.get(date) !== request) return;
+      projectionFreshnessRef.current.set(date, { key, at: Date.now() });
       setProjectionsByDate(prev => {
         const newMap = new Map(prev);
         newMap.set(date, projectionMap);
@@ -1580,9 +1588,9 @@ const Matchup = () => {
     } catch (error) {
       // Don't cache errors - allow retry
     } finally {
-      projectionsLoadingRef.current.delete(date);
+      projectionsLoadingRef.current.delete(requestKey);
     }
-  }, [projectionsByDate, currentMatchup, userLeagueState, demoMyTeam, demoOpponentTeam]);
+  }, [rawProjectionsByDate, currentMatchup, userLeagueState, demoMyTeam, demoOpponentTeam]);
 
   // Fetch detailed stats for selected date (or today) - for PlayerCard display
   // Sync dailyStatsMap from dailyStatsByDate when viewing today (so live stats show in daily breakdown)
@@ -1833,7 +1841,16 @@ const Matchup = () => {
       ]);
     };
 
-    fetchData();
+    void fetchData();
+    const timer = window.setInterval(() => { void fetchData(); }, 120_000);
+    const refresh = () => { void fetchData(); };
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      projectionLatestRequestRef.current.clear();
+      projectionsLoadingRef.current.clear();
+    };
   // fetchProjectionsForDate is intentionally excluded because it depends on projectionsByDate (cache check),
   // and including it would create circular triggers: this effect fetches projections -> updates projectionsByDate
   // -> fetchProjectionsForDate changes -> effect re-runs.
@@ -1873,7 +1890,7 @@ const Matchup = () => {
   const enrichPlayerForDate = useCallback((player: MatchupPlayer, dateStr: string, statsMap: Map<number, any> | undefined, projectionsMap?: Map<string | number, any>): MatchupPlayer => {
     const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
     const dailyStats = statsMap?.get(playerId);
-    const projection = projectionsMap?.get(player.id);
+    const projection = projectionsMap?.get(Number(player.id));
     const isGoalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
     const originalGames = (player.games && Array.isArray(player.games)) ? player.games : (player.games || undefined);
     
@@ -1889,6 +1906,8 @@ const Matchup = () => {
           projected_gaa: Number(projection.projected_gaa || 0),
           projected_save_pct: Number(projection.projected_save_pct || 0),
           projected_gp: Number(projection.projected_gp || 0),
+            projection_basis: 'unconditional' as const,
+            expected_starts: Number(projection.projected_gp || 0),
           starter_confirmed: Boolean(projection.starter_confirmed),
           confidence_score: Number(projection.confidence_score || 0),
           calculation_method: projection.calculation_method || 'probability_based_volume'
@@ -1924,8 +1943,8 @@ const Matchup = () => {
         }
       } : {})
     } : {
-      ...(player.goalieProjection ? { goalieProjection: player.goalieProjection } : {}),
-      ...(player.daily_projection ? { daily_projection: player.daily_projection } : {})
+      goalieProjection: undefined,
+      daily_projection: undefined
     };
     
     const todayStr = getTodayMST();
@@ -2150,7 +2169,7 @@ const Matchup = () => {
         const enrichedMyTeam = baseMyTeam.map(player => {
           const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
           const dailyStats = statsMapForDate?.get(playerId);
-          const projection = dateProjections?.get(player.id);
+          const projection = dateProjections?.get(Number(player.id));
           const isGoalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
           const originalGames = (player.games && Array.isArray(player.games)) ? player.games : (player.games || undefined);
           
@@ -2166,6 +2185,8 @@ const Matchup = () => {
                 projected_gaa: Number(projection.projected_gaa || 0),
                 projected_save_pct: Number(projection.projected_save_pct || 0),
                 projected_gp: Number(projection.projected_gp || 0),
+            projection_basis: 'unconditional' as const,
+            expected_starts: Number(projection.projected_gp || 0),
                 starter_confirmed: Boolean(projection.starter_confirmed),
                 confidence_score: Number(projection.confidence_score || 0),
                 calculation_method: projection.calculation_method || 'probability_based_volume'
@@ -2201,8 +2222,8 @@ const Matchup = () => {
               }
             } : {})
           } : {
-            ...(player.goalieProjection ? { goalieProjection: player.goalieProjection } : {}),
-            ...(player.daily_projection ? { daily_projection: player.daily_projection } : {})
+            goalieProjection: undefined,
+            daily_projection: undefined
           };
           
           const todayStr = getTodayMST();
@@ -2297,7 +2318,7 @@ const Matchup = () => {
         const enrichedOppTeam = baseOppTeam.map(player => {
           const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
           const dailyStats = statsMapForDate?.get(playerId);
-          const projection = dateProjections?.get(player.id);
+          const projection = dateProjections?.get(Number(player.id));
           const isGoalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
           const originalGames = (player.games && Array.isArray(player.games)) ? player.games : (player.games || undefined);
           
@@ -2312,6 +2333,8 @@ const Matchup = () => {
                 projected_gaa: Number(projection.projected_gaa || 0),
                 projected_save_pct: Number(projection.projected_save_pct || 0),
                 projected_gp: Number(projection.projected_gp || 0),
+            projection_basis: 'unconditional' as const,
+            expected_starts: Number(projection.projected_gp || 0),
                 starter_confirmed: Boolean(projection.starter_confirmed),
                 confidence_score: Number(projection.confidence_score || 0),
                 calculation_method: projection.calculation_method || 'probability_based_volume'
@@ -2347,8 +2370,8 @@ const Matchup = () => {
               }
             } : {})
           } : {
-            ...(player.goalieProjection ? { goalieProjection: player.goalieProjection } : {}),
-            ...(player.daily_projection ? { daily_projection: player.daily_projection } : {})
+            goalieProjection: undefined,
+            daily_projection: undefined
           };
           
           const todayStr = getTodayMST();
@@ -2533,6 +2556,7 @@ const Matchup = () => {
     dailyStatsByDate,
     frozenRostersByDate,
     projectionsByDate,
+    expectedProjectionView,
     myTeamSlotAssignments,
     demoMyTeamSlotAssignments,
     opponentTeamSlotAssignments,
@@ -2659,7 +2683,10 @@ const Matchup = () => {
           games: samplePlayer.games
         });
       }
-      return baseTeam; // Use weekly stats from RPC (includes projections from initial load)
+      return baseTeam.map(player => ({ ...player,
+        goalieProjection: player.goalieProjection ? expectedDailyProjection(player.goalieProjection as unknown as Record<string, unknown>, scoringSettings, true) as unknown as MatchupPlayer['goalieProjection'] ?? undefined : undefined,
+        daily_projection: player.daily_projection ? expectedDailyProjection(player.daily_projection as unknown as Record<string, unknown>, scoringSettings, false) as unknown as MatchupPlayer['daily_projection'] ?? undefined : undefined,
+      })); // Never reuse initial conditional totals as expected production.
     }
     
     // Get projections for selected date (may be undefined if not fetched yet)
@@ -2676,7 +2703,7 @@ const Matchup = () => {
       // Match MatchupComparison's conversion logic (line 61)
       const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
       const dailyStats = statsMapForDate?.get(playerId);
-      const projection = dateProjections?.get(player.id);
+      const projection = dateProjections?.get(Number(player.id));
       const isGoalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
       
       // CRITICAL: Capture games array from original player before any transformations
@@ -2714,6 +2741,8 @@ const Matchup = () => {
             projected_gaa: Number(projection.projected_gaa || 0),
             projected_save_pct: Number(projection.projected_save_pct || 0),
             projected_gp: Number(projection.projected_gp || 0),
+            projection_basis: 'unconditional' as const,
+            expected_starts: Number(projection.projected_gp || 0),
             starter_confirmed: Boolean(projection.starter_confirmed),
             confidence_score: Number(projection.confidence_score || 0),
             calculation_method: projection.calculation_method || 'probability_based_volume'
@@ -2750,8 +2779,8 @@ const Matchup = () => {
         } : {})
       } : {
         // No projection found for selected date - preserve original projections from player
-        ...(player.goalieProjection ? { goalieProjection: player.goalieProjection } : {}),
-        ...(player.daily_projection ? { daily_projection: player.daily_projection } : {})
+        goalieProjection: undefined,
+        daily_projection: undefined
       };
       
       // CRITICAL: For past dates, always set daily_total_points (even if 0) so hasDailyStats works
@@ -2906,7 +2935,7 @@ const Matchup = () => {
   // demoMyTeam.length is used instead of demoMyTeam to avoid re-computing when demo team objects
   // change but roster composition hasn't. playerIdsVersion proxies actual player ID changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userLeagueState, playerIdsVersion, demoMyTeam.length, dailyStatsMap, dailyStatsByDate, selectedDate, projectionsByDate, isSwitchingDate, myTeam]);
+  }, [userLeagueState, playerIdsVersion, demoMyTeam.length, dailyStatsMap, dailyStatsByDate, selectedDate, projectionsByDate, isSwitchingDate, myTeam, scoringSettings]);
 
   const displayOpponentTeam = useMemo(() => {
     // During date switching, use previous roster to prevent blank slots
@@ -2919,7 +2948,10 @@ const Matchup = () => {
     // CRITICAL: Only enrich with daily stats if a date is explicitly selected
     // If no date selected, use weekly stats from RPC (which aggregates all games in the week)
     if (!selectedDate) {
-      return baseTeam; // Use weekly stats from RPC (includes projections from initial load)
+      return baseTeam.map(player => ({ ...player,
+        goalieProjection: player.goalieProjection ? expectedDailyProjection(player.goalieProjection as unknown as Record<string, unknown>, scoringSettings, true) as unknown as MatchupPlayer['goalieProjection'] ?? undefined : undefined,
+        daily_projection: player.daily_projection ? expectedDailyProjection(player.daily_projection as unknown as Record<string, unknown>, scoringSettings, false) as unknown as MatchupPlayer['daily_projection'] ?? undefined : undefined,
+      })); // Never reuse initial conditional totals as expected production.
     }
     
     // Get projections for selected date (may be undefined if not fetched yet)
@@ -2936,7 +2968,7 @@ const Matchup = () => {
       // Match MatchupComparison's conversion logic (line 61)
       const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
       const dailyStats = statsMapForDate?.get(playerId);
-      const projection = dateProjections?.get(player.id);
+      const projection = dateProjections?.get(Number(player.id));
       const isGoalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
       
       // CRITICAL: Capture games array from original player before any transformations
@@ -2956,6 +2988,8 @@ const Matchup = () => {
             projected_gaa: Number(projection.projected_gaa || 0),
             projected_save_pct: Number(projection.projected_save_pct || 0),
             projected_gp: Number(projection.projected_gp || 0),
+            projection_basis: 'unconditional' as const,
+            expected_starts: Number(projection.projected_gp || 0),
             starter_confirmed: Boolean(projection.starter_confirmed),
             confidence_score: Number(projection.confidence_score || 0),
             calculation_method: projection.calculation_method || 'probability_based_volume'
@@ -2992,8 +3026,8 @@ const Matchup = () => {
         } : {})
       } : {
         // No projection found for selected date - preserve original projections from player
-        ...(player.goalieProjection ? { goalieProjection: player.goalieProjection } : {}),
-        ...(player.daily_projection ? { daily_projection: player.daily_projection } : {})
+        goalieProjection: undefined,
+        daily_projection: undefined
       };
       
       // CRITICAL: For past dates, always set daily_total_points (even if 0) so hasDailyStats works
@@ -3126,7 +3160,7 @@ const Matchup = () => {
   // demoOpponentTeam.length is used instead of demoOpponentTeam to avoid re-computing when demo team
   // objects change but roster composition hasn't. playerIdsVersion proxies actual player ID changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userLeagueState, playerIdsVersion, demoOpponentTeam.length, dailyStatsMap, dailyStatsByDate, selectedDate, projectionsByDate, isSwitchingDate, opponentTeamPlayers]);
+  }, [userLeagueState, playerIdsVersion, demoOpponentTeam.length, dailyStatsMap, dailyStatsByDate, selectedDate, projectionsByDate, isSwitchingDate, opponentTeamPlayers, scoringSettings]);
   const displayMyTeamSlotAssignments = useMemo(() => {
     // For past dates with frozen rosters, use frozen slot assignments directly
     // This eliminates the race condition where useMemo updates starters immediately
@@ -3285,20 +3319,22 @@ const Matchup = () => {
 
   // Calculate total projections for each team
   const myTotalProjection = useMemo(() => {
+    if (selectedDate && myStarters.some(p => expectedProjectionView.unavailable.get(selectedDate)?.has(Number(p.id)))) return undefined;
     return myStarters.reduce((sum, player) => {
-      const projection = player.daily_projection?.total_projected_points || 
-                        player.goalieProjection?.total_projected_points || 0;
+      const projection = player.daily_projection?.total_projected_points ??
+                        player.goalieProjection?.total_projected_points ?? 0;
       return sum + projection;
     }, 0);
-  }, [myStarters]);
+  }, [myStarters, selectedDate, expectedProjectionView]);
 
   const opponentTotalProjection = useMemo(() => {
+    if (selectedDate && opponentStarters.some(p => expectedProjectionView.unavailable.get(selectedDate)?.has(Number(p.id)))) return undefined;
     return opponentStarters.reduce((sum, player) => {
-      const projection = player.daily_projection?.total_projected_points || 
-                        player.goalieProjection?.total_projected_points || 0;
+      const projection = player.daily_projection?.total_projected_points ??
+                        player.goalieProjection?.total_projected_points ?? 0;
       return sum + projection;
     }, 0);
-  }, [opponentStarters]);
+  }, [opponentStarters, selectedDate, expectedProjectionView]);
 
   // Calculate total games remaining for each team (position-aware, respects roster slots)
   const myTeamGamesRemaining = useMemo(() => {
@@ -3594,6 +3630,12 @@ const Matchup = () => {
     const projectionsReady = remainingDates.every(d => projectionsByDate.has(d));
     if (weekStillOpen && !projectionsReady) return null;
 
+    const unavailableStarter = [...myDays, ...oppDays].some(day => day.starters.some(
+      player => expectedProjectionView.unavailable.get(day.date)?.has(Number(player.id)) ||
+        (player.games?.some(game => game.game_date?.split('T')[0] === day.date && !['final', 'off'].includes((game.status ?? '').toLowerCase())) && !projectionsByDate.get(day.date)?.has(Number(player.id))),
+    ));
+    if (unavailableStarter) return null;
+
     const myRemaining = collectRemainingGames(myDays, projectionsByDate, todayStr);
     const oppRemaining = collectRemainingGames(oppDays, projectionsByDate, todayStr);
 
@@ -3611,6 +3653,7 @@ const Matchup = () => {
     demoOpponentTeam,
     frozenRostersByDate,
     projectionsByDate,
+    expectedProjectionView,
     myTeamPoints,
     opponentTeamPoints,
   ]);
@@ -5350,6 +5393,7 @@ const Matchup = () => {
     setDailyStatsByDate(new Map());
     setDailyStatsMap(new Map());
     setProjectionsByDate(new Map());
+    projectionFreshnessRef.current.clear();
 
     navigate(`/matchup/${leagueId}/${weekNumber}`);
   }, [userLeagueState, league?.id, navigate]);
@@ -5891,6 +5935,7 @@ const Matchup = () => {
             myTeamExpectedFinal={projectedFinals?.my}
             opponentTeamExpectedFinal={projectedFinals?.opp}
             expectedFinalsPending={expectedFinalsPending}
+            projectionUnavailable={myTotalProjection == null || opponentTotalProjection == null || (!matchupOutlook && [...expectedProjectionView.unavailable.values()].some(ids => ids.size > 0))}
             winProbability={matchupOutlook ? matchupOutlook.probability * 100 : undefined}
             // A stored Monte Carlo row (matchup_simulations) overrides the
             // formula when one exists and is fresh. Guests view a demo

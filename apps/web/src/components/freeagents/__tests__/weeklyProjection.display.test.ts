@@ -8,7 +8,7 @@ describe('weekly projection labels and unavailable ranking', () => {
     const backup = { position: 'G', expectedStarts: 3 * 5 / 84, gamesThisWeek: 3 };
     expect(weeklyExposureLabel(backup)).toBe('0.2 expected starts · 3 team games');
     expect(weeklyExposureLabel(backup, true)).toBe('0.2 STARTS');
-    expect(weeklyExposureLabel({ ...backup, expectedStarts: null }, true)).toBe('STARTS —');
+    expect(weeklyExposureLabel({ ...backup, expectedStarts: null }, true)).toBe('STARTS N/A');
     expect(weeklyExposureLabel({ ...backup, expectedStarts: 1.5 }, true)).toBe('1.5 STARTS');
   });
   it('retains negative and zero points and ranks missing forecasts below both', () => {

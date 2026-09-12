@@ -43,7 +43,7 @@ export const weeklyProjectionOrder = (points: number | null | undefined): number
 
 export function weeklyExposureLabel(player: { position: string; gamesThisWeek: number; expectedStarts?: number | null }, compact = false): string {
   if (compact) return player.position === 'G'
-    ? (player.expectedStarts == null ? 'STARTS —' : `${player.expectedStarts.toFixed(1)} STARTS`)
+    ? (player.expectedStarts == null ? 'STARTS N/A' : `${player.expectedStarts.toFixed(1)} STARTS`)
     : `${player.gamesThisWeek} TEAM GP`;
   return player.position === 'G'
     ? `${player.expectedStarts == null ? 'Starts unavailable' : `${player.expectedStarts.toFixed(1)} expected starts`} · ${player.gamesThisWeek} team games`

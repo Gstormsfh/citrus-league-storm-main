@@ -1,6 +1,6 @@
 import type { GameLogEntry } from './gameLogRows';
 import { ScoringCalculator } from '@/utils/scoringUtils';
-import { projectionSettings } from '@citrus/shared/leagueProjection';
+import { expectedDailyProjection, projectionSettings } from '@citrus/shared/leagueProjection';
 
 export function projectionStats(row: Record<string, unknown>): Record<string, number> {
   const fields: Record<string, string[]> = {
@@ -46,21 +46,25 @@ export function seasonProjectionSummary(row: Record<string, unknown> | null, sco
 /** Keep cached raw games reusable when the manager switches league weights. */
 export function scoreGameLog(entries: GameLogEntry[], scoring: unknown): GameLogEntry[] {
   const scorer = new ScoringCalculator(projectionSettings(scoring));
-  return entries.map(entry => ({
+  return entries.map(entry => {
+    const projection = entry.isGoalie && !entry.isPast
+      ? expectedDailyProjection(entry.projection, scoring, true)
+      : entry.projection;
+    return ({
     ...entry,
-    projectedPoints: entry.projection
-      ? scorer.calculatePoints(projectionStats(entry.projection), entry.isGoalie)
+    projectedPoints: projection
+      ? scorer.calculatePoints(projectionStats(projection), entry.isGoalie)
       : 0,
     // Stored FPTS intervals are in default scoring units. Raw category
     // covariance is unavailable, so do not present them as league intervals.
-    projection: entry.projection && scoring != null ? {
-      ...entry.projection,
+    projection: projection && scoring != null ? {
+      ...projection,
       likely_low: null, likely_high: null,
       projection_ci_50_lower: null, projection_ci_50_upper: null,
       projection_std_dev: null,
-    } : entry.projection,
+    } : projection,
     actualPoints: entry.actualStats
       ? scorer.calculatePoints(entry.actualStats as Record<string, number>, entry.isGoalie)
       : undefined,
-  }));
+  }); });
 }

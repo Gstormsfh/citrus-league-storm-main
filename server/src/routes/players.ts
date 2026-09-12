@@ -1,3 +1,4 @@
+import { addGoalieExposure } from '../services/goalieProjectionExposure';
 import { Hono } from 'hono';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Env } from '../app';
@@ -235,7 +236,7 @@ playerRoutes.get('/projections/batch', authMiddleware, async (c) => {
   try {
     let query = supabase
       .from('player_projected_stats')
-      .select('player_id, is_goalie, total_projected_points, projection_date, projected_goals, projected_assists, projected_sog, projected_blocks, projected_hits, projected_pim, projected_ppp, projected_shp, projected_wins, projected_saves, projected_shutouts, projected_goals_against')
+      .select('player_id, game_id, season, calculation_method, projected_gp, is_goalie, total_projected_points, projection_date, projected_goals, projected_assists, projected_sog, projected_blocks, projected_hits, projected_pim, projected_ppp, projected_shp, projected_wins, projected_saves, projected_shutouts, projected_goals_against, game_start_time, game:nhl_games!game_id(status,period,period_time,home_score,away_score)')
       .in('player_id', playerIds);
 
     if (startDate) {
@@ -254,7 +255,7 @@ playerRoutes.get('/projections/batch', authMiddleware, async (c) => {
       return handleError(c, error, 'Failed to fetch batch projections');
     }
 
-    return ok(c, data || []);
+    return ok(c, await addGoalieExposure(supabase, (data || []) as unknown as Record<string, unknown>[]));
   } catch (err) {
     return handleError(c, err, 'Failed to fetch batch projections');
   }

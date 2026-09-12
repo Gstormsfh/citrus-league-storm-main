@@ -43,6 +43,8 @@ interface ScoreCardProps {
    * no reserved space, and the same shift it always had.
    */
   expectedFinalsPending?: boolean;
+  /** Explicit missing workload evidence: suppress an invented probability. */
+  projectionUnavailable?: boolean;
   /**
    * Win chance for the LEFT team, 0–100, from the same computation. When
    * omitted the card derives one from the finals / games-left it has —
@@ -155,11 +157,12 @@ export const ScoreCard = ({
   opponentTeamAvatarUrl,
   myTeamGamesRemaining = 0,
   opponentTeamGamesRemaining = 0,
-  myTeamProjection = 0,
-  opponentTeamProjection = 0,
+  myTeamProjection,
+  opponentTeamProjection,
   myTeamExpectedFinal,
   opponentTeamExpectedFinal,
   expectedFinalsPending = false,
+  projectionUnavailable = false,
   winProbability: winProbabilityProp,
   matchupId,
   simulationPerspective,
@@ -183,8 +186,8 @@ export const ScoreCard = ({
     ? Math.round(Math.min(100, Math.max(0, winProbabilityProp)))
     : Math.round(
         winProbabilityFromTotals({
-          myExpectedFinal: hasExpectedFinals ? myTeamExpectedFinal : myPointsNum + myTeamProjection,
-          oppExpectedFinal: hasExpectedFinals ? opponentTeamExpectedFinal : oppPointsNum + opponentTeamProjection,
+          myExpectedFinal: hasExpectedFinals ? myTeamExpectedFinal : myPointsNum + (myTeamProjection ?? 0),
+          oppExpectedFinal: hasExpectedFinals ? opponentTeamExpectedFinal : oppPointsNum + (opponentTeamProjection ?? 0),
           myGamesLeft: myTeamGamesRemaining,
           oppGamesLeft: opponentTeamGamesRemaining,
         }).probability * 100,
@@ -284,7 +287,7 @@ export const ScoreCard = ({
         </div>
 
         {/* Win chance - Compact (formula, overridden by a fresh simulation row) */}
-        <WinProbabilityBar
+        {!projectionUnavailable && <WinProbabilityBar
           matchupId={matchupId}
           fallbackWinProbability={winProbability}
           team1Projected={myTeamProjection}
@@ -292,7 +295,7 @@ export const ScoreCard = ({
           simulationPerspective={simulationPerspective}
           seasonDormant={seasonDormant}
           compact
-        />
+        />}
       </div>
 
       {/* Desktop: Full layout */}
@@ -373,14 +376,14 @@ export const ScoreCard = ({
 
       {/* Win chance - Desktop (formula, overridden by a fresh simulation row) */}
       <div className="hidden md:block">
-        <WinProbabilityBar
+        {!projectionUnavailable && <WinProbabilityBar
           matchupId={matchupId}
           fallbackWinProbability={winProbability}
           team1Projected={myTeamProjection}
           team2Projected={opponentTeamProjection}
           simulationPerspective={simulationPerspective}
           seasonDormant={seasonDormant}
-        />
+        />}
       </div>
     </div>
   );

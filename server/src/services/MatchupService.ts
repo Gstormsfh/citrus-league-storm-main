@@ -20,7 +20,7 @@ import type { LeagueScoreboardMatchup } from '@citrus/shared';
 import {
   ScoringCalculator,
   projectionSettings,
-  projectedPointsFor,
+  expectedDailyProjection,
   type ProjectedStatRow,
 } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
@@ -69,6 +69,7 @@ export interface ScoreboardProjectionRow extends ProjectedStatRow {
   player_id: number | string;
   /** YYYY-MM-DD */
   projection_date: string;
+  expected_starts?: number | null;
   /**
    * Baked with DEFAULT scoring. Kept on the row for the fallback below and
    * never read on its own by a league surface: getLeagueScoreboard rescores
@@ -283,10 +284,11 @@ export function projectLeagueWeek(input: ScoreboardProjectionInput): Map<string,
     }
     const remainingDates = scoreboardWeekDates(m.week_start_date, m.week_end_date).filter((d) => d >= input.today);
 
-    const side = (teamId: string): { hasLineup: boolean; remaining: number; gamesLeft: number } => {
+    const side = (teamId: string): { hasLineup: boolean; remaining: number; gamesLeft: number; unavailable: boolean } => {
       let hasLineup = false;
       let remaining = 0;
       let gamesLeft = 0;
+      let unavailable = false;
       for (const date of remainingDates) {
         const saved = frozen.get(`${m.id}|${teamId}|${date}`);
         const starters = saved && saved.size > 0 ? saved : current.get(teamId);
@@ -300,11 +302,12 @@ export function projectLeagueWeek(input: ScoreboardProjectionInput): Map<string,
             ? scoreboardGameFraction(game)
             : scoreboardFractionFromStartTime(projection.game_start_time, input.nowMs);
           if (fraction <= 0) continue;
-          gamesLeft += 1;
+          if (projection.total_projected_points == null) { unavailable = true; continue; }
+          gamesLeft += projection.is_goalie ? (projection.expected_starts ?? 0) : 1;
           remaining += fraction * toPoints(projection.total_projected_points);
         }
       }
-      return { hasLineup, remaining, gamesLeft };
+      return { hasLineup, remaining, gamesLeft, unavailable };
     };
 
     const one = side(m.team1_id);
@@ -314,8 +317,8 @@ export function projectLeagueWeek(input: ScoreboardProjectionInput): Map<string,
       continue;
     }
     out.set(m.id, {
-      team1: toPoints(m.team1_score) + one.remaining,
-      team2: toPoints(m.team2_score) + two.remaining,
+      team1: one.unavailable ? null : toPoints(m.team1_score) + one.remaining,
+      team2: two.unavailable ? null : toPoints(m.team2_score) + two.remaining,
       team1GamesLeft: one.gamesLeft,
       team2GamesLeft: two.gamesLeft,
     });
@@ -459,7 +462,7 @@ export class MatchupService {
     const projectionsRead = await pagedSelect<ScoreboardProjectionRow>(this.supabase, {
       table: 'player_projected_stats',
       columns:
-        'player_id, projection_date, game_id, total_projected_points, game_start_time, is_goalie, ' +
+        'player_id, projection_date, game_id, season, calculation_method, projected_gp, total_projected_points, game_start_time, is_goalie, ' +
         'projected_goals, projected_assists, projected_ppp, projected_shp, projected_sog, ' +
         'projected_blocks, projected_hits, projected_pim, ' +
         'projected_wins, projected_saves, projected_shutouts, projected_goals_against, ' +
@@ -484,18 +487,18 @@ export class MatchupService {
     // score on another. Rescore every row under this league's weights before
     // any of it is added up. A league with no scoring document of its own
     // gets the defaults, which is what projectionSettings does.
-    const { data: leagueRow } = await this.supabase
+    const { data: leagueRow, error: scoringError } = await this.supabase
       .from('leagues')
       .select('scoring_settings')
       .eq('id', leagueId)
       .maybeSingle();
-    const scorer = new ScoringCalculator(
-      projectionSettings((leagueRow as { scoring_settings?: unknown } | null)?.scoring_settings ?? null),
-    );
-    const leagueScored = projectionsRead.data.map((row) => ({
-      ...row,
-      total_projected_points: projectedPointsFor(row, scorer),
-    }));
+    if (scoringError || !leagueRow) return { matchups: withProjections(none), error: null };
+    const exposureRows = await addGoalieExposure(this.supabase, projectionsRead.data as unknown as Record<string, unknown>[]);
+    const leagueScored = exposureRows.map((row) => {
+      const expected = expectedDailyProjection(row,
+        (leagueRow as { scoring_settings?: unknown } | null)?.scoring_settings, row.is_goalie === true);
+      return { ...row, expected_starts: expected?.expected_starts ?? null, total_projected_points: expected?.total_projected_points ?? null } as unknown as ScoreboardProjectionRow;
+    });
 
     const totals = projectLeagueWeek({
       matchups: open,
@@ -1573,7 +1576,7 @@ export class MatchupService {
     const { data, error } = await this.supabase
       .from('player_projected_stats')
       .select(
-        'player_id, projection_date, total_projected_points, projected_goals, projected_assists, ' +
+        'player_id, game_id, season, calculation_method, projected_gp, projection_date, total_projected_points, projected_goals, projected_assists, ' +
         'projected_sog, projected_blocks, projected_hits, projected_pim, projected_ppp, projected_shp, ' +
         'projected_wins, projected_saves, projected_shutouts, projected_goals_against, projected_gaa, projected_save_pct, ' +
         'is_goalie, opponent_abbrev, is_home_game, ' +
@@ -1591,7 +1594,7 @@ export class MatchupService {
       .lte('projection_date', endDate)
       .order('projection_date', { ascending: true });
 
-    return { projections: data || [], error };
+    return { projections: error ? [] : await addGoalieExposure(this.supabase, (data || []) as unknown as Record<string, unknown>[]), error };
   }
 
   /** Get frozen daily roster entries for a team/matchup/date */

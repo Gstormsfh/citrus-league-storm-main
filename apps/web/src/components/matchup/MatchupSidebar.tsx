@@ -24,8 +24,8 @@ interface MatchupSidebarProps {
   opponentTeamScore: number;
   myTeamName: string;
   opponentTeamName: string;
-  myTeamProjection: number;
-  opponentTeamProjection: number;
+  myTeamProjection?: number;
+  opponentTeamProjection?: number;
   onPlayerClick?: (player: MatchupPlayer) => void;
 }
 

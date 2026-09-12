@@ -1,3 +1,5 @@
+import { expectedDailyProjection } from '@citrus/shared';
+import { gameFractionRemaining, type GameLike } from '@/utils/winProbability';
 /**
  * THE WK COLUMN, AND THE WIN BAR (2026-09-05, artboard 1a · Team).
  *
@@ -22,12 +24,13 @@
  *
  * Pure: the hook fetches, this file computes, the tests read this file.
  */
-import { projectionStats, projectionSettings } from '@/components/player/projectionScoring';
+import { projectionSettings } from '@/components/player/projectionScoring';
 import { ScoringCalculator } from '@/utils/scoringUtils';
 
 export interface RosterWeekPlayer {
   id: string | number;
   isGoalie: boolean;
+  team?: string;
 }
 
 export interface RosterWeekEntry {
@@ -36,7 +39,7 @@ export interface RosterWeekEntry {
   actualToDate: number;
   projToDate: number;
   projRemaining: number;
-  /** Projected games from today onward; the win model's games-left count. */
+  /** Expected player appearances from today onward: goalie starts, skater games. */
   gamesRemaining: number;
 }
 
@@ -59,20 +62,36 @@ export function weekEntries(
     weekStats instanceof Map ? weekStats.get(Number(id)) : weekStats[id];
 
   const goalieById = new Map(players.map(p => [String(p.id), p.isGoalie]));
+  const unavailable = new Set<string>();
+  const pastUnavailable = new Set<string>();
   const projByPlayer = new Map<string, { toDate: number; remaining: number; gamesRemaining: number }>();
   for (const row of projections) {
     const id = String(row.player_id);
     const date = String(row.projection_date).slice(0, 10);
     const hasRawStats = Object.keys(row).some(key => key.startsWith('projected_'));
-    if (!hasRawStats && scoring != null) throw new Error('Raw projections are required for league scoring');
-    const pts = hasRawStats
-      ? scorer.calculatePoints(projectionStats(row), goalieById.get(id) ?? false)
-      : Number(row.total_projected_points ?? 0) || 0;
+    const isGoalie = goalieById.get(id) ?? false;
+    if (!hasRawStats && scoring != null && !isGoalie) throw new Error('Raw projections are required for league scoring');
+    const expected = expectedDailyProjection(row, scoring, isGoalie);
+    if ((hasRawStats || isGoalie) && !expected) {
+      (date < today ? pastUnavailable : unavailable).add(id);
+      continue;
+    }
+    // Legacy skater-only payloads without raw counts retain their existing
+    // default-scoring fallback. Goalies always require explicit availability.
+    const pts = expected?.total_projected_points ?? (Number(row.total_projected_points ?? 0) || 0);
     const agg = projByPlayer.get(id) ?? { toDate: 0, remaining: 0, gamesRemaining: 0 };
     if (date < today) agg.toDate += pts;
     else {
-      agg.remaining += pts;
-      agg.gamesRemaining += 1;
+      const game = row.game as GameLike | null | undefined;
+      // The actuals include today's live stats: only add the unplayed share.
+      if (date === today && !game) {
+        unavailable.add(id);
+        continue;
+      }
+      const fraction = date === today ? gameFractionRemaining(game!) : 1;
+      agg.toDate += pts * (1 - fraction);
+      agg.remaining += pts * fraction;
+      agg.gamesRemaining += (isGoalie ? expected!.projected_gp : 1) * fraction;
     }
     projByPlayer.set(id, agg);
   }
@@ -80,11 +99,12 @@ export function weekEntries(
   const out = new Map<string, RosterWeekEntry>();
   for (const p of players) {
     const id = String(p.id);
+    if (unavailable.has(id)) continue;
     const stats = statsFor(id);
     const actualToDate = stats ? round1(scorer.calculatePoints(stats, p.isGoalie)) : 0;
     const proj = projByPlayer.get(id) ?? { toDate: 0, remaining: 0, gamesRemaining: 0 };
     const weekPoints = round1(actualToDate + proj.remaining);
-    const weekTrendPct = proj.toDate > 0 ? Math.round(((actualToDate - proj.toDate) / proj.toDate) * 100) : null;
+    const weekTrendPct = !pastUnavailable.has(id) && proj.toDate > 0 ? Math.round(((actualToDate - proj.toDate) / proj.toDate) * 100) : null;
     out.set(id, {
       weekPoints,
       weekTrendPct,

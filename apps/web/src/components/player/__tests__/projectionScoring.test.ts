@@ -69,9 +69,24 @@ describe('daily projection league scoring', () => {
   });
   it('keeps valid zero and negative daily points visible but missing projections absent', async () => {
     const { upcomingRows } = await import('../gameLogRows');
-    const negative = { ...entry, isGoalie: true, projection: { projected_saves: 10, projected_goals_against: 5 } };
+    const negative = { ...entry, isGoalie: true, projection: { projection_basis: 'unconditional', expected_starts: 0.5, projected_wins: 0, projected_shutouts: 0, projected_saves: 10, projected_goals_against: 5 } };
     expect(upcomingRows(scoreGameLog([negative], { goalie: { saves: 0.1, goals_against: -2 } }), true)[0].points).toBe(-9);
     expect(upcomingRows(scoreGameLog([entry], { skater: { goals: 0 } }), false)[0].points).toBe(0);
     expect(upcomingRows(scoreGameLog([{ ...entry, projection: null }], null), false)[0].points).toBeNull();
+  });
+  it('shows workload-adjusted goalie categories and starts without changing cached per-start inputs', async () => {
+    const { upcomingRows } = await import('../gameLogRows');
+    const raw = { ...entry, isGoalie: true, projection: { projection_basis: 'conditional_on_start', expected_starts: 0.2, projected_wins: 0.5, projected_shutouts: 0, projected_saves: 25, projected_goals_against: 3 } };
+    const scored = scoreGameLog([raw], { goalie: { saves: 1, goals_against: -2 } });
+    expect(scored[0].projectedPoints).toBeCloseTo(3.8);
+    expect(upcomingRows(scored, true)[0].cells).toEqual(['0.20', '0.10', '5', '0.6', '–']);
+    expect(raw.projection.projected_saves).toBe(25);
+    expect(scoreGameLog(scored, { goalie: { saves: 1, goals_against: -2 } })[0].projectedPoints).toBeCloseTo(3.8);
+  });
+  it('does not display conditional goalie counts when start exposure is unknown', async () => {
+    const { upcomingRows } = await import('../gameLogRows');
+    const scored = scoreGameLog([{ ...entry, isGoalie: true, projection: { projected_wins: 0.5, projected_shutouts: 0, projected_saves: 25, projected_goals_against: 3 } }], null);
+    expect(upcomingRows(scored, true)[0].cells).toEqual(['–', '–', '–', '–', '–']);
+    expect(upcomingRows(scored, true)[0].points).toBeNull();
   });
 });

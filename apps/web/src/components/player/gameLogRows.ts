@@ -72,7 +72,7 @@ export interface UpcomingCard {
 export const SKATER_LOG_HEADINGS = ['G', 'A', 'SOG', '+/-', 'PPP', 'HIT'];
 export const GOALIE_LOG_HEADINGS = ['W', 'SV', 'GA', 'SO'];
 export const SKATER_PROJ_HEADINGS = ['G', 'A', 'SOG', 'PPP', 'HIT'];
-export const GOALIE_PROJ_HEADINGS = ['W', 'SV', 'GA', 'SV%'];
+export const GOALIE_PROJ_HEADINGS = ['STARTS', 'W', 'SV', 'GA', 'SV%'];
 
 /** `2026-10-01` → `10/1`. */
 export function shortDate(iso: string): string {
@@ -208,6 +208,7 @@ export function upcomingRows(entries: GameLogEntry[], isGoalie: boolean): LogRow
         ? (isGoalie ? GOALIE_PROJ_HEADINGS : SKATER_PROJ_HEADINGS).map(() => '–')
         : isGoalie
           ? [
+              fixed(p.expected_starts, 2),
               fixed(p.projected_wins, 2),
               fixed(p.projected_saves, 0),
               fixed(p.projected_goals_against, 1),

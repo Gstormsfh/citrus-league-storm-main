@@ -236,8 +236,16 @@ export function projectionFor(
 ): DraftProjection | null {
   if (!entry) return null;
   const gamesRemaining = entry.proj_gp;
-  if (typeof gamesRemaining !== 'number' || !Number.isFinite(gamesRemaining) || gamesRemaining <= 0) {
+  if (typeof gamesRemaining !== 'number' || !Number.isFinite(gamesRemaining) || gamesRemaining < 0) {
     return null;
+  }
+
+  if (gamesRemaining === 0) {
+    const counts = entry.is_goalie
+      ? [entry.proj_wins, entry.proj_saves, entry.proj_shutouts, entry.proj_goals_against]
+      : [entry.proj_goals, entry.proj_assists, entry.proj_sog, entry.proj_blocks];
+    return counts.every(value => typeof value === 'number' && Number.isFinite(value) && value === 0)
+      ? { total: 0, perGp: 0, gamesRemaining: 0 } : null;
   }
 
   if (entry.is_goalie) {
@@ -290,4 +298,39 @@ export function projectionFor(
     false,
   );
   return { total, perGp: total / gamesRemaining, gamesRemaining };
+}
+
+/** Daily forecast counts with explicit goalie availability. Never mutates raw caches. */
+export function expectedDailyProjection(
+  row: Record<string, unknown> | null | undefined,
+  scoring: unknown,
+  isGoalie: boolean,
+): (Record<string, unknown> & { total_projected_points: number; projected_gp: number }) | null {
+  if (!row) return null;
+  const keys = isGoalie
+    ? ['projected_wins', 'projected_saves', 'projected_shutouts', 'projected_goals_against']
+    : [];
+  if (keys.some(key => row[key] == null || !Number.isFinite(Number(row[key])))) return null;
+  let exposure = 1;
+  let multiplier = 1;
+  if (isGoalie) {
+    const basis = row.projection_basis;
+    if (basis !== 'conditional_on_start' && basis !== 'unconditional') return null;
+    const raw = row.expected_starts ?? (basis === 'conditional_on_start' ? row.start_probability : row.projected_gp);
+    exposure = raw == null ? NaN : Number(raw);
+    if (!Number.isFinite(exposure) || exposure < 0 || exposure > 1) return null;
+    multiplier = basis === 'conditional_on_start' ? exposure : 1;
+  }
+  const result: Record<string, unknown> = { ...row, is_goalie: isGoalie };
+  for (const key of ['projected_goals', 'projected_assists', 'projected_sog', 'projected_blocks', 'projected_hits', 'projected_pim', 'projected_ppp', 'projected_shp', 'projected_wins', 'projected_saves', 'projected_shutouts', 'projected_goals_against']) {
+    if (row[key] != null) result[key] = Number(row[key]) * multiplier;
+  }
+  // Conditional/default-scoring intervals are not expected custom-league
+  // intervals. No covariance or start-mixture model is available to convert them.
+  for (const key of ['projection_mean', 'projection_std_dev', 'projection_ci_lower', 'projection_ci_upper', 'projection_ci_50_lower', 'projection_ci_50_upper', 'projection_median', 'likely_low', 'likely_high']) delete result[key];
+  const scorer = new ScoringCalculator(projectionSettings(scoring));
+  const points = scoreProjectedStats(result as ProjectedStatRow, scorer);
+  if (points == null || !Number.isFinite(points)) return null;
+  return { ...result, projection_basis: 'unconditional', expected_starts: isGoalie ? exposure : null,
+    projected_gp: exposure, starter_confirmed: false, total_projected_points: points };
 }

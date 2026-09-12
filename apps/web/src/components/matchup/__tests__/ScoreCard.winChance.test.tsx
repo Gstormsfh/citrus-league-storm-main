@@ -166,3 +166,10 @@ describe('ScoreCard — projected finals and left-to-play in the header', () => 
     expect(screen.getAllByText('You')).toHaveLength(2);
   });
 });
+
+
+it('withholds a probability when explicit workload evidence is unavailable', () => {
+  render(<ScoreCard {...baseProps} projectionUnavailable />);
+  expect(screen.queryByTestId('bar-compact')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('bar-full')).not.toBeInTheDocument();
+});

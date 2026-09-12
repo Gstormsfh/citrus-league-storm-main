@@ -1195,7 +1195,7 @@ export const MatchupService = {
         const response = await matchupApi.getDailyProjections(playerIds, targetDate);
 
         if (!response.data) {
-          return new Map<number, DailyProjectionRow>();
+          throw new Error('Daily projection response is unavailable');
         }
 
         // API returns Record<string, DailyProjectionRow> — convert to Map
@@ -1210,7 +1210,7 @@ export const MatchupService = {
         return projectionMap;
       } catch (error: unknown) {
         logger.error('[MatchupService.getDailyProjections] ❌ API error:', error);
-        return new Map<number, DailyProjectionRow>();
+        throw error;
       } finally {
         this._projectionInflight.delete(dedupKey);
       }

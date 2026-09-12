@@ -83,6 +83,22 @@ describe('player-card projection availability and request recovery', () => {
     expect(screen.queryByText('PROJ', { exact: true })).toBeNull();
     expect(screen.queryByText('999.0', { exact: true })).toBeNull();
   });
+  it('separates three team games from expected goalie starts in the rendered upcoming table', async () => {
+    const dates = ['2026-10-01', '2026-10-03', '2026-10-05'];
+    mocks.schedule.mockResolvedValue({ games: dates.map(scheduled), error: null });
+    mocks.log.mockResolvedValue({ data: { games: [], projections: dates.map(projection_date => ({
+      projection_date, projection_basis: 'conditional_on_start', expected_starts: 0.2,
+      projected_wins: 0.5, projected_saves: 25, projected_goals_against: 3, projected_shutouts: 0,
+    })) } });
+    mocks.ros.mockResolvedValue({ data: [{ games_remaining: 5, projected_saves_ros: 125 }] });
+    openCard('G');
+    fireEvent.click(screen.getByRole('tab', { name: 'Game log' }));
+    await screen.findByText('Upcoming');
+    expect(screen.getByText(/3 TEAM GAMES/)).toBeTruthy();
+    expect(screen.getByText('STARTS', { exact: true })).toBeTruthy();
+    expect(screen.getAllByText('0.20', { exact: true })).toHaveLength(3);
+    expect(screen.queryByText('25', { exact: true })).toBeNull();
+  });
   it('keeps the ROS headline available while a failed game log can be retried', async () => {
     mocks.log.mockRejectedValueOnce(new Error('Offline'));
     openCard();

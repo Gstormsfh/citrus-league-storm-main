@@ -134,6 +134,8 @@ export type MatchupPlayer = {
     projected_gaa: number;
     projected_save_pct: number;
     projected_gp: number;
+    projection_basis?: 'conditional_on_start' | 'unconditional' | 'unknown';
+    expected_starts?: number | null;
     starter_confirmed: boolean;
     confidence_score: number;
     calculation_method: string;
