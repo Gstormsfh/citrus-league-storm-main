@@ -90,13 +90,31 @@ describe('cached page upgrade lifecycle', () => {
   });
 });
 
-it('stable worker scripts revalidate after the general one-year asset header', () => {
-  const config = JSON.parse(readFileSync(resolve('firebase.json'), 'utf8'));
+it.each(['../../firebase.json', 'firebase.json'])('stable worker scripts revalidate in deployment config %s', (file) => {
+  // Production CI invokes Hosting from the repository root; local web
+  // commands use the workspace config. Both must carry the same exception.
+  const config = JSON.parse(readFileSync(resolve(file), 'utf8'));
   const rules = config.hosting.headers;
   for (const source of ['/sw.js', '/registerSW.js']) {
     const index = rules.findIndex((rule: { source: string }) => rule.source === source);
     const general = rules.findIndex((rule: { source: string }) => rule.source.includes('js|css'));
     expect(index).toBeGreaterThan(general);
     expect(rules[index].headers).toContainEqual({ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' });
+  }
+});
+
+
+it('production Hosting selects the root config with worker cache exceptions', () => {
+  const workflow = readFileSync(resolve('../../.github/workflows/production-deploy.yml'), 'utf8');
+  const action = workflow.split('- name: Deploy to Firebase')[1]?.split('- name:')[0];
+  expect(action).toContain('uses: FirebaseExtended/action-hosting-deploy@v0');
+  // entryPoint defaults to the repository root, not apps/web, in this action.
+  const entryPoint = action.match(/entryPoint:\s*["']?([^"'\s]+)/)?.[1] ?? '.';
+  const config = JSON.parse(readFileSync(resolve('../..', entryPoint, 'firebase.json'), 'utf8'));
+  expect(config.hosting.public).toBe('apps/web/dist');
+  for (const source of ['/sw.js', '/registerSW.js']) {
+    expect(config.hosting.headers).toContainEqual({ source, headers: [
+      { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+    ] });
   }
 });
