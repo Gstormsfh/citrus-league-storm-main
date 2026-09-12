@@ -40,6 +40,7 @@ import type { PositionType } from '@/utils/rosterUtils';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import PlayerStatsModal from '@/components/PlayerStatsModal';
+import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { Mug } from '@/components/roster/Mug';
 import { mugFromDirectory } from '@/components/roster/headshot';
@@ -2306,7 +2307,7 @@ const FreeAgents = () => {
                                         >
                                           {player.full_name}
                                         </span>
-                                        <span className="text-[11px] text-white/55">{player.status || 'Active'}</span>
+                                        <PlayerAvailabilityBadge availability={player.availability} className="self-start" />
                                       </div>
                                     </div>
                                   </TableCell>
