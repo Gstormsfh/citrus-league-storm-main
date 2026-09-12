@@ -5,7 +5,7 @@
 # Last active: 2026-04-02
 # Invoked:     imported by nightly_projection_batch.py
 # Reads:       player_season_stats, player_talent_metrics, league_averages, models/*.joblib
-# Writes:      player_projected_stats, projection_cache
+# Writes:      player_projected_stats
 # ────────────────────────────────────────────────────────────
 """
 calculate_daily_projections.py

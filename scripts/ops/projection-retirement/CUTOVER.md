@@ -9,14 +9,14 @@ flowchart LR
  R[Reviewed source + evidence] --> C[One effective source revision]
  M --> C
  C --> P[Canonical runtime → ROS / daily outputs]
- L[Selected league settings] --> S[Shared scoring]
+ L[Selected league settings] --> S[League-specific scoring]
  A --> S
  P --> S
  S --> U[Shared API / raw caches → Matchup state]
  U --> V[ScoreCard / phone ScoreBlock / player rows / league strip]
 ```
 
-Actual earned points and forecast categories remain separate inputs. Unknown settings/data remain unavailable. Nightly runtime revisions retain the original editable source revision.
+Actual earned points and forecast categories remain separate inputs. Each league has independent settings and totals; only calculation code and raw hockey facts are common. Unknown settings/data remain unavailable. Nightly runtime revisions retain the original editable source revision.
 
 | Status | Exact action | Blast radius / restore |
 |---|---|---|
