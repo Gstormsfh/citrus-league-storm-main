@@ -1,0 +1,138 @@
+﻿Backend Work Order — Citrus projection engine
+For: the Mac Claude session with codebase access From: the workbook session (no codebase access, by standing rule) Date: 12 Sep 2026 | Camps open: 16-17 Sep | Kit ships: Sun 14 Sep
+
+
+Read the Reasoning Log first for the thinking. This is the task list that falls out of it, ordered by value. Nothing here was actioned by the workbook session because all of it is code.
+
+
+________________
+
+
+P0 — the coverage gap
+The model export covers 314 skaters. The lineups contain 644 slots.
+
+
+That single gap is the cause of most of what follows. It forced 323 hand-built rows, and hand-built rows are where every projection bug in this build lived.
+
+
+Task: every player projected into an NHL lineup slot must get a model row. Where the feature store cannot support one, the model should emit an explicit low-confidence row carrying a documented prior, with provenance = DEFAULT and a populated reason field. It must not emit nothing and leave the gap to be filled downstream by hand.
+
+
+Acceptance: for all 32 teams, every forward-line and defence-pair slot in the current lineup source resolves to a row the model produced. Count of MANUAL skater rows in the kit drops from 323 toward zero.
+
+
+Evidence it matters: Zeev Buium, Danila Yurov, Berkly Catton, Sam Dickinson, Shane Wright, Isaac Howard, Artyom Levshunov, Andrei Kuzmenko and ~300 others are absent from the export entirely. Two more, David Jiricek and Vitali Pinchuk, had no row anywhere and were only caught on 12 Sep by a cross-check between the lineup source and the board. They were occupying real NHL lineup slots with no projection at all.
+
+
+________________
+
+
+P0 — role features on every emitted row
+The bug this prevents: Buium's rates came from 76 games on Minnesota's third pair. He now plays Vancouver's first pair on PP1. The workbook assigned this year's role in one column and left last year's role baked into the rates, and the two never talked to each other. He came out 121st of 190 defencemen.
+
+
+The model already has TOI and PP-share as features, so it does not have this bug natively. The problem is that anything the model does not cover gets a role assigned by hand afterward, with no mechanism to re-rate.
+
+
+Task: emit projected_toi, projected_pp_unit and projected_line_slot on every row, and make the rate conditional on them. A consumer must never have to multiply a model rate by a role it was not conditioned on.
+
+
+Acceptance: for any player, changing the projected line slot changes the emitted rate. Today it does not.
+
+
+________________
+
+
+P1 — crease invariant as a database constraint
+For each team, SUM(projected_starts) = that team's game count. League total 2,688 (32 x 84).
+
+
+A per-row CHECK cannot express a cross-row sum, so this needs a deferred constraint trigger plus an integrity-cron check. The workbook asserts it on every build (pipeline/verify.py, and export_overrides.py refuses to export a violation), but the workbook is downstream. The constraint belongs in the database.
+
+
+Season length must be derived per team from nhl_games. Never a constant. The 82-to-84 CBA change was cheap in the workbook only because rate and volume are stored separately; keep that property.
+
+
+________________
+
+
+P1 — the durability ceiling is correct, do not "fix" it
+MODEL rows top out at 83 GP, not 84. The model's maximum durability prediction was 81 of 82, scaled by 84/82. That is the model correctly saying nobody plays every game.
+
+
+If you re-train on an 84-game basis, keep the ceiling honest. A re-train that produces 84-GP players is worse than the current state, not better. pipeline/verify.py fails any MODEL row above 83.
+
+
+________________
+
+
+P1 — named production defects
+* games_remaining defect
+* shared-default rows
+* unconstrained creases (see above)
+* security_drift failing on citrus_bingo_new_card
+
+
+________________
+
+
+P2 — a name audit before insert
+Four corrupted names were found in the roster data on 12 Sep, and three of the four are first-name substitutions from an adjacent player:
+
+
+Stored
+	Correct
+	How it happened
+	Simon Andrae (TOR)
+	Emil Andrae
+	merged with Simon Benoit, the other side of the same 16 Jun trade
+	Jackson Hinds (ANA)
+	Tyson Hinds
+	merged with Jackson LaCombe, same roster
+	Jacob Crevier (BUF)
+	Louis Crevier
+	wrong first name
+	Maxence D'Astous (TBL)
+	Charle-Edouard D'Astous
+	wrong first name
+
+
+This is systematic, not OCR noise. Worse, the workbook carried a rename map that silently corrected these at display time, which masked the fact that Emil Andrae was listed on two teams at once — stale on Philadelphia and corrupted on Toronto. The map has been retired and the names fixed at source.
+
+
+Task: on ingest, match every roster name against an authoritative list and flag any row whose surname matches while the first name does not. Retain the raw name on every row so a bad match is recoverable rather than silently stranded. Do this before insert, never as a display-time rename.
+
+
+________________
+
+
+P2 — the market column decision (blocks the design pack)
+FantasyPros' NHL ADP is not an API endpoint, so the licence route is dead. They have also never scored a hockey analyst: /nhl/accuracy/ 404s, there is no NHL methodology page and no NHL ranker tool.
+
+
+Choose: build our own ADP ingestion (Underdog), or hold the Buys/Fades pages.
+
+
+Governing rule either way — facts are free, expression is not. ADP is a fact (merger doctrine, NYMEX v. ICE, 497 F.3d 109). Expert rankings are expression (CCC v. Maclean Hunter, 44 F.3d 61; CDN v. Kapes, 197 F.3d 1256). Canada: CCH v. Law Society, 2004 SCC 13 at para 16, "skill and judgment," expressly excluding a "purely mechanical exercise." The named-writer consensus column has already been removed from the kit on this basis.
+
+
+________________
+
+
+Before Sunday, workbook side
+1. Re-pull lineups and roster probability after camps open Wed 16 Sep. Nineteen of 32 teams are still on Daily Faceoff's 4 July batch.
+2. Re-verify Larkin (stripped of the captaincy 11 Sep) and Hellebuyck.
+3. Re-check Jiricek after Philadelphia's final preseason cuts. He is out of waiver exemption and competing with Benoit and Bonk; roster probability is carried at 0.78.
+4. Re-check Matthews (knee, day to day, recovering from March MCL surgery).
+
+
+________________
+
+
+What the workbook session already did, so you do not redo it
+* 84-game rebasing of all MANUAL rows with documented shrinkage
+* Role priors for 19 documented role changes, premium slots only, hard-capped at the slot's model median so a prior can never outrank a real projection
+* Injured blocks on all 32 team tabs, 34 players, GP net of games missed
+* Goalie column-map bug fixed (every CREASE block was pulling saves into the goals column; Spencer Knight read as 1,344 goals)
+* Emil Andrae's team corrected; Jiricek and Pinchuk added
+* The 38-script build chain consolidated into pipeline/build_all.py (24 stages, one command) plus pipeline/verify.py (invariant checks)

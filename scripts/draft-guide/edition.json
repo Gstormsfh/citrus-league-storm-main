@@ -1,0 +1,2887 @@
+{
+  "source_name": "Citrus Draft Kit 2026-27.pdf",
+  "source_sha256": "adf470ac1c1b0f34f11db6adbb4d1f11135979a54877c3b674982fa837fab4bb",
+  "pages": [
+    {
+      "source_page": 3,
+      "eyebrow": "OVERALL BOARD · RANKS 1-13",
+      "title": "THE FIRST ROUND",
+      "metric": [
+        "SCORED ON",
+        "Citrus default"
+      ],
+      "intro": "Ranked on projected fantasy points under the default weights. Pos column carries each player’s rank inside his own position — that number, not the overall rank, is what decides when you have to reach.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TEAM",
+        "POS",
+        "FPTS",
+        "FP/GP",
+        "GP",
+        "PTS",
+        "SOG"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "1",
+            "Connor McDavid",
+            "EDM",
+            "C1",
+            "949",
+            "11.71",
+            "81",
+            "127",
+            "273"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "2",
+            "Nathan MacKinnon",
+            "COL",
+            "C2",
+            "935",
+            "11.84",
+            "79",
+            "112",
+            "331"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "3",
+            "Macklin Celebrini",
+            "SJS",
+            "C3",
+            "865",
+            "10.68",
+            "81",
+            "100",
+            "300"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "4",
+            "Nikita Kucherov",
+            "TBL",
+            "RW1",
+            "835",
+            "10.84",
+            "77",
+            "113",
+            "236"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "5",
+            "David Pastrnak",
+            "BOS",
+            "RW2",
+            "774",
+            "10.06",
+            "77",
+            "94",
+            "282"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "6",
+            "Kirill Kaprizov",
+            "MIN",
+            "LW1",
+            "746",
+            "9.69",
+            "77",
+            "85",
+            "264"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "7",
+            "Cale Makar",
+            "COL",
+            "D1",
+            "733",
+            "9.77",
+            "75",
+            "79",
+            "213"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "8",
+            "Jack Eichel",
+            "VGK",
+            "C4",
+            "719",
+            "9.71",
+            "74",
+            "84",
+            "253"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "9",
+            "Evan Bouchard",
+            "EDM",
+            "D2",
+            "713",
+            "8.80",
+            "81",
+            "80",
+            "221"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "10",
+            "Jason Robertson",
+            "DAL",
+            "LW2",
+            "712",
+            "8.79",
+            "81",
+            "81",
+            "252"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "11",
+            "Kyle Connor",
+            "WPG",
+            "LW3",
+            "696",
+            "8.59",
+            "81",
+            "81",
+            "262"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "12",
+            "Matt Boldy",
+            "MIN",
+            "LW4",
+            "690",
+            "9.07",
+            "76",
+            "74",
+            "249"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "13",
+            "Nick Suzuki",
+            "MTL",
+            "C5",
+            "689",
+            "8.51",
+            "81",
+            "87",
+            "177"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "PROJECTIONS GENERATED 8 SEPTEMBER 2026",
+      "panel_height": 200.70623779296875,
+      "source_text": "OVERALL BOARD · RANKS 1-13\nTHE FIRST ROUND\nSCORED ON\nCitrus default\nRanked on projected fantasy points under the default weights. Pos column carries each player’s rank inside his own\nposition — that number, not the overall rank, is what decides when you have to reach.\n#\nPLAYER\nTEAM\nPOS\nFPTS\nFP/GP\nGP\nPTS\nSOG\n1\nConnor McDavid\nEDM\nC1\n949\n11.71\n81\n127\n273\n2\nNathan MacKinnon\nCOL\nC2\n935\n11.84\n79\n112\n331\n3\nMacklin Celebrini\nSJS\nC3\n865\n10.68\n81\n100\n300\n4\nNikita Kucherov\nTBL\nRW1\n835\n10.84\n77\n113\n236\n5\nDavid Pastrnak\nBOS\nRW2\n774\n10.06\n77\n94\n282\n6\nKirill Kaprizov\nMIN\nLW1\n746\n9.69\n77\n85\n264\n7\nCale Makar\nCOL\nD1\n733\n9.77\n75\n79\n213\n8\nJack Eichel\nVGK\nC4\n719\n9.71\n74\n84\n253\n9\nEvan Bouchard\nEDM\nD2\n713\n8.80\n81\n80\n221\n10\nJason Robertson\nDAL\nLW2\n712\n8.79\n81\n81\n252\n11\nKyle Connor\nWPG\nLW3\n696\n8.59\n81\n81\n262\n12\nMatt Boldy\nMIN\nLW4\n690\n9.07\n76\n74\n249\n13\nNick Suzuki\nMTL\nC5\n689\n8.51\n81\n87\n177\nPLAYER CALL-OUT\nSUMS TO 949 · MODEL FPTS 949\nFP/GP\n11.71\nPTS\n127\nSOG\n273\nBLK\n30\nWHERE THE FANTASY POINTS COME FROM\nASSISTS\n90 × 4\n360\nSHOTS\n273 × 0.9\n246\nGOALS\n37 × 6\n221\nPP PTS\n46 × 2\n93\nBLOCKS\n30 × 1\n30\n81 projected games at 11.71 fantasy points each. 273 shots carries 246 points before a goal is counted.\nC · 1 AT HIS POSITION\nCONNOR\nMCDAVID\nPROJECTIONS GENERATED 8 SEPTEMBER 2026\nCITRUS 2026-27 · P3\n"
+    },
+    {
+      "source_page": 4,
+      "eyebrow": "OVERALL BOARD · RANKS 14-26",
+      "title": "WHERE THE TIERS BREAK",
+      "metric": [
+        "SCORED ON",
+        "Citrus default"
+      ],
+      "intro": "Same board, next slice. The Pos number is the positional rank; a low one next to a late overall rank is the definition of a value pick.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TEAM",
+        "POS",
+        "FPTS",
+        "FP/GP",
+        "GP",
+        "PTS",
+        "SOG"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "14",
+            "Zach Werenski",
+            "CBJ",
+            "D3",
+            "689",
+            "9.19",
+            "75",
+            "71",
+            "250"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "15",
+            "Clayton Keller",
+            "UTA",
+            "RW3",
+            "683",
+            "8.43",
+            "81",
+            "84",
+            "221"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "16",
+            "Jake Guentzel",
+            "TBL",
+            "C6",
+            "675",
+            "8.43",
+            "80",
+            "79",
+            "218"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "17",
+            "Alex DeBrincat",
+            "DET",
+            "RW4",
+            "669",
+            "8.25",
+            "81",
+            "72",
+            "257"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "18",
+            "Wyatt Johnston",
+            "DAL",
+            "C7",
+            "667",
+            "8.23",
+            "81",
+            "74",
+            "212"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "19",
+            "Auston Matthews",
+            "TOR",
+            "C8",
+            "659",
+            "10.46",
+            "63",
+            "65",
+            "245"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "20",
+            "Leon Draisaitl",
+            "EDM",
+            "C9",
+            "657",
+            "9.81",
+            "67",
+            "84",
+            "192"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "21",
+            "Jack Hughes",
+            "NJD",
+            "C10",
+            "655",
+            "10.40",
+            "63",
+            "75",
+            "244"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "22",
+            "Filip Forsberg",
+            "NSH",
+            "LW5",
+            "653",
+            "8.06",
+            "81",
+            "68",
+            "258"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "23",
+            "Cole Caufield",
+            "MTL",
+            "RW5",
+            "652",
+            "8.15",
+            "80",
+            "70",
+            "260"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "24",
+            "Quinn Hughes",
+            "MIN",
+            "D4",
+            "649",
+            "8.78",
+            "74",
+            "79",
+            "190"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "25",
+            "Tage Thompson",
+            "BUF",
+            "C11",
+            "649",
+            "8.12",
+            "80",
+            "67",
+            "262"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "26",
+            "Matthew Schaefer",
+            "NYI",
+            "D5",
+            "636",
+            "7.85",
+            "81",
+            "57",
+            "238"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "PROJECTIONS GENERATED 8 SEPTEMBER 2026",
+      "panel_height": 200.70623779296875,
+      "source_text": "OVERALL BOARD · RANKS 14-26\nWHERE THE TIERS BREAK\nSCORED ON\nCitrus default\nSame board, next slice. The Pos number is the positional rank; a low one next to a late overall rank is the definition\nof a value pick.\n#\nPLAYER\nTEAM\nPOS\nFPTS\nFP/GP\nGP\nPTS\nSOG\n14\nZach Werenski\nCBJ\nD3\n689\n9.19\n75\n71\n250\n15\nClayton Keller\nUTA\nRW3\n683\n8.43\n81\n84\n221\n16\nJake Guentzel\nTBL\nC6\n675\n8.43\n80\n79\n218\n17\nAlex DeBrincat\nDET\nRW4\n669\n8.25\n81\n72\n257\n18\nWyatt Johnston\nDAL\nC7\n667\n8.23\n81\n74\n212\n19\nAuston Matthews\nTOR\nC8\n659\n10.46\n63\n65\n245\n20\nLeon Draisaitl\nEDM\nC9\n657\n9.81\n67\n84\n192\n21\nJack Hughes\nNJD\nC10\n655\n10.40\n63\n75\n244\n22\nFilip Forsberg\nNSH\nLW5\n653\n8.06\n81\n68\n258\n23\nCole Caufield\nMTL\nRW5\n652\n8.15\n80\n70\n260\n24\nQuinn Hughes\nMIN\nD4\n649\n8.78\n74\n79\n190\n25\nTage Thompson\nBUF\nC11\n649\n8.12\n80\n67\n262\n26\nMatthew Schaefer\nNYI\nD5\n636\n7.85\n81\n57\n238\nPLAYER CALL-OUT\nSUMS TO 689 · MODEL FPTS 689\nFP/GP\n9.19\nPTS\n71\nSOG\n250\nBLK\n109\nWHERE THE FANTASY POINTS COME FROM\nSHOTS\n250 × 0.9\n225\nASSISTS\n54 × 4\n217\nBLOCKS\n109 × 1\n109\nGOALS\n17 × 6\n99\nPP PTS\n20 × 2\n39\n75 projected games at 9.19 fantasy points each. 109 blocks at 1 a piece is where the floor comes from.\nD · 3 AT HIS POSITION\nZACH\nWERENSKI\nPROJECTIONS GENERATED 8 SEPTEMBER 2026\nCITRUS 2026-27 · P4\n"
+    },
+    {
+      "source_page": 5,
+      "eyebrow": "OVERALL BOARD · RANKS 27-38",
+      "title": "THE MIDDLE ROUNDS",
+      "metric": [
+        "SCORED ON",
+        "Citrus default"
+      ],
+      "intro": "Same board, next slice. The Pos number is the positional rank; a low one next to a late overall rank is the definition of a value pick.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TEAM",
+        "POS",
+        "FPTS",
+        "FP/GP",
+        "GP",
+        "PTS",
+        "SOG"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "27",
+            "Dylan Guenther",
+            "UTA",
+            "RW6",
+            "631",
+            "8.09",
+            "78",
+            "66",
+            "239"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "28",
+            "Artemi Panarin",
+            "LAK",
+            "LW6",
+            "631",
+            "8.19",
+            "77",
+            "79",
+            "221"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "29",
+            "Tim Stutzle",
+            "OTT",
+            "C12",
+            "629",
+            "7.97",
+            "79",
+            "77",
+            "186"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "29",
+            "Martin Necas",
+            "COL",
+            "C12",
+            "629",
+            "8.17",
+            "77",
+            "79",
+            "204"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "31",
+            "Nico Hischier",
+            "NJD",
+            "C14",
+            "627",
+            "7.74",
+            "81",
+            "68",
+            "206"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "32",
+            "Rasmus Dahlin",
+            "BUF",
+            "D6",
+            "623",
+            "8.10",
+            "77",
+            "66",
+            "204"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "33",
+            "Mitch Marner",
+            "VGK",
+            "RW7",
+            "618",
+            "7.72",
+            "80",
+            "82",
+            "165"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "34",
+            "Mark Scheifele",
+            "WPG",
+            "C15",
+            "613",
+            "7.57",
+            "81",
+            "81",
+            "163"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "35",
+            "Lane Hutson",
+            "MTL",
+            "D7",
+            "611",
+            "7.54",
+            "81",
+            "76",
+            "117"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "36",
+            "Moritz Seider",
+            "DET",
+            "D8",
+            "608",
+            "7.51",
+            "81",
+            "52",
+            "168"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "37",
+            "Sebastian Aho",
+            "CAR",
+            "C16",
+            "607",
+            "7.78",
+            "78",
+            "75",
+            "196"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "38",
+            "Jesper Bratt",
+            "NJD",
+            "LW7",
+            "604",
+            "7.46",
+            "81",
+            "77",
+            "188"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "PROJECTIONS GENERATED 8 SEPTEMBER 2026",
+      "panel_height": 200.70623779296875,
+      "source_text": "OVERALL BOARD · RANKS 27-38\nTHE MIDDLE ROUNDS\nSCORED ON\nCitrus default\nSame board, next slice. The Pos number is the positional rank; a low one next to a late overall rank is the definition\nof a value pick.\n#\nPLAYER\nTEAM\nPOS\nFPTS\nFP/GP\nGP\nPTS\nSOG\n27\nDylan Guenther\nUTA\nRW6\n631\n8.09\n78\n66\n239\n28\nArtemi Panarin\nLAK\nLW6\n631\n8.19\n77\n79\n221\n29\nTim Stutzle\nOTT\nC12\n629\n7.97\n79\n77\n186\n29\nMartin Necas\nCOL\nC12\n629\n8.17\n77\n79\n204\n31\nNico Hischier\nNJD\nC14\n627\n7.74\n81\n68\n206\n32\nRasmus Dahlin\nBUF\nD6\n623\n8.10\n77\n66\n204\n33\nMitch Marner\nVGK\nRW7\n618\n7.72\n80\n82\n165\n34\nMark Scheifele\nWPG\nC15\n613\n7.57\n81\n81\n163\n35\nLane Hutson\nMTL\nD7\n611\n7.54\n81\n76\n117\n36\nMoritz Seider\nDET\nD8\n608\n7.51\n81\n52\n168\n37\nSebastian Aho\nCAR\nC16\n607\n7.78\n78\n75\n196\n38\nJesper Bratt\nNJD\nLW7\n604\n7.46\n81\n77\n188\nPLAYER CALL-OUT\nSUMS TO 631 · MODEL FPTS 631\nFP/GP\n8.19\nPTS\n79\nSOG\n221\nBLK\n14\nWHERE THE FANTASY POINTS COME FROM\nASSISTS\n52 × 4\n209\nSHOTS\n221 × 0.9\n199\nGOALS\n26 × 6\n158\nPP PTS\n25 × 2\n51\nBLOCKS\n14 × 1\n14\n77 projected games at 8.19 fantasy points each. 221 shots carries 199 points before a goal is counted.\nLW · 6 AT HIS POSITION\nARTEMI\nPANARIN\nPROJECTIONS GENERATED 8 SEPTEMBER 2026\nCITRUS 2026-27 · P5\n"
+    },
+    {
+      "source_page": 6,
+      "eyebrow": "OVERALL BOARD · RANKS 39-50",
+      "title": "THE LAST SAFE PICKS",
+      "metric": [
+        "SCORED ON",
+        "Citrus default"
+      ],
+      "intro": "Same board, next slice. The Pos number is the positional rank; a low one next to a late overall rank is the definition of a value pick.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TEAM",
+        "POS",
+        "FPTS",
+        "FP/GP",
+        "GP",
+        "PTS",
+        "SOG"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "39",
+            "Connor Bedard",
+            "CHI",
+            "C17",
+            "599",
+            "8.56",
+            "70",
+            "69",
+            "216"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "40",
+            "Mathew Barzal",
+            "NYI",
+            "C18",
+            "593",
+            "7.41",
+            "80",
+            "71",
+            "195"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "41",
+            "Alex Ovechkin",
+            "WSH",
+            "LW8",
+            "590",
+            "7.28",
+            "81",
+            "62",
+            "243"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "42",
+            "Dylan Larkin",
+            "DET",
+            "C19",
+            "590",
+            "7.97",
+            "74",
+            "64",
+            "217"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "43",
+            "Seth Jarvis",
+            "CAR",
+            "RW8",
+            "589",
+            "8.18",
+            "72",
+            "65",
+            "207"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "44",
+            "Adrian Kempe",
+            "LAK",
+            "RW8",
+            "589",
+            "7.36",
+            "80",
+            "66",
+            "225"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "45",
+            "Mikko Rantanen",
+            "DAL",
+            "RW10",
+            "588",
+            "8.91",
+            "66",
+            "75",
+            "166"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "46",
+            "Brandon Hagel",
+            "TBL",
+            "LW9",
+            "587",
+            "8.16",
+            "72",
+            "72",
+            "197"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "47",
+            "Juraj Slafkovsky",
+            "MTL",
+            "LW10",
+            "585",
+            "7.23",
+            "81",
+            "66",
+            "169"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "48",
+            "Brady Tkachuk",
+            "FLA",
+            "LW11",
+            "578",
+            "9.18",
+            "63",
+            "59",
+            "249"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "49",
+            "John Tavares",
+            "TOR",
+            "C20",
+            "578",
+            "7.14",
+            "81",
+            "67",
+            "200"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "50",
+            "Lucas Raymond",
+            "DET",
+            "LW12",
+            "573",
+            "7.25",
+            "79",
+            "71",
+            "175"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "PROJECTIONS GENERATED 8 SEPTEMBER 2026",
+      "panel_height": 200.70623779296875,
+      "source_text": "OVERALL BOARD · RANKS 39-50\nTHE LAST SAFE PICKS\nSCORED ON\nCitrus default\nSame board, next slice. The Pos number is the positional rank; a low one next to a late overall rank is the definition\nof a value pick.\n#\nPLAYER\nTEAM\nPOS\nFPTS\nFP/GP\nGP\nPTS\nSOG\n39\nConnor Bedard\nCHI\nC17\n599\n8.56\n70\n69\n216\n40\nMathew Barzal\nNYI\nC18\n593\n7.41\n80\n71\n195\n41\nAlex Ovechkin\nWSH\nLW8\n590\n7.28\n81\n62\n243\n42\nDylan Larkin\nDET\nC19\n590\n7.97\n74\n64\n217\n43\nSeth Jarvis\nCAR\nRW8\n589\n8.18\n72\n65\n207\n44\nAdrian Kempe\nLAK\nRW8\n589\n7.36\n80\n66\n225\n45\nMikko Rantanen\nDAL\nRW10\n588\n8.91\n66\n75\n166\n46\nBrandon Hagel\nTBL\nLW9\n587\n8.16\n72\n72\n197\n47\nJuraj Slafkovsky\nMTL\nLW10\n585\n7.23\n81\n66\n169\n48\nBrady Tkachuk\nFLA\nLW11\n578\n9.18\n63\n59\n249\n49\nJohn Tavares\nTOR\nC20\n578\n7.14\n81\n67\n200\n50\nLucas Raymond\nDET\nLW12\n573\n7.25\n79\n71\n175\nPLAYER CALL-OUT\nSUMS TO 599 · MODEL FPTS 599\nFP/GP\n8.56\nPTS\n69\nSOG\n216\nBLK\n31\nWHERE THE FANTASY POINTS COME FROM\nSHOTS\n216 × 0.9\n194\nASSISTS\n44 × 4\n176\nGOALS\n25 × 6\n150\nPP PTS\n24 × 2\n47\nBLOCKS\n31 × 1\n31\n70 projected games at 8.56 fantasy points each. 216 shots carries 194 points before a goal is counted.\nC · 17 AT HIS POSITION\nCONNOR\nBEDARD\nPROJECTIONS GENERATED 8 SEPTEMBER 2026\nCITRUS 2026-27 · P6\n"
+    },
+    {
+      "source_page": 7,
+      "eyebrow": "OFFSEASON",
+      "title": "WHO ACTUALLY MOVED",
+      "metric": [
+        "RECONCILED",
+        "8 of 14"
+      ],
+      "intro": "Every move below was checked against the projection set’s own team column before it was printed — a reported move that the model does not already reflect is not in this table. Eight players changed address; six signed where they were.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TO",
+        "POS",
+        "FROM",
+        "FPTS",
+        "FP/GP",
+        "PTS",
+        "GP"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "48",
+            "Brady Tkachuk",
+            "FLA",
+            "LW11",
+            "OTT",
+            "578",
+            "9.18",
+            "59",
+            "63"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "88",
+            "William Eklund",
+            "OTT",
+            "LW15",
+            "SJS",
+            "504",
+            "6.55",
+            "58",
+            "77"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "103",
+            "Jordan Kyrou",
+            "WSH",
+            "RW25",
+            "STL",
+            "479",
+            "6.65",
+            "51",
+            "72"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "134",
+            "Darren Raddysh",
+            "TOR",
+            "D29",
+            "TBL",
+            "443",
+            "6.06",
+            "46",
+            "73"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "142",
+            "Darnell Nurse",
+            "SJS",
+            "D32",
+            "EDM",
+            "433",
+            "5.35",
+            "28",
+            "81"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "155",
+            "Connor McMichael",
+            "STL",
+            "LW24",
+            "WSH",
+            "415",
+            "5.39",
+            "47",
+            "77"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "163",
+            "Jacob Trouba",
+            "SJS",
+            "D36",
+            "ANA",
+            "411",
+            "5.13",
+            "26",
+            "80"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "193",
+            "Bowen Byram",
+            "CHI",
+            "D44",
+            "BUF",
+            "379",
+            "4.68",
+            "39",
+            "81"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "7",
+            "Cale Makar",
+            "COL",
+            "D1",
+            "stayed",
+            "733",
+            "9.77",
+            "79",
+            "75"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "10",
+            "Jason Robertson",
+            "DAL",
+            "LW2",
+            "stayed",
+            "712",
+            "8.79",
+            "81",
+            "81"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "39",
+            "Connor Bedard",
+            "CHI",
+            "C17",
+            "stayed",
+            "599",
+            "8.56",
+            "69",
+            "70"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "42",
+            "Dylan Larkin",
+            "DET",
+            "C19",
+            "stayed",
+            "590",
+            "7.97",
+            "64",
+            "74"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "110",
+            "Leo Carlsson",
+            "ANA",
+            "C43",
+            "stayed",
+            "469",
+            "6.61",
+            "54",
+            "71"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "173",
+            "Claude Giroux",
+            "OTT",
+            "RW44",
+            "stayed",
+            "402",
+            "4.96",
+            "48",
+            "81"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "MOVES REPORTED BY ESPN, PRO HOCKEY RUMORS AND SPOTRAC · VERIFIED AGAINST THE PROJECTION SET",
+      "panel_height": 200.70623779296875,
+      "source_text": "OFFSEASON\nWHO ACTUALLY MOVED\nRECONCILED\n8 of 14\nEvery move below was checked against the projection set’s own team column before it was printed — a reported\nmove that the model does not already reflect is not in this table. Eight players changed address; six signed where\nthey were.\n#\nPLAYER\nTO\nPOS\nFROM\nFPTS\nFP/GP\nPTS\nGP\n48\nBrady Tkachuk\nFLA\nLW11\nOTT\n578\n9.18\n59\n63\n88\nWilliam Eklund\nOTT\nLW15\nSJS\n504\n6.55\n58\n77\n103\nJordan Kyrou\nWSH\nRW25\nSTL\n479\n6.65\n51\n72\n134\nDarren Raddysh\nTOR\nD29\nTBL\n443\n6.06\n46\n73\n142\nDarnell Nurse\nSJS\nD32\nEDM\n433\n5.35\n28\n81\n155\nConnor McMichael\nSTL\nLW24\nWSH\n415\n5.39\n47\n77\n163\nJacob Trouba\nSJS\nD36\nANA\n411\n5.13\n26\n80\n193\nBowen Byram\nCHI\nD44\nBUF\n379\n4.68\n39\n81\n7\nCale Makar\nCOL\nD1\nstayed\n733\n9.77\n79\n75\n10\nJason Robertson\nDAL\nLW2\nstayed\n712\n8.79\n81\n81\n39\nConnor Bedard\nCHI\nC17\nstayed\n599\n8.56\n69\n70\n42\nDylan Larkin\nDET\nC19\nstayed\n590\n7.97\n64\n74\n110\nLeo Carlsson\nANA\nC43\nstayed\n469\n6.61\n54\n71\n173\nClaude Giroux\nOTT\nRW44\nstayed\n402\n4.96\n48\n81\nPLAYER CALL-OUT\nSUMS TO 578 · MODEL FPTS 578\nFP/GP\n9.18\nPTS\n59\nSOG\n249\nBLK\n25\nWHERE THE FANTASY POINTS COME FROM\nSHOTS\n249 × 0.9\n224\nGOALS\n28 × 6\n166\nASSISTS\n31 × 4\n124\nPP PTS\n20 × 2\n39\nBLOCKS\n25 × 1\n25\nTraded to Florida for four picks. The model has him at FLA, ranked 48 overall.\nOTT → FLA\nBRADY\nTKACHUK\nMOVES REPORTED BY ESPN, PRO HOCKEY RUMORS AND SPOTRAC · VERIFIED AGAINST THE PROJECTION SET\nCITRUS 2026-27 · P7\n"
+    },
+    {
+      "source_page": 8,
+      "eyebrow": "ATLANTIC DIVISION",
+      "title": "ATLANTIC’S BEST FANTASY ASSETS",
+      "metric": [
+        "IN THE TOP 260",
+        "66 skaters"
+      ],
+      "intro": "BOS · BUF · DET · FLA · MTL · OTT · TBL · TOR. Ranked by overall board position, so the numbers are directly comparable with every other page in this kit.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TEAM",
+        "POS",
+        "FPTS",
+        "FP/GP",
+        "GP",
+        "PTS / W",
+        "SOG / SV%"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "4",
+            "Nikita Kucherov",
+            "TBL",
+            "RW1",
+            "835",
+            "10.84",
+            "77",
+            "113",
+            "236"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "5",
+            "David Pastrnak",
+            "BOS",
+            "RW2",
+            "774",
+            "10.06",
+            "77",
+            "94",
+            "282"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "13",
+            "Nick Suzuki",
+            "MTL",
+            "C5",
+            "689",
+            "8.51",
+            "81",
+            "87",
+            "177"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "16",
+            "Jake Guentzel",
+            "TBL",
+            "C6",
+            "675",
+            "8.43",
+            "80",
+            "79",
+            "218"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "17",
+            "Alex DeBrincat",
+            "DET",
+            "RW4",
+            "669",
+            "8.25",
+            "81",
+            "72",
+            "257"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "19",
+            "Auston Matthews",
+            "TOR",
+            "C8",
+            "659",
+            "10.46",
+            "63",
+            "65",
+            "245"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "23",
+            "Cole Caufield",
+            "MTL",
+            "RW5",
+            "652",
+            "8.15",
+            "80",
+            "70",
+            "260"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "25",
+            "Tage Thompson",
+            "BUF",
+            "C11",
+            "649",
+            "8.12",
+            "80",
+            "67",
+            "262"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "29",
+            "Tim Stutzle",
+            "OTT",
+            "C12",
+            "629",
+            "7.97",
+            "79",
+            "77",
+            "186"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "—",
+            "Andrei Vasilevskiy",
+            "TBL",
+            "G1",
+            "603",
+            "10.97",
+            "55",
+            "35W",
+            ".912"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "—",
+            "Jeremy Swayman",
+            "BOS",
+            "G6",
+            "531",
+            "10.01",
+            "53",
+            "27W",
+            ".904"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "ATLANTIC DIVISION · SKATERS CARRY THEIR OVERALL BOARD RANK; GOALIES ARE RANKED SEPARATELY, SO THEIR # IS DASHED AND THE POS COLUMN HOLDS THE GOALIE RANK",
+      "panel_height": 200.70623779296875,
+      "source_text": "ATLANTIC DIVISION\nATLANTIC’S BEST\nFANTASY ASSETS\nIN THE TOP 260\n66 skaters\nBOS · BUF · DET · FLA · MTL · OTT · TBL · TOR. Ranked by overall board position, so the numbers are directly\ncomparable with every other page in this kit.\n#\nPLAYER\nTEAM\nPOS\nFPTS\nFP/GP\nGP\nPTS /\nW\nSOG /\nSV%\n4\nNikita Kucherov\nTBL\nRW1\n835\n10.84\n77\n113\n236\n5\nDavid Pastrnak\nBOS\nRW2\n774\n10.06\n77\n94\n282\n13\nNick Suzuki\nMTL\nC5\n689\n8.51\n81\n87\n177\n16\nJake Guentzel\nTBL\nC6\n675\n8.43\n80\n79\n218\n17\nAlex DeBrincat\nDET\nRW4\n669\n8.25\n81\n72\n257\n19\nAuston Matthews\nTOR\nC8\n659\n10.46\n63\n65\n245\n23\nCole Caufield\nMTL\nRW5\n652\n8.15\n80\n70\n260\n25\nTage Thompson\nBUF\nC11\n649\n8.12\n80\n67\n262\n29\nTim Stutzle\nOTT\nC12\n629\n7.97\n79\n77\n186\n—\nAndrei Vasilevskiy\nTBL\nG1\n603\n10.97\n55\n35W\n.912\n—\nJeremy Swayman\nBOS\nG6\n531\n10.01\n53\n27W\n.904\nPLAYER CALL-OUT\nSUMS TO 835 · MODEL FPTS 835\nFP/GP\n10.84\nPTS\n113\nSOG\n236\nBLK\n29\nWHERE THE FANTASY POINTS COME FROM\nASSISTS\n81 × 4\n324\nSHOTS\n236 × 0.9\n212\nGOALS\n32 × 6\n191\nPP PTS\n39 × 2\n79\nBLOCKS\n29 × 1\n29\n113 points and 236 shots in 77 games. Power-play points add 79.\nTBL · RW 1\nNIKITA\nKUCHEROV\nATLANTIC DIVISION · SKATERS CARRY THEIR OVERALL BOARD RANK; GOALIES ARE RANKED SEPARATELY, SO THEIR #\nIS DASHED AND THE POS COLUMN HOLDS THE GOALIE RANK\nCITRUS 2026-\n27 · P8\n"
+    },
+    {
+      "source_page": 9,
+      "eyebrow": "METROPOLITAN DIVISION",
+      "title": "METROPOLITAN’S BEST FANTASY ASSETS",
+      "metric": [
+        "IN THE TOP 260",
+        "72 skaters"
+      ],
+      "intro": "CAR · CBJ · NJD · NYI · NYR · PHI · PIT · WSH. Ranked by overall board position, so the numbers are directly comparable with every other page in this kit.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TEAM",
+        "POS",
+        "FPTS",
+        "FP/GP",
+        "GP",
+        "PTS / W",
+        "SOG / SV%"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "14",
+            "Zach Werenski",
+            "CBJ",
+            "D3",
+            "689",
+            "9.19",
+            "75",
+            "71",
+            "250"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "21",
+            "Jack Hughes",
+            "NJD",
+            "C10",
+            "655",
+            "10.40",
+            "63",
+            "75",
+            "244"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "26",
+            "Matthew Schaefer",
+            "NYI",
+            "D5",
+            "636",
+            "7.85",
+            "81",
+            "57",
+            "238"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "31",
+            "Nico Hischier",
+            "NJD",
+            "C14",
+            "627",
+            "7.74",
+            "81",
+            "68",
+            "206"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "37",
+            "Sebastian Aho",
+            "CAR",
+            "C16",
+            "607",
+            "7.78",
+            "78",
+            "75",
+            "196"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "38",
+            "Jesper Bratt",
+            "NJD",
+            "LW7",
+            "604",
+            "7.46",
+            "81",
+            "77",
+            "188"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "40",
+            "Mathew Barzal",
+            "NYI",
+            "C18",
+            "593",
+            "7.41",
+            "80",
+            "71",
+            "195"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "41",
+            "Alex Ovechkin",
+            "WSH",
+            "LW8",
+            "590",
+            "7.28",
+            "81",
+            "62",
+            "243"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "43",
+            "Seth Jarvis",
+            "CAR",
+            "RW8",
+            "589",
+            "8.18",
+            "72",
+            "65",
+            "207"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "—",
+            "Logan Thompson",
+            "WSH",
+            "G2",
+            "595",
+            "10.82",
+            "55",
+            "32W",
+            ".911"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "—",
+            "Jet Greaves",
+            "CBJ",
+            "G4",
+            "564",
+            "10.64",
+            "53",
+            "26W",
+            ".911"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "METROPOLITAN DIVISION · SKATERS CARRY THEIR OVERALL BOARD RANK; GOALIES ARE RANKED SEPARATELY, SO THEIR # IS DASHED AND THE POS COLUMN HOLDS THE GOALIE RANK",
+      "panel_height": 200.70623779296875,
+      "source_text": "METROPOLITAN DIVISION\nMETROPOLITAN’S\nBEST FANTASY ASSETS\nIN THE TOP 260\n72 skaters\nCAR · CBJ · NJD · NYI · NYR · PHI · PIT · WSH. Ranked by overall board position, so the numbers are directly\ncomparable with every other page in this kit.\n#\nPLAYER\nTEAM\nPOS\nFPTS\nFP/GP\nGP\nPTS /\nW\nSOG /\nSV%\n14\nZach Werenski\nCBJ\nD3\n689\n9.19\n75\n71\n250\n21\nJack Hughes\nNJD\nC10\n655\n10.40\n63\n75\n244\n26\nMatthew Schaefer\nNYI\nD5\n636\n7.85\n81\n57\n238\n31\nNico Hischier\nNJD\nC14\n627\n7.74\n81\n68\n206\n37\nSebastian Aho\nCAR\nC16\n607\n7.78\n78\n75\n196\n38\nJesper Bratt\nNJD\nLW7\n604\n7.46\n81\n77\n188\n40\nMathew Barzal\nNYI\nC18\n593\n7.41\n80\n71\n195\n41\nAlex Ovechkin\nWSH\nLW8\n590\n7.28\n81\n62\n243\n43\nSeth Jarvis\nCAR\nRW8\n589\n8.18\n72\n65\n207\n—\nLogan Thompson\nWSH\nG2\n595\n10.82\n55\n32W\n.911\n—\nJet Greaves\nCBJ\nG4\n564\n10.64\n53\n26W\n.911\nPLAYER CALL-OUT\nSUMS TO 689 · MODEL FPTS 689\nFP/GP\n9.19\nPTS\n71\nSOG\n250\nBLK\n109\nWHERE THE FANTASY POINTS COME FROM\nSHOTS\n250 × 0.9\n225\nASSISTS\n54 × 4\n217\nBLOCKS\n109 × 1\n109\nGOALS\n17 × 6\n99\nPP PTS\n20 × 2\n39\n71 points and 250 shots in 75 games. Blocks add 109 fantasy points.\nCBJ · D 3\nZACH\nWERENSKI\nMETROPOLITAN DIVISION · SKATERS CARRY THEIR OVERALL BOARD RANK; GOALIES ARE RANKED SEPARATELY, SO\nTHEIR # IS DASHED AND THE POS COLUMN HOLDS THE GOALIE RANK\nCITRUS 2026-\n27 · P9\n"
+    },
+    {
+      "source_page": 10,
+      "eyebrow": "CENTRAL DIVISION",
+      "title": "CENTRAL’S BEST FANTASY ASSETS",
+      "metric": [
+        "IN THE TOP 260",
+        "61 skaters"
+      ],
+      "intro": "CHI · COL · DAL · MIN · NSH · STL · UTA · WPG. Ranked by overall board position, so the numbers are directly comparable with every other page in this kit.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TEAM",
+        "POS",
+        "FPTS",
+        "FP/GP",
+        "GP",
+        "PTS / W",
+        "SOG / SV%"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "2",
+            "Nathan MacKinnon",
+            "COL",
+            "C2",
+            "935",
+            "11.84",
+            "79",
+            "112",
+            "331"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "6",
+            "Kirill Kaprizov",
+            "MIN",
+            "LW1",
+            "746",
+            "9.69",
+            "77",
+            "85",
+            "264"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "7",
+            "Cale Makar",
+            "COL",
+            "D1",
+            "733",
+            "9.77",
+            "75",
+            "79",
+            "213"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "10",
+            "Jason Robertson",
+            "DAL",
+            "LW2",
+            "712",
+            "8.79",
+            "81",
+            "81",
+            "252"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "11",
+            "Kyle Connor",
+            "WPG",
+            "LW3",
+            "696",
+            "8.59",
+            "81",
+            "81",
+            "262"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "12",
+            "Matt Boldy",
+            "MIN",
+            "LW4",
+            "690",
+            "9.07",
+            "76",
+            "74",
+            "249"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "15",
+            "Clayton Keller",
+            "UTA",
+            "RW3",
+            "683",
+            "8.43",
+            "81",
+            "84",
+            "221"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "18",
+            "Wyatt Johnston",
+            "DAL",
+            "C7",
+            "667",
+            "8.23",
+            "81",
+            "74",
+            "212"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "22",
+            "Filip Forsberg",
+            "NSH",
+            "LW5",
+            "653",
+            "8.06",
+            "81",
+            "68",
+            "258"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "—",
+            "Connor Hellebuyck",
+            "WPG",
+            "G3",
+            "574",
+            "10.62",
+            "54",
+            "30W",
+            ".910"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "—",
+            "Jake Oettinger",
+            "DAL",
+            "G7",
+            "529",
+            "10.18",
+            "52",
+            "33W",
+            ".904"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "CENTRAL DIVISION · SKATERS CARRY THEIR OVERALL BOARD RANK; GOALIES ARE RANKED SEPARATELY, SO THEIR # IS DASHED AND THE POS COLUMN HOLDS THE GOALIE RANK",
+      "panel_height": 200.70623779296875,
+      "source_text": "CENTRAL DIVISION\nCENTRAL’S BEST FANTASY ASSETS\nIN THE TOP 260\n61 skaters\nCHI · COL · DAL · MIN · NSH · STL · UTA · WPG. Ranked by overall board position, so the numbers are directly\ncomparable with every other page in this kit.\n#\nPLAYER\nTEAM\nPOS\nFPTS\nFP/GP\nGP\nPTS /\nW\nSOG /\nSV%\n2\nNathan MacKinnon\nCOL\nC2\n935\n11.84\n79\n112\n331\n6\nKirill Kaprizov\nMIN\nLW1\n746\n9.69\n77\n85\n264\n7\nCale Makar\nCOL\nD1\n733\n9.77\n75\n79\n213\n10\nJason Robertson\nDAL\nLW2\n712\n8.79\n81\n81\n252\n11\nKyle Connor\nWPG\nLW3\n696\n8.59\n81\n81\n262\n12\nMatt Boldy\nMIN\nLW4\n690\n9.07\n76\n74\n249\n15\nClayton Keller\nUTA\nRW3\n683\n8.43\n81\n84\n221\n18\nWyatt Johnston\nDAL\nC7\n667\n8.23\n81\n74\n212\n22\nFilip Forsberg\nNSH\nLW5\n653\n8.06\n81\n68\n258\n—\nConnor Hellebuyck\nWPG\nG3\n574\n10.62\n54\n30W\n.910\n—\nJake Oettinger\nDAL\nG7\n529\n10.18\n52\n33W\n.904\nPLAYER CALL-OUT\nSUMS TO 935 · MODEL FPTS 935\nFP/GP\n11.84\nPTS\n112\nSOG\n331\nBLK\n46\nWHERE THE FANTASY POINTS COME FROM\nASSISTS\n75 × 4\n300\nSHOTS\n331 × 0.9\n298\nGOALS\n37 × 6\n223\nPP PTS\n34 × 2\n68\nBLOCKS\n46 × 1\n46\n112 points and 331 shots in 79 games. Power-play points add 68.\nCOL · C 2\nNATHAN\nMACKINNON\nCENTRAL DIVISION · SKATERS CARRY THEIR OVERALL BOARD RANK; GOALIES ARE RANKED SEPARATELY, SO THEIR #\nIS DASHED AND THE POS COLUMN HOLDS THE GOALIE RANK\nCITRUS 2026-\n27 · P10\n"
+    },
+    {
+      "source_page": 11,
+      "eyebrow": "PACIFIC DIVISION",
+      "title": "PACIFIC’S BEST FANTASY ASSETS",
+      "metric": [
+        "IN THE TOP 260",
+        "59 skaters"
+      ],
+      "intro": "ANA · CGY · EDM · LAK · SEA · SJS · VAN · VGK. Ranked by overall board position, so the numbers are directly comparable with every other page in this kit.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TEAM",
+        "POS",
+        "FPTS",
+        "FP/GP",
+        "GP",
+        "PTS / W",
+        "SOG / SV%"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "1",
+            "Connor McDavid",
+            "EDM",
+            "C1",
+            "949",
+            "11.71",
+            "81",
+            "127",
+            "273"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "3",
+            "Macklin Celebrini",
+            "SJS",
+            "C3",
+            "865",
+            "10.68",
+            "81",
+            "100",
+            "300"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "8",
+            "Jack Eichel",
+            "VGK",
+            "C4",
+            "719",
+            "9.71",
+            "74",
+            "84",
+            "253"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "9",
+            "Evan Bouchard",
+            "EDM",
+            "D2",
+            "713",
+            "8.80",
+            "81",
+            "80",
+            "221"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "20",
+            "Leon Draisaitl",
+            "EDM",
+            "C9",
+            "657",
+            "9.81",
+            "67",
+            "84",
+            "192"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "28",
+            "Artemi Panarin",
+            "LAK",
+            "LW6",
+            "631",
+            "8.19",
+            "77",
+            "79",
+            "221"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "33",
+            "Mitch Marner",
+            "VGK",
+            "RW7",
+            "618",
+            "7.72",
+            "80",
+            "82",
+            "165"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "44",
+            "Adrian Kempe",
+            "LAK",
+            "RW8",
+            "589",
+            "7.36",
+            "80",
+            "66",
+            "225"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "53",
+            "Cutter Gauthier",
+            "ANA",
+            "LW13",
+            "568",
+            "7.48",
+            "76",
+            "55",
+            "255"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "—",
+            "Dustin Wolf",
+            "CGY",
+            "G11",
+            "506",
+            "9.37",
+            "54",
+            "24W",
+            ".902"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "—",
+            "Lukas Dostal",
+            "ANA",
+            "G16",
+            "462",
+            "8.71",
+            "53",
+            "25W",
+            ".895"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "PACIFIC DIVISION · SKATERS CARRY THEIR OVERALL BOARD RANK; GOALIES ARE RANKED SEPARATELY, SO THEIR # IS DASHED AND THE POS COLUMN HOLDS THE GOALIE RANK",
+      "panel_height": 200.70623779296875,
+      "source_text": "PACIFIC DIVISION\nPACIFIC’S BEST FANTASY ASSETS\nIN THE TOP 260\n59 skaters\nANA · CGY · EDM · LAK · SEA · SJS · VAN · VGK. Ranked by overall board position, so the numbers are directly\ncomparable with every other page in this kit.\n#\nPLAYER\nTEAM\nPOS\nFPTS\nFP/GP\nGP\nPTS /\nW\nSOG /\nSV%\n1\nConnor McDavid\nEDM\nC1\n949\n11.71\n81\n127\n273\n3\nMacklin Celebrini\nSJS\nC3\n865\n10.68\n81\n100\n300\n8\nJack Eichel\nVGK\nC4\n719\n9.71\n74\n84\n253\n9\nEvan Bouchard\nEDM\nD2\n713\n8.80\n81\n80\n221\n20\nLeon Draisaitl\nEDM\nC9\n657\n9.81\n67\n84\n192\n28\nArtemi Panarin\nLAK\nLW6\n631\n8.19\n77\n79\n221\n33\nMitch Marner\nVGK\nRW7\n618\n7.72\n80\n82\n165\n44\nAdrian Kempe\nLAK\nRW8\n589\n7.36\n80\n66\n225\n53\nCutter Gauthier\nANA\nLW13\n568\n7.48\n76\n55\n255\n—\nDustin Wolf\nCGY\nG11\n506\n9.37\n54\n24W\n.902\n—\nLukas Dostal\nANA\nG16\n462\n8.71\n53\n25W\n.895\nPLAYER CALL-OUT\nSUMS TO 949 · MODEL FPTS 949\nFP/GP\n11.71\nPTS\n127\nSOG\n273\nBLK\n30\nWHERE THE FANTASY POINTS COME FROM\nASSISTS\n90 × 4\n360\nSHOTS\n273 × 0.9\n246\nGOALS\n37 × 6\n221\nPP PTS\n46 × 2\n93\nBLOCKS\n30 × 1\n30\n127 points and 273 shots in 81 games. Power-play points add 93.\nEDM · C 1\nCONNOR\nMCDAVID\nPACIFIC DIVISION · SKATERS CARRY THEIR OVERALL BOARD RANK; GOALIES ARE RANKED SEPARATELY, SO THEIR #\nIS DASHED AND THE POS COLUMN HOLDS THE GOALIE RANK\nCITRUS 2026-\n27 · P11\n"
+    },
+    {
+      "source_page": 12,
+      "eyebrow": "BY POSITION",
+      "title": "CENTRES",
+      "metric": [
+        "TIER 1-2 DEPTH",
+        "4 players"
+      ],
+      "intro": "Ranked inside the position. The overall # is kept so you can see the real cost of waiting — the gap between these rows is the gap you are paying for.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TEAM",
+        "POS",
+        "FPTS",
+        "FP/GP",
+        "GP",
+        "PTS",
+        "SOG"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "1",
+            "Connor McDavid",
+            "EDM",
+            "C1",
+            "949",
+            "11.71",
+            "81",
+            "127",
+            "273"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "2",
+            "Nathan MacKinnon",
+            "COL",
+            "C2",
+            "935",
+            "11.84",
+            "79",
+            "112",
+            "331"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "3",
+            "Macklin Celebrini",
+            "SJS",
+            "C3",
+            "865",
+            "10.68",
+            "81",
+            "100",
+            "300"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "8",
+            "Jack Eichel",
+            "VGK",
+            "C4",
+            "719",
+            "9.71",
+            "74",
+            "84",
+            "253"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "13",
+            "Nick Suzuki",
+            "MTL",
+            "C5",
+            "689",
+            "8.51",
+            "81",
+            "87",
+            "177"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "16",
+            "Jake Guentzel",
+            "TBL",
+            "C6",
+            "675",
+            "8.43",
+            "80",
+            "79",
+            "218"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "18",
+            "Wyatt Johnston",
+            "DAL",
+            "C7",
+            "667",
+            "8.23",
+            "81",
+            "74",
+            "212"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "19",
+            "Auston Matthews",
+            "TOR",
+            "C8",
+            "659",
+            "10.46",
+            "63",
+            "65",
+            "245"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "20",
+            "Leon Draisaitl",
+            "EDM",
+            "C9",
+            "657",
+            "9.81",
+            "67",
+            "84",
+            "192"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "21",
+            "Jack Hughes",
+            "NJD",
+            "C10",
+            "655",
+            "10.40",
+            "63",
+            "75",
+            "244"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "25",
+            "Tage Thompson",
+            "BUF",
+            "C11",
+            "649",
+            "8.12",
+            "80",
+            "67",
+            "262"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "CENTRES · RANKED ON THE DEFAULT WEIGHTS",
+      "panel_height": 212.70623779296875,
+      "source_text": "BY POSITION\nCENTRES\nTIER 1-2 DEPTH\n4 players\nRanked inside the position. The overall # is kept so you can see the real cost of waiting — the gap between these\nrows is the gap you are paying for.\n#\nPLAYER\nTEAM\nPOS\nFPTS\nFP/GP\nGP\nPTS\nSOG\n1\nConnor McDavid\nEDM\nC1\n949\n11.71\n81\n127\n273\n2\nNathan MacKinnon\nCOL\nC2\n935\n11.84\n79\n112\n331\n3\nMacklin Celebrini\nSJS\nC3\n865\n10.68\n81\n100\n300\n8\nJack Eichel\nVGK\nC4\n719\n9.71\n74\n84\n253\n13\nNick Suzuki\nMTL\nC5\n689\n8.51\n81\n87\n177\n16\nJake Guentzel\nTBL\nC6\n675\n8.43\n80\n79\n218\n18\nWyatt Johnston\nDAL\nC7\n667\n8.23\n81\n74\n212\n19\nAuston Matthews\nTOR\nC8\n659\n10.46\n63\n65\n245\n20\nLeon Draisaitl\nEDM\nC9\n657\n9.81\n67\n84\n192\n21\nJack Hughes\nNJD\nC10\n655\n10.40\n63\n75\n244\n25\nTage Thompson\nBUF\nC11\n649\n8.12\n80\n67\n262\nPLAYER CALL-OUT\nSUMS TO 949 · MODEL FPTS 949\nFP/GP\n11.71\nPTS\n127\nSOG\n273\nBLK\n30\nWHERE THE FANTASY POINTS COME FROM\nASSISTS\n90 × 4\n360\nSHOTS\n273 × 0.9\n246\nGOALS\n37 × 6\n221\nPP PTS\n46 × 2\n93\nBLOCKS\n30 × 1\n30\n949 projected fantasy points across 81 games. The bars below are that total, split by the category that\nearned it.\nTIER 1 · C 1\nCONNOR\nMCDAVID\nCENTRES · RANKED ON THE DEFAULT WEIGHTS\nCITRUS 2026-27 · P12\n"
+    },
+    {
+      "source_page": 13,
+      "eyebrow": "BY POSITION",
+      "title": "LEFT WINGS",
+      "metric": [
+        "TIER 1-2 DEPTH",
+        "2 players"
+      ],
+      "intro": "Ranked inside the position. The overall # is kept so you can see the real cost of waiting — the gap between these rows is the gap you are paying for.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TEAM",
+        "POS",
+        "FPTS",
+        "FP/GP",
+        "GP",
+        "PTS",
+        "SOG"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "6",
+            "Kirill Kaprizov",
+            "MIN",
+            "LW1",
+            "746",
+            "9.69",
+            "77",
+            "85",
+            "264"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "10",
+            "Jason Robertson",
+            "DAL",
+            "LW2",
+            "712",
+            "8.79",
+            "81",
+            "81",
+            "252"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "11",
+            "Kyle Connor",
+            "WPG",
+            "LW3",
+            "696",
+            "8.59",
+            "81",
+            "81",
+            "262"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "12",
+            "Matt Boldy",
+            "MIN",
+            "LW4",
+            "690",
+            "9.07",
+            "76",
+            "74",
+            "249"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "22",
+            "Filip Forsberg",
+            "NSH",
+            "LW5",
+            "653",
+            "8.06",
+            "81",
+            "68",
+            "258"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "28",
+            "Artemi Panarin",
+            "LAK",
+            "LW6",
+            "631",
+            "8.19",
+            "77",
+            "79",
+            "221"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "38",
+            "Jesper Bratt",
+            "NJD",
+            "LW7",
+            "604",
+            "7.46",
+            "81",
+            "77",
+            "188"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "41",
+            "Alex Ovechkin",
+            "WSH",
+            "LW8",
+            "590",
+            "7.28",
+            "81",
+            "62",
+            "243"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "46",
+            "Brandon Hagel",
+            "TBL",
+            "LW9",
+            "587",
+            "8.16",
+            "72",
+            "72",
+            "197"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "47",
+            "Juraj Slafkovsky",
+            "MTL",
+            "LW10",
+            "585",
+            "7.23",
+            "81",
+            "66",
+            "169"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "48",
+            "Brady Tkachuk",
+            "FLA",
+            "LW11",
+            "578",
+            "9.18",
+            "63",
+            "59",
+            "249"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "LEFT WINGS · RANKED ON THE DEFAULT WEIGHTS",
+      "panel_height": 212.70623779296875,
+      "source_text": "BY POSITION\nLEFT WINGS\nTIER 1-2 DEPTH\n2 players\nRanked inside the position. The overall # is kept so you can see the real cost of waiting — the gap between these\nrows is the gap you are paying for.\n#\nPLAYER\nTEAM\nPOS\nFPTS\nFP/GP\nGP\nPTS\nSOG\n6\nKirill Kaprizov\nMIN\nLW1\n746\n9.69\n77\n85\n264\n10\nJason Robertson\nDAL\nLW2\n712\n8.79\n81\n81\n252\n11\nKyle Connor\nWPG\nLW3\n696\n8.59\n81\n81\n262\n12\nMatt Boldy\nMIN\nLW4\n690\n9.07\n76\n74\n249\n22\nFilip Forsberg\nNSH\nLW5\n653\n8.06\n81\n68\n258\n28\nArtemi Panarin\nLAK\nLW6\n631\n8.19\n77\n79\n221\n38\nJesper Bratt\nNJD\nLW7\n604\n7.46\n81\n77\n188\n41\nAlex Ovechkin\nWSH\nLW8\n590\n7.28\n81\n62\n243\n46\nBrandon Hagel\nTBL\nLW9\n587\n8.16\n72\n72\n197\n47\nJuraj Slafkovsky\nMTL\nLW10\n585\n7.23\n81\n66\n169\n48\nBrady Tkachuk\nFLA\nLW11\n578\n9.18\n63\n59\n249\nPLAYER CALL-OUT\nSUMS TO 746 · MODEL FPTS 746\nFP/GP\n9.69\nPTS\n85\nSOG\n264\nBLK\n30\nWHERE THE FANTASY POINTS COME FROM\nSHOTS\n264 × 0.9\n238\nGOALS\n38 × 6\n228\nASSISTS\n47 × 4\n186\nPP PTS\n32 × 2\n64\nBLOCKS\n30 × 1\n30\n746 projected fantasy points across 77 games. The bars below are that total, split by the category that\nearned it.\nTIER 2 · LW 1\nKIRILL\nKAPRIZOV\nLEFT WINGS · RANKED ON THE DEFAULT WEIGHTS\nCITRUS 2026-27 · P13\n"
+    },
+    {
+      "source_page": 14,
+      "eyebrow": "BY POSITION",
+      "title": "RIGHT WINGS",
+      "metric": [
+        "TIER 1-2 DEPTH",
+        "2 players"
+      ],
+      "intro": "Ranked inside the position. The overall # is kept so you can see the real cost of waiting — the gap between these rows is the gap you are paying for.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TEAM",
+        "POS",
+        "FPTS",
+        "FP/GP",
+        "GP",
+        "PTS",
+        "SOG"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "4",
+            "Nikita Kucherov",
+            "TBL",
+            "RW1",
+            "835",
+            "10.84",
+            "77",
+            "113",
+            "236"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "5",
+            "David Pastrnak",
+            "BOS",
+            "RW2",
+            "774",
+            "10.06",
+            "77",
+            "94",
+            "282"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "15",
+            "Clayton Keller",
+            "UTA",
+            "RW3",
+            "683",
+            "8.43",
+            "81",
+            "84",
+            "221"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "17",
+            "Alex DeBrincat",
+            "DET",
+            "RW4",
+            "669",
+            "8.25",
+            "81",
+            "72",
+            "257"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "23",
+            "Cole Caufield",
+            "MTL",
+            "RW5",
+            "652",
+            "8.15",
+            "80",
+            "70",
+            "260"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "27",
+            "Dylan Guenther",
+            "UTA",
+            "RW6",
+            "631",
+            "8.09",
+            "78",
+            "66",
+            "239"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "33",
+            "Mitch Marner",
+            "VGK",
+            "RW7",
+            "618",
+            "7.72",
+            "80",
+            "82",
+            "165"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "43",
+            "Seth Jarvis",
+            "CAR",
+            "RW8",
+            "589",
+            "8.18",
+            "72",
+            "65",
+            "207"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "44",
+            "Adrian Kempe",
+            "LAK",
+            "RW8",
+            "589",
+            "7.36",
+            "80",
+            "66",
+            "225"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "45",
+            "Mikko Rantanen",
+            "DAL",
+            "RW10",
+            "588",
+            "8.91",
+            "66",
+            "75",
+            "166"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "54",
+            "Beckett Sennecke",
+            "ANA",
+            "RW11",
+            "563",
+            "6.95",
+            "81",
+            "67",
+            "209"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "RIGHT WINGS · RANKED ON THE DEFAULT WEIGHTS",
+      "panel_height": 212.70623779296875,
+      "source_text": "BY POSITION\nRIGHT WINGS\nTIER 1-2 DEPTH\n2 players\nRanked inside the position. The overall # is kept so you can see the real cost of waiting — the gap between these\nrows is the gap you are paying for.\n#\nPLAYER\nTEAM\nPOS\nFPTS\nFP/GP\nGP\nPTS\nSOG\n4\nNikita Kucherov\nTBL\nRW1\n835\n10.84\n77\n113\n236\n5\nDavid Pastrnak\nBOS\nRW2\n774\n10.06\n77\n94\n282\n15\nClayton Keller\nUTA\nRW3\n683\n8.43\n81\n84\n221\n17\nAlex DeBrincat\nDET\nRW4\n669\n8.25\n81\n72\n257\n23\nCole Caufield\nMTL\nRW5\n652\n8.15\n80\n70\n260\n27\nDylan Guenther\nUTA\nRW6\n631\n8.09\n78\n66\n239\n33\nMitch Marner\nVGK\nRW7\n618\n7.72\n80\n82\n165\n43\nSeth Jarvis\nCAR\nRW8\n589\n8.18\n72\n65\n207\n44\nAdrian Kempe\nLAK\nRW8\n589\n7.36\n80\n66\n225\n45\nMikko Rantanen\nDAL\nRW10\n588\n8.91\n66\n75\n166\n54\nBeckett Sennecke\nANA\nRW11\n563\n6.95\n81\n67\n209\nPLAYER CALL-OUT\nSUMS TO 835 · MODEL FPTS 835\nFP/GP\n10.84\nPTS\n113\nSOG\n236\nBLK\n29\nWHERE THE FANTASY POINTS COME FROM\nASSISTS\n81 × 4\n324\nSHOTS\n236 × 0.9\n212\nGOALS\n32 × 6\n191\nPP PTS\n39 × 2\n79\nBLOCKS\n29 × 1\n29\n835 projected fantasy points across 77 games. The bars below are that total, split by the category that\nearned it.\nTIER 1 · RW 1\nNIKITA\nKUCHEROV\nRIGHT WINGS · RANKED ON THE DEFAULT WEIGHTS\nCITRUS 2026-27 · P14\n"
+    },
+    {
+      "source_page": 15,
+      "eyebrow": "BY POSITION",
+      "title": "DEFENCE",
+      "metric": [
+        "TIER 1-2 DEPTH",
+        "2 players"
+      ],
+      "intro": "Defence is the one position where the ranking and the category profile disagree: blocks are worth a full point each, which is why a 25-point defenceman can outscore a 40-point one.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TEAM",
+        "POS",
+        "FPTS",
+        "FP/GP",
+        "GP",
+        "PTS",
+        "SOG"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "7",
+            "Cale Makar",
+            "COL",
+            "D1",
+            "733",
+            "9.77",
+            "75",
+            "79",
+            "213"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "9",
+            "Evan Bouchard",
+            "EDM",
+            "D2",
+            "713",
+            "8.80",
+            "81",
+            "80",
+            "221"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "14",
+            "Zach Werenski",
+            "CBJ",
+            "D3",
+            "689",
+            "9.19",
+            "75",
+            "71",
+            "250"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "24",
+            "Quinn Hughes",
+            "MIN",
+            "D4",
+            "649",
+            "8.78",
+            "74",
+            "79",
+            "190"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "26",
+            "Matthew Schaefer",
+            "NYI",
+            "D5",
+            "636",
+            "7.85",
+            "81",
+            "57",
+            "238"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "32",
+            "Rasmus Dahlin",
+            "BUF",
+            "D6",
+            "623",
+            "8.10",
+            "77",
+            "66",
+            "204"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "35",
+            "Lane Hutson",
+            "MTL",
+            "D7",
+            "611",
+            "7.54",
+            "81",
+            "76",
+            "117"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "36",
+            "Moritz Seider",
+            "DET",
+            "D8",
+            "608",
+            "7.51",
+            "81",
+            "52",
+            "168"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "52",
+            "Noah Dobson",
+            "MTL",
+            "D9",
+            "570",
+            "7.21",
+            "79",
+            "49",
+            "176"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "56",
+            "Miro Heiskanen",
+            "DAL",
+            "D10",
+            "561",
+            "7.28",
+            "77",
+            "57",
+            "157"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "62",
+            "Roman Josi",
+            "NSH",
+            "D11",
+            "551",
+            "7.99",
+            "69",
+            "53",
+            "182"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "DEFENCE · RANKED ON THE DEFAULT WEIGHTS",
+      "panel_height": 212.70623779296875,
+      "source_text": "BY POSITION\nDEFENCE\nTIER 1-2 DEPTH\n2 players\nDefence is the one position where the ranking and the category profile disagree: blocks are worth a full point each,\nwhich is why a 25-point defenceman can outscore a 40-point one.\n#\nPLAYER\nTEAM\nPOS\nFPTS\nFP/GP\nGP\nPTS\nSOG\n7\nCale Makar\nCOL\nD1\n733\n9.77\n75\n79\n213\n9\nEvan Bouchard\nEDM\nD2\n713\n8.80\n81\n80\n221\n14\nZach Werenski\nCBJ\nD3\n689\n9.19\n75\n71\n250\n24\nQuinn Hughes\nMIN\nD4\n649\n8.78\n74\n79\n190\n26\nMatthew Schaefer\nNYI\nD5\n636\n7.85\n81\n57\n238\n32\nRasmus Dahlin\nBUF\nD6\n623\n8.10\n77\n66\n204\n35\nLane Hutson\nMTL\nD7\n611\n7.54\n81\n76\n117\n36\nMoritz Seider\nDET\nD8\n608\n7.51\n81\n52\n168\n52\nNoah Dobson\nMTL\nD9\n570\n7.21\n79\n49\n176\n56\nMiro Heiskanen\nDAL\nD10\n561\n7.28\n77\n57\n157\n62\nRoman Josi\nNSH\nD11\n551\n7.99\n69\n53\n182\nPLAYER CALL-OUT\nSUMS TO 733 · MODEL FPTS 733\nFP/GP\n9.77\nPTS\n79\nSOG\n213\nBLK\n124\nWHERE THE FANTASY POINTS COME FROM\nASSISTS\n60 × 4\n240\nSHOTS\n213 × 0.9\n192\nBLOCKS\n124 × 1\n124\nGOALS\n19 × 6\n114\nPP PTS\n32 × 2\n63\n733 projected fantasy points across 75 games. The bars below are that total, split by the category that\nearned it.\nTIER 2 · D 1\nCALE\nMAKAR\nDEFENCE · RANKED ON THE DEFAULT WEIGHTS\nCITRUS 2026-27 · P15\n"
+    },
+    {
+      "source_page": 16,
+      "eyebrow": "BY POSITION",
+      "title": "GOALTENDERS",
+      "metric": [
+        "IN THE SET",
+        "60 goalies"
+      ],
+      "intro": "Wins are worth 5 and a shutout 5, but saves at 0.6 each are the quiet bulk of a goalie’s season — which is why a busy goalie on a mediocre team can outscore a quiet one on a good team.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TEAM",
+        "TIER",
+        "FPTS",
+        "FP/GP",
+        "W",
+        "SV%",
+        "GAA"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "1",
+            "Andrei Vasilevskiy",
+            "TBL",
+            "T1",
+            "603",
+            "10.97",
+            "35",
+            ".912",
+            "2.35"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "2",
+            "Logan Thompson",
+            "WSH",
+            "T1",
+            "595",
+            "10.82",
+            "32",
+            ".911",
+            "2.46"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "3",
+            "Connor Hellebuyck",
+            "WPG",
+            "T2",
+            "574",
+            "10.62",
+            "30",
+            ".910",
+            "2.48"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "4",
+            "Jet Greaves",
+            "CBJ",
+            "T2",
+            "564",
+            "10.64",
+            "26",
+            ".911",
+            "2.56"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "5",
+            "Ilya Sorokin",
+            "NYI",
+            "T2",
+            "557",
+            "10.51",
+            "27",
+            ".907",
+            "2.68"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "6",
+            "Jeremy Swayman",
+            "BOS",
+            "T3",
+            "531",
+            "10.01",
+            "27",
+            ".904",
+            "2.75"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "7",
+            "Jake Oettinger",
+            "DAL",
+            "T3",
+            "529",
+            "10.18",
+            "33",
+            ".904",
+            "2.56"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "8",
+            "Karel Vejmelka",
+            "UTA",
+            "T3",
+            "529",
+            "8.81",
+            "31",
+            ".898",
+            "2.65"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "9",
+            "Igor Shesterkin",
+            "NYR",
+            "T3",
+            "518",
+            "10.57",
+            "25",
+            ".909",
+            "2.58"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "10",
+            "Filip Gustavsson",
+            "MIN",
+            "T3",
+            "513",
+            "10.46",
+            "26",
+            ".906",
+            "2.65"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "11",
+            "Dustin Wolf",
+            "CGY",
+            "T3",
+            "506",
+            "9.37",
+            "24",
+            ".902",
+            "2.74"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "12",
+            "Juuse Saros",
+            "NSH",
+            "T3",
+            "499",
+            "8.91",
+            "25",
+            ".897",
+            "2.93"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "GOALTENDERS · 60 RANKED",
+      "panel_height": 195.45623779296875,
+      "source_text": "BY POSITION\nGOALTENDERS\nIN THE SET\n60 goalies\nWins are worth 5 and a shutout 5, but saves at 0.6 each are the quiet bulk of a goalie’s season — which is why a busy\ngoalie on a mediocre team can outscore a quiet one on a good team.\n#\nPLAYER\nTEAM\nTIER\nFPTS\nFP/GP\nW\nSV%\nGAA\n1\nAndrei Vasilevskiy\nTBL\nT1\n603\n10.97\n35\n.912\n2.35\n2\nLogan Thompson\nWSH\nT1\n595\n10.82\n32\n.911\n2.46\n3\nConnor Hellebuyck\nWPG\nT2\n574\n10.62\n30\n.910\n2.48\n4\nJet Greaves\nCBJ\nT2\n564\n10.64\n26\n.911\n2.56\n5\nIlya Sorokin\nNYI\nT2\n557\n10.51\n27\n.907\n2.68\n6\nJeremy Swayman\nBOS\nT3\n531\n10.01\n27\n.904\n2.75\n7\nJake Oettinger\nDAL\nT3\n529\n10.18\n33\n.904\n2.56\n8\nKarel Vejmelka\nUTA\nT3\n529\n8.81\n31\n.898\n2.65\n9\nIgor Shesterkin\nNYR\nT3\n518\n10.57\n25\n.909\n2.58\n10\nFilip Gustavsson\nMIN\nT3\n513\n10.46\n26\n.906\n2.65\n11\nDustin Wolf\nCGY\nT3\n506\n9.37\n24\n.902\n2.74\n12\nJuuse Saros\nNSH\nT3\n499\n8.91\n25\n.897\n2.93\nPLAYER CALL-OUT\nSUMS TO 603 · MODEL FPTS 603\nFP/GP\n10.97\nWINS\n35\nSV%\n.912\nGAA\n2.35\nWHERE THE FANTASY POINTS COME FROM\nSAVES\n1336 × 0.6\n802\nGOALS AG.\n129 × -3\n−387\nWINS\n35 × 5\n174\nSHUTOUTS\n3 × 5\n15\n1336 projected saves is 802 fantasy points before a single win is counted — and the goals-against\npenalty gives some of it back.\nTIER 1 · GOALIE 1\nANDREI\nVASILEVSKIY\nGOALTENDERS · 60 RANKED\nCITRUS 2026-27 · P16\n"
+    },
+    {
+      "source_page": 17,
+      "eyebrow": "THE EDGE",
+      "title": "POSITIONAL VALUE",
+      "metric": [
+        "METHOD",
+        "Pos rank vs overall"
+      ],
+      "intro": "Every player here is top-12 at his position while sitting outside the overall top 45. That gap is not an opinion — it is what happens when a position’s scoring is shallower than the board suggests, and it is the cheapest edge in a draft.",
+      "headers": [
+        "#",
+        "PLAYER",
+        "TEAM",
+        "POS",
+        "FPTS",
+        "FP/GP",
+        "GP",
+        "PTS",
+        "SOG"
+      ],
+      "rows": [
+        {
+          "cells": [
+            "52",
+            "Noah Dobson",
+            "MTL",
+            "D9",
+            "570",
+            "7.21",
+            "79",
+            "49",
+            "176"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "62",
+            "Roman Josi",
+            "NSH",
+            "D11",
+            "551",
+            "7.99",
+            "69",
+            "53",
+            "182"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "56",
+            "Miro Heiskanen",
+            "DAL",
+            "D10",
+            "561",
+            "7.28",
+            "77",
+            "57",
+            "157"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "63",
+            "Jakob Chychrun",
+            "WSH",
+            "D12",
+            "551",
+            "6.97",
+            "79",
+            "47",
+            "203"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "46",
+            "Brandon Hagel",
+            "TBL",
+            "LW9",
+            "587",
+            "8.16",
+            "72",
+            "72",
+            "197"
+          ],
+          "highlight": true
+        },
+        {
+          "cells": [
+            "54",
+            "Beckett Sennecke",
+            "ANA",
+            "RW11",
+            "563",
+            "6.95",
+            "81",
+            "67",
+            "209"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "47",
+            "Juraj Slafkovsky",
+            "MTL",
+            "LW10",
+            "585",
+            "7.23",
+            "81",
+            "66",
+            "169"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "55",
+            "William Nylander",
+            "TOR",
+            "RW12",
+            "563",
+            "8.40",
+            "67",
+            "67",
+            "191"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "19",
+            "Auston Matthews",
+            "TOR",
+            "C8",
+            "659",
+            "10.46",
+            "63",
+            "65",
+            "245"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "20",
+            "Leon Draisaitl",
+            "EDM",
+            "C9",
+            "657",
+            "9.81",
+            "67",
+            "84",
+            "192"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "21",
+            "Jack Hughes",
+            "NJD",
+            "C10",
+            "655",
+            "10.40",
+            "63",
+            "75",
+            "244"
+          ],
+          "highlight": false
+        },
+        {
+          "cells": [
+            "48",
+            "Brady Tkachuk",
+            "FLA",
+            "LW11",
+            "578",
+            "9.18",
+            "63",
+            "59",
+            "249"
+          ],
+          "highlight": false
+        }
+      ],
+      "footer": "TOP ROWS: POSITIONAL VALUE. LOWER ROWS: HIGH PER-GAME RATE ON A REDUCED GAMES PROJECTION.",
+      "panel_height": 200.70623779296875,
+      "source_text": "THE EDGE\nPOSITIONAL VALUE\nMETHOD\nPos rank vs overall\nEvery player here is top-12 at his position while sitting outside the overall top 45. That gap is not an opinion — it is\nwhat happens when a position’s scoring is shallower than the board suggests, and it is the cheapest edge in a draft.\n#\nPLAYER\nTEAM\nPOS\nFPTS\nFP/GP\nGP\nPTS\nSOG\n52\nNoah Dobson\nMTL\nD9\n570\n7.21\n79\n49\n176\n62\nRoman Josi\nNSH\nD11\n551\n7.99\n69\n53\n182\n56\nMiro Heiskanen\nDAL\nD10\n561\n7.28\n77\n57\n157\n63\nJakob Chychrun\nWSH\nD12\n551\n6.97\n79\n47\n203\n46\nBrandon Hagel\nTBL\nLW9\n587\n8.16\n72\n72\n197\n54\nBeckett Sennecke\nANA\nRW11\n563\n6.95\n81\n67\n209\n47\nJuraj Slafkovsky\nMTL\nLW10\n585\n7.23\n81\n66\n169\n55\nWilliam Nylander\nTOR\nRW12\n563\n8.40\n67\n67\n191\n19\nAuston Matthews\nTOR\nC8\n659\n10.46\n63\n65\n245\n20\nLeon Draisaitl\nEDM\nC9\n657\n9.81\n67\n84\n192\n21\nJack Hughes\nNJD\nC10\n655\n10.40\n63\n75\n244\n48\nBrady Tkachuk\nFLA\nLW11\n578\n9.18\n63\n59\n249\nPLAYER CALL-OUT\nSUMS TO 561 · MODEL FPTS 561\nFP/GP\n7.28\nPTS\n57\nSOG\n157\nBLK\n126\nWHERE THE FANTASY POINTS COME FROM\nASSISTS\n47 × 4\n190\nSHOTS\n157 × 0.9\n141\nBLOCKS\n126 × 1\n126\nGOALS\n10 × 6\n58\nPP PTS\n23 × 2\n46\n10th best D on the board at pick 56. 7.28 fantasy points a game across 77 projected games.\nD 10 · TAKEN 56TH\nMIRO\nHEISKANEN\nTOP ROWS: POSITIONAL VALUE. LOWER ROWS: HIGH PER-GAME RATE ON A REDUCED GAMES PROJECTION.\nCITRUS 2026-27 · P17\n"
+    }
+  ],
+  "reading_blocks": [
+    "Citrus\nHOW TO READ THIS KIT",
+    "AN ORANGE ROW IS\nA CALL-OUT",
+    "Every page is a ranking. Three rows on each are filled solid Citrus orange — those are the call-\nouts, and the first is broken out in the panel at the foot of the page: photo, hero numbers, and\nthe category split behind the projection. Each split is reconciled against the model's own total in\nthe panel header, so you can check the arithmetic.",
+    "SKATER SCORING",
+    "GOAL\n6",
+    "ASSIST\n4",
+    "POWER-PLAY POINT\n2",
+    "SHOT ON GOAL\n0.9",
+    "BLOCKED SHOT\n1",
+    "HIT\n0",
+    "PENALTY MINUTE\n0",
+    "GOALIE SCORING",
+    "WIN\n5",
+    "SHUTOUT\n5",
+    "SAVE\n0.6",
+    "GOAL AGAINST\n-3",
+    "PLUS/MINUS IS NOT SCORED — THE PROJECTION\nSET CARRIES NO PLUS/MINUS COLUMN.",
+    "1\nThe Pos column is the number that matters\nIt is the player’s rank inside his own position. A defenceman at D9 taken 52nd overall is a bargain; the same D9\nat pick 20 is not.",
+    "2\nFP/GP separates rate from volume\nA high per-game rate on a low games projection is a talent call with a durability discount. A big FPTS total on\n82 games is a floor.",
+    "3\nTier does not move when you change weights\nTier is fixed under the default scoring. Edit your league’s weights in the workbook and FPTS and both ranks\nrecalculate — tier stays put as a reference.",
+    "4\nBlocks are worth a full point\nThat single weight is why defence rankings here look nothing like a points-only list, and why a shot-blocking\ndefenceman is the cheapest floor on the board.",
+    "5\nThe call-out panel shows the arithmetic\nEach bar is one category: the raw projection times your weight. The longest bar is where that player actually\nearns his ranking — and it is a shot or block total more often than a goal total.",
+    "ONE HONEST CAVEAT",
+    "These are projections, not predictions, and nothing here claims accuracy against any other system. Projected games played is\navailability-adjusted, so a low GP is a durability call, not a data gap. Verify against your own league settings before you draft on it."
+  ],
+  "cover_text": "Citrus\nSEASON-LONG FANTASY HOCKEY\n2 0 2 6 - 2 7 P R O J E C T I O N S\nTHE\nULTIMATE\nDRAFT KIT\nEvery ranking here is scored on the Citrus default weights,\ndivision by division, with the offseason moves reconciled\nagainst the projection set itself.\nSKATERS\n260\nGOALIES\n60\nTEAMS\n32\nPAGES\n17\nPUCK DROPS TUESDAY 29 SEPTEMBER 2026\nCITRUSFANTASYSPORTS.COM\n"
+}

@@ -1,0 +1,299 @@
+﻿Citrus Draft Kit — Reasoning Log and Handoff
+Workbook: Citrus_Draft_Kit_2026-27.xlsx (40 tabs, 12,989 formulas, 0 errors) Date: 12 Sep 2026 | Release target: Sun 14 Sep 2026 Audience: the Mac Claude session working the projection backend
+
+
+This is not a changelog. It is the reasoning, so the Mac session can apply the same rules rather than re-deriving them, and so it knows which problems belong to the codebase rather than the workbook.
+
+
+________________
+
+
+1. The governing principle
+Rate and volume are separate numbers, and they are multiplied only at the end.
+
+
+Skater  FPTS = (per-game rate)  x (games played)
+Goalie  FPTS = (per-start rate) x (starts)
+
+Everything good about this workbook falls out of that one decision.
+
+
+* The 82 to 84 game CBA change was a one-line fix, because games are a separate term.
+* Games played and roster probability are never multiplied at storage time.
+* A role change touches the rate and leaves games alone. An injury touches games and leaves the rate alone. They cannot contaminate each other.
+
+
+Season length is derived per team from nhl_games, never a constant. League goalie starts total = 2,688 (32 x 84).
+
+
+Crease invariant: for each team, SUM(projected_starts) = that team's game count. A per-row CHECK cannot express a cross-row sum, so this needs a deferred constraint trigger plus an integrity-cron check. Still open in production.
+
+
+________________
+
+
+2. Provenance is a first-class field
+Every row carries Src: MODEL, MANUAL, or DEFAULT.
+
+
+A fallback rendered as model output is the worst shippable error.
+
+
+Current state: 257 MODEL rows (56% of total FPTS), 321 MANUAL rows (44%). Top 50 is 100% model. Top 100 is 96% model.
+
+
+Every MANUAL row states its method in its Flag cell, in plain English, naming the source and the arithmetic. If a row cannot explain itself, it does not ship.
+
+
+________________
+
+
+3. The coverage gap (the most important item for the backend)
+citrus_board.json — the model export — contains 314 skaters. The 32 NHL lineups contain 644 slots.
+
+
+Absent from the model export entirely: Zeev Buium, Danila Yurov, Berkly Catton, Sam Dickinson, Shane Wright, Isaac Howard, Artyom Levshunov, Andrei Kuzmenko, and roughly 300 more.
+
+
+So the 321 MANUAL rows are not me overriding the model. They are me filling slots the model has no row for. This is a backend coverage problem, not a workbook problem, and it is the single highest-value fix on the Mac side.
+
+
+Any player projected into an NHL lineup slot needs a model row. If the feature store cannot produce one (insufficient NHL sample), the model should emit an explicit low-confidence row with a documented prior rather than emitting nothing and forcing a hand-build downstream.
+
+
+________________
+
+
+4. The 84-game rebuild
+Problem found: 150 MANUAL rows were projected into a lineup slot but carried under 70 games. Tristan Luneau on Anaheim's top pair at 38 GP. Jiri Kulich as Buffalo's 1C at 43 GP.
+
+
+Root cause: I was penalising them for last season's AHL time instead of projecting the role. A player you have decided is an NHL regular is an NHL regular; his AHL games last year are evidence about his rate, not his 2026-27 availability.
+
+
+Fix (fix84.py) — 304 rows rebuilt, 17 kept with a documented reason:
+
+
+ROLE_GP = {F1:78, F2:78, F3:76, F4:74, D1:78, D2:78, D3:76}
+K = 25                                  # shrinkage constant
+w = prior / (prior + K)                 # weight on his own observed rate
+rate = w * observed + (1 - w) * positional_median
+
+The 17 kept rows are the documented-injury cases whose games already reflect a return date. Those must not be overwritten by a role default.
+
+
+Caveat that must not be papered over: MODEL rows top out at 83 GP, not 84. The model's own maximum durability prediction was 81 of 82, scaled by 84/82. That is the model correctly saying nobody plays every game. Do not force it to 84.
+
+
+________________
+
+
+5. The role bug (found 12 Sep — the important one)
+Symptom: Zeev Buium was the 121st best defenceman of 190, overall #379, while occupying Vancouver's first pair and PP1.
+
+
+Root cause, and it was structural: His rates came from 76 games on Minnesota's third pair (6G, 20A). The Quinn Hughes trade sent him to Vancouver as the centrepiece. I assigned this year's role in the Line and PP columns and left last year's role baked into the rates. The two never talked to each other.
+
+
+The model does not have this bug — TOI and PP share are features, so it role-adjusts natively. My 321 hand-built rows had nothing.
+5a. The first fix was wrong, and why
+I weighted the correction by sample size and pulled every MANUAL lineup row toward its slot's model median. Results included Matt Rempe at 33 points.
+
+
+The failure: the F4 and D3 "baselines" were computed from only 5 MODEL rows each, and those five were good players who happen to be slotted low. That is a selection artifact, not a standard. I was measuring genuine fourth-liners against a baseline built from five non-fourth-liners.
+
+
+I reverted all 251 touched rows exactly, recomputing from depth/stats.py, add15.py, additions.py and patch7.py through the original fix84.py arithmetic. Verified against a known row (Buium back to 6.9G / 23.9A / 92.3 SOG / 13.2 PPP at 78 GP) before proceeding.
+
+
+Lesson worth carrying into the backend: never shrink toward a baseline whose population is smaller than ~15-20 rows. Check the n before trusting the median.
+5b. The correct fix
+Four gates, all of which must pass:
+
+
+1. Premium slots only — F1, F2, D1, D2. These have 82, 67, 41 and 20 MODEL rows respectively, so the median means something. F4 and D3 (n=5) are excluded outright. This alone kills the entire Rempe class of error.
+
+
+2. Documented role change required. One of: NHL sample under 50 games (sheltered by definition); or named in the team's adds for this offseason (new club, new role); or named on the team's PP1 unit while the sample carries a second-unit PP rate.
+
+
+3. Weight by role continuity, not sample size. This was the key correction. 76 games of evidence collected on a third pair say nothing about a first-pair opportunity. Sample size says "trust him"; role change says "that evidence does not apply to this question."
+
+
+ two hard role-change signals -> w = 0.55
+ one hard signal              -> w = 0.70
+ small sample only            -> w = max(0.55, prior/(prior+25))
+
+4. Hard cap at the slot's model median. A role prior must never outrank a real model projection. Ever.
+
+
+Only the offence components move: G, A, SOG, PPP. Hits, blocks, PIM and short-handed points are player style, not role. Untouched.
+
+
+Result: 19 rows moved. Buium 26 -> 40 points, D121 -> D52, overall #379 -> #223. Every adjusted row says so in its Flag cell and remains labelled MANUAL.
+
+
+________________
+
+
+6. Injured players in the lineups
+Each of the 32 team tabs now carries an INJURED / UNAVAILABLE block below the defence pairs, red-highlighted. 34 players across 19 teams.
+
+
+The GP column is what we project him to actually play, already net of the games he misses. The Notes column carries the expected return.
+
+
+Detection is data-driven, not hand-listed, in two passes:
+
+
+1. Draft Board Flag cells matching forward-looking absence language (misses the start, out until, on LTIR, SUSPENDED n GAMES, no firm timeline, unsigned RFA/UFA, week to week, day to day), minus anything matching resolution language (now resolved, fully cleared, no recurrence) unless a suspension, LTIR or unsigned status overrides it.
+2. Team watch-notes in teams/data.py, with attribution guards: the surname must appear in the note's first clause, and a note containing "promoted" or "RETIRED" is rejected unless the note begins with that surname.
+
+
+Guard 2 exists because the Los Angeles note reads "KOPITAR RETIRED. Byfield promoted to 1C, Haula..." and a naive match marked Byfield, Haula and Laughton as injured when they are the beneficiaries. Same class of error as the Rempe bug: matching on proximity instead of subject.
+
+
+Representative output: Terry (back mid-Nov, 58 GP), Bedard (back November, 64), Jarvis (60), Marchand (LTIR to 10 Oct, 57), Demko (no timeline, 22), Andersen (20 Oct, 26), McAvoy (suspended 6), Greig (suspended 2).
+
+
+________________
+
+
+7. Separate bug found while building that
+Every CREASE block on all 32 team tabs was pulling skater column letters from the Goalies tab, which has a different layout:
+
+
+Team tab header
+	Was pulling
+	Should pull
+	G
+	L = Saves
+	n/a
+	Src
+	F = Tier
+	E
+	GP
+	I = Conf
+	H = Proj Starts
+	FPTS
+	V = Market note
+	R
+	Ros %
+	X = empty
+	n/a
+
+
+Spencer Knight read as 1,344 goals.
+
+
+Fixed: goalie rows now pull Citrus #, Src, projected starts and FPTS from the correct Goalies columns, and the skater categories are left blank rather than filled with the wrong field. The section header says so explicitly.
+
+
+General rule this violated: never let a fallback lookup reuse the primary table's column map. Different table, different map, or blank.
+
+
+________________
+
+
+8. Rookie eligibility (three tests, fail any one and he is not a rookie)
+1. Under 25 NHL games in any single preceding season
+2. Not 6+ games in each of any two preceding seasons
+3. Under 26 years old on September 15
+
+
+I got this wrong repeatedly by using rookie status as the filter for the tiers rather than as a label. Ben Kindel is guaranteed to play and is not a rookie. Misa (45 GP) and Parekh (37 GP) are not rookies. Nazar is not a rookie.
+
+
+The Rookies tab is rookies only, tiered Future Studs / Guaranteed NHLers / Depth Guys / Bubble Boys / Minor Leaguers.
+
+
+Waiver exemption, for reference: signed at 18 gives 5 years or 160 GP; at 19, 4 years; at 20, 3 years; at 21, 3 years or 80 GP. Playoff games count toward the 160. An 11-GP reduction cuts the exemption.
+
+
+________________
+
+
+9. Data sourcing: facts versus expression
+This is the legal line that governs what we may ingest.
+
+
+Facts are free. Expression is not.
+
+
+* ADP is a fact. Merger doctrine. NYMEX v. ICE, 497 F.3d 109 (2d Cir. 2007).
+* Expert rankings are expression. CCC v. Maclean Hunter, 44 F.3d 61 (2d Cir. 1994); CDN v. Kapes, 197 F.3d 1256 (9th Cir. 1999).
+* Canada: CCH v. Law Society, 2004 SCC 13 at para 16 — "skill and judgment," expressly excluding a "purely mechanical exercise." Also Tele-Direct, 1997 CanLII 6378; Century 21, 2011 BCSC 1196 (browsewrap enforceable); Trader v. CarGurus, 2017 ONSC 1841.
+
+
+Consequence: the named-writer Consensus column was removed from the Draft Board and Goalies. ADP-derived internal columns are retained and labelled (INTERNAL) with amber fill so they never reach a public page.
+
+
+FantasyPros has never scored a hockey analyst — /nhl/accuracy/ 404s, there is no NHL methodology page and no NHL ranker tool. Their NHL ADP is not an API endpoint at all, which kills the licence option. That unguarded flank is the whole justification for the Citrus Expert Network: we become the source, not an add-on to one.
+
+
+________________
+
+
+10. Open items
+Blocking
+
+
+1. Market column decision. Build our own Underdog ADP, or hold the Buys/Fades pages. The FantasyPros licence route is dead. This blocks the design pack.
+
+
+Backend (Mac session)
+
+
+2. Model coverage for the ~320 uncovered skaters. Highest value item.
+3. Role features on every emitted row so downstream never hand-adjusts again.
+4. Re-train on an 84-game basis. Keep the durability ceiling honest — do not force 84.
+5. games_remaining defect; shared-default rows; unconstrained creases; security_drift failing on citrus_bingo_new_card.
+
+
+Before Sunday
+
+
+6. Re-pull Lineups and Roster % after camps open Wed 16 Sep. Nineteen teams are still on Daily Faceoff's 4 July batch.
+7. Re-verify Larkin (stripped of the captaincy, 11 Sep) and Hellebuyck after camps open.
+
+
+________________
+
+
+11. Errors caught and what each one teaches
+Error
+	Lesson
+	Kreider on the board as Anaheim F1/PP1 at 100% roster, contract terminated 9 Sep
+	Roster state is perishable. Re-verify against a dated source before every ship.
+	Kopitar carried as active after retiring
+	Same class.
+	Evander Kane as a Canuck at 74 GP, unsigned UFA with no team
+	Same class.
+	Buium at third-pair rates in a first-pair slot
+	Role and rate must be derived together, never assigned separately.
+	Rempe pulled to 33 points
+	Never shrink toward a baseline built from n=5.
+	Byfield marked injured by the Kopitar retirement note
+	Match on subject, not proximity.
+	Goalie rows pulling saves into the goals column
+	A fallback lookup must never reuse the primary table's column map.
+	Offseason movers page mixed in-season trades with offseason moves
+	Jake Walman was March 2025. Peterka came from Utah, not Buffalo. Ehlers signed with Carolina in July 2025. Date-check every transaction.
+	Yakov Trenin at 413 hits
+	Flagged as a likely all-time record and a data error. Carried at 300 rather than ship it.
+	Rookie tiers stuffed with established players
+	Definition first, then identification. Never the reverse.
+	Three contradicting rookie documents shipped simultaneously
+	Retire superseded documents in the same turn you supersede them.
+
+
+________________
+
+
+12. Standing constraints
+* The workbook session does not touch the codebase.
+* Season length is derived per team. Never a constant.
+* Every new table has RLS. Every mutation verifies auth.uid() server-side.
+* All scoring goes through ScoringCalculator. All Supabase calls go through service classes.
+* No claim about projection accuracy without data behind it.
+* No hardcoded secrets. No console.log in production.
