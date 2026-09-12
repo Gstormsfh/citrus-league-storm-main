@@ -345,7 +345,12 @@ export const schemas = {
     // PROJECT_PLAN.md Decision Log for the full narrative.
     pickTimeLimit: z.number().int().min(30).max(300).optional(),
     draft_status: z.enum(DRAFT_STATUSES).optional(),
-    scheduled_draft_time: z.string().optional(),
+    // Nullable since 2026-09-12: `optional()` alone meant a commissioner could
+    // MOVE a draft time but never REMOVE one. That was inert while nothing read
+    // the column; now that start_due_scheduled_drafts ignites on it, a time set
+    // by mistake is load-bearing and the only escape was shoving it years into
+    // the future. null clears it.
+    scheduled_draft_time: z.string().nullable().optional(),
     teams_count: z.number().int().min(2).max(20).optional(),
   }),
 

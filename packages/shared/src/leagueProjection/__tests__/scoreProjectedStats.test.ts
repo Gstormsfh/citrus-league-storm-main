@@ -22,13 +22,28 @@ const skaterRow = {
   projected_shp: 0.1,
 };
 
+// projectionSettings reads the CANONICAL key names off the source object --
+// it walks Object.keys(DEFAULT_SCORING) and looks each one up -- so a fixture
+// written with the short spellings silently scores those categories at zero.
+// These fixtures used ppp / sog / shp / pim, which resolved to undefined and
+// then to 0, costing 1.0 + 2.0 + 0.2 = 3.2 points and reporting 18.2 against a
+// hand-checked 21.4. Every league on production stores the long spellings
+// (verified 2026-09-12: 10/10 carry shots_on_goal, power_play_points and
+// short_handed_points; none carry the short forms), so the fixtures were wrong
+// about the shape, not projectionSettings.
 const bangerLeague = projectionSettings({
-  skater: { goals: 6, assists: 4, ppp: 2, sog: 0.5, blocks: 1, hits: 0.5, pim: 0, shp: 2 },
+  skater: {
+    goals: 6, assists: 4, power_play_points: 2, shots_on_goal: 0.5,
+    blocks: 1, hits: 0.5, penalty_minutes: 0, short_handed_points: 2,
+  },
   goalie: { wins: 5, saves: 0.2, shutouts: 3, goals_against: -2 },
 });
 
 const puristLeague = projectionSettings({
-  skater: { goals: 6, assists: 4, ppp: 2, sog: 0.5, blocks: 0, hits: 0, pim: 0, shp: 2 },
+  skater: {
+    goals: 6, assists: 4, power_play_points: 2, shots_on_goal: 0.5,
+    blocks: 0, hits: 0, penalty_minutes: 0, short_handed_points: 2,
+  },
   goalie: { wins: 5, saves: 0.2, shutouts: 3, goals_against: -2 },
 });
 

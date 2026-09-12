@@ -91,6 +91,10 @@ export type SettingField =
       inputType?: 'text' | 'datetime-local';
       maxLength?: number;
       onChange: (value: string) => void;
+      /** Added 2026-09-12: without this a text field could not be locked, so
+       *  the draft time stayed editable after the draft was complete while
+       *  every number field beside it greyed out. */
+      disabled?: boolean;
     };
 
 export interface SettingGroup {
@@ -129,6 +133,9 @@ export interface WaiverState {
 export interface DraftState {
   draft_rounds: number;
   pickTimeLimit: number;
+  /** Local wall time for the `datetime-local` input; '' means no draft is
+   *  scheduled. lib/draftTime converts to and from the stored instant. */
+  scheduledDraftTime: string;
 }
 export interface TradeState {
   trade_review_type: 'none' | 'commissioner' | 'league_vote';
@@ -428,6 +435,22 @@ export function buildLeagueSettingsSections(input: LeagueSettingsInput): Setting
             step: 15,
             unit: 's',
             onChange: (n) => setDraft((p) => ({ ...p, pickTimeLimit: n })),
+            disabled: input.draftCompleted,
+          },
+          {
+            // DRAFT TIME (2026-09-12). The only control was on the dashboard
+            // draft card, which is where a commissioner already is but not
+            // where he looks for a setting. The sweep that ignites a due draft
+            // reads leagues.scheduled_draft_time, and updateDraftSettings --
+            // which this tab already saves through -- is the endpoint that
+            // writes it, so this is a field rather than a new pathway.
+            kind: 'text',
+            key: 'scheduledDraftTime',
+            label: 'Draft time',
+            help: 'Managers see this on their league page, and the draft starts itself when the clock gets there. Leave it empty for no scheduled draft',
+            value: draft.scheduledDraftTime,
+            inputType: 'datetime-local',
+            onChange: (v) => setDraft((p) => ({ ...p, scheduledDraftTime: v })),
             disabled: input.draftCompleted,
           },
         ],

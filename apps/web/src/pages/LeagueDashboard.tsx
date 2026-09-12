@@ -1,5 +1,6 @@
 import { DesktopProduct } from '@/components/DesktopProduct';
 import { userMessage } from '@/lib/userMessage';
+import { instantToLocalInput, localInputToInstant } from '@/lib/draftTime';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
@@ -112,6 +113,7 @@ const LeagueDashboard = () => {
   const [draftSettings, setDraftSettings] = useState({
     draft_rounds: 21,
     pickTimeLimit: 90,
+    scheduledDraftTime: '',
   });
   
   // Roster counts state (for roster overview tab)
@@ -249,6 +251,7 @@ const LeagueDashboard = () => {
       setDraftSettings({
         draft_rounds: leagueData.draft_rounds || 21,
         pickTimeLimit: (leagueData.settings as LeagueSettings)?.pickTimeLimit as number || 90,
+        scheduledDraftTime: instantToLocalInput(leagueData.scheduled_draft_time),
       });
 
       // Update trade review settings.
@@ -489,50 +492,30 @@ const LeagueDashboard = () => {
   }, [activeSettingsTab, leagueId, teams]);
   
   /**
-   * `datetime-local` speaks local wall time and the column stores an instant,
-   * so the two conversions live here rather than at the input.
+   * `datetime-local` speaks local wall time and the column stores an instant.
+   * Both conversions moved to lib/draftTime on 2026-09-12, when the DRAFT
+   * settings tab gained the same field: two inline copies of this would be
+   * two chances to disagree about what "7pm" means.
    */
   useEffect(() => {
-    const scheduled = league?.scheduled_draft_time;
-    if (!scheduled) {
-      setDraftTimeInput('');
-      return;
-    }
-    const when = new Date(scheduled);
-    if (Number.isNaN(when.getTime())) {
-      setDraftTimeInput('');
-      return;
-    }
-    const pad = (n: number) => String(n).padStart(2, '0');
-    setDraftTimeInput(
-      `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}T${pad(when.getHours())}:${pad(when.getMinutes())}`,
-    );
+    setDraftTimeInput(instantToLocalInput(league?.scheduled_draft_time));
   }, [league?.scheduled_draft_time]);
 
   const handleScheduleDraft = async (value: string | null) => {
     if (!leagueId || !user?.id || savingDraftTime) return;
 
-    let iso: string | null = null;
-    if (value) {
-      const when = new Date(value);
-      if (Number.isNaN(when.getTime())) {
-        toast({
-          title: "That date didn't read",
-          description: 'Pick the day and time again.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      if (when.getTime() <= Date.now()) {
-        toast({
-          title: 'Pick a time ahead',
-          description: 'A draft can only be scheduled for the future. To go now, use the draft room.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      iso = when.toISOString();
+    const parsed = localInputToInstant(value ?? '');
+    if (!parsed.ok) {
+      toast({
+        title: parsed.reason === 'past' ? 'Pick a time ahead' : "That date didn't read",
+        description: parsed.reason === 'past'
+          ? 'A draft can only be scheduled for the future. To go now, use the draft room.'
+          : 'Pick the day and time again.',
+        variant: 'destructive',
+      });
+      return;
     }
+    const iso = parsed.iso;
 
     setSavingDraftTime(true);
     try {
@@ -600,13 +583,37 @@ const LeagueDashboard = () => {
         // edit and then propagate them into the rules table via the sync trigger.
         saved = true;
       } else if (activeSettingsTab === 'draft') {
-        const { success, error: saveError } = await LeagueService.updateDraftSettings(
-          leagueId,
-          user.id,
-          draftSettings
-        );
-        saved = success;
-        errorMessage = userMessage(saveError, "Couldn't save the draft settings. Try again in a moment.");
+        // The tab holds the draft time as local wall time; the column stores an
+        // instant. Only convert when it actually CHANGED: otherwise a
+        // commissioner editing rounds on a league whose draft time has since
+        // passed would be blocked by the past-time rule on a field he never
+        // touched.
+        const { scheduledDraftTime, ...draftColumns } = draftSettings;
+        const payload: Record<string, unknown> = { ...draftColumns };
+        const currentTime = instantToLocalInput(league?.scheduled_draft_time);
+        let timeReadable = true;
+
+        if (scheduledDraftTime !== currentTime) {
+          const parsed = localInputToInstant(scheduledDraftTime);
+          if (parsed.ok) {
+            payload.scheduled_draft_time = parsed.iso;
+          } else {
+            timeReadable = false;
+            errorMessage = parsed.reason === 'past'
+              ? 'A draft can only be scheduled for the future. To start one now, use the draft room.'
+              : "That draft date didn't read. Pick the day and time again.";
+          }
+        }
+
+        if (timeReadable) {
+          const { success, error: saveError } = await LeagueService.updateDraftSettings(
+            leagueId,
+            user.id,
+            payload
+          );
+          saved = success;
+          errorMessage = userMessage(saveError, "Couldn't save the draft settings. Try again in a moment.");
+        }
       } else if (activeSettingsTab === 'trades') {
         const { success, error: tradeErr } = await TradeService.updateTradeReviewSettings(
           leagueId,

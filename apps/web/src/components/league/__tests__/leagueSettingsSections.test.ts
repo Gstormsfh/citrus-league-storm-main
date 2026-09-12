@@ -31,7 +31,7 @@ const base = (over: Partial<LeagueSettingsInput> = {}): LeagueSettingsInput => (
     faabBudget: 100,
   },
   setWaiver: noop,
-  draft: { draft_rounds: 21, pickTimeLimit: 90 },
+  draft: { draft_rounds: 21, pickTimeLimit: 90, scheduledDraftTime: '' },
   setDraft: noop,
   trade: { trade_review_type: 'none', trade_review_period_hours: 48, trade_veto_threshold: 0.5, tradeDeadlineWeek: 0 },
   setTrade: noop,
@@ -110,7 +110,8 @@ describe('buildLeagueSettingsSections', () => {
   it('draft and roster slots lock once the draft is complete', () => {
     const done = base({ draftCompleted: true });
     expect(section(done, 'draft').saveable).toBe(false);
-    expect(fields(done, 'draft').every((f) => f.kind === 'number' && f.disabled)).toBe(true);
+    // Every field locks — including the draft time, which is a text kind.
+    expect(fields(done, 'draft').every((f) => (f as { disabled?: boolean }).disabled === true)).toBe(true);
     expect(section(done, 'rosterslots').saveable).toBe(false);
     expect(section(done, 'rosterslots').callout).toMatch(/locked/);
     expect(section(base(), 'draft').saveable).toBe(true);
