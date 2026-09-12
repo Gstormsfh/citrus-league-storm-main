@@ -1,0 +1,74 @@
+{
+  "checks": [
+    "Backup creation failure closes transaction and leaves no active publication",
+    "First activation COMMIT occurred only after fresh locked backup was written and fsynced (0600)",
+    "Stale active CAS, wrong calendar/schema and mismatched expected output hash all refuse recovery without changing publication",
+    "External bundle corruption rejected before opening recovery transaction",
+    "Separate recovery COMMIT restores fresh pre-state hashes and retains immutable run/player history",
+    "Committed intervening canonical materialization invalidates recovery bundle and is not overwritten"
+  ],
+  "first_activation": {
+    "request": {
+      "run_id": "9bbdfe2c-49e4-41f4-b02b-11953885de65",
+      "season": 2026,
+      "revision": "68becf637da5210609842ef8bf504b8178dae94664c8dba6a2f059b4a83b8896"
+    },
+    "database_date": "2026-09-12",
+    "pre_hashes": {
+      "ros": {
+        "md5": "ba445a1d1f20a86641a3669b87188822",
+        "count": 6
+      },
+      "daily": {
+        "md5": "c09e3ac854f6609ac6c4948e492d5bb4",
+        "count": 8
+      },
+      "active": {
+        "md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "count": 0
+      }
+    },
+    "post_hashes": {
+      "ros": {
+        "md5": "1440df44edea9dabe3fd948acbebb3ae",
+        "count": 6
+      },
+      "daily": {
+        "md5": "eb7a05507a662bb9768f038937eb0e5e",
+        "count": 12
+      },
+      "active": {
+        "md5": "185937ee3db744c1227bd27870d77594",
+        "count": 1
+      }
+    }
+  },
+  "committed_recovery": {
+    "hashes": {
+      "ros": {
+        "md5": "ba445a1d1f20a86641a3669b87188822",
+        "count": 6
+      },
+      "daily": {
+        "md5": "c09e3ac854f6609ac6c4948e492d5bb4",
+        "count": 8
+      },
+      "active": {
+        "md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "count": 0
+      }
+    },
+    "restored": true,
+    "history_retained": true
+  },
+  "retained_backup": "/Users/gstorms/.codex/worktrees/4304/citrus/tmp/projection-audit/first-publication-recovery/citrus-recovery-jhg07ssi/first-publication.json",
+  "backup_envelope_sha256": "c0bff55f6cca887a9324bd2d1d079eb643b8a66dcc85d35dc3af96c004e2efd0",
+  "schema_sha256": "7b6f9891525de8b1a77130acd3dc4c8869f1dc3ea79a24405efde9a27d92631d",
+  "files": {
+    "scripts/ops/projection-release/first-publication/run.py": "faffb747525f34a0de962518fe5e9b36c72469a985612e2eb66ffe037b12888d",
+    "scripts/ops/projection-release/first-publication/activate.sql": "99851eb89acc433af8fba68499fc1a7f4e0260377db9c102469905eacb192d38",
+    "scripts/ops/projection-release/first-publication/context.sql": "2c422e0e5cebc158e3d4db95fd999acb5c99f8c8780f0c6232f0cfb085cd6915",
+    "scripts/ops/projection-release/first-publication/restore.sql": "2e27ae8d0e900b259e5acda0dfdda6dacfe7410ba409de240117a5f8ac23daa2"
+  },
+  "scope": "Isolated synthetic full-schema fixture only; first activation and recovery separately committed; final negative case intentionally retains intervening canonical publication; no production/source mutation"
+}
