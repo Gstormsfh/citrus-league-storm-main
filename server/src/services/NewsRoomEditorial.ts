@@ -57,6 +57,58 @@ export function fallbackNewsSummary(item: WireItem): string {
   return excerpt ? `${newsAttribution(item)}: “${excerpt}${words.length > 22 ? '…' : ''}”` : '';
 }
 
+const foldEditorialText = (text: string): string => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/’/g, "'").toLowerCase();
+// Sentence openers and hockey categories are not player/team entities. Other
+// capitalized tokens must occur in publisher text, including surnames alone.
+const NON_ENTITY_WORDS = new Set(('A An The He His Him It Its They Their This That These Those No There If When With Without For In On At After Before But And However Still ' +
+  'Practice Practicing Skating Clearance Availability Injury Injuries Return Returning Activation Deployment Minutes More Less Fewer Additional Increased Reduced ' +
+  'Projected Reported Shots Goals Assists Points Saves Wins Fantasy Power NHL Citrus Check Confirm Monitor Track Keep').split(' '));
+
+function hasUnsupportedEntities(summary: string, evidence: string): boolean {
+  const foldedEvidence = foldEditorialText(evidence);
+  const sourceTokens = new Set(foldedEvidence.match(/[\p{L}\p{M}'-]+/gu)?.map(word => word.replace(/'s$/, '')) || []);
+  const entities = summary.match(/[\p{Lu}][\p{L}\p{M}'’–-]*/gu) || [];
+  if (entities.some(word => !NON_ENTITY_WORDS.has(word) && !sourceTokens.has(foldEditorialText(word).replace(/'s$/, '')))) return true;
+  // Lowercasing an invented name must not bypass the entity check. Only inspect
+  // compact subjects before common reporting predicates; pronouns remain valid.
+  const subjects = summary.matchAll(/(?:^|[.;]\s*)([\p{L}'’-]+(?:\s+[\p{L}'’-]+)?)\s+(?:is|was|has|had|will|skated|practiced|signed|traded|remains|returned)\b/giu);
+  for (const match of subjects) {
+    const subject = foldEditorialText(match[1]);
+    if (/^(?:a|an|the|he|his|it|its|they|their|this|that|these|those)\b/.test(subject)) continue;
+    if (!foldedEvidence.includes(subject)) return true;
+  }
+  // Token presence alone cannot turn Jack Eichel + Quinn Hughes into Jack Hughes.
+  const groups = summary.match(/[\p{Lu}][\p{L}\p{M}'’–-]*(?:\s+[\p{Lu}][\p{L}\p{M}'’–-]*)+/gu) || [];
+  return groups.some(group => {
+    const names = group.split(/\s+/).filter(word => !NON_ENTITY_WORDS.has(word));
+    return names.length > 1 && !foldedEvidence.includes(foldEditorialText(names.join(' ')).replace(/'s$/, ''));
+  });
+}
+
+/** Event vocabulary is only a conservative support check, not an event model.
+ * In particular, an uncertain availability report does not establish an absence.
+ */
+function hasUnsupportedEvents(summary: string, evidence: string): boolean {
+  const events: Array<[RegExp, RegExp]> = [
+    [/\b(?:trad(?:e|ed|ing)|acquir(?:e|ed|es)|deal sent)\b/i, /\b(?:trad(?:e|ed|es|ing)|acquir(?:e|ed|es)|deal sent)\b/i],
+    [/\b(?:sign(?:s|ed|ing)?|re[- ]sign(?:s|ed|ing)?|contract extension)\b/i, /\b(?:sign(?:s|ed|ing)?|re[- ]sign(?:s|ed|ing)?|contract extension|renewed)\b/i],
+    [/\b(?:injur(?:y|ies|ed)|concussion|fractur\w*|sprain\w*|surgery|torn|tear)\b/i, /\b(?:injur(?:y|ies|ed)|concussion|fractur\w*|sprain\w*|surgery|torn|tear|upper.body|lower.body)\b/i],
+    [/\b(?:ruled out|sidelined|unavailable|will miss|injured reserve)\b/i, /\b(?:ruled out|sidelined|unavailable|will miss|injured reserve|out with|out for|out indefinitely)\b/i],
+    [/\b(?:suspend(?:ed|sion)?|suspension|banned|ban)\b/i, /\b(?:suspend(?:ed|sion)?|suspension|banned|ban)\b/i],
+    [/\b(?:promot(?:ed|ion)|demot(?:ed|ion)|top[- ]six|top[- ]pair|first[- ]pair|starting role|starter|backup)\b/i, /\b(?:promot(?:ed|ion)|demot(?:ed|ion)|top[- ]six|top[- ]pair|first[- ]pair|starting role|starter|backup)\b/i],
+    [/\b(?:power[- ]play|penalty[- ]kill)\b/i, /\b(?:power[- ]play|penalty[- ]kill|pp1|pp2)\b/i],
+  ];
+  if (events.some(([claim, support]) => claim.test(summary) && !support.test(evidence))) return true;
+  // A generic injury must not license a specific diagnosis.
+  for (const diagnosis of ['concussion', 'fracture', 'sprain', 'surgery', 'torn', 'tear']) {
+    if (new RegExp(`\\b${diagnosis}\\w*\\b`, 'i').test(summary) && !new RegExp(`\\b${diagnosis}\\w*\\b`, 'i').test(evidence)) return true;
+  }
+  const uncertainEvent = /\b(?:could|might|may|rumou?r(?:ed|s)?|possible|potential|not|never)\b.{0,65}\b(?:trad\w*|sign\w*|suspend\w*|promot\w*|demot\w*)\b|\b(?:trad\w*|sign\w*|suspend\w*|promot\w*|demot\w*)\b.{0,25}\b(?:rumou?r(?:ed|s)?|possible|potential)\b/i;
+  const assertedEvent = /\b(?:was|is|has been|has|will be)\s+(?:traded|signed|suspended|promoted|demoted)\b/i;
+  return uncertainEvent.test(evidence) && assertedEvent.test(summary) && !uncertainEvent.test(summary);
+}
+
 /** Conservative automated checks; these cannot prove every semantic claim. */
 export function validNewsSummary(summary: string, item: WireItem): boolean {
   const words = summary.trim().split(/\s+/);
@@ -64,6 +116,7 @@ export function validNewsSummary(summary: string, item: WireItem): boolean {
     containsNewsInstructions(summary) || /https?:|[<>]|["“”]/i.test(summary)) return false;
   const evidence = `${item.title} ${item.snippet}`.toLowerCase();
   const normalized = summary.toLowerCase();
+  if (hasUnsupportedEntities(summary, evidence) || hasUnsupportedEvents(summary, evidence)) return false;
   // Dates/numbers from publication metadata cannot become medical timelines or stats.
   const numbers = normalized.match(/\d+(?:[.:/-]\d+)*%?/g) || [];
   const sourceNumbers: string[] = evidence.match(/\d+(?:[.:/-]\d+)*%?/g) || [];
