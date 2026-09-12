@@ -533,6 +533,15 @@ matchupRoutes.get('/:matchupId/simulation', async (c) => {
   const matchupId = c.req.param('matchupId');
   const supabase = createUserClient(c.get('userToken'));
 
+  // Gate the SECURITY DEFINER RPC through caller-visible matchups (league RLS).
+  const { data: visibleMatchup, error: visibilityError } = await supabase
+    .from('matchups')
+    .select('id')
+    .eq('id', matchupId)
+    .maybeSingle();
+  if (visibilityError) return handleError(c, visibilityError, 'Failed to verify matchup visibility');
+  if (!visibleMatchup) return fail(c, AppError.notFound('Matchup'));
+
   const { data, error } = await supabase
     .rpc('get_matchup_simulation', { p_matchup_id: matchupId });
 

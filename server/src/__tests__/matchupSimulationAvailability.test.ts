@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 
-const mocks = vi.hoisted(() => ({ rpc: vi.fn(), client: vi.fn(), admin: vi.fn() }));
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), client: vi.fn(), admin: vi.fn(), from: vi.fn(), select: vi.fn(), eq: vi.fn(), visible: vi.fn() }));
 vi.mock('../lib/supabase', () => ({ createUserClient: mocks.client, getSupabaseAdmin: mocks.admin }));
 vi.mock('../middleware/auth', () => ({ authMiddleware: async (c: any, next: any) => {
   if (!c.req.header('Authorization')) return c.json({ error: 'Unauthorized' }, 401);
@@ -17,7 +17,11 @@ const request = (authenticated = true) => app.request(`/api/matchups/${id}/simul
 });
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.client.mockReturnValue({ rpc: mocks.rpc });
+  mocks.client.mockReturnValue({ rpc: mocks.rpc, from: mocks.from });
+  mocks.from.mockReturnValue({ select: mocks.select });
+  mocks.select.mockReturnValue({ eq: mocks.eq });
+  mocks.eq.mockReturnValue({ maybeSingle: mocks.visible });
+  mocks.visible.mockResolvedValue({ data: { id }, error: null });
 });
 
 describe('optional matchup simulation availability', () => {
@@ -29,6 +33,10 @@ describe('optional matchup simulation availability', () => {
     expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith('get_matchup_simulation', { p_matchup_id: id });
     expect(mocks.client).toHaveBeenCalledExactlyOnceWith('test-session');
     expect(mocks.admin).not.toHaveBeenCalled();
+    expect(mocks.from).toHaveBeenCalledWith('matchups');
+    expect(mocks.select).toHaveBeenCalledWith('id');
+    expect(mocks.eq).toHaveBeenCalledWith('id', id);
+    expect(mocks.visible.mock.invocationCallOrder[0]).toBeLessThan(mocks.rpc.mock.invocationCallOrder[0]);
   });
 
   it('retains the normal no-row response', async () => {
@@ -49,6 +57,23 @@ describe('optional matchup simulation availability', () => {
     const response = await request();
     expect(response.status).toBe(500);
     expect((await response.json()).error.code).toBe('INTERNAL_ERROR');
+  });
+
+  it('does not call the definer RPC for a nonexistent or RLS-inaccessible matchup', async () => {
+    mocks.visible.mockResolvedValue({ data: null, error: null });
+    const response = await request();
+    expect(response.status).toBe(404);
+    expect((await response.json()).error.code).toBe('NOT_FOUND');
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.admin).not.toHaveBeenCalled();
+  });
+
+  it('does not hide a genuine visibility lookup failure as absent simulation', async () => {
+    mocks.visible.mockResolvedValue({ data: null, error: { code: '57014', message: 'Query timed out' } });
+    const response = await request();
+    expect(response.status).toBe(500);
+    expect((await response.json()).error.code).toBe('INTERNAL_ERROR');
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
   it('requires authentication before calling the user-scoped RPC', async () => {
