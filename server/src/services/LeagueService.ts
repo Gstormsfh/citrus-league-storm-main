@@ -6,6 +6,8 @@ import {
   deriveStandings,
   rankStandings,
   getTodayMST,
+  structuredLogger,
+  GAME_DAY_TIMEZONE,
   type StandingsMatchup,
   type StandingsTeamRef,
   draftableRosterSize,
@@ -14,6 +16,49 @@ import { getSupabaseAdmin } from '../lib/supabase';
 import { AppError } from '../lib/errors';
 import { LeagueMembershipService } from './LeagueMembershipService';
 import { lockedSettingChange } from '../lib/leagueRules';
+
+/**
+ * The sentence a league reads when the commissioner moves the draft.
+ *
+ * MOUNTAIN TIME ON PURPOSE. packages/shared/src/utils/timezone.ts opens with
+ * "All dates/times should use Mountain Time (America/Denver)" and every other
+ * time this product prints obeys it. A notification rendered in each reader's
+ * own zone would be the single exception, and would disagree with the draft
+ * time shown on the league page two taps away -- which is worse than being
+ * uniformly in one zone, because the reader cannot tell which one is wrong.
+ *
+ * The raw instant rides along in the notification's metadata, so a later
+ * client can render per-viewer without another migration. The SENTENCE has to
+ * stand on its own regardless: the build in App Review renders message text
+ * and reads no metadata at all, so anything not in this string reaches nobody
+ * until the next release.
+ *
+ * Exported for its own test -- importing LeagueService boots a Supabase client.
+ */
+export function draftTimeChangeMessage(scheduledDraftTime: string | null): string {
+  if (!scheduledDraftTime) {
+    return 'The commissioner cleared the scheduled draft time.';
+  }
+
+  const at = new Date(scheduledDraftTime);
+  if (Number.isNaN(at.getTime())) {
+    // A time the database accepted but Date cannot parse is still a real
+    // change worth announcing. Say the true thing rather than broadcasting
+    // "Invalid Date" to every manager in the league.
+    return 'The commissioner changed the scheduled draft time.';
+  }
+
+  const when = new Intl.DateTimeFormat('en-US', {
+    timeZone: GAME_DAY_TIMEZONE,
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(at);
+
+  return `The draft is set for ${when} MT.`;
+}
 
 // Demo league IDs that should never appear in user league lists
 const DEMO_LEAGUE_IDS = new Set([
@@ -401,7 +446,7 @@ export class LeagueService {
   async updateDraftSettings(
     leagueId: string,
     userId: string,
-    draftSettings: { draft_rounds?: number; pickTimeLimit?: number; draft_status?: string; scheduled_draft_time?: string; teams_count?: number },
+    draftSettings: { draft_rounds?: number; pickTimeLimit?: number; draft_status?: string; scheduled_draft_time?: string | null; teams_count?: number },
   ) {
     await this.membership.requireCommissioner(leagueId, userId);
 
@@ -469,7 +514,24 @@ export class LeagueService {
       .eq('id', leagueId);
 
     if (!error) {
-      await this.notifyLeagueMembers(leagueId, 'Draft settings have been updated by the commissioner.');
+      // The draft time is the one draft setting that changes what a manager
+      // has to DO, and since start_due_scheduled_drafts went live it is the
+      // one that starts a draft on its own. It gets its own sentence; every
+      // other draft setting keeps the generic line it has always had.
+      const timeChanged = draftSettings.scheduled_draft_time !== undefined;
+      await this.notifyLeagueMembers(
+        leagueId,
+        timeChanged
+          ? draftTimeChangeMessage(draftSettings.scheduled_draft_time ?? null)
+          : 'Draft settings have been updated by the commissioner.',
+        'League Update',
+        timeChanged
+          ? {
+              kind: 'draft_time_changed',
+              scheduled_draft_time: draftSettings.scheduled_draft_time ?? null,
+            }
+          : undefined,
+      );
     }
 
     return { success: !error, error };
@@ -979,14 +1041,38 @@ export class LeagueService {
   }
 
   /** Notify all league members via RPC (with fallback) */
-  async notifyLeagueMembers(leagueId: string, message: string, title?: string) {
+  async notifyLeagueMembers(
+    leagueId: string,
+    message: string,
+    title?: string,
+    metadata?: Record<string, unknown>,
+  ) {
     try {
-      await this.supabase.rpc('notify_league_members', {
+      const { data, error } = await this.supabase.rpc('notify_league_members', {
         p_league_id: leagueId,
         p_message: message,
         p_title: title || 'League Update',
+        ...(metadata ? { p_metadata: metadata } : {}),
       });
-    } catch {
+
+      // The RPC REPORTS a refusal, it does not raise one: an unauthenticated
+      // or non-commissioner caller gets HTTP 200 and { success: false }. Until
+      // 2026-09-12 this return value was discarded entirely, so the catch below
+      // could only ever fire on a transport error -- a refusal notified nobody
+      // and logged nothing, and the fallback it exists for never ran. Treat a
+      // reported refusal as a throw so it reaches both.
+      if (error) throw error;
+      if (data && (data as { success?: boolean }).success === false) {
+        throw new Error(
+          (data as { error?: string }).error ?? 'notify_league_members refused the write',
+        );
+      }
+    } catch (err) {
+      structuredLogger.warn('league.notify_rpc_failed', {
+        league_id: leagueId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+
       // Fallback: insert notifications directly for each team owner
       try {
         const { data: teams } = await this.supabase
@@ -994,18 +1080,28 @@ export class LeagueService {
           .select('owner_id')
           .eq('league_id', leagueId);
 
-        if (teams && teams.length > 0) {
-          const notifications = teams.map((t: { owner_id: string }) => ({
+        // owner_id is null on AI teams; inserting those rows would write a
+        // notification nobody can read and trip the user_id NOT NULL check.
+        const owners = (teams ?? []).filter(
+          (t: { owner_id: string | null }) => t.owner_id != null,
+        );
+
+        if (owners.length > 0) {
+          const notifications = owners.map((t: { owner_id: string }) => ({
             user_id: t.owner_id,
             league_id: leagueId,
             type: 'SYSTEM',
             title: title || 'League Update',
             message,
+            ...(metadata ? { metadata } : {}),
           }));
           await this.supabase.from('notifications').insert(notifications);
         }
-      } catch {
-        // Silent fail — notifications are best-effort
+      } catch (fallbackErr) {
+        structuredLogger.error('league.notify_failed_entirely', {
+          league_id: leagueId,
+          error: fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr),
+        });
       }
     }
   }
