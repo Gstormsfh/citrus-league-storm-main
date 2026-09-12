@@ -14,7 +14,7 @@ class Handler(BaseHTTPRequestHandler):
  def allowed(self):return self.headers.get('Host') in [f'127.0.0.1:{self.server.server_port}',f'localhost:{self.server.server_port}']
  def do_GET(self):
   if not self.allowed():return self.respond(403,{'error':'Localhost only'})
-  if self.path=='/api/data':return self.respond(200,{'identity':identity(DATA['weights']),'source':DATA['source'],'weights':DATA['weights'],'rookies':DATA['rookies'],'result':calculate(DATA,DATA['weights'])})
+  if self.path=='/api/data':return self.respond(200,{'identity':identity(DATA['weights']),'edition':DATA.get('edition'),'source':DATA['source'],'weights':DATA['weights'],'rookies':DATA['rookies'],'result':calculate(DATA,DATA['weights'])})
   if self.path in ['/','/index.html']:return self.respond(200,(ROOT/'index.html').read_bytes(),'text/html; charset=utf-8')
   name=self.path.removeprefix('/assets/')
   if self.path.startswith('/assets/') and name in ['Barlow-Regular.ttf','Barlow-Bold.ttf','BarlowCondensed-Bold.ttf','logo.png']:

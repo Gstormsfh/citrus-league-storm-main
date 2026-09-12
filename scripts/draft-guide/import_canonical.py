@@ -29,10 +29,28 @@ def finite(value, label):
     return value
 
 
-def validate(document, revision):
+def effective_exposure(player):
+    """A derived runtime owns remaining exposure; the original stays provenance."""
+    if 'remaining' in player:
+        return player['remaining']['used']
+    return player['exposure']['used']
+
+
+def validate(document, revision, *, revision_preimage=None):
     if document.get('schema_version') != VERSION:
         raise ValueError('Unsupported canonical schema')
-    if not revision or document.get('revision') != revision or digest(document) != revision:
+    algorithm = document.get('revision_algorithm')
+    if algorithm == 'sha256_postgres_jsonb_v1':
+        # PostgreSQL's numeric/text serialization is not Python's JSON serializer.
+        # Verify the exact exported preimage AND its parsed payload, never a flag.
+        valid = (isinstance(revision_preimage, str)
+                 and sha256(revision_preimage.encode()).hexdigest() == revision
+                 and json.loads(revision_preimage) == {k: v for k, v in document.items() if k != 'revision'})
+    elif algorithm is None:
+        valid = digest(document) == revision
+    else:
+        raise ValueError('Unsupported canonical revision algorithm')
+    if not revision or document.get('revision') != revision or not valid:
         raise ValueError('Canonical revision mismatch')
     players = {}
     for p in document['players']:
@@ -49,13 +67,21 @@ def validate(document, revision):
             if finite(value, key) < 0 and key != 'plus_minus':
                 raise ValueError(f'{pid}: negative category rate')
         exposure = p['exposure']
-        used = exposure['used']
+        used = effective_exposure(p)
         if exposure['unit'] != ('starts' if p['is_goalie'] else 'games'):
             raise ValueError(f'{pid}: wrong exposure unit')
         if exposure['probability_semantics'] not in {'metadata_only', 'already_in_exposure', 'unknown'}:
             raise ValueError(f'{pid}: unknown probability semantics')
         if used is not None and not 0 <= finite(used, 'exposure') <= document['schedule'].get(p['team'], 84):
             raise ValueError(f'{pid}: invalid exposure')
+        if 'remaining' in p:
+            remaining = p['remaining']
+            if not 0 <= finite(remaining['team_games'], 'remaining team games') <= document['schedule'][p['team']]:
+                raise ValueError(f'{pid}: invalid remaining schedule')
+            if used is not None and used > remaining['team_games']:
+                raise ValueError(f'{pid}: exposure exceeds remaining schedule')
+        elif algorithm == 'sha256_postgres_jsonb_v1' and p['status'] == 'projected':
+            raise ValueError(f'{pid}: runtime projected player lacks remaining horizon')
         probability = exposure.get('roster_probability')
         if probability is not None and not 0 <= finite(probability, 'probability') <= 1:
             raise ValueError(f'{pid}: invalid probability')
@@ -82,9 +108,9 @@ def validate(document, revision):
     return players
 
 
-def convert(document, editorial, revision, *, source_name='canonical.json'):
+def convert(document, editorial, revision, *, source_name='canonical.json', revision_preimage=None, runtime_run_id=None):
     """No fuzzy identities, exposure guessing, probability scaling, or publication."""
-    canonical = validate(document, revision)
+    canonical = validate(document, revision, revision_preimage=revision_preimage)
     result = deepcopy(editorial)
     # Previous rank/score caches and editorial lineups are not canonical forecasts.
     previous = {p['name']: p for p in editorial['players']}
@@ -92,13 +118,13 @@ def convert(document, editorial, revision, *, source_name='canonical.json'):
     for p in document['players']:
         old = previous.get(p['name'], {})
         exposure = p['exposure']
-        rates = {k: v for k, v in p['rates'].items() if k in (GOALIE if p['is_goalie'] else SKATER)}
+        rates = {k: v for k, v in p['rates'].items() if k in (GOALIE if p['is_goalie'] else SKATER | {'plus_minus'})}
         source = p.get('workbook_input') or {}
         result['players'].append({
             'key': 'canonical:' + p['player_id'], 'playerId': p['player_id'],
             'name': p['name'], 'team': p['team'], 'position': p['position'],
             'isGoalie': p['is_goalie'], 'source': p['provenance'], 'tier': old.get('tier'),
-            'baseGames': 1, 'games': exposure['used'], 'stats': deepcopy(rates),
+            'baseGames': 1, 'games': effective_exposure(p), 'stats': deepcopy(rates),
             'rosterProbability': exposure.get('roster_probability'),
             'line': p['role'].get('line'), 'powerPlay': p['role'].get('pp'),
             'note': p['role'].get('notes'), 'confidence': None,
@@ -106,12 +132,13 @@ def convert(document, editorial, revision, *, source_name='canonical.json'):
             'forecastStatus': p['status'], 'availability': deepcopy(p['availability']),
             'exposureSemantics': exposure['probability_semantics'],
             'canonicalExposure': deepcopy(exposure), 'canonicalRates': deepcopy(p['rates']),
+            'canonicalRemaining': deepcopy(p.get('remaining')),
             'canonicalCounts': deepcopy(p['counts']), 'canonicalRole': deepcopy(p['role']),
             'canonicalSources': deepcopy(p['sources']), 'canonicalIssues': deepcopy(p.get('issues', [])),
             'ratePolicy': p['rate_policy'], 'exposurePolicy': p['exposure_policy'],
             'legacyOverrides': deepcopy(p.get('legacy_overrides', [])),
             'unscoredCategories': sorted(set(p['rates']) - set(rates)),
-            'zeroExposureWithoutRates': exposure['used'] == 0 and not p['rates'],
+            'zeroExposureWithoutRates': effective_exposure(p) == 0 and not p['rates'],
         })
     result['teams'] = []
     for team in document['teams']:
@@ -157,6 +184,21 @@ def convert(document, editorial, revision, *, source_name='canonical.json'):
         'inputSha256': deepcopy(document['input_sha256']),
     }
     result['canonicalRevision'] = revision
+    if document.get('revision_algorithm') == 'sha256_postgres_jsonb_v1':
+        if not document.get('source_revision') or not document.get('refresh_at'):
+            raise ValueError('Runtime requires source revision and refresh timestamp')
+        dates = {p['remaining']['as_of'] for p in document['players'] if 'remaining' in p}
+        if len(dates) != 1:
+            raise ValueError('Runtime remaining horizons must share one as-of date')
+        result['edition'] = {
+            'kind': 'effective_runtime', 'parentSourceRevision': document['source_revision'],
+            'runtimeRevision': revision, 'runtimeRunId': runtime_run_id,
+            'asOf': next(iter(dates)), 'refreshedAt': document['refresh_at'],
+            'sourceAsOf': document['as_of'], 'horizon': 'remaining_season',
+        }
+        result['source'].update({'sourceRevision': document['source_revision'],
+                                'asOf': result['edition']['asOf'],
+                                'revisionAlgorithm': document['revision_algorithm']})
     result['schedule'] = deepcopy(document['schedule'])
     schedule = set(document['schedule'].values())
     result['seasonGames'] = next(iter(schedule)) if len(schedule) == 1 else None
@@ -182,13 +224,17 @@ def main():
     parser.add_argument('--revision', required=True, help='Exact canonical revision to import')
     parser.add_argument('--editorial', type=Path, default=ROOT / 'workbook-data.json')
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--revision-preimage', type=Path, help='Exact PostgreSQL (payload-minus-revision)::text export')
+    parser.add_argument('--runtime-run-id', help='Run ID from the matching runtime export receipt')
     args = parser.parse_args()
     protected = {args.canonical.resolve(), args.editorial.resolve(), (ROOT / 'workbook-data.json').resolve()}
     if args.output.resolve() in protected:
         parser.error('Output must be separate from canonical and existing workbook snapshots')
     document = json.loads(args.canonical.read_text())
     editorial = json.loads(args.editorial.read_text())
-    result = convert(document, editorial, args.revision, source_name=args.canonical.name)
+    result = convert(document, editorial, args.revision, source_name=args.canonical.name,
+                     revision_preimage=args.revision_preimage.read_text() if args.revision_preimage else None,
+                     runtime_run_id=args.runtime_run_id)
     # Refuse accidental overwrite of an earlier review artifact.
     with args.output.open('x') as out:
         json.dump(result, out, ensure_ascii=False, indent=2, allow_nan=False)

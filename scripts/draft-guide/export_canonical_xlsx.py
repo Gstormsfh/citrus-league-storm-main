@@ -17,9 +17,14 @@ RUNTIME = Path.home() / '.cache/codex-runtimes/codex-primary-runtime/dependencie
 KEYS = ['goals','assists','power_play_points','short_handed_points','shots_on_goal','blocks','hits','penalty_minutes','wins','saves','shutouts','goals_against']
 
 
-def payload(canonical, editorial, revision, league='Citrus default scoring', weights=None):
-    data = convert(canonical, editorial, revision)
+def payload(canonical, editorial, revision, league='Citrus default scoring', weights=None, *, revision_preimage=None, runtime_run_id=None):
+    kwargs = {}
+    if revision_preimage is not None: kwargs['revision_preimage'] = revision_preimage
+    if runtime_run_id is not None: kwargs['runtime_run_id'] = runtime_run_id
+    data = convert(canonical, editorial, revision, **kwargs)
     if weights is not None:
+        if any(set(weights.get(group, {})) - set(KEYS) for group in ('skater', 'goalie')):
+            raise ValueError('Workbook does not represent these scoring categories')
         for group in ('skater', 'goalie'):
             if set(weights.get(group, {})) != set(data['weights'][group]):
                 raise ValueError('Scoring categories must match supported guide categories')
@@ -36,6 +41,9 @@ import fs from 'node:fs/promises';
 import { Workbook, SpreadsheetFile } from '@oai/artifact-tool';
 const [input,output,preview]=process.argv.slice(2);
 const x=JSON.parse(await fs.readFile(input,'utf8')),d=x.data,c=x.canonical;
+const edition=d.edition??{},remaining=edition.horizon==='remaining_season';
+const horizon=remaining?'Remaining season':'Full season';
+const volumeLabel=remaining?'Remaining games / starts':'Full-season games / starts';
 const w=Workbook.create();
 const names=['Read Me','Scoring','Players','Team Notes','Source History',...d.teams.map(t=>t.team)];
 for(const name of names)w.worksheets.add(name);
@@ -62,9 +70,17 @@ put('Read Me',[
  ['Unsupported category','Plus/minus is preserved in Source History, outside the current guide scorer.'],
  ['Team membership','Team tabs include canonical members and lineup slots. Slots remain scenarios; null identities are unassigned.'],
  ['Publication blockers',JSON.stringify(c.publish_blockers)],
+ ['Forecast horizon',horizon],
+ ['Parent source revision',edition.parentSourceRevision??d.canonicalRevision],
+ ['Runtime revision',edition.runtimeRevision??null],
+ ['Runtime run ID',edition.runtimeRunId??null],
+ ['Source as of',edition.sourceAsOf??c.as_of],
+ ['Runtime as of',edition.kind==='effective_runtime'?edition.asOf:null],
+ ['Runtime refreshed at',edition.refreshedAt?`UTC ${edition.refreshedAt}`:null],
+ ['Exposure provenance','Source History keeps original full-season exposure and runtime remaining exposure separately. Displayed counts and FPTS use the labeled horizon.'],
  ],{A:28,B:105});
-w.worksheets.getItem('Read Me').getRange('B2:B14').format.wrapText=true;
-w.worksheets.getItem('Read Me').getRange('A7:B14').format.rowHeight=48;
+w.worksheets.getItem('Read Me').getRange('B2:B22').format.wrapText=true;
+w.worksheets.getItem('Read Me').getRange('A7:B22').format.rowHeight=48;
 const sc=put('Scoring',[
  ['Scoring group','League',...x.keys],
  ['DRAFT',x.league],['Initial revision',d.canonicalRevision],['Weights below','Editable yellow cells'],
@@ -74,7 +90,7 @@ const sc=put('Scoring',[
 sc.getRange('C5:N6').format.fill='#E6E6E6';sc.getRange('C5:N6').format.numberFormat='0.00';
 for(const [group,r]of [['skater',5],['goalie',6]])for(let j=0;j<x.keys.length;j++)if(Object.hasOwn(d.weights[group],x.keys[j]))sc.getRange(`${col(j+3)}${r}`).format.fill='#FFF1BA';
 sc.getRange('A8:N8').merge();sc.getRange('A8').values=[['Yellow: supported editable scoring inputs. Grey: unsupported categories, fixed zero; not used by the guide scorer.']];sc.getRange('A8:N8').format.wrapText=true;sc.getRange('A8:N8').format.rowHeight=32;
-const headers=['NHL ID','Player','Team','Position','Provenance','Forecast status','Games / starts','Roster probability','Probability semantics','Availability','Availability as of','Authority','Reason','Line','PP','Rate policy','Exposure policy','Source evidence','Legacy overrides',...x.keys.map(k=>'Rate '+k),...x.keys.map(k=>'Season '+k),'FPTS'];
+const headers=['NHL ID','Player','Team','Position','Provenance','Forecast status',volumeLabel,'Roster probability','Probability semantics','Availability','Availability as of','Authority','Reason','Line','PP','Rate policy','Exposure policy','Source evidence','Legacy overrides',...x.keys.map(k=>'Rate '+k),...x.keys.map(k=>(remaining?'Remaining ':'Full season ')+k),'FPTS'];
 const rows=[headers],byId=new Map();
 for(const p of d.players){const a=p.availability;byId.set(p.playerId,rows.length+1);rows.push([p.playerId,p.name,p.team,p.position,p.source,p.forecastStatus,p.games,p.rosterProbability,p.exposureSemantics,a.status,a.as_of,a.authority,a.reason,p.line,p.powerPlay,p.ratePolicy,p.exposurePolicy,JSON.stringify(p.canonicalSources),JSON.stringify(p.legacyOverrides),...x.keys.map(k=>p.canonicalRates[k]??null),...Array(13).fill(null)])}
 const ps=put('Players',rows,{A:14,B:25,F:18,I:24,M:45,R:45,S:45});
@@ -83,9 +99,10 @@ ps.getRange(`T2:AE${rows.length}`).format.numberFormat='0.0000';ps.getRange(`AF2
 const formulas=[];
 for(let i=0;i<d.players.length;i++){
  const p=d.players[i],r=i+2;
- const counts=x.keys.map((k,j)=>`=IF(OR($F${r}<>"projected",NOT(ISNUMBER($G${r}))),"",IF($G${r}=0,0,IF(ISNUMBER(${col(20+j)}${r}),${col(20+j)}${r}*$G${r},"")))`);
+ const counts=x.keys.map((k,j)=>`=IF(OR($F${r}<>"projected",NOT(ISNUMBER($G${r}))),"",IF($G${r}=0,${p.canonicalCounts?.[k]===0?'0':'""'},IF(ISNUMBER(${col(20+j)}${r}),${col(20+j)}${r}*$G${r},"")))`);
  const group=p.isGoalie?6:5;
- counts.push(`=IF(OR($F${r}<>"projected",NOT(ISNUMBER($G${r}))),"",IF($G${r}=0,0,SUMPRODUCT(T${r}:AE${r},'Scoring'!$C$${group}:$N$${group})*$G${r}))`);formulas.push(counts);
+ const missing=x.keys.map((k,j)=>Object.hasOwn(d.weights[p.isGoalie?'goalie':'skater'],k)?`AND('Scoring'!$${col(j+3)}$${group}<>0,NOT(ISNUMBER(${col(20+j)}${r})),NOT(AND($G${r}=0,${p.canonicalCounts?.[k]===0?'TRUE':'FALSE'})))`:null).filter(Boolean).join(',');
+ counts.push(`=IF(OR($F${r}<>"projected",NOT(ISNUMBER($G${r}))),"",IF(OR(${missing}),"",IF($G${r}=0,0,SUMPRODUCT(T${r}:AE${r},'Scoring'!$C$${group}:$N$${group})*$G${r})))`);formulas.push(counts);
 }
 ps.getRange(`AF2:AR${rows.length}`).formulas=formulas;
 const notes=[['Team','Row','Column','Authority','Text']];
@@ -93,10 +110,14 @@ for(const t of d.teams)for(const n of t.canonicalNotes)notes.push([t.team,n.row?
 put('Team Notes',notes,{A:12,B:10,C:10,D:24,E:110}).getRange(`E2:E${notes.length}`).format.wrapText=true;
 const history=[['Scope','Identity','Field','Source record']];
 for(const p of c.players){for(const s of p.sources)history.push(['Player',p.player_id,'source',JSON.stringify(s)]);history.push(['Player',p.player_id,'availability',JSON.stringify(p.availability)]);history.push(['Player',p.player_id,'exposure',JSON.stringify(p.exposure)]);history.push(['Player',p.player_id,'rates',JSON.stringify(p.rates)]);if(p.legacy_overrides?.length)history.push(['Player',p.player_id,'legacy_overrides',JSON.stringify(p.legacy_overrides)]);}
+if(edition.kind==='effective_runtime'){
+ history.push(['Edition',edition.runtimeRevision,'runtime_identity',JSON.stringify(edition)]);
+ for(const p of d.players){history.push(['Player',p.playerId,'full_season_exposure',JSON.stringify(p.canonicalExposure)]);history.push(['Player',p.playerId,'remaining_exposure',JSON.stringify(p.canonicalRemaining)]);}
+}
 for(const entry of c.review_history??[])history.push(['Revision',c.revision,'review_history',JSON.stringify(entry)]);
 put('Source History',history,{A:14,B:16,C:22,D:120}).getRange(`D2:D${history.length}`).format.wrapText=true;
 for(const t of d.teams){
- const tr=[['NHL ID','Player / slot','Position','Forecast status','Games / starts','FPTS','Availability','Line','PP'],['DRAFT',d.canonicalRevision,null,null,'Scoring',x.league],['Canonical members']];
+ const tr=[['NHL ID','Player / slot','Position','Forecast status',volumeLabel,'FPTS','Availability','Line','PP'],['DRAFT',d.canonicalRevision,null,null,'Scoring',x.league],[horizon,edition.kind==='effective_runtime'?`Source ${edition.parentSourceRevision}; run ${edition.runtimeRunId}; as of ${edition.asOf}`:'Canonical members']];
  const references=[];
  for(const p of d.players.filter(p=>p.team===t.team)){const r=byId.get(p.playerId);references.push([tr.length+1,r]);tr.push([p.playerId,p.name,p.position,p.forecastStatus,null,null,p.availability.status,p.line,p.powerPlay]);}
  tr.push([],['Lineup slots']);
@@ -109,6 +130,7 @@ for(const t of d.teams){
   for(const chunk of chunks){noteRows.push([tr.length+1,chunk]);tr.push([`Row ${n.row??'new'} / Col ${n.column??'-'} / ${n.authority??'unknown'}`,chunk]);}
  }
  const s=put(t.team,tr,{A:14,B:40,C:14,D:20,E:17,F:15,G:35});
+ if(edition.kind==='effective_runtime'){s.getRange('B3:I3').merge();s.getRange('A3:I3').format.wrapText=true;s.getRange('A3:I3').format.rowHeight=44;}
  s.getRange('B2:D2').merge();s.getRange('F2:I2').merge();s.getRange('A2:I2').format.wrapText=true;s.getRange('A2:I2').format.rowHeight=44;
  for(const [dest,src]of references)s.getRange(`E${dest}:F${dest}`).formulas=[[`=IF(ISNUMBER('Players'!G${src}),'Players'!G${src},"")`,`=IF(ISNUMBER('Players'!AR${src}),'Players'!AR${src},"")`]];
  s.getRange(`E2:F${tr.length}`).format.numberFormat='0.0';
@@ -125,11 +147,11 @@ await(await SpreadsheetFile.exportXlsx(w)).save(output);
 '''
 
 
-def export(canonical_path, editorial_path, revision, output, *, league='Citrus default scoring', weights=None):
+def export(canonical_path, editorial_path, revision, output, *, league='Citrus default scoring', weights=None, revision_preimage=None, runtime_run_id=None):
     output = Path(output).resolve()
     if output.exists() or output.suffix.lower() != '.xlsx':
         raise ValueError('Choose a new .xlsx output path')
-    x = payload(json.loads(Path(canonical_path).read_text()), json.loads(Path(editorial_path).read_text()), revision, league, weights)
+    x = payload(json.loads(Path(canonical_path).read_text()), json.loads(Path(editorial_path).read_text()), revision, league, weights, revision_preimage=revision_preimage, runtime_run_id=runtime_run_id)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='citrus-canonical-xlsx-') as folder:
         work = Path(folder)
@@ -141,9 +163,9 @@ def export(canonical_path, editorial_path, revision, output, *, league='Citrus d
 
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('canonical',type=Path);p.add_argument('--revision',required=True);p.add_argument('--editorial',type=Path,default=ROOT/'workbook-data.json');p.add_argument('--output',type=Path,required=True);p.add_argument('--settings',type=Path);p.add_argument('--league',default='Citrus default scoring');a=p.parse_args()
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('canonical',type=Path);p.add_argument('--revision',required=True);p.add_argument('--editorial',type=Path,default=ROOT/'workbook-data.json');p.add_argument('--output',type=Path,required=True);p.add_argument('--settings',type=Path);p.add_argument('--league',default='Citrus default scoring');p.add_argument('--revision-preimage',type=Path);p.add_argument('--runtime-run-id');a=p.parse_args()
     settings=json.loads(a.settings.read_text()) if a.settings else None
-    print(export(a.canonical,a.editorial,a.revision,a.output,league=a.league,weights=settings.get('weights',settings) if settings else None))
+    print(export(a.canonical,a.editorial,a.revision,a.output,league=a.league,weights=settings.get('weights',settings) if settings else None,revision_preimage=a.revision_preimage.read_text() if a.revision_preimage else None,runtime_run_id=a.runtime_run_id))
 
 
 if __name__=='__main__':main()

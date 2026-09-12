@@ -4,10 +4,11 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import openpyxl
 from export_canonical_xlsx import export, payload
-from test_canonical_import import fixtures
+from test_canonical_import import fixtures, digest, player
 
 
 class CanonicalWorkbookTests(unittest.TestCase):
@@ -20,6 +21,38 @@ class CanonicalWorkbookTests(unittest.TestCase):
         self.assertIsNone(x['data']['players'][1]['games'])
         self.assertEqual(x['data']['publication']['status'], 'draft')
         self.assertNotEqual(x['scoringHash'], payload(d,e,d['revision'])['scoringHash'])
+
+    def test_runtime_arguments_reach_adapter_without_bypassing_validation(self):
+        d, e = fixtures()
+        with patch('export_canonical_xlsx.convert', side_effect=ValueError('runtime mismatch')) as convert_mock:
+            with self.assertRaisesRegex(ValueError, 'runtime mismatch'):
+                payload(d, e, d['revision'], revision_preimage='exact preimage', runtime_run_id='run-id')
+            convert_mock.assert_called_once_with(d, e, d['revision'],
+                revision_preimage='exact preimage', runtime_run_id='run-id')
+
+    def test_missing_enabled_rate_is_blank_but_disabled_rate_allows_score(self):
+        d, e = fixtures()
+        del d['players'][0]['rates']['goals']
+        del d['players'][0]['counts']['goals']
+        zero=player('3', used=0); zero['rates']={}; zero['counts']={k:0 for k in e['weights']['skater']}; d['players'].append(zero)
+        d['revision'] = digest(d)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); source=root/'source.json'; editorial=root/'editorial.json'
+            source.write_text(json.dumps(d)); editorial.write_text(json.dumps(e))
+            for weight in (1, 0):
+                weights=deepcopy(e['weights']); weights['skater']['goals']=weight
+                out=root/f'review-{weight}.xlsx'
+                export(source, editorial, d['revision'], out, weights=weights)
+                values=openpyxl.load_workbook(out, data_only=True)
+                score=values['Players']['AR2'].value
+                if weight:
+                    self.assertIn(score, (None, ''))
+                else:
+                    self.assertAlmostEqual(score, sum(d['players'][0]['rates'].values())*10)
+                self.assertIn(values['Players']['AF2'].value, (None, ''))
+                self.assertEqual(values['Players']['AR4'].value, 0)
+                self.assertEqual(values['Players']['AF4'].value, 0)
+                self.assertIn(values['Players']['AN4'].value, (None, ''))
 
     def test_bad_weights_and_revision_fail_before_export(self):
         d, e = fixtures()
