@@ -1,3 +1,4 @@
+import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { seasonProjectionSummary, scoreGameLog } from '@/components/player/projectionScoring';
@@ -6,7 +7,7 @@ import { useGameLogIdentity } from '@/components/player/useGameLogIdentity';
 import { userMessage } from '@/lib/userMessage';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
-import { AlertCircle, Clock, Trash2, Snowflake, CalendarDays, Loader2, Newspaper, Star, Share2, ArrowLeftRight } from 'lucide-react';
+import { Trash2, Snowflake, CalendarDays, Loader2, Newspaper, Star, Share2, ArrowLeftRight } from 'lucide-react';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { cn } from '@/lib/utils';
 import { LeagueService, getLeagueFormat } from '@/services/LeagueService';
@@ -805,14 +806,6 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
   ];
   const heroGameCount = futureGames.length;
 
-  const statusConfig: Record<string, { label: string; cls: string; icon: typeof AlertCircle }> = {
-    IR:   { label: 'Injury Reserve', cls: 'bg-red-500/10 text-red-400 border-red-400/40', icon: AlertCircle },
-    SUSP: { label: 'Suspended', cls: 'bg-orange-500/10 text-orange-400 border-orange-400/40', icon: AlertCircle },
-    GTD:  { label: 'Game Time Decision', cls: 'bg-yellow-500/10 text-yellow-400 border-yellow-400/40', icon: Clock },
-    WVR:  { label: 'Waiver', cls: 'bg-pastel-sage/15 text-pastel-sage-soft border-pastel-sage/40', icon: AlertCircle },
-  };
-  const statusInfo = player.status ? statusConfig[player.status] : null;
-
   const handleDropPlayer = async () => {
     if (!user || !leagueId || !player?.id) {
       toast({ title: "Can't Drop Player", description: "We're missing some info this drop needs. Reopen the modal and try again.", variant: "destructive" });
@@ -873,7 +866,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
             const words = (player.name || '').trim().split(/\s+/);
             const firstName = words.length > 1 ? words.slice(0, -1).join(' ') : words[0] ?? '';
             const lastName = words.length > 1 ? words[words.length - 1] : '';
-            const ownerLine = [isOnRoster ? 'YOUR ROSTER' : null, statusInfo?.label?.toUpperCase() ?? null, player.starter ? 'STARTER' : null]
+            const ownerLine = [isOnRoster ? 'YOUR ROSTER' : null, player.starter ? 'STARTER' : null]
               .filter(Boolean)
               .join(' · ');
             const own = [
@@ -898,6 +891,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
               />
             );
           })()}
+
+          <PlayerAvailabilityBadge availability={indexEntry?.availability ?? player.availability} />
 
           {/* THE ACTION BAR (2026-09-05, artboard 1a · player card):
               TRADE · DROP · watch · share, under the vitals. DROP only when

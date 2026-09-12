@@ -1,3 +1,4 @@
+import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { scopedEarnedPoints } from '@/utils/matchupEarnedStats';
 import { memo } from "react";
 import { MatchupPlayer } from "./types";
@@ -312,16 +313,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               {displayName}
             </div>
             <>
-              {/* IR Badge - Display if roster_status is not ACT */}
-              {(player.roster_status && player.roster_status !== 'ACT') || player.is_ir_eligible ? (
-                <Badge
-                  variant="destructive"
-                  className="ml-1 text-[10px] leading-tight px-1 py-0"
-                  title={`Roster Status: ${player.roster_status || 'IR'}`}
-                >
-                  IR
-                </Badge>
-              ) : null}
+              <PlayerAvailabilityBadge availability={player.availability} className="ml-1" />
               {/* Dropped Badge - Display if player was dropped but points still count */}
               {player.wasDropped ? (
                 <Badge

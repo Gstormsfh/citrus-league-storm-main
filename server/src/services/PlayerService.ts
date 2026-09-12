@@ -1,5 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, getCurrentSeason, getMetricsSeason, parseEligiblePositions, type EligiblePositionsRaw } from '@citrus/shared';
+import { COLUMNS, getCurrentSeason, getMetricsSeason, getProjectionsSeason, resolvePlayerAvailability, type PlayerAvailability, parseEligiblePositions, type EligiblePositionsRaw } from '@citrus/shared';
+import { CanonicalProjectionService } from './CanonicalProjectionService';
 import { readAllPaged } from '../lib/pagedRead';
 
 /**
@@ -56,6 +57,8 @@ interface TalentMetricsRow {
   xg_per_60: number | null;
   xg_rating: string | null;
   roster_status: string | null;
+  roster_status_source: string | null;
+  roster_status_updated_at: string | null;
   is_ir_eligible: boolean | null;
 }
 
@@ -71,6 +74,7 @@ interface GoalieGsaxRow {
 }
 
 interface NormalizedPlayer {
+  availability?: PlayerAvailability;
   stats_season: number | null;
   id: number;
   full_name: string;
@@ -81,6 +85,8 @@ interface NormalizedPlayer {
   is_goalie: boolean;
   status: string;
   roster_status: string | null;
+  roster_status_source: string | null;
+  roster_status_updated_at: string | null;
   is_ir_eligible: boolean;
   eligible_positions: string[];
   games_played: number;
@@ -184,6 +190,8 @@ function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talen
     is_goalie: isGoalie,
     status: rosterStatus === 'IR' || rosterStatus === 'LTIR' ? 'injured' : 'active',
     roster_status: rosterStatus,
+    roster_status_source: talent.roster_status_source ?? null,
+    roster_status_updated_at: talent.roster_status_updated_at ?? null,
     is_ir_eligible: talent?.is_ir_eligible || false,
     eligible_positions: parseEligiblePositions(p.eligible_positions, p.position_code),
     games_played: gamesPlayed,
@@ -227,19 +235,36 @@ export class PlayerService {
   async getAllPlayers(): Promise<{ players: NormalizedPlayer[]; error: unknown }> {
     // Check cache
     if (playersCache && Date.now() - playersCache.timestamp < CACHE_TTL) {
-      return { players: playersCache.data, error: null };
+      return { players: await this.withAvailability(playersCache.data), error: null };
     }
 
     // A load is already running — join it rather than starting a second.
     // See the `playersInFlight` note above.
-    if (playersInFlight) return playersInFlight;
+    if (playersInFlight) {
+      const result = await playersInFlight;
+      return { ...result, players: await this.withAvailability(result.players) };
+    }
 
     playersInFlight = this.loadAllPlayers();
     try {
-      return await playersInFlight;
+      const result = await playersInFlight;
+      return { ...result, players: await this.withAvailability(result.players) };
     } finally {
       playersInFlight = null;
     }
+  }
+
+  /** Refresh publication evidence outside the ordinary stats cache. No eligibility mutation. */
+  private async withAvailability(players: NormalizedPlayer[]): Promise<NormalizedPlayer[]> {
+    let contexts;
+    try {
+      contexts = await new CanonicalProjectionService(this.supabase).getPublishedContexts(getProjectionsSeason());
+    } catch {
+      // Unavailable publication is unknown; independently dated reported facts may still apply.
+    }
+    return players.map(player => ({ ...player, availability: resolvePlayerAvailability({
+      ...player, canonical_context: contexts?.get(String(player.id)) ?? null,
+    }) }));
   }
 
   /** The uncached read+merge behind `getAllPlayers`. */
@@ -399,7 +424,7 @@ export class PlayerService {
       return buildPlayer(p, stat, talent, goalieGsax, getMetricsSeason());
     });
 
-    return { players, error: null };
+    return { players: await this.withAvailability(players), error: null };
   }
 
   /** Search players by name */

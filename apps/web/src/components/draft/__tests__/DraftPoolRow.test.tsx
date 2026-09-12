@@ -250,14 +250,15 @@ describe('DraftPoolRow — identity', () => {
     expect(screen.getByLabelText('Connor McDavid')).toBeInTheDocument();
   });
 
-  it('carries the availability chip when a player is not active', () => {
+  it('does not infer current injury from an undated IR field', () => {
     render(<DraftPoolRow {...base} player={mkPlayer({ status: 'IR' })} />);
-    expect(screen.getByTestId('draft-pool-status-chip').textContent).toBe('IR');
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
+    expect(screen.queryByText('IR')).toBeNull();
   });
 
-  it('shows no chip for an active player', () => {
+  it('does not infer health from an undated active field', () => {
     render(<DraftPoolRow {...base} player={mkPlayer({ status: 'ACT' })} />);
-    expect(screen.queryByTestId('draft-pool-status-chip')).toBeNull();
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
   });
 });
 

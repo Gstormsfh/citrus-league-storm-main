@@ -68,6 +68,45 @@ class CanonicalReviewTests(unittest.TestCase):
         result = apply_patch(self.doc, self.patch({'exposure': {'used': 0}}))
         self.assertEqual(result['players'][0]['counts']['saves'], 0)
 
+    def test_reviewed_report_keeps_unknown_return_and_numerical_contract(self):
+        availability = self.reviewed_report()
+        result = apply_patch(self.doc, self.patch({'availability': availability}))
+        for field in ('rates', 'counts', 'exposure'):
+            self.assertEqual(result['players'][0][field], self.doc['players'][0][field])
+        self.assertEqual(result['players'][0]['availability']['status'], 'suspended')
+        self.assertIsNone(result['players'][0]['availability']['return_window'])
+        validate(result)
+
+    @staticmethod
+    def reviewed_report():
+        return {'status': 'suspended', 'authority': 'reviewed_report', 'as_of': '2026-09-10',
+                'review_after': '2026-09-17', 'reason': 'Dated explicit suspension report',
+                'return_window': None, 'source': {'url': 'https://www.nhl.com/example',
+                'source_date': '2026-09-10', 'reviewed_at': '2026-09-12'}}
+
+    def test_reviewed_report_rejects_missing_or_inconsistent_provenance(self):
+        changes = [('review_after', None), ('review_after', 'tomorrow'),
+                   ('review_after', '2026-09-10'), ('as_of', '2026-09-11'), ('reason', ''),
+                   ('source', {}), ('source.url', 'file:///tmp/report'),
+                   ('source.url', 'https://user:secret@example.com/report'),
+                   ('source.source_date', 'invalid'), ('source.reviewed_at', '2026-09-09')]
+        for key, value in changes:
+            availability = self.reviewed_report()
+            if key.startswith('source.'):
+                availability['source'][key.split('.')[1]] = value
+            else:
+                availability[key] = value
+            with self.subTest(key=key, value=value), self.assertRaises(ContractError):
+                apply_patch(self.doc, self.patch({'availability': availability}))
+
+    def test_reviewed_status_vocabulary_does_not_collapse_designations(self):
+        for status in ('active', 'healthy', 'injured', 'out', 'ir', 'ltir', 'day_to_day', 'suspended', 'unknown'):
+            availability = self.reviewed_report()
+            availability['status'] = status
+            with self.subTest(status=status):
+                result = apply_patch(self.doc, self.patch({'availability': availability}))
+                self.assertEqual(result['players'][0]['availability']['status'], status)
+
     def test_invalid_edits_rejected(self):
         for changes in [{'player_id': '2'}, {'counts': {'saves': 10}}, {'rates': {'saves': float('nan')}},
                         {'rates': {'saves': -1}}, {'exposure': {'used': 85}}, {'exposure': {'unit': 'games'}},

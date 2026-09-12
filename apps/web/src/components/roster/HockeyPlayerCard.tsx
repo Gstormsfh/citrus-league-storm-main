@@ -1,8 +1,10 @@
+import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
+import type { PlayerAvailability } from '@citrus/shared';
 import { formatRosCount, type RosterRosStats } from './rosStats';
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Shield, CalendarDays, Skull, Lock } from "lucide-react";
+import { Shield, CalendarDays, Lock } from "lucide-react";
 import { useState, memo } from "react";
 
 import { CitrusPuckPlayerData, AggregatedPlayerData } from "@/types/citruspuck";
@@ -51,7 +53,8 @@ export interface HockeyPlayer {
   team: string;
   teamAbbreviation?: string; // e.g., "EDM", "COL"
   status?: 'IR' | 'SUSP' | 'GTD' | 'WVR' | null; // Injury Reserve, Suspended, Game Time Decision, Waiver
-  roster_status?: string; // Official NHL roster status: ACT, IR, LTIR, etc.
+  availability?: PlayerAvailability;
+  roster_status?: string; // Legacy reported roster code; display evidence and IR eligibility are separate.
   is_ir_eligible?: boolean; // True if player is on IR or LTIR and can be placed in IR slot
   height?: string;
   weight?: string;
@@ -241,37 +244,6 @@ const HockeyPlayerCardContent = ({
     return words[words.length - 1].substring(0, 3).toUpperCase();
   };
 
-  const getStatusBadge = () => {
-    if (!player.status) return null;
-    
-    const statusConfig = {
-      'IR': { label: 'IR', variant: 'destructive' as const, color: 'bg-red-500', icon: Skull },
-      'SUSP': { label: 'SUSP', variant: 'destructive' as const, color: 'bg-orange-500', icon: AlertCircle },
-      'GTD': { label: 'GTD', variant: 'secondary' as const, color: 'bg-yellow-500', icon: AlertCircle },
-      'WVR': { label: 'WVR', variant: 'outline' as const, color: 'bg-blue-500', icon: null },
-    };
-
-    const config = statusConfig[player.status];
-    if (!config) return null;
-
-    const Icon = config.icon;
-
-    // Inline, next to the name — NOT absolutely positioned. This card now
-    // carries two other corner badges (position top-right, and the
-    // headshot itself grew to 44px) — a third floating badge has nowhere
-    // left to sit without covering one of them. Matches MobileRosterList's
-    // already-shipped pattern (status badge inline on the name row).
-    return (
-      <Badge
-        variant={config.variant}
-        className={cn("text-[7px] font-bold h-4 px-1 gap-0.5 flex items-center flex-shrink-0", config.color, "text-white")}
-      >
-        {Icon && <Icon className="w-2 h-2" />}
-        {config.label}
-      </Badge>
-    );
-  };
-
   const getDisplayStats = () => {
     const view = player.statView || 'seasonToDate';
     const cp = player.citrusPuckData;
@@ -378,10 +350,9 @@ const HockeyPlayerCardContent = ({
   // wired the new prop yet still behaves like before.
   const handleCardTap = onSwapTap ?? onClick;
 
-  // Resolved once so the meta row can decide what it has room for: with an
-  // IR/GTD/SUSP/WVR badge alongside it, the jersey number is dropped rather
-  // than truncated mid-string into a dangling "COL • ".
-  const statusBadge = getStatusBadge();
+  // Current availability occupies the meta row, leaving the name its full
+  // width. Unknown is explicit and cannot imply health or recovery.
+  const statusBadge = <PlayerAvailabilityBadge availability={player.availability} />;
 
   return (
     <Card
@@ -464,7 +435,7 @@ const HockeyPlayerCardContent = ({
           </h3>
           <div className="flex items-center gap-1.5 min-w-0 mt-1">
             <span className="text-[9px] text-pastel-sage font-display font-bold uppercase tracking-wide min-w-0 truncate">
-              {statusBadge ? teamAbbr : `${teamAbbr} • #${player.number}`}
+              {teamAbbr}
             </span>
             {statusBadge}
           </div>

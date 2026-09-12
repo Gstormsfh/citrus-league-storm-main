@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getMetricsSeason, getProjectionsSeason, logger, projectedGoalsAgainst, projectionFor, projectionSettings, ScoringCalculator } from '@citrus/shared';
+import { type PlayerAvailability, getMetricsSeason, getProjectionsSeason, logger, projectedGoalsAgainst, projectionFor, projectionSettings, ScoringCalculator } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
 import { mirrorRulesIntoSettings } from '../lib/scoringMirror';
 import { AppError } from '../lib/errors';
@@ -124,6 +124,7 @@ export interface DraftKitCard {
   jersey: number | null;
   headshotUrl: string | null;
   rosterStatus: string | null;
+  availability?: PlayerAvailability;
   /** Games played in the season the impact metrics describe. Drives low-sample styling. */
   sampleGames: number;
   /** Rank within cohort on projected fantasy points. 1 = highest. */
@@ -475,6 +476,7 @@ export class DraftKitService {
           jersey: e.jersey,
           headshotUrl: e.headshot_url,
           rosterStatus: e.roster_status,
+          availability: e.availability,
           sampleGames: e.gp,
           cohortRank: rankById.get(e.id) ?? null,
           tier: tierById.get(e.id) ?? null,

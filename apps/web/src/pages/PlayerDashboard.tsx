@@ -1,3 +1,4 @@
+import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { sourceSeasonLabel } from '@/utils/sourceSeasonContext';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -789,6 +790,7 @@ export default function PlayerDashboard() {
       </div>
 
       <section aria-label="Player overview" className="relative px-4 sm:px-6">
+        <PlayerAvailabilityBadge availability={indexEntry?.availability} className="mb-2" />
         {showRink ? (
           <>
             <RinkHeatmap

@@ -415,7 +415,7 @@ describe('MatchupService', () => {
         { player_id: 3, projected_plus_minus: 0 },
       ];
       const chain = createChain({ data: projections, error: null });
-      mockSupabase.from = vi.fn(() => chain);
+      mockSupabase.from = vi.fn((table) => table === 'canonical_published_runs' ? createChain() : chain);
 
       const result = await service.getDailyProjections([1, 2, 3], '2026-01-15');
 
@@ -424,7 +424,33 @@ describe('MatchupService', () => {
       expect(mockSupabase.from).toHaveBeenCalledWith('player_projected_stats');
       expect(chain.select.mock.calls[0][0].split(',')).toContain('projected_plus_minus');
       expect(chain.eq).toHaveBeenCalledWith('projection_date', '2026-01-15');
+      expect(chain.eq).toHaveBeenCalledWith('season', 2025);
       expect(chain.in).toHaveBeenCalledWith('player_id', [1, 2, 3]);
+    });
+
+    it.each([
+      ['2026-01-15', 2025], ['2026-09-27', 2026], ['2026-09-28', 2026], ['2026-10-15', 2026],
+    ])('scopes both pointer and rows to projection season for %s', async (date, season) => {
+      const pointers: any[] = [];
+      const chain = createChain({ data: [], error: null });
+      mockSupabase.from = vi.fn((table) => {
+        if (table !== 'canonical_published_runs') return chain;
+        const pointer = createChain(); pointers.push(pointer); return pointer;
+      });
+      const result = await service.getDailyProjections([1], date);
+      expect(result.error).toBeNull(); expect(chain.eq).toHaveBeenCalledWith('season', season);
+      expect(pointers).toHaveLength(2);
+      for (const pointer of pointers) expect(pointer.eq).toHaveBeenCalledWith('season', season);
+    });
+
+    it('returns unavailable for active rows with missing stamps after one retry', async () => {
+      const pointer = { season: 2026, run_id: 'active-run', revision: 'active-revision' };
+      mockSupabase.from = vi.fn((table) => createChain({
+        data: table === 'canonical_published_runs' ? pointer : [{ player_id: 1, season: 2026 }], error: null,
+      }));
+      const result = await service.getDailyProjections([1], '2026-09-29');
+      expect(result.projMap.size).toBe(0); expect(result.error).toBeInstanceOf(Error);
+      expect(mockSupabase.from.mock.calls.filter(([table]: [string]) => table === 'canonical_published_runs')).toHaveLength(4);
     });
 
     it('returns empty map when no projections', async () => {
@@ -449,7 +475,7 @@ describe('MatchupService', () => {
         projected_wins: 0.014047662392828968, projected_shutouts: 0.0004438549495895209,
         projected_goals_against: 0.049694936412577044,
       };
-      mockSupabase.from = vi.fn(() => createChain({ data: [row], error: null }));
+      mockSupabase.from = vi.fn((table) => table === 'canonical_published_runs' ? createChain() : createChain({ data: [row], error: null }));
       const result = await service.getDailyProjections([8482193], '2026-09-29');
       expect(result.projMap.get(8482193)).toEqual({
         ...row, projection_basis: 'unconditional', expected_starts: 2 / 84,

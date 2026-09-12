@@ -1163,7 +1163,8 @@ const Matchup = () => {
       },
       team: p.team,
       teamAbbreviation: p.team,
-      status: null, // Game status not applicable here - use roster_status for IR/SUSP/GTD
+      availability: p.availability,
+      status: null, // Game status is separate from current availability
       // Mugshot: the row's own `image` (typed on MatchupPlayer since audit
       // M4 — every producer sets it); otherwise build the NHL CDN "latest"
       // mug from the player id. PlayerStatsModal has an onError fallback

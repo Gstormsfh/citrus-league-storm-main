@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { CanonicalProjectionService, clearCanonicalProjectionCache } from '../services/CanonicalProjectionService';
 import { PlayerService } from '../services/PlayerService';
 import { createChain, createMockSupabase } from './helpers';
 import { getMetricsSeason } from '@citrus/shared';
@@ -9,9 +10,12 @@ describe('PlayerService', () => {
 
   beforeEach(() => {
     PlayerService.clearCache();
+    clearCanonicalProjectionCache();
     mockSupabase = createMockSupabase();
     service = new PlayerService(mockSupabase);
   });
+
+  afterEach(() => vi.restoreAllMocks());
 
   describe('getAllPlayers', () => {
     it('fetches and merges player data from multiple tables', async () => {
@@ -138,14 +142,41 @@ describe('PlayerService', () => {
       expect(players[0].games_played).toBe(0);
     });
 
+    it('refreshes published availability across stats-cache hits without changing eligibility or counts', async () => {
+      mockSupabase.from = vi.fn((table: string) => createChain({ data: table === 'player_directory'
+        ? [{ player_id: 8477942, full_name: 'Kevin Fiala', position_code: 'LW', team_abbrev: 'LAK' }]
+        : table === 'player_talent_metrics' ? [{ player_id: 8477942, roster_status: null, is_ir_eligible: false }] : [], error: null }));
+      const asOf = new Date(Date.now() - 1000).toISOString();
+      const context = (authority: string, revision: string) => new Map([['8477942', { revision, availability: {
+        status: 'out', authority, as_of: asOf, review_after: new Date(Date.now() + 86400000).toISOString(),
+      } } as any]]);
+      const published = vi.spyOn(CanonicalProjectionService.prototype, 'getPublishedContexts')
+        .mockResolvedValueOnce(context('imported_scenario', 'before'))
+        .mockResolvedValueOnce(context('reviewed_report', 'after'))
+        .mockRejectedValueOnce(new Error('publication unavailable'));
+      const before = (await service.getAllPlayers()).players[0];
+      const after = (await service.getAllPlayers()).players[0];
+      const unavailable = (await service.getAllPlayers()).players[0];
+      expect(before.availability?.status).toBe('unknown');
+      expect(after.availability).toMatchObject({ status: 'out', revision: 'after' });
+      expect(unavailable.availability?.status).toBe('unknown');
+      expect(published).toHaveBeenCalledTimes(3);
+      const { availability: _before, ...baseBefore } = before;
+      const { availability: _after, ...baseAfter } = after;
+      expect(baseAfter).toEqual(baseBefore);
+      expect(after.is_ir_eligible).toBe(false);
+      expect(after.roster_status).toBeNull();
+      expect(mockSupabase.from.mock.calls.filter(([table]: [string]) => table === 'player_directory')).toHaveLength(1);
+    });
+
     it('returns cached data on second call', async () => {
       mockSupabase.from = vi.fn(() => createChain({ data: [], error: null }));
 
       await service.getAllPlayers();
-      const callCount1 = mockSupabase.from.mock.calls.length;
+      const callCount1 = mockSupabase.from.mock.calls.filter(([table]: [string]) => table !== 'canonical_published_runs').length;
 
       await service.getAllPlayers();
-      const callCount2 = mockSupabase.from.mock.calls.length;
+      const callCount2 = mockSupabase.from.mock.calls.filter(([table]: [string]) => table !== 'canonical_published_runs').length;
 
       expect(callCount2).toBe(callCount1);
     });
@@ -240,7 +271,7 @@ describe('PlayerService', () => {
 
       // One load, not fifty.
       expect(slowDirectory.range).toHaveBeenCalledTimes(1);
-      expect(mockSupabase.from).toHaveBeenCalledTimes(4); // directory + stats + talent + gsax
+      expect(mockSupabase.from.mock.calls.filter(([table]: [string]) => table !== 'canonical_published_runs')).toHaveLength(4); // directory + stats + talent + gsax
       // And every caller got the same answer.
       for (const r of results) {
         expect(r.error).toBeFalsy();

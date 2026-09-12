@@ -1,10 +1,10 @@
+import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { cn } from '@/lib/utils';
 import { Star } from 'lucide-react';
 import { Mug } from '@/components/roster/Mug';
 import { mugFromDirectory } from '@/components/roster/headshot';
 import { positionChipKey } from '@/components/roster/positionChip';
 import type { PositionType } from '@/utils/rosterUtils';
-import { statusChipFor } from '@/components/player/statusChip';
 import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { getTeamColor } from '@/utils/teamColors';
 import type { PoolHeadline } from './draftPoolHeadline';
@@ -135,7 +135,7 @@ export function DraftPoolRow({
   onShowCard,
 }: DraftPoolRowProps) {
   const posKey = positionChipKey(player.position, positionType);
-  const status = statusChipFor(player.status);
+
   const fallbackHeadline = projection ? projection.total : seasonFpts;
   const headline = headlineOverride ? headlineOverride.value : fallbackHeadline;
   const headlineDecimals = headlineOverride ? headlineOverride.decimals : 1;
@@ -233,20 +233,7 @@ export function DraftPoolRow({
                 </span>
               </>
             )}
-            {status && (
-              <>
-                {' '}
-                <span
-                  data-testid="draft-pool-status-chip"
-                  className={cn(
-                    'font-plex font-bold text-[9px] px-1 py-px rounded-[3px] whitespace-nowrap align-[1px]',
-                    'bg-pressbox-grapefruit/[0.18] text-pressbox-grapefruit-text',
-                  )}
-                >
-                  {status.label}
-                </span>
-              </>
-            )}
+            <PlayerAvailabilityBadge availability={player.availability} />
           </span>
           <span className="block mt-[3px] font-plex font-medium text-[10px] text-pressbox-text/55 truncate">
             {posKey && (

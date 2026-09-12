@@ -1,3 +1,4 @@
+import type { PlayerAvailability } from '@citrus/shared';
 /**
  * FREE-AGENT LIST -> PRESS BOX PLAYERS ROW (2026-09-04).
  *
@@ -39,6 +40,7 @@ export interface FreeAgentLike {
   team: string;
   headshot_url?: string | null;
   status?: string | null;
+  availability?: PlayerAvailability;
   is_on_waivers?: boolean;
   waiver_clears_at?: string | null;
 }
@@ -73,6 +75,7 @@ export function toPlayerRow(
     // opposite of what a status chip is for. That helper returns null for
     // ACTIVE and ACT and the real code otherwise; the legacy row used it and
     // so does this one.
+    availability: p.availability,
     status: statusChipFor(p.status) ? String(p.status).toUpperCase() : null,
     rosteredPct: opts.rosteredPct ?? null,
     startedPct: opts.startedPct ?? null,

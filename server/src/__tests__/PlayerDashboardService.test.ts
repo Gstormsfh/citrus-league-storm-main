@@ -2,7 +2,7 @@
 // section index (2026-08-18). Mirrors the PlayerService test pattern:
 // mock the Supabase chain per-table, assert the merged wire shape.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   PlayerDashboardService,
   clearDashboardIndexCache,
@@ -13,6 +13,7 @@ import {
   MIN_DASHBOARD_SEASON,
   SHOT_CAP,
 } from '../services/PlayerDashboardService';
+import { CanonicalProjectionService } from '../services/CanonicalProjectionService';
 import { createChain, createMockSupabase } from './helpers';
 import { getMetricsSeason, getProjectionsSeason } from '@citrus/shared';
 
@@ -168,6 +169,23 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     clearDashboardIndexCache();
     mockSupabase = createMockSupabase();
     service = new PlayerDashboardService(mockSupabase);
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('passes dated report availability through the dashboard without changing official status or forecasts', async () => {
+    mockTables(mockSupabase);
+    const asOf = new Date(Date.now() - 1000).toISOString();
+    const context = { run_id: 'run', revision: 'revision', status: 'projected', refresh: { at: null }, availability: {
+      status: 'suspended', authority: 'reviewed_report', as_of: asOf, review_after: new Date(Date.now() + 86400000).toISOString(),
+    } } as any;
+    vi.spyOn(CanonicalProjectionService.prototype, 'getPublishedContexts').mockResolvedValue(new Map([['8479318', context]]));
+    const { players } = await service.getDashboardIndex();
+    const row = players.find(p => p.id === 8479318)!;
+    expect(row.availability).toMatchObject({ status: 'suspended', basis: 'reviewed_report', revision: 'revision' });
+    expect(row.roster_status).toBe(TALENT.find(p => p.player_id === 8479318)?.roster_status ?? null);
+    expect(row.points).toBe(53);
+    expect(row.proj_gp).toBeNull(); // unmatched forecast stamps stay unavailable
   });
 
   it('merges all six tables into one entry per directory player', async () => {

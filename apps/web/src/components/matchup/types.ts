@@ -1,3 +1,4 @@
+import type { PlayerAvailability } from '@citrus/shared';
 // `import type` (2026-09-05): as a value import this pulled ScheduleService,
 // api/schedule, api/client and the Supabase client -- which throws at
 // module scope without VITE_SUPABASE_* -- into every matchup component's
@@ -147,7 +148,8 @@ export type MatchupPlayer = {
     dynamic_confidence?: number;
   };
   // IR Status fields from player_talent_metrics
-  roster_status?: string; // Official NHL roster status: ACT, IR, LTIR, etc.
+  availability?: PlayerAvailability;
+  roster_status?: string; // Legacy reported roster code; display evidence and IR eligibility are separate.
   is_ir_eligible?: boolean; // True if player is on IR or LTIR and can be placed in IR slot
   // Dropped player indicator
   wasDropped?: boolean; // True if player was dropped but points still count from when they were in the lineup

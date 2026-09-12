@@ -1,3 +1,5 @@
+import type { PlayerAvailability } from '@citrus/shared';
+import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
 import { Mug } from '@/components/roster/Mug';
@@ -17,7 +19,6 @@ import {
   FA_ROW,
   FA_SUB,
   nextGameLine,
-  statusChipFor,
   waiverClearsLabel,
   type FreeAgentAction,
 } from './freeAgentRowKit';
@@ -35,6 +36,7 @@ export interface FreeAgentRowPlayer {
   team: string;
   headshot_url?: string | null;
   status?: string | null;
+  availability?: PlayerAvailability;
   is_on_waivers?: boolean;
   waiver_clears_at?: string | null;
 }
@@ -108,7 +110,7 @@ export function FreeAgentRow({
   onAction,
 }: FreeAgentRowProps) {
   const game = nextGameLine(games, player.team, todayStr);
-  const status = statusChipFor(player.status);
+
   const posKey = positionChipKey(player.position, positionType);
   const clears = action === 'claim' ? waiverClearsLabel(player.waiver_clears_at) : null;
 
@@ -150,22 +152,7 @@ export function FreeAgentRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className={FA_NAME}>{player.full_name}</span>
-            {status && (
-              <span
-                data-testid="fa-status-chip"
-                /* 8px -> the scale's MICRO rung (2026-09-02). This module's
-                   own note above says a saturated chip at 8px next to a 15px
-                   name reads as a smudge; the tint fixed the weight, 10px
-                   fixes the size. */
-                className={cn(
-                  ROW_MICRO,
-                  'leading-none font-bold px-1 py-px rounded-sm whitespace-nowrap flex-shrink-0',
-                  status.cls,
-                )}
-              >
-                {status.label}
-              </span>
-            )}
+            <PlayerAvailabilityBadge availability={player.availability} />
           </div>
 
           <div className={cn(ROW_META, 'flex items-center gap-1.5 mt-1 overflow-hidden')}>

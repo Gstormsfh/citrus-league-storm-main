@@ -1,3 +1,4 @@
+import type { PlayerAvailability } from '@citrus/shared';
 import { getHeadshotUrl } from "@/utils/seasonConstants";
 import { logger } from '@/utils/logger';
 import { playerApi } from '@/api/players';
@@ -25,6 +26,9 @@ function normalizePosition(p: string): string {
 }
 
 export interface Player {
+  availability?: PlayerAvailability;
+  roster_status_source?: string | null;
+  roster_status_updated_at?: string | null;
   stats_season?: number | null;
   id: string; // Using string ID to be consistent with app usage, but will store NHL ID
   full_name: string;
@@ -33,7 +37,7 @@ export interface Player {
   team: string;
   jersey_number: string | null;
   status: string | null;
-  roster_status?: string; // Official NHL roster status: ACT, IR, LTIR, etc.
+  roster_status?: string; // Legacy reported roster code; display evidence and IR eligibility are separate.
   is_ir_eligible?: boolean; // True if player is on IR or LTIR and can be placed in IR slot
   headshot_url: string | null;
   last_updated: string | null;
@@ -76,6 +80,9 @@ export interface Player {
 
 /** Shape returned by the API server's NormalizedPlayer */
 interface ServerPlayer {
+  availability?: PlayerAvailability;
+  roster_status_source?: string | null;
+  roster_status_updated_at?: string | null;
   stats_season?: number | null;
   id: number;
   full_name: string;
@@ -133,6 +140,9 @@ function mapServerPlayer(sp: ServerPlayer): Player {
     eligible_positions: eligiblePositions,
     team: sp.team || '',
     jersey_number: sp.jersey_number != null ? String(sp.jersey_number) : null,
+    availability: sp.availability,
+    roster_status_source: sp.roster_status_source,
+    roster_status_updated_at: sp.roster_status_updated_at,
     status: sp.status,
     roster_status: sp.roster_status || undefined,
     is_ir_eligible: sp.is_ir_eligible || false,

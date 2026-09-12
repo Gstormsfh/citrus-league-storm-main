@@ -93,6 +93,7 @@ export function dashboardEntryToHockeyPlayer(p: DashboardIndexEntry): HockeyPlay
     teamAbbreviation: p.team,
     image: p.headshot_url ?? undefined,
     status: p.roster_status && ['IR', 'LTIR'].includes(p.roster_status) ? 'IR' : null,
+    availability: p.availability,
     roster_status: p.roster_status ?? undefined,
     stats: p.is_goalie
       ? {

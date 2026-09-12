@@ -65,3 +65,12 @@ describe('V2 shared dashboard preload', () => {
       goalsSavedAboveExpected: 12 });
   });
 });
+
+  it('passes dated evidence independently of stored fantasy eligibility and actual stats', () => {
+    const availability = { status: 'out', basis: 'reviewed_report', as_of: '2026-09-10', expires_at: '2026-09-17', source: 'Primary report', revision: 'r1', stale: false } as const;
+    const baseline = dashboardEntryToPreloadedPlayer(entry({ roster_status: null }));
+    const current = dashboardEntryToPreloadedPlayer(entry({ roster_status: null, availability }));
+    expect(current.availability).toEqual(availability);
+    expect(current.is_ir_eligible).toBe(false);
+    expect({ ...current, availability: undefined }).toEqual(baseline);
+  });

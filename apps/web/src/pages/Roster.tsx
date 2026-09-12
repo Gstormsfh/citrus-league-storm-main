@@ -689,6 +689,7 @@ const Roster = () => {
           team: p.team,
           teamAbbreviation: p.team, // DB has 'EDM' etc
           status: p.status === 'injured' ? 'IR' : (p.status === 'active' ? null : 'WVR'),
+          availability: p.availability,
           roster_status: p.roster_status,
           is_ir_eligible: p.is_ir_eligible,
           image: p.headshot_url || undefined,
@@ -1168,6 +1169,7 @@ const Roster = () => {
               },
               team: p.team,
               teamAbbreviation: p.team,
+              availability: p.availability,
               status: (p.status === 'injured' ? 'IR' : null) as 'IR' | 'SUSP' | 'GTD' | 'WVR' | null,
               image: p.headshot_url || undefined,
               nextGame: undefined,
@@ -4446,6 +4448,7 @@ const Roster = () => {
                 },
                 team: p.team,
                 teamAbbreviation: p.team,
+                availability: p.availability,
                 status: (p.status === 'injured' ? 'IR' : null) as 'IR' | 'SUSP' | 'GTD' | 'WVR' | null,
                 image: p.headshot_url || undefined,
                 nextGame: undefined,

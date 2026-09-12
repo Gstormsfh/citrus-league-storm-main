@@ -1,3 +1,4 @@
+import type { PlayerAvailability } from '@citrus/shared';
 /**
  * Wire shapes for the Draft Kit section.
  *
@@ -36,6 +37,7 @@ export interface DraftKitCard {
   cohort: Cohort;
   jersey: number | null;
   headshotUrl: string | null;
+  availability?: PlayerAvailability;
   rosterStatus: string | null;
   sampleGames: number;
   cohortRank: number | null;
