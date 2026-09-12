@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { CitrusSparkle, CitrusLeaf } from '@/components/icons/CitrusIcons';
 import { toast } from '@/hooks/use-toast';
 import { logger } from '@/utils/logger';
+import { profileDisplayName } from '@citrus/shared';
 
 interface LeagueNotificationsProps {
   leagueId: string;
@@ -188,7 +189,9 @@ const LeagueNotificationsSession: React.FC<LeagueNotificationsProps> = ({ league
 
     setSendingMessage(true);
     try {
-      const senderName = profile?.username || profile?.default_team_name || null;
+      // 2026-09-11: this posted every message under `username`, which for
+      // anyone who has not finished ProfileSetup is the minted handle.
+      const senderName = profileDisplayName(profile, profile?.default_team_name || 'Manager');
 
       // Send chat message via API server
       await notificationApi.sendChatMessage(leagueId, chatMessage.trim(), senderName);

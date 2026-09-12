@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, SEASON_START_YEAR, getSeasonStartDate } from '@citrus/shared';
+import { COLUMNS, SEASON_START_YEAR, getSeasonStartDate, profileDisplayName } from '@citrus/shared';
 import { LeagueMembershipService } from './LeagueMembershipService';
 import { ScheduleService } from './ScheduleService';
 import { AppError } from '../lib/errors';
@@ -233,9 +233,13 @@ export class PoolService {
 
     const userIds = [...map.keys()];
     const { data: profiles } = userIds.length > 0
-      ? await this.supabase.from('profiles').select('id, username, first_name, last_name').in('id', userIds)
+      ? await this.supabase.from('profiles').select('id, display_name, username, first_name, last_name').in('id', userIds)
       : { data: [] };
-    const nameMap = new Map((profiles ?? []).map((p: { id: string; username: string | null; first_name: string | null; last_name: string | null }) => [p.id, p.username || [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Unknown']));
+    const nameMap = new Map(
+      (profiles ?? []).map((p: { id: string; display_name: string | null; username: string | null; first_name: string | null; last_name: string | null }) =>
+        [p.id, profileDisplayName(p, 'Unknown')] as const,
+      ),
+    );
 
     return [...map.entries()]
       .map(([uid, stats]) => ({
@@ -372,9 +376,13 @@ export class PoolService {
 
     const userIds = [...map.keys()];
     const { data: profiles } = userIds.length > 0
-      ? await this.supabase.from('profiles').select('id, username, first_name, last_name').in('id', userIds)
+      ? await this.supabase.from('profiles').select('id, display_name, username, first_name, last_name').in('id', userIds)
       : { data: [] };
-    const nameMap = new Map((profiles ?? []).map((p: { id: string; username: string | null; first_name: string | null; last_name: string | null }) => [p.id, p.username || [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Unknown']));
+    const nameMap = new Map(
+      (profiles ?? []).map((p: { id: string; display_name: string | null; username: string | null; first_name: string | null; last_name: string | null }) =>
+        [p.id, profileDisplayName(p, 'Unknown')] as const,
+      ),
+    );
 
     return [...map.entries()]
       .map(([uid, info]) => ({
@@ -563,9 +571,13 @@ export class PoolService {
 
     const userIds = [...map.keys()];
     const { data: profiles } = userIds.length > 0
-      ? await this.supabase.from('profiles').select('id, username, first_name, last_name').in('id', userIds)
+      ? await this.supabase.from('profiles').select('id, display_name, username, first_name, last_name').in('id', userIds)
       : { data: [] };
-    const nameMap = new Map((profiles ?? []).map((p: { id: string; username: string | null; first_name: string | null; last_name: string | null }) => [p.id, p.username || [p.first_name, p.last_name].filter(Boolean).join(' ') || 'Unknown']));
+    const nameMap = new Map(
+      (profiles ?? []).map((p: { id: string; display_name: string | null; username: string | null; first_name: string | null; last_name: string | null }) =>
+        [p.id, profileDisplayName(p, 'Unknown')] as const,
+      ),
+    );
 
     return [...map.entries()]
       .map(([uid, stats]) => ({

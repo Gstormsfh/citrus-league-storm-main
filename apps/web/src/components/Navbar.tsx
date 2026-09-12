@@ -26,6 +26,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useNotificationStore } from '@/stores/notificationStore';
 import LeagueNotifications from '@/components/matchup/LeagueNotifications';
+import { profileDisplayName } from '@citrus/shared';
 
 const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -86,7 +87,7 @@ const Navbar = () => {
     return location.pathname.startsWith(base);
   };
 
-  const displayName = profile?.display_name || profile?.username || user?.email?.split('@')[0] || 'User';
+  const displayName = profileDisplayName(profile, user?.email?.split('@')[0] || 'User');
   const userInitial = displayName.charAt(0).toUpperCase();
 
   // Navigation tabs — adapt based on league type (fantasy vs pool)

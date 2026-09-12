@@ -105,7 +105,10 @@ export const MATCHUP_LINES_COLUMNS_SLIM = 'id, matchup_id, player_id, team_id, t
 // ============================================================================
 // PROFILE COLUMNS
 // ============================================================================
-export const PROFILE_COLUMNS = 'id, username, first_name, last_name, phone, location, bio, default_team_name, timezone, created_at, updated_at';
+// display_name joined the list on 2026-09-11: it is the name a manager
+// chose and every surface is supposed to show, and a column list that
+// omitted it guaranteed the surfaces reading it fell back to the handle.
+export const PROFILE_COLUMNS = 'id, display_name, username, first_name, last_name, phone, location, bio, default_team_name, timezone, created_at, updated_at';
 
 // ============================================================================
 // DRAFT ORDER COLUMNS
