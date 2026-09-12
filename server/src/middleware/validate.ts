@@ -378,6 +378,18 @@ export const schemas = {
     date: z.string().min(1, 'date is required'),
   }),
 
+  // Retained native clients may serialize roster NHL IDs as digit strings.
+  // Scope compatibility to the daily projection reader, not other mutations.
+  matchupDailyProjectionIds: z.object({
+    playerIds: z.array(z.union([
+      z.number(),
+      z.string().trim().regex(/^\d+$/).transform(Number),
+    ]).pipe(z.number().int().min(1).max(2147483647)))
+      .min(1, 'At least one playerId required')
+      .transform(ids => [...new Set(ids)]),
+    date: z.string().min(1, 'date is required'),
+  }),
+
   matchupPlayerIdsRange: z.object({
     playerIds: z.array(z.number().int()).min(1, 'At least one playerId required'),
     startDate: z.string().min(1, 'startDate is required'),
