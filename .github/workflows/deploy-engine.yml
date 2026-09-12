@@ -519,7 +519,9 @@ jobs:
       # before mutating so a room that opened (or a draft scheduled) while
       # the run waited still blocks the reset. Mirrors the preflight job;
       # the freeze call is the same RPC scripts/check_draft_freeze.ts uses
-      # (FREEZE_HOURS=24, LIVE_HOURS=6) and honours the same override.
+      # and must stay in step with its HARD_HOURS (4) and LIVE_HOURS (6).
+      # Only the hard window belongs here: this step can refuse a deploy, and
+      # the script's 4-24h band is a warning, which a gate cannot express.
       - name: Last look (re-check live drafts, freeze and daylight after approval)
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -545,7 +547,7 @@ jobs:
           else
             BLOCKERS="$(curl -sS --fail-with-body --max-time 20 "${AUTH[@]}" -X POST \
               -H "Content-Type: application/json" \
-              -d '{"p_upcoming_hours":24,"p_live_hours":6}' \
+              -d '{"p_upcoming_hours":4,"p_live_hours":6}' \
               "${SUPABASE_URL}/rest/v1/rpc/draft_freeze_blockers")"
             if [ "$(jq 'length' <<<"$BLOCKERS")" != "0" ]; then
               echo "::error::Change freeze became active while this run waited for approval: $(jq -r 'map(.league_id + " (" + .reason + ")") | join(", ")' <<<"$BLOCKERS"). Nothing was deployed."
