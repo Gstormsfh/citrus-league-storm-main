@@ -27,9 +27,8 @@
 // board behind a blur for a client to unmask.
 //
 // ── ART ──────────────────────────────────────────────────────────────
-// The only images on this page are NHL player headshots from
-// player_directory.headshot_url. The section hero has a marked placeholder
-// where the founder's cover art goes. Nothing here is generated.
+// Player images come from player_directory.headshot_url. The cover uses
+// Citrus's existing mark and typography, without external action photography.
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -62,7 +61,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
 
 export default function DraftKit() {
   const { activeLeagueId, isDemoLeague } = useLeague();
-  const { board, loading, error } = useDraftKitBoard(isDemoLeague(activeLeagueId) ? null : activeLeagueId);
+  const { board, loading, refreshing, error, reload } = useDraftKitBoard(isDemoLeague(activeLeagueId) ? null : activeLeagueId);
   const [params, setParams] = useSearchParams();
   const [cohort, setCohort] = useState<Cohort>('F');
   const [tab, setTab] = useState<Tab>('board');
@@ -74,13 +73,18 @@ export default function DraftKit() {
     [board, selectedId],
   );
 
+  useEffect(() => {
+    if (selected) setCohort(selected.cohort);
+  }, [selected]);
+
   // Default the selection to the top of the visible cohort so the card slot is
   // never an empty box on first paint.
   useEffect(() => {
     if (!board || selected) return;
     const first = board.cards
       .filter((c) => c.cohort === cohort && c.cohortRank != null)
-      .sort((a, b) => (a.cohortRank as number) - (b.cohortRank as number))[0];
+      .sort((a, b) => (a.cohortRank as number) - (b.cohortRank as number))[0]
+      ?? board.cards.find((c) => c.cohort === cohort);
     if (first) {
       setParams((prev) => {
         const next = new URLSearchParams(prev);
@@ -91,6 +95,7 @@ export default function DraftKit() {
   }, [board, cohort, selected, setParams]);
 
   function select(playerId: number) {
+    setTab('board');
     setParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set('player', String(playerId));
@@ -98,6 +103,18 @@ export default function DraftKit() {
     });
     const card = board?.cards.find((c) => c.playerId === playerId);
     if (card) setCohort(card.cohort);
+  }
+
+  function changeCohort(next: Cohort) {
+    setCohort(next);
+    const first = board?.cards.filter((c) => c.cohort === next)
+      .sort((a, b) => (a.cohortRank ?? Infinity) - (b.cohortRank ?? Infinity))[0];
+    if (first) select(first.playerId);
+    else setParams((prev) => {
+      const params = new URLSearchParams(prev);
+      params.delete('player');
+      return params;
+    });
   }
 
   const playerBlurbs = useMemo(
@@ -118,11 +135,6 @@ export default function DraftKit() {
       <div className="hidden lg:block"><Navbar /></div><div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]"><PressBoxAppHeader title="Draft kit" logoSrc="/favicon.svg" /></div>
 
       <main className="mx-auto w-full max-w-[1180px] px-4 pb-24 pt-24 sm:px-6 max-lg:pt-3 max-lg:px-3 pb-app-chrome">
-        {/* Hero.
-            ART PLACEHOLDER: the dashed panel below is where the founder's
-            Draft Kit cover art goes. It is deliberately left as a labelled
-            empty frame rather than filled with generated imagery. Drop a file
-            into apps/web/public/ and swap the panel for an <img>. */}
         <header className="mb-8">
           <p className="font-jbmono max-lg:font-plex text-[10px] font-bold uppercase tracking-[0.32em] text-pastel-orange-soft max-lg:text-pressbox-orange-soft">
             Draft Kit {seasonLabel}
@@ -133,20 +145,21 @@ export default function DraftKit() {
             <span className="text-pastel-orange max-lg:text-pressbox-orange">and the reasoning.</span>
           </h1>
           <p className="mt-4 max-w-xl text-[14px] leading-relaxed text-white/60 sm:text-[15px]">
-            Every skater and goalie, ranked and tiered, with percentiles taken inside position and
-            never across it. Each card names the database column behind every number on it.
+            Compare forwards, defence, and goalies with position-specific rankings and player
+            cards. Choose a league to score supported projections with your commissioner’s settings.
           </p>
 
-          <div
-            className="mt-6 flex aspect-[16/7] w-full items-center justify-center rounded-2xl max-lg:rounded-[12px] border border-dashed border-white/15 bg-white/[0.02]"
-            role="img"
-            aria-label="Draft Kit cover art placeholder"
-          >
-            <span className="px-4 text-center font-jbmono max-lg:font-plex text-[10px] uppercase tracking-[0.2em] text-white/25">
-              Cover art placeholder
-              <br />
-              founder-supplied
-            </span>
+          <div className="relative mt-6 overflow-hidden rounded-2xl border border-white/15 bg-[#10251c] p-6 sm:p-10">
+            <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-32 h-96 w-96 rounded-full border-[40px] border-pastel-orange/10" />
+            <div className="relative flex items-start justify-between gap-6">
+              <div>
+                <p className="font-jbmono text-[10px] font-bold uppercase tracking-[0.24em] text-pastel-orange-soft">Citrus Fantasy Hockey</p>
+                <p className="mt-4 font-barlow text-4xl font-black uppercase leading-none tracking-tight text-pastel-cream sm:text-6xl">Your draft.<br /><span className="text-pastel-orange">Your edge.</span></p>
+                <p className="mt-4 text-sm text-white/65">{seasonLabel ? `${seasonLabel} · ` : ''}Rankings · Player cards · Club moves</p>
+              </div>
+              <img src="/favicon.svg" alt="" className="h-14 w-14 shrink-0 sm:h-20 sm:w-20" />
+            </div>
+            <p className="relative mt-8 border-t border-white/15 pt-4 text-xs leading-relaxed text-white/60">Position-specific comparisons. League-specific points. Clear context behind the numbers.</p>
           </div>
         </header>
 
@@ -158,9 +171,10 @@ export default function DraftKit() {
         )}
 
         {!loading && error && (
-          <p className="rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile px-4 py-6 text-center text-[14px] text-white/60 ring-1 ring-white/10">
-            {error}
-          </p>
+          <div role="alert" className="mb-5 rounded-2xl max-lg:rounded-[12px] bg-pastel-surface-tile max-lg:bg-pressbox-tile px-4 py-6 text-center text-[14px] text-white/60 ring-1 ring-white/10">
+            <p>{error}</p>
+            <button type="button" onClick={() => void reload()} disabled={refreshing} className="mt-3 rounded-lg bg-pastel-orange px-4 py-2 font-bold text-[#581E00] disabled:opacity-50">{refreshing ? 'Refreshing…' : 'Try again'}</button>
+          </div>
         )}
 
         {!loading && board && (
@@ -209,7 +223,8 @@ export default function DraftKit() {
                       <button
                         key={c}
                         type="button"
-                        onClick={() => setCohort(c)}
+                        onClick={() => changeCohort(c)}
+                        aria-label={`${COHORT_LABEL[c]} ${board.cohortSizes[c]}`}
                         aria-pressed={cohort === c}
                         className={`h-8 shrink-0 rounded-lg px-3 font-jbmono max-lg:font-plex text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
                           cohort === c
@@ -237,6 +252,7 @@ export default function DraftKit() {
                   <div className="space-y-4">
                     {selected ? (
                       <DraftKitPlayerCard
+                        key={selected.playerId}
                         card={selected}
                         cohortSize={board.cohortSizes[selected.cohort]}
                         metricsSeason={board.metricsSeason}
@@ -253,6 +269,7 @@ export default function DraftKit() {
                         blurbs={playerBlurbs}
                         title={`On ${selected.name}`}
                         emptyLabel="No written note on this player yet."
+                        locked={board.tier !== 'suite'}
                       />
                     )}
                   </div>
