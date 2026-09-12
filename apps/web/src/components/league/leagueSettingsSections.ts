@@ -91,6 +91,10 @@ export type SettingField =
       inputType?: 'text' | 'datetime-local';
       maxLength?: number;
       onChange: (value: string) => void;
+      /** Added 2026-09-12: without this a text field could not be locked, so
+       *  the draft time stayed editable after the draft was complete while
+       *  every number field beside it greyed out. */
+      disabled?: boolean;
     };
 
 export interface SettingGroup {
@@ -447,6 +451,7 @@ export function buildLeagueSettingsSections(input: LeagueSettingsInput): Setting
             value: draft.scheduledDraftTime,
             inputType: 'datetime-local',
             onChange: (v) => setDraft((p) => ({ ...p, scheduledDraftTime: v })),
+            disabled: input.draftCompleted,
           },
         ],
       },

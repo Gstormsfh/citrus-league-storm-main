@@ -143,6 +143,7 @@ export function SettingFieldRows({
                 placeholder={f.placeholder}
                 inputType={f.inputType}
                 maxLength={f.maxLength}
+                disabled={f.disabled}
                 last={last}
               />
             );

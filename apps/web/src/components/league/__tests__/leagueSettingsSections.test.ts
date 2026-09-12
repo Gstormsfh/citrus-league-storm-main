@@ -110,7 +110,8 @@ describe('buildLeagueSettingsSections', () => {
   it('draft and roster slots lock once the draft is complete', () => {
     const done = base({ draftCompleted: true });
     expect(section(done, 'draft').saveable).toBe(false);
-    expect(fields(done, 'draft').every((f) => f.kind === 'number' && f.disabled)).toBe(true);
+    // Every field locks — including the draft time, which is a text kind.
+    expect(fields(done, 'draft').every((f) => (f as { disabled?: boolean }).disabled === true)).toBe(true);
     expect(section(done, 'rosterslots').saveable).toBe(false);
     expect(section(done, 'rosterslots').callout).toMatch(/locked/);
     expect(section(base(), 'draft').saveable).toBe(true);
