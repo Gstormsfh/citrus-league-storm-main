@@ -48,9 +48,9 @@ def test_finishing_denominator_matches_regular_season_goal_numerator():
     db = SourceDb({'player_season_stats': [
         {'player_id': 1, 'season': 2025, 'nhl_goals': 5}],
         'nhl_shots': [
-            *[{'shooter_id': 1, 'season': 2025, 'game_type': 'regular', 'xg_sql': .1} for _ in range(50)],
-            {'shooter_id': 1, 'season': 2025, 'game_type': 'playoff', 'xg_sql': 20},
-            {'shooter_id': 1, 'season': 2024, 'game_type': 'regular', 'xg_sql': 20},
+            *[{'game_id': 2025020001, 'event_id': i, 'shooter_id': 1, 'season': 2025, 'game_type': 'regular', 'xg_sql': .1} for i in range(50)],
+            {'game_id': 2025030111, 'event_id': 1, 'shooter_id': 1, 'season': 2025, 'game_type': 'playoff', 'xg_sql': 20},
+            {'game_id': 2024020001, 'event_id': 1, 'shooter_id': 1, 'season': 2024, 'game_type': 'regular', 'xg_sql': 20},
         ]})
     assert projections.calculate_finishing_talent(db, 1, 2025) == pytest.approx(1)
     projections._finishing_talent_cache.clear()

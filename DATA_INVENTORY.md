@@ -98,6 +98,455 @@ requires a verified source snapshot, staging proof, backup and rollback.
 
 ### 1.4 Versioned analytics foundation (local, unapplied)
 
+Recorded event-memory ablation (2026-09-06):
+Matched corrected movement is now complete: `docs/analytics-movement-result-20260906.md`;
+plan `docs/analytics-movement-candidate-plan-20260906.json`, runner
+`scripts/proof/run_movement_candidate.py` and its tests. Full coverage runner
+`scripts/proof/replay_movement_coverage.py`, sampled compatibility
+`scripts/proof/audit_movement_source_sample.py`, saved-vector review
+`scripts/proof/review_movement_vectors.py`, and independent point reviewer
+`scripts/proof/review_movement_candidate.mjs` retain create-only results under
+`movement-coverage-*`, `movement-source-audit-*`, `official-movement-*`,
+`movement-vector-review-*` and `movement-candidate-review-*`. Primary fails
+the both-fold gate; no deployment. Separate incident public-routing observations
+under `public-routing-20260906-incident` are not xG acceptance evidence.
+Full-input recovery checkpoint: `docs/analytics-input-recovery-checkpoint-20260906.md`.
+Finishing/shooter-talent preservation detail:
+`docs/analytics-finishing-talent-preservation-20260906.md`. The additive
+`data-pipeline/tests/test_legacy_finishing_uncertainty_diagnostics.py` isolates
+legacy multiplier/cap and uncertainty arithmetic without loading model artifacts.
+The final scoped receipt is `finishing-talent-preservation-20260906-final-tests.xml`
+under proof results. These diagnostics reproduce existing behavior and an
+uncertainty-centering mismatch; they do not accept a new talent model or change
+production. Shooting percentage, finishing relative to neutral xG, talent
+multipliers and downstream forecast uncertainty remain separate obligations.
+`scripts/proof/finishing_quantity_contract.py` is an additive offline structural
+contract with `test_finishing_quantity_contract.py`; it distinguishes SOG and xG
+exposure, observed ratios, count-rate multipliers and identity odds effects, and
+rejects mechanical double application. See
+`docs/analytics-finishing-quantity-contract-20260906.md` and the scoped
+`finishing-quantity-contract-20260906-tests.xml` receipt. This is not a fitted
+talent model, source-availability proof or production acceptance gate.
+Saved shooter-identity evidence replay:
+`scripts/proof/replay_shooter_evidence.py`, its dedicated tests, and
+`scripts/proof/results/shooter-evidence-replay-20260906-full/`. See
+`docs/analytics-shooter-evidence-replay-20260906.md`. This replays an older
+secondary model and reconciles observed-shot player totals; it is not a new
+talent fit, constant finishing multiplier, future-exposure forecast or promotion.
+Forward shooter/movement experiment declaration:
+`docs/analytics-forward-shooter-movement-plan-20260906.json` fixes a three-stage
+forward holdout using the frozen movement model, an earlier-only conditional
+map, then later shooter-effect fitting. The deterministic helper is
+`scripts/proof/forward_shooter_split.py` with its dedicated tests; the create-only
+runner is `scripts/proof/run_forward_shooter_movement.py`. All movement inputs
+remain intact. This is not pooled cross-fitting, an untouched final test,
+constant talent-multiplier estimation or production authorization.
+Execution history: `docs/analytics-forward-shooter-execution-20260906.md`.
+The first attempt stopped before fitting on a hash-domain implementation error;
+its runner and evidence remain intact. `run_forward_shooter_movement_v2.py`
+corrects raw-body versus adapted-envelope verification without changing the
+statistical plan, with author and genuine frozen-source regression tests.
+Completed fitted result: `docs/analytics-forward-shooter-result-20260906.md` and
+`scripts/proof/results/official-forward-shooter-movement-20260906-retry1/`.
+The shooter candidate failed its declared accuracy guard in both folds; it is
+not promoted. Neutral xG, finishing quantities and downstream gates remain
+distinct, with original inputs and evidence preserved.
+Next no-fit diagnostic specification:
+`docs/analytics-forward-shooter-decomposition-plan-20260906.md`. It separates
+map-pipeline, global-adjustment and shooter-increment losses on identical
+frozen-probability bands, calendar months and prior-SOG context, retaining
+sparse and unknown cells. This is loss accounting, not causal attribution,
+refitting or acceptance.
+Implementation: `scripts/proof/decompose_forward_shooter.py`, with author and
+independent Python tests. Independent point review:
+`scripts/proof/review_forward_shooter_decomposition.mjs` and its tests. The
+create-only run retains four-source identity checks and a fixed whole-game
+bootstrap; point review is not an independent bootstrap or fitted-model review.
+Completed diagnostic and independent review:
+`docs/analytics-forward-shooter-decomposition-result-20260906.md`, with outputs
+under `forward-shooter-decomposition-20260906-full` and
+`forward-shooter-decomposition-review-20260906-full`. Calibration-stage losses
+remain the next research priority; the fitted candidate remains rejected.
+Calibration stability study declaration:
+`docs/analytics-calibration-stability-plan-20260906.json`. It fixes calendar
+blocks within the original calibration periods, the saved initial map and
+earlier-only expanding-map updates. Raw movement inputs and model/settings are
+unchanged. Outer validation is not used for this study's fitting or scoring;
+integrity verification may access its bytes, and these historical cohorts are
+not newly blinded. No policy or model is accepted by declaration alone.
+Study implementation: `scripts/proof/run_calibration_stability.py`, author tests,
+and `scripts/proof/test_calibration_stability_review.py` (including a genuine
+frozen-source first-block replay). Independent results checker:
+`scripts/proof/review_calibration_stability.mjs` and its tests. Outputs use
+create-only `official-calibration-stability-*` directories; starting execution
+does not establish predictive improvement.
+Completed result: `docs/analytics-calibration-stability-result-20260906.md` and
+`official-calibration-stability-20260906-full`, independently checked by
+`calibration-stability-review-20260906-full`. Both aggregate point guards passed;
+log-loss intervals favor expanding history, Brier remains uncertain and monthly
+weaknesses persist. No production or downstream model acceptance.
+Bounded-memory calibration execution gate:
+`docs/analytics-bounded-calibration-execution-20260906.md`, with additive
+`scripts/proof/bounded_conditional_calibration.py`, author and independent
+review tests, and `scripts/proof/prove_bounded_conditional.py` with its tests.
+The frozen dense calibrator remains intact. Chunked evaluation preserves the
+statistical objective without dropping history or increasing its design-cell
+budget. Execution parity is not predictive improvement or model acceptance;
+extended fitting requires a separate declaration after this gate passes.
+Completed numerical proof: `docs/analytics-bounded-calibration-result-20260906.md`
+and `scripts/proof/results/bounded-conditional-proof-20260906-full/`.
+Saved-map replay and synthetic allocation stress passed; no real-cohort model
+was fitted. Regression receipt: `bounded-conditional-20260906-suite.xml`.
+Full-period calibration transfer declaration:
+`docs/analytics-calibration-transfer-plan-20260906.json`. It freezes the original
+movement raw model and full-calibration initial map, then updates only from
+strictly earlier dates for every original outer-validation calendar month.
+New runner `scripts/proof/run_calibration_transfer.py` and author/independent
+Python tests retain source, chronology, fit, inference and scorecard evidence.
+Independent point checker: `scripts/proof/review_calibration_transfer.mjs` and
+its tests. Create-only outputs use `official-calibration-transfer-*` directories.
+This is adaptive retrospective evaluation, not untouched or verified-as-of
+testing. A started run is not completion, improved accuracy or model acceptance.
+Completed fitted result: `docs/analytics-calibration-transfer-result-20260906.md`
+and `official-calibration-transfer-20260906-full`. Both declared point guards
+passed; aggregate fixed-fit intervals favor expanding calibration, while
+retrospective selection and historical availability limitations remain.
+No production, finishing or FPAR acceptance follows automatically.
+Independent completed review: `calibration-transfer-review-20260906-full`;
+full offline regression receipt: `calibration-transfer-20260906-suite.xml`.
+Prior-SOG source-fidelity diagnostic:
+`docs/analytics-prior-sog-fidelity-plan-20260906.md` declares an all-event,
+no-fit reconstruction of immediate raw predecessor state and residual accounting.
+`scripts/proof/prior_sog_fidelity.py` and author/independent tests separate known
+boundaries from missing owner facts and preserve the no-cutoff prior-SOG meaning.
+`scripts/proof/audit_prior_sog_fidelity.py` and its tests produce create-only
+`prior-sog-fidelity-*` evidence with fixed predictions; no model or serving change.
+Completed result: `docs/analytics-prior-sog-fidelity-result-20260906.md` and
+`prior-sog-fidelity-20260906-full`. All evaluated prior states match raw-source
+semantics; timing-era discontinuities and delayed-penalty contexts remain
+diagnostic leads, not established causes or accepted model corrections.
+Offline regression receipt: `prior-sog-fidelity-20260906-suite.xml`.
+
+`docs/analytics-timing-era-audit-plan-20260906.md` fixes the original eligible
+development-era population for a no-fit raw clock/composition audit.
+`scripts/proof/audit_timing_eras.py` and its author/independent tests retain signed
+coordinates, unknown actor comparisons, raw predecessor states, targets and source
+hashes. Create-only `timing-era-audit-*` results are descriptive evidence, not a
+new model or production correction. Later-era event bodies remain outside scope.
+Completed: `timing-era-audit-20260906-full` and independent
+`timing-era-review-20260906-full`; findings in
+`docs/analytics-timing-era-audit-result-20260906.md`. All original eligible rows
+reconcile; the timing/outcome discontinuity remains descriptive, not a proven
+source-system cause. Offline regression receipt: `timing-era-audit-20260906-suite.xml`.
+
+`docs/analytics-timing-candidate-plan-20260906.md` declares a single earlier-only
+monthly calibration extension: four ridge-shrunk timing offsets, retaining the
+original raw model, conditional slopes and all existing inputs. Experimental
+engine `scripts/proof/timing_conditional_calibration.py`, runner
+`scripts/proof/run_timing_candidate.py`, and author/independent tests are new
+contracts; frozen baselines remain unchanged. Create-only
+`official-timing-candidate-*` evidence is adaptive development, not model/FPAR
+acceptance. Original subgroup scorecards and separate timing scorecards are retained.
+Completed result: `official-timing-candidate-20260906-full`; independent review:
+`timing-candidate-review-20260906-full`. Both fold-level loss guards pass, with
+remaining subgroup bias and some earlier-period regressions explicitly retained
+in `docs/analytics-timing-candidate-result-20260906.md`. Offline regression:
+`timing-candidate-20260906-suite.xml`. This does not advance production or FPAR acceptance.
+Solo no-fit follow-up: `scripts/proof/audit_timing_shrinkage.py` and its focused
+tests; results `timing-shrinkage-audit-20260906-full`, documented in
+`docs/analytics-timing-shrinkage-result-20260906.md`. This separates saved
+training residuals consistent with ridge shrinkage from train/test differences;
+it neither retunes the candidate nor claims a causal explanation or new accuracy gain.
+Single-factor follow-up: `docs/analytics-timing-ridge10-plan-20260906.md`;
+new `timing_conditional_calibration_ridge10.py` and `run_timing_ridge10.py`
+under `scripts/proof`, with focused regression tests and a separate Node replay.
+Only extra timing ridge changes from 100 to 10. Create-only
+`official-timing-ridge10-*` results compare directly against the preserved
+ridge-100 candidate; they do not replace prior evidence or authorize publication.
+Completed: `official-timing-ridge10-20260906-full`, both fold loss guards pass;
+findings and remaining regressions: `docs/analytics-timing-ridge10-result-20260906.md`.
+Separate implementation replay: `timing-ridge10-review-20260906-full`.
+Regression receipt: `timing-ridge10-20260906-suite.xml`.
+Composed offline candidate: `data-pipeline/projections/xg_candidate_inference.py`;
+full-vector replay and 18 hash-pinned bundles in `composed-xg-replay-20260907-full`.
+All 241113 validation events preserve raw scores exactly and final calibrated
+scores within floating-point rounding. See `docs/analytics-composed-xg-replay-20260907.md`.
+This is retrospective inference parity, not production or FPAR acceptance.
+Player finishing bridge: `scripts/proof/compose_player_finishing.py`, tested by
+`test_compose_player_finishing.py`; completed source-bound event/player ledgers
+in `composed-player-finishing-20260907-full`. See
+`docs/analytics-composed-player-finishing-20260907.md`. These are eligible-event
+descriptive quantities, not official complete actuals, fitted talent, or forecasts.
+Exposure reconciliation: `scripts/proof/reconcile_finishing_exposure.py` and
+`test_reconcile_finishing_exposure.py`; result `finishing-exposure-reconciliation-20260907-full`
+enumerates captured events absent from the model, affected players and explicit
+exclusion reasons. See `docs/analytics-finishing-exposure-reconciliation-20260907.md`.
+Quarantined captures are not promoted to official actuals or model training.
+Development SOG review: `collect_development_sog_reports.py`,
+`collect_development_award_narratives.py`, `review_development_sog_reports.py`,
+and additive `review_development_sog_v2.py` under `scripts/proof`.
+The exact-snapshot statistical review supports 37 games / 38 non-shot credited
+goals; two games remain unresolved. All original source gates/cohorts are retained.
+The additive `scripts/proof/partition_reviewed_goal_credit.py` and its tests keep
+official goal credits distinct from shot-event conversions and require complete
+PL/raw goal, shot and miss actor/type/period/clock correspondence. The verified
+36-game sidecar is offline, not a feature export or model activation; see
+`docs/analytics-reviewed-goal-credit-partition-20260907.md` for the additional
+unidentified-report-shooter exclusion and remaining feature replay gates.
+The reviewed-source feature reconstruction and additive score-origin correction
+are documented in `docs/analytics-reviewed-feature-reconstruction-20260907.md`.
+Use its corrected v2 artifact, not the preserved first run with unknown score.
+This is offline feature evidence, not candidate inference or model acceptance.
+The subsequent frozen-bundle inference is recorded separately in
+`docs/analytics-recovered-xg-evaluation-20260907.md` and
+`scripts/proof/results/recovered-xg-evaluation-20260907-full`. All recovered
+feature rows were scored, with original/recovered/expanded metrics kept distinct;
+remaining bias prevents treating this as model acceptance or a release.
+The follow-up timing/strength/goalie-presence diagnostic is documented in
+`docs/analytics-expanded-timing-diagnostic-20260907.md`; its completed retry
+preserves unknown goalie groups and shows remaining within-situation timing bias.
+The subsequent raw-prefix and bounded official-report clock checks are in
+`docs/analytics-raw-followup-clock-audit-20260907.md`. Saved gaps matched raw
+clocks; no timestamp correction, model fit or production activation followed.
+The subsequent single declared 90-day timing-adaptation experiment is described
+in `docs/analytics-recent-timing-result-20260907.md`. Both original-fold loss
+guards pass, but residual timing bias and a later-fold band regression remain;
+the new comparator is offline and not a replacement for the deployed model.
+The subsequent prequential loss-gate comparison was rejected as a replacement
+because it worsened both original-fold losses relative to that recent comparator.
+See `docs/analytics-timing-loss-gate-result-20260907.md`; negative evidence is
+preserved and no production change followed.
+The stronger ungated recent candidate subsequently passed full-vector composed
+replay: `docs/analytics-recent-candidate-replay-20260907.md`. Dated sidecars and
+the offline inference wrapper preserve the complete input schema and reproduce
+the saved experiment; they are not deployed services or model acceptance.
+The residual-concentration diagnosis and single bounded-influence prior test are
+recorded in `docs/analytics-bounded-timing-prior-result-20260907.md`. The new prior
+is not promoted: it narrowly fails the first-fold Brier guard and has band-level
+trade-offs. The verified ridge-recent reference and negative evidence remain intact.
+The executable consolidated evidence checkpoint is
+`scripts/proof/check_current_xg_checkpoint.py`, documented in
+`docs/analytics-current-xg-checkpoint-20260907.md`. It revalidates candidate/replay,
+rejected alternatives and static input coverage without granting model, FPAR or
+production acceptance. Successful execution is explicitly distinct from release.
+See `docs/analytics-development-sog-review-20260907.md` for report captures,
+source hashes, preserved first review and model/finishing integration boundaries.
+Canonical source/input gate: `scripts/proof/check_analytics_input_coverage.py`
+and `docs/analytics-input-coverage-ledger-20260907-v9.json`; original v1/v2/v3/v4/v5/v6/v7/v8 ledgers
+are retained and superseded. Tests include `scripts/proof/test_analytics_input_coverage.py`
+and normal-suite `data-pipeline/tests/test_analytics_scope_coverage.py`.
+New offline components `pre_shot_history.py` and `fixed_feature_transform.py`
+under projections have dedicated tests plus `test_movement_transform_integration.py`.
+Independent movement review is `test_pre_shot_movement_review.py`.
+Zone/quality recovery adds `pre_shot_zone_context.py`, its original-function
+comparison tests and independent `test_pre_shot_zone_context_review.py`.
+The declared matched experiment is `docs/analytics-zone-context-plan-20260906.json`
+with `scripts/proof/run_zone_context_candidate.py` and its tests; create-only
+results live under `official-zone-context-*`. Starting a run is not acceptance.
+Completed zone result: `docs/analytics-zone-context-result-20260906.md`; primary
+failed, with independent score and sampled source-vector reviews retained.
+New `pre_shot_penalty_context.py` preserves recorded annotations, not active PP
+clocks; author and independent tests accompany it. New
+`conditional_calibration_shape.py` is an offline, partially pooled calibration
+candidate with separate tests, not a serving replacement. Recovery specifications:
+`docs/analytics-powerplay-input-recovery-20260906.md`,
+`docs/analytics-shift-rink-recovery-spec-20260906.md`, and
+`docs/analytics-conditional-shape-proposal-20260906.md`.
+Penalty source proof: `scripts/proof/audit_penalty_source_sample.py` and
+`penalty-source-audit-20260906-systematic100/report.json`. Conditional fitting
+uses `run_conditional_shape_candidate.py`, its tests and the separately declared
+`docs/analytics-conditional-shape-plan-20260906.json`; independent point review
+is `review_conditional_shape_candidate.mjs` with its own tests. These add no
+automatic serving or acceptance path.
+Conditional matched result: `docs/analytics-conditional-shape-result-20260906.md`;
+point guard passes with explicit uncertainty and no acceptance. Retained venue/
+on-ice sources are inventoried in `docs/analytics-retained-venue-shift-inventory-20260906.md`;
+the separate PL parser proposal is `docs/analytics-pl-onice-parser-proposal-20260906.md`.
+The approved evidence-only pilot is implemented in `pl_onice_membership.py`;
+author and independent tests accompany it. Create-only proof output
+`pl-onice-pilot-20260906-retained45/` preserves raw cells, membership mappings and
+unmatched rows; it does not authorize causal features or inferred shift times.
+See `docs/analytics-pl-onice-pilot-result-20260906.md`.
+Full recorded-penalty coverage now lives under
+`penalty-full-coverage-20260906-development/`, generated by
+`scripts/proof/audit_penalty_full_coverage.py`. All 541,067 movement-eligible
+event keys are retained; the result document is
+`docs/analytics-penalty-full-coverage-result-20260906.md`. No active PP-clock or
+accuracy claim follows from this extraction proof.
+Frozen pre-fit declaration:
+`docs/analytics-recorded-penalty-candidate-plan-20260906.json` preserves the
+movement inputs and fixes an additive recorded-annotation ablation. This is a
+declaration, not permission to publish or serve the resulting model.
+Its additive input adapter is now implemented in
+`data-pipeline/projections/recorded_penalty_features.py`, with author and
+independent tests. It preserves the entire movement vector, joins recorded
+annotations by exact event identity, binds the full audit and replay-equivalence
+receipts, and retains explicit unknown states. It does not reconstruct active
+penalty clocks or provide serving authorization.
+The create-only experiment runner is
+`scripts/proof/run_recorded_penalty_candidate.py`, with author and independent
+runner tests. It checks both folds' resource bounds before fitting, preserves
+the frozen controls, and writes separate original-context and penalty-context
+diagnostics. `scripts/proof/review_recorded_penalty_candidate.mjs` and its tests
+provide independent saved-point review; neither script is a production job.
+The completed run is `official-recorded-penalty-20260906-full/`, with independent
+review in `recorded-penalty-review-20260906-full/`. The declared improvement guard
+failed on the later fold; this candidate is not accepted and production is
+unchanged. See `docs/analytics-recorded-penalty-result-20260906.md` for comparisons,
+calibration weaknesses, verification boundaries and the next no-fit analysis.
+The no-fit matched-shot diagnostic utility is
+`scripts/proof/decompose_recorded_penalty.py`, with author and independent tests.
+It anchors all model comparisons to frozen-control probability bands, retains
+prior-shot and recorded-annotation states, and decomposes proper-loss changes
+into raw changes and the difference of calibration effects. It neither fits a
+model nor authorizes production changes; observed sparse cells remain explicit.
+Completed output: `recorded-penalty-decomposition-20260906-full/`; interpretation
+and reproduction are in `docs/analytics-recorded-penalty-decomposition-20260906.md`.
+The later-fold raw probabilities already regress, so calibration alone does not
+explain the failed candidate. No model was fitted or promoted by this analysis.
+Independent point/membership review is implemented by
+`scripts/proof/review_recorded_penalty_decomposition.mjs` with dedicated tests;
+completed evidence is `recorded-penalty-decomposition-review-20260906-full/`.
+Verified local preservation receipt:
+`scripts/proof/results/analytics-input-recovery-checkpoint-20260906-2041/receipt.json`.
+It duplicates selected working-tree source and explicitly listed evidence roots,
+including penalty coverage/candidate, reusable-feature and offline-bundle proofs,
+and this decomposition/review. Originals remain; this is not off-machine backup.
+This inventory pointer and the result report's preservation/next-step addendum
+postdate the snapshot. Loose root-level JUnit receipts remain separately retained.
+Local candidate packaging: `projections/offline_xg_bundle.py` binds named
+inputs, saved transform/model, conditional calibrator, runtime and code hashes;
+author/independent tests and `scripts/proof/prove_offline_xg_bundle.py` accompany it.
+`offline-xg-bundle-proof-20260906-full/` verifies both saved validation folds,
+reversed batches and sampled singleton requests, without a serving hook.
+See `docs/analytics-offline-bundle-result-20260906.md` for the exact boundary.
+Read-only feature reuse is in `projections/verified_movement_reuse_v2.py` with
+dedicated tests and `scripts/proof/prove_verified_movement_reuse_v2.py`;
+`verified-movement-reuse-v2-*` receipts compare full rows against fresh replay.
+Completed comparison: `docs/analytics-verified-feature-reuse-result-20260906.md`;
+exact equivalence passed, with faster local execution but higher peak memory.
+Initial v1 sources and `verified-movement-reuse-fast-20260906/` remain preserved.
+Movement calibration and subgroup weaknesses are documented in
+`docs/analytics-movement-diagnostic-20260906.md`; no subgroup patch is deployed.
+Additional audits: `docs/analytics-legacy-serving-audit-20260906.md` and
+`docs/analytics-model-dependency-audit-20260906.md`; diagnostics are
+`scripts/proof/test_legacy_serving_diagnostics.py` (XML receipt in results)
+and `scripts/proof/reproduce_legacy_rebound_index.py`.
+Original-input recovery now includes a separate, non-serving pair-geometry module
+`data-pipeline/projections/pre_shot_movement.py` and its tests. It preserves raw
+lateral/angular change and elapsed-time units alongside legacy-style composites;
+it does not establish event eligibility, fit a model, or replace production inputs.
+Parallel source audit: `docs/feature_parity_audit-20260906.md`, executable
+`scripts/proof/feature_parity_audit_tests.py`, and its create-only receipt
+`scripts/proof/results/feature-parity-audit-tests-20260906.xml`. These retain
+caller-buffer, event-state, orientation and PP-age defect witnesses, not fixes.
+Completed result: `docs/analytics-event-memory-result-20260906.md` (primary fails
+the both-fold guard). `docs/analytics-legacy-input-parity-20260906.md` preserves
+original feature intent and documents delivery defects. The AST inventory runner
+`scripts/proof/audit_legacy_xg_inputs.py` and executable legacy diagnostics retain
+all literal shot-record fields and both old training lists without loading models.
+`data-pipeline/projections/event_memory_features.py` adds strict-prefix shot/event
+counts, prior-attempt geometry and observed strength-spell age. These are recorded
+event proxies, not tracking, possession, shifts or adjudicated penalty age. The
+fixed plan is `docs/analytics-event-memory-plan-20260906.json`; the create-only
+source-replay/fitting runner is `scripts/proof/run_event_memory_candidate.py`,
+with matching feature/runner tests. Outputs use `official-event-memory-*` under
+`scripts/proof/results/`; independent point/bin review is
+`scripts/proof/review_event_memory.mjs`. All old models and reservations remain
+frozen; completion does not authorize serving.
+
+Public-method/file study and independent applications (2026-09-06):
+`docs/analytics-method-checkpoint-20260906.md` is the combined result and next-step
+entry point. `scripts/proof/review_method_challengers.mjs` plus matching Node
+tests independently recompute point scores/bins and source closure into
+`scripts/proof/results/method-challenger-review-20260906-1755/`. Saved test
+receipts live at `scripts/proof/results/method-verification-20260906.ERLcq5/`.
+The create-only `scripts/proof/archive_method_checkpoint.py` duplicates selected
+current working-tree bytes and these new evidence roots, preserving earlier
+archives. Its receipt is
+`scripts/proof/results/analytics-method-checkpoint-20260906-1755/receipt.json`;
+this is local preservation, not a new Git commit or off-machine backup.
+`docs/analytics-moneypuck-schema-inspection-20260906.md` records a full read of
+the pinned local explanatory dictionary, not training-data use. The bounded
+scanner `scripts/proof/inspect_moneypuck_dictionary.py` and matching tests
+produce `scripts/proof/results/moneypuck-dictionary-inspection-*/inspection.json`.
+`docs/analytics-public-method-gap-20260906.md` retains the broader primary-source
+gap matrix and completed strength-specialist comparison. Its new candidate,
+runner/tests and fixed plan use `strength_partition_candidate.py`,
+`run_strength_partition_candidate.py`, and
+`docs/analytics-strength-partition-plan-20260906.json`; complete outputs live
+under `scripts/proof/results/official-strength-partition-*/`.
+
+The additive static-horizon FPAR adapter is
+`packages/shared/src/utils/fparFoundation.ts`, with focused tests and
+`docs/analytics-fpar-foundation-adapter-20260906.md`. It calls ScoringCalculator,
+requires a full bound verifier and feasible joint replacement allocation, and
+is not exported for serving. Synthetic proofs are not validated live FPAR.
+
+Daily-engine missing-xG/read-population correction and nightly fail-closed
+task/output reconciliation are documented in
+`docs/analytics-live-model-gap-20260906.md` and
+`docs/analytics-nightly-forecast-health-20260906.md`, with new
+`test_daily_projection_xg_availability.py` and `test_nightly_projection_health.py`.
+Old source is archived; current source deliberately withholds unverified team
+exposure and reuse and must not be automatically rolled out.
+
+Identity-conditioned event forecast experiment (2026-09-06):
+`data-pipeline/projections/identity_probability.py` fits bounded, earlier-period
+shooter/goalie logit effects with explicit shrinkage and an identity-free control.
+It is not neutral xG or a causal talent estimate and must not become the goalie
+evaluation baseline. Target-free prediction inputs reject same-day/fit-game use;
+unseen or unavailable actors have no learned identity effect. Its fixed plan is
+`docs/analytics-identity-probability-plan-20260906.json`. The source/feature/actor
+and JSON-inference replay plus independent sparse objective/KKT audit live in
+`scripts/proof/run_identity_probability.py`, with matching pipeline/proof tests.
+Create-only real outputs use `scripts/proof/results/official-identity-probability-*/`.
+This lane does not overwrite previous neutral models or prospective reservations.
+The first attempt failed its numerical convergence gate before validation
+scoring. Separate `identity_probability_v2.py`, `run_identity_probability_v2.py`,
+their tests and `docs/analytics-identity-probability-v2-plan-20260906.json` preserve
+the exact likelihood, penalties, bounds and raw-gradient threshold while fixing
+numerical scaling. The calibration-only diagnosis and v2 replay are create-only
+`official-identity-probability-v2-*` outputs; v1 bytes remain frozen.
+
+Fixed prequential calibration challenger (2026-09-06):
+`data-pipeline/projections/prequential_calibration.py` supplies a pure bounded
+rolling intercept fit with a two-day simulated label lag, one state per game
+date, explicit sparse-history fallback and immutable history/state hashes.
+`scripts/proof/run_prequential_calibration.py` replays original official source
+and feature cohorts, verifies pinned raw/map vectors, independently reconstructs
+every history window and scalar optimum, tests future-label perturbation and
+retains all original scorecard subgroups plus monthly diagnostics. Its declaration
+is `docs/analytics-prequential-calibration-plan-20260906.json`; create-only outputs
+use `scripts/proof/results/official-prequential-calibration-*/`. Matching tests
+cover lag/window boundaries, duplicates, source/vector drift and state tampering.
+Historical availability is simulated, not proven. No old experiment, raw model,
+actual, future reservation, serving path or hosted database is modified.
+The separate conservative challenger in
+`data-pipeline/projections/selective_calibration.py` adds a fixed game-residual
+uncertainty-scaled L1 penalty with a Bernoulli variance floor; this regularizer
+does not assert confidence coverage. Its source-bound runner and independent
+variance/solver audit are `scripts/proof/run_selective_calibration.py`, with
+matching pipeline/proof tests and
+`docs/analytics-selective-calibration-plan-20260906.json`. Create-only outputs
+use `scripts/proof/results/official-selective-calibration-*/` and preserve the
+first challenger as a scored comparison even when its guard fails.
+Both completed challengers failed their fixed no-regression guard. The combined
+`docs/analytics-adaptive-calibration-result-20260906.md` explains the measured
+losses and remaining gates; `analytics-adaptive-calibration-index-20260906.json`
+in the same directory binds the full runs, plans, code and test receipts.
+`docs/analytics-adaptive-calibration-review-20260906.json` retains the separate
+JavaScript point-score/bin and consumed-file review. Verification outputs are
+also bound alongside `docs/analytics-adaptive-calibration-integrity-20260906.json`,
+which freshly rehashes all 62 separately named prior/result/archive pins.
+Verification output directories are
+`scripts/proof/results/prequential-verification-20260906-1630/` and
+`scripts/proof/results/selective-verification-20260906-1650/`, including the
+test-only fixture correction and prior-pin check notes.
+`docs/analytics-adaptive-calibration-archive-20260906.json` describes a verified
+additive working-tree byte snapshot and evidence duplicate, with originals
+retained; it does not claim a new Git commit, runtime bundle or remote backup.
+
 Overnight handoff (2026-09-06):
 `docs/analytics-overnight-handoff-20260906.md` links verified local results,
 preserved research and the remaining ordered source/calibration/forecast gates.

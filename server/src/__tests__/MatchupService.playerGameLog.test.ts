@@ -118,6 +118,15 @@ describe('MatchupService.getPlayerGameLog', () => {
 });
 
 describe('MatchupService.getPlayerProjectionLog', () => {
+  it('includes goalie goals against required by the upcoming player-card GA column', async () => {
+    const row = { ...PROJECTION_ROWS[0], projected_goals_against: 2.65 };
+    const { service, projChain } = serviceWith([], [row]);
+    const { projections } = await service.getPlayerProjectionLog(8476883, '2026-01-01', '2026-06-30');
+    const selected = String(projChain.select.mock.calls[0][0]).split(',').map(c => c.trim());
+    expect(selected).toContain('projected_goals_against');
+    expect(projections[0]).toMatchObject({ projected_goals_against: 2.65 });
+  });
+
   it('reads the range in one query, bounded by player and date', async () => {
     const { service, supabase, projChain } = serviceWith([], PROJECTION_ROWS);
     const { projections } = await service.getPlayerProjectionLog(8476883, '2026-01-01', '2026-06-30');
