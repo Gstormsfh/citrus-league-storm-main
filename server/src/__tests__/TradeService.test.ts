@@ -165,7 +165,13 @@ describe('TradeService', () => {
       mockSupabase.from = vi.fn((table: string) => {
         if (table === 'teams') return createChain({ data: teamsRows('user-1'), error: null });
         if (table === 'roster_assignments') {
-          return createChain({ data: [{ player_id: '100' }, { player_id: '200' }], error: null });
+          // 300 belongs here too: the offer below requests him, and the
+          // ownership check runs BEFORE the dedupe. Leaving him out made this
+          // test return early and assert nothing about array order at all.
+          return createChain({
+            data: [{ player_id: '100' }, { player_id: '200' }, { player_id: '300' }],
+            error: null,
+          });
         }
         if (table === 'leagues') return createChain({ data: { settings: {} }, error: null });
         if (table === 'trade_offers') {
