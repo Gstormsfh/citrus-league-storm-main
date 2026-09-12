@@ -597,6 +597,9 @@ jobs:
         with:
           node-version: 22
 
+      # Recovery/retirement SQL tests use the pinned PGlite dev dependency.
+      - run: npm ci
+
       - name: Run script contract tests
         shell: bash
         run: npm run test:scripts 2>&1 | tee /tmp/test-scripts.log
