@@ -8,6 +8,7 @@ describe('projectionFraming', () => {
     expect(f.beforeOpener).toBe(true);
     expect(f.eyebrow).toBe('2026-27 projection');
     expect(f.gpPhrase(74)).toBe(' in a projected 74 GP');
+    expect(f.gpPhrase(46, 'starts')).toBe(' in a projected 46 starts');
   });
 
   it('once the season is under way it is the rest of the season', () => {

@@ -13,7 +13,7 @@ export interface ProjectionFraming {
   /** `2026-27 projection` before the opener; `Rest of season` after. */
   eyebrow: string;
   /** ` in a projected 74 GP` before the opener; ` over 74 GP` after. */
-  gpPhrase: (gp: number) => string;
+  gpPhrase: (gp: number, unit?: 'GP' | 'starts') => string;
   beforeOpener: boolean;
 }
 
@@ -24,13 +24,13 @@ export function projectionFraming(now: Date = new Date()): ProjectionFraming {
   if (beforeOpener) {
     return {
       eyebrow: `${seasonLabel(season)} projection`,
-      gpPhrase: (gp) => ` in a projected ${Math.round(gp)} GP`,
+      gpPhrase: (gp, unit = 'GP') => ` in a projected ${Math.round(gp)} ${unit}`,
       beforeOpener,
     };
   }
   return {
     eyebrow: 'Rest of season',
-    gpPhrase: (gp) => ` over ${Math.round(gp)} GP`,
+    gpPhrase: (gp, unit = 'GP') => ` over ${Math.round(gp)} ${unit}`,
     beforeOpener,
   };
 }

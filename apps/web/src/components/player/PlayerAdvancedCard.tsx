@@ -500,13 +500,13 @@ export function PlayerAdvancedCard({
               {player.is_goalie
                 ? `${fmt1(player.proj_wins)} W · ${fmt1(player.proj_saves)} SV · ${fmt1(player.proj_shutouts)} SO`
                 : `${fmt1(player.proj_goals)} G · ${fmt1(player.proj_assists)} A · ${fmt1(player.proj_sog)} SOG`}
-              {player.proj_gp != null && framing.gpPhrase(player.proj_gp)}
+              {player.proj_gp != null && framing.gpPhrase(player.proj_gp, player.is_goalie ? 'starts' : 'GP')}
             </div>
           </div>
           <div className="flex-shrink-0 text-right">
             <div className={cn(ROW_HEADLINE, 'text-pastel-orange-soft max-lg:text-pressbox-orange-soft')}>{fmt2(projPpg)}</div>
             <div className={cn(ROW_HEADLINE_LABEL, 'mt-1 text-white/55')}>
-              FP/G · {fmt1(projFp)} total
+              {player.is_goalie ? 'FP/start' : 'FP/G'} · {fmt1(projFp)} total
             </div>
           </div>
         </Band>

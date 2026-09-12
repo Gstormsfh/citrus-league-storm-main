@@ -1,5 +1,5 @@
 import { useLeague } from '@/contexts/LeagueContext';
-import { projectedSummary, scoreGameLog } from '@/components/player/projectionScoring';
+import { seasonProjectionSummary, scoreGameLog } from '@/components/player/projectionScoring';
 import { hasUnprojectedPlusMinus, leagueDashboardProjection, usesFantasyPoints } from '@/components/player/leagueDashboardProjection';
 import { useGameLogIdentity } from '@/components/player/useGameLogIdentity';
 import { userMessage } from '@/lib/userMessage';
@@ -213,7 +213,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
   const [leagueScoring, setLeagueScoring] = useState<unknown>(null);
   const [scoringReady, setScoringReady] = useState(!leagueId);
   const [pointsFormat, setPointsFormat] = useState(true);
-  const [goalieRos, setGoalieRos] = useState<Record<string, unknown> | null>(null);
+  const [playerRos, setPlayerRos] = useState<Record<string, unknown> | null>(null);
+  const rosRequestVersion = useRef(0);
   const [showProjectionBreakdown, setShowProjectionBreakdown] = useState(false);
   const projectionPlayerId = player?.id;
   const projectionGoalie = player?.position === 'G' || player?.position === 'Goalie';
@@ -222,7 +223,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
     setShowProjectionBreakdown(false);
     setScoringReady(!leagueId);
     setLeagueScoring(null);
-    setGoalieRos(null);
+    setPlayerRos(null);
     if (!isOpen) return;
     void (async () => {
       try {
@@ -232,10 +233,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
         setLeagueScoring(result?.league?.scoring_settings ?? null);
         setPointsFormat(usesFantasyPoints(result?.league ? getLeagueFormat(result.league).scoringFormat : undefined));
         setScoringReady(true);
-        if (projectionGoalie && projectionPlayerId) {
+        if (projectionPlayerId) {
+          const requestVersion = ++rosRequestVersion.current;
           const response = await playerApi.getRosProjectionForPlayer(Number(projectionPlayerId));
           const rows = response.data as Record<string, unknown>[] | undefined;
-          if (!cancelled) setGoalieRos(rows?.[0] ?? null);
+          if (!cancelled && requestVersion === rosRequestVersion.current) setPlayerRos(rows?.[0] ?? null);
         }
       } catch (error) { logger.error('[PlayerStatsModal] League projection scoring unavailable:', error); }
     })();
@@ -346,11 +348,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
     // his name and his team over the previous player's game log and totals,
     // until the fetch landed and everything swapped underneath the reader.
     //
-    // `gameLogLoading` did not save it: the log list is gated on that flag,
-    // but `heroProjectedPts` is not - it reads `totalProjected` straight out
-    // of state, at the top of the card, in the largest type on the screen.
-    // So the first thing a manager saw was the LAST player's projection
-    // attributed to this one.
+    // Clear cached game-log content on an identity change. The season hero
+    // has its own guarded ROS request and no longer reads this accumulator.
     //
     // Cleared here, synchronously, in the same commit that changes the
     // identity: an empty card for a moment is honest, a populated wrong one
@@ -536,18 +535,12 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
           });
         }
 
-        // GOALIE-PROJ SANITY (2026-09-01): a goalie's daily projection
-        // rows exist for every TEAM game (they are "if he starts"
-        // values), so summing them promised one netminder 84 starts and
-        // a 619-point season — which outranked every skater and fed the
-        // founder's "goalies drafted first overall" report. The
-        // rest-of-season table already carries start-aware numbers
-        // (Vasilevskiy 55 games, not 84); the headline total and games
-        // label read from it for goalies. Skater sums stay as-is —
-        // team games ≈ player games for them.
+        // Preserve expected goalie starts in the selected season's log cache.
+        // The season headline is scored separately from ROS for every position;
+        // this legacy aggregate is not a headline input.
         let goalieAwareTotal = projTotal;
         let startsRemaining: number | null = null;
-        if (playerIsGoalie) {
+        if (playerIsGoalie && logSeason === getProjectionsSeason()) {
           try {
             const rosRes = await playerApi.getRosProjectionForPlayer(playerId);
             const rosRows = (rosRes?.data ?? []) as Array<{
@@ -560,10 +553,10 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
             if (Number.isFinite(rosTotal) && rosTotal > 0) {
               goalieAwareTotal = rosTotal;
             }
-            startsRemaining = Number.isFinite(rosGames) && rosGames > 0 ? Math.round(rosGames) : null;
+            startsRemaining = ros?.games_remaining != null && Number.isFinite(rosGames) && rosGames >= 0 ? Math.round(rosGames) : null;
           } catch {
-            // ROS row unavailable — keep the summed value rather than
-            // showing nothing; the label falls back to team games.
+            // Without ROS, the log can report team games only; it cannot
+            // infer expected goalie starts from conditional daily rows.
             startsRemaining = null;
           }
         }
@@ -595,10 +588,13 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
     };
   }, [isOpen, gameLogPlayer, logSeason, gameLogAttempt]);
 
-  const leagueProjection = useMemo(() => projectedSummary(
-    projectionGoalie && goalieRos ? [goalieRos] : gameLog.filter(g => !g.isPast && g.projection).map(g => g.projection!),
-    leagueScoring, projectionGoalie,
-  ), [gameLog, leagueScoring, projectionGoalie, goalieRos]);
+  // The headline uses the same exposure-aware season source as the draft
+  // board. Changing the game-log season cannot turn 84 conditional daily
+  // forecasts into a season forecast or replace a missing goalie ROS row.
+  const seasonProjection = useMemo(() => seasonProjectionSummary(
+    playerRos, leagueScoring, projectionGoalie,
+  ), [leagueScoring, projectionGoalie, playerRos]);
+  const leagueProjection = seasonProjection ?? { points: 0, stats: {}, breakdown: {} };
 
   // MUST sit above the `if (!player) return null` below — a hook called after
   // an early return runs conditionally, which breaks the Rules of Hooks and
@@ -611,13 +607,30 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
   const scoredGameLog = useMemo(() => scoreGameLog(gameLog, leagueScoring), [gameLog, leagueScoring]);
   const leagueActualTotal = scoredGameLog.reduce((sum, entry) => sum + (entry.isPast ? entry.actualPoints ?? 0 : 0), 0);
   const playedLog = useMemo(() => playedRows(scoredGameLog, logIsGoalie), [scoredGameLog, logIsGoalie]);
-  const upcomingLog = useMemo(() => upcomingRows(gameLog, logIsGoalie), [gameLog, logIsGoalie]);
+  const upcomingLog = useMemo(() => upcomingRows(scoredGameLog, logIsGoalie), [scoredGameLog, logIsGoalie]);
 
   // ── THE ARTBOARD'S TILES, WATCH AND SHARE (2026-09-05) ────────────────
   // Rank and the xG rate come off the shared dashboard index, already in
   // memory on every surface that opens a card; the week's points are the
   // log's last seven days; the season projection is the hero's figure.
   const rawIndex = usePlayerDashboardIndex({ enabled: isOpen });
+  const matchingRawProjection = rawIndex.players.find(entry => String(entry.id) === String(projectionPlayerId));
+  // Compare only this player's projection fields, so unrelated index entries
+  // and ordinary renders cannot trigger another single-player request.
+  const matchingProjectionVersion = matchingRawProjection
+    ? JSON.stringify(Object.entries(matchingRawProjection).filter(([key]) => key.startsWith('proj_')).sort(([a], [b]) => a.localeCompare(b)))
+    : null;
+  useEffect(() => {
+    if (!isOpen || !projectionPlayerId || matchingProjectionVersion == null || rawIndex.status !== 'ready') return;
+    let cancelled = false;
+    const requestVersion = ++rosRequestVersion.current;
+    void playerApi.getRosProjectionForPlayer(Number(projectionPlayerId)).then(response => {
+      const rows = response.data as Record<string, unknown>[] | undefined;
+      if (!cancelled && requestVersion === rosRequestVersion.current) setPlayerRos(rows?.[0] ?? null);
+    }).catch(error => logger.debug('[PlayerStatsModal] ROS refresh unavailable:', error));
+    return () => { cancelled = true; };
+  }, [isOpen, projectionPlayerId, matchingProjectionVersion, rawIndex.status]);
+
   const leagueIndex = useMemo(() => leagueDashboardProjection(rawIndex.players, leagueScoring, isOpen && scoringReady && pointsFormat),
     [rawIndex.players, leagueScoring, isOpen, scoringReady, pointsFormat]);
   const index = { ...rawIndex, players: leagueIndex };
@@ -733,8 +746,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
       garPercentile: pct('gar_per_60'),
       cohortNoun: advanced?.cohortNoun ?? null,
       cohortSize: advanced?.cohortSize ?? null,
-      projFp: scoringReady && pointsFormat && !gameLogLoading && gameLog.some(g => !g.isPast && g.projection) ? leagueProjection.points : null,
-      projGp: isGoalie ? goalieStartsRemaining : gameLog.filter(g => !g.isPast && g.projection).length || null,
+      projFp: scoringReady && pointsFormat && seasonProjection ? seasonProjection.points : null,
+      projGp: seasonProjection?.gp ?? null,
       posRank: positionRank,
       projectionLabel: framing.beforeOpener ? `for ${framing.eyebrow.replace(' projection', '')}` : 'the rest of the way',
       career,
@@ -764,10 +777,11 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
   const posAbbr = getPositionAbbr(player.position);
   const teamAbbr = player.teamAbbreviation || player.team?.split(' ').pop()?.substring(0, 3).toUpperCase() || '';
 
-  // Use game log totals for the hero banner
+  // The hero uses ROS; the game-log sections retain their selected season.
   const futureGames = gameLog.filter(g => !g.isPast);
   const pastGames = gameLog.filter(g => g.isPast);
-  const hasProjection = scoringReady && pointsFormat && !gameLogLoading && !gameLogError && futureGames.some(g => g.projection != null);
+  const hasProjection = scoringReady && pointsFormat && seasonProjection != null;
+  const hasLogProjection = hasProjection && logSeason === getProjectionsSeason();
   const heroProjectedPts = leagueProjection.points;
   const cardTiles: PressBoxStatTile[] = [
     // QA PASS 1 (2026-09-09): say what each tile is. "SZN PROJ" and "L7 PTS"
@@ -990,6 +1004,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                 <div className="flex justify-between text-sm font-semibold"><span>Projected scoring breakdown</span><button type="button" onClick={() => setShowProjectionBreakdown(false)} aria-label="Close projection breakdown">Close</button></div>
                 {!scoringReady ? <p className="text-sm mt-2">League scoring is unavailable. Try reopening the player.</p> : <>
                   <p className="text-xs text-pressbox-text/60 mt-1">{leagueId ? 'Using this league’s scoring settings.' : 'Using default scoring; no league selected.'}</p>
+                  <p className="text-xs text-pressbox-text/60 mt-1">{projectionFraming().eyebrow} · {seasonProjection?.gp} projected {isGoalie ? 'starts' : 'GP'}</p>
                   {!isGoalie && hasUnprojectedPlusMinus(leagueScoring) && <p className="text-xs text-pressbox-text/60 mt-1">Plus/minus isn’t projected; this total excludes it.</p>}
                   <table className="w-full text-xs mt-2"><thead><tr><th className="text-left">Stat</th><th>Projected</th><th>Weight</th><th>Points</th></tr></thead><tbody>
                     {Object.entries(leagueProjection.breakdown).filter(([, b]) => b.points !== 0).map(([stat, b]) => <tr key={stat}><td className="py-1">{stat}</td><td className="text-center">{b.count.toFixed(2)}</td><td className="text-center">{(b.points / b.count).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td><td className="text-right">{b.points.toFixed(1)}</td></tr>)}
@@ -1368,7 +1383,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                       {scoringReady && pointsFormat && scoredGameLog.some(g => g.isPast && g.actualPoints != null) && (
                         <div className="font-plex font-semibold text-[17px] tabular-nums text-pressbox-text leading-tight">{leagueActualTotal.toFixed(1)}<span className="font-plex font-medium text-[9px] text-pressbox-text/45 uppercase ml-1">actual</span></div>
                       )}
-                      {hasProjection && (
+                      {hasLogProjection && (
                         <div className="font-plex font-semibold text-[14px] tabular-nums text-pressbox-orange-soft leading-tight">{leagueProjection.points.toFixed(1)}<span className="font-plex font-medium text-[9px] text-pressbox-text/45 uppercase ml-1">proj</span></div>
                       )}
                     </div>
@@ -1414,7 +1429,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                         action={
                           <span className="font-plex font-medium text-[10px] tabular-nums text-pressbox-text/45 whitespace-nowrap">
                             {futureGames.length} GAME{futureGames.length === 1 ? '' : 'S'}
-                            {hasProjection ? ` · ${leagueProjection.points.toFixed(1)} PROJ` : ''}
+                            {hasLogProjection ? ` · ${leagueProjection.points.toFixed(1)} PROJ` : ''}
                           </span>
                         }
                       />

@@ -225,7 +225,7 @@ export function upcomingRows(entries: GameLogEntry[], isGoalie: boolean): LogRow
         key: e.date,
         date: shortDate(e.date),
         opponent: e.opponent,
-        points: e.projectedPoints > 0 ? e.projectedPoints : null,
+        points: p && Number.isFinite(e.projectedPoints) ? e.projectedPoints : null,
         cells,
         toi: range,
         ...(e.isToday ? { latest: true } : {}),
