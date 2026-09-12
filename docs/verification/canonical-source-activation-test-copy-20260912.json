@@ -1,0 +1,60 @@
+{
+  "test_revision": "ac6291b9e51d269ddb6e4aca35016130aa1d3b90c564a21cb1a23d73d4483612",
+  "validation": {
+    "valid": true,
+    "errors": [],
+    "checked_at": "2026-09-12T08:48:51.874995+00:00"
+  },
+  "activation": {
+    "run_id": "b84d3625-492c-4cd9-a653-fc3a56d207af",
+    "season": 2026,
+    "revision": "ac6291b9e51d269ddb6e4aca35016130aa1d3b90c564a21cb1a23d73d4483612",
+    "readiness": "published"
+  },
+  "projected_players": 674,
+  "daily_rows": 56616,
+  "checked_categories": [
+    "goals",
+    "assists",
+    "shots_on_goal",
+    "blocks",
+    "power_play_points",
+    "short_handed_points",
+    "hits",
+    "penalty_minutes",
+    "wins",
+    "saves",
+    "shutouts",
+    "goals_against"
+  ],
+  "unmapped_nonzero_categories": [
+    {
+      "player_id": "8483669",
+      "stat": "plus_minus",
+      "count": -0.4671516662388652
+    }
+  ],
+  "source_players_teams_schedule_unchanged": true,
+  "original_draft_bytes_unchanged": true,
+  "rollback_fingerprints": {
+    "canonical_projection_active": "e7da2aa74d0d98abc4ea8000da023a20",
+    "canonical_projection_runs": "7190ea76df9447dc6785e1424fe989e0",
+    "canonical_projection_players": "b6576b28c977bf430adae322a986363e",
+    "player_ros_projections": "43859964a78769076be25708dfd68e2e",
+    "player_projected_stats": "7b17ee5be343952b71e4c0654f7396e2",
+    "player_directory": "65c95323397a807345f2da837378362a",
+    "nhl_games": "9744608886237d186c54cda49bc0e9b4"
+  },
+  "checks": [
+    "All projected player IDs and exposure match source",
+    "All exported categories match source and daily sums per player within 1e-8",
+    "ROS and daily default points match source scored from shared scoring JSON per player within 1e-8",
+    "All ROS/daily rows carry activated test run and revision",
+    "Rollback restored original pointer, runs, player records, outputs, directory and schedule"
+  ],
+  "source_revision": "6a71c8db63eb6ee43798f8ab963652b89c103d2f9dae718f3d51b0abb97dd117",
+  "source_sha256": "d2ee0bc9d55231b0541ba10f3c114c253f57c252923f41ad834967a595e111fa",
+  "directory_rows": 1312,
+  "regular_games": 1344,
+  "scope": "Isolated local rollback-only rehearsal; test copy is not human approval, original remains DRAFT, no production write"
+}
