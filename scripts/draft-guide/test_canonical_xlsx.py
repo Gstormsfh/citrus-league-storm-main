@@ -1,13 +1,16 @@
 """Canonical workbook export guards and cached formula checks."""
 from copy import deepcopy
 import json
+import os
+import re
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
 
 import openpyxl
-from export_canonical_xlsx import export, payload
+from export_canonical_xlsx import BUILDER, RUNTIME, export, payload
 from test_canonical_import import fixtures, digest, player
 
 
@@ -91,6 +94,53 @@ class CanonicalWorkbookTests(unittest.TestCase):
             self.assertIn("'Players'!AT2",formulas['ANA']['F4'].value)
         invalid=deepcopy(weights);invalid['goalie']['plus_minus']=1
         with self.assertRaises(ValueError):payload(d,e,d['revision'],weights=invalid)
+
+    def test_history_chunks_roundtrip_in_xlsx_without_changing_other_cells(self):
+        d, e = fixtures()
+        base = payload(d, e, d['revision'])
+        at_limit = {'note': 'a' * (30000 - len(json.dumps({'note': ''}, separators=(',', ':'))))}
+        base['canonical']['review_history'] = [at_limit]
+        changed = deepcopy(base)
+        # First emoji straddles an unadjusted 30,000 UTF-16-unit boundary.
+        records = [{'note': 'x' * (30000 - len('{"note":"') - 1) + '🏒' + 'x' * 22000},
+                   {'note': 'y' * 303000}, {'note': 'z' * 590000}]
+        changed['canonical']['review_history'] += records
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root/'node_modules').symlink_to(RUNTIME/'node/node_modules', target_is_directory=True)
+            (root/'build.mjs').write_text(BUILDER)
+            books = []
+            for name, data in [('base', base), ('chunked', changed)]:
+                source = root/f'{name}.json'; output = root/f'{name}.xlsx'
+                source.write_text(json.dumps(data))
+                subprocess.run([os.environ.get('CITRUS_NODE', str(RUNTIME/'node/bin/node')),
+                                str(root/'build.mjs'), str(source), str(output), str(root/f'{name}.png')],
+                               check=True, timeout=600, capture_output=True)
+                books.append((openpyxl.load_workbook(output, data_only=True),
+                              openpyxl.load_workbook(output, data_only=False)))
+            for cached in (0, 1):
+                before, after = books[0][cached], books[1][cached]
+                self.assertEqual(before.sheetnames, after.sheetnames)
+                for name in before.sheetnames:
+                    if name != 'Source History':
+                        self.assertEqual(list(before[name].values), list(after[name].values), name)
+            before = list(books[0][0]['Source History'].values)
+            sheet = books[1][0]['Source History']
+            rows = list(sheet.values)
+            self.assertEqual(rows[:len(before)], before)  # Small/non-string history unchanged.
+            at = len(before)
+            for record in records:
+                match = re.fullmatch(r'review_history \[part 1/(\d+)\]', rows[at][2])
+                self.assertIsNotNone(match)
+                count = int(match.group(1)); parts = rows[at:at+count]
+                for index, row in enumerate(parts, 1):
+                    self.assertEqual(row[:3], ('Revision', d['revision'], f'review_history [part {index}/{count}]'))
+                    self.assertLessEqual(len(row[3].encode('utf-16-le')) // 2, 30000)
+                self.assertEqual(''.join(row[3] for row in parts),
+                                 json.dumps(record, ensure_ascii=False, separators=(',', ':')))
+                at += count
+            self.assertEqual(at, len(rows))
+            self.assertTrue(sheet.cell(len(rows), 4).alignment.wrap_text)
 
     def test_bad_weights_and_revision_fail_before_export(self):
         d, e = fixtures()
