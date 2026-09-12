@@ -92,7 +92,7 @@ describe('scoreProjectedStats', () => {
   });
 
   it('a real zero is a measurement, not a missing component', () => {
-    const row = { is_goalie: false, projected_goals: 0, projected_assists: 0 };
+    const row = { ...Object.fromEntries(Object.keys(skaterRow).map(key => [key, 0])), is_goalie: false };
     expect(scoreProjectedStats(row, new ScoringCalculator(bangerLeague))).toBe(0);
   });
 });
@@ -103,13 +103,22 @@ describe('projectedPointsFor', () => {
       .toBeCloseTo(21.4, 5);
   });
 
-  it('falls back to the stored total when they are not', () => {
-    expect(projectedPointsFor({ total_projected_points: 7.5 }, new ScoringCalculator(bangerLeague))).toBeCloseTo(7.5, 5);
-    expect(projectedPointsFor({ total_projected_points: '7.5' }, new ScoringCalculator(bangerLeague))).toBeCloseTo(7.5, 5);
+  it('never substitutes a default-scored stored total', () => {
+    expect(projectedPointsFor({ total_projected_points: 7.5 }, new ScoringCalculator(bangerLeague))).toBeNull();
+    expect(projectedPointsFor({ total_projected_points: '7.5' }, new ScoringCalculator(bangerLeague))).toBeNull();
   });
 
-  it('nothing at all is zero', () => {
-    expect(projectedPointsFor(null, new ScoringCalculator(bangerLeague))).toBe(0);
-    expect(projectedPointsFor({}, new ScoringCalculator(bangerLeague))).toBe(0);
+  it('missing is unavailable, not zero', () => {
+    expect(projectedPointsFor(null, new ScoringCalculator(bangerLeague))).toBeNull();
+    expect(projectedPointsFor({}, new ScoringCalculator(bangerLeague))).toBeNull();
+  });
+  it('requires enabled components and allows disabled ones to be missing', () => {
+    const row = { ...skaterRow, projected_hits: undefined, projected_blocks: undefined };
+    expect(scoreProjectedStats(row, new ScoringCalculator(bangerLeague))).toBeNull();
+    expect(scoreProjectedStats(row, new ScoringCalculator(puristLeague))).toBeCloseTo(18.4);
+  });
+  it('keeps unsupported plus/minus unavailable when enabled', () => {
+    expect(scoreProjectedStats(skaterRow, new ScoringCalculator({ ...bangerLeague,
+      skater: { ...bangerLeague.skater, plus_minus: 1 } }))).toBeNull();
   });
 });

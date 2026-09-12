@@ -25,6 +25,7 @@ function normalizePosition(p: string): string {
 }
 
 export interface Player {
+  stats_season?: number | null;
   id: string; // Using string ID to be consistent with app usage, but will store NHL ID
   full_name: string;
   position: string; // Primary position (C, LW, RW, D, G)
@@ -75,6 +76,7 @@ export interface Player {
 
 /** Shape returned by the API server's NormalizedPlayer */
 interface ServerPlayer {
+  stats_season?: number | null;
   id: number;
   full_name: string;
   position: string;
@@ -125,6 +127,7 @@ function mapServerPlayer(sp: ServerPlayer): Player {
 
   return {
     id: String(sp.id),
+    stats_season: sp.stats_season ?? null,
     full_name: sp.full_name,
     position: normalizePosition(sp.position) || '',
     eligible_positions: eligiblePositions,

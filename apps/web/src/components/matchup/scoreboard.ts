@@ -73,6 +73,13 @@ export function scoreOf(value: number | string | null | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Missing scores stay unavailable in visible scoreboard rows. */
+export function knownScoreOf(value: number | string | null | undefined): number | null {
+  if (value == null || (typeof value === 'string' && !value.trim())) return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** A matchup with no second team is a bye. */
 export function isBye(row: WeekMatchupRow): boolean {
   return !row.team2_id;
@@ -111,8 +118,9 @@ export function initialOf(name: string): string {
  */
 export function leaderOf(row: WeekMatchupRow): ScoreboardSide | null {
   if (isBye(row)) return null;
-  const a = scoreOf(row.team1_score);
-  const b = scoreOf(row.team2_score);
+  const a = knownScoreOf(row.team1_score);
+  const b = knownScoreOf(row.team2_score);
+  if (a === null || b === null) return null;
   if (a > b) return 'team1';
   if (b > a) return 'team2';
   return null;
@@ -237,5 +245,6 @@ export function anyGameLive(players: PlayerWithGames[], today: string): boolean 
 
 /** Points to one decimal, the way every other score on the page prints. */
 export function formatScore(value: number | string | null | undefined): string {
-  return scoreOf(value).toFixed(1);
+  const score = knownScoreOf(value);
+  return score === null ? 'N/A' : score.toFixed(1);
 }

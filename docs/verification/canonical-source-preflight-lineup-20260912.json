@@ -1,0 +1,29 @@
+{
+  "source_revision": "6a71c8db63eb6ee43798f8ab963652b89c103d2f9dae718f3d51b0abb97dd117",
+  "source_sha256": "d2ee0bc9d55231b0541ba10f3c114c253f57c252923f41ad834967a595e111fa",
+  "directory_rows": 1312,
+  "regular_games": 1344,
+  "validation": {
+    "valid": false,
+    "errors": [
+      {
+        "code": "IMPORTED_REVIEW_BLOCKERS",
+        "detail": [
+          {
+            "code": "ROSTER_ROLE_SCENARIOS_NOT_CONFIRMED",
+            "reason": "Explicit publication review is required; offline edits cannot activate a run."
+          }
+        ]
+      },
+      {
+        "code": "REVIEW_NOT_COMPLETE"
+      }
+    ],
+    "checked_at": "2026-09-12T08:45:46.203665+00:00"
+  },
+  "distinct_error_codes": [
+    "IMPORTED_REVIEW_BLOCKERS",
+    "REVIEW_NOT_COMPLETE"
+  ],
+  "scope": "Actual source rejection preflight, isolated full schema; transaction rolled back, no activation or production write"
+}

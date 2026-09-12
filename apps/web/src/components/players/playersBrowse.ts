@@ -83,6 +83,7 @@ export function browseStatLine(p: DashboardIndexEntry): string | null {
 
 export function dashboardEntryToHockeyPlayer(p: DashboardIndexEntry): HockeyPlayer {
   return {
+    statsSeason: p.actuals_season ?? null,
     id: p.id,
     name: p.name,
     position: p.position,

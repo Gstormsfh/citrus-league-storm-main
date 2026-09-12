@@ -1,0 +1,112 @@
+{
+  "image": "public.ecr.aws/supabase/postgres:17.6.1.159",
+  "migration_count": 5,
+  "checks": [
+    "Full production public schema and all prepared transactional migrations loaded",
+    "Real 35-category catalog + league FK/trigger path repairs drift, resets defaults and retains explicit zero/negative fractions",
+    "No active canonical run executes both real legacy writers",
+    "Atomic publication preserves fractional starts and ROS/daily category, points and revision identity",
+    "Nightly refresh executes real veteran/cohort models and retains authoritative source identity",
+    "Real table trigger failure rolls back new run, pointer and derivative writes while failure health persists",
+    "Stale editor CAS rejected; exact current revision accepted",
+    "Real snapshot roles/RLS permit published reads and reject authenticated staging"
+  ],
+  "files": {
+    "supabase/schema/production_snapshot_20260813.sql": "68ca96d6ed6893e583343fed14d5ecf22ab273ee461c4ec6c608e9f7ba3dfa4f",
+    "data-pipeline/tests/rehearsal/production-functions-20260912.sql": "65cbe2d921249fea4fb4957761f256b3a3e6d794df6abab76c9f76c515c78ca1",
+    "data-pipeline/tests/rehearsal/production-columns-20260912.json": "ba75241cd38ac07257f7eff455f8c475a3ba2432ff7c22254ab010fad026c1d4",
+    "data-pipeline/tests/rehearsal/production-stat-catalog-20260912.json": "749a9a6b001ae2a1f757ccab6813e087ce5242d29f1580f1a7f7a20743e89c6e",
+    "supabase/migrations/20260912073140_canonical_projection_runs.sql": "6a2092e4a93d029ce4ae7c9de4a19c2f817f8cb3c0dc2d8957b25253ca900e92",
+    "supabase/migrations/20260912073240_canonical_projection_materialization.sql": "f9202da5ecc849d4b32a078e63b50ac9d9495423328a47424099877b2c08e216",
+    "supabase/migrations/20260912073340_canonical_projection_refresh.sql": "157572aeebc22de75b1ff0915b5f070c4d4f62a1507306d8c4443c45775950ac",
+    "supabase/migrations/20260912073440_scoring_rules_replace_removed_keys.sql": "184040fe215bf46a0fdecb7ed774c5d666aac73904a4cb48b49b00c895f6a519",
+    "supabase/migrations/20260912073540_canonical_projection_write_boundary.sql": "625ef55720681de6ce472ce11b01245c094420cc56f70b8b2310c183ddbaa439"
+  },
+  "alignment_columns": 10,
+  "server_version": "17.6",
+  "public_tables": 114,
+  "real_model_rows": {
+    "project_ros": 4,
+    "project_rookies": 2
+  },
+  "legacy_fallback": {
+    "ros": {
+      "rows_written": 6,
+      "skaters": 2,
+      "goalies": 4,
+      "target_games": 2
+    },
+    "daily": {
+      "rows_written": 8,
+      "players": 4,
+      "games": 2
+    }
+  },
+  "identity": [
+    {
+      "player_id": 4,
+      "gp": 2,
+      "daily_gp": 2.0,
+      "saves": 0,
+      "daily_saves": 0.0,
+      "points": 16.4,
+      "daily_points": 16.4,
+      "matched": true
+    },
+    {
+      "player_id": 6,
+      "gp": 0,
+      "daily_gp": 0.0,
+      "saves": 0,
+      "daily_saves": 0.0,
+      "points": 0.0,
+      "daily_points": 0.0,
+      "matched": true
+    },
+    {
+      "player_id": 2,
+      "gp": 0.5,
+      "daily_gp": 0.5,
+      "saves": 12.5,
+      "daily_saves": 12.5,
+      "points": 6.0,
+      "daily_points": 6.0,
+      "matched": true
+    },
+    {
+      "player_id": 3,
+      "gp": 2,
+      "daily_gp": 2.0,
+      "saves": 50,
+      "daily_saves": 50.0,
+      "points": 24.0,
+      "daily_points": 24.0,
+      "matched": true
+    },
+    {
+      "player_id": 1,
+      "gp": 1.5,
+      "daily_gp": 1.5,
+      "saves": 37.5,
+      "daily_saves": 37.5,
+      "points": 18.0,
+      "daily_points": 18.0,
+      "matched": true
+    },
+    {
+      "player_id": 5,
+      "gp": 1,
+      "daily_gp": 1.0,
+      "saves": 0,
+      "daily_saves": 0.0,
+      "points": 8.2,
+      "daily_points": 8.2,
+      "matched": true
+    }
+  ],
+  "refresh": {
+    "revision": "420c3709bafbbe83ef9caf3da5ebbd411a7f38636d4b7945ee77abdd121ce0b4",
+    "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "last_refresh_status": "success"
+  }
+}

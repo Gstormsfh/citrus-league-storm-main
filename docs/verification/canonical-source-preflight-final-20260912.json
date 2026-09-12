@@ -1,0 +1,118 @@
+{
+  "source_revision": "40525a75441f7646fff3049f9886007cc72561f88ad0110d2223f11822023fa2",
+  "source_sha256": "bab91ef7268a771e522db3fcaca9eee9acecc1c9e92b1d0ea9ea0e694057fa8a",
+  "directory_rows": 1312,
+  "regular_games": 1344,
+  "validation": {
+    "valid": false,
+    "errors": [
+      {
+        "code": "IMPORTED_REVIEW_BLOCKERS",
+        "detail": [
+          {
+            "code": "UNREVIEWED_LINEUP_SLOTS",
+            "slots": [
+              {
+                "row": 24,
+                "team": "ANA"
+              },
+              {
+                "row": 17,
+                "team": "CAR"
+              },
+              {
+                "row": 26,
+                "team": "CBJ"
+              },
+              {
+                "row": 9,
+                "team": "NJD"
+              },
+              {
+                "row": 12,
+                "team": "NJD"
+              },
+              {
+                "row": 17,
+                "team": "NJD"
+              },
+              {
+                "row": 6,
+                "team": "NYI"
+              },
+              {
+                "row": 17,
+                "team": "NYI"
+              },
+              {
+                "row": 6,
+                "team": "NYR"
+              },
+              {
+                "row": 15,
+                "team": "NYR"
+              },
+              {
+                "row": 16,
+                "team": "NYR"
+              },
+              {
+                "row": 17,
+                "team": "PHI"
+              },
+              {
+                "row": 12,
+                "team": "PIT"
+              },
+              {
+                "row": 15,
+                "team": "PIT"
+              },
+              {
+                "row": 21,
+                "team": "PIT"
+              },
+              {
+                "row": 25,
+                "team": "PIT"
+              },
+              {
+                "row": 35,
+                "team": "VAN"
+              },
+              {
+                "row": 15,
+                "team": "WSH"
+              },
+              {
+                "row": 16,
+                "team": "WSH"
+              },
+              {
+                "row": 22,
+                "team": "WSH"
+              }
+            ]
+          },
+          {
+            "code": "ROSTER_ROLE_SCENARIOS_NOT_CONFIRMED",
+            "reason": "Explicit publication review is required; offline edits cannot activate a run."
+          }
+        ]
+      },
+      {
+        "code": "REVIEW_NOT_COMPLETE"
+      },
+      {
+        "code": "UNRESOLVED_LINEUP_SLOT"
+      }
+    ],
+    "checked_at": "2026-09-12T08:39:23.142351+00:00"
+  },
+  "distinct_error_codes": [
+    "IMPORTED_REVIEW_BLOCKERS",
+    "REVIEW_NOT_COMPLETE",
+    "UNRESOLVED_LINEUP_SLOT"
+  ],
+  "scope": "Actual source rejection preflight, isolated full schema; transaction rolled back, no activation or production write"
+}

@@ -133,11 +133,11 @@ describe('PlayerCard — week view: the number is the week, the tap is the break
     expect(value(container)!.closest('button')).toBeNull();
   });
 
-  it('no week total on file prints 0.0, not NaN', () => {
+  it('no week total remains unavailable rather than an earned zero', () => {
     const { container } = render(
       <PlayerCard player={player({ games: [], total_points: undefined, stats_breakdown: undefined })} isUserTeam selectedDate={null} />,
     );
-    expect(value(container)!.textContent).toBe('0.0');
+    expect(value(container)!.textContent).toBe('N/A');
   });
 
   it('tonight still to come: "+proj" in orange under the week total, tappable for the projection breakdown', () => {

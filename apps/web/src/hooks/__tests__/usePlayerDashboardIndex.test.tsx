@@ -1,5 +1,5 @@
 /**
- * The shared dashboard-index fetch: one request per session, and a 401 that
+ * The shared dashboard-index fetch: shared requests with bounded freshness, and a 401 that
  * costs the host surface nothing.
  *
  * The 401 path is the one that matters most. `/api/players/dashboard-index`
@@ -100,6 +100,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   resetPlayerDashboardIndex();
 });
 
@@ -250,4 +251,87 @@ describe('usePlayerDashboardIndex', () => {
     // Preserves the Players page's first paint: a spinner, not an empty table.
     expect(peekPlayerDashboardIndex()).toMatchObject({ status: 'idle', loading: true });
   });
+});
+
+
+describe('dashboard projection freshness', () => {
+  it('refreshes stale projections once on foreground for all consumers without blanking the board', async () => {
+    let now = 1_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    getMock.mockResolvedValueOnce({ data: [row(1, 'Before')] });
+    render(<><Probe label="a" /><Probe label="b" /></>);
+    await waitFor(() => expect(screen.getByTestId('count-a')).toHaveTextContent('1'));
+    act(() => window.dispatchEvent(new Event('focus')));
+    expect(getMock).toHaveBeenCalledTimes(1);
+    let finish!: (value: unknown) => void;
+    getMock.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    now += 120_001;
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(getMock).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId('count-a')).toHaveTextContent('1');
+    expect(screen.getByTestId('loading-a')).toHaveTextContent('false');
+    await act(async () => finish({ data: [row(1, 'Updated'), row(2, 'Added')] }));
+    expect(screen.getByTestId('count-a')).toHaveTextContent('2');
+    expect(screen.getByTestId('count-b')).toHaveTextContent('2');
+  });
+
+  it('refreshes a stale later mount but never fetches for a disabled consumer', async () => {
+    let now = 1_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    getMock.mockResolvedValue({ data: [row(1, 'Before')] });
+    const first = render(<Probe />);
+    await waitFor(() => expect(screen.getByTestId('count-a')).toHaveTextContent('1'));
+    first.unmount();
+    now += 120_001;
+    const disabled = render(<Probe enabled={false} />);
+    act(() => window.dispatchEvent(new Event('focus')));
+    expect(getMock).toHaveBeenCalledTimes(1);
+    disabled.unmount();
+    render(<Probe />);
+    await waitFor(() => expect(getMock).toHaveBeenCalledTimes(2));
+  });
+});
+
+
+it('polls one shared request while visible and stops after the last consumer unmounts', async () => {
+  vi.useFakeTimers();
+  try {
+    getMock.mockResolvedValue({ data: [row(1, 'A')] });
+    const view = render(<><Probe label="a" /><Probe label="b" /></>);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(getMock).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+    expect(getMock).toHaveBeenCalledTimes(2);
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+    expect(getMock).toHaveBeenCalledTimes(2);
+    view.unmount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(240_000); });
+    expect(getMock).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+
+it('keeps the last successful projections when a background refresh fails', async () => {
+  let now = 1_000;
+  vi.spyOn(Date, 'now').mockImplementation(() => now);
+  getMock.mockResolvedValueOnce({ data: [row(1, 'Retained')] });
+  render(<Probe />);
+  await waitFor(() => expect(screen.getByTestId('count-a')).toHaveTextContent('1'));
+  getMock.mockRejectedValueOnce(new Error('Temporary network failure'));
+  now += 120_001;
+  act(() => window.dispatchEvent(new Event('focus')));
+  await waitFor(() => expect(screen.getByTestId('error-a')).toHaveTextContent('Temporary network failure'));
+  expect(screen.getByTestId('count-a')).toHaveTextContent('1');
+  expect(screen.getByTestId('loading-a')).toHaveTextContent('false');
+  expect(peekPlayerDashboardIndex().status).toBe('error');
+  act(() => window.dispatchEvent(new Event('focus')));
+  expect(getMock).toHaveBeenCalledTimes(2);
+  getMock.mockResolvedValueOnce({ data: [row(1, 'Fresh'), row(2, 'New')] });
+  now += 60_001;
+  act(() => window.dispatchEvent(new Event('focus')));
+  await waitFor(() => expect(screen.getByTestId('count-a')).toHaveTextContent('2'));
+  expect(screen.getByTestId('error-a')).toHaveTextContent('');
 });

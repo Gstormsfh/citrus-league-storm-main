@@ -71,6 +71,7 @@ interface GoalieGsaxRow {
 }
 
 interface NormalizedPlayer {
+  stats_season: number | null;
   id: number;
   full_name: string;
   position: string;
@@ -139,7 +140,7 @@ const CACHE_TTL = 2 * 60 * 1000;
  */
 let playersInFlight: Promise<{ players: NormalizedPlayer[]; error: unknown }> | null = null;
 
-function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talent?: Partial<TalentMetricsRow>, goalieGsax?: GoalieGsaxRow): NormalizedPlayer {
+function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talent?: Partial<TalentMetricsRow>, goalieGsax?: GoalieGsaxRow, statsSeason?: number): NormalizedPlayer {
   const rosterStatus = talent?.roster_status ?? null;
   const isGoalie = p.position_code === 'G';
 
@@ -174,6 +175,7 @@ function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talen
 
   return {
     id: p.player_id,
+    stats_season: stat.player_id != null ? statsSeason ?? null : null,
     full_name: p.full_name,
     position: p.position_code,
     team: p.team_abbrev,
@@ -330,7 +332,7 @@ export class PlayerService {
       const stat = statsMap.get(p.player_id) || {};
       const talent = talentMap.get(p.player_id) || {};
       const goalieGsax = gsaxMap.get(p.player_id);
-      return buildPlayer(p, stat, talent, goalieGsax);
+      return buildPlayer(p, stat, talent, goalieGsax, metricsSeason);
     });
 
     // Sort by points descending
@@ -394,7 +396,7 @@ export class PlayerService {
       const stat = statsMap.get(p.player_id) || {};
       const talent = talentMap.get(p.player_id) || {};
       const goalieGsax = gsaxMap.get(p.player_id);
-      return buildPlayer(p, stat, talent, goalieGsax);
+      return buildPlayer(p, stat, talent, goalieGsax, getMetricsSeason());
     });
 
     return { players, error: null };

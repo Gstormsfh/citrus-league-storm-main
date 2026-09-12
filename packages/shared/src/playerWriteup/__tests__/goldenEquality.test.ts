@@ -62,6 +62,8 @@ const NOW = new Date('2026-09-11T12:00:00-06:00');
 
 const ROW: DashboardIndexEntry = {
   id: 0,
+  actuals_season: 2026,
+  projection_season: 2026,
   name: '',
   team: 'EDM',
   position: 'C',
@@ -354,6 +356,7 @@ const fixtures: Fixture[] = [
       now: NOW,
     },
     player: {
+      statsSeason: 2026,
       id: 8478402,
       name: 'Connor McTest',
       position: 'C',
@@ -379,6 +382,7 @@ const fixtures: Fixture[] = [
       },
     },
     extras: {
+      projectionSeason: 2026,
       age: 29,
       goalsBySeason: [
         { season: 2021, goals: 44 },
@@ -408,6 +412,7 @@ const fixtures: Fixture[] = [
       now: NOW,
     },
     player: {
+      statsSeason: 2026,
       id: 8479361,
       name: 'Ilya Testov',
       position: 'G',
@@ -433,6 +438,7 @@ const fixtures: Fixture[] = [
       },
     },
     extras: {
+      projectionSeason: 2026,
       age: 28,
       goalsBySeason: [],
       // No xG/60 and no GAR row exists for a goalie anywhere in this
@@ -462,6 +468,7 @@ const fixtures: Fixture[] = [
       now: NOW,
     },
     player: {
+      statsSeason: 2026,
       id: 8484000,
       name: 'Rook Ledger',
       position: 'LW',
@@ -487,6 +494,7 @@ const fixtures: Fixture[] = [
       },
     },
     extras: {
+      projectionSeason: 2026,
       age: 21,
       goalsBySeason: [],
       // Four of the 23 qualified forwards sit at or below his 0.62 xG/60
@@ -518,6 +526,7 @@ const fixtures: Fixture[] = [
       now: NOW,
     },
     player: {
+      statsSeason: 2026,
       id: 8477500,
       name: 'Sidney Bench',
       position: 'C',
@@ -543,6 +552,7 @@ const fixtures: Fixture[] = [
       },
     },
     extras: {
+      projectionSeason: 2026,
       age: 29,
       goalsBySeason: [
         { season: 2021, goals: 44 },
@@ -572,6 +582,7 @@ const fixtures: Fixture[] = [
       now: NOW,
     },
     player: {
+      statsSeason: 2026,
       id: 8490000,
       name: 'Callup Kidd',
       position: 'RW',
@@ -597,6 +608,7 @@ const fixtures: Fixture[] = [
       },
     },
     extras: {
+      projectionSeason: 2026,
       age: 22,
       goalsBySeason: [],
       // Three games is below `DISTRIBUTION_MIN_GP`, so he is PLACED against
@@ -615,6 +627,12 @@ const fixtures: Fixture[] = [
     },
   },
 ];
+
+// Browser and server now both pass the enabled scoring categories to the shared policy.
+for (const f of fixtures) {
+  if (f.sources.scoring != null) f.extras.scoringWeights = {"goals": 7, "assists": 5, "power_play_points": 2, "short_handed_points": 0, "shots": 0.9, "blocks": 1, "hits": 0, "penalty_minutes": 0, "plus_minus": 0, "wins": 5, "shutouts": 5, "saves": 0.6, "goals_against": -3};
+  if (f.sources.scoring != null) f.extras.scoringCategories = ['goals', 'assists', 'power_play_points', 'shots', 'blocks', 'wins', 'shutouts', 'saves', 'goals_against'];
+}
 
 describe('server-assembled writeup equals the one the browser used to build', () => {
   for (const f of fixtures) {
@@ -646,10 +664,10 @@ describe('server-assembled writeup equals the one the browser used to build', ()
     // instead of a number.
     const thin = buildWriteupFromSources(byLabel('a three-game call-up, below the rate floor').sources);
     expect(thin.hasEnoughData).toBe(false);
-    expect(thin.analysis).toMatch(/Too early to draw conclusions/);
+    expect(thin.analysis).toMatch(/larger NHL sample.*dependable rate/);
     expect(thin.analysis).not.toMatch(/percentile|Projects to/);
     expect(thin.summary).not.toMatch(/He is 22|Career:/);
-    expect(thin.tags).toEqual([{ label: 'Limited sample', tone: 'neutral' }]);
+    expect(thin.tags).toContainEqual({ label: 'Limited sample', tone: 'neutral' });
 
     // Availability outranks the stat line, and it takes the card's one line.
     const ir = buildWriteupFromSources(byLabel('a player on injured reserve').sources);
@@ -673,7 +691,7 @@ describe('server-assembled writeup equals the one the browser used to build', ()
     // A goalie is never placed on a skater's scale.
     const goalie = buildWriteupFromSources(byLabel('a goalie').sources);
     expect(goalie.analysis).not.toMatch(/xG\/60|GAR\/60/);
-    expect(goalie.analysis).toMatch(/Projects to \d+ fantasy points over 58 games for 2026-27 \(G1\)\./);
+    expect(goalie.analysis).toMatch(/Projects to \d+ fantasy points over 58 starts for 2026-27 \(G1\)\./);
   });
 });
 

@@ -1,3 +1,4 @@
+import { editorialScoringWeights, editorialScoringCategories, type EditorialCanonicalContext, type EditorialNewsItem } from '../editorial';
 /**
  * THE SERVER'S HALF OF THE WRITEUP (2026-09-11).
  *
@@ -105,6 +106,7 @@ export function writeupPlayerFromIndex(entry: DashboardIndexEntry): WriteupPlaye
     id: entry.id,
     name: entry.name,
     position: entry.position,
+    ...(entry.actuals_season != null ? { statsSeason: entry.actuals_season } : {}),
     status: rosterStatus === 'IR' || rosterStatus === 'LTIR' ? 'IR' : null,
     stats: {
       gamesPlayed: entry.gp,
@@ -130,6 +132,7 @@ export function writeupPlayerFromIndex(entry: DashboardIndexEntry): WriteupPlaye
 
 /** Everything the assembly needs that is not the engine's own arithmetic. */
 export interface WriteupSources {
+  newsItems?: readonly EditorialNewsItem[] | null;
   /** The player's own row out of the dashboard index. */
   entry: DashboardIndexEntry;
   /** The whole index. The cohort is selected from it; do not pre-filter. */
@@ -147,6 +150,8 @@ export interface WriteupSources {
    * production, and a wrong number is worse than a missing one.
    */
   scoring?: unknown | null;
+  /** Category and roto leagues compare stats, never weighted point totals. */
+  scoringFormat?: string | null;
   /** Injected so a test is not at the mercy of the day it runs on. */
   now?: Date;
 }
@@ -206,17 +211,20 @@ export function positionRank(
  * after. The same two phrasings `projectionFraming` gives the card, so the
  * sentence under the bar matches the bar.
  */
-export function projectionLabelFor(now: Date): string {
-  const season = getProjectionsSeason(now);
+export function projectionLabelFor(now: Date, season = getProjectionsSeason(now)): string {
   const start = getSeasonStartDate(season);
   const beforeOpener = start ? now < new Date(`${start}T00:00:00`) : false;
-  return beforeOpener ? `for ${seasonLabel(season)}` : 'the rest of the way';
+  return beforeOpener ? `for ${seasonLabel(season)}` : `for the rest of ${seasonLabel(season)}`;
 }
 
 /** Assemble the extras the engine hangs its extra sentences on. */
 export function writeupExtrasFromSources(src: WriteupSources): WriteupExtras {
   const now = src.now ?? new Date();
   const scoring = src.scoring ?? null;
+  const pointsFormat = src.scoringFormat !== 'h2h-categories' && src.scoringFormat !== 'roto';
+  // Additive active-view context is hydrated by the canonical source owner.
+  const canonicalContext = src.entry.canonical_context;
+  const projectionSeason = src.entry.projection_season ?? getProjectionsSeason(now);
 
   const goalsBySeason = (src.xgSeasons ?? [])
     .filter((p) => p.game_type === 'regular' && Number.isFinite(p.goals))
@@ -225,7 +233,7 @@ export function writeupExtrasFromSources(src: WriteupSources): WriteupExtras {
 
   let projFp: number | null = null;
   let projGp: number | null = null;
-  if (scoring != null) {
+  if (scoring != null && pointsFormat) {
     const settings = projectionSettings(scoring);
     const projection = projectionFor(src.entry, new ScoringCalculator(settings), settings);
     if (projection) {
@@ -235,13 +243,18 @@ export function writeupExtrasFromSources(src: WriteupSources): WriteupExtras {
   }
 
   return {
+    ...(src.entry.actuals_season != null || src.entry.projection_season != null ? { projectionSeason } : {}),
+    ...(canonicalContext ? { canonicalContext, now } : {}),
+    ...(src.entry.as_of ? { indexAsOf: src.entry.as_of } : {}),
+    ...(src.newsItems ? { newsItems: src.newsItems, now } : {}),
+    ...(scoring != null ? { scoringCategories: editorialScoringCategories(scoring), scoringWeights: pointsFormat ? editorialScoringWeights(scoring) : null } : {}),
     age: src.birthdate ? ageOn(src.birthdate, now) : null,
     goalsBySeason,
     ...cohortReads(src.entry, src.index),
     projFp,
     projGp,
     posRank: projFp == null ? null : positionRank(src.entry, src.index, scoring),
-    projectionLabel: projectionLabelFor(now),
+    projectionLabel: projectionLabelFor(now, projectionSeason),
     career: src.career ?? null,
   };
 }

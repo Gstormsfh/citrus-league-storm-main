@@ -1,0 +1,24 @@
+{
+  "owner_role_privileges": {
+    "service_can_set": false,
+    "postgres_can_set": false,
+    "schema_create": false,
+    "role_login": false
+  },
+  "checks": [
+    "player_ros_projections: direct insert/update/delete/upsert retaining original stamps/truncate rejected",
+    "player_projected_stats: direct insert/update/delete/upsert retaining original stamps/truncate rejected",
+    "Service role cannot SET ROLE to materializer owner; spoofed GUC cannot authorize writes",
+    "RR and serializable noncanonical forecasts explicitly rejected, preventing stale snapshot bypass",
+    "No-active ROS/daily updates and active-season historical daily insert/update/delete repairs remain allowed",
+    "Service-role canonical materialization succeeds through restricted owner role",
+    "Concurrent legacy writer waits on publication lock, then rejects active output mutation"
+  ],
+  "rollback_fingerprints": {
+    "active": "e8cdb19e9a3fd8852e551726bf0b6515",
+    "ros": "eafe11455c0245526fb8db608d79da7f",
+    "daily": "d3ee486ee7061be95c61fbed819ad54c"
+  },
+  "migration_sha256": "625ef55720681de6ce472ce11b01245c094420cc56f70b8b2310c183ddbaa439",
+  "scope": "Isolated full-schema database only; no source change or production write"
+}

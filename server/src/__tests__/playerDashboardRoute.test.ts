@@ -350,7 +350,7 @@ describe('GET /api/players/:playerId/xg-history', () => {
     expect(data.points[0].xg).toBeCloseTo(26.75);
     expect(data.points[1].teams).toBe(1);
     expect(data.as_of).toBe('2026-09-01T06:00:00.000Z');
-    expect(user.from.mock.calls.map((c: unknown[]) => c[0])).toEqual(['player_xg_season']);
+    expect(user.from.mock.calls.map((c: unknown[]) => c[0])).toEqual(['player_xg_season', 'canonical_published_runs']);
   });
 
   it('never reaches for the service-role client', async () => {

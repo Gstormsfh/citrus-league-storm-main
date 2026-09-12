@@ -1,5 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getMetricsSeason, getProjectionsSeason, logger } from '@citrus/shared';
+import { getMetricsSeason, getProjectionsSeason, logger, projectedGoalsAgainst, projectionFor, projectionSettings, ScoringCalculator } from '@citrus/shared';
+import { LeagueMembershipService } from './LeagueMembershipService';
+import { mirrorRulesIntoSettings } from '../lib/scoringMirror';
+import { AppError } from '../lib/errors';
 import { PlayerDashboardService, type DashboardIndexEntry } from './PlayerDashboardService';
 
 /**
@@ -164,6 +167,9 @@ export interface DraftKitBlurb {
 }
 
 export interface DraftKitBoard {
+  /** Supplied only when the returned board was assembled from a published canonical run. */
+  projection_source?: { kind: 'canonical'; revision: string; run_id: string;
+    season: number; readiness: 'published' } | null;
   tier: DraftKitTier;
   /** True when the caller is seeing a truncated board. */
   locked: boolean;
@@ -352,7 +358,37 @@ export class DraftKitService {
     entries: DashboardIndexEntry[],
     goalieGsax: Map<number, GoalieXgRow>,
     clubs: Map<number, { current: string | null; previous: string | null }>,
+    scoring?: Record<string, unknown>,
   ): { cards: DraftKitCard[]; cohortSizes: Record<Cohort, number> } {
+    // Cached dashboard totals use default scoring. Rescore copies before any
+    // ranking or percentile calculation; raw ROS counts already include workload.
+    if (scoring !== undefined) {
+      const settings = projectionSettings(scoring);
+      const scorer = new ScoringCalculator(settings);
+      entries = entries.map((entry) => {
+        const components = entry.is_goalie
+          ? [entry.proj_wins, entry.proj_saves, entry.proj_shutouts, entry.proj_goals_against]
+          : [entry.proj_goals, entry.proj_assists, entry.proj_ppp, entry.proj_shp,
+            entry.proj_sog, entry.proj_hits, entry.proj_blocks, entry.proj_pim];
+        const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+        const available: Record<string, unknown> = entry.is_goalie
+          ? { wins: entry.proj_wins, saves: entry.proj_saves, shutouts: entry.proj_shutouts,
+            goals_against: finite(entry.proj_goals_against) ? entry.proj_goals_against
+              : projectedGoalsAgainst(entry.proj_saves, entry.save_pct) }
+          : { goals: entry.proj_goals, assists: entry.proj_assists,
+            power_play_points: entry.proj_ppp, short_handed_points: entry.proj_shp,
+            shots_on_goal: entry.proj_sog, blocks: entry.proj_blocks,
+            hits: entry.proj_hits, penalty_minutes: entry.proj_pim };
+        // Missing enabled categories cannot silently become zero. Plus/minus
+        // has no projected component, so a league enabling it remains unavailable.
+        const complete = Object.entries(entry.is_goalie ? settings.goalie : settings.skater)
+          .every(([category, weight]) => !weight || finite(available[category]));
+        const projection = complete && components.some(finite)
+          ? projectionFor(entry, scorer, settings) : null;
+        return { ...entry, proj_fantasy_points: projection?.total ?? null,
+          proj_fantasy_ppg: projection?.perGp ?? null };
+      });
+    }
     // Partition FIRST. Everything downstream reads from these three buckets,
     // so there is no code path in which a forward's number can reach a
     // defenceman's pool.
@@ -461,12 +497,28 @@ export class DraftKitService {
 
   /**
    * The whole section payload for one caller, shaped by their tier.
+   * Omitted league context preserves the default board for older/unscoped clients.
+   * Explicit league context always uses verified effective rules or fails visibly.
    *
    * The gate is here, at assembly. An unentitled caller gets an object that
    * was never populated with the paid rows, so there is nothing in the
    * response for a client to un-hide.
    */
-  async getBoard(): Promise<{ board: DraftKitBoard | null; error: Error | null }> {
+  async getBoard(context?: { leagueId: string; userId: string }): Promise<{ board: DraftKitBoard | null; error: Error | null }> {
+    let scoring: Record<string, unknown> | undefined;
+    if (context) {
+      const membership = new LeagueMembershipService(this.supabase);
+      if (!context.userId || !(await membership.verifyMembership(context.leagueId, context.userId))) {
+        throw AppError.forbidden('League membership required');
+      }
+      const [catalog, rules] = await Promise.all([
+        this.supabase.from('stat_catalog').select('stat_key, applies_to'),
+        this.supabase.rpc('get_effective_scoring_rules', { p_league_id: context.leagueId }),
+      ]);
+      if (catalog.error || rules.error) throw AppError.serviceUnavailable('League scoring unavailable');
+      scoring = mirrorRulesIntoSettings(null, catalog.data ?? [], rules.data ?? []);
+      if (Object.keys(scoring).length === 0) throw AppError.serviceUnavailable('League scoring unavailable');
+    }
     const tier = await this.getTier();
     // The interface has always said "last completed season"; the code read
     // getCurrentSeason(), which flips on the opener to a season with no stat
@@ -537,7 +589,7 @@ export class DraftKitService {
       else clubs.set(d.player_id, { current: null, previous: d.team_abbrev ?? null });
     }
 
-    const { cards, cohortSizes } = this.buildCards(players, goalieGsax, clubs);
+    const { cards, cohortSizes } = this.buildCards(players, goalieGsax, clubs, scoring);
 
     const allRosterChanges: RosterChange[] = cards
       .filter((c) => c.previousTeam)

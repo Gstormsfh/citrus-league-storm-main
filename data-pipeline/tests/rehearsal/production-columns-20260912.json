@@ -1,0 +1,1864 @@
+[
+  {
+    "table_name": "league_scoring_rules",
+    "column_name": "league_id",
+    "data_type": "uuid",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "league_scoring_rules",
+    "column_name": "stat_key",
+    "data_type": "text",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "league_scoring_rules",
+    "column_name": "multiplier",
+    "data_type": "numeric",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "league_scoring_rules",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "not_null": true,
+    "default_expression": "now()"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "id",
+    "data_type": "uuid",
+    "not_null": true,
+    "default_expression": "gen_random_uuid()"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "name",
+    "data_type": "text",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "commissioner_id",
+    "data_type": "uuid",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "draft_status",
+    "data_type": "draft_status",
+    "not_null": true,
+    "default_expression": "'not_started'::draft_status"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "join_code",
+    "data_type": "text",
+    "not_null": true,
+    "default_expression": "generate_join_code()"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "roster_size",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "21"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "draft_rounds",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "21"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "settings",
+    "data_type": "jsonb",
+    "not_null": false,
+    "default_expression": "'{}'::jsonb"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "not_null": true,
+    "default_expression": "now()"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "not_null": true,
+    "default_expression": "now()"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "scoring_settings",
+    "data_type": "jsonb",
+    "not_null": false,
+    "default_expression": "'{\"goalie\": {\"wins\": 5, \"saves\": 0.6, \"shutouts\": 5, \"goals_against\": -3}, \"skater\": {\"hits\": 0, \"goals\": 6, \"blocks\": 1, \"assists\": 4, \"plus_minus\": 0, \"shots_on_goal\": 0.9, \"penalty_minutes\": 0, \"power_play_points\": 2, \"short_handed_points\": 0}, \"advanced\": {\"assist_per_goal_ratio\": 0.0, \"use_fractional_scoring\": false, \"shooting_percentage_bonus\": 0.0}}'::jsonb"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "league_size",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "roster_slots",
+    "data_type": "jsonb",
+    "not_null": false,
+    "default_expression": "'{\"C\": 2, \"D\": 4, \"G\": 2, \"LW\": 2, \"RW\": 2}'::jsonb"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "waiver_process_time",
+    "data_type": "time without time zone",
+    "not_null": false,
+    "default_expression": "'03:00:00'::time without time zone"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "waiver_period_hours",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": "48"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "waiver_game_lock",
+    "data_type": "boolean",
+    "not_null": false,
+    "default_expression": "true"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "waiver_type",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": "'rolling'::text"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "allow_trades_during_games",
+    "data_type": "boolean",
+    "not_null": false,
+    "default_expression": "true"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "scheduled_draft_time",
+    "data_type": "timestamp with time zone",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "trade_review_type",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": "'none'::text"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "trade_review_period_hours",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": "48"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "trade_veto_threshold",
+    "data_type": "numeric",
+    "not_null": false,
+    "default_expression": "0.5"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "pool_status",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": "'active'::text"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "pool_winner_id",
+    "data_type": "uuid",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "pool_winner_declared_at",
+    "data_type": "timestamp with time zone",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "draft_event_counter",
+    "data_type": "bigint",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "draft_state",
+    "data_type": "text",
+    "not_null": true,
+    "default_expression": "'not_started'::text"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "pick_deadline",
+    "data_type": "timestamp with time zone",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "feature_flags",
+    "data_type": "jsonb",
+    "not_null": true,
+    "default_expression": "'{}'::jsonb"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "draft_generation",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "draft_shadow_mode",
+    "data_type": "boolean",
+    "not_null": true,
+    "default_expression": "true"
+  },
+  {
+    "table_name": "leagues",
+    "column_name": "playoff_season",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "id",
+    "data_type": "uuid",
+    "not_null": true,
+    "default_expression": "gen_random_uuid()"
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "game_id",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "game_date",
+    "data_type": "date",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "game_time",
+    "data_type": "timestamp with time zone",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "home_team",
+    "data_type": "text",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "away_team",
+    "data_type": "text",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "home_score",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "away_score",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "status",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": "'scheduled'::text"
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "period",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "period_time",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "venue",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "season",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "game_type",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": "'regular'::text"
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "not_null": true,
+    "default_expression": "now()"
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "not_null": true,
+    "default_expression": "now()"
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "home_team_id",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "away_team_id",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "moneyline_home",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "moneyline_away",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "implied_win_probability_home",
+    "data_type": "numeric(4,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "implied_win_probability_away",
+    "data_type": "numeric(4,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "playoff_round",
+    "data_type": "smallint",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "series_id",
+    "data_type": "uuid",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "nhl_games",
+    "column_name": "series_game_number",
+    "data_type": "smallint",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "season",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "player_id",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "full_name",
+    "data_type": "text",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "team_abbrev",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "position_code",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "is_goalie",
+    "data_type": "boolean",
+    "not_null": true,
+    "default_expression": "false"
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "jersey_number",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "headshot_url",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "shoots_catches",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "not_null": true,
+    "default_expression": "now()"
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "not_null": true,
+    "default_expression": "now()"
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "height_in",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "weight_lb",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "birthdate",
+    "data_type": "date",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "nationality",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "college_team",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "prior_team",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "bio_summary",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "notes",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "source_last_fetched_at",
+    "data_type": "timestamp with time zone",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "eligible_positions",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "career",
+    "data_type": "jsonb",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_directory",
+    "column_name": "career_fetched_at",
+    "data_type": "timestamp with time zone",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "season",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "game_id",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "game_date",
+    "data_type": "date",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "player_id",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "team_abbrev",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "position_code",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "is_goalie",
+    "data_type": "boolean",
+    "not_null": true,
+    "default_expression": "false"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "goals",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "primary_assists",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "secondary_assists",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "points",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "shots_on_goal",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "hits",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "blocks",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "pim",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "ppp",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "shp",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "plus_minus",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "icetime_seconds",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "goalie_gp",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "wins",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "saves",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "shots_faced",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "goals_against",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "shutouts",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "not_null": true,
+    "default_expression": "now()"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "not_null": true,
+    "default_expression": "now()"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_goals",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_assists",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_points",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_shots_on_goal",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_hits",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_blocks",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_pim",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_ppp",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_shp",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_plus_minus",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_toi_seconds",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_wins",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_losses",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_ot_losses",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_saves",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_shots_faced",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_goals_against",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_shutouts",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_faceoff_wins",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_faceoff_losses",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_takeaways",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_giveaways",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_ppg",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_ppa",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_shg",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_sha",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_shots_missed",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_shots_attempted",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_shifts",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_gwg",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_save_pct",
+    "data_type": "numeric(5,3)",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_pp_saves",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_sh_saves",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_faceoff_taken",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_shots_blocked",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_shot_attempts",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_otg",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_even_saves",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_even_shots_against",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_pp_shots_against",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_game_stats",
+    "column_name": "nhl_sh_shots_against",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projection_id",
+    "data_type": "uuid",
+    "not_null": true,
+    "default_expression": "gen_random_uuid()"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "player_id",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "game_id",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projection_date",
+    "data_type": "date",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_goals",
+    "data_type": "numeric(5,3)",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_assists",
+    "data_type": "numeric(5,3)",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_sog",
+    "data_type": "numeric(5,3)",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_blocks",
+    "data_type": "numeric(5,3)",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_xg",
+    "data_type": "numeric(5,3)",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "total_projected_points",
+    "data_type": "numeric(10,3)",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "base_ppg",
+    "data_type": "numeric(5,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "shrinkage_weight",
+    "data_type": "numeric(4,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "finishing_multiplier",
+    "data_type": "numeric(4,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "opponent_adjustment",
+    "data_type": "numeric(4,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "b2b_penalty",
+    "data_type": "numeric(4,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "home_away_adjustment",
+    "data_type": "numeric(4,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "calculation_method",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": "'hybrid_bayesian'::text"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "confidence_score",
+    "data_type": "numeric(3,2)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "season",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "not_null": true,
+    "default_expression": "now()"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "not_null": true,
+    "default_expression": "now()"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "is_goalie",
+    "data_type": "boolean",
+    "not_null": true,
+    "default_expression": "false"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_wins",
+    "data_type": "numeric(5,3)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_saves",
+    "data_type": "numeric(7,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_shutouts",
+    "data_type": "numeric(5,3)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_goals_against",
+    "data_type": "numeric(5,3)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_gaa",
+    "data_type": "numeric(4,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_save_pct",
+    "data_type": "numeric(4,3)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_gp",
+    "data_type": "numeric(3,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "starter_confirmed",
+    "data_type": "boolean",
+    "not_null": false,
+    "default_expression": "false"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_ppp",
+    "data_type": "numeric(5,3)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_shp",
+    "data_type": "numeric(5,3)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_hits",
+    "data_type": "numeric(5,3)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_pim",
+    "data_type": "numeric(5,3)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projected_vopa",
+    "data_type": "numeric(10,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "opponent_team_id",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "opponent_abbrev",
+    "data_type": "character varying(3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "is_home_game",
+    "data_type": "boolean",
+    "not_null": false,
+    "default_expression": "false"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "matchup_difficulty",
+    "data_type": "numeric(3,2)",
+    "not_null": false,
+    "default_expression": "1.00"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "injury_status",
+    "data_type": "character varying(20)",
+    "not_null": false,
+    "default_expression": "'healthy'::character varying"
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "game_start_time",
+    "data_type": "timestamp with time zone",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projection_mean",
+    "data_type": "numeric(10,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projection_std_dev",
+    "data_type": "numeric(10,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projection_ci_lower",
+    "data_type": "numeric(10,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projection_ci_upper",
+    "data_type": "numeric(10,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projection_ci_50_lower",
+    "data_type": "numeric(10,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projection_ci_50_upper",
+    "data_type": "numeric(10,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projection_median",
+    "data_type": "numeric(10,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "projection_skewness",
+    "data_type": "numeric(6,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "upside_probability",
+    "data_type": "numeric(5,4)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "floor_probability",
+    "data_type": "numeric(5,4)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "dynamic_confidence",
+    "data_type": "numeric(4,3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "likely_low",
+    "data_type": "numeric(6,1)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "likely_high",
+    "data_type": "numeric(6,1)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_projected_stats",
+    "column_name": "confidence_label",
+    "data_type": "text",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "player_id",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "season",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "games_remaining",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "games_played",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "total_projected_points",
+    "data_type": "numeric(8,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "projected_goals",
+    "data_type": "numeric(6,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "projected_assists",
+    "data_type": "numeric(6,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "projected_sog",
+    "data_type": "numeric(6,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "projected_blocks",
+    "data_type": "numeric(6,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "projected_ppp",
+    "data_type": "numeric(6,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "projected_shp",
+    "data_type": "numeric(6,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "projected_hits",
+    "data_type": "numeric(6,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "projected_pim",
+    "data_type": "numeric(6,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "avg_points_per_game",
+    "data_type": "numeric(4,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "avg_goals_per_game",
+    "data_type": "numeric(4,3)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "avg_assists_per_game",
+    "data_type": "numeric(4,3)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "playoff_games",
+    "data_type": "integer",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "playoff_week_projection",
+    "data_type": "numeric(6,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "projected_wins_ros",
+    "data_type": "numeric(5,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "projected_saves_ros",
+    "data_type": "numeric(7,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "projected_shutouts_ros",
+    "data_type": "numeric(4,2)",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "player_name",
+    "data_type": "character varying(100)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "team_abbrev",
+    "data_type": "character varying(3)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "position",
+    "data_type": "character varying(5)",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "is_goalie",
+    "data_type": "boolean",
+    "not_null": false,
+    "default_expression": "false"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "not_null": true,
+    "default_expression": "now()"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "not_null": true,
+    "default_expression": "now()"
+  },
+  {
+    "table_name": "player_ros_projections",
+    "column_name": "projected_ga_ros",
+    "data_type": "numeric",
+    "not_null": false,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "season",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "game_type",
+    "data_type": "text",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "player_id",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "team_id",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "shots",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "sog",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "goals",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "xg",
+    "data_type": "double precision",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "finishing",
+    "data_type": "double precision",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "shots_ev",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "shots_pp",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "shots_pk",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "goals_ev",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "goals_pp",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "goals_sh",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "xg_ev",
+    "data_type": "double precision",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "xg_pp",
+    "data_type": "double precision",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "xg_pk",
+    "data_type": "double precision",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "goals_en",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "xg_en",
+    "data_type": "double precision",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "avg_dist",
+    "data_type": "double precision",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "avg_xg_per_shot",
+    "data_type": "double precision",
+    "not_null": false,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "rebounds_shot",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "rush_shots",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "player_xg_season",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "not_null": true,
+    "default_expression": "now()"
+  },
+  {
+    "table_name": "stat_catalog",
+    "column_name": "stat_key",
+    "data_type": "text",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "stat_catalog",
+    "column_name": "display_name",
+    "data_type": "text",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "stat_catalog",
+    "column_name": "applies_to",
+    "data_type": "text",
+    "not_null": true,
+    "default_expression": null
+  },
+  {
+    "table_name": "stat_catalog",
+    "column_name": "default_multiplier",
+    "data_type": "numeric",
+    "not_null": true,
+    "default_expression": "0"
+  },
+  {
+    "table_name": "stat_catalog",
+    "column_name": "is_core",
+    "data_type": "boolean",
+    "not_null": true,
+    "default_expression": "false"
+  },
+  {
+    "table_name": "stat_catalog",
+    "column_name": "sort_order",
+    "data_type": "integer",
+    "not_null": true,
+    "default_expression": "100"
+  }
+]

@@ -89,11 +89,10 @@ Write-Host "  - Start automatically at system boot"
 Write-Host "  - Run daily PBP processing at 11:59 PM"
 Write-Host "  - Run adaptive live ingestion (30s during games, 5min off-hours)"
 Write-Host "  - Run live stats updates during game nights (every 30s)"
-Write-Host "  - Run daily projections at 6:00 AM"
+Write-Host "  - Projection generation has separate SQL ownership; this installer does not schedule it"
 Write-Host ""
 Write-Host "Logs will be written to: $logDir\data_scraping_service.log"
 Write-Host ""
 Write-Host "To uninstall, run: .\ops\windows\uninstall_data_scraping_service.ps1"
 Write-Host ""
-
 

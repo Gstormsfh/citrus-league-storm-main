@@ -1,0 +1,105 @@
+[
+  {
+    "id": 8478402,
+    "name": "Connor McDavid",
+    "position": "C",
+    "statsSeason": 2025,
+    "source": "https://api-web.nhle.com/v1/player/8478402/landing",
+    "retrievedAt": "2026-09-12",
+    "stats": {
+      "gamesPlayed": 82,
+      "goals": 48,
+      "assists": 90,
+      "points": 138,
+      "shots": 306,
+      "powerPlayPoints": 54,
+      "toi": "22:59"
+    }
+  },
+  {
+    "id": 8477492,
+    "name": "Nathan MacKinnon",
+    "position": "C",
+    "statsSeason": 2025,
+    "source": "https://api-web.nhle.com/v1/player/8477492/landing",
+    "retrievedAt": "2026-09-12",
+    "stats": {
+      "gamesPlayed": 80,
+      "goals": 53,
+      "assists": 74,
+      "points": 127,
+      "shots": 350,
+      "powerPlayPoints": 30,
+      "toi": "22:16"
+    }
+  },
+  {
+    "id": 8476453,
+    "name": "Nikita Kucherov",
+    "position": "R",
+    "statsSeason": 2025,
+    "source": "https://api-web.nhle.com/v1/player/8476453/landing",
+    "retrievedAt": "2026-09-12",
+    "stats": {
+      "gamesPlayed": 76,
+      "goals": 44,
+      "assists": 86,
+      "points": 130,
+      "shots": 231,
+      "powerPlayPoints": 37,
+      "toi": "20:20"
+    }
+  },
+  {
+    "id": 8477934,
+    "name": "Leon Draisaitl",
+    "position": "C",
+    "statsSeason": 2025,
+    "source": "https://api-web.nhle.com/v1/player/8477934/landing",
+    "retrievedAt": "2026-09-12",
+    "stats": {
+      "gamesPlayed": 65,
+      "goals": 35,
+      "assists": 62,
+      "points": 97,
+      "shots": 186,
+      "powerPlayPoints": 42,
+      "toi": "21:35"
+    }
+  },
+  {
+    "id": 8480069,
+    "name": "Cale Makar",
+    "position": "D",
+    "statsSeason": 2025,
+    "source": "https://api-web.nhle.com/v1/player/8480069/landing",
+    "retrievedAt": "2026-09-12",
+    "stats": {
+      "gamesPlayed": 75,
+      "goals": 20,
+      "assists": 59,
+      "points": 79,
+      "shots": 199,
+      "powerPlayPoints": 29,
+      "toi": "24:51"
+    }
+  },
+  {
+    "id": 8476945,
+    "name": "Connor Hellebuyck",
+    "position": "G",
+    "statsSeason": 2025,
+    "source": "https://api-web.nhle.com/v1/player/8476945/landing",
+    "retrievedAt": "2026-09-12",
+    "stats": {
+      "gamesPlayed": 57,
+      "goals": 0,
+      "assists": 0,
+      "wins": 23,
+      "losses": 23,
+      "shutouts": 0,
+      "savePct": 0.895281,
+      "gaa": 2.857605
+    }
+  }
+]

@@ -1,0 +1,4 @@
+# Reproducible local delivery artifacts; generate with scripts/draft-guide/build.py.
+*.pdf
+*.manifest.json
+archive/

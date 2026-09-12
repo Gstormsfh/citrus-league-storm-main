@@ -1,6 +1,8 @@
+import { NewsRoomService } from './NewsRoomService';
 import { SupabaseClient } from '@supabase/supabase-js';
 import {
   buildWriteupFromSources,
+  extractFormatSettings,
   logger,
   type DashboardIndexEntry,
   type CareerSummary,
@@ -71,9 +73,13 @@ export class PlayerWriteupService {
       const entry = players.find((p: DashboardIndexEntry) => p.id === input.playerId);
       if (!entry) return null;
 
-      const [directory, scoring] = await Promise.all([
+      const [directory, scoring, newsItems] = await Promise.all([
         this.directoryFor(input.playerId),
         this.scoringFor(input.leagueId, input.userId),
+        new NewsRoomService(this.supabase).forPlayer(input.playerId, 20).catch((err) => {
+          logger.debug('[PlayerWriteupService] news unavailable:', err);
+          return [];
+        }),
       ]);
 
       return buildWriteupFromSources({
@@ -82,8 +88,10 @@ export class PlayerWriteupService {
         xgSeasons: input.xgSeasons ?? null,
         career: directory.career,
         birthdate: directory.birthdate,
-        scoring,
+        scoring: scoring?.settings ?? null,
+        scoringFormat: scoring?.format ?? null,
         now: input.now,
+        newsItems,
       });
     } catch (err) {
       logger.debug('[PlayerWriteupService] writeup unavailable:', err);
@@ -148,20 +156,21 @@ export class PlayerWriteupService {
   private async scoringFor(
     leagueId: string | null | undefined,
     userId: string | null | undefined,
-  ): Promise<Record<string, unknown> | null> {
+  ): Promise<{ settings: Record<string, unknown>; format: string } | null> {
     if (!leagueId || !userId) return null;
 
     const membership = new LeagueMembershipService(this.supabase);
     if (!(await membership.verifyMembership(leagueId, userId))) return null;
 
-    const [catalogRes, rulesRes] = await Promise.all([
+    const [catalogRes, rulesRes, leagueRes] = await Promise.all([
       this.supabase.from('stat_catalog').select('stat_key, applies_to'),
       this.supabase.rpc('get_effective_scoring_rules', { p_league_id: leagueId }),
+      this.supabase.from('leagues').select('settings').eq('id', leagueId).maybeSingle(),
     ]);
-    if (catalogRes.error || rulesRes.error) {
+    if (catalogRes.error || rulesRes.error || leagueRes.error || !leagueRes.data) {
       logger.debug(
         '[PlayerWriteupService] scoring rules unavailable:',
-        catalogRes.error?.message ?? rulesRes.error?.message,
+        catalogRes.error?.message ?? rulesRes.error?.message ?? leagueRes.error?.message,
       );
       return null;
     }
@@ -175,6 +184,7 @@ export class PlayerWriteupService {
     // which scores every player at exactly 0.0 fantasy points. That is not a
     // projection, it is a lie with a decimal point, so it degrades to no
     // sentence at all.
-    return Object.keys(settings).length > 0 ? settings : null;
+    return Object.keys(settings).length > 0
+      ? { settings, format: extractFormatSettings(leagueRes.data.settings ?? {}).scoringFormat ?? 'h2h-points' } : null;
   }
 }

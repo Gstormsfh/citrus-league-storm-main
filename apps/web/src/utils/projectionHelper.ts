@@ -1,10 +1,12 @@
+import { playerApi } from '@/api/players';
+import { ScheduleService } from '@/services/ScheduleService';
 import { apiClient } from '@/api/client';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import { getCurrentSeason, getProjectionsSeason } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
 import { ScoringCalculator } from '@citrus/shared';
-import { projectedPointsFor, type ProjectedStatRow } from '@citrus/shared/leagueProjection';
+import { expectedDailyProjection, projectionSettings } from '@citrus/shared/leagueProjection';
 
 /**
  * Get weekly projected fantasy points for players
@@ -15,15 +17,10 @@ export async function getWeeklyProjections(
   playerIds: number[],
   weekStart: Date,
   weekEnd: Date,
-  /**
-   * The league's scorer. With one, each day is scored from its component
-   * stats under that league's weights; without one, the stored total stands,
-   * which is baked with DEFAULT scoring (routes/players.ts:184). Optional so
-   * the callers that have no league in hand keep working unchanged.
-   */
+  /** Required loaded league scorer; absent scoring cannot produce fantasy points. */
   scorer?: ScoringCalculator,
 ): Promise<Map<number, number>> {
-  if (!playerIds || playerIds.length === 0) {
+  if (!scorer || !playerIds || playerIds.length === 0) {
     return new Map();
   }
 
@@ -61,18 +58,38 @@ export async function getWeeklyProjections(
       `/api/players/projections/batch?ids=${playerIds.join(',')}&startDate=${startDate}&endDate=${endDate}&season=${getProjectionsSeason()}`
     );
 
-    // Sum projections per player across all days
+    if (!Array.isArray(data)) return new Map();
+    const directory = await playerApi.getPlayersByIds(playerIds.map(String));
+    if (!Array.isArray(directory.data)) return new Map();
+    const identities = new Map<number, { team: string; goalie: boolean }>();
+    const ambiguous = new Set<number>();
+    for (const player of directory.data as Array<{ id: number; team?: string; position?: string; is_goalie?: boolean }>) {
+      const id = Number(player.id);
+      if (identities.has(id)) ambiguous.add(id);
+      if (player.team) identities.set(id, { team: player.team.toUpperCase(), goalie: player.is_goalie === true || player.position === 'G' });
+    }
+    const schedule = await ScheduleService.getGamesForTeams([...new Set([...identities.values()].map(p => p.team))], weekStart, weekEnd);
+    if (schedule.error) return new Map();
     const weeklyTotals = new Map<number, number>();
-
-    ((data || []) as Record<string, unknown>[]).forEach((projection) => {
-      const playerId = Number(projection.player_id);
-      const points = scorer
-        ? projectedPointsFor(projection as ProjectedStatRow, scorer)
-        : Number(projection.total_projected_points) || 0;
-      const current = weeklyTotals.get(playerId) || 0;
-      weeklyTotals.set(playerId, current + points);
-    });
-
+    for (const id of new Set(playerIds)) {
+      const identity = identities.get(id);
+      if (!identity || ambiguous.has(id)) continue;
+      const games = schedule.gamesByTeam.get(identity.team);
+      if (!games) continue;
+      const scheduledDates = new Set(games.filter(game => game.status !== 'postponed')
+        .map(game => game.game_date.slice(0, 10)).filter(date => date >= startDate && date <= endDate));
+      const rows = (data as Record<string, unknown>[]).filter(row => Number(row.player_id) === id);
+      let total = 0;
+      let complete = true;
+      for (const date of scheduledDates) {
+        const day = rows.filter(row => String(row.projection_date).slice(0, 10) === date);
+        if (day.length !== 1) { complete = false; break; }
+        const expected = expectedDailyProjection(day[0], scorer.getSettings(), identity.goalie);
+        if (!expected) { complete = false; break; }
+        total += expected.total_projected_points;
+      }
+      if (complete) weeklyTotals.set(id, total);
+    }
     return weeklyTotals;
   } catch (error) {
     logger.error('Error in getWeeklyProjections:', error);
@@ -118,11 +135,14 @@ export async function getLeagueAverageProjections(
       return new Map();
     }
 
-    // Get weekly projections for all players
+    const { data: league } = await leagueApi.getLeague(leagueId) as { data?: { scoring_settings?: unknown } };
+    if (!league || !('scoring_settings' in league)) return new Map();
+    // Explicitly loaded persisted rules; no stored/default total fallback.
     const weeklyProjections = await getWeeklyProjections(
       Array.from(allPlayerIds),
       weekStart,
-      weekEnd
+      weekEnd,
+      new ScoringCalculator(projectionSettings(league.scoring_settings))
     );
 
     // Get player positions to group by position via API client
@@ -145,7 +165,8 @@ export async function getLeagueAverageProjections(
 
       if (!normalizedPos) return;
 
-      const projectedPoints = weeklyProjections.get(playerId) || 0;
+      const projectedPoints = weeklyProjections.get(playerId);
+      if (projectedPoints == null) return;
       const current = positionTotals.get(normalizedPos) || { total: 0, count: 0 };
       positionTotals.set(normalizedPos, {
         total: current.total + projectedPoints,

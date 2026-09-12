@@ -78,7 +78,9 @@ describe('the projection reaches the pool', () => {
 
   it('the pool ranks by the projection when it has one', () => {
     const src = code(POOL);
-    expect(src).toContain('projectedFptsMap.get(p.id)');
+    expect(src).toContain('rankDraftCandidates(availablePlayers, projectedFptsMap, calcFpts)');
+    const ranking = code(read('../components/draft/draftDecision.ts'));
+    expect(ranking).toContain('forecast: projections.get(player.id)?.total');
   });
 });
 

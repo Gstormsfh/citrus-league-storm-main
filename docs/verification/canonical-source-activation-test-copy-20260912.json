@@ -1,0 +1,67 @@
+{
+  "test_revision": "ac6291b9e51d269ddb6e4aca35016130aa1d3b90c564a21cb1a23d73d4483612",
+  "validation": {
+    "valid": true,
+    "errors": [],
+    "checked_at": "2026-09-12T09:09:56.862255+00:00"
+  },
+  "activation": {
+    "run_id": "25e7e9e8-ac59-4175-9caa-f364fac77ad6",
+    "season": 2026,
+    "revision": "ac6291b9e51d269ddb6e4aca35016130aa1d3b90c564a21cb1a23d73d4483612",
+    "readiness": "published"
+  },
+  "projected_players": 674,
+  "daily_rows": 56616,
+  "checked_categories": [
+    "goals",
+    "assists",
+    "shots_on_goal",
+    "blocks",
+    "power_play_points",
+    "short_handed_points",
+    "hits",
+    "penalty_minutes",
+    "wins",
+    "saves",
+    "shutouts",
+    "goals_against"
+  ],
+  "unmapped_nonzero_categories": [
+    {
+      "player_id": "8483669",
+      "stat": "plus_minus",
+      "count": -0.4671516662388652
+    }
+  ],
+  "source_players_teams_schedule_unchanged": true,
+  "original_draft_bytes_unchanged": true,
+  "rollback_fingerprints": {
+    "canonical_projection_active": "ea298754e780a75cdc2d00c3a321b8c8",
+    "canonical_projection_runs": "661e1b1a4db99988abce00cfcd65d7bf",
+    "canonical_projection_players": "2fdaeabc7726e8021dcd14edd95f780b",
+    "player_ros_projections": "b2921d251d1157636731c840cbe26d6d",
+    "player_projected_stats": "153a64f99606234b112569ac93f873aa",
+    "player_directory": "fe7f8edc11a6216a935c37905e9afa16",
+    "nhl_games": "a7271d46902634e2e450f48debde7dff"
+  },
+  "checks": [
+    "All projected player IDs and exposure match source",
+    "All exported categories match source and daily sums per player within 1e-8",
+    "ROS and daily default points match source scored from shared scoring JSON per player within 1e-8",
+    "All ROS/daily rows carry activated test run and revision",
+    "Rollback restored original pointer, runs, player records, outputs, directory and schedule"
+  ],
+  "source_revision": "6a71c8db63eb6ee43798f8ab963652b89c103d2f9dae718f3d51b0abb97dd117",
+  "source_sha256": "d2ee0bc9d55231b0541ba10f3c114c253f57c252923f41ad834967a595e111fa",
+  "directory_rows": 1312,
+  "regular_games": 1344,
+  "scope": "Isolated local rollback-only rehearsal; test copy is not human approval, original remains DRAFT, no production write",
+  "migration_sha256": {
+    "20260912073140_canonical_projection_runs.sql": "6a2092e4a93d029ce4ae7c9de4a19c2f817f8cb3c0dc2d8957b25253ca900e92",
+    "20260912073240_canonical_projection_materialization.sql": "f9202da5ecc849d4b32a078e63b50ac9d9495423328a47424099877b2c08e216",
+    "20260912073340_canonical_projection_refresh.sql": "157572aeebc22de75b1ff0915b5f070c4d4f62a1507306d8c4443c45775950ac",
+    "20260912073440_scoring_rules_replace_removed_keys.sql": "184040fe215bf46a0fdecb7ed774c5d666aac73904a4cb48b49b00c895f6a519",
+    "20260912073540_canonical_projection_write_boundary.sql": "625ef55720681de6ce472ce11b01245c094420cc56f70b8b2310c183ddbaa439"
+  }
+}

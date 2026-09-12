@@ -1,20 +1,22 @@
 # 🏒 CITRUS LEAGUE - OPERATIONS GUIDE
 
-## ⚡ TLDR - Just Run This
+> Current projection ownership, 12 September 2026: SQL pg_cron owns the verified ROS and daily rebuilds. The commands and daemon schedules below are historical/operator paths, not instructions to run a second writer against the same outputs. Verify the deployed host command and current ownership first; see the [data-lineage map](docs/audits/citrus-data-lineage-2026-09-12.md).
+
+## Historical daemon entry point
 
 ```bash
-python data_scraping_service.py
+python data-pipeline/acquisition/data_scraping_service.py
 ```
 
-**That's it!** This service handles everything:
+The daemon contains these responsibilities; this document does not establish that its host scheduler is currently running:
 - ✅ Detects live games automatically
 - ✅ Updates player stats every 30 seconds during games
 - ✅ Calculates matchup fantasy points
 - ✅ Runs projections at 6 AM
 - ✅ Processes PBP data at 11:59 PM
 
-### Nightly (Automatic - updates PPP/SHP after games):
-Runs automatically at midnight MT via `data_scraping_service.py`
+### Historical landing-stat schedule
+The daemon contains a midnight-Mountain landing-stat path; current host activation and execution must be verified.
 
 ---
 
@@ -28,7 +30,7 @@ Runs automatically at midnight MT via `data_scraping_service.py`
 | **Per-game PPP/SHP** | **Game-Log API** | `sync_ppp_from_gamelog.py` (auto after games) |
 | **Season PPP/SHP** | **Landing Endpoint** | `fetch_nhl_stats_from_landing.py` |
 
-✅ **PPP/SHP are now synced automatically!** 
+**PPP/SHP code paths (live execution not established by this runbook):**
 - Per-game: `sync_ppp_from_gamelog.py` runs after games finish
 - Season totals: `fetch_nhl_stats_from_landing.py` (nightly at midnight MT)
 
@@ -43,7 +45,7 @@ Runs automatically at midnight MT via `data_scraping_service.py`
 | `data_scraping_service.py` | **Main scheduler** - runs everything | Always running during season |
 | `scrape_live_nhl_stats.py` | Live game updates | Called by service |
 | `calculate_matchup_scores.py` | Fantasy point calculations | Called by service |
-| `fetch_nhl_stats_from_landing.py` | Get PPP/SHP from NHL.com | Nightly (automatic at midnight MT) |
+| `fetch_nhl_stats_from_landing.py` | Get PPP/SHP from NHL.com | Historical midnight schedule; host unverified |
 | `build_player_season_stats.py` | Aggregate per-game → season | Called by service |
 | `run_daily_projections.py` | Player projections | End of day |
 
@@ -65,12 +67,12 @@ data_scraping_service.py (running)
 ### End of Day (After Games)
 ```bash
 # If not already done by service:
-python build_player_season_stats.py    # Aggregate stats
-python run_daily_projections.py        # Update projections
+python data-pipeline/projections/build_player_season_stats.py  # Manual writer; verify ownership first
+python data-pipeline/projections/run_daily_projections.py      # Manual competing writer; not a read-only check
 ```
 
-### Nightly Maintenance (Automatic)
-- `fetch_nhl_stats_from_landing.py` runs automatically at midnight MT
+### Manual/host maintenance: verify ownership first
+- `fetch_nhl_stats_from_landing.py` has a historical midnight schedule; verify the deployed host before treating it as active.
 - Updates PPP/SHP season totals from NHL.com landing endpoint
 - Optimized with 100-IP proxy rotation for fast execution (~2-5 minutes)
 
@@ -83,7 +85,7 @@ python run_daily_projections.py        # Update projections
 | Per-game stats | NHL Boxscore API | `scrape_live_nhl_stats.py` |
 | PPP, SHP | NHL Landing Endpoint | `fetch_nhl_stats_from_landing.py` |
 | Play-by-play | NHL PBP API | `ingest_live_raw_nhl.py` |
-| Projections | Internal calculation | `run_daily_projections.py` |
+| Projections | SQL historical rates / schedule; separate Python tooling | Verified SQL `rebuild_ros_projections` / `rebuild_player_projected_stats`; Python batch invocation remains unverified |
 
 ---
 

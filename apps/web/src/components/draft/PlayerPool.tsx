@@ -1,3 +1,4 @@
+import { rankDraftCandidates } from './draftDecision';
 import { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -62,6 +63,7 @@ interface PlayerPoolProps {
   draftedPlayerSet?: Set<string>;
   /** League scoring settings for calculating fantasy points */
   scoringSettings?: ScoringSettings | null;
+  scoringReady?: boolean;
   /** Pre-computed projected FPTS from ROS projections */
   projectedFptsMap?: Map<string, DraftProjection>;
   /**
@@ -151,6 +153,7 @@ export const PlayerPool = memo(({
   watchlist = new Set(),
   draftedPlayerSet: externalDraftedSet,
   scoringSettings,
+  scoringReady = false,
   projectedFptsMap = EMPTY_PROJECTIONS,
   qualitySignals = EMPTY_SIGNALS,
   isYourTurn = false,
@@ -239,19 +242,8 @@ export const PlayerPool = memo(({
    * was before.
    */
   const rankMap = useMemo<Map<string, number>>(() => {
-    const projected: { id: string; value: number }[] = [];
-    const unprojected: { id: string; value: number }[] = [];
-    for (const p of availablePlayers) {
-      const proj = projectedFptsMap.get(p.id);
-      if (proj && Number.isFinite(proj.total)) projected.push({ id: p.id, value: proj.total });
-      else unprojected.push({ id: p.id, value: calcFpts(p) });
-    }
-    projected.sort((a, b) => b.value - a.value);
-    unprojected.sort((a, b) => b.value - a.value);
     const map = new Map<string, number>();
-    [...projected, ...unprojected].forEach((p, i) => {
-      map.set(p.id, i + 1);
-    });
+    rankDraftCandidates(availablePlayers, projectedFptsMap, calcFpts).forEach((p, i) => map.set(p.id, i + 1));
     return map;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availablePlayers, scorer, projectedFptsMap]);
@@ -333,6 +325,11 @@ export const PlayerPool = memo(({
       return ra - rb;
     };
     const goalieSort = (a: typeof filtered[0], b: typeof filtered[0]) => {
+      if (sortBy === 'projFpts' || sortBy === 'projFptsPerGp') {
+        const key = sortBy === 'projFpts' ? 'total' : 'perGp';
+        const av = projectedFptsMap.get(a.id)?.[key], bv = projectedFptsMap.get(b.id)?.[key];
+        if (av == null || bv == null) return av == null ? (bv == null ? 0 : 1) : -1;
+      }
       if (sortBy === 'projRank') return rankCompare(a, b);
       let comparison = 0;
       switch (sortBy) {
@@ -357,6 +354,11 @@ export const PlayerPool = memo(({
     };
 
     const skaterSort = (a: typeof filtered[0], b: typeof filtered[0]) => {
+      if (sortBy === 'projFpts' || sortBy === 'projFptsPerGp') {
+        const key = sortBy === 'projFpts' ? 'total' : 'perGp';
+        const av = projectedFptsMap.get(a.id)?.[key], bv = projectedFptsMap.get(b.id)?.[key];
+        if (av == null || bv == null) return av == null ? (bv == null ? 0 : 1) : -1;
+      }
       if (sortBy === 'projRank') return rankCompare(a, b);
       let comparison = 0;
       switch (sortBy) {
@@ -492,8 +494,8 @@ export const PlayerPool = memo(({
         </td>
         <td className="px-2 py-1.5 text-xs text-pastel-cream/70">{player.team}</td>
         <td className="px-2 py-1.5 text-xs text-center font-medium text-pastel-cream">{player.games_played}</td>
-        <td className="px-2 py-1.5 text-xs text-center font-bold text-sky-300 bg-sky-500/10" title={`${projectedFptsMap.get(player.id)?.gamesRemaining || 0} games remaining`}>{(projectedFptsMap.get(player.id)?.total || 0) > 0 ? (projectedFptsMap.get(player.id)!.total).toFixed(1) : '-'}</td>
-        <td className="px-2 py-1.5 text-xs text-center font-semibold text-sky-300 bg-sky-500/10">{(projectedFptsMap.get(player.id)?.perGp || 0) > 0 ? (projectedFptsMap.get(player.id)!.perGp).toFixed(2) : '-'}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-bold text-sky-300 bg-sky-500/10" title={`${projectedFptsMap.get(player.id)?.gamesRemaining || 0} games remaining`}>{Number.isFinite(projectedFptsMap.get(player.id)?.total) ? (projectedFptsMap.get(player.id)!.total).toFixed(1) : '-'}</td>
+        <td className="px-2 py-1.5 text-xs text-center font-semibold text-sky-300 bg-sky-500/10">{Number.isFinite(projectedFptsMap.get(player.id)?.perGp) ? (projectedFptsMap.get(player.id)!.perGp).toFixed(2) : '-'}</td>
         <td className="px-2 py-1.5 text-xs text-center font-bold text-emerald-300 bg-emerald-500/10">{(fptsMap.get(player.id) || 0).toFixed(1)}</td>
         <td className="px-2 py-1.5 text-xs text-center font-semibold text-emerald-300 bg-emerald-500/10">{player.games_played ? ((fptsMap.get(player.id) || 0) / player.games_played).toFixed(2) : '-'}</td>
         {player.position === 'G' ? (
@@ -716,7 +718,9 @@ export const PlayerPool = memo(({
           const isSelected = selectedPlayer?.id === player.id;
           const isDrafted = draftedSet.has(player.id);
           const queueIndex = queue.indexOf(player.id);
-          return (
+
+
+  return (
             <DraftPoolRow
               key={player.id}
               rank={index + 1}
@@ -808,8 +812,11 @@ export const PlayerPool = memo(({
     </div>
   );
 
+  if (!scoringReady) return <div role="status" className="p-4 text-sm text-muted-foreground">League scoring is unavailable. Rankings will load when the league settings are ready.</div>;
+
   return (
     <>
+    <p className="px-2 text-xs text-pastel-cream/70" data-testid="draft-actuals-season">{actualsCohortLabel(availablePlayers.map(p => p.stats_season))}. Projected points are labeled separately.</p>
     {phonePool}
     <Card className="hidden md:block p-2 sm:p-4 border-white/10 bg-pastel-surface-tile">
       <div className="flex items-center justify-between mb-3 px-1">
@@ -1292,3 +1299,4 @@ export const PlayerPool = memo(({
 });
 
 PlayerPool.displayName = 'PlayerPool';
+import { actualsCohortLabel } from '@citrus/shared';

@@ -45,11 +45,16 @@ const baseProps = {
 afterEach(cleanup);
 
 describe('PlayerPool — per-row card button (V2-PARITY)', () => {
+  it('withholds league rankings while scoring settings are unavailable', () => {
+    render(<PlayerPool {...baseProps} scoringReady={false} />);
+    expect(screen.getByRole('status').textContent).toContain('League scoring is unavailable');
+    expect(screen.queryByTestId('pool-row-card-button')).toBeNull();
+  });
   it('renders an info button per row and reports the clicked row player', () => {
     const onShowCard = vi.fn();
     const onPlayerSelect = vi.fn();
     render(
-      <PlayerPool {...baseProps} onPlayerSelect={onPlayerSelect} onShowCard={onShowCard} />,
+      <PlayerPool scoringReady={true} {...baseProps} onPlayerSelect={onPlayerSelect} onShowCard={onShowCard} />,
     );
 
     // Both breakpoints render (jsdom applies no media queries), so each
@@ -68,7 +73,7 @@ describe('PlayerPool — per-row card button (V2-PARITY)', () => {
   });
 
   it('renders NO info button when onShowCard is absent (v1 call sites untouched)', () => {
-    render(<PlayerPool {...baseProps} />);
+    render(<PlayerPool scoringReady={true} {...baseProps} />);
     expect(screen.queryByTestId('pool-row-card-button')).toBeNull();
   });
 });

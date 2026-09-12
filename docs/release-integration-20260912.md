@@ -1,0 +1,110 @@
+# Projection, source review and scoring integration
+
+This branch integrates the workbook/guide, canonical source editor, editorial changes and projection/scoring work. It is based on `origin/master` `6aef8ab7`, re-fetched during integration. The saved development checkout was not changed. Nothing in this release has been deployed, staged into production, activated, or submitted to the App Store.
+
+## Integrated boundaries
+
+```mermaid
+flowchart LR
+  W[Workbook overrides + documented model priors] --> C[Reviewed canonical source]
+  M[Existing veteran + rookie models] --> R[Refresh under source policies]
+  C --> R
+  R --> O[Atomic ROS + daily outputs]
+  O --> D[Shared dashboard + daily readers]
+  A[Official NHL actual statistics] --> S[League-specific scoring]
+  D --> S
+  S --> U[Cards / draft / roster / Matchup / Scores]
+```
+
+The canonical source governs forecasts; official measured statistics remain the authority for actuals. Both use league-specific settings through common calculation code. Each league's rules and totals stay independent. ROS and daily tables are derived outputs needed by current consumers.
+
+| Boundary | Reviewable commits |
+|---|---|
+| Initial projection and source reconciliation | `51b2c3ae`, `1365b357`, `aa5cd8e2` |
+| Expected workload across user-facing consumers | `7be93f23` |
+| Canonical importer and revision-guarded offline review | `5594a002` |
+| Published context, source stamps and shared V2 reader | `73b642bb` |
+| Complete guide, lineage maps and source editor | `60cf5afc`, `e844cb64`, `f829f440`, `c3441031` |
+| Loaded league rules and unavailable forecast behavior | `2f771e39` |
+| Integrated editorial changes | `3308daeb` through `96f5dc85`, category correction `a2860c73` |
+
+Prepared canonical and scoring synchronization migrations are committed in `0de296f3`; independent lineage/cleanup evidence is integrated in `d957e5aa`. Final earned-scoring, reader and request-reduction changes are committed in `37241b2f`. All changes are in the same worktree and are tested together; independently passing branches are not being presented as an integrated release.
+
+## Source and publication
+
+The initial canonical source is `tmp/projection-audit/canonical/canonical.json`, revision `1ca49b4864550ccc0db20240df5e1a8a1487b066a3a5e8859bd68771586e5bcd`. It contains 1,325 unique players: all 1,312 directory players and all 707 workbook rows have stable identity coverage. It preserves 32 team notes/lineup breakouts and the original manual evidence. There are 1,262 projected rows, 62 rates-only rows and one unresolved forecast. All 32 full-season goalie budgets equal 84 starts. Thirty-seven lineup slots remain unresolved; overlapping skater camp scenarios are explicit.
+
+Completeness is not publication approval. The source remains DRAFT and activation-blocked. Review must resolve the missing forecast/lineup allocations, team disagreements and overlapping workload budgets without inventing forecasts or claiming assumed roles are confirmed. The editor emits revision-bound patches; the CLI validates, records history and writes a new file without overwriting its source. Neither activates a run.
+
+The final evidence-based candidate is `tmp/projection-audit/source-reconciliation/lineup-candidate.json`, revision `6a71c8db63eb6ee43798f8ab963652b89c103d2f9dae718f3d51b0abb97dd117`. It retains all 1,325 profiles: 674 projected, 650 rates-only and one unavailable identity-only profile. All rates remain unchanged and original forecast alternatives remain auditable. The bounded source pass resolves all 20 required lineup gaps through documented workbook/NHL projected scenarios, 19 exact prior restorations and coordinated moves without duplicate active players. Carolina's Reilly hedge remains an unallocated original scenario; choosing the documented Gostisbehere–Nikishin pairing and bottom six yields 1,496 GP against 1,512 capacity. All 32 goalie budgets are conserved and every skater budget fits. See the [source reconciliation outcome](audits/source-decisions-20260912.md).
+
+The existing coverage validator accepts auditable, nonselected unavailable profiles and explicitly optional depth notes. Required active or unknown slot labels still require same-team projected players; optional metadata cannot override those labels. Identity, units and workload budgets remain enforced. The actual-source full-schema preflight now reports only the explicit publication review gate, with no remaining player, schedule, budget or lineup error. The editor serves this final candidate; it remains DRAFT pending deliberate publication review.
+
+An explicitly reviewed **local test copy**, differing only in review/test metadata, also passed actual-source activation in a rollback-only transaction: 674 ROS rows and 56,616 daily rows matched per-player exposure, all 12 supported compatibility categories, independently calculated default points and revision stamps. The original DRAFT byte hash stayed unchanged, and rollback restored the previous pointer, runs, outputs, directory and schedule. [Actual-source activation evidence](verification/canonical-source-activation-test-copy-20260912.json). Plus/minus remains in source data but is not exported as a compatibility forecast category; enabled unsupported forecast inputs remain unavailable.
+
+The published view exposes immutable editable `source_payload/source_revision/source_run_id` separately from the derived runtime `payload/revision/run_id`. This lets a reviewer reopen full-season inputs after nightly refresh. Activation revalidates all counts/coverage/budgets, uses an expected-active-revision check, and switches the pointer and ROS/daily outputs in one transaction. Failed work retains the previous complete snapshot with explicit health. Historical actual statistics are not rewritten by this pipeline.
+
+## Release surfaces and cleanup
+
+Backend code can be delivered independently of a native bundle: canonical storage/materialization/refresh, scoring-rule synchronization, published context reads, official daily-stat reads and expected-workload API metadata. The five prepared SQL migrations are not applied to production. Apply the schema before deploying readers that query the new published views; an unavailable publication lookup intentionally withholds forecasts. The isolated full-schema PostgreSQL rehearsal passes with actual model and legacy function definitions. A second rollback-only activation uses the actual reconciled source's numerical records and current schedule. The approved release must repeat preflight against its then-current source and production state.
+
+Build 18 contains bundled JavaScript. Changes to cards, draft rooms, free agents, roster, Matchup rendering/loading, scoring hydration and client source readers require a new web build and Build 19 for native delivery. No server hotfix can replace those already-bundled readers. API changes preserve raw fields and add metadata, but that does not make Build 18 fully corrected.
+
+Proven executable cleanup removes the independent V2 directory/stat loader in favor of the shared dashboard store, the V1 independent ROS projection map in favor of the same dashboard source, the duplicate web scoring implementation in favor of shared scoring, and repeated Matchup scoring/request paths. Stored default-point fallbacks and season-points substitutions are removed from the corrected league-bound paths. Lineage documentation identifies remaining active writers and historical evidence.
+
+Commit `46004a7b` also removes exactly three uncalled Python helpers: the legacy physical-cache reader/writer and a no-op league recalculation placeholder. The [retirement execution inventory](../scripts/ops/projection-retirement/README.md) prepares a guarded, reversible rename of only `projection_cache`; it retains necessary source/model/output tables and cron entrypoints. The actual 1,461-row backup passed full-schema restore, rename and inverse rename with identical content hash, table OID, ACL/RLS, policies, constraints and indexes; parent-game foreign keys remained intact. [Restore evidence](verification/cache-retirement-full-schema-20260912.json). No production quarantine was performed; release and external-caller evidence remain required.
+
+No projection tables, historical source records, model functions, external host jobs or production cron entries were deleted. The legacy writers are retained behind explicit no-active-canonical-run wrappers. Their eventual retirement requires a valid active source, consumer parity and external scheduler evidence; absence of a checked-in caller is insufficient proof.
+
+## Validation and practical limits
+
+Integrated checks completed during acceptance:
+
+- Full web suite: 4,805 tests across 354 files passed on the final integrated runtime (23.63 seconds).
+- Full server suite: 2,061 tests passed, six skipped; no failed tests.
+- Shared package: 434 tests passed on the final combined editorial/scoring runtime.
+- Real PostgreSQL/PGlite: 18 tests passed, including RLS, atomic publication, source/runtime separation, stale activation rejection, workload conservation and scoring-rule resets.
+- Canonical importer/review: 21 Python tests passed during initial acceptance; the final coverage follow-up passes 28. Guide/export: 21 tests passed. Editor HTTP boundary: four tests passed; browser-script harness passed.
+- Web and server TypeScript checks passed. SQL default-scoring generation matches the shared checked-in scoring source.
+- Retirement follow-up: 66 focused Python tests and eight quarantine/restore guard tests passed.
+- Full-schema Supabase PostgreSQL 17.6 rehearsal: 114 public tables, all five migrations, actual veteran/rookie/legacy functions, fractional/zero workload identity, nightly refresh, source immutability, stale activation rejection, derivative-failure rollback and authenticated RLS passed. The real reverse scoring trigger exposed a backfill interaction; the corrected backfill now repairs derived rules through the forward trigger while preserving saved settings JSON exactly. All 23 SQL regression tests passed after the coverage correction; 28 canonical Python tests also passed. [Pinned rehearsal evidence](verification/canonical-full-schema-20260912.json).
+
+The source editor was exercised in a real browser by its owner; its patch was validated in memory only. Signed-in deployed Matchup update-to-screen latency and a Build 19 device session have not been measured. The initial Wednesday fixture uses eight actual-stat requests before the change and three after it; a future week uses zero and a completed week seven. Local aggregation measured approximately 0.126 ms per 40-player sample (a separate final rerun measured 0.131 ms). These are not live end-to-end latency measurements; see [the Matchup report](audits/2026-09-12-matchup-earned-scoring.md). There is no claim about competitor implementation or a production speedup.
+
+Explicit persisted null scoring settings follow the existing product default-rule contract, now synchronized against the scoring catalog. Missing settings, failed reads and another league's stale response are unavailable. Category-league editorial output does not masquerade as weighted fantasy-point projections. Enabled categories without projected inputs remain unavailable; the existence of 35 actual-scoring categories does not imply 35 model projections.
+
+## Rollback and deployment gates
+
+Retain the currently deployed API image and web/native artifacts. Application rollback restores those versions; do not rewrite the immutable source history. Before first source activation, the new SQL wrappers preserve legacy behavior. After activation, rollback to another canonical run must pass validation and the expected-active-revision check; an old remaining-calendar snapshot is not automatically safe to republish. Rehearse that operation in staging with the deployment plan.
+
+Do not narrow numeric exposure columns back to integers or drop canonical history during application rollback. Failed publication/materialization already rolls back atomically. Production rollout, source approval, alert routing and native build/submission remain explicit release steps, not actions performed by this task.
+
+## Usable local outputs
+
+- Final same-source review editions: [188-page DRAFT PDF](/Users/gstorms/.codex/worktrees/8265/citrus/output/pdf/Citrus-Canonical-Review-6a71c8db63eb-10ea21e260b7-DRAFT.pdf) and [DRAFT workbook](/Users/gstorms/.codex/worktrees/8265/citrus/output/canonical-review/Citrus-Canonical-Review-6a71c8db63eb-10ea21e260b7-DRAFT.xlsx). Both match the editor's `6a71c8db…` source and explicitly use the same Citrus default-scoring preview, not a live league. All 1,325 workbook scores/blank values, category formulas, 706 lineup mappings and source notes passed verification; PDF and workbook visual checks passed. The [artifact receipt](/Users/gstorms/.codex/worktrees/8265/citrus/output/canonical-review/LATEST-REVIEW.json) pins hashes and checks. Earlier editions below remain preserved historical outputs.
+- Interactive scoring preview at `http://127.0.0.1:8765` now uses that same canonical source. All 1,325 API rows match the shared scorer under a materially different custom setting, with 651 unavailable rows preserved. The source editor remains at `http://127.0.0.1:8766`. Explicit source/scoring labels distinguish current review from preserved older workbook editions.
+- [Executable cutover decision](../scripts/ops/projection-release/RELEASE.md) and [actual Build 18 compatibility](audits/build18-cutover-compatibility-20260912.md) specify the release order, scoring transaction, source activation, native boundary and separate cache quarantine.
+- The [atomic affected-league rescore](verification/scoring-rescore-full-schema-20260912.json) also passed against actual current scoring functions under repeatable-read isolation: default, zero, negative and category scores, persisted point calibration, unchanged source settings, unaffected/future scope and full table/function rollback. The composed release SQL is prepared locally and has not been sent to production.
+
+- Source editor: `http://127.0.0.1:8766`, started by the guide task; [launch/review instructions](../scripts/projection-review/README.md). It is local and read-only except for downloading proposed patch files.
+- [Canonical review CLI](../data-pipeline/draftkit/CANONICAL_REVIEW.md), [league scoring acceptance matrix](league-scoring-acceptance-20260912.md), and [current/target data map](audits/citrus-data-lineage-2026-09-12.md).
+- Original completed guide and canonical DRAFT exports remain in the guide worktree: `/Users/gstorms/.codex/worktrees/8265/citrus/output/pdf/` and `/Users/gstorms/.codex/worktrees/8265/citrus/output/canonical-review/`. The canonical DRAFT export is 197 pages and its workbook has 37 tabs; it must not be confused with the original 707-player, 183-page completed guide.
+- Final checks also include clean web/server TypeScript and diff whitespace. Six server tests remain explicitly skipped by their suite; passing counts do not conceal them.
+
+Production remains the previous API revision `6aef8ab7`, independently observed at Cloud Run revision `citrus-api-00310-q6p`; deployment evidence is in [scheduler execution proof](audits/scheduler-execution-proof-2026-09-12.md). Local source reconciliation, source-specific activation/rollback rehearsal and reversible cleanup preparation are complete. Remaining work is deliberate source/release approval, then-current production preflight and rollout, deployed source-to-Matchup acceptance, and Build 19/device acceptance. Cache quarantine additionally requires supported external-caller evidence. None of those production actions is claimed complete.
+
+### Null-settings backfill preflight
+
+A final read-only production query on September 12 checked both SQL NULL and JSON null `leagues.scoring_settings`: **0 null-document leagues and 0 null-document leagues with nondefault effective rules**. The query compared `get_effective_scoring_rules(l.id).multiplier` with the matching `stat_catalog.default_multiplier`. There is therefore no observed historical null/custom-rule ambiguity in this snapshot. Repeat this preflight immediately before applying the scoring synchronization migration. If any such rows appear, preserve their existing custom rules and resolve provenance before the bulk reconciliation; the deliberate-reset unit tests alone are not evidence of historical user intent. No backfill was executed.
+
+
+## Final output boundary and scoring rollback disposition
+
+The fifth prepared migration restricts active ROS and future daily writes to the existing fixed-body canonical materializer through a private non-login owner role. Direct inserts, updates, deletes, upserts retaining old stamps, truncation, spoofed GUCs and service-role impersonation were rejected in the isolated full-schema rehearsal; canonical writes and historical/no-active paths passed. [Boundary evidence](verification/canonical-write-boundary-20260912.json). Existing cron entrypoints remain; obsolete Python callers can catch rejection and exit successfully, so process exit alone is not write evidence. [Caller scope](audits/legacy-projection-writer-blast-radius-20260912.md).
+
+A successful committed scoring repair remains installed during API/web rollback. The pinned prior API already uses the same effective-rule v2 scorer and persisted-line RPCs, with unchanged arguments/results and source settings. Reverting traffic therefore retains normalized rules and corrected scores rather than replaying historical drift. [Compatibility and recovery disposition](../scripts/release/scoring-rescore/README.md). The companion regression and all 23 SQL regression tests pass; actual-function full-schema calibration is separately recorded above. Production traffic rollback and device behavior remain untested here.
+
+
+The first-publication operator now captures a fresh durable backup inside the locked activation boundary and provides a separate committed recovery with active CAS, database/date/schema and post-output checks. The local synthetic full-schema rehearsal restores all captured fingerprints while preserving history, and refuses a committed intervening materialization. [Executable procedure](../scripts/ops/projection-release/first-publication/README.md) and [proof](verification/first-publication-recovery-20260912.json). This complements, rather than replaces, the separate actual-source workload rehearsal.
+
+Build 19 local validation passed in an isolated checkout at client base `0a9fb633ad55350060d2bc6ab323c465bf20ff7c`: native assertions/sync, shared typecheck, 51 client tests, simulator compilation, unsigned device archive, and equality of 215 bundled files. [Exact receipt](/Users/gstorms/.codex/worktrees/native19-review/citrus/outputs/native-build19/validation.json). Subsequent guard/scoring/recovery commits do not change client inputs. This is an unsigned candidate; signing, launch, authenticated device acceptance and distribution remain open.

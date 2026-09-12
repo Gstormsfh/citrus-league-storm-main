@@ -201,12 +201,14 @@ describe('the phone list leads with the projection', () => {
 });
 
 describe('one scoring path', () => {
-  it('the page builds exactly one ScoringCalculator, and every list reads through it', () => {
+  it('every list reads the same supported weekly forecast without an actual-PPG fallback', () => {
     // Two copies of the rest-of-week projection existed — one in the Top
     // Projected card, one inline in the Schedule tab's table body, each
     // constructing its own calculator. Two copies is two answers to "what
     // is he worth"; the phone row would have made three.
-    expect(count('new ScoringCalculator(')).toBe(1);
+    expect(count('new ScoringCalculator(')).toBe(0);
+    expect(PAGE).toContain('summarizeWeeklyProjection(filtered, leagueScoring');
+    expect(PAGE).not.toContain('estimatedFantasyPPG');
     expect(PAGE).toContain('const withProjection = useCallback(');
     // Trending, Top Projected, the phone list and the Schedule tab.
     expect(count('withProjection')).toBeGreaterThanOrEqual(6);

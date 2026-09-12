@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PlayerService } from '../services/PlayerService';
 import { createChain, createMockSupabase } from './helpers';
+import { getMetricsSeason } from '@citrus/shared';
 
 describe('PlayerService', () => {
   let service: PlayerService;
@@ -43,9 +44,11 @@ describe('PlayerService', () => {
       expect(mcdavid.goals).toBe(30);
       expect(mcdavid.xg_per_60).toBe(1.5);
       expect(mcdavid.status).toBe('active');
+      expect(mcdavid.stats_season).toBe(getMetricsSeason());
 
       const matthews = result.players.find((p: any) => p.id === 2);
       expect(matthews.status).toBe('injured');
+      expect(matthews.stats_season).toBeNull();
     });
 
     // ── goalie games played (2026-08-26) ─────────────────────────────────

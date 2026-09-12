@@ -60,7 +60,7 @@ ALLOWED: Dict[str, str] = {
 # is ever wired back up, move it out of here and fix it first.
 KNOWN_DEAD: Dict[str, str] = {
     "projections/fantasy_projection_pipeline.py":
-        "not imported by nightly_projection_batch.py (the cron entry) and "
+        "not imported by nightly_projection_batch.py (external schedule unverified) and "
         "listed in docs/DEAD_CODE_CLEANUP_COMPLETE.md; the 6 AM MT schedule "
         "the onboarding doc describes does not exist in .github/workflows",
 }

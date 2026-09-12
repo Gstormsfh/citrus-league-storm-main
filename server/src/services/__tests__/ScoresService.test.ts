@@ -165,6 +165,9 @@ const proj = (over: Record<string, unknown>) => ({
   season: 2026,
   is_goalie: false,
   total_projected_points: '8.889',
+  projected_goals: Number(over.total_projected_points ?? 8.889) / 6,
+  projected_assists: 0, projected_sog: 0, projected_blocks: 0, projected_ppp: 0,
+  projected_shp: 0, projected_hits: 0, projected_pim: 0,
   confidence_label: 'High',
   updated_at: '2026-09-01T00:00:00Z',
   ...over,
@@ -570,5 +573,24 @@ describe('ScoresService.getGameDetail', () => {
     const svc = new ScoresService(makeSupabase({}));
     const { error } = await svc.getGameDetail(Number.NaN);
     expect(error?.message).toContain('integer');
+  });
+});
+
+describe('expected goalie workload in Scores detail', () => {
+  it('uses explicit unconditional counts once and refuses unknown conditional exposure', async () => {
+    const goalie = { is_goalie: true, projected_wins: 0, projected_saves: 10, projected_shutouts: 0, projected_goals_against: 1, projected_gp: .25 };
+    const svc = new ScoresService(makeSupabase({
+      nhl_games: [SCHEDULED_GAME], nhl_teams: TEAMS, player_game_stats: [],
+      player_projected_stats: [proj({ ...goalie, player_id: 1, calculation_method: 'canonical_expected_volume_v1' }), proj({ ...goalie, player_id: 2, calculation_method: 'unknown' })],
+      player_directory: [dir({player_id:1,is_goalie:true}),dir({player_id:2,is_goalie:true})],
+    }));
+    const {result}=await svc.getDay('2026-09-29');
+    expect(result!.games[0].citrus!.players.find(p=>p.playerId===1)?.projectedPoints).toBe(3);
+    expect(result!.games[0].citrus!.players.find(p=>p.playerId===2)?.projectedPoints).toBeNull();
+  });
+  it('stored default alone remains unavailable', async () => {
+    const svc = new ScoresService(makeSupabase({nhl_games:[SCHEDULED_GAME],nhl_teams:TEAMS,player_game_stats:[],player_directory:[dir({})],
+      player_projected_stats:[proj({projected_goals:null,projected_assists:null,projected_sog:null,projected_blocks:null,projected_ppp:null})]}));
+    const {result}=await svc.getDay('2026-09-29');expect(result!.games[0].citrus!.players[0].projectedPoints).toBeNull();
   });
 });

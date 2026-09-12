@@ -35,6 +35,12 @@ describe('TodayStrip — what it says', () => {
     expect(screen.getByText('Today')).toBeInTheDocument();
   });
 
+  it('shows an unavailable forecast instead of zero or a partial total', () => {
+    render(<TodayStrip summary={summary({ projected: null })} dayLabel="Today" />);
+    expect(screen.getByTestId('strip-proj')).toHaveTextContent('Unavailable');
+    expect(screen.getByTestId('strip-proj')).not.toHaveTextContent('0.0');
+  });
+
   it('every number is set in the mono face with tabular figures', () => {
     render(<TodayStrip summary={summary({ benchPlaying: 1, locked: 3 })} dayLabel="Today" />);
     for (const id of ['strip-starters', 'strip-bench', 'strip-proj']) {

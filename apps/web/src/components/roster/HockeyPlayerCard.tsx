@@ -8,6 +8,7 @@ import { CitrusPuckPlayerData, AggregatedPlayerData } from "@/types/citruspuck";
 import { playerPositionsLabel } from "./positions";
 
 export interface HockeyPlayer {
+  statsSeason?: number | null;
   id: number | string;
   name: string;
   position: string; // 'Centre', 'Right Wing', 'Left Wing', 'Defence', 'Goalie', 'C', 'RW', 'LW', 'D', 'G'
@@ -119,6 +120,10 @@ export interface HockeyPlayer {
 
   // Goalie-specific projection object (matches Matchup tab structure)
   goalieProjection?: {
+    /** Components already include expected starting probability. */
+    projection_basis?: 'unconditional';
+    expected_starts?: number;
+    availability_source?: string;
     total_projected_points: number;
     projected_wins: number;
     projected_saves: number;
@@ -609,7 +614,7 @@ const HockeyPlayerCardContent = ({
                "text-[10px] font-varsity font-black tracking-tight",
                hasGameOnSelectedDate ? "text-pastel-orange" : "text-white/55"
              )}>
-                 {hasGameOnSelectedDate ? projectedPoints.toFixed(1) : '-'}
+                 {hasGameOnSelectedDate && dailyProjection ? projectedPoints.toFixed(1) : '-'}
              </span>
           </div>
         </div>

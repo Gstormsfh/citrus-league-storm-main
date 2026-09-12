@@ -96,11 +96,11 @@ const LEAGUE: DashboardPlayer[] = [
   entry({ id: MAKAR, name: 'Cale Makar', team: 'COL', position: 'D', jersey: 8, headshot_url: null, points: 90 }),
 ];
 
-function renderPage(initialEntry = '/players') {
+function renderPage(initialEntry = '/players', notes: unknown[] = []) {
   apiGet.mockImplementation((path: string) =>
     path.includes('/dashboard-index')
       ? Promise.resolve({ data: LEAGUE })
-      : Promise.resolve({ data: { notes: [] } }),
+      : Promise.resolve({ data: { notes } }),
   );
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -215,4 +215,11 @@ describe('the face on this page is the shared Mug', () => {
     expect(PAGE).not.toMatch(/src=\{[^}]*headshot_url/);
     expect(PAGE).not.toMatch(/<img/);
   });
+});
+
+
+it('labels stored Citrus prose with its source season and publication date without rewriting it', async () => {
+  renderPage('/players', [{ id: 'old-note', season: 2024, published_at: '2026-09-12T00:30:00Z', headline: 'Stored headline', body: 'He played well last season.', analysis: null, severity: 'info' }]);
+  expect(await screen.findByText('2024-25 · Published Sep 12, 2026')).toBeInTheDocument();
+  expect(screen.getByText('He played well last season.')).toBeInTheDocument();
 });

@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => ({
   format: vi.fn(),
   schedule: vi.fn(),
   log: vi.fn(),
+  wireItems: [] as Array<Record<string, unknown>>,
   leagueId: '11111111-1111-1111-1111-111111111111' as string | null,
 }));
 
@@ -55,7 +56,7 @@ vi.mock('@/api/players', () => ({
   },
 }));
 vi.mock('@/hooks/usePlayerDashboardIndex', () => ({ usePlayerDashboardIndex: () => ({ players: [] }) }));
-vi.mock('@/hooks/useCitrusPlayerNotes', () => ({ useCitrusPlayerNotes: () => ({ notes: [], items: [] }) }));
+vi.mock('@/hooks/useCitrusPlayerNotes', () => ({ useCitrusPlayerNotes: () => ({ notes: [], items: mocks.wireItems }) }));
 vi.mock('../PlayerAdvancedCard', () => ({ PlayerAdvancedCard: () => null }));
 vi.mock('@/utils/timezoneUtils', () => ({ getTodayMST: () => '2026-09-06' }));
 // The one mock that matters: the HTTP client the real `usePlayerXgHistory`
@@ -78,18 +79,13 @@ const STATS = {
   toi: '21:30',
 };
 
-/**
- * A FIXED ID, DELIBERATELY. The engine's voice rotates on a seed built from
- * `id|name` so two star forwards do not read as the same card with the
- * numbers swapped, which means a per-test id would hand each test a
- * different sentence. Pinning it keeps the assertions below about the
- * fallback and not about which phrasing the seed happened to draw.
- */
+/** Stable identity makes attribution and request-path assertions explicit. */
 const PLAYER_ID = '8478402';
 
 function openCard() {
   const player = {
     id: PLAYER_ID,
+    statsSeason: 2024,
     name: 'Connor McTest',
     position: 'C',
     team: 'Edmonton Oilers',
@@ -113,13 +109,8 @@ const SERVER_WRITEUP = {
   cardTone: 'positive',
 };
 
-/**
- * A clause only the in-bundle engine can produce for this stat line. The
- * engine words the lead several ways off its seed; every one of them
- * carries the split, which is the part no server fixture in this file
- * says.
- */
-const LOCAL_SUMMARY = /44 goals and 89 assists/;
+/** The local historical stat line is absent from the server fixture. */
+const LOCAL_SUMMARY = /paired 89 assists with .* shots per game in 2024-25/;
 
 function xgHistory(extra: Record<string, unknown> = {}) {
   return { data: { player_id: Number(PLAYER_ID), points: [], as_of: null, ...extra } };
@@ -127,10 +118,11 @@ function xgHistory(extra: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.wireItems = [];
   mocks.leagueId = '11111111-1111-1111-1111-111111111111';
   mocks.schedule.mockResolvedValue({ games: [], error: null });
   mocks.log.mockResolvedValue({ data: { games: [], projections: [] } });
-  mocks.league.mockResolvedValue({ league: { scoring_settings: { skater: { goals: 3 } } } });
+  mocks.league.mockResolvedValue({ league: { id: mocks.leagueId, scoring_settings: { skater: { goals: 3 } } } });
   mocks.format.mockReturnValue({ scoringFormat: 'h2h-points' });
   mocks.get.mockResolvedValue(xgHistory());
 });
@@ -146,11 +138,21 @@ describe('the player card falls back to the in-bundle writeup', () => {
     expect(screen.queryByText(LOCAL_SUMMARY)).toBeNull();
   });
 
+  it('falls back safely when optional server news links are malformed', async () => {
+    mocks.get.mockResolvedValue(xgHistory({ writeup: { ...SERVER_WRITEUP,
+      newsSources: [{ source: 'NHL', url: 'javascript:alert(1)', publishedAt: null }],
+    } }));
+    openCard();
+    expect(await screen.findByText(LOCAL_SUMMARY)).toBeTruthy();
+    expect(screen.queryByText('Server-rendered headline')).toBeNull();
+  });
+
   it('renders the local writeup when the payload omits the field', async () => {
     mocks.get.mockResolvedValue(xgHistory());
     openCard();
 
     expect(await screen.findByText(LOCAL_SUMMARY)).toBeTruthy();
+    expect(screen.getByTestId('overview-season-label').textContent).toBe('2024-25 actuals');
     expect(screen.queryByText('Server-rendered headline')).toBeNull();
   });
 
@@ -173,6 +175,20 @@ describe('the player card falls back to the in-bundle writeup', () => {
     expect(screen.queryByText('Half a card')).toBeNull();
   });
 
+  it('uses attached dated reporting in the bundled fallback', async () => {
+    mocks.wireItems = [{
+      id: 'practice', player_ids: [Number(PLAYER_ID)], title: 'Connor McTest practiced today',
+      snippet: '', source_id: 'nhl', url: 'https://www.nhl.com/news/mctest-practice',
+      published_at: new Date(Date.now() - 3600_000).toISOString(),
+    }];
+    mocks.get.mockRejectedValue(new Error('Server unavailable'));
+    openCard();
+    expect(await screen.findByText(/Connor McTest took part in practice or skating/)).toBeTruthy();
+    expect(screen.getByText(/Practice alone settles neither game clearance/)).toBeTruthy();
+    const source = screen.getByRole('link', { name: /nhl.com/ });
+    expect(source.getAttribute('href')).toBe('https://www.nhl.com/news/mctest-practice');
+  });
+
   it('asks for the writeup in the active league, so the projection is scored for it', async () => {
     openCard();
 
@@ -192,4 +208,13 @@ describe('the player card falls back to the in-bundle writeup', () => {
     expect(paths.some((p) => p.endsWith('/xg-history'))).toBe(true);
     expect(paths.some((p) => p.includes('leagueId'))).toBe(false);
   });
+});
+
+it('category fallback keeps its hockey assessment without a weighted points valuation', async () => {
+  mocks.format.mockReturnValue({ scoringFormat: 'h2h-categories' });
+  openCard();
+  expect(await screen.findByText(LOCAL_SUMMARY)).toBeTruthy();
+  await waitFor(() => expect(mocks.league).toHaveBeenCalled());
+  expect(screen.queryByText(/scoring points|Projects to/)).toBeNull();
+  expect(await screen.findByText(/assist total is not directly rewarded/)).toBeTruthy();
 });

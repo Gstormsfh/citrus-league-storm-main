@@ -44,7 +44,7 @@ export function projectionSettings(raw: unknown): ScoringSettings {
     Object.entries(DEFAULT_SCORING).map(([group, defaults]) => [
       group,
       Object.fromEntries(
-        Object.keys(defaults).map((stat) => {
+        [...new Set([...Object.keys(defaults), ...Object.keys(source[group] ?? {})])].map((stat) => {
           const value = source[group]?.[stat];
           return [stat, typeof value === 'number' && Number.isFinite(value) ? value : 0];
         }),
@@ -98,7 +98,7 @@ export interface ProjectedStatRow {
   is_goalie?: boolean | null;
   /**
    * The stored total, baked with DEFAULT scoring. Present on both tables and
-   * carried here only as the fallback for a row with no components; no league
+   * carried here only for compatibility; missing components remain unavailable. No league
    * surface reads it on its own.
    */
   total_projected_points?: number | string | null;
@@ -119,6 +119,7 @@ export interface ProjectedStatRow {
   projected_saves_ros?: number | string | null;
   projected_shutouts_ros?: number | string | null;
   projected_ga_ros?: number | string | null;
+  projected_plus_minus?: number | string | null;
 }
 
 const projectedNumber = (value: unknown): number => {
@@ -151,14 +152,32 @@ const anyPresent = (...values: Array<number | string | null | undefined>): boole
  * Null rather than 0 (2026-09-12, caught by the suite): a backfilled or older
  * row that has only the stored total would otherwise rescore to zero and take
  * a player's projection off the screen entirely. A missing input is not a
- * measurement of nothing. Callers that need a number use projectedPointsFor,
- * which falls back to the stored total.
+ * measurement of nothing. The alias projectedPointsFor preserves this same unavailable result.
  */
 export function scoreProjectedStats(
   row: ProjectedStatRow | null | undefined,
   scorer: ScoringCalculator,
 ): number | null {
   if (!row) return null;
+  const settings = scorer.getSettings();
+  const components: Record<string, unknown> = row.is_goalie === true ? {
+    wins: row.projected_wins ?? row.projected_wins_ros,
+    saves: row.projected_saves ?? row.projected_saves_ros,
+    shutouts: row.projected_shutouts ?? row.projected_shutouts_ros,
+    goals_against: row.projected_goals_against ?? row.projected_ga_ros,
+  } : {
+    goals: row.projected_goals, assists: row.projected_assists,
+    power_play_points: row.projected_ppp, short_handed_points: row.projected_shp,
+    shots_on_goal: row.projected_sog, blocks: row.projected_blocks,
+    hits: row.projected_hits, penalty_minutes: row.projected_pim,
+    plus_minus: row.projected_plus_minus,
+  };
+  const weights = row.is_goalie === true ? settings.goalie : settings.skater;
+  if (Object.entries(weights).some(([stat, weight]) => {
+    const value = components[stat];
+    return weight !== 0 && weight != null &&
+      (value == null || value === '' || typeof value === 'boolean' || !Number.isFinite(Number(value)));
+  })) return null;
 
   if (row.is_goalie === true) {
     if (
@@ -207,6 +226,7 @@ export function scoreProjectedStats(
       hits: projectedNumber(row.projected_hits),
       pim: projectedNumber(row.projected_pim),
       shp: projectedNumber(row.projected_shp),
+      plus_minus: projectedNumber(row.projected_plus_minus),
     },
     false,
   );
@@ -215,18 +235,14 @@ export function scoreProjectedStats(
 /**
  * What this row is worth to this league, as a number.
  *
- * The league-scored value where the components are there; the stored
- * default-scored total where they are not, because a row with no components
- * is a row we cannot rescore, not a player projected to score nothing.
+ * The league-scored value when enabled components are present, otherwise null.
+ * Stored benchmark totals never substitute for the selected league rules.
  */
 export function projectedPointsFor(
   row: ProjectedStatRow | null | undefined,
   scorer: ScoringCalculator,
-): number {
-  const scored = scoreProjectedStats(row, scorer);
-  if (scored !== null) return scored;
-  const stored = projectedNumber(row?.total_projected_points);
-  return stored;
+): number | null {
+  return scoreProjectedStats(row, scorer);
 }
 
 export function projectionFor(
@@ -236,58 +252,63 @@ export function projectionFor(
 ): DraftProjection | null {
   if (!entry) return null;
   const gamesRemaining = entry.proj_gp;
-  if (typeof gamesRemaining !== 'number' || !Number.isFinite(gamesRemaining) || gamesRemaining <= 0) {
+  if (typeof gamesRemaining !== 'number' || !Number.isFinite(gamesRemaining) || gamesRemaining < 0) {
     return null;
   }
 
-  if (entry.is_goalie) {
-    /**
-     * The EFFECTIVE weight, not the raw field. `ScoringCalculator` falls back
-     * to `DEFAULT_SCORING` when it is handed null, and default scoring puts
-     * goals against at -3 — so reading `settings?.goalie?.goals_against` and
-     * treating undefined as "not scored" would skip the derivation for every
-     * league on default settings, which is most of them, and inflate every
-     * goalie by roughly forty per cent. That is the exact defect the
-     * derivation exists to prevent.
-     */
-    const gaWeight = settings
-      ? settings.goalie?.goals_against
-      : DEFAULT_SCORING.goalie.goals_against;
-    // Only pay for the derivation when the league actually scores goals
-    // against. A league that zeroes it does not need the number and must not
-    // lose a goalie's projection because his save percentage is missing.
-    let goalsAgainst = 0;
-    if (typeof gaWeight === 'number' && gaWeight !== 0) {
-      const derived = entry.proj_goals_against != null && Number.isFinite(entry.proj_goals_against)
-        ? entry.proj_goals_against
-        : projectedGoalsAgainst(entry.proj_saves, entry.save_pct);
-      if (derived === null) return null;
-      goalsAgainst = derived;
-    }
-    const total = scorer.calculatePoints(
-      {
-        wins: entry.proj_wins ?? 0,
-        saves: entry.proj_saves ?? 0,
-        shutouts: entry.proj_shutouts ?? 0,
-        goals_against: goalsAgainst,
-      },
-      true,
-    );
-    return { total, perGp: total / gamesRemaining, gamesRemaining };
+  const projected: ProjectedStatRow = {
+    is_goalie: entry.is_goalie,
+    projected_goals: entry.proj_goals, projected_assists: entry.proj_assists,
+    projected_ppp: entry.proj_ppp, projected_shp: entry.proj_shp,
+    projected_sog: entry.proj_sog, projected_blocks: entry.proj_blocks,
+    projected_hits: entry.proj_hits, projected_pim: entry.proj_pim,
+    projected_wins: entry.proj_wins, projected_saves: entry.proj_saves,
+    projected_shutouts: entry.proj_shutouts,
+    projected_goals_against: entry.proj_goals_against ?? projectedGoalsAgainst(entry.proj_saves, entry.save_pct),
+  };
+  const total = scoreProjectedStats(projected, scorer);
+  if (gamesRemaining === 0) {
+    const hasNonzero = Object.entries(projected).some(([key, value]) => key !== 'is_goalie' && value != null && Number(value) !== 0);
+    return total === 0 && !hasNonzero ? {total: 0, perGp: 0, gamesRemaining: 0} : null;
   }
+  return total == null ? null : { total, perGp: total / gamesRemaining, gamesRemaining };
+}
 
-  const total = scorer.calculatePoints(
-    {
-      goals: entry.proj_goals ?? 0,
-      assists: entry.proj_assists ?? 0,
-      ppp: entry.proj_ppp ?? 0,
-      sog: entry.proj_sog ?? 0,
-      blocks: entry.proj_blocks ?? 0,
-      hits: entry.proj_hits ?? 0,
-      pim: entry.proj_pim ?? 0,
-      shp: entry.proj_shp ?? 0,
-    },
-    false,
-  );
-  return { total, perGp: total / gamesRemaining, gamesRemaining };
+/** Daily forecast counts with explicit goalie availability. Never mutates raw caches. */
+export function expectedDailyProjection(
+  row: Record<string, unknown> | null | undefined,
+  scoring: unknown,
+  isGoalie: boolean,
+): (Record<string, unknown> & { total_projected_points: number; projected_gp: number }) | null {
+  if (!row) return null;
+  const keys = isGoalie
+    ? ['projected_wins', 'projected_saves', 'projected_shutouts', 'projected_goals_against']
+    : [];
+  if (keys.some(key => row[key] == null || !Number.isFinite(Number(row[key])))) return null;
+  let exposure = 1;
+  let multiplier = 1;
+  if (!isGoalie && row.projection_basis === 'unconditional' && row.projected_gp != null) {
+    exposure = Number(row.projected_gp);
+    if (!Number.isFinite(exposure) || exposure < 0 || exposure > 1) return null;
+  }
+  if (isGoalie) {
+    const basis = row.projection_basis;
+    if (basis !== 'conditional_on_start' && basis !== 'unconditional') return null;
+    const raw = row.expected_starts ?? (basis === 'conditional_on_start' ? row.start_probability : row.projected_gp);
+    exposure = raw == null ? NaN : Number(raw);
+    if (!Number.isFinite(exposure) || exposure < 0 || exposure > 1) return null;
+    multiplier = basis === 'conditional_on_start' ? exposure : 1;
+  }
+  const result: Record<string, unknown> = { ...row, is_goalie: isGoalie };
+  for (const key of ['projected_goals', 'projected_assists', 'projected_sog', 'projected_blocks', 'projected_hits', 'projected_pim', 'projected_ppp', 'projected_shp', 'projected_wins', 'projected_saves', 'projected_shutouts', 'projected_goals_against']) {
+    if (row[key] != null) result[key] = Number(row[key]) * multiplier;
+  }
+  // Conditional/default-scoring intervals are not expected custom-league
+  // intervals. No covariance or start-mixture model is available to convert them.
+  for (const key of ['projection_mean', 'projection_std_dev', 'projection_ci_lower', 'projection_ci_upper', 'projection_ci_50_lower', 'projection_ci_50_upper', 'projection_median', 'likely_low', 'likely_high']) delete result[key];
+  const scorer = new ScoringCalculator(projectionSettings(scoring));
+  const points = scoreProjectedStats(result as ProjectedStatRow, scorer);
+  if (points == null || !Number.isFinite(points)) return null;
+  return { ...result, projection_basis: 'unconditional', expected_starts: isGoalie ? exposure : null,
+    projected_gp: exposure, starter_confirmed: false, total_projected_points: points };
 }

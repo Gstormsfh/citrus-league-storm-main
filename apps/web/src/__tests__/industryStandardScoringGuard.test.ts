@@ -33,6 +33,7 @@ import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_SCORING as SHARED_DEFAULTS,
   SCORING_DEFAULTS,
+  ScoringCalculator, projectionSettings, scoreProjectedStats,
   defaultLeagueStats,
   describeScoringDefaults,
   getDefaultSettings as sharedGetDefaultSettings,
@@ -147,7 +148,7 @@ describe('(b) every consumer derives from the source', () => {
     ['apps/web/src/types/leagueTypes.ts', 'defaultLeagueStats()'],
     ['apps/web/src/pages/CreateLeague.tsx', 'defaultLeagueStats()'],
     ['apps/web/src/pages/Profile.tsx', 'SCORING_DEFAULTS.stats'],
-    ['apps/web/src/utils/scoringUtils.ts', "DEFAULT_SCORING as SHARED_DEFAULT_SCORING } from '@citrus/shared'"],
+    ['apps/web/src/utils/scoringUtils.ts', "} from '@citrus/shared'"],
     ['server/src/services/LeagueService.ts', 'DEFAULT_SCORING.skater'],
     ['server/src/lib/stormy/systemPrompt.ts', '${describeScoringDefaults()}'],
     ['data-pipeline/scoring/simulate_matchups.py', 'from data_pipeline.scoring.scoring_defaults import'],
@@ -212,7 +213,8 @@ describe('regression pins from the 2026-09-01 scoring review', () => {
     // 55-start goalie by hundreds of points. The route must serve the column
     // and the board must use it.
     expect(repo('server/src/routes/players.ts')).toContain('projected_shutouts_ros, projected_ga_ros');
-    expect(repo('apps/web/src/pages/DraftRoom.tsx')).toContain('goals_against: p.projected_ga_ros || 0');
+    expect(repo('apps/web/src/pages/DraftRoom.tsx')).toContain('buildDraftProjectionMap(canonicalDashboard');
+    expect(scoreProjectedStats({ is_goalie: true, projected_ga_ros: 3 }, new ScoringCalculator(projectionSettings({ goalie: { goals_against: -2 } })))).toBe(-6);
     expect(repo('server/src/services/TeamAnalyticsService.ts')).toContain('num(p.projected_ga_ros)');
   });
 
@@ -262,6 +264,8 @@ const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', '.git', '__pycache__
 
 /** Files whose literals are intentional. Every entry needs a reason. */
 const ALLOWLIST: Record<string, string> = {
+  'packages/shared/src/playerWriteup/__tests__/goldenEquality.test.ts': 'Independent editorial golden fixtures mix observed player totals and deliberately varied custom league weights; not a runtime default set',
+  'docs/projection-correctness-followup-20260912.md': 'Verified historical custom-league audit evidence; recorded database weights are not runtime defaults',
   'packages/shared/src/constants/scoringDefaults.json': 'THE source',
   'data-pipeline/scoring/scoring_defaults.py': 'generated from the source (freshness checked in (c))',
   'docs/generated/SCORING_DEFAULTS.md': 'generated from the source (freshness checked in (c))',

@@ -153,6 +153,7 @@ const OtherTeam = () => {
           const transformedPlayers: HockeyPlayer[] = demoRoster.map((p) => ({
             id: p.id,
             name: p.full_name,
+          statsSeason: p.stats_season ?? null,
             position: p.position,
             number: parseInt(p.jersey_number || '0'),
             starter: false,

@@ -58,6 +58,8 @@ const baseProps = {
   selectedPlayer: null,
   draftedPlayers: [] as string[],
   isDraftActive: true,
+  scoringReady: true,
+  scoringSettings: null,
 };
 
 /**

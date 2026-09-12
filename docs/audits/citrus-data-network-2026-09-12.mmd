@@ -1,0 +1,72 @@
+flowchart TB
+  subgraph Sources[Sources and acquisition]
+    NHL["NHL gamecenter / PBP / boxscore / landing / rosters"]
+    ING["Python acquisition and raw_nhl_data [R]"]
+    FACT["player_game_stats → player_season_stats [R/P]"]
+    META["player_directory + nhl_games [R/P]"]
+    SHOT["nhl_shots: shot-event features"]
+    NHL --> ING --> FACT
+    DIRJOB["GitHub roster/discovery refresh [observed run]<br/>player_directory only"]
+    REPAIR["GitHub conditional shot repair [observed run]<br/>raw_nhl_data → legacy raw_shots; not nhl_shots"]
+    NHL --> DIRJOB --> META
+    NHL -->|"conditional PBP refetch; successful run does not prove healing"| REPAIR
+    NHL -. "regular nhl_games schedule import host unverified" .-> META
+    ING -. "shot extractor trigger unverified" .-> SHOT
+  end
+  subgraph Models[Observed SQL projection paths]
+    V5["Cron 22: first-party xg_v5 scoring [P]"]
+    XG["Cron 22: xg_sql → player_xg_season [P]"]
+    RATE["project_ros: historical rates + age + availability [R/O]"]
+    ROOKIE["project_rookies: cohort rates + opportunity [R/O]"]
+    ROS["Cron 31 → player_ros_projections [P]"]
+    DAILY["Cron 34 → player_projected_stats [P]<br/>SQL goalie counts are conditional on starting"]
+    SHOT --> V5
+    SHOT --> XG
+    FACT -->|"player_game_stats only"| RATE
+    XG --> RATE
+    META --> RATE
+    META --> ROOKIE
+    RATE --> ROS
+    ROOKIE --> ROS
+    META --> ROS
+    RATE --> DAILY
+    META --> DAILY
+  end
+  subgraph Product[App serving and cards]
+    API["Player / Dashboard / Matchup / DraftKit services + RPCs [R/O]<br/>GAR, talent and goalie metrics joined separately"]
+    CACHE["Server TTL → web API / service caches → page state [R]"]
+    CARD["Cards: Draft v1 + v2 / Roster / Matchup / Free Agents [R/O]"]
+    APPKIT["App Draft Kit board + season-scoped blurbs [R]"]
+    FACT --> API
+    META --> API
+    ROS --> API
+    DAILY --> API
+    API --> CACHE --> CARD
+    API --> APPKIT
+    API -->|"V2 shared index replaces direct browser reader locally at73b642bb"| CARD
+  end
+  subgraph ActualMatchup[Actual earned matchup points / repository trace]
+    ELIG["League rules + matchup period + frozen eligible starters"]
+    SQLACT["calculate_daily_matchup_scores_v2 / score_matchup_lines<br/>fantasy_matchup_lines + matchups team totals"]
+    RAWACT["get_daily_game_stats API<br/>7 daily raw requests / configured 10s API cache"]
+    UIACT["Matchup.tsx dailyStatsByDate<br/>browser actual-score arithmetic + calculatedDailyTotals"]
+    SELECTACT["myTeamPoints / opponentTeamPoints<br/>loading + RPC fallback precedence"]
+    SCOREBOARD["Desktop ScoreCard / phone PressBoxScoreBlock<br/>WeeklySchedule / PlayerCard actual points + tooltip"]
+    STRIP["allWeekMatchups → ScoreboardStrip / dropdown"]
+    FACT --> SQLACT
+    ELIG --> SQLACT
+    FACT --> RAWACT --> UIACT
+    ELIG --> UIACT
+    SQLACT -->|"daily totals fallback"| SELECTACT
+    UIACT --> SELECTACT --> SCOREBOARD
+    SQLACT --> STRIP
+    UIACT -. "current-week poll configured 120s; end-to-end latency unmeasured" .-> RAWACT
+  end
+  subgraph Publication[Separate publication branches]
+    INPUT["Supplied workbook + dated qualitative evidence + production SELECT snapshots"]
+    WB["Reconciled 707-player XLSX [local verified]"]
+    SNAP["workbook-data.json + shared league scorer"]
+    PDF["Local scoring UI → 183-page PDF + fingerprint manifest"]
+    ROS -->|"read-only source snapshot; no writeback"| INPUT
+    INPUT --> WB --> SNAP --> PDF
+  end

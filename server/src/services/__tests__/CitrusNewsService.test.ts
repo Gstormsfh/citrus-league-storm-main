@@ -129,6 +129,8 @@ describe('bounce-back detector', () => {
     });
     const notes = await detector.run(sb, 2025, OFFSEASON);
     expect(notes).toHaveLength(1);
+    expect(notes[0].body).toContain('finished 2025-26');
+    expect(notes[0].body).not.toContain('last season');
     expect(notes[0].body).toContain('10 goals');
     expect(notes[0].body).toContain('25 expected');
     expect(notes[0].severity).toBe('positive');
@@ -230,6 +232,9 @@ describe('usage-surge detector', () => {
     const notes = await detector.run(sb, 2025, OFFSEASON);
     expect(notes).toHaveLength(1);
     expect(notes[0].headline).toContain('3');
+    expect(notes[0].body).toContain('in 2025-26');
+    expect(notes[0].body).toContain('2024-25');
+    expect(notes[0].body).not.toContain('last season');
   });
 
   it('does NOT fire on a small drift', async () => {

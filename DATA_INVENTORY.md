@@ -1,6 +1,6 @@
 # Citrus Data Inventory
 
-**Last updated:** 2026-05-05 (post-R6 reorganization) · **Status:** Stable canonical structure
+**Historical inventory baseline:** 2026-05-05 (post-R6 reorganization). Projection-serving corrections verified 2026-09-12 are recorded in the [current data-lineage map](docs/audits/citrus-data-lineage-2026-09-12.md). Row counts and deployment statements below retain their observation dates; they are not a fresh production census.
 **Maintainer protocol:** When adding any new data artifact (table, file, model, script), update this doc inline. The companion `apps/web/docs/DATA_ORGANIZATION_AUDIT.md` holds the full audit + reorganization history (phases R1-R6 complete); this file is the day-to-day "where does data live?" reference.
 
 **Reorganization complete:** see [`apps/web/docs/DATA_ORGANIZATION_AUDIT.md`](./apps/web/docs/DATA_ORGANIZATION_AUDIT.md) §§7-8 for R5 dispositions + Investigation 1 model-lineage findings. R6 archived the Dec 2024 pre-monorepo repo to `~/Documents/_archive/citrus-pre-monorepo/` — see `README_ARCHIVED.md` at that location for the full lineage map.
@@ -35,7 +35,7 @@ Applied to staging only (not production): `20260906164444_apple_provider_token_c
 | `player_shifts` | 341,612 | 86 MB | `data-pipeline/acquisition/ingest_shiftcharts.py` |
 | `player_shifts_official` | 198,110 *(pg_class estimate; list_tables reports 0 — see audit §6)* | 34 MB | unclear |
 | `raw_shots` | 99,322 | 81 MB | `scripts/utilities/populate_raw_shots.py` ← `data-pipeline/acquisition/data_acquisition.py` |
-| `player_projected_stats` | 70,296 | 45 MB | `data-pipeline/projections/nightly_projection_batch.py` |
+| `player_projected_stats` | 70,296 (historical) | 45 MB (historical) | Current verified SQL writer: `rebuild_player_projected_stats` via pg_cron at 09:05 UTC. Python batch remains a reachable competing writer with unverified external scheduling. |
 | `integrity_check_results` | 65,431 | 16 MB | likely `scripts/utilities/validate_*.py` or similar |
 | `player_toi_by_situation` | 64,308 | 14 MB | `scripts/utilities/calculate_player_toi.py` |
 | `player_game_stats` | 53,358 | 36 MB | `scripts/utilities/process_xg_stats.py` + boxscore loaders |
@@ -200,7 +200,7 @@ The `chunk_*.sql` and `prod_*.sql` files at the repo root of `citrus-league-stor
 ### 3.1 Active pipelines (referenced by GitHub workflows or cron)
 
 Workflows in `.github/workflows/`:
-- **`main.yml`** — Nightly Projection Batch, daily 7 AM UTC: runs `data-pipeline/projections/nightly_projection_batch.py --season 2025`
+- **`main.yml`** — Projection Output Health, daily 10:30 UTC: runs read-only `scripts/ops/check_projection_outputs.py` after the SQL projection jobs. It does not run a projection writer. See the [workflow](.github/workflows/main.yml).
 - **`playoff-sync.yml`** — Playoff result + bracket sync (active during playoffs)
 - **`rls-audit.yml`** — Periodic RLS verification
 - **`ci.yml`** — Build + test on every PR
@@ -220,7 +220,7 @@ NPM scripts in `package.json` (root):
 | Subdirectory | Files | Role |
 |---|---|---|
 | `acquisition/` | 13 files | NHL API ingestion: `data_acquisition.py`, `data_scraping_service.py`, `fetch_nhl_stats_from_landing*.py`, `ingest_live_raw_nhl.py`, `ingest_nhl_playoff_bracket.py`, `ingest_playoff_schedule.py`, `ingest_raw_nhl.py`, `ingest_shiftcharts.py`, `populate_team_stats.py`, `scrape_live_nhl_stats.py`, `scrape_per_game_nhl_stats.py`, `sync_playoff_results.py` |
-| `projections/` | 9 files | Projection generation: `build_player_season_stats.py`, `calculate_daily_projections.py`, `fantasy_projection_pipeline.py`, **`nightly_projection_batch.py` (cron entry)**, `projection_uncertainty.py`, `quantify_monte_carlo_impact.py`, `quantify_uncertainty_impact.py`, `run_daily_projections.py`, `sync_ppp_from_gamelog.py` |
+| `projections/` | 9 files | Projection generation: `build_player_season_stats.py`, `calculate_daily_projections.py`, `fantasy_projection_pipeline.py`, **`nightly_projection_batch.py` (reachable batch; external schedule unverified)**, `projection_uncertainty.py`, `quantify_monte_carlo_impact.py`, `quantify_uncertainty_impact.py`, `run_daily_projections.py`, `sync_ppp_from_gamelog.py` |
 | `scoring/` | 5 files | `calculate_matchup_scores.py`, `reconcile_player_stats.py`, `run_daily_pbp_processing.py`, `simulate_matchups.py`, **`scoring_defaults.py` (generated — do not edit; `npm run gen:scoring`)** |
 | `monitoring/` | 12 files | Health/freshness checks: `alerting.py`, `audit_projection_accuracy.py`, `check_data_freshness.py`, `draft_latency_scorecard.py` (weekly Mandate scorecard over the `draft_latency_scorecard` view), `health_check_server.py`, `monitor_data_scraping.py`, `monitor_proxy_health.py`, `run_midnight_update.py`, `verify_data_integrity.py`, `verify_projection_pipeline.py` + 2 test files |
 | `draftkit/` | 1 script + `blurbs/` | `load_blurbs.py` — validates hand-written Draft Kit copy and upserts `draft_kit_blurbs` through the service role. Dry-run by default; `--apply` writes. Every CHECK constraint in the migration is re-implemented locally so an error names the file and line instead of surfacing as a PostgREST 23514. `blurbs/` holds the source `.md` files plus `_TEMPLATE.md` and a README; files starting with `_` are skipped |

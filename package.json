@@ -31,6 +31,7 @@
     "gen:scoring:check": "node scripts/gen-scoring-defaults.mjs --check"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.3.15",
     "typescript": "^5.5.3"
   }
 }

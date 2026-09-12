@@ -35,50 +35,53 @@ export interface CitrusNote {
  */
 export type { WireNewsItem };
 
+let clientModule: Promise<typeof import('@/api/client')> | null = null;
+const loadClient = () => clientModule ??= import('@/api/client').catch(error => {
+  clientModule = null;
+  throw error;
+});
+const EMPTY = { notes: [] as CitrusNote[], items: [] as WireNewsItem[], loading: false };
+
 export function useCitrusPlayerNotes(playerId: number | string | null | undefined, enabled = true) {
-  const [notes, setNotes] = useState<CitrusNote[]>([]);
-  const [items, setItems] = useState<WireNewsItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const numericId = Number(playerId);
+  const active = enabled && playerId != null && Number.isSafeInteger(numericId) && numericId > 0;
+  const [stored, setStored] = useState<{ id: number; notes: CitrusNote[]; items: WireNewsItem[]; loading: boolean } | null>(null);
+  const [refresh, setRefresh] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const timer = setInterval(() => setRefresh(n => n + 1), 60_000);
+    return () => clearInterval(timer);
+  }, [active, numericId]);
 
   useEffect(() => {
-    const numericId = typeof playerId === 'string' ? Number.parseInt(playerId, 10) : playerId;
-    if (!enabled || !numericId || !Number.isFinite(numericId)) {
-      setNotes([]);
-      setItems([]);
+    if (!active) {
+      setStored(null);
       return;
     }
-
     let cancelled = false;
-    setLoading(true);
-
-    // Lazy import for the same reason NewsService uses one: `@/api/client`
-    // loads the Supabase client, which throws at module scope without
-    // VITE_SUPABASE_* set, taking down any test that renders a component in
-    // this import chain. Keeping it inside the effect makes this hook safe to
-    // import anywhere.
-    import('@/api/client')
-      .then(({ apiClient }) => apiClient.get<{ notes: CitrusNote[]; items?: WireNewsItem[] }>(`/api/news/player/${numericId}`))
-      .then((response) => {
+    setStored(previous => previous?.id === numericId
+      ? { ...previous, loading: true }
+      : { ...EMPTY, id: numericId, loading: true });
+    void loadClient()
+      .then(({ apiClient }) => cancelled ? undefined : apiClient.get<{ notes: CitrusNote[]; items?: WireNewsItem[] }>(`/api/news/player/${numericId}`))
+      .then(response => {
         if (cancelled) return;
-        setNotes(response.data?.notes ?? []);
-        setItems(response.data?.items ?? []);
+        setStored({ id: numericId, loading: false,
+          notes: Array.isArray(response?.data?.notes) ? response.data.notes : [],
+          items: Array.isArray(response?.data?.items) ? response.data.items : [],
+        });
       })
-      .catch((error) => {
+      .catch(error => {
         if (cancelled) return;
-        // Debug, not error: pre-deploy this 404s on every card open, and a
-        // console full of red for an optional block trains people to ignore it.
         logger.debug('[citrus-notes] unavailable:', error);
-        setNotes([]);
-        setItems([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        setStored({ ...EMPTY, id: numericId });
       });
+    return () => { cancelled = true; };
+  }, [numericId, active, refresh]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [playerId, enabled]);
-
-  return { notes, items, loading };
+  // Hide stale news in the very render that changes identity or closes the
+  // card, including while the previous player's request remains in flight.
+  if (!active) return EMPTY;
+  if (stored?.id !== numericId) return { ...EMPTY, loading: true };
+  return { notes: stored.notes, items: stored.items, loading: stored.loading };
 }

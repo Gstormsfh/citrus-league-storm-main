@@ -246,7 +246,8 @@ describe('MatchupService.getLeagueScoreboard: the reads', () => {
     matchups: createChain({ data: rows, error: null }),
     fantasy_daily_rosters: createChain({ data: rosters, error: null }),
     team_lineups: createChain({ data: lineups, error: null }),
-    player_projected_stats: createChain({ data: projections, error: null }),
+    player_projected_stats: createChain({ data: projections.map(p => ({ ...p, projected_goals: Number(p.total_projected_points) / 6, projected_assists: 0, projected_sog: 0, projected_blocks: 0, projected_ppp: 0 })), error: null }),
+    leagues: createChain({ data: { scoring_settings: null }, error: null }),
   });
 
   beforeEach(() => {
@@ -273,6 +274,26 @@ describe('MatchupService.getLeagueScoreboard: the reads', () => {
     // A bye and a completed matchup say nothing.
     expect(matchups.find((m) => m.id === 'm2')).toMatchObject({ team1_projected_total: null, team2_projected_total: null });
     expect(matchups.find((m) => m.id === 'm3')).toMatchObject({ team1_projected_total: null, team2_projected_total: null });
+  });
+
+  it('weights a goalie once under league scoring and counts expected starts, not team games', async () => {
+    const tables = chains();
+    tables.leagues = createChain({ data: { scoring_settings: { goalie: { saves: 1 } } }, error: null });
+    tables.player_projected_stats = createChain({ data: projections.map(p => p.player_id === 2 ? {
+      ...p, is_goalie: true, calculation_method: 'probability_based_volume', projected_gp: 0.25,
+      projected_saves: 7, projected_wins: 0, projected_shutouts: 0, projected_goals_against: 0,
+    } : { ...p, projected_goals: 0, projected_assists: 0 }), error: null });
+    const result = await new MatchupService(createMockSupabase(tables)).getLeagueScoreboard('league-1', 3, TODAY, NOW_MS);
+    const first = result.matchups.find(m => m.id === 'm1')!;
+    expect(first.team1_projected_total).toBeCloseTo(19.4); // 12.4 banked +7 expected, not7*.25
+    expect(first.team1_games_left).toBeCloseTo(1.25); // one skater game +.25 goalie starts
+  });
+
+  it('does not score configured leagues with defaults after a scoring read failure', async () => {
+    const tables = chains();
+    tables.leagues = createChain({ data: null, error: { message: 'unavailable' } });
+    const result = await new MatchupService(createMockSupabase(tables)).getLeagueScoreboard('league-1', 3, TODAY, NOW_MS);
+    expect(result.matchups.find(m => m.id === 'm1')!.team1_projected_total).toBeNull();
   });
 
   it('reads through the user-scoped client, one query per table for the league-week, never the admin client', async () => {

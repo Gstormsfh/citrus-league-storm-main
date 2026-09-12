@@ -34,11 +34,10 @@ import { logger } from '@/utils/logger';
  * large, risky diff for a feature whose entire brief is "must not change how
  * the host surface behaves".
  *
- * DESIGN: the requirement is "at most once per session", which is not
- * React Query's model. `staleTime: Infinity` gets close, but the cache is
- * per-QueryClient, and this payload wants to survive a provider remount and
- * be readable by code that is not a component. A module-level store is the
- * simpler thing that is exactly the requirement.
+ * The module store survives provider remounts and is readable outside React.
+ * Successful data expires after two minutes, matching the server cache.
+ * Active, visible consumers refresh together; foregrounding a stale page
+ * also refreshes it. Requests remain shared across all cards and draft rooms.
  *
  * `useSyncExternalStore` rather than `useState` + a subscription: it is the
  * React 18 primitive for exactly this shape, and it guarantees every
@@ -105,6 +104,10 @@ let state: PlayerDashboardIndexState = {
 };
 let inFlight: Promise<void> | null = null;
 let failedAt = 0;
+let loadedAt = 0;
+const FRESH_FOR_MS = 120_000;
+let activeConsumers = 0;
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
 const listeners = new Set<() => void>();
 
@@ -127,7 +130,7 @@ function getSnapshot(): PlayerDashboardIndexState {
 
 /**
  * Kick the fetch if it has not run. Safe to call from every consumer on
- * every mount — after the first success it does nothing at all.
+ * every mount — a successful response is reused for two minutes.
  *
  * `@/api/client` is imported LAZILY, not at module scope, for the reason
  * `useCitrusPlayerNotes` documents: it pulls in the Supabase client, which
@@ -139,13 +142,13 @@ function getSnapshot(): PlayerDashboardIndexState {
 function ensureLoaded(force = false): Promise<void> {
   if (inFlight) return inFlight;
   if (!force) {
-    if (state.status === 'ready') return Promise.resolve();
+    if (state.status === 'ready' && Date.now() - loadedAt < FRESH_FOR_MS) return Promise.resolve();
     if (state.status === 'error' && Date.now() - failedAt < RETRY_AFTER_FAILURE_MS) {
       return Promise.resolve();
     }
   }
 
-  setState({ players: state.players, status: 'loading', loading: true, error: null });
+  setState({ players: state.players, status: 'loading', loading: state.players.length === 0, error: null });
 
   inFlight = import('@/api/client')
     .then(({ apiClient }) => apiClient.get<DashboardIndexEntry[]>('/api/players/dashboard-index'))
@@ -155,6 +158,7 @@ function ensureLoaded(force = false): Promise<void> {
       // `pages/Players.tsx` has carried it since the page shipped, and the
       // card must not be the one consumer that breaks if the envelope moves.
       const list = (response?.data ?? (response as unknown as DashboardIndexEntry[])) as DashboardIndexEntry[];
+      loadedAt = Date.now();
       setState({
         players: Array.isArray(list) ? list : [],
         status: 'ready',
@@ -169,7 +173,10 @@ function ensureLoaded(force = false): Promise<void> {
       // /players.
       logger.debug('[player-dashboard-index] unavailable:', err);
       setState({
-        players: EMPTY,
+        // Keep the last successful snapshot on a refresh failure. A transient
+        // outage must not remove projections from an open draft board. An
+        // initial failure still has EMPTY here, as guest callers expect.
+        players: state.players,
         status: 'error',
         loading: false,
         error: (err as { message?: string })?.message ?? 'Failed to load players.',
@@ -197,6 +204,7 @@ export function reloadPlayerDashboardIndex(): Promise<void> {
 export function resetPlayerDashboardIndex(): void {
   inFlight = null;
   failedAt = 0;
+  loadedAt = 0;
   state = { players: EMPTY, status: 'idle', loading: true, error: null };
   // Deliberately notifies: a test that reset mid-render should re-render.
   for (const l of listeners) l();
@@ -219,9 +227,9 @@ export interface UsePlayerDashboardIndexOptions {
 /**
  * The shared payload, plus the two flags a UI needs to caveat it.
  *
- * Returns `players: []` on every failure path — a consumer that renders
- * nothing when the array is empty is automatically correct on 401, on a
- * network drop, and before the first load resolves.
+ * Initial failures return `players: []`. A failed background refresh keeps
+ * the previous snapshot and exposes the error so callers can caveat stale
+ * data without removing an open draft board.
  */
 export function usePlayerDashboardIndex(
   options: UsePlayerDashboardIndexOptions = {},
@@ -232,6 +240,23 @@ export function usePlayerDashboardIndex(
   useEffect(() => {
     if (!enabled) return;
     void ensureLoaded();
+    const refreshVisible = () => {
+      if (document.visibilityState !== 'hidden') void ensureLoaded();
+    };
+    // One timer for the entire store; opening more cards adds no polling.
+    if (activeConsumers++ === 0) {
+      refreshTimer = setInterval(refreshVisible, FRESH_FOR_MS);
+    }
+    window.addEventListener('focus', refreshVisible);
+    document.addEventListener('visibilitychange', refreshVisible);
+    return () => {
+      window.removeEventListener('focus', refreshVisible);
+      document.removeEventListener('visibilitychange', refreshVisible);
+      if (--activeConsumers === 0 && refreshTimer !== null) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+      }
+    };
   }, [enabled]);
 
   return { ...snapshot, reload: reloadPlayerDashboardIndex };

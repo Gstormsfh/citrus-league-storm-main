@@ -16,12 +16,16 @@ import {
   shortTrophy,
 } from '../playerWriteup';
 import type { PlayerWriteup } from '../playerWriteup';
-import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import type { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import { getProjectionsSeason } from '@citrus/shared/constants';
 import aiVoice from '@citrus/shared/constants/aiVoice.json';
+
+const ACTUALS_LABEL = `${getProjectionsSeason()}-${String((getProjectionsSeason() + 1) % 100).padStart(2, '0')}`;
 
 const skater = (overrides: Partial<HockeyPlayer> = {}, stats: Record<string, unknown> = {}): HockeyPlayer =>
   ({
     id: 1,
+    statsSeason: getProjectionsSeason(),
     name: 'Connor McTest',
     position: 'C',
     number: 97,
@@ -81,7 +85,7 @@ describe('generatePlayerWriteup — small samples are never extrapolated', () =>
   it('handles a player who has not played at all without dividing by zero', () => {
     const w = generatePlayerWriteup(skater({}, { gamesPlayed: 0, points: 0, goals: 0, assists: 0 }));
     expect(w.hasEnoughData).toBe(false);
-    expect(w.summary).toMatch(/hasn't played/i);
+    expect(w.summary).toMatch(/no NHL appearances recorded/i);
     expect(w.summary).not.toMatch(/NaN|Infinity|undefined/);
   });
 
@@ -101,78 +105,88 @@ describe('generatePlayerWriteup — small samples are never extrapolated', () =>
   });
 });
 
-describe('generatePlayerWriteup — skater banding uses rates, not totals', () => {
-  it('calls a 1.43 PPG forward a star', () => {
+describe('generatePlayerWriteup — evidence selects the hockey profile', () => {
+  it('explains shot volume and conversion while preserving the scoring rate', () => {
     const w = generatePlayerWriteup(skater());
-    expect(w.headline).toBe('Star forward');
+    expect(w.headline).toBe('Volume shooter');
     expect(w.hasEnoughData).toBe(true);
-    expect(w.summary).toContain('100 points');
-    expect(w.summary).toContain('1.43 per game');
+    expect(w.summary).toContain('40 goals');
+    expect(w.summary).toContain('16% of his shots');
+    expect(w.summary).not.toContain('100 points (');
+    expect(w.cardNote).toContain('1.43 P/GP');
+    expect(w.summary).toContain('3.6 shots per game');
+    expect(w.analysis).toMatch(/leagues counting shots/);
   });
 
-  it('ranks a high-rate part-season player above a low-rate full-season one', () => {
-    const parttime = generatePlayerWriteup(
-      skater({}, { gamesPlayed: 25, points: 30, goals: 12, assists: 18 }),
-    );
-    const fulltime = generatePlayerWriteup(
-      skater({}, { gamesPlayed: 82, points: 33, goals: 15, assists: 18 }),
-    );
-    // 1.20 PPG on 30 points vs 0.40 PPG on 33 points — totals would invert this.
-    expect(parttime.headline).toBe('Star forward');
-    expect(fulltime.headline).toBe('Depth forward');
+  it('keeps part-season and full-season scoring rates separate from their totals', () => {
+    const parttime = generatePlayerWriteup(skater({}, { gamesPlayed: 25, points: 30, goals: 12, assists: 18, shots: 60, powerPlayPoints: 4 }));
+    const fulltime = generatePlayerWriteup(skater({}, { gamesPlayed: 82, points: 33, goals: 15, assists: 18, shots: 150, powerPlayPoints: 4 }));
+    expect(parttime.cardNote).toContain('1.2 P/GP');
+    expect(fulltime.cardNote).toContain('0.4 P/GP');
+    expect(parttime.summary).toContain('30 points');
+    expect(fulltime.summary).toContain('33 points');
+    expect(parttime.cardTone).toBe('positive');
+    expect(fulltime.cardTone).toBe('neutral');
   });
 
-  it('judges defencemen on their own curve, not the forward curve', () => {
-    const statLine = { gamesPlayed: 70, points: 45, goals: 10, assists: 35, toi: '23:00' };
+  it('uses the defence-slot context without inventing top-pair deployment', () => {
+    const statLine = { gamesPlayed: 70, points: 45, goals: 20, assists: 25, shots: 140, powerPlayPoints: 5, toi: '23:00' };
     const d = generatePlayerWriteup(skater({ position: 'D' }, statLine));
     const f = generatePlayerWriteup(skater({ position: 'C' }, statLine));
-    // Same 0.64 PPG: a top-pair number for a D, middle-six for a forward.
-    expect(d.headline).toBe('Top-pair contributor');
-    expect(f.headline).toBe('Middle-six contributor');
+    expect(d.headline).toBe('Scoring beyond the power play');
+    expect(f.headline).toBe('Balanced scoring profile');
+    expect(d.analysis).toMatch(/defence slot/);
+    expect(d.summary).toContain('40 came outside the power play');
+    expect(d.summary + d.analysis).not.toMatch(/40 (?:even-strength|even strength)|40.*five.on.five/);
+    expect(d.summary).not.toMatch(/top.pair|coach.*trust/i);
   });
 
-  it('flags heavy usage and shot volume as upside tags', () => {
+  it('keeps the shot-volume story focused without adding an unrelated minutes sentence', () => {
     const w = generatePlayerWriteup(skater());
-    const labels = w.tags.map((t) => t.label);
-    expect(labels).toContain('Heavy minutes');
-    expect(labels).toContain('Shot volume');
+    expect(w.tags.map(t => t.label)).toContain('Shot volume');
+    expect(w.summary).toContain('3.6 shots per game');
+    expect(w.summary).not.toContain('21.5 minutes per game');
+    expect(`${w.summary} ${w.analysis}`).not.toMatch(/coach.*trust|secure.*role|top.line winger/i);
   });
 
-  it('flags power-play dependence as a caution, with the real percentage', () => {
-    const w = generatePlayerWriteup(
-      skater({}, { gamesPlayed: 70, points: 50, goals: 20, assists: 30, powerPlayPoints: 25 }),
-    );
-    expect(w.tags.find((t) => t.label === 'PP-dependent')?.tone).toBe('caution');
-    // Lives in the Analysis paragraph: it's a call to action, not a stat.
-    expect(w.analysis).toContain('50% of his points');
+  it('quantifies power-play dependence without inferring a unit assignment', () => {
+    const w = generatePlayerWriteup(skater({}, { gamesPlayed: 70, points: 50, goals: 20, assists: 30, powerPlayPoints: 25 }));
+    expect(w.tags.find(t => t.label === 'PP-dependent')?.tone).toBe('caution');
+    expect(w.summary).toContain('25 of his 50 points on the power play');
+    expect(w.analysis).toMatch(/power-play usage/);
+    expect(w.analysis).toMatch(/Reduced special-teams time would require more scoring elsewhere/);
+    expect(`${w.summary} ${w.analysis}`).not.toMatch(/(?:plays|skates|is) on (?:the )?first.unit/i);
   });
 
-  it('flags thin ice time as a caution rather than staying silent', () => {
-    const w = generatePlayerWriteup(
-      skater({}, { gamesPlayed: 40, points: 8, goals: 3, assists: 5, toi: '9:30', shots: 20 }),
-    );
-    expect(w.tags.find((t) => t.label === 'Limited ice time')?.tone).toBe('caution');
-    expect(w.headline).toBe('Bottom-six role player');
+  it('reports limited minutes without guessing a bottom-six assignment', () => {
+    const w = generatePlayerWriteup(skater({}, { gamesPlayed: 40, points: 8, goals: 3, assists: 5, toi: '9:30', shots: 20, powerPlayPoints: 1 }));
+    expect(w.summary).toContain('9.5 minutes per game');
+    expect(w.headline).not.toMatch(/bottom.six|top.line/i);
+    expect(w.summary).not.toMatch(/coach|sheltered|fourth.line/i);
   });
 
-  it('credits hits/blocks value for players whose case is peripherals', () => {
-    const w = generatePlayerWriteup(
-      skater({}, { gamesPlayed: 70, points: 20, goals: 8, assists: 12, hits: 200, blockedShots: 90, toi: '15:00' }),
-    );
-    expect(w.tags.map((t) => t.label)).toContain('Peripheral value');
+  it('credits hits and blocks with the limited offence tradeoff', () => {
+    const w = generatePlayerWriteup(skater({}, { gamesPlayed: 70, points: 20, goals: 8, assists: 12, hits: 200, blockedShots: 90, toi: '15:00' }));
+    expect(w.headline).toBe('Peripheral specialist');
+    expect(w.tags.map(t => t.label)).toContain('Peripheral value');
+    expect(w.analysis).toMatch(/When hits and blocks count/);
+    expect(w.summary).toContain('0.29 points per game');
+    expect(w.summary).toContain('2.9 hits and 1.3 blocks');
+    expect(w.analysis).toContain('limited offence');
   });
 });
 
 describe('generatePlayerWriteup — goalies', () => {
   const goalie = (stats: Record<string, unknown>): HockeyPlayer =>
     ({
-      id: 30, name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
+      id: 30, statsSeason: getProjectionsSeason(), name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
       stats: { gamesPlayed: 50, savePct: 0.925, gaa: 2.35, wins: 30, losses: 15, shutouts: 4, ...stats },
     }) as HockeyPlayer;
 
-  it('reads an elite save rate as a starter, in hockey notation', () => {
+  it('reports a strong save rate without claiming a starting job', () => {
     const w = generatePlayerWriteup(goalie({}));
-    expect(w.headline).toBe('Starting-calibre goalie');
+    expect(w.headline).toBe('Save-rate strength');
+    expect(w.analysis).toMatch(/do not establish his current share of starts/);
     expect(w.summary).toContain('.925'); // not "0.925", not "92.5"
     expect(w.summary).toContain('2.35 goals-against average');
   });
@@ -184,22 +198,28 @@ describe('generatePlayerWriteup — goalies', () => {
 
   it('calls out a sub-.900 goalie honestly', () => {
     const w = generatePlayerWriteup(goalie({ savePct: 0.881, gaa: 3.61 }));
-    expect(w.headline).toBe('Struggling in net');
-    expect(w.tags.find((t) => t.tone === 'caution')).toBeTruthy();
+    expect(w.headline).toBe('Wins with ratio risk');
+    expect(w.cardTone).toBe('caution');
+    expect(w.summary).toContain('winning 30');
+    expect(w.summary).toContain('.881 save percentage');
+    expect(w.analysis).toMatch(/wins chase.*save-percentage lead/);
   });
 
   it('reports goals saved above expected in both directions', () => {
     const good = generatePlayerWriteup(goalie({ goalsSavedAboveExpected: 12.4 }));
-    expect(good.summary).toMatch(/He has stopped 12\.4 goals more/);
+    expect(good.summary).toMatch(/Citrus GSAx.*12\.4 goals saved above expected/);
     const bad = generatePlayerWriteup(goalie({ goalsSavedAboveExpected: -8.2 }));
-    expect(bad.summary).toMatch(/He has conceded 8\.2 goals more/);
-    expect(bad.tags.map((t) => t.label)).toContain('Underperforming xG');
+    expect(bad.summary).toMatch(/Citrus GSAx.*8\.2 goals allowed beyond expected/);
+    expect(bad.analysis).toMatch(/shot-quality adjustment and the raw save rate point in different directions/);
+    expect(bad.analysis).toMatch(/neither measure establishes the future crease split/);
   });
 
   it('will not characterise a goalie with two appearances', () => {
     const w = generatePlayerWriteup(goalie({ gamesPlayed: 2 }));
     expect(w.hasEnoughData).toBe(false);
-    expect(w.headline).toMatch(/not enough/i);
+    expect(w.headline).toMatch(/limited sample/i);
+    expect(w.summary).toContain('2 appearances');
+    expect(w.analysis).toMatch(/larger NHL sample.*dependable rate/i);
   });
 });
 
@@ -209,7 +229,7 @@ describe('generatePlayerWriteup — availability outranks production', () => {
     expect(w.summary).toMatch(/^Currently on injured reserve\./);
     expect(w.tags[0]).toEqual({ label: 'Injured reserve', tone: 'caution' });
     // The underlying scouting read survives beneath the status.
-    expect(w.headline).toBe('Star forward');
+    expect(w.headline).toBe(generatePlayerWriteup(skater()).headline);
   });
 
   it('surfaces a game-time decision before the stat line', () => {
@@ -232,23 +252,23 @@ describe('generatePlayerWriteup — availability outranks production', () => {
 describe('cardNote — the one-liner roster cards render', () => {
   it('carries the RATE, which the card stat grid (GP/G/A/SOG totals) never shows', () => {
     const w = generatePlayerWriteup(skater());
-    expect(w.cardNote).toBe('Star forward · 1.43 P/GP');
+    expect(w.cardNote).toBe(`${ACTUALS_LABEL} · 1.43 P/GP`);
     expect(w.cardTone).toBe('positive');
   });
 
   it('uses save percentage for goalies, in hockey notation', () => {
     const w = generatePlayerWriteup({
-      id: 30, name: 'Test Goalie', position: 'G', number: 1, starter: true, team: 'X',
+      id: 30, statsSeason: getProjectionsSeason(), name: 'Test Goalie', position: 'G', number: 1, starter: true, team: 'X',
       stats: { gamesPlayed: 50, savePct: 0.925, gaa: 2.35, wins: 30, losses: 15 },
     } as HockeyPlayer);
-    expect(w.cardNote).toBe('Starting-calibre goalie · .925 SV%');
+    expect(w.cardNote).toBe(`${ACTUALS_LABEL} · .925 SV%`);
   });
 
   it('stays short enough for a truncating one-line card slot', () => {
-    // Longest realistic band + rate. Cards truncate, but a note that ALWAYS
+    // Season provenance plus the rate. Cards truncate, but a note that ALWAYS
     // truncates communicates nothing.
     const d = generatePlayerWriteup(skater({ position: 'D' }, { gamesPlayed: 70, points: 60, goals: 15, assists: 45 }));
-    expect(d.cardNote).toBe('Elite offensive defenceman · 0.86 P/GP');
+    expect(d.cardNote).toBe(`${ACTUALS_LABEL} · 0.86 P/GP`);
     expect(d.cardNote.length).toBeLessThanOrEqual(45);
   });
 
@@ -262,9 +282,9 @@ describe('cardNote — the one-liner roster cards render', () => {
   });
 
   it('states the sample size instead of a rate when the sample is thin', () => {
-    expect(generatePlayerWriteup(skater({}, { gamesPlayed: 3 })).cardNote).toBe('Only 3 games played');
-    expect(generatePlayerWriteup(skater({}, { gamesPlayed: 1 })).cardNote).toBe('Only 1 game played');
-    expect(generatePlayerWriteup(skater({}, { gamesPlayed: 0 })).cardNote).toBe('No games played yet');
+    expect(generatePlayerWriteup(skater({}, { gamesPlayed: 3 })).cardNote).toBe(`${ACTUALS_LABEL} · 3 GP`);
+    expect(generatePlayerWriteup(skater({}, { gamesPlayed: 1 })).cardNote).toBe(`${ACTUALS_LABEL} · 1 GP`);
+    expect(generatePlayerWriteup(skater({}, { gamesPlayed: 0 })).cardNote).toBe(`${ACTUALS_LABEL} · 0 GP`);
   });
 
   it('is empty for a null player so cards render nothing rather than a stray dot', () => {
@@ -293,20 +313,24 @@ describe('analysis paragraph — the "what should I do" half', () => {
     }
   });
 
-  it('calls out over-performing finishers as regression candidates', () => {
+  it('quantifies finishing above xG without an automatic sell-high recommendation', () => {
     const w = generatePlayerWriteup(
       skater({}, { gamesPlayed: 70, goals: 30, assists: 20, points: 50, xGoals: 15 }),
     );
-    expect(w.analysis).toMatch(/30 goals on 15 expected/);
-    expect(w.analysis).toMatch(/sell high/i);
+    expect(w.analysis).toMatch(/15 goals above the 15 Citrus expected goals estimate/);
+    expect(w.analysis).toContain('15 goals above');
+    expect(w.analysis).toMatch(/A repeat needs that finishing advantage or more chance creation/);
+    expect(w.analysis).not.toMatch(/sell high|guaranteed (?:decline|reversal)/i);
   });
 
-  it('calls out unlucky finishers as buy-low rather than drop', () => {
+  it('quantifies finishing below xG without calling it luck or an automatic buy-low', () => {
     const w = generatePlayerWriteup(
       skater({}, { gamesPlayed: 70, goals: 8, assists: 30, points: 38, xGoals: 18 }),
     );
-    expect(w.analysis).toMatch(/8 goals on 18 expected/);
-    expect(w.analysis).toMatch(/buy low/i);
+    expect(w.analysis).toMatch(/10 goals below the 18 Citrus expected goals estimate/);
+    expect(w.analysis).toContain('10 goals below');
+    expect(w.analysis).toMatch(/Better conversion is a path to more goals, not a guaranteed rebound/);
+    expect(w.analysis).not.toMatch(/buy low|will bounce back/i);
   });
 
   it('stays silent on finishing luck when xG is missing or a tiny sample', () => {
@@ -320,21 +344,28 @@ describe('analysis paragraph — the "what should I do" half', () => {
     const w = generatePlayerWriteup(
       skater({}, { gamesPlayed: 60, points: 18, goals: 7, assists: 11, toi: '15:00', shots: 80, hits: 20, blocks: 20, powerPlayPoints: 1, xGoals: undefined }),
     );
-    expect(w.analysis).toMatch(/streamer|depth/i);
+    expect(w.cardNote).toContain('0.3 P/GP');
+    expect(w.summary).toContain('18 points in 60 games');
+    expect(w.analysis).toContain('7 goals and 11 assists');
+    expect(w.analysis).toMatch(/roster.*need/);
+    expect(w.analysis).not.toMatch(/must.start|automatic.*play/i);
   });
 
   it('gives goalies a workload verdict, not just a save-rate restatement', () => {
     const starter = generatePlayerWriteup({
-      id: 30, name: 'Test Goalie', position: 'G', number: 1, starter: true, team: 'X',
+      id: 30, statsSeason: getProjectionsSeason(), name: 'Test Goalie', position: 'G', number: 1, starter: true, team: 'X',
       stats: { gamesPlayed: 55, savePct: 0.925, gaa: 2.3, wins: 33, losses: 15 },
     } as HockeyPlayer);
-    expect(starter.analysis).toMatch(/workload/i);
+    expect(starter.analysis).toMatch(/Counting-stat value still depends on the next crease allocation/);
+    expect(starter.analysis).toMatch(/do not establish his current share of starts/);
 
     const backup = generatePlayerWriteup({
-      id: 31, name: 'Backup Guy', position: 'G', number: 2, starter: false, team: 'X',
+      id: 31, statsSeason: getProjectionsSeason(), name: 'Backup Guy', position: 'G', number: 2, starter: false, team: 'X',
       stats: { gamesPlayed: 14, savePct: 0.915, gaa: 2.6, wins: 6, losses: 6 },
     } as HockeyPlayer);
-    expect(backup.analysis).toMatch(/14 appearances/);
+    expect(backup.summary).toContain('14 appearances');
+    expect(backup.analysis).toMatch(/do not establish his current share of starts/);
+    expect(backup.cardNote).toContain('.915 SV%');
   });
 });
 
@@ -383,26 +414,25 @@ const BANNED_PHRASES = VOICE.bannedPhrases.map((p) => ({ name: p.name, re: new R
 const ACCURACY_CLAIMS = VOICE.accuracyClaims.map((p) => ({ name: p.name, re: new RegExp(p.pattern, 'i') }));
 
 /** Any of the names the copy brief allows for a Citrus number. */
-const CITRUS_SOURCE = /Citrus (?:xG|GAR|GSAx|ROS projection)|on the Citrus board/;
+const CITRUS_SOURCE = /Citrus (?:expected goals|xG|GAR|GSAx|ROS projection)|on the Citrus board/;
 
 /** A sentence that quotes expected goals, in either sport's shorthand. */
 const QUOTES_EXPECTED_GOALS = /\bexpected\b|\bxG\b|\bGSAx\b/;
 
 const testGoalie = (stats: Record<string, unknown> = {}, overrides: Partial<HockeyPlayer> = {}): HockeyPlayer =>
   ({
-    id: 30, name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
+    id: 30, statsSeason: getProjectionsSeason(), name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
     stats: { gamesPlayed: 50, savePct: 0.925, gaa: 2.35, wins: 30, losses: 15, shutouts: 4, ...stats },
     ...overrides,
   }) as HockeyPlayer;
 
 /**
- * Every prose branch of the generator, as finished writeups.
+ * Representative evidence and availability cases, as finished writeups.
  *
- * The skater cases walk both headline curves, all three usage bands, the
- * power-play and peripheral rules, both directions of the finishing gap,
- * the fallback, and the three availability wrappers. The goalie cases walk
- * all four save-rate bands, both GSAx signs, both workload verdicts and
- * both thin-sample paths.
+ * The cases cover power-play exposure, peripherals, minutes, both finishing
+ * gap directions, availability wrappers, save-rate tradeoffs, both GSAx
+ * signs, and thin samples. Dedicated tests above check distinct profile
+ * selection and category implications.
  */
 function everyWriteup(): Array<{ label: string; w: PlayerWriteup }> {
   return [
@@ -442,9 +472,8 @@ function prose(w: PlayerWriteup): string[] {
 describe('player writeups: voice conformance', () => {
   const CASES = everyWriteup();
 
-  it('covers every prose branch of the generator', () => {
-    // A refactor that quietly collapses a branch would leave this block
-    // testing fewer sentences than it claims to.
+  it('keeps the representative evidence and availability cases usable', () => {
+    // Keep the fixture inventory stable; distinct structure is tested above.
     expect(CASES.length).toBe(25);
     for (const c of CASES) {
       expect(c.w.headline.length, c.label).toBeGreaterThan(0);
@@ -484,35 +513,22 @@ describe('player writeups: voice conformance', () => {
     }
   });
 
-  // THE BRAND RULE, REVERSED (2026-09-05, Garrett: "don't mention Citrus
-  // at all; just mention stats if relevant"). The old brief had every
-  // expected-goals sentence name the model behind it; the card now reads
-  // as a scout's note, not a product's. Stated twice: as a property of any
-  // sentence that reaches for expected goals, and on the four branches that
-  // used to name it.
-  it.each(CASES.map((c) => [c.label] as const))(
-    '%s: no sentence names the brand',
-    (label) => {
-      const w = CASES.find((c) => c.label === label)!.w;
-      for (const text of [w.summary, w.analysis]) {
-        expect(CITRUS_SOURCE.test(text), `brand named in: ${text}`).toBe(false);
-        expect(text).not.toMatch(/\bCitrus\b/);
+  // Source attribution is evidence provenance, not a promotional accuracy claim.
+  it.each(CASES.map(c => [c.label] as const))('%s: attributed model numbers', label => {
+    const w = CASES.find(c => c.label === label)!.w;
+    for (const sentence of `${w.summary} ${w.analysis}`.split(/(?<=[.!?])\s+/)) {
+      if (/\d/.test(sentence) && QUOTES_EXPECTED_GOALS.test(sentence)) {
+        expect(CITRUS_SOURCE.test(sentence), `missing source in: ${sentence}`).toBe(true);
       }
-    },
-  );
+    }
+  });
 
-  it('the four branches built on an expected-goals number quote the number and not the brand', () => {
-    const named = [
-      'finishing above his chances',
-      'finishing below his chances',
-      'goalie beating GSAx',
-      'goalie below GSAx',
-    ];
-    for (const label of named) {
-      const w = CASES.find((c) => c.label === label)!.w;
+  it('both finishing directions and GSAx directions name their model source', () => {
+    for (const label of ['finishing above his chances', 'finishing below his chances', 'goalie beating GSAx', 'goalie below GSAx']) {
+      const w = CASES.find(c => c.label === label)!.w;
       const text = `${w.summary} ${w.analysis}`;
-      expect(QUOTES_EXPECTED_GOALS.test(text), `${label} should quote the number: ${text}`).toBe(true);
-      expect(CITRUS_SOURCE.test(text), `${label} names the brand: ${text}`).toBe(false);
+      expect(QUOTES_EXPECTED_GOALS.test(text), label).toBe(true);
+      expect(CITRUS_SOURCE.test(text), label).toBe(true);
     }
   });
 
@@ -537,7 +553,7 @@ describe('player writeups: voice conformance', () => {
 describe('the voice (2026-09-05)', () => {
   const goalie = (overrides: Partial<HockeyPlayer> = {}): HockeyPlayer =>
     ({
-      id: 30, name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
+      id: 30, statsSeason: getProjectionsSeason(), name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
       stats: { gamesPlayed: 50, savePct: 0.925, gaa: 2.35, wins: 30, losses: 15, shutouts: 4 },
       ...overrides,
     }) as HockeyPlayer;
@@ -550,12 +566,14 @@ describe('the voice (2026-09-05)', () => {
     expect(g.summary.indexOf('Igor Shesterkin')).toBeLessThan(20);
   });
 
-  it('gives two players with the same line different prose, and the same player the same prose twice', () => {
+  it('does not manufacture differences by renaming identical evidence', () => {
     const a = generatePlayerWriteup(skater({ id: 8478402, name: 'Connor McDavid' }));
     const b = generatePlayerWriteup(skater({ id: 8477492, name: 'Nathan MacKinnon' }));
     const c = generatePlayerWriteup(skater({ id: 8476453, name: 'Nikita Kucherov' }));
     const shapes = new Set([a, b, c].map((w) => w.summary.replace(/Connor McDavid|Nathan MacKinnon|Nikita Kucherov/g, 'X')));
-    expect(shapes.size).toBeGreaterThan(1);
+    expect(shapes.size).toBe(1);
+    expect(a.analysis).toBe(b.analysis);
+    expect(b.analysis).toBe(c.analysis);
     expect(generatePlayerWriteup(skater({ id: 8478402, name: 'Connor McDavid' })).summary).toBe(a.summary);
   });
 
@@ -565,11 +583,18 @@ describe('the voice (2026-09-05)', () => {
     }
   });
 
-  it('says more than points when the box score does: the power play, the plus-minus, the shooting', () => {
-    const w = generatePlayerWriteup(skater({}, { gamesPlayed: 70, points: 100, goals: 40, assists: 60, shots: 250, powerPlayPoints: 30, plusMinus: 22 }));
-    expect(w.summary).toMatch(/power play/i);
-    expect(w.summary).toMatch(/plus-22/);
-    expect(w.summary).toMatch(/16%/);
+  it('changes the structure and category consequence when the hockey evidence changes', () => {
+    const profiles = [
+      generatePlayerWriteup(skater()),
+      generatePlayerWriteup(skater({}, { goals: 15, assists: 55, points: 70, shots: 100, powerPlayPoints: 10 })),
+      generatePlayerWriteup(skater({}, { goals: 40, assists: 25, points: 65, shots: 220, powerPlayPoints: 10 })),
+      generatePlayerWriteup(skater({}, { goals: 5, assists: 15, points: 20, hits: 220, blockedShots: 100, powerPlayPoints: 2 })),
+    ];
+    expect(profiles.map(w => w.headline)).toEqual(['Volume shooter', 'Assist-led production', 'Finishing and playmaking', 'Peripheral specialist']);
+    expect(new Set(profiles.map(w => w.analysis)).size).toBe(4);
+    expect(profiles[1].analysis).toMatch(/assists need.*little shot volume/);
+    expect(profiles[2].analysis).toMatch(/same shot volume requires that conversion to hold/);
+    expect(profiles[3].analysis).toMatch(/without needing a scoring night/);
   });
 });
 
@@ -612,7 +637,7 @@ describe('writeup extras (2026-09-05): what the stat line cannot say', () => {
     expect(w.tags.some((t) => t.label.includes('30-goal'))).toBe(false);
   });
 
-  it('cohort reads only when notable, the projection as a number, and never the brand', () => {
+  it('cohort reads only when notable and the projection keeps its scoring context', () => {
     const w = generatePlayerWriteup(ovi, {
       xgPercentile: 92,
       garPercentile: 98,
@@ -626,7 +651,14 @@ describe('writeup extras (2026-09-05): what the stat line cannot say', () => {
     expect(w.analysis).toContain('XG/60 in the 92nd percentile, GAR/60 in the 98th of forwards.');
     expect(w.analysis).toContain('Projects to 611 fantasy points over 74 games for 2026-27 (LW8).');
     expect(w.tags.some((t) => t.label === 'Elite GAR')).toBe(true);
-    expect(`${w.summary} ${w.analysis}`).not.toMatch(/Citrus/);
+  });
+
+  it('labels goalie projected volume as starts and preserves the supplied total', () => {
+    const w = generatePlayerWriteup(testGoalie(), {
+      projFp: 275.4, projGp: 52, projectionLabel: 'for 2026-27',
+    });
+    expect(w.analysis).toContain('Projects to 275 fantasy points over 52 starts for 2026-27.');
+    expect(w.analysis).not.toContain('over 52 games');
   });
 
   it('a middling percentile says nothing', () => {
@@ -665,7 +697,7 @@ describe('writeup extras (2026-09-05): what the stat line cannot say', () => {
     for (const label of ['500-goal club', '1,000-point club', '1,000 games', 'Veteran']) {
       expect(w.tags.some((t) => t.label === label), label).toBe(true);
     }
-    expect(`${w.summary} ${w.analysis}`).not.toMatch(/—|Citrus/);
+    expect(`${w.summary} ${w.analysis}`).not.toMatch(/—/);
   });
 
   it('a goalie career counts wins and shutouts; a late pick is not mentioned; undrafted is', () => {
@@ -686,8 +718,39 @@ describe('writeup extras (2026-09-05): what the stat line cannot say', () => {
     expect(shortTrophy('Ted Lindsay Award')).toBe('Ted Lindsay');
   });
 
-  it('never writes an em dash or the brand', () => {
+  it('never writes an em dash in combined career and projection prose', () => {
     const w = generatePlayerWriteup(ovi, { age: 40, goalsBySeason: nine, xgPercentile: 92, garPercentile: 98, cohortNoun: 'forwards', cohortSize: 515, projFp: 611, projGp: 74, posRank: 'LW8', projectionLabel: 'for 2026-27' });
-    expect(`${w.summary} ${w.analysis}`).not.toMatch(/—|Citrus/);
+    expect(`${w.summary} ${w.analysis}`).not.toMatch(/—/);
+  });
+});
+
+
+describe('concise assessments keep evidence limits', () => {
+  it('does not convert minutes, production or a finishing gap into unsupported deployment and forecasts', () => {
+    const profiles = [
+      generatePlayerWriteup(skater({}, { toi: '25:00', goals: 10, assists: 50, points: 60, xGoals: 30 })),
+      generatePlayerWriteup(skater({ position: 'D' }, { toi: '26:00', goals: 10, assists: 55, points: 65, powerPlayPoints: 35 })),
+      generatePlayerWriteup(testGoalie({ gamesPlayed: 60, savePct: .930, wins: 40 })),
+    ];
+    for (const w of profiles) {
+      const text = `${w.summary} ${w.analysis}`;
+      expect(text).not.toMatch(/(?:will|should) (?:score \d|return (?:on|by)|miss \d|play \d)/i);
+      expect(text).not.toMatch(/(?:has|owns) (?:an? )?(?:undisputed|uncontested|guaranteed) (?:crease|starting role)/i);
+      expect(text).not.toMatch(/(?:plays|skates|is deployed) (?:on|with) (?:the )?(?:first|top)[- ](?:line|pair|power.play unit)/i);
+      expect(text).not.toMatch(/Leon Draisaitl|Mikko Rantanen|Nathan MacKinnon/);
+    }
+    // The cautious prose still exposes the actual finishing gap for inspection.
+    expect(`${profiles[0].summary} ${profiles[0].analysis}`).toMatch(/20 goals below/);
+    expect(`${profiles[0].summary} ${profiles[0].analysis}`).toMatch(/Citrus (?:expected goals|xG)/);
+  });
+
+  it('never turns current injury status into a precise return date or projected absence', () => {
+    for (const status of ['IR', 'GTD', 'SUSP'] as const) {
+      const w = generatePlayerWriteup(skater({ status }));
+      const text = `${w.summary} ${w.analysis}`;
+      expect(w.tags[0].tone).toBe('caution');
+      expect(text).not.toMatch(/(?:returns?|back|cleared) (?:on|by) (?:[A-Z][a-z]+ \d|20\d{2}-)|(?:miss|out for) \d+ games/i);
+      expect(w.cardTone).toBe('caution');
+    }
   });
 });

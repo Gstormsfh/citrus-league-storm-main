@@ -1,3 +1,6 @@
+import { rankDraftCandidates } from '@/components/draft/draftDecision';
+import { projectionSettings } from '@citrus/shared';
+import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 // Phase 4.5 chunk 11g DR-3 (2026-07-29) — the visual room.
 //
 // The v2 page mounts the proven v1 draft components (DraftBoard,
@@ -1880,33 +1883,8 @@ function MainTabs({
   // AUCTION BOARD (2026-09-05): the lot's budgets for the column heads.
   const auctionDerived = useAuctionDerived();
 
-  // LEAGUE-SCORING WIRE (2026-08-23 final audit): the pool previously
-  // ranked EVERY league with DEFAULT_SCORING — a custom league (e.g.
-  // 1 pt G / 1 pt A) drafted off rankings computed for the default
-  // categories. One GET at mount; ScoringCalculator accepts the raw
-  // leagues.scoring_settings JSON. Fetch failure falls back to default
-  // scoring — never block the pool on this request.
-  const [leagueScoring, setLeagueScoring] = useState<ScoringSettings | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { apiClient } = await import('@/api/client');
-        const response = await apiClient.get<{ scoring_settings?: ScoringSettings | null }>(
-          `/api/leagues/${encodeURIComponent(leagueId)}`,
-        );
-        const payload = (response.data ?? response) as { scoring_settings?: ScoringSettings | null };
-        if (!cancelled && payload?.scoring_settings) {
-          setLeagueScoring(payload.scoring_settings);
-        }
-      } catch {
-        /* default scoring remains */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [leagueId]);
+  const leagueScoringContext = useLeagueScoringContext(leagueId);
+  const leagueScoring = useMemo(() => projectionSettings(leagueScoringContext.scoring), [leagueScoringContext.scoring]);
   // Entry 87 Fix C — clamp source for OnClockActionBar's countdown.
   // Same store selector StickyHeader reads for DraftTimerV2 so the
   // sticky bar and the header timer agree frame-for-frame.
@@ -2115,8 +2093,8 @@ function MainTabs({
    * once per scoring change is cheaper than 240 rows on every keystroke.
    */
   const projectedFptsMap = useMemo(
-    () => buildDraftProjectionMap(dashboardIndex, leagueScoring),
-    [dashboardIndex, leagueScoring],
+    () => leagueScoringContext.ready ? buildDraftProjectionMap(dashboardIndex, leagueScoring) : new Map(),
+    [dashboardIndex, leagueScoring, leagueScoringContext.ready],
   );
 
   /**
@@ -2378,18 +2356,16 @@ function MainTabs({
     // engine's own expiry autopick remains the backstop, and the toast
     // tells the manager what happened.
     if (pickNo === null || lastAutoPickForRef.current === pickNo) return;
-    if (availablePlayers.length === 0) return;
+    if (availablePlayers.length === 0 || !leagueScoringContext.ready) return;
     const timer = setTimeout(() => {
       const availSet = new Set(availablePlayers.map(p => p.id));
       const queuedId = queue.find(id => availSet.has(id));
       let target = queuedId ? availablePlayers.find(p => p.id === queuedId) : undefined;
       if (!target) {
-        // Mirror PlayerPool's rankMap: season FPTS via the LEAGUE's
-        // scoring settings (wired 2026-08-23 — both the pool and this
-        // fallback previously used default scoring for every league),
-        // so autodraft still matches the visible #1 exactly.
+        // Match the visible pool: available league-scored ROS first,
+        // then historical league points for players without a forecast.
         const scorer = new ScoringCalculator(leagueScoring ?? undefined);
-        const scored = availablePlayers.map((p) => {
+        const scoreActual = (p: Player) => {
           const isG = p.position === 'G';
           const f = scorer.calculatePoints(
             isG
@@ -2397,8 +2373,9 @@ function MainTabs({
               : { goals: p.goals || 0, assists: p.assists || 0, shots: p.shots || 0, blocks: p.blocks || 0, hits: p.hits || 0, pim: p.pim || 0, ppp: p.ppp || 0, shp: p.shp || 0 },
             isG,
           );
-          return { p, f };
-        }).sort((a, b) => b.f - a.f);
+          return f;
+        };
+        const scored = rankDraftCandidates(availablePlayers, projectedFptsMap, scoreActual).map(p => ({p}));
 
         // CLIENT-AUTODRAFT SHAPE GUARD (2026-08-23): count what my team
         // already holds by position and prefer the best player at a
@@ -2434,7 +2411,7 @@ function MainTabs({
       }
     }, 1500);
     return () => clearTimeout(timer);
-  }, [autodraftOn, amIOnClock, isSubmitPending, isMyKeeperSlot, derived?.currentPickNumber, availablePlayers, queue, handleDraftFromPool, rosterCaps, myTeamId, playersById, leagueScoring]);
+  }, [autodraftOn, amIOnClock, isSubmitPending, isMyKeeperSlot, derived?.currentPickNumber, availablePlayers, queue, handleDraftFromPool, rosterCaps, myTeamId, playersById, leagueScoring, leagueScoringContext.ready, projectedFptsMap]);
 
   /*
    * THE BOARD IS NOT A TAB ON DESKTOP (2026-09-10).
@@ -2788,6 +2765,7 @@ function MainTabs({
               /* LEAGUE-SCORING WIRE (2026-08-23) — rankings/FPTS follow
                  this league's categories instead of default scoring. */
               scoringSettings={leagueScoring}
+              scoringReady={leagueScoringContext.ready}
               /* QUEUE-REACH (2026-08-13) — the two props that make the
                  per-row star appear. `onAddToQueue` is optional in
                  PlayerPool and the star is gated on it being defined,

@@ -74,6 +74,9 @@ export interface DraftKitBlurb {
 }
 
 export interface DraftKitBoard {
+  /** Supplied only when the returned board was assembled from a published canonical run. */
+  projection_source?: { kind: 'canonical'; revision: string; run_id: string;
+    season: number; readiness: 'published' } | null;
   tier: DraftKitTier;
   locked: boolean;
   metricsSeason: number;

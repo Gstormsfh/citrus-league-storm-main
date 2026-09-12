@@ -146,6 +146,19 @@ export function buildDraftProjectionMap(
   return out;
 }
 
+/** Shared board/autopick order: available forecasts first, then actual-season rank. */
+export function rankDraftCandidates<T extends { id: string }>(
+  players: readonly T[], projections: ReadonlyMap<string, DraftProjection>, actualPoints: (player: T) => number,
+): T[] {
+  return players.map(player => ({ player, forecast: projections.get(player.id)?.total,
+    actual: actualPoints(player) })).sort((a, b) => {
+    const ap = a.forecast != null && Number.isFinite(a.forecast);
+    const bp = b.forecast != null && Number.isFinite(b.forecast);
+    if (ap !== bp) return ap ? -1 : 1;
+    return ap && bp ? b.forecast! - a.forecast! : b.actual - a.actual;
+  }).map(row => row.player);
+}
+
 // ── Positional scarcity ─────────────────────────────────────────────
 
 /** What the bar says about one position. */

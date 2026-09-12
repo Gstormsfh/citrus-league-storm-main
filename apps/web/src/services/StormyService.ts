@@ -311,8 +311,9 @@ class StormyServiceImpl {
    * scoring document in the same context block.
    */
   static rosToken(row: RosProjectionRow | undefined, scorer: ScoringCalculator): string {
-    if (!row || row.total_projected_points == null) return '';
-    return ` ROS:${projectedPointsFor(row, scorer).toFixed(1)}pts ${row.games_remaining}GR`;
+    const points = projectedPointsFor(row, scorer);
+    if (!row || points == null) return '';
+    return ` ROS:${points.toFixed(1)}pts ${row.games_remaining}GR`;
   }
 
   /** `Gap: you lead by 15.0`, or null until both sides have a score. */
@@ -366,6 +367,7 @@ class StormyServiceImpl {
         roster_slots?: Record<string, number>; league_size?: number; roster_size?: number;
         settings?: Record<string, unknown>;
       } | null;
+      if (!leagueRow || !('scoring_settings' in leagueRow)) return ctx;
 
       const leagueSetup = formatLeagueSetup(leagueRow?.settings, leagueRow?.roster_slots, leagueRow?.league_size);
       if (leagueSetup) ctx.leagueSetup = leagueSetup;
@@ -374,7 +376,7 @@ class StormyServiceImpl {
       // stored totals are baked with default scoring, and a projection on the
       // wrong scale sitting next to the league's own scoring document is
       // worse than no projection: he does arithmetic across the two.
-      const leagueScorer = new ScoringCalculator(projectionSettings(leagueRow?.scoring_settings ?? null));
+      const leagueScorer = new ScoringCalculator(projectionSettings(leagueRow.scoring_settings));
 
       let weekStart: Date | null = null;
       let weekEnd: Date | null = null;
@@ -743,7 +745,7 @@ class StormyServiceImpl {
 
           if (freeAgents.length > 0) {
             const faLines = freeAgents.map(p =>
-              `${p.position ?? "?"} ${p.player_name} (${p.team_abbrev ?? "?"}) ROS:${projectedPointsFor(p, leagueScorer).toFixed(1)}pts ${Number(p.avg_points_per_game).toFixed(1)}PPG ${p.games_remaining}GR`
+              `${p.position ?? "?"} ${p.player_name} (${p.team_abbrev ?? "?"}) ROS:${projectedPointsFor(p, leagueScorer)?.toFixed(1) ?? 'unavailable'}pts ${p.games_remaining}GR`
             );
             ctx.extra = (ctx.extra ? ctx.extra + "\n\n" : "") + "Top Available Free Agents:\n" + faLines.join("\n");
           }

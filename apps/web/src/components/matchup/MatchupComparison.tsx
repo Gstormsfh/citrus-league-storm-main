@@ -1,3 +1,4 @@
+import { scopedEarnedPoints } from '@/utils/matchupEarnedStats';
 import { useEffect, useRef, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -5,7 +6,7 @@ import { MatchupPlayer } from "./types";
 import { MatchupPositionGroup } from "./MatchupPositionGroup";
 import { organizeMatchupData } from "./matchupUtils";
 import type { PositionType } from "@/utils/rosterUtils";
-import { ScoringCalculator, ScoringSettings } from "@/utils/scoringUtils";
+import { ScoringSettings } from "@/utils/scoringUtils";
 import { NEUTRAL_CHIP, POSITION_CHIP_BASE } from "@/components/roster/positionChip";
 import { isMobileViewport } from "@/hooks/useIsMobile";
 
@@ -114,7 +115,7 @@ export const MatchupComparison = ({
 }: MatchupComparisonProps) => {
   const pressbox = variant === 'pressbox';
   // Create scoring calculator with league-specific settings
-  const scorer = useMemo(() => new ScoringCalculator(scoringSettings), [scoringSettings]);
+
   // Organize players by slot order (flattened, no position grouping)
   const positionGroups = organizeMatchupData(
     userStarters,
@@ -181,142 +182,22 @@ export const MatchupComparison = ({
   
   // For weekly view, use weeklyTotalFromDaily if available (even if 0 - it's the calculated value)
   // For daily view, calculate from players
-  const userTotal = (!isShowingDailyView && weeklyTotalFromDaily) 
-    ? weeklyTotalFromDaily.myTotal 
-    : allUserPlayers.reduce((sum, player) => {
-    if (!player) return sum;
-    if (isShowingDailyView) {
-      // For dropped players, use the same fallback chain as PlayerCard
-      if (player.wasDropped) {
-        // Try dailyStatsMap first
-        if (dailyStatsMap) {
-          const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-          const stats = dailyStatsMap.get(playerId);
-          if (stats?.daily_total_points !== undefined) {
-            return sum + stats.daily_total_points;
-          }
-        }
-        // Fallback to player properties (total_points = their daily contribution since dropped mid-game)
-        return sum + (player.daily_total_points ?? player.total_points ?? player.points ?? 0);
-      }
-      // Non-dropped: use daily_total_points from dailyStatsMap (single source of truth for daily view)
-      // First check dailyStatsMap (most reliable for selected date)
-      if (dailyStatsMap) {
-        const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-        const stats = dailyStatsMap.get(playerId);
-        if (stats?.daily_total_points !== undefined && stats.daily_total_points !== null) {
-          return sum + stats.daily_total_points;
-        }
-      }
-      // Fallback to player.daily_total_points (set by enrichment)
-      if (player.daily_total_points !== undefined && player.daily_total_points !== null) {
-        return sum + player.daily_total_points;
-      }
-      // If no daily stats available, return 0 (don't use weekly totals for daily view)
-      return sum + 0;
-    }
-    // Weekly view: prefer total_points (matchup week points) over points (season points)
-    // total_points is specifically set for matchup week, so it's more reliable
-    // This ensures demo leagues show correct weekly totals
-    // Also try to calculate from matchupStats if total_points is missing or 0
-    if (player.total_points !== undefined && player.total_points !== null && player.total_points > 0) {
-      return sum + player.total_points;
-    }
-    // Fallback: try to calculate from matchupStats if available (even if total_points is 0)
-    if (player.matchupStats) {
-      const isGoalie = player.position === 'G' || player.position === 'Goalie';
-      const calculatedPoints = scorer.calculatePoints(player.matchupStats, isGoalie);
-      return sum + calculatedPoints; // Use matchup week stats with league scoring
-    }
-    // Last resort: For demo leagues, if no matchup stats, use season stats from player.stats
-    // This is a fallback when matchup lines aren't populated yet
-    if (player.stats) {
-      const isGoalie = player.position === 'G' || player.position === 'Goalie';
-      if (isGoalie && player.goalieStats) {
-        const goaliePoints = scorer.calculatePoints(player.goalieStats, true);
-        return sum + goaliePoints;
-      } else if (!isGoalie) {
-        // Calculate from season stats (approximation for demo when matchup stats unavailable)
-        const skaterPoints = scorer.calculatePoints(player.stats, false);
-        return sum + skaterPoints;
-      }
-    }
-    // Final fallback: use total_points even if 0, or points (season), or 0
-    return sum + (player.total_points ?? player.points ?? 0);
+  const sumEarned = (players: typeof allUserPlayers): number => players.reduce((sum, player) => {
+    const day = dailyStatsMap?.get(Number(player.id));
+    const points = scopedEarnedPoints(player, isShowingDailyView, day?.daily_total_points);
+    return points === null ? NaN : sum + points;
   }, 0);
-  
-  // For weekly view, use weeklyTotalFromDaily if available (even if 0 - it's the calculated value)
-  // For daily view, calculate from players
-  const opponentTotal = (!isShowingDailyView && weeklyTotalFromDaily) 
-    ? weeklyTotalFromDaily.oppTotal 
-    : allOpponentPlayers.reduce((sum, player) => {
-    if (!player) return sum;
-    if (isShowingDailyView) {
-      // For dropped players, use the same fallback chain as PlayerCard
-      if (player.wasDropped) {
-        // Try dailyStatsMap first
-        if (dailyStatsMap) {
-          const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-          const stats = dailyStatsMap.get(playerId);
-          if (stats?.daily_total_points !== undefined) {
-            return sum + stats.daily_total_points;
-          }
-        }
-        // Fallback to player properties (total_points = their daily contribution since dropped mid-game)
-        return sum + (player.daily_total_points ?? player.total_points ?? player.points ?? 0);
-      }
-      // Non-dropped: use daily_total_points from dailyStatsMap (single source of truth for daily view)
-      // First check dailyStatsMap (most reliable for selected date)
-      if (dailyStatsMap) {
-        const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-        const stats = dailyStatsMap.get(playerId);
-        if (stats?.daily_total_points !== undefined && stats.daily_total_points !== null) {
-          return sum + stats.daily_total_points;
-        }
-      }
-      // Fallback to player.daily_total_points (set by enrichment)
-      if (player.daily_total_points !== undefined && player.daily_total_points !== null) {
-        return sum + player.daily_total_points;
-      }
-      // If no daily stats available, return 0 (don't use weekly totals for daily view)
-      return sum + 0;
-    }
-    // Weekly view: prefer total_points (matchup week points) over points (season points)
-    // total_points is specifically set for matchup week, so it's more reliable
-    // This ensures demo leagues show correct weekly totals
-    // Also try to calculate from matchupStats if total_points is missing or 0
-    if (player.total_points !== undefined && player.total_points !== null && player.total_points > 0) {
-      return sum + player.total_points;
-    }
-    // Fallback: try to calculate from matchupStats if available (even if total_points is 0)
-    if (player.matchupStats) {
-      const isGoalie = player.position === 'G' || player.position === 'Goalie';
-      const calculatedPoints = scorer.calculatePoints(player.matchupStats, isGoalie);
-      return sum + calculatedPoints; // Use matchup week stats with league scoring
-    }
-    // Last resort: For demo leagues, if no matchup stats, use season stats from player.stats
-    // This is a fallback when matchup lines aren't populated yet
-    if (player.stats) {
-      const isGoalie = player.position === 'G' || player.position === 'Goalie';
-      if (isGoalie && player.goalieStats) {
-        const goaliePoints = scorer.calculatePoints(player.goalieStats, true);
-        return sum + goaliePoints;
-      } else if (!isGoalie) {
-        // Calculate from season stats (approximation for demo when matchup stats unavailable)
-        const skaterPoints = scorer.calculatePoints(player.stats, false);
-        return sum + skaterPoints;
-      }
-    }
-    // Final fallback: use total_points even if 0, or points (season), or 0
-    return sum + (player.total_points ?? player.points ?? 0);
-  }, 0);
-  
+  const userTotal = scoringSettings == null ? NaN : (!isShowingDailyView && weeklyTotalFromDaily)
+    ? weeklyTotalFromDaily.myTotal : sumEarned(allUserPlayers);
+  const opponentTotal = scoringSettings == null ? NaN : (!isShowingDailyView && weeklyTotalFromDaily)
+    ? weeklyTotalFromDaily.oppTotal : sumEarned(allOpponentPlayers);
+
   // Track previous values to prevent redundant callbacks
   const prevTotalsRef = useRef<{ user: number; opp: number; date: string | null } | null>(null);
   
   // Report calculated totals to parent (for WeeklySchedule synchronization)
   useEffect(() => {
-    if (onTotalsCalculated && isShowingDailyView && selectedDate) {
+    if (onTotalsCalculated && isShowingDailyView && selectedDate && Number.isFinite(userTotal) && Number.isFinite(opponentTotal)) {
       // Only call if values actually changed (prevent flicker)
       const prev = prevTotalsRef.current;
       if (!prev || 
@@ -447,7 +328,7 @@ export const MatchupComparison = ({
           <div className="matchup-total-label">
             {isShowingDailyView ? 'Daily Total' : 'Total'}
           </div>
-          <div className="matchup-total-score font-jbmono tabular-nums">{userTotal.toFixed(1)}</div>
+          <div className="matchup-total-score font-jbmono tabular-nums">{Number.isFinite(userTotal) ? userTotal.toFixed(1) : 'N/A'}</div>
         </div>
         <div className="matchup-center-column matchup-total-center">
           <span className="position-label">{isShowingDailyView ? 'DAY' : 'TOT'}</span>
@@ -462,7 +343,7 @@ export const MatchupComparison = ({
           <div className="matchup-total-label">
             {isShowingDailyView ? 'Daily Total' : 'Total'}
           </div>
-          <div className="matchup-total-score font-jbmono tabular-nums">{opponentTotal.toFixed(1)}</div>
+          <div className="matchup-total-score font-jbmono tabular-nums">{Number.isFinite(opponentTotal) ? opponentTotal.toFixed(1) : 'N/A'}</div>
         </div>
       </div>
 

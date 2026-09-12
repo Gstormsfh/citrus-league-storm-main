@@ -1,0 +1,282 @@
+[
+  {
+    "stat_key": "wins",
+    "display_name": "Wins",
+    "applies_to": "goalie",
+    "default_multiplier": "5.0",
+    "is_core": true,
+    "sort_order": 10
+  },
+  {
+    "stat_key": "saves",
+    "display_name": "Saves",
+    "applies_to": "goalie",
+    "default_multiplier": "0.6",
+    "is_core": true,
+    "sort_order": 20
+  },
+  {
+    "stat_key": "shutouts",
+    "display_name": "Shutouts",
+    "applies_to": "goalie",
+    "default_multiplier": "5.0",
+    "is_core": true,
+    "sort_order": 30
+  },
+  {
+    "stat_key": "goals_against",
+    "display_name": "Goals Against",
+    "applies_to": "goalie",
+    "default_multiplier": "-3.0",
+    "is_core": true,
+    "sort_order": 40
+  },
+  {
+    "stat_key": "losses",
+    "display_name": "Losses",
+    "applies_to": "goalie",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 50
+  },
+  {
+    "stat_key": "ot_losses",
+    "display_name": "Overtime Losses",
+    "applies_to": "goalie",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 60
+  },
+  {
+    "stat_key": "shots_faced",
+    "display_name": "Shots Faced",
+    "applies_to": "goalie",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 70
+  },
+  {
+    "stat_key": "even_saves",
+    "display_name": "Even Strength Saves",
+    "applies_to": "goalie",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 80
+  },
+  {
+    "stat_key": "pp_saves",
+    "display_name": "Power Play Saves",
+    "applies_to": "goalie",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 90
+  },
+  {
+    "stat_key": "sh_saves",
+    "display_name": "Short Handed Saves",
+    "applies_to": "goalie",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 100
+  },
+  {
+    "stat_key": "goalie_toi_minutes",
+    "display_name": "Goalie TOI (minutes)",
+    "applies_to": "goalie",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 110
+  },
+  {
+    "stat_key": "goals",
+    "display_name": "Goals",
+    "applies_to": "skater",
+    "default_multiplier": "6.0",
+    "is_core": true,
+    "sort_order": 10
+  },
+  {
+    "stat_key": "assists",
+    "display_name": "Assists",
+    "applies_to": "skater",
+    "default_multiplier": "4.0",
+    "is_core": true,
+    "sort_order": 20
+  },
+  {
+    "stat_key": "power_play_points",
+    "display_name": "Power Play Points",
+    "applies_to": "skater",
+    "default_multiplier": "2.0",
+    "is_core": true,
+    "sort_order": 30
+  },
+  {
+    "stat_key": "short_handed_points",
+    "display_name": "Short Handed Points",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": true,
+    "sort_order": 40
+  },
+  {
+    "stat_key": "shots_on_goal",
+    "display_name": "Shots on Goal",
+    "applies_to": "skater",
+    "default_multiplier": "0.9",
+    "is_core": true,
+    "sort_order": 50
+  },
+  {
+    "stat_key": "blocks",
+    "display_name": "Blocked Shots",
+    "applies_to": "skater",
+    "default_multiplier": "1.0",
+    "is_core": true,
+    "sort_order": 60
+  },
+  {
+    "stat_key": "hits",
+    "display_name": "Hits",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": true,
+    "sort_order": 70
+  },
+  {
+    "stat_key": "penalty_minutes",
+    "display_name": "Penalty Minutes",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": true,
+    "sort_order": 80
+  },
+  {
+    "stat_key": "plus_minus",
+    "display_name": "Plus/Minus",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 90
+  },
+  {
+    "stat_key": "power_play_goals",
+    "display_name": "Power Play Goals",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 100
+  },
+  {
+    "stat_key": "power_play_assists",
+    "display_name": "Power Play Assists",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 110
+  },
+  {
+    "stat_key": "short_handed_goals",
+    "display_name": "Short Handed Goals",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 120
+  },
+  {
+    "stat_key": "short_handed_assists",
+    "display_name": "Short Handed Assists",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 130
+  },
+  {
+    "stat_key": "game_winning_goals",
+    "display_name": "Game Winning Goals",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 140
+  },
+  {
+    "stat_key": "overtime_goals",
+    "display_name": "Overtime Goals",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 150
+  },
+  {
+    "stat_key": "faceoff_wins",
+    "display_name": "Faceoff Wins",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 160
+  },
+  {
+    "stat_key": "faceoff_losses",
+    "display_name": "Faceoff Losses",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 170
+  },
+  {
+    "stat_key": "takeaways",
+    "display_name": "Takeaways",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 180
+  },
+  {
+    "stat_key": "giveaways",
+    "display_name": "Giveaways",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 190
+  },
+  {
+    "stat_key": "shot_attempts",
+    "display_name": "Shot Attempts",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 200
+  },
+  {
+    "stat_key": "shots_missed",
+    "display_name": "Shots Missed",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 210
+  },
+  {
+    "stat_key": "shots_blocked_by_opp",
+    "display_name": "Shots Blocked (own)",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 220
+  },
+  {
+    "stat_key": "shifts",
+    "display_name": "Shifts",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 230
+  },
+  {
+    "stat_key": "toi_minutes",
+    "display_name": "Time on Ice (minutes)",
+    "applies_to": "skater",
+    "default_multiplier": "0.0",
+    "is_core": false,
+    "sort_order": 240
+  }
+]

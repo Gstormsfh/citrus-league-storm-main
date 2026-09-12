@@ -13,7 +13,8 @@
     "./playerWriteup": "./src/playerWriteup/index.ts",
     "./playerPercentiles": "./src/playerPercentiles/index.ts",
     "./leagueProjection": "./src/leagueProjection/index.ts",
-    "./playerWriteup/fromIndex": "./src/playerWriteup/fromIndex.ts"
+    "./playerWriteup/fromIndex": "./src/playerWriteup/fromIndex.ts",
+    "./editorial": "./src/editorial/index.ts"
   },
   "scripts": {
     "build": "tsc --noEmit",

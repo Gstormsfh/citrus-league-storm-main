@@ -1,3 +1,6 @@
+import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
+import { actualsSeasonLabel, actualsCohortLabel } from '@citrus/shared';
+import { summarizeWeeklyProjection, weeklyPointsLabel, weeklyProjectionOrder, weeklyExposureLabel, freeAgentMatchupWeek } from '@/components/freeagents/weeklyProjection';
 import { userMessage } from '@/lib/userMessage';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
@@ -50,7 +53,6 @@ import LeagueNotifications from '@/components/matchup/LeagueNotifications';
 import { GameLogosBar } from '@/components/matchup/GameLogosBar';
 import { logger } from '@/utils/logger';
 import { notifyRosterChanged } from '@/utils/rosterRefresh';
-import { ScoringCalculator } from '@/utils/scoringUtils';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { DropPlayerForAddDialog } from '@/components/freeagents/DropPlayerForAddDialog';
 import { FreeAgentRowPressBox } from '@/components/freeagents/FreeAgentRowPressBox';
@@ -117,6 +119,7 @@ const FreeAgents = () => {
   const [activeTab, setActiveTab] = useState('available');
   const [viewMode, setViewMode] = useState<'summary' | 'all'>('summary');
   const [players, setPlayers] = useState<Player[]>([]);
+  const poolRequestVersion = useRef(0);
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [rosterLookupFailed, setRosterLookupFailed] = useState(false);
@@ -132,11 +135,13 @@ const FreeAgents = () => {
   }, [activeLeagueId]);
   const [scheduleMaximizers, setScheduleMaximizers] = useState<Array<Player & { gamesThisWeek: number; gameDays: string[]; games?: NHLGame[] }>>([]);
   const [loadingMaximizers, setLoadingMaximizers] = useState(false);
+  const scheduleRequestVersion = useRef(0);
 
   // Weekly projections state (playerId -> total weekly projection)
   // Use numeric IDs to match RPC return type
-  const [weeklyProjections, setWeeklyProjections] = useState<Map<number, number>>(new Map());
-  const [weeklyGameCounts, setWeeklyGameCounts] = useState<Map<number, number>>(new Map());
+  const [weeklyRawProjections, setWeeklyRawProjections] = useState<Map<number, Record<string, unknown>[]>>(new Map());
+  const weeklyRequestVersion = useRef(0);
+  const [projectionWeek, setProjectionWeek] = useState<string | null>(null);
   const [loadingProjections, setLoadingProjections] = useState(false);
 
   // Sorting state
@@ -216,11 +221,10 @@ const FreeAgents = () => {
   const [availableMode, setAvailableMode] = useState<PlayersAvailableMode>('proj');
   const [phoneSearchOpen, setPhoneSearchOpen] = useState(false);
 
-  // SETTINGS-ENFORCEMENT (2026-08-16) — league scoring for FPTS
-  // display. Undefined → DEFAULT_SCORING inside ScoringCalculator, so
-  // default leagues render identical numbers (pinned by scoringUtils
-  // equivalence test).
-  const [leagueScoring, setLeagueScoring] = useState<import('@citrus/shared').ScoringSettings | undefined>(undefined);
+  // Forecasts require loaded league settings; only explicit previews use defaults.
+  const { scoring: leagueScoring, ready: scoringReady } = useLeagueScoringContext(
+    isGuestMode(userLeagueState) ? null : activeLeagueId ?? leagueId, activeLeague, !isChangingLeague, isGuestMode(userLeagueState),
+  );
 
   // Waiver process time from league settings (for toast messages)
   const [waiverProcessTime, setWaiverProcessTime] = useState<string | null>(null);
@@ -257,25 +261,36 @@ const FreeAgents = () => {
     }
     fetchPlayers();
     setWatchlist(new Set(LeagueService.getWatchlist()));
+    return () => { poolRequestVersion.current++; };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchPlayers/setWatchlist are stable; triggers: URL params, league change, state resolution
   }, [searchParams, activeLeagueId, isChangingLeague, userLeagueState]);
 
+  const [weeklyRefreshEpoch, setWeeklyRefreshEpoch] = useState(0);
+  useEffect(() => {
+    const refresh = () => setWeeklyRefreshEpoch(value => value + 1);
+    const timer = window.setInterval(refresh, 120_000);
+    window.addEventListener('focus', refresh);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, []);
+
   // Load schedule maximizers when players are loaded (needed for Top Projected combined view)
   useEffect(() => {
-    if (players.length > 0 && scheduleMaximizers.length === 0 && !loadingMaximizers) {
+    if (players.length > 0) {
       calculateScheduleMaximizers(players);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time fetch when players first load; scheduleMaximizers.length/loadingMaximizers are guards, not triggers
-  }, [players.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh the schedule for the same pool/league as projections
+    return () => { scheduleRequestVersion.current++; };
+  }, [players, activeLeagueId, weeklyRefreshEpoch]);
 
-  // Fetch weekly projections for top free agents (for Top Projected list)
+  // Fetch raw weekly projections for the entire available pool.
   // CRITICAL: Works for BOTH active users AND demo/guest users (EXACT SAME WAY)
   useEffect(() => {
-    if (players.length > 0 && weeklyProjections.size === 0 && !loadingProjections) {
+    if (players.length > 0) {
       fetchWeeklyProjections();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time fetch; weeklyProjections.size/loadingProjections are guards, not triggers
-  }, [players.length, activeLeagueId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch on pool/league changes; score raw rows locally on scoring changes
+    return () => { weeklyRequestVersion.current++; };
+  }, [players, activeLeagueId, weeklyRefreshEpoch]);
 
   // Reset visible count when search/position filter changes
   useEffect(() => {
@@ -310,7 +325,7 @@ const FreeAgents = () => {
    * result is applied with a functional update so it cannot race the initial
    * setPlayers above it.
    */
-  const enrichWithWaiverStatus = async (leagueId: string) => {
+  const enrichWithWaiverStatus = async (leagueId: string, expectedPoolVersion = poolRequestVersion.current) => {
     try {
       const db = supabase as unknown as {
         from: (t: string) => any;
@@ -329,6 +344,7 @@ const FreeAgents = () => {
           .single(),
       ]);
 
+      if (expectedPoolVersion !== poolRequestVersion.current) return;
       const waiverRows = (waiverRes?.data ?? []) as Array<{ player_id: number; dropped_at: string }>;
       const periodRow = (periodRes?.data ?? null) as { waiver_period_hours: number | null } | null;
 
@@ -363,7 +379,7 @@ const FreeAgents = () => {
    * READY. RENDER IT." note below): two more round trips before the first
    * player would undo the fix that note describes.
    */
-  const enrichRosterCapacity = async (currentLeagueId: string) => {
+  const enrichRosterCapacity = async (currentLeagueId: string, expectedPoolVersion = poolRequestVersion.current) => {
     if (!user) return;
     try {
       const [leagueResult, myTeamResponse] = await Promise.all([
@@ -373,7 +389,7 @@ const FreeAgents = () => {
       const team = myTeamResponse.data as { id: string } | undefined;
       if (leagueResult.error || !leagueResult.league || !team) return;
       const { count, error } = await PlayerService.getRosterAssignmentCount(team.id, currentLeagueId);
-      if (error) return;
+      if (error || expectedPoolVersion !== poolRequestVersion.current) return;
       setRosterFull((count || 0) >= (leagueResult.league.roster_size || 22));
     } catch (err) {
       logger.warn('Free agents: roster capacity check failed', err);
@@ -381,6 +397,7 @@ const FreeAgents = () => {
   };
 
   const fetchPlayers = async () => {
+    const requestVersion = ++poolRequestVersion.current;
     try {
       setLoading(true);
       setRosterLookupFailed(false);
@@ -389,6 +406,7 @@ const FreeAgents = () => {
       if (isGuestMode(userLeagueState)) {
         try {
           const allPlayers = await PlayerService.getAllPlayers();
+          if (requestVersion !== poolRequestVersion.current) return;
           
           // Show ALL players — skaters sorted by points, goalies sorted by wins
           const skaters = allPlayers.filter(p => p.position !== 'G');
@@ -405,6 +423,7 @@ const FreeAgents = () => {
           setLoading(false);
           return;
         } catch (error) {
+          if (requestVersion !== poolRequestVersion.current) return;
           logger.error('Error fetching demo players:', error);
           toast({
             title: "Move Didn't Take",
@@ -433,23 +452,16 @@ const FreeAgents = () => {
         }
       }
       
+      if (requestVersion !== poolRequestVersion.current) return;
       setLeagueId(currentLeagueId || null);
 
       // Fetch waiver settings for this league (for dynamic toast messages)
       if (currentLeagueId && user) {
         void loadPendingClaims(currentLeagueId);
         WaiverService.getLeagueWaiverSettings(currentLeagueId, user.id)
-          .then(settings => { if (settings) setWaiverProcessTime(settings.waiver_process_time); })
+          .then(settings => { if (requestVersion === poolRequestVersion.current && settings) setWaiverProcessTime(settings.waiver_process_time); })
           .catch(() => { /* non-critical */ });
-        // League scoring for FPTS columns — one fetch, display-only.
-        supabase
-          .from('leagues')
-          .select('scoring_settings')
-          .eq('id', currentLeagueId)
-          .single()
-          .then(({ data }) => {
-            if (data?.scoring_settings) setLeagueScoring(data.scoring_settings as unknown as import('@citrus/shared').ScoringSettings);
-          });
+
       }
 
       // Get all players from our pipeline tables (player_directory + player_season_stats)
@@ -457,6 +469,7 @@ const FreeAgents = () => {
       // CRITICAL: This now filters to only include players with matching stats records (same as getPlayersByIds)
       // This ensures Free Agents shows the EXACT same players and stats as Matchup tab and Player Cards
       const allPlayers = await PlayerService.getAllPlayers();
+      if (requestVersion !== poolRequestVersion.current) return;
 
       if (!allPlayers || allPlayers.length === 0) {
         throw new Error('The player pool came back empty.');
@@ -465,6 +478,7 @@ const FreeAgents = () => {
       // LeagueService determines free agents - uses real database if leagueId provided
       // Dropped players (with deleted_at) will be included as free agents
       const freeAgentResult = await LeagueService.getFreeAgents(allPlayers, currentLeagueId, user.id);
+      if (requestVersion !== poolRequestVersion.current) return;
 
       /*
        * THE LIST IS READY. RENDER IT.
@@ -492,6 +506,7 @@ const FreeAgents = () => {
       
       // Don't calculate schedule maximizers here - will be lazy loaded when tab is active
     } catch (error) {
+      if (requestVersion !== poolRequestVersion.current) return;
       logger.error('Error fetching players:', error);
       toast({
         title: "Unable to Load Players",
@@ -499,34 +514,20 @@ const FreeAgents = () => {
         variant: "default"
       });
     } finally {
-      setLoading(false);
+      if (requestVersion === poolRequestVersion.current) setLoading(false);
     }
   };
 
   const fetchWeeklyProjections = async () => {
+    const requestVersion = ++weeklyRequestVersion.current;
+    setWeeklyRawProjections(new Map());
     try {
       setLoadingProjections(true);
       
-      // Get top 50 free agents to fetch projections for
-      // Include mix of top skaters and top goalies
-      const topSkaters = [...players]
-        .filter(p => p.position !== 'G')
-        .sort((a, b) => (b.points || 0) - (a.points || 0))
-        .slice(0, 40);
-      
-      const topGoalies = [...players]
-        .filter(p => p.position === 'G')
-        .sort((a, b) => {
-          // Sort goalies by wins first, then by points
-          const aWins = a.wins || 0;
-          const bWins = b.wins || 0;
-          if (bWins !== aWins) return bWins - aWins;
-          return (b.points || 0) - (a.points || 0);
-        })
-        .slice(0, 10);
-      
-      const topPlayers = [...topSkaters, ...topGoalies];
-      
+      // Every free agent uses the same supported projection path. A backup
+      // outside a top-ten goalie slice must not fall back to team-game PPG.
+      const topPlayers = players;
+
       if (topPlayers.length === 0) {
         return;
       }
@@ -540,8 +541,8 @@ const FreeAgents = () => {
       let weekStart: Date | null = null;
       let weekEnd: Date | null = null;
       
-      const effectiveLeagueId = leagueId || DEMO_LEAGUE_ID_FOR_GUESTS; // Demo league ID for guests
-      const isDemo = !leagueId || effectiveLeagueId === DEMO_LEAGUE_ID_FOR_GUESTS;
+      const effectiveLeagueId = activeLeagueId || leagueId || DEMO_LEAGUE_ID_FOR_GUESTS; // Demo league ID for guests
+      const isDemo = (!activeLeagueId && !leagueId) || effectiveLeagueId === DEMO_LEAGUE_ID_FOR_GUESTS;
       // CRITICAL FIX: For DEMO mode, ALWAYS use current calendar week (Sunday-Saturday)
       // The demo league's DB dates are stale and don't represent the actual current week.
       if (isDemo) {
@@ -560,7 +561,7 @@ const FreeAgents = () => {
         try {
           const matchupResponse = await matchupApi.getLeagueMatchups(effectiveLeagueId);
           const allMatchups = matchupResponse.data as Array<{ week_start_date: string; week_end_date: string; status: string }>;
-          const inProgressMatchup = allMatchups?.find(m => m.status === 'in_progress');
+          const inProgressMatchup = freeAgentMatchupWeek(allMatchups ?? [], todayMSTStr);
 
           if (inProgressMatchup) {
             weekStart = new Date(inProgressMatchup.week_start_date + 'T00:00:00');
@@ -613,6 +614,7 @@ const FreeAgents = () => {
         return `${year}-${month}-${day}`;
       };
       
+      if (requestVersion === weeklyRequestVersion.current) setProjectionWeek(`${formatDateLocal(weekStart)} – ${formatDateLocal(weekEnd)}`);
       const weekDays: string[] = [];
       const startDate = today > weekStart ? today : weekStart; // Start from today or week start, whichever is later
       const currentDate = new Date(startDate);
@@ -631,19 +633,7 @@ const FreeAgents = () => {
         return;
       }
 
-      // Fetch projections for each day of the week and sum them up
-      // Use numeric IDs to match RPC return type (Map<number, any>)
-      const weeklyProjectionMap = new Map<number, number>();
-      const gameCountMap = new Map<number, number>();
-
-      // Initialize all players with 0 using NUMERIC IDs
-      topPlayers.forEach(player => {
-        const numericId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-        if (!isNaN(numericId) && numericId > 0) {
-          weeklyProjectionMap.set(numericId, 0);
-          gameCountMap.set(numericId, 0);
-        }
-      });
+      const rawByPlayer = new Map<number, Record<string, unknown>[]>();
 
       // PERF SWEEP (2026-08-16): fetch all days CONCURRENTLY. The old
       // sequential for-await made this 7 round-trips back to back —
@@ -651,36 +641,37 @@ const FreeAgents = () => {
       const perDay = await Promise.all(
         weekDays.map(async (date) => {
           try {
-            return await MatchupService.getDailyProjectionsForMatchup(playerIds, date);
+            const merged = new Map<number, Awaited<ReturnType<typeof MatchupService.getDailyProjectionsForMatchup>> extends Map<number, infer Row> ? Row : never>();
+            for (let offset = 0; offset < playerIds.length; offset += 250) {
+              const batch = await MatchupService.getDailyProjectionsForMatchup(playerIds.slice(offset, offset + 250), date);
+              batch.forEach((row, id) => merged.set(id, row));
+            }
+            return merged;
           } catch {
             return null; // continue with other dates
           }
         }),
       );
-      for (const dailyProjections of perDay) {
+      for (const [dayIndex, dailyProjections] of perDay.entries()) {
         if (!dailyProjections) continue;
-        // Sum up ALL STATS for each player (full transparency)
-        // CRITICAL: Use playerId directly (numeric) as Map key to ensure proper accumulation
         dailyProjections.forEach((projection, playerId) => {
-          const currentTotal = weeklyProjectionMap.get(playerId) || 0;
-          const dailyPoints = Number(projection.total_projected_points || 0);
-          weeklyProjectionMap.set(playerId, currentTotal + dailyPoints);
-          // Count games: if projection system returned data for this player on this day, they have a game
-          gameCountMap.set(playerId, (gameCountMap.get(playerId) || 0) + 1);
+          const rows = rawByPlayer.get(playerId) ?? [];
+          rows.push({ ...projection, projection_date: weekDays[dayIndex] } as unknown as Record<string, unknown>);
+          rawByPlayer.set(playerId, rows);
         });
       }
-
-      setWeeklyProjections(weeklyProjectionMap);
-      setWeeklyGameCounts(gameCountMap);
+      if (requestVersion === weeklyRequestVersion.current) setWeeklyRawProjections(rawByPlayer);
     } catch (error) {
       logger.error('Error fetching weekly projections:', error);
-      // On error, set empty map (will fall back to mock projection)
+      // Missing goalie exposure remains unavailable; do not invent starts.
     } finally {
-      setLoadingProjections(false);
+      if (requestVersion === weeklyRequestVersion.current) setLoadingProjections(false);
     }
   };
 
   const calculateScheduleMaximizers = async (freeAgents: Player[]) => {
+    const requestVersion = ++scheduleRequestVersion.current;
+    setScheduleMaximizers([]);
     try {
       setLoadingMaximizers(true);
       const maximizers: Array<Player & { gamesThisWeek: number; gameDays: string[]; games?: NHLGame[] }> = [];
@@ -701,8 +692,8 @@ const FreeAgents = () => {
       let weekStart: Date | null = null;
       let weekEnd: Date | null = null;
       
-      const effectiveLeagueId = leagueId || DEMO_LEAGUE_ID_FOR_GUESTS; // Demo league ID for guests
-      const isDemo = !leagueId || effectiveLeagueId === DEMO_LEAGUE_ID_FOR_GUESTS;
+      const effectiveLeagueId = activeLeagueId || leagueId || DEMO_LEAGUE_ID_FOR_GUESTS; // Demo league ID for guests
+      const isDemo = (!activeLeagueId && !leagueId) || effectiveLeagueId === DEMO_LEAGUE_ID_FOR_GUESTS;
       // CRITICAL FIX: For DEMO mode, ALWAYS use current calendar week (Sunday-Saturday)
       // The demo league's DB dates are stale and don't represent the actual current week.
       // This matches what the Matchup tab does - it recalculates dates, not trusts DB dates.
@@ -722,7 +713,7 @@ const FreeAgents = () => {
         try {
           const matchupResponse = await matchupApi.getLeagueMatchups(effectiveLeagueId);
           const allMatchups = matchupResponse.data as Array<{ week_start_date: string; week_end_date: string; status: string }>;
-          const inProgressMatchup = allMatchups?.find(m => m.status === 'in_progress');
+          const inProgressMatchup = freeAgentMatchupWeek(allMatchups ?? [], todayMSTStr);
 
           if (inProgressMatchup) {
             weekStart = new Date(inProgressMatchup.week_start_date + 'T00:00:00');
@@ -835,12 +826,12 @@ const FreeAgents = () => {
         return (b.points || 0) - (a.points || 0);
       });
       
-      setScheduleMaximizers(maximizers); // Show ALL players (scrollable list)
+      if (requestVersion === scheduleRequestVersion.current) setScheduleMaximizers(maximizers); // Show ALL players (scrollable list)
     } catch (error) {
       logger.error('Error calculating schedule maximizers:', error);
-      setScheduleMaximizers([]);
+      if (requestVersion === scheduleRequestVersion.current) setScheduleMaximizers([]);
     } finally {
-      setLoadingMaximizers(false);
+      if (requestVersion === scheduleRequestVersion.current) setLoadingMaximizers(false);
     }
   };
 
@@ -1367,25 +1358,24 @@ const FreeAgents = () => {
     }
   };
 
-  /**
-   * ONE PROJECTION, ONE SCORING PATH (2026-09-02).
-   *
-   * The rest-of-week fantasy projection every list on this page prints —
-   * the Top Projected card, the Schedule tab, and now every phone row's
-   * headline number. It was written out twice, once here and once inline
-   * in the Schedule tab's table body, each building its own
-   * `ScoringCalculator`; two copies of a scoring rule is two answers to
-   * "what is he worth", and the phone row would have made three.
-   *
-   * Preference order is unchanged from the original:
-   *   1. the projection system's own per-day totals, summed over the days
-   *      left in the matchup week (`weeklyProjections`);
-   *   2. failing that, the player's LEAGUE-SCORED points per game
-   *      (`ScoringCalculator`, seeded with this league's
-   *      `scoring_settings`) times the games he has left.
-   * No games left is 0, not a pro-rated guess.
-   */
-  const projectionScorer = useMemo(() => new ScoringCalculator(leagueScoring), [leagueScoring]);
+  // Raw weekly counts are scored with this league's weights. A conditional
+  // goalie row is weighted once by its explicit expected-start probability.
+  const weeklySummaries = useMemo(() => {
+    const goalieIds = new Set(players.filter(p => p.position === 'G').map(p => Number(p.id)));
+    const schedules = new Map(scheduleMaximizers.map(p => [Number(p.id), p]));
+    const today = getTodayMST();
+    return new Map([...weeklyRawProjections].map(([id, rows]) => {
+      const schedule = schedules.get(id);
+      const remainingDates = schedule?.games?.filter(game => game.game_date.split('T')[0] >= today && !['final', 'off'].includes((game.status ?? '').toLowerCase())).map(game => game.game_date.split('T')[0]);
+      const filtered = remainingDates ? rows.filter(row => remainingDates.includes(String(row.projection_date))) : rows;
+      // An absent API day is not an expected zero: withhold partial weekly totals.
+      const complete = remainingDates != null && new Set(filtered.map(row => row.projection_date)).size === new Set(remainingDates).size;
+      return [id, complete && scoringReady ? summarizeWeeklyProjection(filtered, leagueScoring, goalieIds.has(id)) : null];
+    }));
+  }, [weeklyRawProjections, leagueScoring, players, scheduleMaximizers, scoringReady]);
+  const weeklyProjections = new Map([...weeklySummaries].filter(([, value]) => value != null).map(([id, value]) => [id, value!.points]));
+  const weeklyGameCounts = new Map([...weeklyRawProjections].map(([id, rows]) => [id, rows.length]));
+
   /**
    * The week's schedule, keyed. The old inline `scheduleMaximizers.find(...)`
    * ran a linear scan per player per render — 800 free agents against 800
@@ -1398,37 +1388,25 @@ const FreeAgents = () => {
     [scheduleMaximizers],
   );
   const withProjection = useCallback(
-    <T extends Player>(p: T): T & { weeklyProjection: number; gamesThisWeek: number; gameDays: string[]; games: NHLGame[] } => {
+    <T extends Player>(p: T): T & { weeklyProjection: number | null; expectedStarts: number | null; gamesThisWeek: number; gameDays: string[]; games: NHLGame[] } => {
       const numericId = typeof p.id === 'string' ? parseInt(p.id, 10) : p.id;
-      const realProjection = weeklyProjections.get(numericId);
-      const projectionGameCount = weeklyGameCounts.get(numericId) || 0;
+      const summary = weeklySummaries.get(numericId);
       const scheduleData = scheduleById.get(p.id);
-      const gamesThisWeek = projectionGameCount > 0 ? projectionGameCount : (scheduleData?.gamesThisWeek || 0);
-
+      const gamesThisWeek = scheduleData?.gamesThisWeek ?? weeklyRawProjections.get(numericId)?.length ?? 0;
       const isGoalie = p.position === 'G';
-      const estimatedFantasyPPG = isGoalie
-        ? ((p.wins || 0) > 0 && p.games_played > 0 ? projectionScorer.calculatePointsPerGame({
-            wins: p.wins || 0, saves: p.saves || 0, shutouts: p.shutouts || 0, goals_against: p.goals_against || 0
-          }, true, p.games_played) : 3.0)
-        : (p.games_played > 0
-          ? projectionScorer.calculatePointsPerGame({
-              goals: p.goals || 0, assists: p.assists || 0, ppp: p.ppp || 0, shp: p.shp || 0,
-              sog: p.shots || 0, blocks: p.blocks || 0, hits: p.hits || 0, pim: p.pim || 0
-            }, false, p.games_played)
-          : 0);
-      const weeklyProjection = gamesThisWeek === 0
-        ? 0
-        : ((realProjection && realProjection > 0) ? realProjection : (estimatedFantasyPPG * gamesThisWeek));
+      const weeklyProjection = !scoringReady || !scheduleData ? null : scheduleData.gamesThisWeek === 0 ? 0 : summary?.points ?? null;
+      const expectedStarts = isGoalie ? (scheduleData?.gamesThisWeek === 0 ? 0 : summary?.expectedStarts ?? null) : null;
 
       return {
         ...p,
         weeklyProjection,
+        expectedStarts,
         gamesThisWeek,
         gameDays: scheduleData?.gameDays || [],
         games: scheduleData?.games || [],
       };
     },
-    [projectionScorer, weeklyProjections, weeklyGameCounts, scheduleById],
+    [weeklySummaries, weeklyRawProjections, scheduleById, scoringReady],
   );
 
   /**
@@ -1465,7 +1443,7 @@ const FreeAgents = () => {
     .map(withProjection);
 
   // Combined Top Projected with Schedule Icons - merges projections + schedule data
-  // Game count comes from the SAME projection system (how many days had projections = how many games)
+  // Schedule games and expected goalie starts remain separate in every list.
   const topProjected = [...filteredPlayers]
     .map(withProjection)
     .filter(p => {
@@ -1475,7 +1453,7 @@ const FreeAgents = () => {
       }
       return true; // Before projections load, show all
     })
-    .sort((a, b) => b.weeklyProjection - a.weeklyProjection)
+    .sort((a, b) => weeklyProjectionOrder(b.weeklyProjection) - weeklyProjectionOrder(a.weeklyProjection))
     .slice(0, 10); // Show top 10 instead of 5
 
   const leaguePosType = activeLeagueFormat?.positionType === 'forward' ? 'forward' : 'individual';
@@ -1552,7 +1530,7 @@ const FreeAgents = () => {
         return okPos && okSearch;
       })
       .map(withProjection)
-      .sort((a, b) => b.gamesThisWeek - a.gamesThisWeek || b.weeklyProjection - a.weeklyProjection);
+      .sort((a, b) => b.gamesThisWeek - a.gamesThisWeek || weeklyProjectionOrder(b.weeklyProjection) - weeklyProjectionOrder(a.weeklyProjection));
   }, [scheduleMaximizers, positionFilter, searchQuery, withProjection]);
 
   const watchRows = useMemo(
@@ -1566,14 +1544,15 @@ const FreeAgents = () => {
    * rather than three zeros that look like a bad night.
    */
   const seasonLineFor = (p: Player): string => {
+    const label = actualsSeasonLabel(p.stats_season) + ' · ';
     if (p.position === 'G') {
       const gp = p.goalie_gp ?? p.games_played ?? 0;
-      if (!gp) return '0 GP';
+      if (!gp) return label + '0 GP';
       const sv = p.save_percentage != null ? p.save_percentage.toFixed(3).replace(/^0/, '') : null;
-      return [`${p.wins ?? 0} W`, sv ? `${sv} SV%` : null, `${gp} GP`].filter(Boolean).join(' · ');
+      return label + [`${p.wins ?? 0} W`, sv ? `${sv} SV%` : null, `${gp} GP`].filter(Boolean).join(' · ');
     }
-    if (!p.games_played) return '0 GP';
-    return `${p.goals} G · ${p.assists} A · ${p.points} P · ${p.games_played} GP`;
+    if (!p.games_played) return label + '0 GP';
+    return label + `${p.goals} G · ${p.assists} A · ${p.points} P · ${p.games_played} GP`;
   };
 
   type PhoneRow = ReturnType<typeof withProjection> & { adds?: number; drops?: number; hasRealData?: boolean };
@@ -1642,8 +1621,8 @@ const FreeAgents = () => {
           {...common}
           movement={null}
           figure={String(player.gamesThisWeek)}
-          subLabel={player.gamesThisWeek === 1 ? 'GAME' : 'GAMES'}
-          seasonLine={player.gameDays.length ? player.gameDays.map((d) => d.toUpperCase()).join(' · ') : 'NO GAMES LEFT'}
+          subLabel="TEAM GAMES"
+          seasonLine={`${weeklyExposureLabel(player)} · ${player.gameDays.length ? player.gameDays.map((d) => d.toUpperCase()).join(' · ') : 'NO GAMES LEFT'}`}
         />
       );
     }
@@ -1652,9 +1631,9 @@ const FreeAgents = () => {
         key={player.id}
         {...common}
         movement={null}
-        figure={player.weeklyProjection.toFixed(1)}
-        subLabel={`${player.gamesThisWeek} GP`}
-        seasonLine={seasonLineFor(player)}
+        figure={weeklyPointsLabel(player.weeklyProjection)}
+        subLabel={weeklyExposureLabel(player, true)}
+        seasonLine={`${weeklyExposureLabel(player)} · ${seasonLineFor(player)}`}
       />
     );
   };
@@ -1703,6 +1682,7 @@ const FreeAgents = () => {
         * flash, no `window.innerWidth` on the render path.
         */}
       <PressBoxLeagueChrome />
+      <p className="px-4 py-2 text-xs text-white/55">{actualsCohortLabel(players.map(p => p.stats_season))} · {projectionWeek ? `Weekly projections: ${projectionWeek}` : 'Weekly projection window loading'}</p>
       <div className="lg:hidden pb-app-chrome">
         <PlayersPhone
           view={phoneView}
@@ -2025,7 +2005,7 @@ const FreeAgents = () => {
                               games={player.games}
                               todayStr={todayStr}
                               action={freeAgentAction(player, rosterFull, hasPendingClaim(player))}
-                              subLabel={`${player.gamesThisWeek || 0} game${(player.gamesThisWeek || 0) === 1 ? '' : 's'}`}
+                              subLabel={weeklyExposureLabel(player, true)}
                               pending={addingPlayerId === toNumericId(player.id)}
                               disabled={addingPlayerId !== null}
                               onOpen={() => handlePlayerClick(player)}
@@ -2094,8 +2074,8 @@ const FreeAgents = () => {
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex flex-col items-end">
-                                    <span className="font-bold text-pastel-sage-soft">{(player.weeklyProjection || 0).toFixed(1)}</span>
-                                    <span className="text-[11px] text-white/55">{player.gamesThisWeek || 0} games</span>
+                                    <span className="font-bold text-pastel-sage-soft">{weeklyPointsLabel(player.weeklyProjection)}</span>
+                                    <span className="text-[11px] text-white/55">{weeklyExposureLabel(player)}</span>
                                   </div>
                                 </TableCell>
                                 <TableCell>
@@ -2159,7 +2139,7 @@ const FreeAgents = () => {
                             games={player.games}
                             todayStr={todayStr}
                             action={freeAgentAction(player, rosterFull, hasPendingClaim(player))}
-                            subLabel={`${player.gamesThisWeek || 0} game${(player.gamesThisWeek || 0) === 1 ? '' : 's'}`}
+                            subLabel={weeklyExposureLabel(player, true)}
                             pending={addingPlayerId === toNumericId(player.id)}
                             disabled={addingPlayerId !== null}
                             onOpen={() => handlePlayerClick(player)}
@@ -2502,7 +2482,7 @@ const FreeAgents = () => {
                         // phone row print the same number for the same player.
                         const sorted = [...positionFiltered].map(withProjection).sort((a, b) => {
                           if (sortColumn === 'weeklyProjection' || !sortColumn) {
-                            return b.weeklyProjection - a.weeklyProjection;
+                            return weeklyProjectionOrder(b.weeklyProjection) - weeklyProjectionOrder(a.weeklyProjection);
                           }
                           // Handle other sort columns
                           if (sortColumn === 'name') {
@@ -2515,7 +2495,7 @@ const FreeAgents = () => {
                               ? a.position.localeCompare(b.position)
                               : b.position.localeCompare(a.position);
                           }
-                          return b.weeklyProjection - a.weeklyProjection;
+                          return weeklyProjectionOrder(b.weeklyProjection) - weeklyProjectionOrder(a.weeklyProjection);
                         });
                         
                         const visibleSorted = sorted.slice(0, visibleCount);
@@ -2624,10 +2604,10 @@ const FreeAgents = () => {
                                   <span className={`text-lg font-bold ${
                                     isTopPick ? 'text-pastel-orange-soft' : 'text-pastel-sage-soft'
                                   }`}>
-                                    {player.weeklyProjection.toFixed(1)}
+                                    {weeklyPointsLabel(player.weeklyProjection)}
                                   </span>
                                   <span className="text-[11px] text-white/55">
-                                    {player.gamesThisWeek || 0} game{(player.gamesThisWeek || 0) !== 1 ? 's' : ''} left
+                                    {weeklyExposureLabel(player)}
                                   </span>
                                 </div>
                               </TableCell>

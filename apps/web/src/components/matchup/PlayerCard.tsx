@@ -1,3 +1,4 @@
+import { scopedEarnedPoints } from '@/utils/matchupEarnedStats';
 import { memo } from "react";
 import { MatchupPlayer } from "./types";
 import { cn } from "@/lib/utils";
@@ -73,15 +74,15 @@ const SCORE_ACTUAL_CLASS = `player-score-value ${ROW_HEADLINE}`;
 // Calculate percentages for data bars (mock calculations based on available stats)
 const calculatePercentages = (player: MatchupPlayer) => {
   // Calculate shot percentage (goals / shots, capped at 100%)
-  const shotPct = player.stats?.sog > 0 
-    ? Math.min((player.stats.goals / player.stats.sog) * 100, 100) 
+  const shotPct = player.stats?.sog > 0
+    ? Math.min((player.stats.goals / player.stats.sog) * 100, 100)
     : 0;
-  
+
   // Calculate point production rate (points per game, normalized)
   const pointRate = player.stats?.gamesPlayed && player.stats.gamesPlayed > 0
     ? Math.min((player.points / player.stats.gamesPlayed) * 10, 100) // Normalize to 0-100
     : 0;
-  
+
   return { shotPct, pointRate };
 };
 
@@ -110,34 +111,34 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
   const displayName = compactPlayerName(player.name, isMobile);
   const positionColors = getPositionColorClasses(player.position);
   const { shotPct, pointRate } = calculatePercentages(player);
-  
+
   // Check if player is goalie
   const isGoalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
-  
+
   // Use appropriate projection based on player type
   const dailyProjection = isGoalie ? player.goalieProjection : player.daily_projection;
   const projectedPoints = dailyProjection?.total_projected_points || 0;
-  
+
   // Determine if we're showing daily stats (when a date is selected or defaulting to today)
-  const hasDailyStats = player.daily_total_points !== undefined;
-  const dailyTotalPoints = player.daily_total_points || 0;
-  
+  const hasDailyStats = Number.isFinite(player.daily_total_points);
+  const dailyTotalPoints = scopedEarnedPoints(player, true) ?? NaN;
+
   // Check if a specific date was selected (vs defaulting to today)
   const isDateExplicitlySelected = selectedDate !== null;
-  
+
   // Get today's date string for comparison
   const todayStr = getTodayMST();
-  
+
   // Check if viewing a past date (Historical Record)
   // Past dates should ALWAYS show actual points, not projections
   const isViewingPastDate = selectedDate ? selectedDate < todayStr : false;
-  
+
   // Check if viewing a future date (beyond today)
   const isViewingFutureDate = selectedDate ? selectedDate > todayStr : false;
-  
+
   // Are we in "daily view mode"? (Either a date is explicitly selected OR viewing past dates)
   const isInDailyViewMode = isDateExplicitlySelected || isViewingPastDate;
-  
+
   // Check if player has a game on the selected date (or today if no date selected)
   const dateToCheck = selectedDate || todayStr;
   const dateGames = (player.games && Array.isArray(player.games) && player.games.length > 0)
@@ -146,10 +147,10 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
         // Match game_date - handle both 'YYYY-MM-DD' and 'YYYY-MM-DDTHH:MM:SS' formats
         const gameDate = g.game_date?.split('T')[0];
         return gameDate === dateToCheck;
-      }) 
+      })
     : [];
   const hasGameOnDate = dateGames.length > 0;
-  
+
   // Check if game is final or live (for determining projection vs daily points)
   const gameStatus = (dateGames[0]?.status || 'scheduled').toLowerCase();
   // Our database uses: 'scheduled', 'live', 'intermission', 'final'
@@ -161,7 +162,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
     (dateGames[0].home_score || 0) + (dateGames[0].away_score || 0) > 0 ||
     (dateGames[0].period !== null && dateGames[0].period !== undefined && dateGames[0].period !== '')
   );
-  
+
   // Simplified logic: Show Daily Points when:
   // 1. Past dates (past games are always final, show 0 if no data)
   // 2. OR game is FINAL (show data if exists, or 0 if no data)
@@ -170,13 +171,13 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
   // 5. OR player HAS daily stats data (this is the safest check - if we have data, show it!)
   // For live/started games, we want to show actual points (even if 0) instead of projections
   const shouldShowDailyPoints = isViewingPastDate || isGameFinal || isGameLive || gameHasStarted || hasDailyStats;
-  
+
   // Zero Projection Logic: If projectedPoints === 0 but hasGameOnDate is true, show "TBD" or "Calculating"
   // For goalies, also check starter_confirmed flag
   // Only applies when game is not final, not live, and not started (show projections until game starts)
-  const hasProjection = dailyProjection && projectedPoints > 0;
-  const isStarterConfirmed = isGoalie ? (player.goalieProjection?.starter_confirmed ?? false) : true;
-  const showTBD = hasGameOnDate && !isGameFinal && !isGameLive && !gameHasStarted && (!hasProjection || (isGoalie && !isStarterConfirmed));
+  const hasProjection = dailyProjection?.total_projected_points != null && Number.isFinite(dailyProjection.total_projected_points);
+  const hasUsableProjection = hasProjection; // Expected workload does not claim a confirmed NHL start.
+  const showTBD = hasGameOnDate && !isGameFinal && !isGameLive && !gameHasStarted && (!hasProjection || (isGoalie && !hasUsableProjection));
 
   // WEEK VIEW (2026-09-01, audit M9). With no day selected the page shows
   // the whole matchup week — the total row sums the week, the ScoreCard
@@ -188,16 +189,14 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
   // the day's number (tap → daily breakdown) in day view. Same sentinel as
   // MatchupComparison's isShowingDailyView, so row and total agree.
   const isWeekView = selectedDate === null || selectedDate === undefined;
-  const weekPoints = typeof player.total_points === 'number' && Number.isFinite(player.total_points)
-    ? player.total_points
-    : 0;
+  const weekPoints = scopedEarnedPoints(player, false) ?? NaN;
   const weekBreakdown =
     player.stats_breakdown && typeof player.stats_breakdown === 'object' && Object.keys(player.stats_breakdown).length > 0
       ? player.stats_breakdown
       : undefined;
   // Tonight's game still to come, with a number on it: shown under the
   // week total as "+4.2" (orange = forecast), tappable for its breakdown.
-  const tonightPending = hasGameOnDate && !isGameFinal && !isGameLive && !gameHasStarted && !!hasProjection && isStarterConfirmed;
+  const tonightPending = hasGameOnDate && !isGameFinal && !isGameLive && !gameHasStarted && !!hasProjection && hasUsableProjection;
   const tonightLive = hasGameOnDate && (isGameLive || (gameHasStarted && !isGameFinal));
 
   // OPPONENT TINT (2026-09-01, audit M10): the model's opponent multiplier
@@ -205,7 +204,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
   // tougher, default within ±5%. The projection tooltip carries the
   // legend, so the colour is never bare.
   const oppTint = opponentTint(player.daily_projection?.opponent_adjustment);
-  
+
   // Max points for bar display - 15 for all players (skaters and goalies)
   const maxBarPoints = 15;
   // Calculate how many "chunks" to fill (out of 15)
@@ -213,25 +212,25 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
   const dailyPartialChunk = Math.min(dailyTotalPoints % 1, 1); // Partial fill for decimal
   const projectionFilledChunks = Math.min(Math.floor(projectedPoints), maxBarPoints);
   const projectionPartialChunk = Math.min(projectedPoints % 1, 1);
-  
+
   // Get unique stats for top right corner
   const getUniqueStats = () => {
     const stats: Array<{ label: string; value: string }> = [];
-    
+
     // F Pts - Fantasy Points (MATCHUP WEEK total for mini stats box)
-    stats.push({ 
-      label: 'F Pts', 
-      value: (player.total_points ?? 0).toFixed(1)  // Matchup week total
+    stats.push({
+      label: 'F Pts',
+      value: (Number.isFinite(weekPoints) ? weekPoints.toFixed(1) : 'N/A')  // Matchup week total
     });
-    
+
     if (isGoalie) {
       // Goalie stats: SV%, GSAx (season stats)
       const savePct = player.goalieStats?.savePct ?? 0;
-      stats.push({ 
-        label: 'SV%', 
+      stats.push({
+        label: 'SV%',
         value: (savePct * 100).toFixed(1) + '%'
       });
-      
+
       // SWEEP FIX (2026-08-16): the ingest hasn't populated GSAx yet — every
       // goalie carries 0, and a card full of "+0.0" reads as broken. Show
       // the chip only when a real (non-zero) value exists; wins fill the
@@ -251,23 +250,23 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
       // Use season stats from player.stats (fallback to ppp for safety)
       const ppp = player.stats?.powerPlayPoints ?? (player as { ppp?: number }).ppp ?? 0;
       const xGoals = player.stats?.xGoals ?? 0;
-      
-      stats.push({ 
-        label: 'PPP', 
-        value: ppp.toFixed(0) 
+
+      stats.push({
+        label: 'PPP',
+        value: ppp.toFixed(0)
       });
-      
-      stats.push({ 
-        label: 'xG', 
-        value: xGoals.toFixed(1) 
+
+      stats.push({
+        label: 'xG',
+        value: xGoals.toFixed(1)
       });
     }
-    
+
     return stats;
   };
 
   const uniqueStats = getUniqueStats();
-  
+
   // Get status tag
   const getStatusTag = () => {
     if (player.status === 'In Game') return { text: 'LIVE', color: 'bg-primary text-primary-foreground' };
@@ -279,7 +278,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
   const statusTag = getStatusTag();
 
   return (
-    <div 
+    <div
       className={cn(
         `player-card ${isUserTeam ? 'user-team' : 'opponent-team'} cursor-pointer relative`,
         !isBench && positionColors,
@@ -294,7 +293,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
     >
       {/* Background Position */}
       <div className="player-card-bg-text">{player.position}</div>
-      
+
       <div className="player-card-content">
         {/* Header Section with Unique Stats in Top Right */}
         <div className="player-card-header">
@@ -315,8 +314,8 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
             <>
               {/* IR Badge - Display if roster_status is not ACT */}
               {(player.roster_status && player.roster_status !== 'ACT') || player.is_ir_eligible ? (
-                <Badge 
-                  variant="destructive" 
+                <Badge
+                  variant="destructive"
                   className="ml-1 text-[10px] leading-tight px-1 py-0"
                   title={`Roster Status: ${player.roster_status || 'IR'}`}
                 >
@@ -325,7 +324,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               ) : null}
               {/* Dropped Badge - Display if player was dropped but points still count */}
               {player.wasDropped ? (
-                <Badge 
+                <Badge
                   variant="secondary"
                   className="ml-1 text-[10px] leading-tight px-1 py-0 border-pastel-orange/40 bg-pastel-orange/20 text-pastel-orange font-semibold"
                   title="Player was dropped but points still count from when they were in the lineup"
@@ -450,10 +449,10 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               {isGoalie ? (
                 // Goalie: ALWAYS show SEASON TOTALS
                 <>
-                  GP: {player.goalieStats?.gamesPlayed || 0}, 
-                  W: {player.goalieStats?.wins || 0}, 
-                  SV%: {((player.goalieStats?.savePct || 0) * 100).toFixed(1)}%, 
-                  GAA: {(player.goalieStats?.gaa || 0).toFixed(2)}, 
+                  GP: {player.goalieStats?.gamesPlayed || 0},
+                  W: {player.goalieStats?.wins || 0},
+                  SV%: {((player.goalieStats?.savePct || 0) * 100).toFixed(1)}%,
+                  GAA: {(player.goalieStats?.gaa || 0).toFixed(2)},
                   SO: {player.goalieStats?.shutouts || 0}
                 </>
               ) : (
@@ -464,56 +463,19 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               )}
               {/* Show matchup points contribution for dropped players */}
               {player.wasDropped && (() => {
-                // For daily view: Try to get points from daily_total_points, or calculate from daily stats
-                let contributingPoints = 0;
-                let pointsLabel = '';
-                
-                if (isInDailyViewMode && selectedDate) {
-                  // In daily view - try multiple sources for points
-                  // 1. First try dailyStatsMap (same source as WeeklySchedule uses)
-                  if (dailyStatsMap) {
-                    const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-                    const dailyStats = dailyStatsMap.get(playerId);
-                    if (dailyStats?.daily_total_points !== undefined && dailyStats.daily_total_points !== null) {
-                      contributingPoints = dailyStats.daily_total_points;
-                      pointsLabel = 'pts contributing today';
-                    }
-                  }
-                  
-                  // 2. Fallback to player.daily_total_points if not found in map
-                  if (contributingPoints === 0 && player.daily_total_points !== undefined && player.daily_total_points !== null) {
-                    contributingPoints = player.daily_total_points;
-                    pointsLabel = 'pts contributing today';
-                  }
-                  
-                  // 3. Calculate from breakdown if available
-                  if (contributingPoints === 0 && player.daily_stats_breakdown && Object.keys(player.daily_stats_breakdown).length > 0) {
-                    contributingPoints = Object.values(player.daily_stats_breakdown).reduce(
-                      (sum, stat) => sum + (stat.points || 0), 
-                      0
-                    );
-                    pointsLabel = 'pts contributing today';
-                  }
-                  
-                  // 4. Final fallback to weekly total
-                  if (contributingPoints === 0) {
-                    contributingPoints = player.total_points || player.points || 0;
-                    pointsLabel = 'pts contributing this week';
-                  }
-                } else {
-                  // Weekly view - use total_points or points
-                  contributingPoints = player.total_points || player.points || 0;
-                  pointsLabel = 'pts contributing this week';
-                }
-                
+                const daily = !!(isInDailyViewMode && selectedDate);
+                const contributingPoints = scopedEarnedPoints(player, daily,
+                  dailyStatsMap?.get(Number(player.id))?.daily_total_points);
+                const pointsLabel = daily ? 'pts contributing today' : 'pts contributing this week';
+
                 // Always show the indicator for dropped players (even if 0, to show they're being counted)
                 return (
                   <div className="mt-1 text-[10px] font-semibold text-pastel-orange flex items-center gap-1">
                     <span className="inline-flex items-center">
                       <span className="w-1.5 h-1.5 rounded-full bg-pastel-orange mr-1" />
-                      {contributingPoints > 0 
+                      {contributingPoints !== null
                         ? `${contributingPoints.toFixed(1)} ${pointsLabel}`
-                        : 'Points counted from lineup'
+                        : 'Contribution unavailable'
                       }
                     </span>
                   </div>
@@ -532,8 +494,8 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                     <div key={idx} className="unique-stat-item">
                       <span className="unique-stat-label">{stat.label}:</span>
                       <span className="unique-stat-value">
-                        <PointsTooltip 
-                          breakdown={player.stats_breakdown} 
+                        <PointsTooltip
+                          breakdown={player.stats_breakdown}
                           totalPoints={totalPoints}
                         />
                       </span>
@@ -558,8 +520,8 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
         {/* Game Logos Bar - HIDDEN ON MOBILE */}
         {player.games && Array.isArray(player.games) && player.games.length > 0 && player.team && (
           <div className="hidden lg:block -mt-1 mb-0 px-0.5 py-0 bg-gradient-to-r from-pastel-sage/5 via-pastel-sage/5 to-pastel-sage/5 rounded border border-pastel-sage/20">
-            <GameLogosBar 
-              games={player.games} 
+            <GameLogosBar
+              games={player.games}
               playerTeam={player.team}
               selectedDate={selectedDate}
             />
@@ -589,14 +551,14 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
             </div>
             {/* Centered total above bar - Premium Badge - COMPACT */}
             <div className="flex justify-center mb-0.5">
-              {player.daily_stats_breakdown && Object.keys(player.daily_stats_breakdown).length > 0 ? (
-                <PointsTooltip 
-                  breakdown={player.daily_stats_breakdown} 
+              {Number.isFinite(dailyTotalPoints) && player.daily_stats_breakdown && Object.keys(player.daily_stats_breakdown).length > 0 ? (
+                <PointsTooltip
+                  breakdown={player.daily_stats_breakdown}
                   totalPoints={dailyTotalPoints}
                 />
               ) : (
                 <span className="text-xs font-varsity font-black text-pastel-orange bg-pastel-sage/30 px-1.5 py-0.5 rounded border border-pastel-sage/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
-                  {dailyTotalPoints.toFixed(1)} pts
+                  {Number.isFinite(dailyTotalPoints) ? dailyTotalPoints.toFixed(1) : 'N/A'} pts
                 </span>
               )}
             </div>
@@ -605,13 +567,13 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               {Array.from({ length: maxBarPoints }, (_, i) => {
                 const isFilled = i < dailyFilledChunks;
                 const isPartialFilled = i === dailyFilledChunks && dailyPartialChunk > 0;
-                
+
                 return (
-                  <div 
+                  <div
                     key={i}
                     className={`flex-1 h-2 rounded overflow-hidden transition-all duration-300
-                      ${!isFilled && !isPartialFilled 
-                        ? 'border-2 border-dashed border-pastel-sage/30 bg-[#1A2A20] backdrop-blur-sm/50' 
+                      ${!isFilled && !isPartialFilled
+                        ? 'border-2 border-dashed border-pastel-sage/30 bg-[#1A2A20] backdrop-blur-sm/50'
                         : 'bg-[#1A2A20] backdrop-blur-sm border-2 border-pastel-sage/40'
                       }`}
                   >
@@ -620,8 +582,8 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                       <div className="w-full h-full bg-gradient-to-br from-pastel-sage via-[#7CB518] to-pastel-sage shadow-[inset_0_1px_2px_rgba(255,255,255,0.3)]" />
                     )}
                     {isPartialFilled && (
-                      <div 
-                        className="h-full bg-gradient-to-br from-pastel-sage/70 via-[#7CB518]/70 to-pastel-sage/70" 
+                      <div
+                        className="h-full bg-gradient-to-br from-pastel-sage/70 via-[#7CB518]/70 to-pastel-sage/70"
                         style={{ width: `${dailyPartialChunk * 100}%` }}
                       />
                     )}
@@ -657,7 +619,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
             </div>
             {/* Centered total above bar - Premium Badge - COMPACT */}
             <div className="flex justify-center items-center gap-1 mb-0.5">
-              {hasProjection && isStarterConfirmed && dailyProjection ? (
+              {hasProjection && hasUsableProjection && dailyProjection ? (
                 isGoalie ? (
                   <GoalieProjectionTooltip projection={player.goalieProjection}>
                     <span className="text-xs font-varsity font-black text-pastel-orange bg-pastel-sage/30 px-1.5 py-0.5 rounded border border-pastel-sage/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)] cursor-pointer hover:text-pastel-cream transition-all">
@@ -674,14 +636,14 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               ) : (
                 <span className="text-xs font-varsity font-black text-pastel-orange bg-pastel-sage/30 px-1.5 py-0.5 rounded border border-pastel-sage/50 shadow-[inset_0_1px_1px_rgba(0,0,0,0.1)]">
                   {showTBD
-                    ? (isGoalie && !isStarterConfirmed ? 'Probable' : 'TBD')
+                    ? (isGoalie && !hasUsableProjection ? 'Probable' : 'TBD')
                     : '0.0 pts'
                   }
                 </span>
               )}
             </div>
             {/* Likely Range - "3.2 – 5.8 likely" (50% CI) - HIDDEN ON MOBILE */}
-            {hasProjection && isStarterConfirmed && dailyProjection?.likely_low != null && dailyProjection?.likely_high != null && (
+            {hasProjection && hasUsableProjection && dailyProjection?.likely_low != null && dailyProjection?.likely_high != null && (
               <div className="hidden lg:flex justify-center mb-0.5">
                 <span className="text-[8px] font-display text-white/55">
                   Likely: {dailyProjection.likely_low.toFixed(1)} – {dailyProjection.likely_high.toFixed(1)}
@@ -689,7 +651,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               </div>
             )}
             {/* Confidence Bar - gradient fill matching PlayerStatsModal style */}
-            {hasProjection && isStarterConfirmed && dailyProjection?.dynamic_confidence != null ? (
+            {hasProjection && hasUsableProjection && dailyProjection?.dynamic_confidence != null ? (
               <div className="flex items-center gap-1 w-full">
                 <div className="flex-1 h-1.5 bg-pastel-sage/10 rounded-full overflow-hidden">
                   <div
@@ -701,7 +663,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                   {Math.round(dailyProjection.dynamic_confidence * 100)}%
                 </span>
               </div>
-            ) : hasProjection && isStarterConfirmed ? (
+            ) : hasProjection && hasUsableProjection ? (
               <div className="flex gap-0.5 w-full">
                 {Array.from({ length: maxBarPoints }, (_, i) => {
                   const isFilled = i < projectionFilledChunks;
@@ -806,15 +768,15 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
       >
         {isWeekView ? (
           <>
-            {weekBreakdown ? (
+            {weekBreakdown && Number.isFinite(weekPoints) ? (
               <PointsTooltip breakdown={weekBreakdown} totalPoints={weekPoints}>
                 <span className={cn(SCORE_ACTUAL_CLASS, isBench ? 'text-pastel-cream' : 'text-pastel-sage', 'cursor-pointer')}>
-                  {weekPoints.toFixed(1)}
+                  {Number.isFinite(weekPoints) ? weekPoints.toFixed(1) : 'N/A'}
                 </span>
               </PointsTooltip>
             ) : (
               <span className={cn(SCORE_ACTUAL_CLASS, isBench ? 'text-pastel-cream' : 'text-pastel-sage')}>
-                {weekPoints.toFixed(1)}
+                {Number.isFinite(weekPoints) ? weekPoints.toFixed(1) : 'N/A'}
               </span>
             )}
             {tonightPending && dailyProjection ? (
@@ -846,18 +808,18 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
           // Live / final / started: the actual number, tappable when a
           // breakdown exists, over the projection it is measured against.
           <>
-            {player.daily_stats_breakdown && Object.keys(player.daily_stats_breakdown).length > 0 ? (
+            {Number.isFinite(dailyTotalPoints) && player.daily_stats_breakdown && Object.keys(player.daily_stats_breakdown).length > 0 ? (
               <PointsTooltip
                 breakdown={player.daily_stats_breakdown}
                 totalPoints={dailyTotalPoints}
               >
                 <span className={cn(SCORE_ACTUAL_CLASS, isBench ? 'text-pastel-cream' : 'text-pastel-sage', 'cursor-pointer')}>
-                  {dailyTotalPoints.toFixed(1)}
+                  {Number.isFinite(dailyTotalPoints) ? dailyTotalPoints.toFixed(1) : 'N/A'}
                 </span>
               </PointsTooltip>
             ) : (
               <span className={cn(SCORE_ACTUAL_CLASS, isBench ? 'text-pastel-cream' : 'text-pastel-sage')}>
-                {dailyTotalPoints.toFixed(1)}
+                {Number.isFinite(dailyTotalPoints) ? dailyTotalPoints.toFixed(1) : 'N/A'}
               </span>
             )}
             {hasProjection ? (
@@ -874,7 +836,7 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
               </span>
             )}
           </>
-        ) : hasProjection && projectedPoints > 0 ? (
+        ) : hasProjection ? (
           // Yet to play: the forecast, tappable for its breakdown.
           <>
             {isGoalie ? (

@@ -6,7 +6,8 @@
  * already carries start-aware numbers (top goalies 53–60 games).
  *
  * Contract: the card's goalie headline reads the ROS row (total +
- * projected starts) instead of the team-game sum; skaters keep the sum.
+ * projected starts) instead of the team-game sum. Headline ROS selection
+ * for every position is behavior-tested in PlayerStatsModal.recovery.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -18,10 +19,10 @@ const CARD = readFileSync(resolve(here, '../components/PlayerStatsModal.tsx'), '
 const API = readFileSync(resolve(here, '../api/players.ts'), 'utf-8');
 
 describe('goalie projections are start-aware on the player card', () => {
-  it('the goalie branch reads the rest-of-season row', () => {
-    const at = CARD.indexOf('if (playerIsGoalie) {');
+  it('the current-season goalie log reads expected starts from ROS', () => {
+    const at = CARD.indexOf('if (playerIsGoalie && logSeason === getProjectionsSeason()) {');
     expect(at, 'goalie ROS branch missing').toBeGreaterThan(-1);
-    const body = CARD.slice(at, at + 1200);
+    const body = CARD.slice(at, at + 1400);
     expect(body).toContain('getRosProjectionForPlayer(playerId)');
     expect(body).toContain('goalieAwareTotal = rosTotal');
     expect(body).toContain('setGoalieStartsRemaining(');

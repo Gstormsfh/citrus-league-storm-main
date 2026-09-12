@@ -46,6 +46,7 @@ import {
   RosterChangeList,
   type Cohort,
 } from '@/components/draftkit';
+import { useLeague } from '@/contexts/LeagueContext';
 import { useDraftKitBoard } from '@/hooks/useDraftKitBoard';
 
 const COHORTS: Cohort[] = ['F', 'D', 'G'];
@@ -60,7 +61,8 @@ const TABS: Array<{ id: Tab; label: string }> = [
 ];
 
 export default function DraftKit() {
-  const { board, loading, error } = useDraftKitBoard();
+  const { activeLeagueId, isDemoLeague } = useLeague();
+  const { board, loading, error } = useDraftKitBoard(isDemoLeague(activeLeagueId) ? null : activeLeagueId);
   const [params, setParams] = useSearchParams();
   const [cohort, setCohort] = useState<Cohort>('F');
   const [tab, setTab] = useState<Tab>('board');

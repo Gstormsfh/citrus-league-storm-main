@@ -52,6 +52,8 @@ export interface XgHistoryState {
 }
 
 export interface UsePlayerXgHistoryOptions {
+  /** News, source seasons or effective scoring changed while the card is open. */
+  revision?: string;
   /** False skips the fetch entirely and holds the state at `idle`. */
   enabled?: boolean;
   /**
@@ -66,66 +68,82 @@ export interface UsePlayerXgHistoryOptions {
 
 const IDLE: XgHistoryState = { points: null, status: 'idle', asOf: null, writeup: null };
 
+// Keep imports lazy while sharing an in-flight module load across revisions.
+// Loading scoring/news can invalidate the first request before import resolves.
+let clientModule: Promise<typeof import('@/api/client')> | null = null;
+const loadClient = () => clientModule ??= import('@/api/client').catch(error => {
+  clientModule = null;
+  throw error;
+});
+
+function completeWriteup(value: unknown): value is PlayerWriteup {
+  if (!value || typeof value !== 'object') return false;
+  const w = value as Partial<PlayerWriteup>;
+  return typeof w.headline === 'string' && typeof w.summary === 'string'
+    && typeof w.analysis === 'string' && typeof w.cardNote === 'string'
+    && ['positive', 'neutral', 'caution'].includes(w.cardTone ?? '')
+    && typeof w.hasEnoughData === 'boolean' && Array.isArray(w.tags)
+    && w.tags.every(t => t && typeof t.label === 'string' && ['positive', 'neutral', 'caution'].includes(t.tone))
+    && (w.newsSources === undefined || Array.isArray(w.newsSources) && w.newsSources.every(source => {
+      if (!source || typeof source.source !== 'string' || typeof source.publishedAt !== 'string' ||
+        !Number.isFinite(Date.parse(source.publishedAt)) || typeof source.url !== 'string') return false;
+      try {
+        const url = new URL(source.url);
+        return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password;
+      } catch { return false; }
+    }));
+}
+
 export function usePlayerXgHistory(
   playerId: number | null | undefined,
   options: UsePlayerXgHistoryOptions = {},
 ): XgHistoryState {
-  const enabled = options.enabled ?? true;
+  const numericId = Number(playerId);
+  const enabled = (options.enabled ?? true) && playerId != null && Number.isSafeInteger(numericId) && numericId > 0;
   const leagueId = options.leagueId ?? null;
-  const [state, setState] = useState<XgHistoryState>(IDLE);
-
-  // A player change mid-flight must not let the OLD response win. Every
-  // request carries a token; only the newest one is allowed to write.
+  const revision = options.revision ?? '';
+  const key = JSON.stringify([numericId, leagueId, revision]);
+  const [refresh, setRefresh] = useState(0);
+  useEffect(() => {
+    if (!enabled) return;
+    const timer = setInterval(() => setRefresh(n => n + 1), 60_000);
+    return () => clearInterval(timer);
+  }, [enabled, numericId]);
+  const [stored, setStored] = useState<{ key: string; state: XgHistoryState } | null>(null);
   const latest = useRef(0);
 
   useEffect(() => {
-    if (!enabled || playerId == null || !Number.isFinite(Number(playerId))) {
-      setState(IDLE);
+    if (!enabled) {
+      setStored(null);
       return;
     }
-
     const token = ++latest.current;
     let cancelled = false;
-    const path = `/api/players/${Number(playerId)}/xg-history${
-      leagueId ? `?leagueId=${encodeURIComponent(leagueId)}` : ''
-    }`;
-
-    setState({ points: null, status: 'loading', asOf: null, writeup: null });
-
-    void import('@/api/client')
-      .then(({ apiClient }) => apiClient.get<PlayerXgHistoryPayload>(path))
-      .then((response) => {
+    const path = `/api/players/${numericId}/xg-history${leagueId ? `?leagueId=${encodeURIComponent(leagueId)}` : ''}`;
+    // Same-context polling keeps the established server copy visible. A new
+    // player, scoring revision or news revision uses the current fallback.
+    setStored(previous => previous?.key === key ? previous : { key, state: { ...IDLE, status: 'loading' } });
+    void loadClient()
+      .then(({ apiClient }) => cancelled ? undefined : apiClient.get<PlayerXgHistoryPayload>(path))
+      .then(response => {
         if (cancelled || token !== latest.current) return;
-        // The route answers `ok(c, payload)`, which wraps in `{ data }`; the
-        // bare branch is the belt to that suspender, as in both dashboard
-        // hooks. A response with no `points` array (a mocked client, a
-        // future envelope change) is "no history", never a crash.
-        const payload = (response?.data ??
-          (response as unknown as PlayerXgHistoryPayload)) as PlayerXgHistoryPayload | undefined;
-        const points = payload && Array.isArray(payload.points) ? payload.points : [];
-        setState({
-          points,
+        const payload = (response?.data ?? response) as PlayerXgHistoryPayload | undefined;
+        setStored({ key, state: {
+          points: payload && Array.isArray(payload.points) ? payload.points : [],
           status: 'ready',
           asOf: payload && typeof payload.as_of === 'string' ? payload.as_of : null,
-          // Shape-checked, not trusted: an old API, a mock, or a partial
-          // body must read as "no writeup" and never as a half-rendered
-          // card. `summary` is the field the modal paints first.
-          writeup:
-            payload && payload.writeup && typeof payload.writeup.summary === 'string'
-              ? payload.writeup
-              : null,
-        });
+          writeup: completeWriteup(payload?.writeup) ? payload.writeup : null,
+        } });
       })
-      .catch((err: unknown) => {
+      .catch((error: unknown) => {
         if (cancelled || token !== latest.current) return;
-        logger.debug('[player-xg-history] unavailable:', path, err);
-        setState({ points: null, status: 'error', asOf: null, writeup: null });
+        logger.debug('[player-xg-history] unavailable:', path, error);
+        setStored({ key, state: { ...IDLE, status: 'error' } });
       });
+    return () => { cancelled = true; };
+  }, [enabled, numericId, leagueId, key, refresh]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [playerId, enabled, leagueId]);
-
-  return state;
+  // Effects run after paint: do not expose the previous player's payload in
+  // the render before the new effect clears it.
+  return !enabled ? IDLE : stored?.key === key ? stored.state : { ...IDLE, status: 'loading' };
 }

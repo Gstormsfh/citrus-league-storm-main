@@ -14,6 +14,7 @@ import {
   SHOT_CAP,
 } from '../services/PlayerDashboardService';
 import { createChain, createMockSupabase } from './helpers';
+import { getMetricsSeason, getProjectionsSeason } from '@citrus/shared';
 
 const DIR = [
   {
@@ -154,7 +155,7 @@ function mockTables(supabase: any, overrides: Record<string, { data: unknown; er
     if (table === 'player_talent_metrics') return createChain({ data: TALENT, error: null });
     if (table === 'player_ros_projections') return createChain({ data: ROS, error: null });
     if (table === 'goalie_gsax_primary') return createChain({ data: INDEX_GSAX, error: null });
-    return createChain({ data: [], error: null });
+    return createChain({ data: table === 'canonical_published_runs' ? null : [], error: null });
   });
 }
 
@@ -178,6 +179,8 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     expect(am.name).toBe('Auston Matthews');
     expect(am.is_goalie).toBe(false);
     expect(am.gp).toBe(60); // skater gp = games_played
+    expect(am.actuals_season).toBe(getMetricsSeason());
+    expect(am.projection_season).toBe(getProjectionsSeason());
     expect(am.points).toBe(53);
     expect(am.gar_per_60).toBeCloseTo(0.497);
     expect(am.gar_ppo).toBeCloseTo(0.085);
@@ -316,12 +319,13 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     expect(woll.proj_fantasy_points).toBeNull();
   });
 
-  it('caches: a second call issues no new queries', async () => {
+  it('caches base data while checking the published context revision', async () => {
     mockTables(mockSupabase);
     await service.getDashboardIndex();
     const calls1 = mockSupabase.from.mock.calls.length;
     await service.getDashboardIndex();
-    expect(mockSupabase.from.mock.calls.length).toBe(calls1);
+    expect(mockSupabase.from.mock.calls.length).toBe(calls1 + 2);
+    expect(mockSupabase.from).toHaveBeenLastCalledWith('canonical_published_runs');
   });
 
   // REGRESSION (2026-09-02 scale audit): this was a plain check-then-fetch
@@ -347,7 +351,7 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
       if (table === 'player_talent_metrics') return createChain({ data: TALENT, error: null });
       if (table === 'player_ros_projections') return createChain({ data: ROS, error: null });
       if (table === 'goalie_gsax_primary') return createChain({ data: INDEX_GSAX, error: null });
-      return createChain({ data: [], error: null });
+      return createChain({ data: table === 'canonical_published_runs' ? null : [], error: null });
     });
 
     // Fifty callers arrive while the first fan-out is still outstanding.
@@ -357,7 +361,7 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
 
     // One fan-out, not fifty: six tables, one read each.
     expect(slowDirectory.range).toHaveBeenCalledTimes(1);
-    expect(mockSupabase.from).toHaveBeenCalledTimes(6);
+    expect(mockSupabase.from).toHaveBeenCalledTimes(8);
     for (const r of results) {
       expect(r.error).toBeNull();
       expect(r.players).toEqual(results[0].players);
@@ -414,7 +418,7 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
       if (table === 'player_gar_components') return createChain({ data: GAR, error: null });
       if (table === 'player_talent_metrics') return createChain({ data: TALENT, error: null });
       if (table === 'player_ros_projections') return createChain({ data: ROS, error: null });
-      return createChain({ data: [], error: null });
+      return createChain({ data: table === 'canonical_published_runs' ? null : [], error: null });
     });
 
     const { players, error } = await service.getDashboardIndex();
@@ -615,7 +619,7 @@ function userClient(overrides: Record<string, { data: unknown; error: unknown }>
         error: { message: 'permission denied for table nhl_shots' },
       });
     }
-    return createChain({ data: [], error: null });
+    return createChain({ data: table === 'canonical_published_runs' ? null : [], error: null });
   });
   return mock;
 }
@@ -981,7 +985,7 @@ describe('PlayerDashboardService.getXgHistory', () => {
     const mock = createMockSupabase();
     mock.from = vi.fn((table: string) => {
       if (table === 'player_xg_season') return createChain({ data: error ? null : rows, error });
-      return createChain({ data: [], error: null });
+      return createChain({ data: table === 'canonical_published_runs' ? null : [], error: null });
     });
     return mock;
   }

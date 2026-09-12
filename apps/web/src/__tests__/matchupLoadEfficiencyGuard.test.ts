@@ -90,7 +90,7 @@ describe('every day of the viewed week gets projections', () => {
 
   it('the in-flight guard is per-date, not a single boolean', () => {
     expect(MATCHUP).toMatch(/projectionsLoadingRef = useRef<Set<string>>/);
-    expect(MATCHUP).toMatch(/projectionsLoadingRef\.current\.has\(date\)/);
-    expect(MATCHUP).toMatch(/projectionsLoadingRef\.current\.delete\(date\)/);
+    expect(MATCHUP).toMatch(/projectionsLoadingRef\.current\.has\(requestKey\)/);
+    expect(MATCHUP).toMatch(/projectionsLoadingRef\.current\.delete\(requestKey\)/);
   });
 });
