@@ -103,3 +103,55 @@ class CanonicalReviewTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class OptionalCoverageTests(unittest.TestCase):
+    def optional(self, label='Third'):
+        return {'row': 30, 'slot': label, 'player_id': None, 'snapshot_status': 'unresolved',
+                'source_reconciliation': {'classification': 'alternative_depth',
+                  'counts_toward_active_lineup': False, 'selected_player_id': None,
+                  'evidence': [{'file': 'workbook', 'locator': 'A30'}]}}
+
+    def unresolved(self):
+        p = deepcopy(fixture()['players'][0]); p.update(player_id='2', status='unresolved', rates={}, counts=None,
+             exposure_policy='unallocated', issues=['Identity supported; no numerical forecast.'])
+        p['exposure'].update(used=None, kind='unallocated')
+        return p
+
+    def test_optional_depth_and_nonselected_unsupported_profile_are_not_mandatory(self):
+        d = fixture(); d['players'].append(self.unresolved()); d['teams'][0]['lineup_slots']=[self.optional()]
+        rebuild(d); d['revision']=digest(d); validate(d)
+        self.assertEqual([b['code'] for b in d['publish_blockers']], ['ROSTER_ROLE_SCENARIOS_NOT_CONFIRMED'])
+        self.assertFalse(d['contract']['publication_ready'])
+
+    def test_required_labels_cannot_be_bypassed_by_optional_flags(self):
+        for label in ['L1','L4','D1','D3','Starter','Backup','unrecognized',None]:
+            d=fixture(); d['teams'][0]['lineup_slots']=[self.optional(label)]; rebuild(d)
+            self.assertIn('UNREVIEWED_LINEUP_SLOTS',[b['code'] for b in d['publish_blockers']])
+
+    def test_rates_only_cannot_fill_required_slot(self):
+        d=fixture(); p=self.unresolved(); p['status']='rates_only'; p['rates']={'saves':20}; d['players'].append(p)
+        slot=self.optional('Backup'); slot['player_id']='2'; d['teams'][0]['lineup_slots']=[slot]; rebuild(d)
+        self.assertIn('UNREVIEWED_LINEUP_SLOTS',[b['code'] for b in d['publish_blockers']])
+
+    def test_missing_evidence_preserves_optional_and_profile_blockers(self):
+        d=fixture(); p=self.unresolved(); p['issues']=[]; d['players'].append(p)
+        slot=self.optional(); slot['source_reconciliation']['evidence']=[]; d['teams'][0]['lineup_slots']=[slot]; rebuild(d)
+        codes=[b['code'] for b in d['publish_blockers']]
+        self.assertIn('UNRESOLVED_FORECAST',codes); self.assertIn('UNREVIEWED_LINEUP_SLOTS',codes)
+
+    def test_optional_identity_must_still_match_team(self):
+        d=fixture(); slot=self.optional();slot['player_id']='999';d['teams'][0]['lineup_slots']=[slot];rebuild(d);d['revision']=digest(d)
+        with self.assertRaises(ContractError): validate(d)
+
+    def test_documented_stale_third_slot_is_optional_but_same_label_does_not_demote_pair(self):
+        from canonical_inputs import optional_lineup_context
+        s=self.optional();s['source_reconciliation']['classification']='vacant_after_transfer'
+        self.assertTrue(optional_lineup_context(s));s['slot']='D3';self.assertFalse(optional_lineup_context(s))
+
+    def test_unselected_unavailable_fa_or_unknown_team_retains_source_without_allocating(self):
+        for team in ['FA', None]:
+            d=fixture();p=self.unresolved();p['status']='rates_only';p['team']=team;d['players'].append(p)
+            rebuild(d);d['revision']=digest(d);validate(d)
+            self.assertEqual([b['code'] for b in d['publish_blockers']], ['ROSTER_ROLE_SCENARIOS_NOT_CONFIRMED'])
+            s=self.optional('L1');s['player_id']='2';d['teams'][0]['lineup_slots']=[s];rebuild(d);d['revision']=digest(d)
+            with self.assertRaises(ContractError):validate(d)

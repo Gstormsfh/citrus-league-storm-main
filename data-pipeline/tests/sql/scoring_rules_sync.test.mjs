@@ -11,8 +11,9 @@ async function setup(){
  CREATE TABLE league_scoring_rules(league_id uuid,stat_key text,multiplier numeric,updated_at timestamptz,PRIMARY KEY(league_id,stat_key));
  INSERT INTO leagues VALUES('00000000-0000-0000-0000-000000000001','{"skater":{"goals":2}}'),('00000000-0000-0000-0000-000000000002',null);
  INSERT INTO league_scoring_rules VALUES('00000000-0000-0000-0000-000000000001','shots_on_goal',9,now()),('00000000-0000-0000-0000-000000000002','goals',99,now());`);
- await db.exec(migration);
+ await db.exec('CREATE FUNCTION sync_scoring_settings_to_rules() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RETURN NEW;END$$');
  await db.exec('CREATE TRIGGER sync_scoring_settings_to_rules_trg AFTER INSERT OR UPDATE OF scoring_settings ON leagues FOR EACH ROW EXECUTE FUNCTION sync_scoring_settings_to_rules()');
+ await db.exec(migration);
  const rules=async id=>Object.fromEntries((await db.query('select stat_key,multiplier::float8 multiplier from league_scoring_rules where league_id=$1',[id])).rows.map(r=>[r.stat_key,r.multiplier]));
  const id='00000000-0000-0000-0000-000000000001';
  const update=async value=>db.query('update leagues set scoring_settings=$1::jsonb where id=$2',[value===null?null:JSON.stringify(value),id]);

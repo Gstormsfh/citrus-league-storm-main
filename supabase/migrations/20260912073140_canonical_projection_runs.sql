@@ -79,6 +79,24 @@ BEGIN
  RETURN v_id;
 END $$;
 
+-- Source labels are authoritative: false flags cannot demote active/unknown slots.
+CREATE FUNCTION public.canonical_optional_lineup_context(slot jsonb) RETURNS boolean
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog AS $$
+ SELECT coalesce(lower(btrim(slot->>'slot')) IN
+   ('third','note','notes','ltir','ir','out','dtd','day-to-day','no timeline','injured','suspended')
+ AND slot#>>'{source_reconciliation,classification}' IN
+   ('identified_depth','alternative_depth','unknown_depth','non_roster_note','availability_note','vacant_after_transfer')
+ AND slot#>'{source_reconciliation,counts_toward_active_lineup}'='false'::jsonb
+ AND slot#>'{source_reconciliation,selected_player_id}'='null'::jsonb
+ AND CASE WHEN jsonb_typeof(slot#>'{source_reconciliation,evidence}')='array' THEN
+   jsonb_array_length(slot#>'{source_reconciliation,evidence}')>0
+   AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(slot#>'{source_reconciliation,evidence}') e
+     WHERE NOT ((jsonb_typeof(e)='object' AND e<>'{}'::jsonb)
+       OR (jsonb_typeof(e)='string' AND btrim(e#>>'{}')<>''))) ELSE false END,false)
+$$;
+REVOKE ALL ON FUNCTION public.canonical_optional_lineup_context(jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.canonical_optional_lineup_context(jsonb) TO service_role;
+
 CREATE FUNCTION public.canonical_validate_projection_run(p_run_id uuid) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
 DECLARE r public.canonical_projection_runs; p jsonb; errors jsonb='[]'; report jsonb;
@@ -106,25 +124,54 @@ BEGIN
  ELSE
    IF EXISTS(SELECT 1 FROM jsonb_each(r.payload->'schedule') s WHERE NOT EXISTS(SELECT 1 FROM jsonb_array_elements(r.payload->'teams') t WHERE t->>'team'=s.key)) THEN errors:=errors||'[{"code":"MISSING_TEAM_REVIEW"}]'; END IF;
    IF EXISTS(SELECT 1 FROM jsonb_array_elements(r.payload->'teams') t CROSS JOIN LATERAL jsonb_array_elements(t->'lineup_slots') slot
-      WHERE slot->>'player_id' IS NULL OR NOT EXISTS(SELECT 1 FROM public.canonical_projection_players c WHERE c.run_id=r.id AND c.player_id=slot->>'player_id' AND c.payload->>'team'=t->>'team')) THEN errors:=errors||'[{"code":"UNRESOLVED_LINEUP_SLOT"}]'; END IF;
+      WHERE (NOT public.canonical_optional_lineup_context(slot) AND
+        (slot->>'snapshot_status'='unresolved' OR slot->>'player_id' IS NULL OR NOT EXISTS(
+          SELECT 1 FROM public.canonical_projection_players c WHERE c.run_id=r.id
+          AND c.player_id=slot->>'player_id' AND c.payload->>'team'=t->>'team' AND c.payload->>'status'='projected')))
+        OR (slot->>'player_id' IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.canonical_projection_players c
+          WHERE c.run_id=r.id AND c.player_id=slot->>'player_id' AND c.payload->>'team'=t->>'team'))) THEN errors:=errors||'[{"code":"UNRESOLVED_LINEUP_SLOT"}]'; END IF;
  END IF;
  FOR p IN SELECT payload FROM public.canonical_projection_players WHERE run_id=r.id LOOP
    BEGIN
-     IF p->>'status' NOT IN ('projected','rates_only') OR p->>'status' IS NULL THEN
+     IF p->>'status' NOT IN ('projected','rates_only','unresolved') OR p->>'status' IS NULL THEN
        RAISE EXCEPTION 'Unresolved forecast';
      END IF;
      IF p->>'rate_policy' NOT IN ('refresh_model','refresh_cohort','preserve_override') OR p->>'rate_policy' IS NULL
        OR jsonb_typeof(p->'availability') IS DISTINCT FROM 'object' OR jsonb_typeof(p->'sources') IS DISTINCT FROM 'array' OR jsonb_array_length(p->'sources')=0 THEN RAISE EXCEPTION 'Missing metadata policies or source evidence'; END IF;
      IF EXISTS(SELECT 1 FROM public.player_directory d WHERE d.season=r.season AND d.player_id::text=p->>'player_id' AND d.team_abbrev IS NOT NULL AND d.team_abbrev<>p->>'team')
        AND (p#>>'{team_assignment,reviewed}' IS DISTINCT FROM 'true' OR coalesce(p#>>'{team_assignment,evidence}','')='') THEN RAISE EXCEPTION 'Team differs from current directory without reviewed assignment evidence'; END IF;
-     IF NOT (r.payload->'schedule' ? (p->>'team')) THEN RAISE EXCEPTION 'Player team not scheduled'; END IF;
-     IF p->>'status'='rates_only' THEN
-       IF p->>'exposure_policy' IS DISTINCT FROM 'unallocated' THEN RAISE EXCEPTION 'Rates-only policy must be unallocated'; END IF;
+     IF (p->>'is_goalie')::boolean IS NULL OR p#>>'{exposure,unit}' IS DISTINCT FROM
+       (CASE WHEN (p->>'is_goalie')::boolean THEN 'starts' ELSE 'games' END) THEN RAISE EXCEPTION 'Wrong exposure unit'; END IF;
+     IF p->>'status'='unresolved' THEN
+       IF jsonb_typeof(p->'issues') IS DISTINCT FROM 'array' OR jsonb_array_length(p->'issues')=0
+         OR EXISTS(SELECT 1 FROM jsonb_array_elements(p->'issues') issue
+           WHERE NOT ((jsonb_typeof(issue)='object' AND issue<>'{}'::jsonb)
+             OR (jsonb_typeof(issue)='string' AND btrim(issue#>>'{}')<>'')))
+         OR EXISTS(SELECT 1 FROM jsonb_array_elements(r.payload->'teams') t
+           CROSS JOIN LATERAL jsonb_array_elements(t->'lineup_slots') slot
+           WHERE slot->>'player_id'=p->>'player_id' AND NOT public.canonical_optional_lineup_context(slot)) THEN
+         RAISE EXCEPTION 'Unsupported forecast requires auditable nonselected profile';
+       END IF;
+     END IF;
+     IF EXISTS(SELECT 1 FROM jsonb_array_elements(p->'sources') e WHERE NOT
+       ((jsonb_typeof(e)='object' AND e<>'{}'::jsonb) OR (jsonb_typeof(e)='string' AND btrim(e#>>'{}')<>''))) THEN
+       RAISE EXCEPTION 'Invalid source evidence';
+     END IF;
+     IF p->>'status' IN ('rates_only','unresolved') THEN
+       IF jsonb_typeof(p->'rates') IS DISTINCT FROM 'object' THEN RAISE EXCEPTION 'Unavailable rates must be an object'; END IF;
+       FOR k IN SELECT jsonb_object_keys(p->'rates') LOOP
+         IF k<>ALL(CASE WHEN (p->>'is_goalie')::boolean THEN ARRAY['wins','saves','shutouts','goals_against']
+            ELSE ARRAY['goals','assists','shots_on_goal','blocks','power_play_points','short_handed_points','hits','penalty_minutes','plus_minus'] END)
+           OR jsonb_typeof(p->'rates'->k) IS DISTINCT FROM 'number'
+           OR (k<>'plus_minus' AND (p->'rates'->>k)::numeric<0) THEN RAISE EXCEPTION 'Invalid unavailable rate'; END IF;
+       END LOOP;
+       IF p->>'exposure_policy' IS DISTINCT FROM 'unallocated' THEN RAISE EXCEPTION 'Unavailable policy must be unallocated'; END IF;
        IF p->'counts' IS DISTINCT FROM 'null'::jsonb OR p#>'{exposure,used}' IS DISTINCT FROM 'null'::jsonb THEN
-         RAISE EXCEPTION 'Rates-only row carries exposure or counts';
+         RAISE EXCEPTION 'Unavailable row carries exposure or counts';
        END IF;
        CONTINUE;
      END IF;
+     IF p->>'team' IS NULL OR NOT (r.payload->'schedule' ? (p->>'team')) THEN RAISE EXCEPTION 'Player team not scheduled'; END IF;
      IF p->>'rate_policy' NOT IN ('refresh_model','refresh_cohort','preserve_override') OR p->>'rate_policy' IS NULL
       OR p->>'exposure_policy' NOT IN ('preserve_season_override','model_remaining') OR p->>'exposure_policy' IS NULL THEN
        RAISE EXCEPTION 'Missing explicit rate/exposure policy';

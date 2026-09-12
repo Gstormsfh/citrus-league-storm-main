@@ -18,6 +18,57 @@ from typing import Literal, TypedDict
 
 from projection_contract import ContractError
 
+# Optional context is recognized by its source label AND auditable metadata.
+# An active or unknown label can never become optional through a false flag.
+OPTIONAL_SLOT_LABELS = {'third', 'note', 'notes', 'ltir', 'ir', 'out', 'dtd',
+                        'day-to-day', 'no timeline', 'injured', 'suspended'}
+OPTIONAL_SLOT_CLASSES = {'identified_depth', 'alternative_depth', 'unknown_depth',
+                         'non_roster_note', 'availability_note', 'vacant_after_transfer'}
+
+
+def has_evidence(value):
+    return isinstance(value, list) and bool(value) and all(
+        (isinstance(v, dict) and bool(v)) or (isinstance(v, str) and bool(v.strip())) for v in value)
+
+
+def optional_lineup_context(slot):
+    context = slot.get('source_reconciliation')
+    return (str(slot.get('slot', '')).strip().lower() in OPTIONAL_SLOT_LABELS
+        and isinstance(context, dict) and context.get('classification') in OPTIONAL_SLOT_CLASSES
+        and context.get('counts_toward_active_lineup') is False
+        and 'selected_player_id' in context and context['selected_player_id'] is None
+        and has_evidence(context.get('evidence')))
+
+
+def lineup_coverage_issues(players, teams):
+    by_id = {p['player_id']: p for p in players}
+    return [{'team': t['team'], 'row': slot.get('row')} for t in teams for slot in t['lineup_slots']
+        if not optional_lineup_context(slot) and (slot.get('snapshot_status') == 'unresolved'
+            or slot.get('player_id') not in by_id
+            or by_id[slot['player_id']]['team'] != t['team']
+            or by_id[slot['player_id']]['status'] != 'projected')]
+
+
+def unavailable_profile_audited(player, teams):
+    # Existing source/issue fields explain why an identity remains visible without numbers.
+    return (has_evidence(player.get('sources')) and has_evidence(player.get('issues'))
+        and not any(slot.get('player_id') == player['player_id'] and not optional_lineup_context(slot)
+                    for team in teams for slot in team['lineup_slots']))
+
+
+def coverage_blockers(players, teams):
+    required = {slot.get('player_id') for team in teams for slot in team['lineup_slots']
+                if not optional_lineup_context(slot)}
+    entries = [
+        {'code': 'UNALLOCATED_GOALIES', 'player_ids': [p['player_id'] for p in players
+            if p['is_goalie'] and p['exposure']['used'] is None and p['player_id'] in required]},
+        {'code': 'UNRESOLVED_FORECAST', 'player_ids': [p['player_id'] for p in players
+            if p['status'] == 'unresolved' and not unavailable_profile_audited(p, teams)]},
+        {'code': 'UNREVIEWED_LINEUP_SLOTS', 'slots': lineup_coverage_issues(players, teams)},
+    ]
+    return [entry for entry in entries if entry.get('player_ids') or entry.get('slots')]
+
+
 VERSION = 'citrus.canonical-projection-inputs.v1'
 SKATER_COLS = {'goals': 11, 'assists': 12, 'shots_on_goal': 14,
                'power_play_points': 15, 'short_handed_points': 16,
@@ -328,15 +379,11 @@ def build(input_dir: Path):
             'nonworkbook_goalies': 'rates only until explicit crease allocation',
             'publication_ready': False, 'availability': 'Imported status never applies another absence multiplier; GP already incorporates absences',
             'reason': 'Unresolved roster/role scenarios and overlapping skater exposure require review.'}}
-    document['publish_blockers'] = [
-        {'code': 'UNALLOCATED_GOALIES', 'player_ids': [r['player_id'] for r in players
-            if r['is_goalie'] and r['exposure']['used'] is None]},
-        {'code': 'UNRESOLVED_FORECAST', 'player_ids': [r['player_id'] for r in players if r['status'] == 'unresolved']},
-        {'code': 'UNREVIEWED_LINEUP_SLOTS', 'slots': [{'team': t['team'], 'row': slot['row']}
-            for t in teams for slot in t['lineup_slots'] if slot['snapshot_status'] == 'unresolved']},
+    document['publish_blockers'] = coverage_blockers(players, teams) + [
         {'code': 'OVERLAPPING_SKATER_SCENARIOS', 'teams': [t['team'] for t in ledger if t['skater_capacity_delta'] > 0]},
         {'code': 'ROSTER_ROLE_SCENARIOS_NOT_CONFIRMED', 'reason': 'Imported projected lineups require explicit review before publication.'},
     ]
+    document['publish_blockers'] = [b for b in document['publish_blockers'] if b.get('reason') or b.get('teams') or b.get('player_ids') or b.get('slots')]
     document['revision'] = sha256(json.dumps(document, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
     return document
 

@@ -8,7 +8,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 
-from canonical_inputs import VERSION, GOALIE_COLS, SKATER_COLS, number, unique_ids
+from canonical_inputs import VERSION, GOALIE_COLS, SKATER_COLS, number, unique_ids, coverage_blockers, optional_lineup_context, has_evidence
 from projection_contract import ContractError
 
 
@@ -60,6 +60,10 @@ def validate(document):
                     raise ContractError(f'{pid}: counts differ from rate times exposure')
             if set(p['rates']) - set(p['counts']):
                 raise ContractError(f'{pid}: missing derived counts')
+        elif p.get('exposure_policy') != 'unallocated':
+            raise ContractError(f'{pid}: unavailable forecast requires unallocated policy')
+        elif not has_evidence(p.get('sources')):
+            raise ContractError(f'{pid}: unavailable forecast requires source evidence')
         elif p['counts'] is not None or used is not None:
             raise ContractError(f'{pid}: unavailable forecasts must not carry exposure or counts')
         a = p['availability']
@@ -110,14 +114,12 @@ def rebuild(document):
             'interpretation': 'Reviewed exposure ledger; publication blockers remain explicit.'})
     document['team_ledger'] = ledger
     document['coverage']['status_counts'] = dict(Counter(p['status'] for p in players))
-    document['publish_blockers'] = [
-        {'code': 'UNALLOCATED_GOALIES', 'player_ids': [p['player_id'] for p in players if p['is_goalie'] and p['exposure']['used'] is None]},
-        {'code': 'UNRESOLVED_FORECAST', 'player_ids': [p['player_id'] for p in players if p['status'] == 'unresolved']},
-        {'code': 'UNREVIEWED_LINEUP_SLOTS', 'slots': [{'team': t['team'], 'row': s['row']} for t in document['teams'] for s in t['lineup_slots'] if s['snapshot_status'] == 'unresolved']},
+    document['publish_blockers'] = coverage_blockers(players, document['teams']) + [
         {'code': 'OVERLAPPING_SKATER_SCENARIOS', 'teams': [t['team'] for t in ledger if t['skater_capacity_delta'] > 1e-8]},
         {'code': 'GOALIE_BUDGET_MISMATCH', 'teams': [t['team'] for t in ledger if abs(t['starts_delta']) > 1e-8]},
         {'code': 'ROSTER_ROLE_SCENARIOS_NOT_CONFIRMED', 'reason': 'Explicit publication review is required; offline edits cannot activate a run.'},
     ]
+    document['publish_blockers'] = [b for b in document['publish_blockers'] if b.get('reason') or b.get('teams') or b.get('player_ids') or b.get('slots')]
     document['contract']['publication_ready'] = False
 
 
@@ -172,7 +174,7 @@ def apply_patch(document, patch, *, now=None):
                     if index >= len(old) and note.get('authority') != 'manual_review':
                         raise ContractError('New team notes require manual_review authority')
             if key == 'team':
-                for field, editable in [('lineup_slots', {'player_id', 'notes', 'snapshot_status'}), ('special_teams', {'snapshot_status'})]:
+                for field, editable in [('lineup_slots', {'player_id', 'notes', 'snapshot_status', 'source_reconciliation'}), ('special_teams', {'snapshot_status'})]:
                     if field not in changes:
                         continue
                     rows, old = changes[field], record[field]
@@ -181,6 +183,8 @@ def apply_patch(document, patch, *, now=None):
                     for row, previous in zip(rows, old):
                         if not isinstance(row, dict) or {k: v for k, v in row.items() if k not in editable} != {k: v for k, v in previous.items() if k not in editable}:
                             raise ContractError(f'{field}: immutable source metadata changed')
+                        if 'source_reconciliation' in row and not isinstance(row['source_reconciliation'], dict):
+                            raise ContractError('Lineup reconciliation must be structured')
                         if row.get('snapshot_status') not in {'assumed', 'unresolved', 'reviewed', 'verified'}:
                             raise ContractError(f'{field}: invalid review status')
             for name, value in changes.items():

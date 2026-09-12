@@ -65,3 +65,54 @@ test('rates-only metadata is validated and staged rows are hidden by RLS',async(
  await db.exec('set role authenticated');assert.equal((await db.query('select * from canonical_projection_players')).rows.length,0);
  }finally{await db.close()}
 });
+
+const optionalSlot=(slot='Third')=>({slot,player_id:null,snapshot_status:'unresolved',source_reconciliation:{classification:'alternative_depth',counts_toward_active_lineup:false,selected_player_id:null,evidence:[{file:'workbook',locator:'A30'}]}});
+const unavailable=(sample,status='unresolved')=>({...sample,player_id:'3',status,rates:{},counts:null,exposure:{used:null,unit:'starts'},exposure_policy:'unallocated',issues:['Identity only; forecast unavailable.']});
+test('audited optional depth and nonselected unsupported profiles remain visible without fabricated numbers',async()=>{
+ const{db,payload,stage}=await fixture();try{
+ payload.players.push(unavailable(payload.players[0]));payload.teams[0].lineup_slots.push(optionalSlot());
+ const id=await stage();const report=(await db.query('select canonical_validate_projection_run($1) report',[id])).rows[0].report;
+ assert.equal(report.valid,true,JSON.stringify(report.errors));
+ await db.query('select canonical_activate_projection_run($1,$2)',[id,payload.revision]);
+ assert.equal((await db.query("select payload->>'status' status from canonical_published_players where player_id='3'")).rows[0].status,'unresolved');
+ }finally{await db.close()}
+});
+test('required and unknown labels cannot use optional metadata to hide a vacancy or rates-only selection',async()=>{
+ const{db,payload,stage}=await fixture();try{
+ payload.players.push(unavailable(payload.players[0],'rates_only'));
+ for(const [index,label] of ['L1','L4','D1','D3','Starter','Backup','unknown',null].entries()){
+ const p=structuredClone(payload);p.revision=String(index+1).repeat(64);p.teams[0].lineup_slots.push({...optionalSlot(label),player_id:index%2?'3':null});
+ const id=await stage(p);const report=(await db.query('select canonical_validate_projection_run($1) report',[id])).rows[0].report;
+ assert.equal(report.valid,false,label);assert.ok(report.errors.some(e=>e.code==='UNRESOLVED_LINEUP_SLOT'),label);
+ }
+ }finally{await db.close()}
+});
+test('optional evidence, unsupported-profile reason, and unavailable units remain mandatory',async()=>{
+ const{db,payload,stage}=await fixture();try{
+ const p=unavailable(payload.players[0]);p.issues=[];p.exposure.unit='games';payload.players.push(p);
+ const slot=optionalSlot();slot.source_reconciliation.evidence=[];payload.teams[0].lineup_slots.push(slot);
+ const id=await stage();const report=(await db.query('select canonical_validate_projection_run($1) report',[id])).rows[0].report;
+ assert.ok(report.errors.some(e=>e.code==='UNRESOLVED_LINEUP_SLOT'));assert.ok(report.errors.some(e=>e.code==='INVALID_PLAYER'&&e.player_id==='3'));
+ }finally{await db.close()}
+});
+test('optional stale depth still preserves exact same-team identity validation',async()=>{
+ const{db,payload,stage}=await fixture();try{
+ const s=optionalSlot();s.source_reconciliation.classification='vacant_after_transfer';
+ assert.equal((await db.query('select canonical_optional_lineup_context($1::jsonb) optional',[JSON.stringify(s)])).rows[0].optional,true);
+ s.player_id='2';payload.teams[0].lineup_slots.push(s);
+ const id=await stage();const report=(await db.query('select canonical_validate_projection_run($1) report',[id])).rows[0].report;
+ assert.ok(report.errors.some(e=>e.code==='UNRESOLVED_LINEUP_SLOT'));
+ }finally{await db.close()}
+});
+test('unselected unavailable free agents keep source affiliation but cannot occupy an active slot',async()=>{
+ const{db,payload,stage}=await fixture();try{
+ for(const [index,team] of ['FA',null].entries()){
+ const p=structuredClone(payload);p.revision=String(index+4).repeat(64);p.players.push({...unavailable(p.players[0],'rates_only'),team});
+ const id=await stage(p);const report=(await db.query('select canonical_validate_projection_run($1) report',[id])).rows[0].report;
+ assert.equal(report.valid,true,JSON.stringify(report.errors));
+ p.revision=String(index+6).repeat(64);p.teams[0].lineup_slots.push({slot:'L1',player_id:'3'});
+ const active=await stage(p);const invalid=(await db.query('select canonical_validate_projection_run($1) report',[active])).rows[0].report;
+ assert.ok(invalid.errors.some(e=>e.code==='UNRESOLVED_LINEUP_SLOT'));
+ }
+ }finally{await db.close()}
+});
