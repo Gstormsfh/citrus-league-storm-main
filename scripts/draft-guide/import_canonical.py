@@ -162,9 +162,9 @@ def convert(document, editorial, revision, *, source_name='canonical.json'):
     result['seasonGames'] = next(iter(schedule)) if len(schedule) == 1 else None
     result['season'] = document['season']
     result['publication'] = {
-        'status': 'draft', 'label': 'DRAFT — canonical review; not approved for publication',
+        'status': 'draft', 'label': 'DRAFT — local scoring review; export is not a publication action',
         'publicationReady': False, 'sourcePublicationReady': document['contract']['publication_ready'],
-        'reason': 'Offline revision import has no verified published-run marker.',
+        'reason': 'Offline import does not independently establish live publication status.',
         'blockers': deepcopy(document['publish_blockers']),
     }
     result['canonicalContract'] = deepcopy(document['contract'])

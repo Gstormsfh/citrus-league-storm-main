@@ -17,7 +17,7 @@ class LeagueGuide(Guide):
   super().__init__();self.data=data;self.result=result;self.name=name;self.byname={p['name']:p for p in result['players']};self.bykey={p['key']:p for p in result['players']};self.photos=json.loads((ASSETS/'player-photos.json').read_text());self.featured=set();self.manifest=[]
  def end(self):
   if self.data.get('canonicalRevision'):
-   self.text('DRAFT / CANONICAL '+self.data['canonicalRevision'][:16]+' / NOT PUBLISHED',306,749,6,'Semi',ORANGE,'center')
+   self.text('DRAFT / CANONICAL '+self.data['canonicalRevision'][:16]+' / LOCAL SCORING PREVIEW',306,749,6,'Semi',ORANGE,'center')
   super().end()
  def heading(self,title,section,sub=''):
   self.start(title,section);size=min(49,540/pdfmetrics.stringWidth(title.upper(),'Display',1));self.text(title.upper(),36,107,size,'Display')
@@ -162,7 +162,7 @@ class LeagueGuide(Guide):
  def colophon(self):
   if self.data.get('canonicalRevision'):
    self.notes('CANONICAL REVISION','Source review',[
-    'DRAFT — NOT PUBLISHED. Canonical revision: '+self.data['canonicalRevision'],
+    'DRAFT — LOCAL SCORING PREVIEW. Canonical revision: '+self.data['canonicalRevision'],
     'Per-game or per-start rates are multiplied by exposure exactly once. Roster probability and availability labels are metadata; neither applies another absence multiplier. Unallocated and unresolved forecasts have no fantasy score or rank.',
     'Availability is separate from forecast coverage. Unknown availability does not mean healthy. Team roles remain scenarios unless explicitly reviewed. Publication and application require the canonical owner workflow; exporting this guide does not activate a run.',
     'This artifact includes every canonical player. Workbook editorial rookie material is retained as separately sourced commentary. Source evidence and complete availability records remain in the canonical JSON and its review interface.'
@@ -189,7 +189,7 @@ class LeagueGuide(Guide):
   doc.set_toc(self.bookmarks);doc.set_metadata({'title':f'Citrus Draft Kit 2026-27 — {self.name}','author':'Citrus Fantasy Sports'})
   if self.data.get('canonicalRevision'):
    for page in doc:
-    if page.number==1 or 'DRAFT / CANONICAL' not in page.get_text():page.insert_text((185,749),'DRAFT / CANONICAL '+self.data['canonicalRevision'][:16]+' / NOT PUBLISHED',fontsize=6,color=(1,.42,.1))
+    if page.number==1 or 'DRAFT / CANONICAL' not in page.get_text():page.insert_text((185,749),'DRAFT / CANONICAL '+self.data['canonicalRevision'][:16]+' / LOCAL SCORING PREVIEW',fontsize=6,color=(1,.42,.1))
   path=Path(path);path.parent.mkdir(parents=True,exist_ok=True);doc.save(path,garbage=4,deflate=True)
   scoring_revision=hashlib.sha256(json.dumps(self.result['weights'],sort_keys=True,separators=(',',':')).encode()).hexdigest()
   manifest={'scoringIdentity':{'label':self.name,'weightsSha256':scoring_revision,'kind':'explicit_local_preview'},'canonicalRevision':self.data.get('canonicalRevision'),'publication':self.data.get('publication'),'pages':len(doc),'source':self.data['source'],'weights':self.result['weights'],'league':self.name,'featured':sorted(self.featured),'content':self.manifest,'sections':sections}

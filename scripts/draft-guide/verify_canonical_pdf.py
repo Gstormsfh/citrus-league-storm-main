@@ -98,7 +98,7 @@ def verify(path, data):
                           (p['line'] or '-') if p else '-', (p['powerPlay'] or '-') if p else '-']
                 assert actual_row == norm(' '.join(values)), ('team rendered score/ID', team['team'], values, actual_row)
             offset += len(slots); slot_count += len(slots)
-    stamp = 'DRAFT / CANONICAL ' + revision[:16] + ' / NOT PUBLISHED'
+    stamp = 'DRAFT / CANONICAL ' + revision[:16] + ' / LOCAL SCORING PREVIEW'
     for page in doc:
         footer = norm(page.get_text(clip=fitz.Rect(0, 735, 612, 754)))
         assert stamp in footer, ('missing draft/revision footer', page.number + 1)

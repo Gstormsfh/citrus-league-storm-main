@@ -51,7 +51,7 @@ function put(name,rows,widths={}){
  s.showGridLines=false;s.freezePanes.freezeRows(1);return s;
 }
 put('Read Me',[
- ['Citrus canonical export','DRAFT — NOT PUBLISHED'],
+ ['Citrus canonical export','DRAFT — LOCAL SCORING PREVIEW'],
  ['Canonical revision',d.canonicalRevision],['As of',c.as_of],['Season',c.season],
  ['Scoring label',x.league],['Initial scoring fingerprint',x.scoringHash],
  ['Authority','This workbook is an offline review export. Changes do not alter or approve canonical inputs.'],
