@@ -29,7 +29,7 @@
 //     the room continues to render with `#<id>` fallbacks.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CURRENT_SEASON } from '@citrus/shared';
+import { getCurrentSeason, getMetricsSeason } from '@citrus/shared';
 import { logger } from '@/utils/logger';
 import type { Player } from '@/services/PlayerService';
 
@@ -133,7 +133,8 @@ interface SeasonStatsRow {
 const n = (v: number | null | undefined): number => (typeof v === 'number' ? v : 0);
 
 /** Mutates `p` in place with the player's real season production. */
-function applySeasonStats(p: Player, s: SeasonStatsRow): void {
+function applySeasonStats(p: Player, s: SeasonStatsRow, season: number): void {
+  p.stats_season = season;
   // `wins !== null` is this file's goalie test — directoryRowToPlayer seeds
   // the four goalie counters to 0 for goalies and null for skaters.
   const isGoalie = p.wins !== null || p.saves !== null;
@@ -298,7 +299,7 @@ export function usePreloadedPlayers(): UsePreloadedPlayersResult {
             .select(
               'player_id, full_name, position_code, team_abbrev, jersey_number, headshot_url, is_goalie, eligible_positions',
             )
-            .eq('season', CURRENT_SEASON)
+            .eq('season', getCurrentSeason())
             .order('player_id', { ascending: true })
             .range(offset, offset + PAGE_SIZE - 1);
           if (cancelledRef.current) return;
@@ -376,6 +377,7 @@ export function usePreloadedPlayers(): UsePreloadedPlayersResult {
           };
         };
         try {
+          const statsSeason = getMetricsSeason();
           let statsOffset = 0;
           while (true) {
             const { data: statsData, error: statsErr } = await statsClient
@@ -383,7 +385,7 @@ export function usePreloadedPlayers(): UsePreloadedPlayersResult {
               .select(
                 'player_id, games_played, goalie_gp, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_toi_seconds, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_goals_against, nhl_shutouts, nhl_save_pct, nhl_gaa, x_goals',
               )
-              .eq('season', CURRENT_SEASON)
+              .eq('season', statsSeason)
               .order('player_id', { ascending: true })
               .range(statsOffset, statsOffset + PAGE_SIZE - 1);
             if (cancelledRef.current) return;
@@ -393,7 +395,7 @@ export function usePreloadedPlayers(): UsePreloadedPlayersResult {
             const statRows = (statsData ?? []) as SeasonStatsRow[];
             for (const s of statRows) {
               const player = map.get(String(s.player_id));
-              if (player) applySeasonStats(player, s);
+              if (player) applySeasonStats(player, s, statsSeason);
             }
             // Same ≤1000-row paging discipline as the directory above —
             // this table is 1,066 rows on staging and would otherwise be

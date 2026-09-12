@@ -73,6 +73,11 @@ vi.mock('@/integrations/supabase/client', () => ({
 }));
 
 import { usePreloadedPlayers } from '../usePreloadedPlayers';
+vi.mock('@citrus/shared', async importOriginal => ({
+  ...await importOriginal<typeof import('@citrus/shared')>(),
+  getCurrentSeason: () => 2026,
+  getMetricsSeason: () => 2025,
+}));
 
 function mkRow(player_id: number, full_name: string) {
   return {
@@ -363,6 +368,7 @@ describe('usePreloadedPlayers — season-stats merge', () => {
     expect(p?.assists).toBe(90);
     expect(p?.shots).toBe(306);
     expect(p?.games_played).toBe(82);
+    expect(p?.stats_season).toBe(2025);
   });
 
   it('queries player_season_stats as a separate table', async () => {
@@ -374,6 +380,8 @@ describe('usePreloadedPlayers — season-stats merge', () => {
 
     expect(fromMock).toHaveBeenCalledWith('player_directory');
     expect(fromMock).toHaveBeenCalledWith('player_season_stats');
+    expect(eqMock).toHaveBeenCalledWith('season', 2026);
+    expect(statsEqMock).toHaveBeenCalledWith('season', 2025);
   });
 
   it('leaves a player with no stats row at zero — they sort to the bottom', async () => {
