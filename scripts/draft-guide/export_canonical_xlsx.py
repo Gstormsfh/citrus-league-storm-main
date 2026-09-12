@@ -17,10 +17,11 @@ RUNTIME = Path.home() / '.cache/codex-runtimes/codex-primary-runtime/dependencie
 KEYS = ['goals','assists','power_play_points','short_handed_points','shots_on_goal','blocks','hits','penalty_minutes','wins','saves','shutouts','goals_against']
 
 
-def payload(canonical, editorial, revision, league='Citrus default scoring', weights=None, *, revision_preimage=None, runtime_run_id=None):
+def payload(canonical, editorial, revision, league='Citrus default scoring', weights=None, *, revision_preimage=None, runtime_run_id=None, runtime_activated_at=None):
     kwargs = {}
     if revision_preimage is not None: kwargs['revision_preimage'] = revision_preimage
     if runtime_run_id is not None: kwargs['runtime_run_id'] = runtime_run_id
+    if runtime_activated_at is not None: kwargs['runtime_activated_at'] = runtime_activated_at
     data = convert(canonical, editorial, revision, **kwargs)
     if weights is not None:
         for group in ('skater', 'goalie'):
@@ -80,11 +81,13 @@ put('Read Me',[
  ['Runtime run ID',edition.runtimeRunId??null],
  ['Source as of',edition.sourceAsOf??c.as_of],
  ['Runtime as of',edition.kind==='effective_runtime'?edition.asOf:null],
- ['Runtime refreshed at',edition.refreshedAt?`UTC ${edition.refreshedAt}`:null],
+ [edition.componentRepair?'Inherited model refresh at':'Runtime refreshed at',edition.refreshedAt?`UTC ${edition.refreshedAt}`:null],
  ['Exposure provenance','Source History keeps original full-season exposure and runtime remaining exposure separately. Displayed counts and FPTS use the labeled horizon.'],
+ ...(edition.activatedAt?[['Runtime activated at',`UTC ${edition.activatedAt}`]]:[]),
+ ...(edition.parentRuntimeRevision?[['Parent runtime revision',edition.parentRuntimeRevision]]:[]),
  ],{A:28,B:105});
-w.worksheets.getItem('Read Me').getRange('B2:B22').format.wrapText=true;
-w.worksheets.getItem('Read Me').getRange('A7:B22').format.rowHeight=48;
+w.worksheets.getItem('Read Me').getRange(`B2:B${22+(edition.activatedAt?1:0)+(edition.parentRuntimeRevision?1:0)}`).format.wrapText=true;
+w.worksheets.getItem('Read Me').getRange(`A7:B${22+(edition.activatedAt?1:0)+(edition.parentRuntimeRevision?1:0)}`).format.rowHeight=48;
 const sc=put('Scoring',[
  ['Scoring group','League',...x.keys],
  ['DRAFT',x.league],['Initial revision',d.canonicalRevision],['Weights below','Editable yellow cells'],
@@ -116,7 +119,7 @@ const history=[['Scope','Identity','Field','Source record']];
 for(const p of c.players){for(const s of p.sources)history.push(['Player',p.player_id,'source',JSON.stringify(s)]);history.push(['Player',p.player_id,'availability',JSON.stringify(p.availability)]);history.push(['Player',p.player_id,'exposure',JSON.stringify(p.exposure)]);history.push(['Player',p.player_id,'rates',JSON.stringify(p.rates)]);if(p.legacy_overrides?.length)history.push(['Player',p.player_id,'legacy_overrides',JSON.stringify(p.legacy_overrides)]);}
 if(edition.kind==='effective_runtime'){
  history.push(['Edition',edition.runtimeRevision,'runtime_identity',JSON.stringify(edition)]);
- for(const p of d.players){history.push(['Player',p.playerId,'full_season_exposure',JSON.stringify(p.canonicalExposure)]);history.push(['Player',p.playerId,'remaining_exposure',JSON.stringify(p.canonicalRemaining)]);}
+ for(const p of d.players){history.push(['Player',p.playerId,'full_season_exposure',JSON.stringify(p.canonicalExposure)]);history.push(['Player',p.playerId,'remaining_exposure',JSON.stringify(p.canonicalRemaining)]);if(p.canonicalRateComponents)history.push(['Player',p.playerId,'rate_components',JSON.stringify(p.canonicalRateComponents)]);}
 }
 for(const entry of c.review_history??[])history.push(['Revision',c.revision,'review_history',JSON.stringify(entry)]);
 put('Source History',history,{A:14,B:16,C:22,D:120}).getRange(`D2:D${history.length}`).format.wrapText=true;
@@ -151,11 +154,11 @@ await(await SpreadsheetFile.exportXlsx(w)).save(output);
 '''
 
 
-def export(canonical_path, editorial_path, revision, output, *, league='Citrus default scoring', weights=None, revision_preimage=None, runtime_run_id=None):
+def export(canonical_path, editorial_path, revision, output, *, league='Citrus default scoring', weights=None, revision_preimage=None, runtime_run_id=None, runtime_activated_at=None):
     output = Path(output).resolve()
     if output.exists() or output.suffix.lower() != '.xlsx':
         raise ValueError('Choose a new .xlsx output path')
-    x = payload(json.loads(Path(canonical_path).read_text()), json.loads(Path(editorial_path).read_text()), revision, league, weights, revision_preimage=revision_preimage, runtime_run_id=runtime_run_id)
+    x = payload(json.loads(Path(canonical_path).read_text()), json.loads(Path(editorial_path).read_text()), revision, league, weights, revision_preimage=revision_preimage, runtime_run_id=runtime_run_id, runtime_activated_at=runtime_activated_at)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='citrus-canonical-xlsx-') as folder:
         work = Path(folder)
@@ -167,9 +170,9 @@ def export(canonical_path, editorial_path, revision, output, *, league='Citrus d
 
 
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('canonical',type=Path);p.add_argument('--revision',required=True);p.add_argument('--editorial',type=Path,default=ROOT/'workbook-data.json');p.add_argument('--output',type=Path,required=True);p.add_argument('--settings',type=Path);p.add_argument('--league',default='Citrus default scoring');p.add_argument('--revision-preimage',type=Path);p.add_argument('--runtime-run-id');a=p.parse_args()
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('canonical',type=Path);p.add_argument('--revision',required=True);p.add_argument('--editorial',type=Path,default=ROOT/'workbook-data.json');p.add_argument('--output',type=Path,required=True);p.add_argument('--settings',type=Path);p.add_argument('--league',default='Citrus default scoring');p.add_argument('--revision-preimage',type=Path);p.add_argument('--runtime-run-id');p.add_argument('--runtime-activated-at');a=p.parse_args()
     settings=json.loads(a.settings.read_text()) if a.settings else None
-    print(export(a.canonical,a.editorial,a.revision,a.output,league=a.league,weights=settings.get('weights',settings) if settings else None,revision_preimage=a.revision_preimage.read_text() if a.revision_preimage else None,runtime_run_id=a.runtime_run_id))
+    print(export(a.canonical,a.editorial,a.revision,a.output,league=a.league,weights=settings.get('weights',settings) if settings else None,revision_preimage=a.revision_preimage.read_text() if a.revision_preimage else None,runtime_run_id=a.runtime_run_id,runtime_activated_at=a.runtime_activated_at))
 
 
 if __name__=='__main__':main()

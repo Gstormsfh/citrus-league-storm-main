@@ -175,8 +175,11 @@ class LeagueGuide(Guide):
     'Parent source revision: '+edition['parentSourceRevision'],
     'Runtime revision: '+edition['runtimeRevision'],
     'Runtime run ID: '+edition['runtimeRunId'],
+    *(['Parent runtime revision: '+edition['parentRuntimeRevision']] if edition.get('parentRuntimeRevision') else []),
+    *(['Activated at: '+edition['activatedAt']] if edition.get('activatedAt') else []),
+    *(['Component repair metadata: '+json.dumps(edition['componentRepair'],sort_keys=True,ensure_ascii=False)] if edition.get('componentRepair') else []),
     'As of: '+edition['asOf']+'. Horizon: '+edition['horizon']+'.',
-    'Refreshed at: '+str(edition.get('refreshedAt') or 'not supplied')+'. Parent source as of: '+str(edition.get('sourceAsOf') or 'not supplied')+'.',
+    ('Inherited model refresh: ' if edition.get('componentRepair') else 'Refreshed at: ')+str(edition.get('refreshedAt') or 'not supplied')+'. Parent source as of: '+str(edition.get('sourceAsOf') or 'not supplied')+'.',
     'Ranked GP/starts, category totals and fantasy points cover the remaining season. Parent source full-season exposure is separate provenance, not additional remaining workload. Rates are multiplied by remaining exposure exactly once.',
     'Availability remains separate from forecast coverage. Roster probability does not apply another absence multiplier. Unallocated and unresolved forecasts have no fantasy score or rank. Team roles and editorial notes retain their source dates and review status.'
    ])
