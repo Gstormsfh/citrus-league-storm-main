@@ -1,7 +1,8 @@
 {
   "image": "public.ecr.aws/supabase/postgres:17.6.1.159",
+  "migration_count": 5,
   "checks": [
-    "Full production public schema and all four transactional migrations loaded",
+    "Full production public schema and all prepared transactional migrations loaded",
     "Real 35-category catalog + league FK/trigger path repairs drift, resets defaults and retains explicit zero/negative fractions",
     "No active canonical run executes both real legacy writers",
     "Atomic publication preserves fractional starts and ROS/daily category, points and revision identity",
@@ -18,7 +19,8 @@
     "supabase/migrations/20260912073140_canonical_projection_runs.sql": "6a2092e4a93d029ce4ae7c9de4a19c2f817f8cb3c0dc2d8957b25253ca900e92",
     "supabase/migrations/20260912073240_canonical_projection_materialization.sql": "f9202da5ecc849d4b32a078e63b50ac9d9495423328a47424099877b2c08e216",
     "supabase/migrations/20260912073340_canonical_projection_refresh.sql": "157572aeebc22de75b1ff0915b5f070c4d4f62a1507306d8c4443c45775950ac",
-    "supabase/migrations/20260912073440_scoring_rules_replace_removed_keys.sql": "184040fe215bf46a0fdecb7ed774c5d666aac73904a4cb48b49b00c895f6a519"
+    "supabase/migrations/20260912073440_scoring_rules_replace_removed_keys.sql": "184040fe215bf46a0fdecb7ed774c5d666aac73904a4cb48b49b00c895f6a519",
+    "supabase/migrations/20260912073540_canonical_projection_write_boundary.sql": "625ef55720681de6ce472ce11b01245c094420cc56f70b8b2310c183ddbaa439"
   },
   "alignment_columns": 10,
   "server_version": "17.6",
@@ -103,7 +105,7 @@
     }
   ],
   "refresh": {
-    "revision": "c7797fd38a35f284f0f33514d5f9a34230aaa874c22594ab5e779c350bbb5817",
+    "revision": "420c3709bafbbe83ef9caf3da5ebbd411a7f38636d4b7945ee77abdd121ce0b4",
     "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "last_refresh_status": "success"
   }

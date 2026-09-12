@@ -1,0 +1,84 @@
+{
+  "affected_leagues": 4,
+  "scores": [
+    {
+      "name": "Local rescore 1",
+      "team1": 12.0,
+      "team2": 6.0,
+      "week": 1
+    },
+    {
+      "name": "Local rescore 1",
+      "team1": 99,
+      "team2": 99,
+      "week": 2
+    },
+    {
+      "name": "Local rescore 2",
+      "team1": 0.0,
+      "team2": 0.0,
+      "week": 1
+    },
+    {
+      "name": "Local rescore 3",
+      "team1": -4.0,
+      "team2": -2.0,
+      "week": 1
+    },
+    {
+      "name": "Local rescore 4",
+      "team1": 1.5,
+      "team2": 0.5,
+      "week": 1
+    },
+    {
+      "name": "Local rescore 5",
+      "team1": 99,
+      "team2": 99,
+      "week": 1
+    }
+  ],
+  "point_calibrations": true,
+  "source_json": {
+    "Local rescore 2": {
+      "skater": {
+        "goals": 0
+      }
+    },
+    "Local rescore 1": null,
+    "Local rescore 3": {
+      "skater": {
+        "goals": -2
+      }
+    },
+    "Local rescore 4": {},
+    "Local rescore 5": {}
+  },
+  "scope": "Isolated full-schema PostgreSQL; actual read-only-exported scoring functions/view, synthetic leagues/rosters/stats; transaction rolled back, no production writes",
+  "rollback_function_fingerprint": "3844a9b1367be3ee5f164055f5381cbe",
+  "rollback_fingerprints": {
+    "leagues": "25e40fba5bb7819ed79c15604d4e9026",
+    "league_scoring_rules": "509c78288050da5a018d047941d65b10",
+    "matchups": "d41d8cd98f00b204e9800998ecf8427e",
+    "fantasy_matchup_lines": "d41d8cd98f00b204e9800998ecf8427e",
+    "fantasy_daily_rosters": "d41d8cd98f00b204e9800998ecf8427e",
+    "teams": "d41d8cd98f00b204e9800998ecf8427e",
+    "player_game_stats": "4bb3a6da1753e92cda92e98b22e8f748",
+    "nhl_games": "9744608886237d186c54cda49bc0e9b4"
+  },
+  "files": {
+    "data-pipeline/tests/rehearsal/production-scoring-functions-20260912.sql": "20a0d51e971440fbebab1b1d7fd89cf17ba3396e6ede8e72c1800fd94ad5daa2",
+    "data-pipeline/tests/rehearsal/production-scoring-view-20260912.sql": "9377a045445468d6083467ca5f1fb30f0fd5992b4ceca11b7d4d3ff5d9e28a59",
+    "scripts/release/scoring-rescore/capture.sql": "816583a099275766487b3e66451cc777b8f3c31e8517326e134c923a0873e716",
+    "supabase/migrations/20260912073440_scoring_rules_replace_removed_keys.sql": "184040fe215bf46a0fdecb7ed774c5d666aac73904a4cb48b49b00c895f6a519",
+    "scripts/release/scoring-rescore/rescore.sql": "bdcb243fd00aba66f45789758c05cb62bb11b3926e2d7bc787ab552975595c5c"
+  },
+  "checks": [
+    "Exact capture\u2192073440\u2192rescore composition under REPEATABLE READ",
+    "Real v2 points scorer + persisted line verifier calibrate",
+    "Real categories scorer gives 1.5\u20130.5, not fantasy points",
+    "Null/default, explicit zero/negative and source JSON preserved",
+    "Unaffected league and future matchup unchanged",
+    "Entire transaction rollback restores original table contents"
+  ]
+}

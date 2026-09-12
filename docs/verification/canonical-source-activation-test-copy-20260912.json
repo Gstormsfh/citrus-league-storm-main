@@ -3,10 +3,10 @@
   "validation": {
     "valid": true,
     "errors": [],
-    "checked_at": "2026-09-12T08:48:51.874995+00:00"
+    "checked_at": "2026-09-12T09:09:56.862255+00:00"
   },
   "activation": {
-    "run_id": "b84d3625-492c-4cd9-a653-fc3a56d207af",
+    "run_id": "25e7e9e8-ac59-4175-9caa-f364fac77ad6",
     "season": 2026,
     "revision": "ac6291b9e51d269ddb6e4aca35016130aa1d3b90c564a21cb1a23d73d4483612",
     "readiness": "published"
@@ -37,13 +37,13 @@
   "source_players_teams_schedule_unchanged": true,
   "original_draft_bytes_unchanged": true,
   "rollback_fingerprints": {
-    "canonical_projection_active": "e7da2aa74d0d98abc4ea8000da023a20",
-    "canonical_projection_runs": "7190ea76df9447dc6785e1424fe989e0",
-    "canonical_projection_players": "b6576b28c977bf430adae322a986363e",
-    "player_ros_projections": "43859964a78769076be25708dfd68e2e",
-    "player_projected_stats": "7b17ee5be343952b71e4c0654f7396e2",
-    "player_directory": "65c95323397a807345f2da837378362a",
-    "nhl_games": "9744608886237d186c54cda49bc0e9b4"
+    "canonical_projection_active": "ea298754e780a75cdc2d00c3a321b8c8",
+    "canonical_projection_runs": "661e1b1a4db99988abce00cfcd65d7bf",
+    "canonical_projection_players": "2fdaeabc7726e8021dcd14edd95f780b",
+    "player_ros_projections": "b2921d251d1157636731c840cbe26d6d",
+    "player_projected_stats": "153a64f99606234b112569ac93f873aa",
+    "player_directory": "fe7f8edc11a6216a935c37905e9afa16",
+    "nhl_games": "a7271d46902634e2e450f48debde7dff"
   },
   "checks": [
     "All projected player IDs and exposure match source",
@@ -56,5 +56,12 @@
   "source_sha256": "d2ee0bc9d55231b0541ba10f3c114c253f57c252923f41ad834967a595e111fa",
   "directory_rows": 1312,
   "regular_games": 1344,
-  "scope": "Isolated local rollback-only rehearsal; test copy is not human approval, original remains DRAFT, no production write"
+  "scope": "Isolated local rollback-only rehearsal; test copy is not human approval, original remains DRAFT, no production write",
+  "migration_sha256": {
+    "20260912073140_canonical_projection_runs.sql": "6a2092e4a93d029ce4ae7c9de4a19c2f817f8cb3c0dc2d8957b25253ca900e92",
+    "20260912073240_canonical_projection_materialization.sql": "f9202da5ecc849d4b32a078e63b50ac9d9495423328a47424099877b2c08e216",
+    "20260912073340_canonical_projection_refresh.sql": "157572aeebc22de75b1ff0915b5f070c4d4f62a1507306d8c4443c45775950ac",
+    "20260912073440_scoring_rules_replace_removed_keys.sql": "184040fe215bf46a0fdecb7ed774c5d666aac73904a4cb48b49b00c895f6a519",
+    "20260912073540_canonical_projection_write_boundary.sql": "625ef55720681de6ce472ce11b01245c094420cc56f70b8b2310c183ddbaa439"
+  }
 }

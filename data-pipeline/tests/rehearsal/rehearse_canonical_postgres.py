@@ -16,7 +16,7 @@ def command(args,input=None):
 def run(container):
  def sql(s):return command(['docker','exec','-i',container,'psql','-U','postgres','-d','postgres','-v','ON_ERROR_STOP=1','-At'],s).strip()
  def query(s):return json.loads(sql(s))
- report={'image':IMAGE,'checks':[],'files':{}}
+ report={'image':IMAGE,'migration_count':len(MIGRATIONS),'checks':[],'files':{}}
  snapshot=ROOT/'supabase/schema/production_snapshot_20260813.sql'
  sql(snapshot.read_text())
  alignment=command([sys.executable,str(HERE/'align-production-columns.py'),container]);sql(alignment)
@@ -35,7 +35,7 @@ def run(container):
   sql('BEGIN;\n'+path.read_text()+'\nCOMMIT;')
  for path in [snapshot,HERE/'production-functions-20260912.sql',HERE/'production-columns-20260912.json',HERE/'production-stat-catalog-20260912.json',*MIGRATIONS]:report['files'][str(path.relative_to(ROOT))]=hashlib.sha256(path.read_bytes()).hexdigest()
  report['alignment_columns']=alignment.count('ADD COLUMN')
- report['checks'].append('Full production public schema and all four transactional migrations loaded')
+ report['checks'].append('Full production public schema and all prepared transactional migrations loaded')
  assert query("select scoring_settings from leagues where id='00000000-0000-0000-0000-000000000012';")=={'skater':{'goals':2}}
  assert float(sql("select multiplier from league_scoring_rules where league_id='00000000-0000-0000-0000-000000000012' and stat_key='shots_on_goal';"))==0
  sql("update leagues set scoring_settings=null where id='00000000-0000-0000-0000-000000000012';")
