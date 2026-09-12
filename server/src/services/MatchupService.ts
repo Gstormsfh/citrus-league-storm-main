@@ -1410,9 +1410,16 @@ export class MatchupService {
 
   /** Get daily projections for players on a date */
   async getDailyProjections(playerIds: number[], targetDate: string) {
-    const { data, error } = await this.supabase.rpc('get_daily_projections', {
-      p_player_ids: playerIds,
-      p_target_date: targetDate,
+    // The legacy RPC omits plus/minus and coalesces missing categories to
+    // zero. Read the canonical materialization directly so league scoring
+    // receives signed counts and can distinguish unavailable from zero.
+    if (!playerIds.length) return { projMap: new Map<number, Record<string, unknown>>(), error: null };
+    const { data, error } = await pagedSelect<Record<string, unknown>>(this.supabase, {
+      table: 'player_projected_stats',
+      columns: 'player_id,game_id,projection_date,season,projected_goals,projected_assists,projected_sog,projected_blocks,projected_ppp,projected_shp,projected_hits,projected_pim,projected_plus_minus,projected_xg,total_projected_points,base_ppg,shrinkage_weight,finishing_multiplier,opponent_adjustment,b2b_penalty,home_away_adjustment,confidence_score,calculation_method,opponent_team_id,opponent_abbrev,is_home_game,matchup_difficulty,injury_status,game_start_time,projected_wins,projected_saves,projected_shutouts,projected_goals_against,projected_gaa,projected_save_pct,projected_gp,starter_confirmed,is_goalie,projection_mean,projection_std_dev,projection_ci_lower,projection_ci_upper,projection_ci_50_lower,projection_ci_50_upper,projection_median,dynamic_confidence,likely_low,likely_high,confidence_label',
+      filters: [['projection_date', targetDate]],
+      inFilters: [['player_id', playerIds]],
+      orderBy: ['player_id', 'game_id'],
     });
 
     const projMap = new Map<number, Record<string, unknown>>();

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { summarizeWeeklyProjection } from '../weeklyProjection';
+import finalsz from '../../../../../../packages/shared/src/leagueProjection/__tests__/fixtures/finalsz-scoring.json';
 
 const league = {
   goalie: { wins: 4, saves: 0.2, goals_against: -1, shutouts: 3 },
@@ -139,5 +140,26 @@ describe('free-agent weekly goalie contract', () => {
 
   it('distinguishes no projection data from an explicit zero projection', () => {
     expect(summarizeWeeklyProjection([], league, true)).toBeNull();
+  });
+
+  it.each([2, 0.5])('scores signed weekly plus/minus at weight %s and withholds missing enabled categories', weight => {
+    const row = { projected_goals: 0.5, projected_assists: 0.5, projected_plus_minus: -0.25 };
+    const scoring = { skater: { goals: 6, plus_minus: weight } };
+    expect(summarizeWeeklyProjection([row, row], scoring, false)?.points).toBe(6 - 0.5 * weight);
+    expect(summarizeWeeklyProjection([{ ...row, projected_plus_minus: 0 }], scoring, false)?.points).toBe(3);
+    expect(summarizeWeeklyProjection([{ ...row, projected_plus_minus: undefined }], scoring, false)).toBeNull();
+    expect(summarizeWeeklyProjection([{ ...row, projected_plus_minus: undefined }], { skater: { goals: 6 } }, false)?.points).toBe(3);
+  });
+
+  it('preserves the saved Finalsz plus/minus category while Test night9th leaves it disabled', () => {
+    const row = { projected_goals: 1, projected_assists: 1, projected_sog: 2,
+      projected_blocks: 1, projected_hits: 1, projected_pim: 0,
+      projected_ppp: 0, projected_shp: 0, projected_plus_minus: -2 };
+    const testNight = { skater: { goals: 6, assists: 4, shots_on_goal: 0.9, blocks: 1 },
+      goalie: { wins: 5, saves: 0.6, shutouts: 5, goals_against: -3 } };
+    expect(summarizeWeeklyProjection([row], finalsz, false)?.points).toBeCloseTo(5.5);
+    expect(summarizeWeeklyProjection([{ ...row, projected_plus_minus: 0 }], finalsz, false)?.points).toBeCloseTo(6.5);
+    expect(summarizeWeeklyProjection([{ ...row, projected_plus_minus: null }], finalsz, false)).toBeNull();
+    expect(summarizeWeeklyProjection([{ ...row, projected_plus_minus: null }], testNight, false)?.points).toBeCloseTo(12.8);
   });
 });

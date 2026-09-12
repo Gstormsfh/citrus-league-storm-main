@@ -27,11 +27,14 @@ export function summarizeWeeklyProjection(rows: Record<string, unknown>[], scori
       projected_sog: stats.sog, projected_blocks: stats.blocks,
       projected_hits: stats.hits, projected_pim: stats.pim,
       projected_ppp: stats.ppp, projected_shp: stats.shp,
+      projected_plus_minus: stats.plus_minus,
       projected_wins: stats.wins, projected_saves: stats.saves,
       projected_shutouts: stats.shutouts, projected_goals_against: stats.goals_against,
     }).map(([key, value]) => [key, value * multiplier])));
   }
-  return { points: projectedSummary(normalized, scoring, goalie).points,
+  const points = projectedSummary(normalized, scoring, goalie).points;
+  if (points === null) return null;
+  return { points,
     expectedStarts: goalie ? expectedStarts : null, teamGames: rows.length };
 }
 

@@ -408,17 +408,23 @@ describe('MatchupService', () => {
   });
 
   describe('getDailyProjections', () => {
-    it('returns projections map via RPC', async () => {
+    it('reads signed and missing daily categories directly without the legacy RPC', async () => {
       const projections = [
-        { player_id: 1, xG: 0.5, xA: 0.3 },
-        { player_id: 2, xG: 0.2, xA: 0.8 },
+        { player_id: 1, projected_plus_minus: -0.25 },
+        { player_id: 2, projected_plus_minus: null },
+        { player_id: 3, projected_plus_minus: 0 },
       ];
-      mockSupabase.rpc = vi.fn().mockResolvedValue({ data: projections, error: null });
+      const chain = createChain({ data: projections, error: null });
+      mockSupabase.from = vi.fn(() => chain);
 
-      const result = await service.getDailyProjections([1, 2], '2026-01-15');
+      const result = await service.getDailyProjections([1, 2, 3], '2026-01-15');
 
-      expect(result.projMap.get(1)).toEqual({ player_id: 1, xG: 0.5, xA: 0.3 });
-      expect(result.projMap.size).toBe(2);
+      expect([...result.projMap.values()]).toEqual(projections);
+      expect(mockSupabase.rpc).not.toHaveBeenCalled();
+      expect(mockSupabase.from).toHaveBeenCalledWith('player_projected_stats');
+      expect(chain.select.mock.calls[0][0].split(',')).toContain('projected_plus_minus');
+      expect(chain.eq).toHaveBeenCalledWith('projection_date', '2026-01-15');
+      expect(chain.in).toHaveBeenCalledWith('player_id', [1, 2, 3]);
     });
 
     it('returns empty map when no projections', async () => {
@@ -427,6 +433,28 @@ describe('MatchupService', () => {
       const result = await service.getDailyProjections([1], '2026-01-15');
 
       expect(result.projMap.size).toBe(0);
+    });
+
+    it('returns a reader failure instead of an apparent empty successful projection', async () => {
+      mockSupabase.from = vi.fn(() => createChain({ data: null, error: { message: 'read failed' } }));
+      const result = await service.getDailyProjections([1], '2026-01-15');
+      expect(result.error).toEqual({ message: 'read failed' });
+      expect(result.projMap.size).toBe(0);
+    });
+
+    it('preserves canonical goalie volumes and exposes fractional starts without weighting twice', async () => {
+      const row = {
+        player_id: 8482193, is_goalie: true, calculation_method: 'canonical_expected_volume_v1',
+        projected_gp: 2 / 84, projected_saves: 0.6626340017164704,
+        projected_wins: 0.014047662392828968, projected_shutouts: 0.0004438549495895209,
+        projected_goals_against: 0.049694936412577044,
+      };
+      mockSupabase.from = vi.fn(() => createChain({ data: [row], error: null }));
+      const result = await service.getDailyProjections([8482193], '2026-09-29');
+      expect(result.projMap.get(8482193)).toEqual({
+        ...row, projection_basis: 'unconditional', expected_starts: 2 / 84,
+        start_probability: 2 / 84, availability_source: 'canonical_crease_share',
+      });
     });
   });
 
