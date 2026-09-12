@@ -30,3 +30,9 @@ Run the existing importing/calculation suites against the edited 8265 checkout: 
 Initial attempt: bundled runtime and system Python have no pytest installed; no tests ran in that attempt. The selected suites use pytest functions/classes and fixtures, so unittest discovery is not an equivalent runner. No existing pytest runtime was identified and no dependencies were installed for these narrow removals. Focused runtime tests remain **blocked by missing pytest**; do not interpret AST compilation as a test-suite pass.
 
 No source-guide dataset, generated PDF, UI, migration, job, live cache, or production setting was modified by this bounded retirement.
+
+## Integrated validation follow-up
+
+Reconciliation integrated93e382fe as46004a7b and reported all66 focused Python tests passing in an isolated temporary virtual environment, plus all8 retirement SQL guard tests. This closes the earlier local pytest-runtime limitation; it does not certify unobserved external imports or a production deployment. The owner's comment-only follow-up also removes the stale module header claim that this module writes projection_cache.
+
+Actual-backup full-schema quarantine/inverse also passed in isolated PostgreSQL17.6:1461rows and original content hash retained; table OID, schema objects, fixture ACL/RLS and valid NHL FKs preserved. Proof: `/Users/gstorms/.codex/worktrees/4304/citrus/docs/verification/cache-retirement-full-schema-20260912.json`. Production release/external-client approval is still separate.
