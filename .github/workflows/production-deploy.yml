@@ -27,15 +27,23 @@ jobs:
 
       - run: npm ci
 
+      # The step below can refuse this deploy, so it is typechecked before it
+      # is trusted. It compiles clean only under `strict`; tsconfig.scripts.json
+      # explains why that is not optional here.
+      - name: Type check (deploy gate scripts)
+        run: npx tsc -p tsconfig.scripts.json
+
       # ── Change freeze guard ─────────────────────────────────────────
-      # Blocks production deploys within 24 hours of any scheduled live
-      # draft. See docs/LIVE_DRAFT_DISASTER_POSTMORTEM.md §4 — ten deploys
-      # in 2.5 hours before the inaugural draft is how a combination of
-      # latent bugs became a production incident.
+      # Refuses a production deploy during a live draft, or within HARD_HOURS
+      # (4) of a scheduled one; warns from there out to WARN_HOURS (24).
+      # See docs/LIVE_DRAFT_DISASTER_POSTMORTEM.md §4 — ten deploys in the 2.5
+      # hours before the inaugural draft is how a pile of latent bugs became a
+      # production incident, and the 4h hard window is sized to cover that
+      # documented span with margin on both sides.
       #
       # Emergency bypass: set OVERRIDE_DRAFT_FREEZE=1 in the workflow env.
       # Must be justified in the commit message.
-      - name: Change freeze guard (24h before any scheduled draft)
+      - name: Change freeze guard (live draft, or 4h before a scheduled one)
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
