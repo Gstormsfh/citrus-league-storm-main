@@ -29,8 +29,8 @@ jobs:
         shell: bash
         run: python scripts/ops/check_projection_outputs.py 2>&1 | tee /tmp/nightly.log
 
-      # One row in public.ops_ci_runs (last line of the batch output as the
-      # summary) so Claude can see whether last night's batch ran, through the
+      # One row in public.ops_ci_runs (last line of the health-check output as
+      # the summary) records whether this read-only projection check ran, through the
       # Supabase MCP. Never fails the job. See docs/RUNBOOKS/CI_TELEMETRY.md.
       - name: Report run
         if: always()

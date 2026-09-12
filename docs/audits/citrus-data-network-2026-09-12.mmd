@@ -6,7 +6,11 @@ flowchart TB
     META["player_directory + nhl_games [R/P]"]
     SHOT["nhl_shots: shot-event features"]
     NHL --> ING --> FACT
-    NHL -. "host / regular schedule import not fully verified" .-> META
+    DIRJOB["GitHub roster/discovery refresh [observed run]<br/>player_directory only"]
+    REPAIR["GitHub conditional shot repair [observed run]<br/>raw_nhl_data → legacy raw_shots; not nhl_shots"]
+    NHL --> DIRJOB --> META
+    NHL -->|"conditional PBP refetch; successful run does not prove healing"| REPAIR
+    NHL -. "regular nhl_games schedule import host unverified" .-> META
     ING -. "shot extractor trigger unverified" .-> SHOT
   end
   subgraph Models[Observed SQL projection paths]
@@ -39,7 +43,7 @@ flowchart TB
     DAILY --> API
     API --> CACHE --> CARD
     API --> APPKIT
-    FACT -->|"Draft v2 direct browser actuals read [R]"| CARD
+    API -->|"V2 shared index replaces direct browser reader locally at73b642bb"| CARD
   end
   subgraph ActualMatchup[Actual earned matchup points / repository trace]
     ELIG["League rules + matchup period + frozen eligible starters"]

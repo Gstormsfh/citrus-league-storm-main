@@ -15,7 +15,11 @@ flowchart TB
     META["player_directory + nhl_games [R/P]"]
     SHOT["nhl_shots: shot-event features"]
     NHL --> ING --> FACT
-    NHL -. "host / regular schedule import not fully verified" .-> META
+    DIRJOB["GitHub roster/discovery refresh [observed run]<br/>player_directory only"]
+    REPAIR["GitHub conditional shot repair [observed run]<br/>raw_nhl_data → legacy raw_shots; not nhl_shots"]
+    NHL --> DIRJOB --> META
+    NHL -->|"conditional PBP refetch; successful run does not prove healing"| REPAIR
+    NHL -. "regular nhl_games schedule import host unverified" .-> META
     ING -. "shot extractor trigger unverified" .-> SHOT
   end
   subgraph Models[Observed SQL projection paths]
@@ -48,7 +52,7 @@ flowchart TB
     DAILY --> API
     API --> CACHE --> CARD
     API --> APPKIT
-    FACT -->|"Draft v2 direct browser actuals read [R]"| CARD
+    API -->|"V2 shared index replaces direct browser reader locally at73b642bb"| CARD
   end
   subgraph ActualMatchup[Actual earned matchup points / repository trace]
     ELIG["League rules + matchup period + frozen eligible starters"]
@@ -163,3 +167,11 @@ Owner evidence: [projection serving/archive audit](/Users/gstorms/.codex/worktre
 Before any runtime retirement, collect deployed host task/service commands and recent runs, then current database function/view/trigger/foreign-key/grant/publication dependencies. Archive one proven local candidate per reversible change and run its affected contracts. Database retirement needs a concrete restore/compatibility plan and separate review; no `CASCADE` shortcut.
 
 Open proof gaps: current regular-season schedule importer; current shot-extractor trigger; external Python/Windows invocation; deployed API commit; exact archive Git SHA; source-level outcomes behind caught SQL exceptions; complete advanced-metric field lineage; failed-news-feed causes. These are explicit unknown edges, not assumed dead silos.
+
+## Subsequent observed scheduler evidence
+
+[GitHub execution proof](scheduler-execution-proof-2026-09-12.md) establishes successful September11 health-check, player-directory and conditional raw-shot-repair runs at exact commit6439b2ad. The graph now resolves the directory trigger while retaining the separate unknown regular schedule and ordinary first-party extractor hosts. Reported run times are observed; configured cadences are not freshness guarantees. Integrated consumer reviews are tracked separately because runtime changes are still moving.
+
+## Integrated reader and actual-score proof
+
+[Integrated V2 review](integrated-v2-review-2026-09-12.md) confirms the duplicate browser reader was retired locally in73b642bb and the subsequent publication-error/auto-draft corrections pass121 focused follow-up tests. [Matchup review](integrated-matchup-review-2026-09-12.md) records partial fixes and exact remaining card/upstream-count/scoring-revision gates against later working-tree fingerprints; it does not claim complete actual-score convergence or measured performance gains. [Local retirement proof](local-retirement-proof-2026-09-12.md) separates completed reader/text cleanup from unresolved external execution. Production API traffic is now independently observed at revisioncitrus-api-00310-q6p, commit label6aef8ab7, as detailed in the scheduler proof; local later commits are not a deployment.

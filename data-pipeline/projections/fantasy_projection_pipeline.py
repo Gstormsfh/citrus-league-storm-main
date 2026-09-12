@@ -3,14 +3,16 @@
 # CATEGORY: UNWIRED — do not run without reading the note below
 # Purpose:     Top-level fantasy projection pipeline orchestrator (physical → fantasy translation)
 # Last active: 2026-03-08
-# Invoked:     NOTHING. Verified 2026-08-12 across .github/workflows and all of
+# Invoked:     No checked-in caller found. External/manual invocation unverified.
+#              Verified 2026-08-12 across .github/workflows and all of
 #              data-pipeline: no workflow runs it and no module imports it. The
 #              previous header claimed "imported by nightly_projection_batch.py +
 #              run_daily_projections.py" — both of those import
 #              calculate_daily_projections instead. The stale ACTIVE label is the
 #              dangerous part: it invites someone to trust and run this.
 # Reads:       raw_shots  ← RETIRED. See note.
-# Writes:      fantasy_matchup_lines
+# Writes:      None. update_all_projections only queries games and logs a
+#              placeholder; it does not persist fantasy_matchup_lines.
 #
 # NOTE (2026-08-12): get_player_xg_per_game() reads public.raw_shots and prefers
 # shooting_talent_adjusted_xg. raw_shots is the retired third-party import whose
@@ -437,13 +439,10 @@ def update_all_projections(
     player_xg: Dict[int, float]
 ):
     """
-    Update all projections in the projections table with GSAx adjustments.
-    
-    This is a high-level function that:
-    1. Fetches all games from nhl_games table
-    2. For each game, identifies teams and goalies
-    3. Calculates adjusted projections
-    4. Updates projections table
+    Historical placeholder: query games and log the unimplemented update step.
+
+    This function does not calculate or persist matchup projections. The
+    arguments describe the intended design, not an active output writer.
     
     Args:
         goalie_factors: Dictionary mapping goalie_id to goalie_factor
@@ -495,4 +494,3 @@ if __name__ == "__main__":
         logger.info("2. Pass team rosters, goalie IDs, and the lookup dictionaries")
         logger.info("3. Update projections table with adjusted values")
         logger.info("\nNote: Full integration requires team roster and goalie assignment data")
-
