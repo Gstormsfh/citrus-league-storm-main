@@ -48,8 +48,11 @@ import {
   type ScoresGameDetailResponse,
   type ScoresPlayerActuals,
   type ScoresPlayerLine,
+  // Root, not the /leagueProjection subpath: the server's vitest alias points
+  // at src/index.ts, so a subpath import resolves to index.ts/leagueProjection.
+  scoreProjectedStats,
+  type ProjectedStatRow,
 } from '@citrus/shared';
-import { scoreProjectedStats, type ProjectedStatRow } from '@citrus/shared/leagueProjection';
 import { pagedSelect } from '../lib/pagedSelect';
 
 // ── Column lists. Explicit, never `*`. ──────────────────────────────────

@@ -11,12 +11,17 @@ import {
   secondsRemaining,
 } from '@citrus/shared';
 import type { LeagueScoreboardMatchup } from '@citrus/shared';
-import { ScoringCalculator } from '@citrus/shared';
+// The package ROOT, not the /leagueProjection subpath: server/vitest.config.ts
+// aliases '@citrus/shared' straight at src/index.ts, so a subpath import
+// resolves to `index.ts/leagueProjection` and every suite that reaches this
+// file dies with ENOTDIR. tsc resolves the subpath through package exports
+// and says nothing, which is how it got past a clean typecheck.
 import {
+  ScoringCalculator,
   projectionSettings,
   scoreProjectedStats,
   type ProjectedStatRow,
-} from '@citrus/shared/leagueProjection';
+} from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { pagedSelect } from '../lib/pagedSelect';
 
