@@ -1,6 +1,8 @@
+import { CanonicalProjectionService } from './CanonicalProjectionService';
 import { SupabaseClient } from '@supabase/supabase-js';
 import {
   getCurrentSeason,
+  parseEligiblePositions,
   getProjectionsSeason,
   getMetricsSeason,
   logger,
@@ -121,6 +123,8 @@ interface TalentRow {
 }
 
 interface RosRow {
+  projection_run_id?: string | null;
+  projection_revision?: string | null;
   player_id: number;
   games_remaining: number | null;
   total_projected_points: number | null;
@@ -173,6 +177,8 @@ const INDEX_GSAX_COLS =
 // 2-minute in-process cache, same TTL philosophy as PlayerService:
 // short enough to surface nightly-pipeline refreshes, long enough to
 // absorb a browse session's re-fetches.
+let indexRevisionKey = '';
+let indexGeneration = 0;
 let indexCache: { season: number; data: DashboardIndexEntry[]; timestamp: number } | null = null;
 const CACHE_TTL_MS = 2 * 60 * 1000;
 
@@ -288,6 +294,8 @@ async function selectAllPaged<T>(
 
 /** Test hook — clears the module-level cache between tests. */
 export function clearDashboardIndexCache(): void {
+  indexGeneration++;
+  indexRevisionKey = '';
   indexCache = null;
   indexInFlight = null;
 }
@@ -765,6 +773,32 @@ export class PlayerDashboardService {
    * curated directory, ~1–2k rows, and cached).
    */
   async getDashboardIndex(): Promise<{ players: DashboardIndexEntry[]; error: Error | null }> {
+    const canonical = new CanonicalProjectionService(this.supabase);
+    let lastIndex: { players: DashboardIndexEntry[]; error: Error | null } = { players: [], error: null };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const contexts = await canonical.getPublishedContexts(getProjectionsSeason());
+      const first = contexts.values().next().value;
+      const revisionKey = first ? `${first.run_id}:${first.revision}` : '';
+      if (indexRevisionKey !== revisionKey) {
+        clearDashboardIndexCache();
+        indexRevisionKey = revisionKey;
+      }
+      const index = await this.getBaseDashboardIndex(Boolean(revisionKey));
+      lastIndex = index;
+      const after = await canonical.getPublishedContexts(getProjectionsSeason());
+      const published = after.values().next().value;
+      if ((published ? `${published.run_id}:${published.revision}` : '') !== revisionKey) continue;
+      return { ...index, players: index.players.map(player => {
+        const context = contexts.get(String(player.id)) ?? null;
+        const matches = context && context.status === 'projected' && player.projection_run_id === context.run_id && player.projection_revision === context.revision;
+        return { ...(revisionKey && !matches ? withoutForecast(player) : player), canonical_context: context };
+      }) };
+    }
+    // Activation raced both reads. Actuals stay visible; forecasts wait for a stable revision.
+    return { ...lastIndex, players: lastIndex.players.map(player => ({ ...withoutForecast(player), canonical_context: null })) };
+  }
+
+  private async getBaseDashboardIndex(canonicalPublished: boolean): Promise<{ players: DashboardIndexEntry[]; error: Error | null }> {
     // The index describes the METRICS season (see getMetricsSeason): the
     // last season with a real sample. From the 2026-09-29 opener until
     // three weeks in that is still 2025; the directory read below follows
@@ -781,7 +815,7 @@ export class PlayerDashboardService {
     // `indexInFlight` note above.
     if (indexInFlight && indexInFlight.season === season) return indexInFlight.promise;
 
-    const promise = this.loadDashboardIndex(season);
+    const promise = this.loadDashboardIndex(season, canonicalPublished, indexGeneration);
     indexInFlight = { season, promise };
     try {
       return await promise;
@@ -793,6 +827,8 @@ export class PlayerDashboardService {
   /** The uncached six-table fan-out and merge behind `getDashboardIndex`. */
   private async loadDashboardIndex(
     season: number,
+    canonicalPublished: boolean,
+    generation: number,
   ): Promise<{ players: DashboardIndexEntry[]; error: Error | null }> {
     // Parallel fan-out. These tables have no FKs between them, so this is
     // 6 independent index-only scans, not an N+1. Each one is PAGED (see
@@ -812,7 +848,7 @@ export class PlayerDashboardService {
       // offseason that's the upcoming season, not `season` (which still
       // points at last season's actuals). Joining on `season` here read
       // zero rows all summer → "Proj FP —" for every player.
-      selectAllPaged<RosRow>(this.supabase, 'player_ros_projections', ROS_COLS, getProjectionsSeason()),
+      selectAllPaged<RosRow>(this.supabase, 'player_ros_projections', ROS_COLS + (canonicalPublished ? ',projection_run_id,projection_revision' : ''), getProjectionsSeason()),
       // GOALIE GSAx (2026-09-03). Keyed on `goalie_id`, the table's primary
       // key, so the paged sort is unique per row. Season-filtered like the
       // other five: the table can only hold one season per goalie, and on
@@ -867,6 +903,7 @@ export class PlayerDashboardService {
         name: d.full_name,
         team: d.team_abbrev,
         position: d.position_code,
+        eligible_positions: parseEligiblePositions(d.eligible_positions, d.position_code),
         jersey: d.jersey_number ? parseInt(d.jersey_number, 10) : null,
         headshot_url: d.headshot_url,
         is_goalie: isGoalie,
@@ -911,6 +948,8 @@ export class PlayerDashboardService {
         gsax_shots_faced: num(x?.total_shots_faced),
         gsax_xga: num(x?.total_xga),
         gsax_ga: num(x?.total_ga),
+        projection_run_id: r?.projection_run_id ?? null,
+        projection_revision: r?.projection_revision ?? null,
         proj_gp: r?.games_remaining ?? null,
         proj_fantasy_points: r?.total_projected_points ?? null,
         proj_fantasy_ppg: r?.avg_points_per_game ?? null,
@@ -933,7 +972,7 @@ export class PlayerDashboardService {
       } as DashboardIndexEntry;
     });
 
-    indexCache = { season, data: players, timestamp: Date.now() };
+    if (generation === indexGeneration) indexCache = { season, data: players, timestamp: Date.now() };
     return { players, error: null };
   }
 
@@ -1204,4 +1243,9 @@ export class PlayerDashboardService {
     putBounded(xgHistoryCache, key, { data: payload, timestamp: Date.now() }, PLAYER_CACHE_MAX_ENTRIES);
     return { payload, error: null };
   }
+}
+
+/** Null only forecast columns when their canonical publication cannot be established. */
+function withoutForecast(player: DashboardIndexEntry): DashboardIndexEntry {
+  return Object.fromEntries(Object.entries(player).map(([key, value]) => [key, key.startsWith('proj_') || key === 'projection_season' ? null : value])) as unknown as DashboardIndexEntry;
 }

@@ -34,7 +34,27 @@ import type { PlayerWriteup } from '../playerWriteup';
  * server; the client never sees a season column because every row is the
  * same season.
  */
+export interface CanonicalProjectionContext {
+  season: number;
+  run_id: string;
+  revision: string;
+  activated_at: string;
+  availability: Record<string, unknown> | null;
+  role: Record<string, unknown> | null;
+  sources: unknown[];
+  team_notes: unknown;
+  provenance: string | null;
+  status: string | null;
+  issues: string[];
+  refresh: { at: string | null; status: string | null; error: string | null };
+}
+
 export interface DashboardIndexEntry {
+  /** Current published forecast context; never inferred from a staged workbook. */
+  canonical_context?: CanonicalProjectionContext | null;
+  projection_run_id?: string | null;
+  projection_revision?: string | null;
+  eligible_positions?: string[];
   /** Season key of the actual-stat read. Null when this player has no stat row. */
   actuals_season?: number | null;
   /** Season key of the independently joined forecast. */

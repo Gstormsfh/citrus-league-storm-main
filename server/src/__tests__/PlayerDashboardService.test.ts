@@ -319,12 +319,13 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     expect(woll.proj_fantasy_points).toBeNull();
   });
 
-  it('caches: a second call issues no new queries', async () => {
+  it('caches base data while checking the published context revision', async () => {
     mockTables(mockSupabase);
     await service.getDashboardIndex();
     const calls1 = mockSupabase.from.mock.calls.length;
     await service.getDashboardIndex();
-    expect(mockSupabase.from.mock.calls.length).toBe(calls1);
+    expect(mockSupabase.from.mock.calls.length).toBe(calls1 + 2);
+    expect(mockSupabase.from).toHaveBeenLastCalledWith('canonical_published_runs');
   });
 
   // REGRESSION (2026-09-02 scale audit): this was a plain check-then-fetch
@@ -360,7 +361,7 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
 
     // One fan-out, not fifty: six tables, one read each.
     expect(slowDirectory.range).toHaveBeenCalledTimes(1);
-    expect(mockSupabase.from).toHaveBeenCalledTimes(6);
+    expect(mockSupabase.from).toHaveBeenCalledTimes(8);
     for (const r of results) {
       expect(r.error).toBeNull();
       expect(r.players).toEqual(results[0].players);
