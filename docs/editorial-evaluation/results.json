@@ -25,7 +25,7 @@
       "after": {
         "headline": "Playmaking with shot volume",
         "summary": "Connor McDavid paired 90 assists with 3.7 shots per game in 2025-26 while averaging 23 minutes.",
-        "analysis": "If shots count, the own-shot contribution covers a different roster need from the assist total; the playmaking does not leave this profile dependent on assists alone. Carrying that pace forward assumes a comparable workload; more minutes would need fresh deployment evidence.",
+        "analysis": "If shots count, the shooting contribution covers a different roster need from the assist total; the playmaking does not leave this profile dependent on assists alone. Carrying that pace forward assumes a comparable workload; more minutes would need fresh deployment evidence.",
         "tags": [
           {
             "label": "2025-26 actuals",
@@ -35,7 +35,7 @@
         "hasEnoughData": true,
         "cardNote": "2025-26 · 1.68 P/GP",
         "cardTone": "positive",
-        "editorialVersion": "2026-09-12.1",
+        "editorialVersion": "2026-09-12.2",
         "sourceContext": {
           "actualsSeason": 2025,
           "projectionSeason": 2026,
@@ -78,7 +78,7 @@
         "hasEnoughData": true,
         "cardNote": "2025-26 · 1.59 P/GP",
         "cardTone": "positive",
-        "editorialVersion": "2026-09-12.1",
+        "editorialVersion": "2026-09-12.2",
         "sourceContext": {
           "actualsSeason": 2025,
           "projectionSeason": 2026,
@@ -117,7 +117,7 @@
         "hasEnoughData": true,
         "cardNote": "2025-26 · 1.71 P/GP",
         "cardTone": "positive",
-        "editorialVersion": "2026-09-12.1",
+        "editorialVersion": "2026-09-12.2",
         "sourceContext": {
           "actualsSeason": 2025,
           "projectionSeason": 2026,
@@ -146,7 +146,7 @@
       "after": {
         "headline": "Power-play exposure",
         "summary": "Leon Draisaitl earned 42 of his 97 points on the power play in 2025-26.",
-        "analysis": "Where power-play points earn extra value, that concentration makes unit retention a central part of the valuation. Reduced special-teams time would require more scoring elsewhere to sustain the same overall return.",
+        "analysis": "Where power-play points earn extra value, that concentration makes power-play usage a central part of the valuation. Reduced special-teams time would require more scoring elsewhere to sustain the same overall return.",
         "tags": [
           {
             "label": "2025-26 actuals",
@@ -160,7 +160,7 @@
         "hasEnoughData": true,
         "cardNote": "2025-26 · 1.49 P/GP",
         "cardTone": "positive",
-        "editorialVersion": "2026-09-12.1",
+        "editorialVersion": "2026-09-12.2",
         "sourceContext": {
           "actualsSeason": 2025,
           "projectionSeason": 2026,
@@ -199,7 +199,7 @@
         "hasEnoughData": true,
         "cardNote": "2025-26 · 1.05 P/GP",
         "cardTone": "positive",
-        "editorialVersion": "2026-09-12.1",
+        "editorialVersion": "2026-09-12.2",
         "sourceContext": {
           "actualsSeason": 2025,
           "projectionSeason": 2026,
@@ -228,7 +228,7 @@
       "after": {
         "headline": "Ratio recovery needed",
         "summary": "Connor Hellebuyck made 57 appearances in 2025-26, winning 23, with a .895 save percentage and 2.86 goals-against average.",
-        "analysis": "More appearances offer another chance at wins and saves, but repeating that save rate would work against a ratio roster. A rebound in performance and a larger workload are separate assumptions.",
+        "analysis": "If wins, saves and save percentage count, more appearances offer another chance at volume, but repeating that save rate would work against the ratio. A rebound in performance and a larger workload are separate assumptions.",
         "tags": [
           {
             "label": "2025-26 actuals",
@@ -238,7 +238,7 @@
         "hasEnoughData": true,
         "cardNote": "2025-26 · .895 SV%",
         "cardTone": "caution",
-        "editorialVersion": "2026-09-12.1",
+        "editorialVersion": "2026-09-12.2",
         "sourceContext": {
           "actualsSeason": 2025,
           "projectionSeason": 2026,
@@ -252,7 +252,7 @@
     "plain": {
       "headline": "Power-play exposure",
       "summary": "Sample Forward earned 35 of his 80 points on the power play in 2025-26.",
-      "analysis": "Where power-play points earn extra value, that concentration makes unit retention a central part of the valuation. Reduced special-teams time would require more scoring elsewhere to sustain the same overall return.",
+      "analysis": "Where power-play points earn extra value, that concentration makes power-play usage a central part of the valuation. Reduced special-teams time would require more scoring elsewhere to sustain the same overall return.",
       "tags": [
         {
           "label": "2025-26 actuals",
@@ -266,7 +266,7 @@
       "hasEnoughData": true,
       "cardNote": "2025-26 · 1 P/GP",
       "cardTone": "positive",
-      "editorialVersion": "2026-09-12.1",
+      "editorialVersion": "2026-09-12.2",
       "sourceContext": {
         "actualsSeason": 2025,
         "projectionSeason": 2026,
@@ -276,7 +276,7 @@
     },
     "withNews": {
       "headline": "Power-play exposure",
-      "summary": "example.com (2026-09-11): Sample Forward was reported working with the first power-play unit. Sample Forward earned 35 of his 80 points on the power play in 2025-26.",
+      "summary": "example.com (2026-09-11): Sample Forward was reported working with the first power-play unit. He earned 35 of his 80 points on the power play in 2025-26.",
       "analysis": "First-unit practice is especially consequential for this scoring mix. If that assignment carries into games, it preserves a major source of his offence; sustained power-play time is the condition to watch.",
       "tags": [
         {
@@ -291,7 +291,7 @@
       "hasEnoughData": true,
       "cardNote": "2025-26 · 1 P/GP",
       "cardTone": "positive",
-      "editorialVersion": "2026-09-12.1",
+      "editorialVersion": "2026-09-12.2",
       "sourceContext": {
         "actualsSeason": 2025,
         "projectionSeason": 2026,
@@ -308,5 +308,65 @@
         }
       ]
     }
-  }
+  },
+  "settingsCounterfactual": [
+    {
+      "label": "Goals weighted above assists",
+      "scoringWeights": {
+        "goals": 8,
+        "assists": 1,
+        "shots": 0
+      },
+      "writeup": {
+        "headline": "Finishing and playmaking",
+        "summary": "Nikita Kucherov scored 44 goals on 19% shooting in 2025-26, with 3 shots per game and 86 assists.",
+        "analysis": "Goals contributed 352 scoring points versus 86 from assists at these weights. Repeating that larger goal component requires comparable conversion or more shots.",
+        "tags": [
+          {
+            "label": "2025-26 actuals",
+            "tone": "neutral"
+          }
+        ],
+        "hasEnoughData": true,
+        "cardNote": "2025-26 · 1.71 P/GP",
+        "cardTone": "positive",
+        "editorialVersion": "2026-09-12.2",
+        "sourceContext": {
+          "actualsSeason": 2025,
+          "projectionSeason": 2026,
+          "indexAsOf": null
+        },
+        "newsSources": []
+      }
+    },
+    {
+      "label": "Assists weighted above goals",
+      "scoringWeights": {
+        "goals": 1,
+        "assists": 8,
+        "shots": 0
+      },
+      "writeup": {
+        "headline": "Finishing and playmaking",
+        "summary": "Nikita Kucherov scored 44 goals on 19% shooting in 2025-26, with 3 shots per game and 86 assists.",
+        "analysis": "Assists contributed 688 scoring points versus 44 from goals. That assist weighting reduces how much the roster decision depends on repeating the shooting percentage.",
+        "tags": [
+          {
+            "label": "2025-26 actuals",
+            "tone": "neutral"
+          }
+        ],
+        "hasEnoughData": true,
+        "cardNote": "2025-26 · 1.71 P/GP",
+        "cardTone": "positive",
+        "editorialVersion": "2026-09-12.2",
+        "sourceContext": {
+          "actualsSeason": 2025,
+          "projectionSeason": 2026,
+          "indexAsOf": null
+        },
+        "newsSources": []
+      }
+    }
+  ]
 }

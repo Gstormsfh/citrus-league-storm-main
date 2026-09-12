@@ -27,7 +27,7 @@ The 2025-26 rates provide a historical baseline. Current line assignment, power-
 
 Connor McDavid paired 90 assists with 3.7 shots per game in 2025-26 while averaging 23 minutes.
 
-If shots count, the own-shot contribution covers a different roster need from the assist total; the playmaking does not leave this profile dependent on assists alone. Carrying that pace forward assumes a comparable workload; more minutes would need fresh deployment evidence.
+If shots count, the shooting contribution covers a different roster need from the assist total; the playmaking does not leave this profile dependent on assists alone. Carrying that pace forward assumes a comparable workload; more minutes would need fresh deployment evidence.
 
 ## Nathan MacKinnon
 
@@ -69,7 +69,7 @@ The 2025-26 rates provide a historical baseline. Current line assignment, power-
 
 Leon Draisaitl earned 42 of his 97 points on the power play in 2025-26.
 
-Where power-play points earn extra value, that concentration makes unit retention a central part of the valuation. Reduced special-teams time would require more scoring elsewhere to sustain the same overall return.
+Where power-play points earn extra value, that concentration makes power-play usage a central part of the valuation. Reduced special-teams time would require more scoring elsewhere to sustain the same overall return.
 
 ## Cale Makar
 
@@ -97,7 +97,7 @@ The 2025-26 results inform his outlook, but recorded appearances do not establis
 
 Connor Hellebuyck made 57 appearances in 2025-26, winning 23, with a .895 save percentage and 2.86 goals-against average.
 
-More appearances offer another chance at wins and saves, but repeating that save rate would work against a ratio roster. A rebound in performance and a larger workload are separate assumptions.
+If wins, saves and save percentage count, more appearances offer another chance at volume, but repeating that save rate would work against the ratio. A rebound in performance and a larger workload are separate assumptions.
 
 ## Counterfactual news (synthetic, not reporting)
 
@@ -105,12 +105,28 @@ This deliberately fictional fixture isolates the effect of one qualifying practi
 
 **Without news**
 
-Where power-play points earn extra value, that concentration makes unit retention a central part of the valuation. Reduced special-teams time would require more scoring elsewhere to sustain the same overall return.
+Where power-play points earn extra value, that concentration makes power-play usage a central part of the valuation. Reduced special-teams time would require more scoring elsewhere to sustain the same overall return.
 
 **With confirmed first-unit practice evidence**
 
-example.com (2026-09-11): Sample Forward was reported working with the first power-play unit. Sample Forward earned 35 of his 80 points on the power play in 2025-26.
+example.com (2026-09-11): Sample Forward was reported working with the first power-play unit. He earned 35 of his 80 points on the power play in 2025-26.
 
 First-unit practice is especially consequential for this scoring mix. If that assignment carries into games, it preserves a major source of his offence; sustained power-play time is the condition to watch.
 
 Production evidence selection also rejects wrong players, undated/future/stale stories, prompt instructions, conditional or retrospective claims, and superseded health reports. Those cases are behavioral tests, not claims about these six players.
+
+## Same player, different league weights
+
+Synthetic league settings applied to the same historical Kucherov evidence; these are not projections or saved league settings.
+
+**Goals weighted above assists**
+
+Weights: {"goals":8,"assists":1,"shots":0}
+
+Goals contributed 352 scoring points versus 86 from assists at these weights. Repeating that larger goal component requires comparable conversion or more shots.
+
+**Assists weighted above goals**
+
+Weights: {"goals":1,"assists":8,"shots":0}
+
+Assists contributed 688 scoring points versus 44 from goals. That assist weighting reduces how much the roster decision depends on repeating the shooting percentage.

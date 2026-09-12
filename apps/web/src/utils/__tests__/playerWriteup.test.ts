@@ -153,7 +153,7 @@ describe('generatePlayerWriteup — evidence selects the hockey profile', () => 
     const w = generatePlayerWriteup(skater({}, { gamesPlayed: 70, points: 50, goals: 20, assists: 30, powerPlayPoints: 25 }));
     expect(w.tags.find(t => t.label === 'PP-dependent')?.tone).toBe('caution');
     expect(w.summary).toContain('25 of his 50 points on the power play');
-    expect(w.analysis).toMatch(/unit retention/);
+    expect(w.analysis).toMatch(/power-play usage/);
     expect(w.analysis).toMatch(/Reduced special-teams time would require more scoring elsewhere/);
     expect(`${w.summary} ${w.analysis}`).not.toMatch(/(?:plays|skates|is) on (?:the )?first.unit/i);
   });
@@ -356,7 +356,7 @@ describe('analysis paragraph — the "what should I do" half', () => {
       id: 30, statsSeason: getProjectionsSeason(), name: 'Test Goalie', position: 'G', number: 1, starter: true, team: 'X',
       stats: { gamesPlayed: 55, savePct: 0.925, gaa: 2.3, wins: 33, losses: 15 },
     } as HockeyPlayer);
-    expect(starter.analysis).toMatch(/counting stats still depends on the next crease allocation/);
+    expect(starter.analysis).toMatch(/Counting-stat value still depends on the next crease allocation/);
     expect(starter.analysis).toMatch(/do not establish his current share of starts/);
 
     const backup = generatePlayerWriteup({
