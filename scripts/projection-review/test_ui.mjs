@@ -64,6 +64,26 @@ for (const status of ['out', 'healthy', 'injured']) {
   assert.equal(run('patch().player_updates.length'), 0, 'rendering a current report cannot create a source edit');
 }
 run('base=copy(fixture);draft=copy(base)');
+// Drive the actual authoring handlers: no article URL and no numeric edit.
+run("selected=draft.players[target].player_id;$('#editor').onclick({target:{id:'manualConfirmation'}})");
+assert.match(run('validate()'), /manual confirmation requires/);
+for (const [key,value] of Object.entries({confirmed_by:'Garrett Storms',reference:'Citrus review 2026-09-12',reviewed_at:'2026-09-12'})) {
+  context.inputKey=key;context.inputValue=value;
+  run("$('#editor').oninput({target:{dataset:{manualSource:inputKey},value:inputValue}})");
+}
+for (const [key,value] of Object.entries({as_of:'2026-09-12',review_after:'2026-09-17',reason:'My explicit current status confirmation',status:'out'})) {
+  context.inputKey=key;context.inputValue=value;
+  run("$('#editor').oninput({target:{dataset:{group:'availability',field:inputKey},type:'text',value:inputValue}})");
+}
+assert.equal(run('validate()'),null);
+const manualPatch=JSON.parse(run('JSON.stringify(patch())'));
+assert.deepEqual(Object.keys(manualPatch.player_updates[0].changes),['availability']);
+assert.equal(manualPatch.player_updates[0].changes.availability.source.file,'Manual confirmation by Garrett Storms: Citrus review 2026-09-12');
+assert.equal(manualPatch.player_updates[0].changes.availability.source.url,undefined);
+assert.equal(run('equal(base,fixture)'),true,'manual authoring cannot mutate the loaded source');
+run("draft.players[target].availability.source.reviewed_at='2099-01-01';draft.players[target].availability.review_after='2099-01-03'");
+assert.match(run('validate()'), /not in the future/, 'a future confirmation cannot establish current status');
+run('base=copy(fixture);draft=copy(base)');
 const rate = Object.keys(source.players[target].rates)[0];
 context.rate = rate;
 run('draft.players[target].rates[rate]=null');
