@@ -31,7 +31,7 @@ const base = (over: Partial<LeagueSettingsInput> = {}): LeagueSettingsInput => (
     faabBudget: 100,
   },
   setWaiver: noop,
-  draft: { draft_rounds: 21, pickTimeLimit: 90 },
+  draft: { draft_rounds: 21, pickTimeLimit: 90, scheduledDraftTime: '' },
   setDraft: noop,
   trade: { trade_review_type: 'none', trade_review_period_hours: 48, trade_veto_threshold: 0.5, tradeDeadlineWeek: 0 },
   setTrade: noop,
