@@ -1,0 +1,159 @@
+{
+  "source_revision": "75c954143e686eed017fe92a9d54308d09a6221d69e35a44258a780346eb7301",
+  "source_sha256": "77dfab458fe9aaa4670b78fce8943134b6a91691a20a343244803b483bd0e927",
+  "directory_rows": 1312,
+  "regular_games": 1344,
+  "validation": {
+    "valid": false,
+    "errors": [
+      {
+        "code": "IMPORTED_REVIEW_BLOCKERS",
+        "detail": [
+          {
+            "code": "UNREVIEWED_LINEUP_SLOTS",
+            "slots": [
+              {
+                "row": 24,
+                "team": "ANA"
+              },
+              {
+                "row": 17,
+                "team": "CAR"
+              },
+              {
+                "row": 26,
+                "team": "CBJ"
+              },
+              {
+                "row": 9,
+                "team": "NJD"
+              },
+              {
+                "row": 12,
+                "team": "NJD"
+              },
+              {
+                "row": 17,
+                "team": "NJD"
+              },
+              {
+                "row": 6,
+                "team": "NYI"
+              },
+              {
+                "row": 17,
+                "team": "NYI"
+              },
+              {
+                "row": 6,
+                "team": "NYR"
+              },
+              {
+                "row": 15,
+                "team": "NYR"
+              },
+              {
+                "row": 16,
+                "team": "NYR"
+              },
+              {
+                "row": 17,
+                "team": "PHI"
+              },
+              {
+                "row": 12,
+                "team": "PIT"
+              },
+              {
+                "row": 15,
+                "team": "PIT"
+              },
+              {
+                "row": 21,
+                "team": "PIT"
+              },
+              {
+                "row": 25,
+                "team": "PIT"
+              },
+              {
+                "row": 35,
+                "team": "VAN"
+              },
+              {
+                "row": 15,
+                "team": "WSH"
+              },
+              {
+                "row": 16,
+                "team": "WSH"
+              },
+              {
+                "row": 22,
+                "team": "WSH"
+              }
+            ]
+          },
+          {
+            "code": "ROSTER_ROLE_SCENARIOS_NOT_CONFIRMED",
+            "reason": "Explicit publication review is required; offline edits cannot activate a run."
+          }
+        ]
+      },
+      {
+        "code": "REVIEW_NOT_COMPLETE"
+      },
+      {
+        "code": "UNRESOLVED_LINEUP_SLOT"
+      },
+      {
+        "code": "INVALID_PLAYER",
+        "detail": "Player team not scheduled",
+        "player_id": "8471685"
+      },
+      {
+        "code": "INVALID_PLAYER",
+        "detail": "Player team not scheduled",
+        "player_id": "8471734"
+      },
+      {
+        "code": "INVALID_PLAYER",
+        "detail": "Player team not scheduled",
+        "player_id": "8475169"
+      },
+      {
+        "code": "INVALID_PLAYER",
+        "detail": "Team differs from current directory without reviewed assignment evidence",
+        "player_id": "8475184"
+      },
+      {
+        "code": "INVALID_PLAYER",
+        "detail": "Player team not scheduled",
+        "player_id": "8475660"
+      },
+      {
+        "code": "INVALID_PLAYER",
+        "detail": "Player team not scheduled",
+        "player_id": "8478971"
+      },
+      {
+        "code": "INVALID_PLAYER",
+        "detail": "Player team not scheduled",
+        "player_id": "8479339"
+      },
+      {
+        "code": "INVALID_PLAYER",
+        "detail": "Player team not scheduled",
+        "player_id": "8482484"
+      }
+    ],
+    "checked_at": "2026-09-12T08:38:09.374807+00:00"
+  },
+  "distinct_error_codes": [
+    "IMPORTED_REVIEW_BLOCKERS",
+    "INVALID_PLAYER",
+    "REVIEW_NOT_COMPLETE",
+    "UNRESOLVED_LINEUP_SLOT"
+  ],
+  "scope": "Actual source rejection preflight, isolated full schema; transaction rolled back, no activation or production write"
+}

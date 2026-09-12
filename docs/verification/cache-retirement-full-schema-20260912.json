@@ -1,0 +1,66 @@
+{
+  "backup_sha256": "f2bd48eb3fad0ae4a32d30d8cc01ae75c8218e65f1dc6755f2515602bf7ba0a8",
+  "backup_captured_at": "2026-09-12T08:24:29.385218+00:00",
+  "backup_rows": 1461,
+  "content_md5": "b4c066a94381465a07dcda52f98a6622",
+  "metadata_before_and_after": {
+    "oid": "17912",
+    "acl": "{postgres=arwdDxtm/postgres,anon=arwdDxtm/postgres,authenticated=arwdDxtm/postgres,service_role=arwdDxtm/postgres}",
+    "rls": true,
+    "force_rls": false,
+    "rows": 1461,
+    "content_md5": "b4c066a94381465a07dcda52f98a6622",
+    "constraints": [
+      {
+        "oid": "19292",
+        "name": "projection_cache_game_id_fkey",
+        "definition": "FOREIGN KEY (game_id) REFERENCES nhl_games(game_id) ON DELETE CASCADE"
+      },
+      {
+        "oid": "18405",
+        "name": "projection_cache_pkey",
+        "definition": "PRIMARY KEY (cache_id)"
+      },
+      {
+        "oid": "17923",
+        "name": "projection_date_not_future",
+        "definition": "CHECK ((projection_date <= (calculation_timestamp)::date))"
+      },
+      {
+        "oid": "18471",
+        "name": "unique_player_game_date",
+        "definition": "UNIQUE (player_id, game_id, projection_date)"
+      }
+    ],
+    "policies": [
+      {
+        "oid": "19474",
+        "name": "Authenticated users can read projections",
+        "command": "r",
+        "roles": "{0}",
+        "qual": "(( SELECT auth.role() AS role) = 'authenticated'::text)",
+        "check": null
+      }
+    ],
+    "index_oids": [
+      "18404",
+      "18470",
+      "18703",
+      "18704",
+      "18705",
+      "18706"
+    ]
+  },
+  "checks": [
+    "Actual backup restored into full schema with real NHL parent rows and foreign key intact",
+    "Quarantine renamed only the table, preserving OID, rows/hash, ACLs/RLS, policy/constraint/index OIDs",
+    "Inverse rename restored original endpoint name and identical metadata/data",
+    "No dangling game foreign keys"
+  ],
+  "operations_sha256": {
+    "preflight-cache.sql": "8cfff45b1f123b931073cc1b1e3c373f22ff19307015d6750bcb29da2ba65271",
+    "quarantine-cache.sql": "6e78131e65988b8bea9263a3c33a4e8d112f5641b9e5703fa6766710a1c9b958",
+    "restore-cache.sql": "6e3085882ccda035451ad54eea508d2b3fc8d37d298cf4d1d5601c7255b3fdc9"
+  },
+  "scope": "Isolated local container only; does not establish production release/external caller approval"
+}

@@ -13,3 +13,7 @@ node --test data-pipeline/tests/sql/scoring_rules_sync.test.mjs
 ```
 
 Four tests cover existing drift reconciliation, key removal, null reset versus empty configuration, zero/negative/decimal/exponent values and invalid numeric strings. No production mutation, migration or deployment was performed.
+
+The full-schema PostgreSQL 17.6 rehearsal additionally loads the real reverse trigger on `league_scoring_rules`. It exposed a backfill interaction absent from the small fixture: directly upserting derived rules fires the reverse trigger at depth one and rewrites the source settings JSON. The migration now reconciles through `UPDATE leagues SET scoring_settings=scoring_settings`, so the forward trigger writes rules and the nested reverse trigger correctly exits. The exact saved JSON and SQL NULL survive; the ordinary league `updated_at` trigger still runs. The focused four-test fixture exercises the forward trigger; the full-schema rehearsal provides the real reverse-trigger regression.
+
+Reproduce with `python3 data-pipeline/tests/rehearsal/rehearse_canonical_postgres.py`. Its pinned schema, current function/catalog exports and report are described in [the canonical pipeline notes](canonical-projection-pipeline-20260912.md).
