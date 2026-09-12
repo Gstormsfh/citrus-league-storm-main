@@ -61,9 +61,12 @@ export default defineConfig(({ mode }) => ({
       // registerSW.js afterwards. Web builds are untouched.
       disable: process.env.VITE_NATIVE === '1',
       registerType: "autoUpdate",
+      injectRegister: false, // main.tsx owns lifecycle checks and an explicit reload action.
       includeAssets: ["favicon.svg", "favicon.ico", "apple-touch-icon.png", "loading-citrus.png"],
       manifest: false, // Use existing public/manifest.json
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         // Precache the app shell (JS, CSS, HTML)
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff,woff2}"],
         // Don't precache source maps or huge files
