@@ -204,6 +204,8 @@ function wire(options: WireOptions = {}) {
         return createChain({ data: { commissioner_id: member ? 'u-test' : 'someone-else' }, error: null });
       case 'teams':
         return createChain({ data: null, error: null });
+      case 'canonical_published_runs':
+        return createChain({ data: null, error: null });
       default:
         return createChain({ data: [], error: null });
     }
