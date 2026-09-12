@@ -48,3 +48,9 @@ See `assets/PHOTO-CREDITS.md` for original added-photo URLs and CC BY-SA 2.0 cre
 This tool is standalone and local. It changes no native app, backend, deployment, App Store submission or production data. Build 18 compatibility is unaffected by running it. Integrating new UI into a native binary would be separate app work and may require build 19; this delivery does not certify live player cards or draft rooms. The separate source reconciliation task owns that end-to-end audit.
 
 See `WORKLOG.md` for concrete evidence, pending source reconciliation, tests and launch dependencies. Monday 14 September is the launch target; work is being completed as soon as possible, not deferred until Monday.
+
+## Current canonical scoring preview
+
+The existing localhost8765 configurator also accepts `server.py --data /absolute/path/to/guide-data.json`. The current review uses `output/canonical-review/guide-data-6a71c8db63eb.json`; its header identifies the canonical review draft, and its footer shows the full source revision, selected league label and current weight fingerprint. Unavailable scores and ranks remain blank. Scoring and PDF generation use that same immutable in-memory input. Restart with a newly imported adapter snapshot to change the source.
+
+To reopen this review through the existing launcher, set `CITRUS_GUIDE_DATA` to the absolute adapter JSON path before running `Open Citrus Guide.command`. Without that setting the launcher still selects the preserved original workbook edition, which is explicitly labeled as such; it refuses to reuse a server with different source data. The generated immutable PDF/XLSX editions are not modified by preview controls.

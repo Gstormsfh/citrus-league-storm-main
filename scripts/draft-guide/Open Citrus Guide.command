@@ -4,8 +4,10 @@ CITRUS_PYTHON="$HOME/.cache/codex-runtimes/codex-primary-runtime/dependencies/py
 if [[ ! -x "$CITRUS_PYTHON" ]]; then CITRUS_PYTHON=python3; fi
 export CITRUS_NODE="${CITRUS_NODE:-$(command -v node)}"
 if [[ -z "$CITRUS_NODE" ]]; then export CITRUS_NODE="$HOME/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node"; fi
+export CITRUS_GUIDE_DATA="${CITRUS_GUIDE_DATA:-workbook-data.json}"
 "$CITRUS_PYTHON" - <<'PY'
 import json
+import os
 import socket
 import sys
 import urllib.request
@@ -13,7 +15,7 @@ import webbrowser
 from pathlib import Path
 
 url = 'http://127.0.0.1:8765'
-expected = json.loads(Path('workbook-data.json').read_text())
+expected = json.loads(Path(os.environ['CITRUS_GUIDE_DATA']).read_text())
 try:
     # Ignore system proxies for this local-only check. Never follow redirects
     # to another service when deciding whether this is our configurator.
@@ -54,7 +56,7 @@ sys.exit(10)  # Free port: let the existing runtime launch the server below.
 PY
 CITRUS_LAUNCH_STATUS=$?
 if [[ "$CITRUS_LAUNCH_STATUS" == 10 ]]; then
-  "$CITRUS_PYTHON" server.py --open
+  "$CITRUS_PYTHON" server.py --data "$CITRUS_GUIDE_DATA" --open
 else
   exit "$CITRUS_LAUNCH_STATUS"
 fi
