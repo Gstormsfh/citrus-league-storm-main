@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, Navigate, Link as RouterLink } from 'react-router-dom';
 import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
@@ -91,6 +91,13 @@ const TradeAnalyzer = () => {
   const [tradeOffersError, setTradeOffersError] = useState(false);
   const [activeTab, setActiveTab] = useState('propose');
   const [tradeMessage, setTradeMessage] = useState('');
+  // DOUBLE SUBMIT (2026-09-11) — a double tap on PROPOSE TRADE sent two
+  // identical offers, 455 ms apart, and both were accepted. The ref is the
+  // guard that matters: two taps in the same frame both read a stale
+  // `proposing` state, but the ref flips synchronously on the first one. The
+  // state exists to grey the button while the request is in flight.
+  const [proposing, setProposing] = useState(false);
+  const proposingRef = useRef(false);
 
   // Propose-tab view mode: list (default) or grid
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
@@ -263,33 +270,42 @@ const TradeAnalyzer = () => {
       return;
     }
 
-    const result = await TradeService.createTradeOffer(
-      activeLeagueId,
-      myTeamId,
-      String(selectedTeamId),
-      mySelectedPlayers.map(Number),
-      theirSelectedPlayers.map(Number),
-      tradeMessage || undefined
-    );
+    if (proposingRef.current) return;
+    proposingRef.current = true;
+    setProposing(true);
 
-    if (result.success) {
-      toast({
-        title: "Trade Proposed",
-        description: "Your trade offer has been sent",
-      });
-      setMySelectedPlayers([]);
-      setTheirSelectedPlayers([]);
-      setTradeMessage('');
-      if (myTeamId) {
-        await loadTradeOffers(myTeamId);
+    try {
+      const result = await TradeService.createTradeOffer(
+        activeLeagueId,
+        myTeamId,
+        String(selectedTeamId),
+        mySelectedPlayers.map(Number),
+        theirSelectedPlayers.map(Number),
+        tradeMessage || undefined
+      );
+
+      if (result.success) {
+        toast({
+          title: "Trade Proposed",
+          description: "Your trade offer has been sent",
+        });
+        setMySelectedPlayers([]);
+        setTheirSelectedPlayers([]);
+        setTradeMessage('');
+        if (myTeamId) {
+          await loadTradeOffers(myTeamId);
+        }
+        setActiveTab('offers');
+      } else {
+        toast({
+          title: "Trade Failed",
+          description: result.error,
+          variant: "destructive"
+        });
       }
-      setActiveTab('offers');
-    } else {
-      toast({
-        title: "Trade Failed",
-        description: result.error,
-        variant: "destructive"
-      });
+    } finally {
+      proposingRef.current = false;
+      setProposing(false);
     }
   };
 
@@ -594,6 +610,7 @@ const TradeAnalyzer = () => {
           message={tradeMessage}
           onMessage={setTradeMessage}
           onPropose={handleProposeTrade}
+          proposing={proposing}
           onClear={() => {
             setMySelectedPlayers([]);
             setTheirSelectedPlayers([]);
@@ -898,7 +915,7 @@ const TradeAnalyzer = () => {
                     <Button
                       size="sm"
                       className="hidden lg:inline-flex bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_4px_12px_-4px_rgba(255,168,87,0.4)] disabled:bg-white/10 disabled:text-white/55 disabled:shadow-none disabled:opacity-100"
-                      disabled={myAssets.length === 0 || theirAssets.length === 0 || !selectedPartnerTeam}
+                      disabled={proposing || myAssets.length === 0 || theirAssets.length === 0 || !selectedPartnerTeam}
                       onClick={handleProposeTrade}
                     >
                       <Send className="h-4 w-4 mr-2" /> Submit Trade Offer
@@ -1027,7 +1044,7 @@ const TradeAnalyzer = () => {
                   />
                   <Button
                     className="w-full bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)] mt-2 disabled:bg-white/10 disabled:text-white/55 disabled:shadow-none disabled:opacity-100"
-                    disabled={myAssets.length === 0 || theirAssets.length === 0 || !selectedPartnerTeam}
+                    disabled={proposing || myAssets.length === 0 || theirAssets.length === 0 || !selectedPartnerTeam}
                     onClick={handleProposeTrade}
                   >
                     <Send className="h-4 w-4 mr-2" /> Submit Trade Offer

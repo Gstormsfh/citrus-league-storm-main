@@ -225,6 +225,38 @@ export class TradeService {
       }
     }
 
+    // DOUBLE SUBMIT (2026-09-11) — a double tap on PROPOSE TRADE inserted two
+    // identical pending offers 455 ms apart in production. Nothing here looked
+    // for an existing offer and the table had no uniqueness beyond the primary
+    // key, so both landed. An identical pending offer IS this offer: return it
+    // instead of creating a second one. The partial unique index in migration
+    // 20260911233000 is the race-proof half; this is the half that answers a
+    // double tap with success rather than a constraint error.
+    const sameIds = (existingIds: unknown, incoming: number[]) => {
+      const a = Array.isArray(existingIds) ? existingIds.map(Number).sort((x, y) => x - y) : [];
+      const b = [...incoming].map(Number).sort((x, y) => x - y);
+      return a.length === b.length && a.every((v, i) => v === b[i]);
+    };
+    const findPendingTwin = async () => {
+      const { data: rows } = await this.supabase
+        .from('trade_offers')
+        .select('id, offered_player_ids, requested_player_ids')
+        .eq('league_id', leagueId)
+        .eq('from_team_id', fromTeamId)
+        .eq('to_team_id', toTeamId)
+        .eq('status', 'pending');
+      return (rows || []).find(
+        (r: { offered_player_ids?: unknown; requested_player_ids?: unknown }) =>
+          sameIds(r.offered_player_ids, offeredPlayerIds) &&
+          sameIds(r.requested_player_ids, requestedPlayerIds),
+      ) as { id?: string } | undefined;
+    };
+
+    const alreadyPending = await findPendingTwin();
+    if (alreadyPending?.id) {
+      return { success: true, tradeId: alreadyPending.id, duplicate: true };
+    }
+
     // Calculate expiration
     const expirationDays = league?.settings?.trade_expiration_days || 7;
     const expiresAt = new Date();
@@ -244,6 +276,18 @@ export class TradeService {
       })
       .select(COLUMNS.TRADE)
       .single();
+
+    // The other half of the same race: two submits in flight at once both
+    // pass the check above, and the unique index rejects the loser with
+    // 23505. The row the winner created is the offer the manager meant to
+    // send, so return it and let the notification belong to the winner.
+    if (error && (error as { code?: string }).code === '23505') {
+      const winner = await findPendingTwin();
+      if (winner?.id) {
+        return { success: true, tradeId: winner.id, duplicate: true };
+      }
+      return { success: false, error: 'That offer is already pending' };
+    }
 
     // NOTIFICATIONS (2026-08-16) — the top gap from the audit: the
     // recipient was never told a trade offer arrived. Targeted insert to

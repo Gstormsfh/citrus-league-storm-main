@@ -63,6 +63,8 @@ export interface TradesPhoneProps {
   message: string;
   onMessage: (m: string) => void;
   onPropose: () => void;
+  /** In flight: the propose request has been sent and not yet answered. */
+  proposing?: boolean;
   onClear: () => void;
   onOpenPlayer: (p: Player) => void;
   offers: TradeOfferWithPlayers[];
@@ -306,7 +308,7 @@ export function TradesPhone(p: TradesPhoneProps) {
               saveLabel="PROPOSE TRADE"
               onDiscard={p.onClear}
               onSave={p.onPropose}
-              saveDisabled={!ready}
+              saveDisabled={!ready || !!p.proposing}
             />
           </div>
         )
