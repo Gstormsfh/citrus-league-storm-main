@@ -26,6 +26,8 @@ import {
 } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { pagedSelect } from '../lib/pagedSelect';
+import { readCanonicalProjectionRows } from '../lib/canonicalProjectionRead';
+import { getProjectionsSeason } from '@citrus/shared';
 
 // ============================================================================
 // LEAGUE SCOREBOARD PROJECTIONS (2026-09-03, Sleeper parity audit M7)
@@ -1414,22 +1416,25 @@ export class MatchupService {
     // zero. Read the canonical materialization directly so league scoring
     // receives signed counts and can distinguish unavailable from zero.
     if (!playerIds.length) return { projMap: new Map<number, Record<string, unknown>>(), error: null };
-    const { data, error } = await pagedSelect<Record<string, unknown>>(this.supabase, {
-      table: 'player_projected_stats',
-      columns: 'player_id,game_id,projection_date,season,projected_goals,projected_assists,projected_sog,projected_blocks,projected_ppp,projected_shp,projected_hits,projected_pim,projected_plus_minus,projected_xg,total_projected_points,base_ppg,shrinkage_weight,finishing_multiplier,opponent_adjustment,b2b_penalty,home_away_adjustment,confidence_score,calculation_method,opponent_team_id,opponent_abbrev,is_home_game,matchup_difficulty,injury_status,game_start_time,projected_wins,projected_saves,projected_shutouts,projected_goals_against,projected_gaa,projected_save_pct,projected_gp,starter_confirmed,is_goalie,projection_mean,projection_std_dev,projection_ci_lower,projection_ci_upper,projection_ci_50_lower,projection_ci_50_upper,projection_median,dynamic_confidence,likely_low,likely_high,confidence_label',
-      filters: [['projection_date', targetDate]],
-      inFilters: [['player_id', playerIds]],
-      orderBy: ['player_id', 'game_id'],
-    });
-
     const projMap = new Map<number, Record<string, unknown>>();
-    // Add explicit exposure metadata; legacy conditional stats remain unchanged.
-    const rows = error ? [] : await addGoalieExposure(this.supabase, data || []);
-    for (const row of rows) {
-      projMap.set(Number(row.player_id), row);
+    const season = getProjectionsSeason(new Date(`${targetDate}T12:00:00`));
+    try {
+      const rows = await readCanonicalProjectionRows(this.supabase, season, async () => {
+        const { data, error } = await pagedSelect<Record<string, unknown>>(this.supabase, {
+          table: 'player_projected_stats',
+          columns: 'projection_run_id,projection_revision,player_id,game_id,projection_date,season,projected_goals,projected_assists,projected_sog,projected_blocks,projected_ppp,projected_shp,projected_hits,projected_pim,projected_plus_minus,projected_xg,total_projected_points,base_ppg,shrinkage_weight,finishing_multiplier,opponent_adjustment,b2b_penalty,home_away_adjustment,confidence_score,calculation_method,opponent_team_id,opponent_abbrev,is_home_game,matchup_difficulty,injury_status,game_start_time,projected_wins,projected_saves,projected_shutouts,projected_goals_against,projected_gaa,projected_save_pct,projected_gp,starter_confirmed,is_goalie,projection_mean,projection_std_dev,projection_ci_lower,projection_ci_upper,projection_ci_50_lower,projection_ci_50_upper,projection_median,dynamic_confidence,likely_low,likely_high,confidence_label',
+          filters: [['projection_date', targetDate], ['season', season]],
+          inFilters: [['player_id', playerIds]],
+          orderBy: ['player_id', 'game_id'],
+        });
+        if (error) throw error;
+        return addGoalieExposure(this.supabase, data || []);
+      });
+      for (const row of rows) projMap.set(Number(row.player_id), row);
+      return { projMap, error: null };
+    } catch (error) {
+      return { projMap, error };
     }
-
-    return { projMap, error };
   }
 
   /** Get daily lineup via RPC */

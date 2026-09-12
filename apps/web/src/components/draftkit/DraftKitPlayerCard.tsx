@@ -1,3 +1,4 @@
+import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { useState } from 'react';
 // Direct module import, not the citrus2 barrel: the barrel re-exports
 // Homepage, which pulls Navbar -> AuthContext -> the Supabase client, and that
@@ -147,11 +148,7 @@ export function DraftKitPlayerCard({
                 New: {card.previousTeam} to {card.team}
               </span>
             )}
-            {card.rosterStatus && ['IR', 'LTIR'].includes(card.rosterStatus) && (
-              <span className="rounded-md bg-red-500/15 px-1.5 py-0.5 font-jbmono text-[10px] font-bold uppercase tracking-[0.14em] text-red-300 ring-1 ring-red-400/30">
-                {card.rosterStatus}
-              </span>
-            )}
+            <PlayerAvailabilityBadge availability={card.availability} />
           </div>
         </div>
       </header>

@@ -17,3 +17,4 @@ export * from './playerWriteup/fromIndex';
 export * from './playerPercentiles';
 export * from './leagueProjection';
 export * from './editorial';
+export * from './playerAvailability';

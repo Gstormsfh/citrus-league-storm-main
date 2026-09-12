@@ -105,18 +105,19 @@ describe('FreeAgentRow — everything the decision needs, on one 64px line', () 
     expect(name.className).toMatch(/text-pastel-cream/);
   });
 
-  it('wears the status chip only when the player carries a status', () => {
+  it('does not turn undated legacy IR into current status', () => {
     const clean = row();
     expect(clean.queryByTestId('fa-status-chip')).toBeNull();
     clean.unmount();
 
     row({ player: player({ status: 'IR' }) });
-    expect(screen.getByTestId('fa-status-chip').textContent).toBe('IR');
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
+    expect(screen.queryByText('IR')).toBeNull();
   });
 
-  it("an 'ACT' player is not a status — no chip for the ordinary case", () => {
+  it("an undated ACT field cannot establish current health", () => {
     row({ player: player({ status: 'ACT' }) });
-    expect(screen.queryByTestId('fa-status-chip')).toBeNull();
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
   });
 
   it('reuses the roster position palette rather than inventing a second one', () => {

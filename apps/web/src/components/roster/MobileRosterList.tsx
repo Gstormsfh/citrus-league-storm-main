@@ -1,3 +1,4 @@
+import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Lock, Shield, CalendarDays, Skull, AlertCircle } from "lucide-react";
@@ -175,12 +176,7 @@ const PlayerRow = ({ player, positionType = 'individual', slotId, slotPosition, 
   // on both surfaces. Pure arithmetic over player.stats — no fetch.
   const writeup = player ? generatePlayerWriteup(player) : null;
 
-  const statusBadge = player?.status ? {
-    IR: { label: 'IR', cls: 'bg-red-500 text-white' },
-    SUSP: { label: 'SUSP', cls: 'bg-orange-500 text-white' },
-    GTD: { label: 'GTD', cls: 'bg-yellow-500 text-white' },
-    WVR: { label: 'WVR', cls: 'bg-blue-500 text-white' },
-  }[player.status] : null;
+
 
   // MULTI-POSITION (2026-09-03, gap A). The chip is the SLOT; a C/LW player
   // in UTIL or on the bench never said he could play LW. His own positions
@@ -267,14 +263,7 @@ const PlayerRow = ({ player, positionType = 'individual', slotId, slotPosition, 
               <span className={cn(ROW_NAME, "text-pastel-cream")}>
                 {player.name}
               </span>
-              {statusBadge && (
-                /* 8px -> the MICRO rung. A solid saturated fill at 8px beside
-                   a 15px name is a smudge rather than a word (the same note
-                   freeAgentRowKit.ts makes about its own status chip). */
-                <span className={cn(ROW_MICRO, "leading-none font-bold px-1 py-px rounded-sm flex-shrink-0", statusBadge.cls)}>
-                  {statusBadge.label}
-                </span>
-              )}
+              <PlayerAvailabilityBadge availability={player.availability} />
               {moveOffIr && (
                 // Orange is the page's action colour and this is an action.
                 // pastel-forest on it, not white: the text that survives the

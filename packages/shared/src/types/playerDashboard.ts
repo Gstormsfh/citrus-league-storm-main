@@ -26,6 +26,7 @@
  */
 
 import type { PlayerWriteup } from '../playerWriteup';
+import type { PlayerAvailability } from '../playerAvailability';
 
 /**
  * One row of `GET /api/players/dashboard-index`: a directory player for the
@@ -50,6 +51,9 @@ export interface CanonicalProjectionContext {
 }
 
 export interface DashboardIndexEntry {
+  availability?: PlayerAvailability;
+  roster_status_source?: string | null;
+  roster_status_updated_at?: string | null;
   /** Current published forecast context; never inferred from a staged workbook. */
   canonical_context?: CanonicalProjectionContext | null;
   projection_run_id?: string | null;

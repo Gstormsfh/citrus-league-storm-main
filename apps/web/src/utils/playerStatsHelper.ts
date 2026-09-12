@@ -87,6 +87,7 @@ export function servicePlayerToHockeyPlayer(player: Player): HockeyPlayer {
       team: player.team,
       teamAbbreviation: player.team,
       status: player.status === 'injured' ? 'IR' : null,
+      availability: player.availability,
       roster_status: player.roster_status,
       is_ir_eligible: player.is_ir_eligible,
       image: player.headshot_url || undefined,

@@ -24,7 +24,7 @@ vi.mock('@/utils/logger', () => ({
 }));
 
 // Import after mocks
-import { getPlayerWithSeasonStats } from '../playerStatsHelper';
+import { getPlayerWithSeasonStats, servicePlayerToHockeyPlayer } from '../playerStatsHelper';
 import { PlayerService } from '@/services/PlayerService';
 
 const mockGetPlayersByIds = vi.mocked(PlayerService.getPlayersByIds);
@@ -232,3 +232,12 @@ describe('getPlayerWithSeasonStats', () => {
     expect(result!.number).toBe(0);
   });
 });
+
+  it('carries current status evidence through a roster/card conversion without granting IR eligibility', () => {
+    const availability = { status: 'out', basis: 'reviewed_report', as_of: '2026-09-10', expires_at: '2026-09-17', source: 'Primary report', revision: 'r1', stale: false } as const;
+    const input = makePlayer({ availability, is_ir_eligible: false, roster_status: undefined });
+    const result = servicePlayerToHockeyPlayer(input);
+    expect(result.availability).toEqual(availability);
+    expect(result.is_ir_eligible).toBe(false);
+    expect(result.roster_status).toBeUndefined();
+  });

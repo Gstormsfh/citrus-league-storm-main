@@ -3,7 +3,8 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from urllib.parse import urlparse
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -72,10 +73,24 @@ def validate(document):
                 raise ContractError(f'{pid}: availability {field} must be text or null')
         if a.get('source') is not None and not isinstance(a['source'], dict):
             raise ContractError(f'{pid}: availability source must be a structured evidence record')
-        if a['status'] not in {'active', 'out', 'ir', 'ltir', 'day_to_day', 'suspended', 'unknown'} or a['authority'] not in {'verified', 'imported_scenario', 'unknown'}:
+        if a['status'] not in {'active', 'healthy', 'injured', 'out', 'ir', 'ltir', 'day_to_day', 'suspended', 'unknown'} or a['authority'] not in {'verified', 'reviewed_report', 'imported_scenario', 'unknown'}:
             raise ContractError(f'{pid}: invalid availability')
         if a['authority'] == 'verified' and (not a.get('source') or not a.get('as_of')):
             raise ContractError(f'{pid}: verified availability requires dated evidence')
+        if a['authority'] == 'reviewed_report':
+            source = a.get('source') or {}
+            try:
+                observed = date.fromisoformat(a['as_of'])
+                deadline = date.fromisoformat(a['review_after'])
+                reported = date.fromisoformat(source['source_date'])
+                reviewed = date.fromisoformat(source['reviewed_at'])
+                url = urlparse(source['url'])
+            except (KeyError, TypeError, ValueError):
+                raise ContractError(f'{pid}: reviewed report requires dated evidence and review deadline') from None
+            if (reported != observed or reviewed < reported or deadline <= observed
+                    or url.scheme != 'https' or not url.hostname or url.username or url.password
+                    or not isinstance(a.get('reason'), str) or not a['reason'].strip()):
+                raise ContractError(f'{pid}: invalid reviewed report provenance or freshness boundary')
         if p.get('rate_policy') not in {'refresh_model', 'refresh_cohort', 'preserve_override'} or p.get('exposure_policy') not in {'preserve_season_override', 'model_remaining', 'unallocated'}:
             raise ContractError(f'{pid}: explicit refresh policies required')
     teams = [t['team'] for t in document['teams']]

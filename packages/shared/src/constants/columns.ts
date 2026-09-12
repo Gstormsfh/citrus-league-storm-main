@@ -182,7 +182,7 @@ export const PLAYER_DIRECTORY_COLUMNS = 'player_id, full_name, position_code, te
 // ============================================================================
 // PLAYER TALENT METRICS COLUMNS
 // ============================================================================
-export const PLAYER_TALENT_METRICS_COLUMNS = 'player_id, xg_per_60, xg_rating, roster_status, is_ir_eligible';
+export const PLAYER_TALENT_METRICS_COLUMNS = 'player_id, xg_per_60, xg_rating, roster_status, roster_status_source, roster_status_updated_at, is_ir_eligible';
 
 // ============================================================================
 // GOALIE GSAX COLUMNS

@@ -1,3 +1,4 @@
+import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { citrusNoteContext } from '@/utils/sourceSeasonContext';
 // Players — league-wide browse + advanced-metrics dashboard section.
 //
@@ -44,7 +45,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpRight, Loader2, Search, ShieldAlert } from 'lucide-react';
+import { ArrowUpRight, Loader2, Search } from 'lucide-react';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
 import { Mug } from '@/components/roster/Mug';
 import type { MugPlayer } from '@/components/roster/headshot';
@@ -183,12 +184,7 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
               xG rating: {player.xg_rating}
             </Badge>
           )}
-          {player.roster_status && ['IR', 'LTIR'].includes(player.roster_status) && (
-            <Badge variant="destructive" className="ml-1.5 mt-1.5">
-              <ShieldAlert className="mr-1 h-3 w-3" />
-              {player.roster_status}
-            </Badge>
-          )}
+          <PlayerAvailabilityBadge availability={player.availability} className="ml-1.5 mt-1.5" />
         </div>
       </div>
 

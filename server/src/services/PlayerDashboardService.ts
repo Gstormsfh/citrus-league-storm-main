@@ -2,6 +2,7 @@ import { CanonicalProjectionService } from './CanonicalProjectionService';
 import { SupabaseClient } from '@supabase/supabase-js';
 import {
   getCurrentSeason,
+  resolvePlayerAvailability,
   parseEligiblePositions,
   getProjectionsSeason,
   getMetricsSeason,
@@ -116,6 +117,8 @@ interface TalentRow {
   xg_per_60: number | null;
   xg_rating: string | null;
   roster_status: string | null;
+  roster_status_source: string | null;
+  roster_status_updated_at: string | null;
   /** Both `numeric`; both NULL on every 2025 production row as of 2026-09-03. */
   vopa_score: number | string | null;
   avg_toi_per_game: number | string | null;
@@ -169,7 +172,7 @@ const INDEX_STATS_COLS =
   'player_id, games_played, nhl_goals, nhl_assists, nhl_points, nhl_shots_on_goal, nhl_hits, nhl_blocks, nhl_pim, nhl_ppp, nhl_shp, nhl_plus_minus, nhl_toi_seconds, x_goals, goalie_gp, nhl_wins, nhl_losses, nhl_ot_losses, nhl_saves, nhl_save_pct, nhl_gaa, nhl_shutouts, nhl_goals_against, updated_at';
 const GAR_COLS =
   'player_id, evo_gar_per_60, evd_gar_per_60, ppo_gar_per_60, ppd_gar_per_60, penalty_gar_per_60, total_gar_per_60, toi_total_minutes, updated_at';
-const TALENT_COLS = 'player_id, xg_per_60, xg_rating, roster_status, vopa_score, avg_toi_per_game, updated_at';
+const TALENT_COLS = 'player_id, xg_per_60, xg_rating, roster_status, roster_status_source, roster_status_updated_at, vopa_score, avg_toi_per_game, updated_at';
 const ROS_COLS =
   'player_id, games_remaining, total_projected_points, avg_points_per_game, projected_goals, projected_assists, projected_sog, projected_ppp, projected_hits, projected_blocks, projected_pim, projected_plus_minus, projected_shp, projected_ga_ros, projected_wins_ros, projected_saves_ros, projected_shutouts_ros, updated_at';
 const INDEX_GSAX_COLS =
@@ -793,15 +796,15 @@ export class PlayerDashboardService {
         return { ...index, players: index.players.map(player => {
           const context = contexts.get(String(player.id)) ?? null;
           const matches = context && context.status === 'projected' && player.projection_run_id === context.run_id && player.projection_revision === context.revision;
-          return { ...(revisionKey && !matches ? withoutForecast(player) : player), canonical_context: context };
+          return { ...(revisionKey && !matches ? withoutForecast(player) : player), canonical_context: context, availability: resolvePlayerAvailability({ ...player, canonical_context: context }) };
         }) };
       }
       // Activation raced both reads. Actuals stay visible; forecasts wait for a stable revision.
-      return { ...lastIndex, players: lastIndex.players.map(player => ({ ...withoutForecast(player), canonical_context: null })) };
+      return { ...lastIndex, players: lastIndex.players.map(player => ({ ...withoutForecast(player), canonical_context: null, availability: resolvePlayerAvailability({ ...player, canonical_context: null }) })) };
     } catch (error) {
       logger.warn('[PlayerDashboardService] Canonical publication unknown; forecasts withheld', error);
       const index = await this.getBaseDashboardIndex(false);
-      return { ...index, players: index.players.map(player => ({ ...withoutForecast(player), canonical_context: null })) };
+      return { ...index, players: index.players.map(player => ({ ...withoutForecast(player), canonical_context: null, availability: resolvePlayerAvailability({ ...player, canonical_context: null }) })) };
     }
   }
 
@@ -915,6 +918,8 @@ export class PlayerDashboardService {
         headshot_url: d.headshot_url,
         is_goalie: isGoalie,
         roster_status: t?.roster_status ?? null,
+        roster_status_source: t?.roster_status_source ?? null,
+        roster_status_updated_at: t?.roster_status_updated_at ?? null,
         gp: (isGoalie ? s?.goalie_gp : s?.games_played) ?? 0,
         goals: s?.nhl_goals ?? 0,
         assists: s?.nhl_assists ?? 0,

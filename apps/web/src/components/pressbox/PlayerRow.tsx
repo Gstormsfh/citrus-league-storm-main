@@ -1,3 +1,5 @@
+import type { PlayerAvailability } from '@citrus/shared';
+import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 /**
  * THE PRESS BOX PLAYERS ROW — the pool, ranked, with what the league is doing
  * about each name.
@@ -50,6 +52,7 @@ export interface PressBoxPlayerRowPlayer extends MugPlayer {
   note?: string;
   /** Injury or roster status, e.g. `DTD`. */
   status?: string | null;
+  availability?: PlayerAvailability;
   rosteredPct?: number | null;
   startedPct?: number | null;
   weekProjection?: number | null;
@@ -203,11 +206,7 @@ export function PressBoxPlayerRow({
       <button type="button" onClick={onPress} className="flex-1 min-w-0 text-left" aria-label={`Open player card for ${player.name}`}>
         <span className={cn(PB_ROW_NAME, 'block text-pressbox-text')}>
           {player.name}
-          {player.status && (
-            <span className="ml-1.5 font-plex font-bold text-[9px] px-1 py-px rounded-[3px] bg-pressbox-grapefruit/[0.18] text-pressbox-grapefruit-text align-[1px]">
-              {player.status}
-            </span>
-          )}
+          <PlayerAvailabilityBadge availability={player.availability} />
         </span>
 
         <span className={cn(PB_ROW_META, 'block mt-0.5 text-pressbox-text/55')}>

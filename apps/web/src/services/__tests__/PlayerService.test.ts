@@ -301,6 +301,15 @@ describe('PlayerService', () => {
       expect(players[2].full_name).toBe('Player A'); // 15 pts
     });
 
+    it('preserves current evidence independently of fantasy IR eligibility', async () => {
+      const availability = { status: 'out', basis: 'reviewed_report', as_of: '2026-09-10', expires_at: '2026-09-17', source: 'Primary report', revision: 'r1', stale: false };
+      mockSearchPlayers.mockResolvedValueOnce({ data: [{ ...makeServerPlayer({ is_ir_eligible: false, roster_status: null }), availability }] });
+      const [result] = await PlayerService.getAllPlayers();
+      expect(result.availability).toEqual(availability);
+      expect(result.is_ir_eligible).toBe(false);
+      expect(result.roster_status).toBeUndefined();
+    });
+
     it('derives IR status from server data', async () => {
       const sp = makeServerPlayer({
         status: 'injured',

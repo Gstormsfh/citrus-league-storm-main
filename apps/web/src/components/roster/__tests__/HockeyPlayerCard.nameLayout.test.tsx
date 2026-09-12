@@ -28,7 +28,7 @@
 // jsdom has no layout engine, so the pixel findings above cannot be
 // re-measured here. What IS assertable, and is what actually broke, is the
 // DOM structure: the name must not share a shrink contest with the badge.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -38,6 +38,10 @@ import HockeyPlayerCard, { HockeyPlayer } from '../HockeyPlayerCard';
 const HERE = resolve(fileURLToPath(import.meta.url), '..');
 const CARD_SRC = readFileSync(resolve(HERE, '..', 'HockeyPlayerCard.tsx'), 'utf8');
 const BENCH_SRC = readFileSync(resolve(HERE, '..', 'BenchGrid.tsx'), 'utf8');
+
+beforeEach(() => vi.setSystemTime(new Date('2026-09-12')));
+afterEach(() => vi.useRealTimers());
+const evidence = (status: 'ir' | 'suspended' | 'day_to_day' | 'out') => ({ status, basis: 'reviewed_report' as const, as_of: '2026-09-10', expires_at: '2026-09-17', source: 'Primary report', revision: 'r1', stale: false });
 
 const player = (over: Partial<HockeyPlayer> = {}): HockeyPlayer =>
   ({
@@ -59,9 +63,9 @@ describe('HockeyPlayerCard — the name never loses a width contest', () => {
   });
 
   it('the status badge is NOT a sibling of the name — that is the defect', () => {
-    const { container } = render(<HockeyPlayerCard player={player({ status: 'GTD' })} />);
+    const { container } = render(<HockeyPlayerCard player={player({ availability: evidence('day_to_day') })} />);
     const h3 = container.querySelector('h3')!;
-    const badge = screen.getByText('GTD');
+    const badge = screen.getByText('DTD');
     expect(h3).toBeTruthy();
     // The badge must not share the name's flex row. If it is ever moved back
     // alongside the <h3>, the two become flex siblings again and the name —
@@ -74,11 +78,11 @@ describe('HockeyPlayerCard — the name never loses a width contest', () => {
     expect(h3.nextElementSibling!.contains(badge)).toBe(true);
   });
 
-  it.each(['IR', 'SUSP', 'GTD', 'WVR'] as const)(
+  it.each([['ir', 'IR'], ['suspended', 'SUSP'], ['day_to_day', 'DTD'], ['out', 'OUT']] as const)(
     '%s badge sits on the meta row and drops the jersey number rather than truncating it',
-    (status) => {
-      const { container } = render(<HockeyPlayerCard player={player({ status })} />);
-      const badge = screen.getByText(status);
+    (status, label) => {
+      const { container } = render(<HockeyPlayerCard player={player({ availability: evidence(status) })} />);
+      const badge = screen.getByText(label);
       const metaRow = badge.parentElement!;
       expect(metaRow.textContent).toContain('COL');
       // No dangling "COL • " with the number guillotined off by a truncate.
@@ -87,9 +91,10 @@ describe('HockeyPlayerCard — the name never loses a width contest', () => {
     },
   );
 
-  it('with no status badge the meta row keeps team and jersey number', () => {
+  it('unknown evidence stays on the meta row without crowding the name', () => {
     const { container } = render(<HockeyPlayerCard player={player()} />);
-    expect(container.textContent).toContain('COL • #8');
+    expect(screen.getByText('Unknown').parentElement?.textContent).toContain('COL');
+    expect(container.querySelector('h3')?.textContent).toBe('Cale Makar');
   });
 });
 
