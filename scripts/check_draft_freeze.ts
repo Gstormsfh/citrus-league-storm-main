@@ -141,7 +141,38 @@ function describe(league: Blocker): string {
   return `${label} — ${league.reason} (${when})`;
 }
 
+// This reviewed exception is limited to the known Roster text draft. Supporting
+// another league requires review; a dispatcher cannot silently expand its scope.
+const APPROVED_EXCEPTION_LEAGUE = '3fd3e70c-fa85-432f-b98a-b29ce43a519c';
+
+type DraftException = { sha: string; league: string; reason: string };
+function readDraftException(): DraftException | null {
+  const sha = process.env.PRODUCTION_DRAFT_EXCEPTION_SHA || '';
+  const league = process.env.PRODUCTION_DRAFT_EXCEPTION_LEAGUE || '';
+  const reason = process.env.PRODUCTION_DRAFT_EXCEPTION_REASON || '';
+  const supplied = Boolean(sha || league || reason);
+  const productionDispatch = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
+    && process.env.GITHUB_WORKFLOW === 'Production Deploy';
+  if (!supplied && !productionDispatch) return null;
+
+  if (process.env.GITHUB_EVENT_NAME !== 'workflow_dispatch'
+    || process.env.GITHUB_WORKFLOW !== 'Production Deploy'
+    || process.env.GITHUB_REF !== 'refs/heads/master'
+    || !process.env.GITHUB_REPOSITORY
+    || process.env.GITHUB_WORKFLOW_REF !== `${process.env.GITHUB_REPOSITORY}/.github/workflows/production-deploy.yml@refs/heads/master`
+    || !/^[a-f0-9]{40}$/.test(sha)
+    || sha !== process.env.GITHUB_SHA
+    || league !== APPROVED_EXCEPTION_LEAGUE
+    || reason.trim().length < 10 || reason.length > 500 || /[\r\n\x00-\x1f\x7f]/.test(reason)
+    || process.env[OVERRIDE_ENV] === '1') {
+    throw new Error('Invalid run-scoped draft exception: require Production Deploy dispatch on master, matching exact SHA, approved league, single-line audit reason, and no global override');
+  }
+  return { sha, league, reason };
+}
+
 async function main(): Promise<number> {
+  // Validate before any bypass or data read. Partial/mis-scoped input fails closed.
+  const draftException = readDraftException();
   // Manual override — emergency bypass. Must be logged in commit message.
   if (process.env[OVERRIDE_ENV] === '1') {
     console.log(
@@ -170,7 +201,22 @@ async function main(): Promise<number> {
     return 2;
   }
 
-  if (hard.blockers.length > 0) {
+  // Do not reinterpret or hide the RPC result. Only the reviewed league can be
+  // excepted, and an additional blocker refuses the entire run.
+  if (draftException) {
+    console.log(`Draft exception audit: ${JSON.stringify({
+      ...draftException, runId: process.env.GITHUB_RUN_ID,
+      runAttempt: process.env.GITHUB_RUN_ATTEMPT, actor: process.env.GITHUB_ACTOR,
+      observedBlockers: hard.blockers,
+    })}`);
+    if (hard.blockers.some((blocker) => blocker.league_id !== draftException.league)) {
+      console.error('::error::Additional draft blocker outside the approved single-league exception');
+      return 1;
+    }
+    console.log('::warning::Explicit single-run draft exception accepted; draft state is unchanged. All remaining deployment gates still apply.');
+  }
+
+  if (hard.blockers.length > 0 && !draftException) {
     console.error(
       `::error::Change freeze active: ${hard.blockers.length} league(s) are drafting now or within ${HARD_HOURS} hours.`,
     );
@@ -211,7 +257,9 @@ async function main(): Promise<number> {
 
   if (upcoming.length === 0) {
     console.log(
-      `check_draft_freeze: OK — no draft running now, and none scheduled in the next ${WARN_HOURS} hours.`,
+      draftException
+        ? `check_draft_freeze: OK — approved exception recorded; no additional drafts scheduled in the next ${WARN_HOURS} hours.`
+        : `check_draft_freeze: OK — no draft running now, and none scheduled in the next ${WARN_HOURS} hours.`,
     );
     return 0;
   }

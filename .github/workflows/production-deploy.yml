@@ -1,6 +1,20 @@
 name: Production Deploy
 
 on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: 'Exact 40-character master commit to deploy (must match this run)'
+        required: true
+        type: string
+      draft_exception_league:
+        description: 'Explicitly approved draft league UUID; all other blockers still refuse deployment'
+        required: true
+        type: string
+      draft_exception_reason:
+        description: 'User authorization and reason for this single-run exception'
+        required: true
+        type: string
   push:
     branches: [master]
 
@@ -48,7 +62,14 @@ jobs:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           OVERRIDE_DRAFT_FREEZE: ${{ vars.OVERRIDE_DRAFT_FREEZE }}
+          # Inputs are absent on push. Never use a repository variable for this exception.
+          PRODUCTION_DRAFT_EXCEPTION_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.release_sha || '' }}
+          PRODUCTION_DRAFT_EXCEPTION_LEAGUE: ${{ github.event_name == 'workflow_dispatch' && inputs.draft_exception_league || '' }}
+          PRODUCTION_DRAFT_EXCEPTION_REASON: ${{ github.event_name == 'workflow_dispatch' && inputs.draft_exception_reason || '' }}
         run: npx tsx scripts/check_draft_freeze.ts
+
+      - name: Test draft exception guard
+        run: node --test scripts/check-draft-freeze.test.mjs
 
       - name: Lint
         run: cd apps/web && npx eslint src/
