@@ -5,6 +5,7 @@ import { AppError } from '../lib/errors';
 import { getSupabaseAdmin } from '../lib/supabase';
 import { logger } from '@citrus/shared';
 import { NewsRoomService } from '../services/NewsRoomService';
+import { augmentCitrusNotesWithNews } from '../services/CitrusNewsService';
 
 /**
  * News routes — server-side proxy for third-party NHL news feeds.
@@ -175,7 +176,7 @@ newsRoutes.get('/player/:playerId', async (c) => {
     // NEWS ROOM (2026-09-05): the wire stories that name him ride along with
     // our notes, so the card's NEWS tab reads like Sleeper's: a summary and
     // a link to the writer. Either read failing leaves the other standing.
-    const [notesRes, items] = await Promise.all([
+    const [notesRes, items, identity] = await Promise.all([
       supabase
         .from('citrus_news')
         .select('id, kind, headline, body, analysis, severity, tags, published_at, season')
@@ -186,13 +187,25 @@ newsRoutes.get('/player/:playerId', async (c) => {
         logger.warn(`[news] wire items unavailable for ${playerId}:`, err instanceof Error ? err.message : String(err));
         return [];
       }),
+      (async () => {
+        try {
+          const { data, error } = await supabase.from('player_directory').select('full_name')
+            .eq('player_id', playerId).order('season', { ascending: false }).limit(1);
+          if (error) throw new Error(error.message);
+          const name = data?.[0]?.full_name;
+          return typeof name === 'string' && name.trim() ? { id: playerId, name: name.trim() } : null;
+        } catch (error) {
+          logger.warn(`[news] player identity unavailable for ${playerId}:`, error instanceof Error ? error.message : String(error));
+          return null;
+        }
+      })(),
     ]);
 
     if (notesRes.error) {
       logger.warn(`[news] player notes query failed for ${playerId}:`, notesRes.error.message);
       return ok(c, { notes: [], items });
     }
-    return ok(c, { notes: notesRes.data || [], items });
+    return ok(c, { notes: augmentCitrusNotesWithNews(notesRes.data || [], identity, items), items });
   } catch (error) {
     logger.warn(`[news] player notes unavailable for ${playerId}:`, error);
     return ok(c, { notes: [] });
