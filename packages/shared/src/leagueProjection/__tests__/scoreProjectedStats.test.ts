@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { ScoringCalculator } from '../../utils/scoring';
-import { projectionSettings, scoreProjectedStats } from '../index';
+import { projectionSettings, projectedPointsFor, scoreProjectedStats } from '../index';
 
 const skaterRow = {
   is_goalie: false,
@@ -68,8 +68,33 @@ describe('scoreProjectedStats', () => {
     expect(scoreProjectedStats(row, new ScoringCalculator(bangerLeague))).toBeCloseTo(21.4, 5);
   });
 
-  it('a missing row is worth nothing, not a guess', () => {
-    expect(scoreProjectedStats(null, new ScoringCalculator(bangerLeague))).toBe(0);
-    expect(scoreProjectedStats(undefined, new ScoringCalculator(bangerLeague))).toBe(0);
+  it('a row with no components cannot be rescored, and says so', () => {
+    // A backfilled row that carries only the stored total. Answering 0 here
+    // would take the player's projection off the screen.
+    expect(scoreProjectedStats({ total_projected_points: 7.5 }, new ScoringCalculator(bangerLeague))).toBeNull();
+    expect(scoreProjectedStats(null, new ScoringCalculator(bangerLeague))).toBeNull();
+    expect(scoreProjectedStats(undefined, new ScoringCalculator(bangerLeague))).toBeNull();
+  });
+
+  it('a real zero is a measurement, not a missing component', () => {
+    const row = { is_goalie: false, projected_goals: 0, projected_assists: 0 };
+    expect(scoreProjectedStats(row, new ScoringCalculator(bangerLeague))).toBe(0);
+  });
+});
+
+describe('projectedPointsFor', () => {
+  it('scores under the league when the components are there', () => {
+    expect(projectedPointsFor({ ...skaterRow, total_projected_points: 99 }, new ScoringCalculator(bangerLeague)))
+      .toBeCloseTo(21.4, 5);
+  });
+
+  it('falls back to the stored total when they are not', () => {
+    expect(projectedPointsFor({ total_projected_points: 7.5 }, new ScoringCalculator(bangerLeague))).toBeCloseTo(7.5, 5);
+    expect(projectedPointsFor({ total_projected_points: '7.5' }, new ScoringCalculator(bangerLeague))).toBeCloseTo(7.5, 5);
+  });
+
+  it('nothing at all is zero', () => {
+    expect(projectedPointsFor(null, new ScoringCalculator(bangerLeague))).toBe(0);
+    expect(projectedPointsFor({}, new ScoringCalculator(bangerLeague))).toBe(0);
   });
 });

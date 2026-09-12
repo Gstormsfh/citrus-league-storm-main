@@ -283,7 +283,11 @@ describe('MatchupService.getLeagueScoreboard: the reads', () => {
     await service.getLeagueScoreboard('league-1', 3, TODAY, NOW_MS);
 
     const touched = supabase.from.mock.calls.map((c: unknown[]) => c[0]);
-    expect(touched).toEqual(['matchups', 'fantasy_daily_rosters', 'team_lineups', 'player_projected_stats']);
+    // `leagues` joined the list on 2026-09-12: the scoreboard scores each
+    // projection under the league's own weights, so it reads that league's
+    // scoring document once. Still one query per table, still never the admin
+    // client, which is what this test is here to hold.
+    expect(touched).toEqual(['matchups', 'fantasy_daily_rosters', 'team_lineups', 'player_projected_stats', 'leagues']);
     expect(adminFrom).not.toHaveBeenCalled();
 
     // Rosters: the open matchups only, active slots, from today to the week's end.

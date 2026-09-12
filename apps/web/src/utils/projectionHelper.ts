@@ -4,7 +4,7 @@ import { rosterApi } from '@/api/rosters';
 import { getCurrentSeason, getProjectionsSeason } from '@/utils/seasonConstants';
 import { logger } from '@/utils/logger';
 import { ScoringCalculator } from '@citrus/shared';
-import { scoreProjectedStats, type ProjectedStatRow } from '@citrus/shared/leagueProjection';
+import { projectedPointsFor, type ProjectedStatRow } from '@citrus/shared/leagueProjection';
 
 /**
  * Get weekly projected fantasy points for players
@@ -67,7 +67,7 @@ export async function getWeeklyProjections(
     ((data || []) as Record<string, unknown>[]).forEach((projection) => {
       const playerId = Number(projection.player_id);
       const points = scorer
-        ? scoreProjectedStats(projection as ProjectedStatRow, scorer)
+        ? projectedPointsFor(projection as ProjectedStatRow, scorer)
         : Number(projection.total_projected_points) || 0;
       const current = weeklyTotals.get(playerId) || 0;
       weeklyTotals.set(playerId, current + points);

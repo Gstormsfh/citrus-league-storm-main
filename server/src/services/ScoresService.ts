@@ -50,7 +50,7 @@ import {
   type ScoresPlayerLine,
   // Root, not the /leagueProjection subpath: the server's vitest alias points
   // at src/index.ts, so a subpath import resolves to index.ts/leagueProjection.
-  scoreProjectedStats,
+  projectedPointsFor,
   type ProjectedStatRow,
 } from '@citrus/shared';
 import { pagedSelect } from '../lib/pagedSelect';
@@ -676,7 +676,7 @@ export class ScoresService {
         // baked with default scoring - so this line printed a default-scored
         // projection directly above an actualPoints computed with the league's
         // own scorer, two numbers on two scales in one row.
-        projectedPoints: scoreProjectedStats(proj, ctx.scorer),
+        projectedPoints: projectedPointsFor(proj, ctx.scorer),
         confidenceLabel: proj.confidence_label ?? null,
         actualPoints: actual
           ? ctx.scorer.calculatePoints(actualsToStatBag(actual), Boolean(actual.is_goalie))

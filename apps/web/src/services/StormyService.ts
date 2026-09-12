@@ -25,7 +25,7 @@ import {
 import { fetchGamesForTeams } from "@/utils/scheduleMaximizer";
 import { getWeeklyProjections } from "@/utils/projectionHelper";
 import { ScoringCalculator } from '@citrus/shared';
-import { projectionSettings, scoreProjectedStats, type ProjectedStatRow } from '@citrus/shared/leagueProjection';
+import { projectionSettings, projectedPointsFor, type ProjectedStatRow } from '@citrus/shared/leagueProjection';
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -393,7 +393,7 @@ class StormyServiceImpl {
    */
   static rosToken(row: RosProjectionRow | undefined, scorer: ScoringCalculator): string {
     if (!row || row.total_projected_points == null) return '';
-    return ` ROS:${scoreProjectedStats(row, scorer).toFixed(1)}pts ${row.games_remaining}GR`;
+    return ` ROS:${projectedPointsFor(row, scorer).toFixed(1)}pts ${row.games_remaining}GR`;
   }
 
   /** `Gap: you lead by 15.0`, or null until both sides have a score. */
@@ -824,7 +824,7 @@ class StormyServiceImpl {
 
           if (freeAgents.length > 0) {
             const faLines = freeAgents.map(p =>
-              `${p.position ?? "?"} ${p.player_name} (${p.team_abbrev ?? "?"}) ROS:${scoreProjectedStats(p, leagueScorer).toFixed(1)}pts ${Number(p.avg_points_per_game).toFixed(1)}PPG ${p.games_remaining}GR`
+              `${p.position ?? "?"} ${p.player_name} (${p.team_abbrev ?? "?"}) ROS:${projectedPointsFor(p, leagueScorer).toFixed(1)}pts ${Number(p.avg_points_per_game).toFixed(1)}PPG ${p.games_remaining}GR`
             );
             ctx.extra = (ctx.extra ? ctx.extra + "\n\n" : "") + "Top Available Free Agents:\n" + faLines.join("\n");
           }

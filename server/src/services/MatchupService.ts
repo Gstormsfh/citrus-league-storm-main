@@ -19,7 +19,7 @@ import type { LeagueScoreboardMatchup } from '@citrus/shared';
 import {
   ScoringCalculator,
   projectionSettings,
-  scoreProjectedStats,
+  projectedPointsFor,
   type ProjectedStatRow,
 } from '@citrus/shared';
 import { getSupabaseAdmin } from '../lib/supabase';
@@ -493,7 +493,7 @@ export class MatchupService {
     );
     const leagueScored = projectionsRead.data.map((row) => ({
       ...row,
-      total_projected_points: scoreProjectedStats(row, scorer),
+      total_projected_points: projectedPointsFor(row, scorer),
     }));
 
     const totals = projectLeagueWeek({

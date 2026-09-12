@@ -96,6 +96,12 @@ export function normalizeSavePctValue(v: number | null | undefined): number | nu
  */
 export interface ProjectedStatRow {
   is_goalie?: boolean | null;
+  /**
+   * The stored total, baked with DEFAULT scoring. Present on both tables and
+   * carried here only as the fallback for a row with no components; no league
+   * surface reads it on its own.
+   */
+  total_projected_points?: number | string | null;
   projected_goals?: number | string | null;
   projected_assists?: number | string | null;
   projected_ppp?: number | string | null;
@@ -135,13 +141,36 @@ const projectedNumber = (value: unknown): number => {
  * projectionFor does for a draft board, against the other table's column
  * names.
  */
+const anyPresent = (...values: Array<number | string | null | undefined>): boolean =>
+  values.some((v) => v !== null && v !== undefined && v !== '');
+
+/**
+ * The league-scored value of a row, or null when the row carries no component
+ * stats to score from.
+ *
+ * Null rather than 0 (2026-09-12, caught by the suite): a backfilled or older
+ * row that has only the stored total would otherwise rescore to zero and take
+ * a player's projection off the screen entirely. A missing input is not a
+ * measurement of nothing. Callers that need a number use projectedPointsFor,
+ * which falls back to the stored total.
+ */
 export function scoreProjectedStats(
   row: ProjectedStatRow | null | undefined,
   scorer: ScoringCalculator,
-): number {
-  if (!row) return 0;
+): number | null {
+  if (!row) return null;
 
   if (row.is_goalie === true) {
+    if (
+      !anyPresent(
+        row.projected_wins ?? row.projected_wins_ros,
+        row.projected_saves ?? row.projected_saves_ros,
+        row.projected_shutouts ?? row.projected_shutouts_ros,
+        row.projected_goals_against ?? row.projected_ga_ros,
+      )
+    ) {
+      return null;
+    }
     return scorer.calculatePoints(
       {
         wins: projectedNumber(row.projected_wins ?? row.projected_wins_ros),
@@ -151,6 +180,21 @@ export function scoreProjectedStats(
       },
       true,
     );
+  }
+
+  if (
+    !anyPresent(
+      row.projected_goals,
+      row.projected_assists,
+      row.projected_ppp,
+      row.projected_sog,
+      row.projected_blocks,
+      row.projected_hits,
+      row.projected_pim,
+      row.projected_shp,
+    )
+  ) {
+    return null;
   }
 
   return scorer.calculatePoints(
@@ -166,6 +210,23 @@ export function scoreProjectedStats(
     },
     false,
   );
+}
+
+/**
+ * What this row is worth to this league, as a number.
+ *
+ * The league-scored value where the components are there; the stored
+ * default-scored total where they are not, because a row with no components
+ * is a row we cannot rescore, not a player projected to score nothing.
+ */
+export function projectedPointsFor(
+  row: ProjectedStatRow | null | undefined,
+  scorer: ScoringCalculator,
+): number {
+  const scored = scoreProjectedStats(row, scorer);
+  if (scored !== null) return scored;
+  const stored = projectedNumber(row?.total_projected_points);
+  return stored;
 }
 
 export function projectionFor(
