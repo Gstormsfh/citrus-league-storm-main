@@ -1,8 +1,10 @@
 # Citrus Fantasy Sports — Engineering Reference
 
+> Projection-serving update, 12 September 2026: use the [verified lineage map](docs/audits/citrus-data-lineage-2026-09-12.md) for current writers, units, consumers and release boundaries. Historical architecture examples and dated incident notes below do not establish current scheduler activity.
+
 ## 1. System Overview
 
-Citrus Fantasy Sports is an NHL fantasy hockey platform featuring multiple league formats (head-to-head, best ball, pick'em, survivor, confidence pools), a live draft room, weekly matchup scoring, waiver wire, trade system, and an AI assistant ("Stormy"). The platform is powered by a proprietary expected goals (xG v3) projection model built on XGBoost with 31 features, giving it a data-driven competitive edge over other fantasy hockey products. The system ingests live NHL data via a Python pipeline with 100-IP proxy rotation, processes it through ML models, and serves projections and scores through a TypeScript API to a React SPA.
+Citrus Fantasy Sports is an NHL fantasy hockey platform featuring multiple league formats (head-to-head, best ball, pick'em, survivor, confidence pools), a live draft room, weekly matchup scoring, waiver wire, trade system, and an AI assistant ("Stormy"). The system combines NHL acquisition, SQL projection writers, Python model tooling, a TypeScript API and a React SPA. Current production projection lineage is documented separately from historical model-training and operator paths.
 
 ## 2. Tech Stack
 
@@ -235,7 +237,7 @@ Mirror of server routes — 18 modules (`leagues.ts`, `players.ts`, `matchups.ts
 | Workflow | Trigger | Actions |
 |----------|---------|---------|
 | `ci.yml` | PR to main | Lint, typecheck, test (web + server) |
-| `main.yml` | Push to main | Build + deploy preview |
+| `main.yml` | Daily 10:30 UTC / manual | Read-only projection-output health check |
 | `deploy-preview.yml` | PR | Firebase preview channel deploy |
 | `production-deploy.yml` | Release/manual | Build → Firebase deploy + Cloud Run deploy |
 
@@ -258,7 +260,9 @@ npm run dev:all      # Both concurrently
 
 ## 9. End-to-End Data Flow
 
-### How an NHL goal becomes fantasy points on screen
+### Historical acquisition and scoring overview
+
+The diagram below is retained as historical context. In particular, its Python schedule and projection-cache write claims are superseded by the verified SQL writer and dependency map linked above.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -309,19 +313,17 @@ npm run dev:all      # Both concurrently
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Key insight:** The Python pipeline does all heavy computation (scraping, scoring, projections). The API server reads pre-computed data through RLS. The frontend displays results with league-specific scoring adjustments via `ScoringCalculator`.
+**Current projection ownership:** observed production pg_cron jobs run SQL ROS and daily rebuilds. Python acquisition/model/batch paths also exist, but their external schedule is not established by repository presence. The API and client have multiple actual/forecast readers; league rescoring must be checked at each consumer.
 
-### Operational Schedule
+### Verified projection schedule (12 September 2026)
 
-| Time | Process | What happens |
-|------|---------|-------------|
-| **Continuous** | `data_scraping_service.py` | Live game sync every 5-10s via 100-IP proxy rotation |
-| **Continuous** | Health check server (:8888) | Exposes pipeline health: `healthy` (<10min stale) → `degraded` (10-30min) → `unhealthy` (>30min) |
-| **Midnight MT** | `fetch_nhl_stats_from_landing.py` | Nightly PPP/SHP stats sync from NHL.com landing pages |
-| **Midnight MT** | `reconcile_player_stats.py` | Audit and fix player stat discrepancies |
-| **Post-midnight** | `calculate_matchup_scores.py` | Refresh pre-calculated matchup lines for all active leagues |
-| **Morning** | `run_daily_projections.py` | Daily player projections (multiprocessing, 600+ players) |
-| **2 AM ET** | `nightly_projection_batch.py` | Full ROS batch: 6 phases, ~15,000 projections, 15-30 min runtime |
+| UTC | Process | Evidence scope |
+|---|---|---|
+| 08:50 | `rebuild_ros_projections(get_projection_target_season())` | Production cron31 and successful runs inspected by reconciliation audit |
+| 09:05 | `rebuild_player_projected_stats(get_projection_target_season())` | Production cron34 and successful runs inspected by reconciliation audit |
+| 10:30 | `.github/workflows/main.yml` | Checked-in read-only output health workflow; not a writer |
+
+Acquisition daemon, landing/PPP refresh, reconciliation, matchup processing and Python batch entry points remain in the repository. Their historical midnight/Mountain/Eastern schedules are not asserted here as live deployments; verify host task/service definitions and recent execution before invoking or disabling them.
 
 ### Auth Flow (request lifecycle)
 
@@ -352,7 +354,7 @@ Service Layer
 
 4. **WaiverService** (`server/src/services/WaiverService.ts`) — Processes waiver claims with FAAB (Free Agent Acquisition Budget) bidding or priority-based processing. Claims are batched and resolved in priority order.
 
-5. **xG Projection Pipeline** (`data-pipeline/projections/`) — Runs nightly: fetches latest NHL data, applies the 31-feature XGBoost model with Bayesian shrinkage and contextual adjustments (matchup difficulty, rest, home/away), writes projections to `player_projected_stats`.
+5. **Projection serving** — Verified SQL jobs rebuild `player_ros_projections` and `player_projected_stats`. Python tools under `data-pipeline/projections/` are separate reachable paths; their model/training descriptions do not prove they wrote the currently served rows. See the lineage map for source inputs and conditional versus unconditional units.
 
 6. **LeagueMembershipService** (`server/src/services/LeagueMembershipService.ts`) — Authorization gate: verifies a user belongs to a league before any league data access. Used by `membershipMiddleware` on all league routes.
 

@@ -1,0 +1,23 @@
+flowchart TB
+  INPUT["NHL facts + named model rates<br/>actuals, IDs, rosters, schedule, rate provenance"]
+  EDIT["Excel-style source editor<br/>every team / every player / TEAM NOTES<br/>availability, IR, suspension, role and overrides"]
+  VALID["Validate edits and imports<br/>identity, units, evidence, team allocation, revision conflict"]
+  SOURCE["ONE VERSIONED PLAYER + TEAM SOURCE<br/>effective rates, workload, structured status, notes and provenance"]
+  DERIVE["ONE PROJECTION PIPELINE<br/>derive daily / weekly / season categories and expected exposure"]
+  SCORE["Shared league scoring + versioned API/views"]
+  APP["All cards and boards<br/>draft, roster, matchup, free agents, app Draft Kit"]
+  EXPORT["Workbook + PDF guide<br/>same published revision"]
+  NEWS["News Room<br/>cited, dated evidence"]
+  PROSE["Player writeups + Citrus notes<br/>canonical facts / forecast context + news"]
+  INPUT --> VALID
+  EDIT -->|"reviewed changes"| VALID
+  VALID -->|"publish a validated revision"| SOURCE
+  SOURCE -->|"load current revision"| EDIT
+  SOURCE --> DERIVE --> SCORE
+  SCORE --> APP
+  SCORE --> EXPORT
+  SOURCE -->|"structured status + revision invalidation"| APP
+  SOURCE --> PROSE
+  NEWS --> PROSE
+  classDef canonical fill:#e4f2e8,stroke:#21734b,stroke-width:2px,color:#10291f;
+  class SOURCE canonical;
