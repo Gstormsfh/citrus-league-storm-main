@@ -63,3 +63,7 @@ Do not narrow numeric exposure columns back to integers or drop canonical histor
 - Final checks also include clean web/server TypeScript and diff whitespace. Six server tests remain explicitly skipped by their suite; passing counts do not conceal them.
 
 Production remains the previous API revision `6aef8ab7`, independently observed at Cloud Run revision `citrus-api-00310-q6p`; deployment evidence is in [scheduler execution proof](audits/scheduler-execution-proof-2026-09-12.md). The user can review and use the local source interface and exports now. Activation requires a publishable reviewed source, staging migration/rollback rehearsal, and a deliberate release; Build 19/device acceptance remains separate.
+
+### Null-settings backfill preflight
+
+A final read-only production query on September 12 checked both SQL NULL and JSON null `leagues.scoring_settings`: **0 null-document leagues and 0 null-document leagues with nondefault effective rules**. The query compared `get_effective_scoring_rules(l.id).multiplier` with the matching `stat_catalog.default_multiplier`. There is therefore no observed historical null/custom-rule ambiguity in this snapshot. Repeat this preflight immediately before applying the scoring synchronization migration. If any such rows appear, preserve their existing custom rules and resolve provenance before the bulk reconciliation; the deliberate-reset unit tests alone are not evidence of historical user intent. No backfill was executed.
