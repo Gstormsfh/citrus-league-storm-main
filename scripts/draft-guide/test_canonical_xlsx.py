@@ -54,6 +54,44 @@ class CanonicalWorkbookTests(unittest.TestCase):
                 self.assertEqual(values['Players']['AF4'].value, 0)
                 self.assertIn(values['Players']['AN4'].value, (None, ''))
 
+    def test_optional_signed_plus_minus_exports_only_when_configured(self):
+        d, e = fixtures()
+        baseline=payload(d, e, d['revision'])
+        self.assertNotIn('plus_minus', baseline['keys'])
+        self.assertEqual(len(baseline['keys']), 12)
+        d['players']=[player(str(i)) for i in range(1,5)]
+        for p, rate in zip(d['players'], (-.5, .5, 0, None)):
+            if rate is not None:
+                p['rates']['plus_minus']=rate
+                p['counts']['plus_minus']=rate*p['exposure']['used']
+        d['revision']=digest(d)
+        weights=deepcopy(e['weights']); weights['skater']['plus_minus']=-2
+        configured=payload(d, e, d['revision'], weights=weights)
+        self.assertEqual(configured['keys'][-1], 'plus_minus')
+        self.assertEqual(len(configured['keys']), 13)
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder); source=root/'source.json'; editorial=root/'editorial.json'
+            source.write_text(json.dumps(d)); editorial.write_text(json.dumps(e))
+            out=root/'plus-minus.xlsx'
+            export(source, editorial, d['revision'], out, weights=weights)
+            values=openpyxl.load_workbook(out, data_only=True)
+            formulas=openpyxl.load_workbook(out, data_only=False)
+            self.assertEqual(values['Players']['AT1'].value, 'FPTS')
+            self.assertEqual(values['Scoring']['O5'].value, -2)
+            for row, expected in zip(range(2,6), (26,6,16,None)):
+                actual=values['Players'].cell(row,46).value
+                if expected is None:
+                    self.assertIn(actual,(None,''))
+                else:
+                    self.assertAlmostEqual(actual,expected)
+            self.assertEqual(values['Players']['AS2'].value,-5)
+            self.assertEqual(values['Players']['AS3'].value,5)
+            self.assertEqual(values['Players']['AS4'].value,0)
+            self.assertIn(values['Players']['AS5'].value,(None,''))
+            self.assertIn("'Players'!AT2",formulas['ANA']['F4'].value)
+        invalid=deepcopy(weights);invalid['goalie']['plus_minus']=1
+        with self.assertRaises(ValueError):payload(d,e,d['revision'],weights=invalid)
+
     def test_bad_weights_and_revision_fail_before_export(self):
         d, e = fixtures()
         with self.assertRaises(ValueError):payload(d,e,'incorrect')
