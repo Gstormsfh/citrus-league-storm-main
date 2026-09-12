@@ -53,6 +53,17 @@ assert.equal(run('validate()'), null, 'valid source must not block all exports')
 const target = source.players.findIndex(p => p.status === 'projected' && Object.keys(p.rates || {}).length && Number.isFinite(source.schedule[p.team]));
 assert.ok(target >= 0, 'test source needs a projected player with scheduled team');
 context.target = target;
+// A published report must not fall back to the select's first (verified/active)
+// option, or a normal editor round trip can silently change its meaning.
+for (const status of ['out', 'healthy', 'injured']) {
+  context.reportStatus = status;
+  run("base=copy(fixture);base.players[target].availability={...base.players[target].availability,status:reportStatus,authority:'reviewed_report'};draft=copy(base);selected=draft.players[target].player_id;playerEditor()");
+  const editor = element('#editor').innerHTML;
+  assert.match(editor, /<option value="reviewed_report" selected>/, 'published report authority must remain selected');
+  assert.ok(editor.includes(`<option value="${status}" selected>`), 'published status must remain selected');
+  assert.equal(run('patch().player_updates.length'), 0, 'rendering a current report cannot create a source edit');
+}
+run('base=copy(fixture);draft=copy(base)');
 const rate = Object.keys(source.players[target].rates)[0];
 context.rate = rate;
 run('draft.players[target].rates[rate]=null');
