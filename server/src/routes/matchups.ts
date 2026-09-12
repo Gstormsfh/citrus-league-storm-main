@@ -546,8 +546,8 @@ matchupRoutes.get('/:matchupId/simulation', async (c) => {
 // ── Batch / global operations ────────────────────────────────────────
 
 // POST /api/matchups/projections/daily — Get daily projections for players
-matchupRoutes.post('/projections/daily', validateBody(schemas.matchupPlayerIds), async (c) => {
-  const body = getValidatedBody<z.infer<typeof schemas.matchupPlayerIds>>(c);
+matchupRoutes.post('/projections/daily', validateBody(schemas.matchupDailyProjectionIds), async (c) => {
+  const body = getValidatedBody<z.infer<typeof schemas.matchupDailyProjectionIds>>(c);
 
   const supabase = createUserClient(c.get('userToken'));
   const service = new MatchupService(supabase);
