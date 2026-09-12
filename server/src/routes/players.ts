@@ -163,7 +163,7 @@ playerRoutes.get('/ros-projections', authMiddleware, async (c) => {
   // starts — clients that rescore ROS rows under league settings must
   // include it, or every goalie is overstated by |GA weight| × GA.
   const ROS_COLUMNS =
-    'player_id, player_name, position, team_abbrev, is_goalie, total_projected_points, avg_points_per_game, games_remaining, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_wins_ros, projected_saves_ros, projected_shutouts_ros, projected_ga_ros';
+    'player_id, player_name, position, team_abbrev, is_goalie, total_projected_points, avg_points_per_game, games_remaining, projected_goals, projected_assists, projected_sog, projected_blocks, projected_ppp, projected_shp, projected_hits, projected_pim, projected_plus_minus, projected_wins_ros, projected_saves_ros, projected_shutouts_ros, projected_ga_ros';
 
   // Single-player lookup keeps the cheap one-row path.
   if (playerId !== null && Number.isFinite(playerId)) {
@@ -236,7 +236,7 @@ playerRoutes.get('/projections/batch', authMiddleware, async (c) => {
   try {
     let query = supabase
       .from('player_projected_stats')
-      .select('player_id, game_id, season, calculation_method, projected_gp, is_goalie, total_projected_points, projection_date, projected_goals, projected_assists, projected_sog, projected_blocks, projected_hits, projected_pim, projected_ppp, projected_shp, projected_wins, projected_saves, projected_shutouts, projected_goals_against, game_start_time, game:nhl_games!game_id(status,period,period_time,home_score,away_score)')
+      .select('player_id, game_id, season, calculation_method, projected_gp, is_goalie, total_projected_points, projection_date, projected_goals, projected_assists, projected_sog, projected_blocks, projected_hits, projected_pim, projected_plus_minus, projected_ppp, projected_shp, projected_wins, projected_saves, projected_shutouts, projected_goals_against, game_start_time, game:nhl_games!game_id(status,period,period_time,home_score,away_score)')
       .in('player_id', playerIds);
 
     if (startDate) {
@@ -583,7 +583,7 @@ playerRoutes.get('/:playerId/projections', authMiddleware, async (c) => {
     const coreColumns = [
       'projection_id', 'player_id', 'game_id', 'projection_date', 'season',
       'projected_goals', 'projected_assists', 'projected_sog', 'projected_blocks',
-      'projected_ppp', 'projected_shp', 'projected_hits', 'projected_pim',
+      'projected_ppp', 'projected_shp', 'projected_hits', 'projected_pim', 'projected_plus_minus',
       'projected_xg', 'total_projected_points',
       'base_ppg', 'shrinkage_weight', 'finishing_multiplier',
       'opponent_adjustment', 'b2b_penalty', 'home_away_adjustment',

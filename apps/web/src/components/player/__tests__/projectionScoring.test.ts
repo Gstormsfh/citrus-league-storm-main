@@ -54,7 +54,7 @@ describe('season headline exposure and missing-data behavior', () => {
     expect(seasonProjectionSummary({ games_remaining: 84 }, null, false)).toBeNull();
   });
   it('retains a supported zero-start forecast as zero', () => {
-    expect(seasonProjectionSummary({ games_remaining: 0, projected_saves_ros: 0 }, null, true)).toMatchObject({ points: 0, gp: 0 });
+    expect(seasonProjectionSummary({ games_remaining: 0, projected_saves_ros: 0, projected_wins_ros: 0, projected_ga_ros: 0, projected_shutouts_ros: 0 }, null, true)).toMatchObject({ points: 0, gp: 0 });
   });
 });
 
@@ -88,5 +88,32 @@ describe('daily projection league scoring', () => {
     const scored = scoreGameLog([{ ...entry, isGoalie: true, projection: { projected_wins: 0.5, projected_shutouts: 0, projected_saves: 25, projected_goals_against: 3 } }], null);
     expect(upcomingRows(scored, true)[0].cells).toEqual(['–', '–', '–', '–', '–']);
     expect(upcomingRows(scored, true)[0].points).toBeNull();
+  });
+});
+
+import finalsz from '../../../../../../packages/shared/src/leagueProjection/__tests__/fixtures/finalsz-scoring.json';
+
+describe('Finalsz modal and log completeness', () => {
+  const row = { projected_goals: 1.2, projected_assists: 2, projected_ppp: .5,
+    projected_sog: 4, projected_blocks: 1.5, projected_hits: 3, projected_pim: .5,
+    projected_shp: .1, projected_plus_minus: -2, games_remaining: 10 };
+  const entry: GameLogEntry = { date: '2026-10-10', dayLabel: 'Sat', dateLabel: 'Oct 10',
+    opponent: '@ PIT', projectedPoints: 999, projection: row, isToday: false,
+    computedConfidence: 0, isPast: false, isGoalie: false };
+  it('includes signed plus/minus in the same league-scored season and daily totals', () => {
+    expect(seasonProjectionSummary(row, finalsz, false)?.points).toBeCloseTo(10.5);
+    expect(projectedSummary([row], finalsz, false).stats.plus_minus).toBe(-2);
+    expect(scoreGameLog([entry], finalsz)[0].projectedPoints).toBeCloseTo(10.5);
+    expect(entry.projectedPoints).toBe(999);
+  });
+  it('keeps absent required components unavailable in headlines and upcoming rows', async () => {
+    const { projected_plus_minus, ...missing } = row;
+    const { upcomingRows } = await import('../gameLogRows');
+    expect(seasonProjectionSummary(missing, finalsz, false)).toBeNull();
+    expect(projectedSummary([row, missing], finalsz, false).points).toBeNull();
+    const log = scoreGameLog([{...entry, projection: missing}], finalsz);
+    expect(log[0].projectedPoints).toBeNull();
+    expect(upcomingRows(log, false)[0].points).toBeNull();
+    expect(seasonProjectionSummary({...row, projected_plus_minus: 0}, finalsz, false)?.points).toBeCloseTo(11.5);
   });
 });

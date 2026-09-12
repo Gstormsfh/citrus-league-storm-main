@@ -24,8 +24,17 @@ def verify(path, data):
     revision = data['canonicalRevision']
     assert manifest['source']['canonicalRevision'] == revision, 'Canonical revision mismatch'
     assert manifest['canonicalRevision'] == revision
-    assert manifest['publication']['status'] == 'draft'
-    assert manifest['publication']['publicationReady'] is False
+    edition = data.get('edition') or {}
+    effective = edition.get('kind') == 'effective_runtime'
+    if effective:
+        assert manifest['edition'] == edition, 'Runtime edition identity mismatch'
+        assert edition['horizon'] == 'remaining_season'
+        for key in ('parentSourceRevision', 'runtimeRevision', 'runtimeRunId', 'asOf'):
+            assert isinstance(edition.get(key), str) and edition[key].strip(), ('missing edition field', key)
+        assert manifest['publication'] == data.get('publication'), 'Export publication metadata mismatch'
+    else:
+        assert manifest['publication']['status'] == 'draft'
+        assert manifest['publication']['publicationReady'] is False
     identity = manifest['scoringIdentity']
     expected_hash = sha256(json.dumps(manifest['weights'], sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     assert identity['weightsSha256'] == expected_hash, 'Scoring fingerprint mismatch'
@@ -98,7 +107,20 @@ def verify(path, data):
                           (p['line'] or '-') if p else '-', (p['powerPlay'] or '-') if p else '-']
                 assert actual_row == norm(' '.join(values)), ('team rendered score/ID', team['team'], values, actual_row)
             offset += len(slots); slot_count += len(slots)
-    stamp = 'DRAFT / CANONICAL ' + revision[:16] + ' / NOT PUBLISHED'
+    if effective:
+        stamp = ('RUNTIME ' + edition['runtimeRevision'][:12] + ' / SOURCE ' + edition['parentSourceRevision'][:12]
+                 + ' / AS OF ' + edition['asOf'][:10] + ' / REMAINING SEASON')
+        assert 'EFFECTIVE RUNTIME / REMAINING SEASON' in norm(doc[0].get_text()), 'Runtime cover label missing'
+        for label, key in [('Parent source revision:', 'parentSourceRevision'), ('Runtime revision:', 'runtimeRevision'),
+                           ('Runtime run ID:', 'runtimeRunId'), ('As of:', 'asOf'), ('Horizon:', 'horizon')]:
+            assert norm(label + ' ' + edition[key]) in text, ('missing full runtime metadata', key)
+        assert 'not an activated production projection run' not in text, 'Stale local-draft/runtime-inactive claim'
+        assert 'Parent source full-season exposure' in text, 'Source/runtime exposure distinction missing'
+        for item in manifest['content']:
+            if item['type'] == 'ranking':
+                assert 'Remaining-season totals' in norm(doc[item['page'] - 1].get_text()), ('runtime horizon label', item['page'])
+    else:
+        stamp = 'DRAFT / CANONICAL ' + revision[:16] + ' / LOCAL SCORING PREVIEW'
     for page in doc:
         footer = norm(page.get_text(clip=fitz.Rect(0, 735, 612, 754)))
         assert stamp in footer, ('missing draft/revision footer', page.number + 1)
@@ -114,7 +136,7 @@ def verify(path, data):
             assert w[0] >= -1 and w[1] >= -1 and w[2] <= 613 and w[3] <= 793, ('off-page text', page.number + 1, w)
     assert len(doc.get_toc()) == len(doc)
     assert sorted(l['page'] + 1 for l in doc[1].get_links()) == sorted(s[1] for s in manifest['sections'])
-    print(f'PASS: {len(doc)} draft pages / {len(projected)} ranked + {len(unavailable)} unavailable; '
+    print(f'PASS: {len(doc)} {'effective-runtime' if effective else 'draft'} pages / {len(projected)} ranked + {len(unavailable)} unavailable; '
           f'{row_count} league-score rows; {len(team_entries)} teams / {slot_count} stable-ID slots; '
           f'revision {revision[:16]}; scoring {expected_hash[:16]}; visible stamps, navigation and bounds.')
 

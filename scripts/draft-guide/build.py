@@ -8,16 +8,24 @@ from reportlab.lib.styles import ParagraphStyle
 from layout import Guide,ROOT,ASSETS,INK,CREAM,ORANGE,MUTED,WHITE,RULE,pdfmetrics
 from scoring import calculate
 
-LABELS={'goals':'Goals','assists':'Assists','power_play_points':'Power-play points','short_handed_points':'Short-handed points','shots_on_goal':'Shots on goal','blocks':'Blocks','hits':'Hits','penalty_minutes':'Penalty minutes','wins':'Wins','saves':'Saves','shutouts':'Shutouts','goals_against':'Goals against'}
+LABELS={'plus_minus':'Plus/minus','goals':'Goals','assists':'Assists','power_play_points':'Power-play points','short_handed_points':'Short-handed points','shots_on_goal':'Shots on goal','blocks':'Blocks','hits':'Hits','penalty_minutes':'Penalty minutes','wins':'Wins','saves':'Saves','shutouts':'Shutouts','goals_against':'Goals against'}
 def fmt(v,d=1):return '-' if v is None else f'{v:,.{d}f}'
 def safe(s):return escape(str(s or '')).replace('\n','<br/>')
+def runtime_edition(data):
+ edition=data.get('edition') or {}
+ return edition if edition.get('kind')=='effective_runtime' else None
+def edition_stamp(data):
+ edition=runtime_edition(data)
+ if edition:return 'RUNTIME '+edition['runtimeRevision'][:12]+' / SOURCE '+edition['parentSourceRevision'][:12]+' / AS OF '+edition['asOf'][:10]+' / REMAINING SEASON'
+ return 'DRAFT / CANONICAL '+data['canonicalRevision'][:16]+' / LOCAL SCORING PREVIEW'
+
 
 class LeagueGuide(Guide):
  def __init__(self,data,result,name):
   super().__init__();self.data=data;self.result=result;self.name=name;self.byname={p['name']:p for p in result['players']};self.bykey={p['key']:p for p in result['players']};self.photos=json.loads((ASSETS/'player-photos.json').read_text());self.featured=set();self.manifest=[]
  def end(self):
   if self.data.get('canonicalRevision'):
-   self.text('DRAFT / CANONICAL '+self.data['canonicalRevision'][:16]+' / NOT PUBLISHED',306,749,6,'Semi',ORANGE,'center')
+   self.text(edition_stamp(self.data),306,749,6,'Semi',ORANGE,'center')
   super().end()
  def heading(self,title,section,sub=''):
   self.start(title,section);size=min(49,540/pdfmetrics.stringWidth(title.upper(),'Display',1));self.text(title.upper(),36,107,size,'Display')
@@ -44,26 +52,26 @@ class LeagueGuide(Guide):
   self.text(pname.upper(),45,y+182,min(18,130/pdfmetrics.stringWidth(pname.upper(),'Display',1)),'Display',CREAM)
   self.text('PLAYER CALL-OUT / '+str(p['source']),198,y+22,8,'Bold',ORANGE)
   self.text(f'{p["team"]} / {p["position"]}{p["positionRank"]}',564,y+22,8,'Semi',CREAM,'right')
-  for x,label,value in [(198,'FPTS',fmt(p['fantasyPoints'])),(313,'FP/START' if p['isGoalie'] else 'FP/GP',fmt(p['pointsPerGame'],2)),(422,'STARTS' if p['isGoalie'] else 'GP USED',fmt(p['games'],0))]:
+  for x,label,value in [(198,'FPTS',fmt(p['fantasyPoints'])),(313,'FP/START' if p['isGoalie'] else 'FP/GP',fmt(p['pointsPerGame'],2)),(422,('ST LEFT' if p['isGoalie'] else 'GP LEFT') if runtime_edition(self.data) else ('STARTS' if p['isGoalie'] else 'GP USED'),fmt(p['games'],0))]:
    self.text(label,x,y+44,7,'Semi',CREAM);self.text(value,x,y+68,24,'Display',ORANGE)
   contrib=sorted(p['contributions'],key=lambda q:abs(q['points']),reverse=True);scale=max([abs(c['points']) for c in contrib]+[1]);bar_y=y+86
   for c in contrib:
    self.text(LABELS[c['key']].upper(),198,bar_y+8,6.5,'Semi',CREAM)
    self.rect(318,bar_y,185,6,'#294237');self.rect(318,bar_y,185*abs(c['points'])/scale,6,ORANGE if c['points']>=0 else '#E3AEB8')
-   self.text(fmt(c['points']),563,bar_y+8,8,'Semi',CREAM,'right');bar_y+=12
+   self.text(fmt(c['points']),563,bar_y+8,8,'Semi',CREAM,'right');bar_y+=min(12,96/max(len(contrib),1))
   self.text('CATEGORY POINTS RECALCULATED FOR YOUR LEAGUE',198,y+188,6.2,'Semi',CREAM)
  def board(self,players,title,section,allow_features=False,goalie=False):
   start=0
   while start<len(players):
    candidate=next((p for p in players[start:start+16] if p['name'] in self.photos and p['name'] not in self.featured),None) if allow_features else None
    chunk=players[start:start+(16 if candidate else 29)]
-   self.heading(title,section,f'{self.name} / {start+1}-{start+len(chunk)} of {len(players)} / Rankings use your selected league weights.')
+   self.heading(title,section,f'{self.name} / {start+1}-{start+len(chunk)} of {len(players)} / '+('Remaining-season totals; selected league weights.' if runtime_edition(self.data) else 'Rankings use your selected league weights.'))
    rows=[]
    for p in chunk:
     s={key:(value/p['baseGames']*p['games'] if p['baseGames'] else 0) for key,value in p['stats'].items()};rows.append([str(p['rank']),p['name'],p['team'],p['position']+str(p['positionRank']),fmt(p['games'],0),fmt(p['pointsPerGame'],2),fmt(p['fantasyPoints']),fmt(s.get('wins') if goalie else s.get('goals',0)+s.get('assists',0)),fmt(s.get('saves') if goalie else s.get('shots_on_goal'),0),fmt(s.get('goals_against') if goalie else s.get('blocks'),0),p['source'] or '-'])
-   self.table(['#','PLAYER','TEAM','POS','ST' if goalie else 'GP','FP/ST' if goalie else 'FP/GP','FPTS','W' if goalie else 'PTS','SV' if goalie else 'SOG','GA' if goalie else 'BLK','SOURCE'],rows,172,[24,139,28,37,31,43,51,49,39,39,60],row_height=18,featured=candidate['key'] if candidate else None,keys=[p['key'] for p in chunk])
+   self.table(['#','PLAYER','TEAM','POS',('RST' if goalie else 'RGP') if runtime_edition(self.data) else ('ST' if goalie else 'GP'),'FP/ST' if goalie else 'FP/GP','FPTS','W' if goalie else 'PTS','SV' if goalie else 'SOG','GA' if goalie else 'BLK','SOURCE'],rows,172,[24,139,28,37,31,43,51,49,39,39,60],row_height=18,featured=candidate['key'] if candidate else None,keys=[p['key'] for p in chunk])
    if candidate:self.card(candidate)
-   else:self.para('Category totals reflect projected GP or starts: source categories / source games × projected games. SOURCE records projection provenance. Raw rates and volume stay separate; ties share rank.',36,730,540,8,10,MUTED)
+   else:self.para(('RGP/RST = remaining games/starts. Categories and FPTS are remaining-season totals. Parent source full-season exposure remains separate; it is not added or applied again.' if runtime_edition(self.data) else 'Category totals reflect projected GP or starts: source categories / source games × projected games. SOURCE records projection provenance. Raw rates and volume stay separate; ties share rank.'),36,730,540,8,10,MUTED)
    self.manifest.append({'page':self.number,'type':'ranking','keys':[p['key'] for p in chunk],'featured':candidate['key'] if candidate else None,'title':title})
    self.footer(section);self.end();start+=len(chunk)
  def notes(self,title,section,paragraphs):
@@ -136,15 +144,15 @@ class LeagueGuide(Guide):
   for start in range(0,len(roster),29):
    chunk=roster[start:start+29];self.heading(t['title'],'Team guide',str(t['intro']))
    rows=[[slot,p['name'],p.get('slotPosition',p['position']),('-' if p['rank'] is None else str(p['rank']))+(' G' if p['isGoalie'] else ''),fmt(p['games'],0),fmt(p['fantasyPoints']),p['source'] or '-',p['line'] or '-',p['powerPlay'] or '-'] for slot,p in chunk]
-   self.table(['SLOT','PLAYER','POS','#','GP/ST','FPTS','SOURCE','LINE','PP'],rows,186,[51,161,31,37,35,63,62,50,50],size=9,row_height=17)
-   self.para(('Ranks and fantasy points follow the selected scoring settings. G marks a goalie rank. Lineup assignments and notes retain canonical review status.' if self.data.get('canonicalRevision') else 'Ranks and fantasy points follow your scoring settings. G marks a goalie rank. Source lineup assignments and commentary remain the workbook author’s projections.'),36,718,540,8.5,11,MUTED)
+   self.table(['SLOT','PLAYER','POS','#','RGP/ST' if runtime_edition(self.data) else 'GP/ST','FPTS','SOURCE','LINE','PP'],rows,186,[51,161,31,37,35,63,62,50,50],size=9,row_height=17)
+   self.para(('RGP/ST and FPTS cover the remaining season; parent source full-season exposure is separate. G marks goalie rank. Lineups and notes retain canonical review status.' if runtime_edition(self.data) else 'Ranks and fantasy points follow the selected scoring settings. G marks a goalie rank. Lineup assignments and notes retain canonical review status.' if self.data.get('canonicalRevision') else 'Ranks and fantasy points follow your scoring settings. G marks a goalie rank. Source lineup assignments and commentary remain the workbook author’s projections.'),36,718,540,8.5,11,MUTED)
    self.manifest.append({'page':self.number,'type':'team','team':t['team'],'keys':[p['key'] for _,p in chunk]});self.footer(t['team']);self.end()
   self.notes(t['team']+' / Team notes','Team guide',notes)
  def cover_new(self):
   self.start('Cover',dark=True);self.logo(36,28,176);self.text('2026-27',576,60,23,'Display',ORANGE,'right')
   self.text('YOUR LEAGUE. YOUR BOARD.',36,121,13,'Semi',ORANGE);self.text('DRAFT KIT',32,213,108,'Display',CREAM)
   self.photo('mcdavid.jpg',0,236,612,408);self.rect(36,621,270,31,ORANGE);self.text(self.name[:48],47,641,11,'Bold')
-  self.text('CANONICAL SOURCE / REVIEW DRAFT' if self.data.get('canonicalRevision') else 'THE COMPLETE WORKBOOK EDITION',36,686,20,'Display',CREAM)
+  self.text('EFFECTIVE RUNTIME / REMAINING SEASON' if runtime_edition(self.data) else ('CANONICAL SOURCE / REVIEW DRAFT' if self.data.get('canonicalRevision') else 'THE COMPLETE WORKBOOK EDITION'),36,686,20,'Display',CREAM)
   count=len([p for p in self.data['players'] if not p['isGoalie']]);goalies=len(self.data['players'])-count
   self.para(f'{count} skaters / {goalies} goalies / 32 team guides / The rookie class',36,705,540,12,16,CREAM)
   self.text('CITRUSFANTASYSPORTS.COM',36,764,8,'Semi',CREAM);self.end()
@@ -156,21 +164,33 @@ class LeagueGuide(Guide):
    for key,value in self.result['weights'][group].items():
     self.line(36,y+20,540);self.text(LABELS[key],36,y+15,10.5);self.text(str(value),576,y+15,11,'Bold',INK,'right');y+=24
    y+=30
-  self.para('Points leagues: FPTS = weighted model categories / model games × GP Used (skaters) or projected starts (goalies). Raw hockey projections do not change when you change fantasy weights. Fantasy totals, ranks, position ranks, rookie FPTS and category contributions do.',36,612,540,10.5,14)
-  self.para(('Canonical rates are scored using the explicit league weights above. Roster probability is metadata; adjusted fantasy points are not calculated. Plus/minus is not scored by this guide. ' if self.data.get('canonicalRevision') else '')+('This PDF records the selected scoring settings at generation time. Lineups and editorial rookie tiers retain their source meaning.' if self.data.get('canonicalRevision') else 'Open the Citrus guide configurator, change the weights and choose Generate PDF. This PDF records those settings at generation time. Plus/minus is unavailable because the supplied projections do not contain it. Tiers, roster probabilities, lineups and editorial rookie tiers retain their source meaning.'),36,679,540,10,13)
+  self.para(('Remaining-season FPTS = per-game or per-start rates × remaining exposure × league weights. Category totals use that same remaining horizon. Parent source full-season exposure is retained separately and is not multiplied into runtime totals.' if runtime_edition(self.data) else 'Points leagues: FPTS = weighted model categories / model games × GP Used (skaters) or projected starts (goalies). Raw hockey projections do not change when you change fantasy weights. Fantasy totals, ranks, position ranks, rookie FPTS and category contributions do.'),36,612,540,10.5,14)
+  self.para(('Canonical rates are scored using the explicit league weights above. Roster probability is metadata; adjusted fantasy points are not calculated. Configured categories require supplied forecasts; missing enabled inputs make scores unavailable. ' if self.data.get('canonicalRevision') else '')+('This PDF records the selected scoring settings at generation time. Lineups and editorial rookie tiers retain their source meaning.' if self.data.get('canonicalRevision') else 'Open the Citrus guide configurator, change the weights and choose Generate PDF. This PDF records those settings at generation time. Plus/minus is unavailable because the supplied projections do not contain it. Tiers, roster probabilities, lineups and editorial rookie tiers retain their source meaning.'),36,679,540,10,13)
   self.footer('Scoring');self.end()
  def colophon(self):
-  if self.data.get('canonicalRevision'):
+  edition=runtime_edition(self.data)
+  if edition:
+   self.notes('EFFECTIVE RUNTIME EDITION','Runtime provenance',[
+    'LOCAL PDF EXPORT — EFFECTIVE RUNTIME SNAPSHOT. Local export status does not imply that the underlying runtime is inactive. Exporting this guide does not activate or change a run.',
+    'Parent source revision: '+edition['parentSourceRevision'],
+    'Runtime revision: '+edition['runtimeRevision'],
+    'Runtime run ID: '+edition['runtimeRunId'],
+    'As of: '+edition['asOf']+'. Horizon: '+edition['horizon']+'.',
+    'Refreshed at: '+str(edition.get('refreshedAt') or 'not supplied')+'. Parent source as of: '+str(edition.get('sourceAsOf') or 'not supplied')+'.',
+    'Ranked GP/starts, category totals and fantasy points cover the remaining season. Parent source full-season exposure is separate provenance, not additional remaining workload. Rates are multiplied by remaining exposure exactly once.',
+    'Availability remains separate from forecast coverage. Roster probability does not apply another absence multiplier. Unallocated and unresolved forecasts have no fantasy score or rank. Team roles and editorial notes retain their source dates and review status.'
+   ])
+  elif self.data.get('canonicalRevision'):
    self.notes('CANONICAL REVISION','Source review',[
-    'DRAFT — NOT PUBLISHED. Canonical revision: '+self.data['canonicalRevision'],
+    'DRAFT — LOCAL SCORING PREVIEW. Canonical revision: '+self.data['canonicalRevision'],
     'Per-game or per-start rates are multiplied by exposure exactly once. Roster probability and availability labels are metadata; neither applies another absence multiplier. Unallocated and unresolved forecasts have no fantasy score or rank.',
     'Availability is separate from forecast coverage. Unknown availability does not mean healthy. Team roles remain scenarios unless explicitly reviewed. Publication and application require the canonical owner workflow; exporting this guide does not activate a run.',
     'This artifact includes every canonical player. Workbook editorial rookie material is retained as separately sourced commentary. Source evidence and complete availability records remain in the canonical JSON and its review interface.'
    ])
   self.notes('EDITION & PHOTOGRAPHY','Credits',[
-   (f'Canonical input: {self.data["source"]["name"]}. All canonical players and teams are included. Rates and exposure come only from this revision; editorial rookie commentary retains its separate workbook source. Revision: {self.data["canonicalRevision"]}.' if self.data.get('canonicalRevision') else f'Authoritative source: {self.data["source"]["name"]}. This edition imports every Draft Board and Goalies row, all 32 team tabs, the rookie profiles and rookie commentary. Fantasy scores are regenerated using the selected settings and the workbook’s games-scaling formulas. Source SHA-256: {self.data["source"]["sha256"]}.'),
+   (f'Effective runtime input: {self.data["source"]["name"]}. Runtime rates and remaining exposure drive the tables. Parent source full-season exposure and editorial rookie commentary retain their separate source meaning.' if edition else f'Canonical input: {self.data["source"]["name"]}. All canonical players and teams are included. Rates and exposure come only from this revision; editorial rookie commentary retains its separate workbook source. Revision: {self.data["canonicalRevision"]}.' if self.data.get('canonicalRevision') else f'Authoritative source: {self.data["source"]["name"]}. This edition imports every Draft Board and Goalies row, all 32 team tabs, the rookie profiles and rookie commentary. Fantasy scores are regenerated using the selected settings and the workbook’s games-scaling formulas. Source SHA-256: {self.data["source"]["sha256"]}.'),
    'Orange rows identify the single player featured directly below that table. Each original player photo is featured only once in the guide. All panel statistics and category bars are recalculated. Unhighlighted tables have no callout.',
-   ('Canonical provenance is retained for every player. Unreviewed roles, unavailable forecasts and publication blockers remain explicit in the canonical source. This local review draft is not an activated production projection run.' if self.data.get('canonicalRevision') else 'The workbook contains MODEL, MANUAL and DEFAULT projections. DEFAULT marks a supplied rookie cohort prior, not an individual player forecast; its games already include cohort availability assumptions. Team assignments, player notes, rookie eligibility and source tiers are supplied editorial data, not newly verified facts. The original PDF and workbook disagree in coverage and some totals; this edition uses the workbook. Internal ADP/value columns are omitted because the workbook labels them INTERNAL.'),
+   ('This is a local scoring export of the identified effective runtime snapshot. Its parent source revision is preserved; local export status is independent of runtime activation.' if edition else 'Canonical provenance is retained for every player. Unreviewed roles, unavailable forecasts and publication blockers remain explicit in the canonical source. This local review draft is not an activated production projection run.' if self.data.get('canonicalRevision') else 'The workbook contains MODEL, MANUAL and DEFAULT projections. DEFAULT marks a supplied rookie cohort prior, not an individual player forecast; its games already include cohort availability assumptions. Team assignments, player notes, rookie eligibility and source tiers are supplied editorial data, not newly verified facts. The original PDF and workbook disagree in coverage and some totals; this edition uses the workbook. Internal ADP/value columns are omitted because the workbook labels them INTERNAL.'),
    'Cover: Connor McDavid, Edmonton at Washington, 2 February 2022. Brian Murphy / All-Pro Reels. Source: https://commons.wikimedia.org/wiki/File:Connor_McDavid_of_the_Edmonton_Oilers.jpg',
    'Contents: Vegas at Seattle, 2024 Winter Classic. Jenn G / Jennthulhu Photos. Source: https://www.flickr.com/photos/jennthulhu_photog/53440834756/',
    'Both added action photos: CC BY-SA 2.0, https://creativecommons.org/licenses/by-sa/2.0/. Cover resized; contents photograph resized and cropped. Photographic adaptations are offered under the same license. No endorsement is implied.',
@@ -189,13 +209,18 @@ class LeagueGuide(Guide):
   doc.set_toc(self.bookmarks);doc.set_metadata({'title':f'Citrus Draft Kit 2026-27 — {self.name}','author':'Citrus Fantasy Sports'})
   if self.data.get('canonicalRevision'):
    for page in doc:
-    if page.number==1 or 'DRAFT / CANONICAL' not in page.get_text():page.insert_text((185,749),'DRAFT / CANONICAL '+self.data['canonicalRevision'][:16]+' / NOT PUBLISHED',fontsize=6,color=(1,.42,.1))
+    if page.number==1 or edition_stamp(self.data) not in page.get_text():page.insert_textbox(fitz.Rect(36,741,576,754),edition_stamp(self.data),fontsize=6,color=(1,.42,.1),align=1)
   path=Path(path);path.parent.mkdir(parents=True,exist_ok=True);doc.save(path,garbage=4,deflate=True)
   scoring_revision=hashlib.sha256(json.dumps(self.result['weights'],sort_keys=True,separators=(',',':')).encode()).hexdigest()
-  manifest={'scoringIdentity':{'label':self.name,'weightsSha256':scoring_revision,'kind':'explicit_local_preview'},'canonicalRevision':self.data.get('canonicalRevision'),'publication':self.data.get('publication'),'pages':len(doc),'source':self.data['source'],'weights':self.result['weights'],'league':self.name,'featured':sorted(self.featured),'content':self.manifest,'sections':sections}
+  manifest={'scoringIdentity':{'label':self.name,'weightsSha256':scoring_revision,'kind':'explicit_local_preview'},'edition':self.data.get('edition'),'canonicalRevision':self.data.get('canonicalRevision'),'publication':self.data.get('publication'),'pages':len(doc),'source':self.data['source'],'weights':self.result['weights'],'league':self.name,'featured':sorted(self.featured),'content':self.manifest,'sections':sections}
   path.with_suffix('.manifest.json').write_text(json.dumps(manifest,indent=2));return manifest
 
 def generate(data,weights,name,path):
+ edition=runtime_edition(data)
+ if edition:
+  for key in ('parentSourceRevision','runtimeRevision','runtimeRunId','asOf'):
+   if not isinstance(edition.get(key),str) or not edition[key].strip():raise ValueError('Effective runtime edition requires '+key)
+  if edition.get('horizon')!='remaining_season':raise ValueError('Effective runtime edition requires remaining_season horizon')
  result=calculate(data,weights);g=LeagueGuide(data,result,name);g.cover_new();g.start('Contents');g.end();sections=[('League settings',3)];g.settings()
  sk=[p for p in result['players'] if not p['isGoalie'] and p['rank'] is not None];go=[p for p in result['players'] if p['isGoalie'] and p['rank'] is not None]
  sections.append(('Complete skater board',g.number+1));g.board(sk,'THE SKATER BOARD','Overall rankings',True)
@@ -212,12 +237,12 @@ def generate(data,weights,name,path):
  for p in remaining:
   g.heading(p['name'],'Player focus',name+' / A closer look at the categories behind the ranking.')
   rows=[[str(p['rank']),p['name'],p['team'],p['position']+str(p['positionRank']),fmt(p['games'],0),fmt(p['pointsPerGame'],2),fmt(p['fantasyPoints']),p['source'] or '-']]
-  g.table(['#','PLAYER','TEAM','POS','GP','FP/GP','FPTS','SOURCE'],rows,178,[28,180,40,47,45,55,70,75],featured=p['key'],keys=[p['key']])
+  g.table(['#','PLAYER','TEAM','POS','RGP/ST' if runtime_edition(data) else 'GP','FP/GP','FPTS','SOURCE'],rows,178,[28,180,40,47,45,55,70,75],featured=p['key'],keys=[p['key']])
   g.card(p,298)
-  g.para(safe(p['note'] or 'The fantasy-point breakdown uses the selected league weights, the source model or manual category rates, and the workbook games projection. Underlying hockey rates and availability are kept separate.'),36,522,540,11,15)
+  g.para(safe(p['note'] or ('The fantasy-point breakdown uses remaining-season games or starts and the selected league weights. Parent source full-season exposure is separate.' if runtime_edition(data) else 'The fantasy-point breakdown uses the selected league weights, the source model or manual category rates, and the workbook games projection. Underlying hockey rates and availability are kept separate.')),36,522,540,11,15)
   g.manifest.append({'page':g.number,'type':'focus','keys':[p['key']],'featured':p['key']});g.footer('Player focus');g.end()
  sections.append(('Credits & edition notes',g.number+1));g.colophon();return g.save_new(path,sections)
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('--data',type=Path,default=ROOT/'workbook-data.json');p.add_argument('--settings',type=Path);p.add_argument('--league');p.add_argument('--output',type=Path);a=p.parse_args();data=json.loads(a.data.read_text());settings=json.loads(a.settings.read_text()) if a.settings else {};weights=settings.get('weights',settings) if settings else data['weights'];name=a.league or settings.get('league','Citrus default scoring');output=a.output or ROOT.parent.parent/'output/pdf'/('Citrus-Canonical-Review-DRAFT.pdf' if data.get('canonicalRevision') else 'Citrus-Draft-Kit-2026-27-Complete.pdf');m=generate(data,weights,name,output);print(f'Built {m["pages"]} pages / {len(m["featured"])} unique callouts: {output}')
+ p=argparse.ArgumentParser();p.add_argument('--data',type=Path,default=ROOT/'workbook-data.json');p.add_argument('--settings',type=Path);p.add_argument('--league');p.add_argument('--output',type=Path);a=p.parse_args();data=json.loads(a.data.read_text());settings=json.loads(a.settings.read_text()) if a.settings else {};weights=settings.get('weights',settings) if settings else data['weights'];name=a.league or settings.get('league','Citrus default scoring');output=a.output or ROOT.parent.parent/'output/pdf'/('Citrus-Effective-Runtime-LOCAL.pdf' if runtime_edition(data) else 'Citrus-Canonical-Review-DRAFT.pdf' if data.get('canonicalRevision') else 'Citrus-Draft-Kit-2026-27-Complete.pdf');m=generate(data,weights,name,output);print(f'Built {m["pages"]} pages / {len(m["featured"])} unique callouts: {output}')
 if __name__=='__main__':main()

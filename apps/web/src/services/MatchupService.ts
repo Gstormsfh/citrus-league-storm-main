@@ -1,3 +1,4 @@
+import { scoreProjectedStats } from '@citrus/shared/leagueProjection';
 import { scoreEarnedWeek } from '@/utils/matchupEarnedStats';
 // NOTE: Direct Supabase usage removed — all DB queries now go through matchupApi (3-tier architecture)
 import { League, Team, LeagueService } from './LeagueService';
@@ -58,6 +59,7 @@ interface DailyProjectionRow {
   projected_shp?: number;
   projected_hits?: number;
   projected_pim?: number;
+  projected_plus_minus?: number | null;
   projected_xg?: number;
   base_ppg?: number;
   shrinkage_weight?: number;
@@ -1466,6 +1468,7 @@ export const MatchupService = {
             projected_shp: Number(dailyProjection.projected_shp || 0),
             projected_hits: Number(dailyProjection.projected_hits || 0),
             projected_pim: Number(dailyProjection.projected_pim || 0),
+            projected_plus_minus: dailyProjection.projected_plus_minus ?? null,
             projected_xg: Number(dailyProjection.projected_xg || 0),
             base_ppg: Number(dailyProjection.base_ppg || 0),
             shrinkage_weight: Number(dailyProjection.shrinkage_weight || 0),
@@ -2142,16 +2145,9 @@ export const MatchupService = {
           // Recalculate projection total_projected_points with league-specific scoring
           if (transformed.daily_projection && !transformed.isGoalie) {
             const dp = transformed.daily_projection;
-            transformed.daily_projection.total_projected_points = scorer.calculatePoints({
-              goals: dp.projected_goals || 0,
-              assists: dp.projected_assists || 0,
-              sog: dp.projected_sog || 0,
-              blocks: dp.projected_blocks || 0,
-              ppp: dp.projected_ppp || 0,
-              shp: dp.projected_shp || 0,
-              hits: dp.projected_hits || 0,
-              pim: dp.projected_pim || 0,
-            }, false);
+            const points = scoreProjectedStats({ ...dailyProjection, is_goalie: false }, scorer);
+            if (points === null) transformed.daily_projection = undefined;
+            else dp.total_projected_points = points;
           }
           if (transformed.goalieProjection && transformed.isGoalie) {
             const gp = transformed.goalieProjection;
@@ -2340,16 +2336,9 @@ export const MatchupService = {
           // Recalculate projection total_projected_points with league-specific scoring
           if (transformed.daily_projection && !transformed.isGoalie) {
             const dp = transformed.daily_projection;
-            transformed.daily_projection.total_projected_points = scorer.calculatePoints({
-              goals: dp.projected_goals || 0,
-              assists: dp.projected_assists || 0,
-              sog: dp.projected_sog || 0,
-              blocks: dp.projected_blocks || 0,
-              ppp: dp.projected_ppp || 0,
-              shp: dp.projected_shp || 0,
-              hits: dp.projected_hits || 0,
-              pim: dp.projected_pim || 0,
-            }, false);
+            const points = scoreProjectedStats({ ...dailyProjection, is_goalie: false }, scorer);
+            if (points === null) transformed.daily_projection = undefined;
+            else dp.total_projected_points = points;
           }
           if (transformed.goalieProjection && transformed.isGoalie) {
             const gp = transformed.goalieProjection;

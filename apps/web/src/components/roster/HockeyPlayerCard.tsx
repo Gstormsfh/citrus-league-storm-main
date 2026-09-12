@@ -98,6 +98,7 @@ export interface HockeyPlayer {
     projected_ppp?: number;      // Power Play Points
     projected_shp?: number;      // Shorthanded Points
     projected_hits?: number;     // Hits
+    projected_plus_minus?: number | null;
     projected_pim?: number;      // Penalty Minutes
     projected_xg: number;
     base_ppg: number;

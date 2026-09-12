@@ -137,6 +137,7 @@ const ROS = [
     projected_hits: 49.02,
     projected_blocks: 78.87,
     projected_pim: 24,
+    projected_plus_minus: -3.5,
     projected_shp: 2.5,
     projected_ga_ros: 0,
     projected_wins_ros: 0,
@@ -202,6 +203,7 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     expect(am.proj_blocks).toBeCloseTo(78.87);
     expect(am.proj_hits).toBeCloseTo(49.02);
     expect(am.proj_pim).toBe(24);
+    expect(am.proj_plus_minus).toBe(-3.5);
     expect(am.proj_shp).toBe(2.5);
     expect(am.proj_goals_against).toBe(0);
   });
@@ -213,6 +215,7 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     expect(woll.proj_blocks).toBeNull();
     expect(woll.proj_hits).toBeNull();
     expect(woll.proj_pim).toBeNull();
+    expect(woll.proj_plus_minus).toBeNull();
     expect(woll.proj_shp).toBeNull();
     expect(woll.proj_goals_against).toBeNull();
   });
