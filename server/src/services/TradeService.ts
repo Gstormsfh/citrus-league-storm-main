@@ -245,7 +245,16 @@ export class TradeService {
         .eq('from_team_id', fromTeamId)
         .eq('to_team_id', toTeamId)
         .eq('status', 'pending');
-      return (rows || []).find(
+      // Fail OPEN on a shape we did not expect. This read is an optimisation
+      // that turns a double tap into a friendly success; the partial unique
+      // index is the actual guarantee. If `rows` is ever not an array, the
+      // old code threw a TypeError out of createTradeOffer and no manager
+      // could send any trade at all -- a defensive feature breaking the
+      // action it defends. Treat it as "no twin found" and let the insert
+      // run: the index still refuses a genuine duplicate, and the 23505
+      // branch below still answers it with the winning offer.
+      if (!Array.isArray(rows)) return undefined;
+      return rows.find(
         (r: { offered_player_ids?: unknown; requested_player_ids?: unknown }) =>
           sameIds(r.offered_player_ids, offeredPlayerIds) &&
           sameIds(r.requested_player_ids, requestedPlayerIds),

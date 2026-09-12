@@ -123,6 +123,118 @@ describe('TradeService', () => {
       expect(result.success).toBe(true);
       expect(result.tradeId).toBe('trade-1');
     });
+
+    // DOUBLE SUBMIT (2026-09-11). A double tap on PROPOSE TRADE put two
+    // identical pending offers in production 455 ms apart. The dedupe that
+    // closed it shipped with no test of its own, and the first thing it did
+    // on this branch was throw a TypeError out of createTradeOffer -- which
+    // would have taken ALL trade creation down, not just the duplicate.
+    it('answers a double tap with the offer that already exists, and does not insert again', async () => {
+      let tradeOffersCall = 0;
+      const chains: any[] = [];
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'teams') return createChain({ data: teamsRows('user-1'), error: null });
+        if (table === 'roster_assignments') {
+          return createChain({ data: [{ player_id: '100' }, { player_id: '200' }], error: null });
+        }
+        if (table === 'leagues') return createChain({ data: { settings: {} }, error: null });
+        if (table === 'trade_offers') {
+          tradeOffersCall += 1;
+          const chain = createChain({
+            data: [{ id: 'existing-1', offered_player_ids: [100], requested_player_ids: [200] }],
+            error: null,
+          });
+          chains.push(chain);
+          return chain;
+        }
+        return createChain({ data: null, error: null });
+      });
+
+      const result = await service.createTradeOffer(
+        'league-1', 'team-1', 'team-2', [100], [200], 'user-1',
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.tradeId).toBe('existing-1');
+      expect(result.duplicate).toBe(true);
+      expect(tradeOffersCall).toBe(1);
+      expect(chains[0].insert).not.toHaveBeenCalled();
+    });
+
+    it('matches the twin on the same players in any order, not on array order', async () => {
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'teams') return createChain({ data: teamsRows('user-1'), error: null });
+        if (table === 'roster_assignments') {
+          return createChain({ data: [{ player_id: '100' }, { player_id: '200' }], error: null });
+        }
+        if (table === 'leagues') return createChain({ data: { settings: {} }, error: null });
+        if (table === 'trade_offers') {
+          return createChain({
+            data: [{ id: 'existing-2', offered_player_ids: [200, 100], requested_player_ids: [300] }],
+            error: null,
+          });
+        }
+        return createChain({ data: null, error: null });
+      });
+
+      const result = await service.createTradeOffer(
+        'league-1', 'team-1', 'team-2', [100, 200], [300], 'user-1',
+      );
+      expect(result.tradeId).toBe('existing-2');
+      expect(result.duplicate).toBe(true);
+    });
+
+    // The other half of the same race: both submits pass the read, the
+    // partial unique index refuses the loser with 23505, and the loser is
+    // answered with the winner's offer rather than a constraint error.
+    it('answers the 23505 loser with the offer the winner created', async () => {
+      let tradeOffersCall = 0;
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'teams') return createChain({ data: teamsRows('user-1'), error: null });
+        if (table === 'roster_assignments') {
+          return createChain({ data: [{ player_id: '100' }, { player_id: '200' }], error: null });
+        }
+        if (table === 'leagues') return createChain({ data: { settings: {} }, error: null });
+        if (table === 'trade_offers') {
+          tradeOffersCall += 1;
+          if (tradeOffersCall === 1) return createChain({ data: [], error: null });
+          if (tradeOffersCall === 2) return createChain({ data: null, error: { code: '23505' } });
+          return createChain({
+            data: [{ id: 'winner-1', offered_player_ids: [100], requested_player_ids: [200] }],
+            error: null,
+          });
+        }
+        return createChain({ data: null, error: null });
+      });
+
+      const result = await service.createTradeOffer(
+        'league-1', 'team-1', 'team-2', [100], [200], 'user-1',
+      );
+      expect(result.success).toBe(true);
+      expect(result.tradeId).toBe('winner-1');
+      expect(result.duplicate).toBe(true);
+    });
+
+    // The guard that this branch needed: a read that is not an array must
+    // mean "no twin", never a TypeError. The index is the guarantee; this
+    // read is only the friendly path.
+    it('still creates the offer when the pending read comes back a non-array', async () => {
+      mockSupabase.from = vi.fn((table: string) => {
+        if (table === 'teams') return createChain({ data: teamsRows('user-1'), error: null });
+        if (table === 'roster_assignments') {
+          return createChain({ data: [{ player_id: '100' }, { player_id: '200' }], error: null });
+        }
+        if (table === 'leagues') return createChain({ data: { settings: {} }, error: null });
+        if (table === 'trade_offers') return createChain({ data: { id: 'trade-9' }, error: null });
+        return createChain({ data: null, error: null });
+      });
+
+      const result = await service.createTradeOffer(
+        'league-1', 'team-1', 'team-2', [100], [200], 'user-1',
+      );
+      expect(result.success).toBe(true);
+      expect(result.tradeId).toBe('trade-9');
+    });
   });
 
   describe('acceptTradeOffer — offer expiry (OFFER-EXPIRY FIX 2026-08-23)', () => {
