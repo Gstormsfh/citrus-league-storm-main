@@ -122,7 +122,21 @@ if(edition.kind==='effective_runtime'){
  for(const p of d.players){history.push(['Player',p.playerId,'full_season_exposure',JSON.stringify(p.canonicalExposure)]);history.push(['Player',p.playerId,'remaining_exposure',JSON.stringify(p.canonicalRemaining)]);if(p.canonicalRateComponents)history.push(['Player',p.playerId,'rate_components',JSON.stringify(p.canonicalRateComponents)]);}
 }
 for(const entry of c.review_history??[])history.push(['Revision',c.revision,'review_history',JSON.stringify(entry)]);
-put('Source History',history,{A:14,B:16,C:22,D:120}).getRange(`D2:D${history.length}`).format.wrapText=true;
+// Excel limits cell text in UTF-16 units. Preserve ordered history without
+// cutting a surrogate pair, which XLSX serialization could otherwise replace.
+const safeHistory=[];
+for(const row of history){
+ const value=row[3];
+ if(typeof value!=='string'||value.length<=30000){safeHistory.push(row);continue;}
+ const parts=[];
+ for(let start=0;start<value.length;){
+  let end=Math.min(start+30000,value.length);
+  if(end<value.length&&value.charCodeAt(end-1)>=0xD800&&value.charCodeAt(end-1)<=0xDBFF&&value.charCodeAt(end)>=0xDC00&&value.charCodeAt(end)<=0xDFFF)end--;
+  parts.push(value.slice(start,end));start=end;
+ }
+ parts.forEach((part,i)=>safeHistory.push([row[0],row[1],`${row[2]} [part ${i+1}/${parts.length}]`,part]));
+}
+put('Source History',safeHistory,{A:14,B:16,C:22,D:120}).getRange(`D2:D${safeHistory.length}`).format.wrapText=true;
 for(const t of d.teams){
  const tr=[['NHL ID','Player / slot','Position','Forecast status',volumeLabel,'FPTS','Availability','Line','PP'],['DRAFT',d.canonicalRevision,null,null,'Scoring',x.league],[horizon,edition.kind==='effective_runtime'?`Source ${edition.parentSourceRevision}; run ${edition.runtimeRunId}; as of ${edition.asOf}`:'Canonical members']];
  const references=[];
