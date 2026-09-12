@@ -1,8 +1,21 @@
 # Citrus source → screen pipeline: current operating map
 
-This is the maintained entry point for projection authority, readers, availability, freshness and retirement. **The numerical source is published and the documented Test/Finalsz reader repairs passed actual browser replay. Availability display is being reconciled separately; that work is not yet a serving-release claim.**
+This is the maintained entry point for projection authority, readers, availability, freshness and retirement. The published source supplies the reviewed forecast and dated availability contract. Use the current release receipt below for serving identity and actual acceptance coverage; implementation and a green build alone do not establish every screen or upstream status fact.
 
-Use the [final serving release receipt](../../../outputs/projection-reconciliation-20260912/live-reader-repair/RESULT.md) for the exact code/API/Hosting identity, source/runtime/output/settings fingerprints, native candidate and acceptance boundaries. It supersedes release and pending-acceptance statements in earlier reports. Do not copy those changing identities into other “current” maps. The published baseline is source `1fb82cff` → runtime `858d8a9c`; a later runtime refresh may retain the same source.
+Use the [current release receipt](../../../docs/audits/2026-09-12-availability-release.md) for the exact code/API/Hosting identity, source/runtime/output/settings fingerprints, native candidate and acceptance boundaries. It supersedes release and pending-acceptance statements in earlier reports. Do not copy those changing identities into other “current” maps. Publication identity and model-refresh time are separate. A metadata-only publication preserves numerical values and the inherited refresh time; a later scheduled model refresh may retain the same source.
+
+## Identify the current publication
+
+Use the published view, not the newest local filename, to identify the active season. An authorized read-only operator can query:
+
+```sql
+SELECT season, run_id, revision, source_revision, activated_at,
+       last_refresh_at, last_refresh_status, last_refresh_error
+FROM public.canonical_published_runs
+ORDER BY season;
+```
+
+`source_payload` on that same view is the original reviewed source; `payload` is its effective runtime. `canonical_published_players` supplies only the current runtime's player context. Compare output `projection_run_id`/`projection_revision` with this pointer. Read API health separately: HTTP200 is not evidence that a particular source revision is active. Record publication and model-refresh times separately, and inspect actual scheduler results before claiming a scheduled refresh completed.
 
 ## Authority and flow
 
@@ -24,7 +37,7 @@ flowchart TD
   C --> W[Source editor and writing: dated player/team evidence]
   C --> D[Availability context: reviewed claim distinct from forecast workload]
   H[Separately sourced dated status facts] --> D
-  D -. display reconciliation pending .-> U
+  D --> U
 ```
 
 | Boundary | Authority and implementation | Important limit |
@@ -40,31 +53,31 @@ flowchart TD
 
 ## Availability is a separate dated fact contract
 
-The serving baseline does not establish consistent injury/suspension badges across every screen. The local availability repair is reviewable but **not deployed or published**. Its [shared contract](../../../packages/shared/src/playerAvailability.ts) separates current dated evidence, a projection scenario, official roster status and fantasy IR eligibility.
+The [shared contract](../../../packages/shared/src/playerAvailability.ts) separates current dated evidence, a projection scenario, official roster status and fantasy IR eligibility.
 
-- A published `reviewed_report` supplies current display status only with an explicit factual date and expiry. The reviewed source validator requires a dated HTTPS evidence record, review date and freshness deadline. Fiala's candidate uses the September10 report that he will miss camp start, with return undetermined; September17 is a review deadline, not a recovery date. His old imported scenario and all historical source editions remain retained.
-- `imported_scenario`/`reviewed_scenario` appears only as separately labelled projection context. Reduced GP, zero starts, surgery narrative or unknown return timetable cannot establish current injury. Merzlikins remains current-status unknown.
+- A published `reviewed_report` supplies current display status only with an explicit factual date and expiry. The reviewed source validator requires a dated HTTPS evidence record, review date and freshness deadline. A review deadline governs freshness; it is never an invented recovery date. Prior source editions remain retained.
+- `imported_scenario`/`reviewed_scenario` appears only as separately labelled projection context. Reduced GP, zero starts, surgery narrative or unknown return timetable cannot establish current injury.
 - The only recognized supplementary adapter is `espn-injuries`, with its explicit `roster_status_updated_at`. It expires after24hours. Undated/unrecognized-provider values and absence from the feed are unknown, never healthy. This is reported status, not a new official NHL designation feed.
 - The most recently dated explicit current evidence wins; equal timestamps favor the reviewed source. If that evidence expires, the answer is unknown rather than resurrecting older evidence. The defensive default review window is2days for DTD and7days otherwise; new reviewed reports require an explicit deadline. Cached display evidence is checked again at render.
 - `PlayerService` attaches published availability outside its statistics cache; dashboard attachment uses its existing publication checks; DraftKit forwards that contract. The shared web badge and adapters cover browse, draft rows, Free Agents, PressBox, Roster/mobile roster, Matchup and player modals/cards. The new display property does not mutate `roster_status`, `is_ir_eligible`, lineup slots or saved rules. Current missing evidence shows **Unknown**, with a current-availability explanation.
 
-The [ownership audit](../../../outputs/projection-reconciliation-20260912/availability-repair/STATUS-EVIDENCE-OWNERSHIP.md) found all940 current talent rows without status provenance, no active injury cron in inspected pg_cron, and no successful inspected injury workflow run. The live talent rebuild deletes goalie/no-TOI rows, so merely enabling the old job would not make the feed durable. No new feed table or runner change is part of this repair.
+The [dated release audit](../../../docs/audits/2026-09-12-availability-release.md) records the observed empty status feed, scheduler inspection and talent-row ownership gap. The live talent rebuild deletes goalie/no-TOI rows, so merely enabling the old job would not make the feed durable. No new feed table or runner change is part of this repair.
 
-The [metadata candidate receipt](../../../outputs/projection-reconciliation-20260912/availability-repair/FIALA-CANDIDATE.md) records exact numerical equality and publication constraints. Publish a new source and a metadata-only successor of the current effective runtime through existing stage/validate/CAS activation. Never activate the older source-number payload over the effective runtime or call model refresh to implement a metadata correction. Source staging generates the UUID needed to bind the final runtime hash; review that exact bound identity before activation.
+The [dated metadata publication receipt](../../../docs/audits/2026-09-12-availability-release.md) records exact numerical equality and publication constraints. Publish a new source and a metadata-only successor of the current effective runtime through existing stage/validate/CAS activation. Never activate the older source-number payload over the effective runtime or call model refresh to implement a metadata correction. Source staging generates the UUID needed to bind the final runtime hash; review that exact bound identity before activation.
 
 ## Freshness and revision boundaries
 
 - Publication is atomic and revision guarded. [CanonicalProjectionService](../../../server/src/services/CanonicalProjectionService.ts) reads published views, keys snapshots by season/run/revision, rejects mixed or changed publication during paged context reads and rechecks active health. Dashboard attachment compares output identity with canonical context.
-- Atomic publication does **not** itself prove a multi-request reader cannot span two publications. The local repair adds [a shared read guard](../../../server/src/lib/canonicalProjectionRead.ts) to daily Matchup and ROS responses: check the season-scoped pointer before and after the full result, require each active row to match season/run/revision, retry once and otherwise return unavailable/error. Pointer failure never silently selects legacy data; a genuinely absent pointer preserves no-active-season behavior. Daily queries use the requested date’s projection season (including the upcoming season before the opener). Empty rows remain missing. This adds two pointer queries to a stable assembled response, up to four with one repeated full read; there is no per-page/player query. It is a local patch, not yet a serving guarantee. Historical rows that do not match an existing season pointer are withheld rather than falsely stamped current.
+- Atomic publication does **not** itself prove a multi-request reader cannot span two publications. The daily Matchup and ROS APIs use [a shared read guard](../../../server/src/lib/canonicalProjectionRead.ts): check the season-scoped pointer before and after the full result, require each active row to match season/run/revision, retry once and otherwise return unavailable/error. Pointer failure never silently selects legacy data; a genuinely absent pointer preserves no-active-season behavior. Daily queries use the requested date’s projection season (including the upcoming season before the opener). Empty rows remain missing. This adds two pointer queries to a stable assembled response, up to four with one repeated full read; there is no per-page/player query. Server response consistency does not invalidate all existing browser caches immediately. Historical rows that do not match an existing season pointer are withheld rather than falsely stamped current.
 - Server/browser caches and a service worker remain. Initial authenticated replay needed temporary tab cache/SW bypass to obtain current code; after restoration, final fresh-tab and ordinary reload replay passed. The normal existing-user upgrade path before that recovery remains unproven. No general cache redesign or guarantee against all future stale data is claimed.
 - The refresh entrypoint is existing pg_cron job31 at `08:50 UTC`; job34 at `09:05 UTC` rematerializes the active snapshot. The GitHub output-health workflow checks outputs; it is not the model writer. The first post-activation scheduled-cycle acceptance is owned by the coordinator's existing heartbeat. Consult its actual observation rather than treating a scheduled time or a manual test as a completed run.
 - Record source activation and model refresh times separately. A code-only deployment does not refresh projections. A newly activated runtime can inherit an earlier model-refresh timestamp.
 
 ## Acceptance and native boundary
 
-The final release receipt links actual authenticated Test night9th (September27–October3) and Finalsz (September28–October4) replay: weekly signed plus/minus, expected goalie starts, canonical Roster ROS GP/counts, empty-slot Matchup rendering and separately labeled actual/projected scores passed for the documented examples.
+The current receipt links the baseline and subsequent focused acceptance. The baseline authenticated Test night9th (September27–October3) and Finalsz (September28–October4) replay established that weekly signed plus/minus, expected goalie starts, canonical Roster ROS GP/counts, empty-slot Matchup rendering and separately labeled actual/projected scores passed for the documented examples.
 
-Premium DraftKit/draft access, installed Build18, authenticated digit-string HTTP replay, comprehensive zero/missing UI cases, independent full-roster score recomputation and the pre-recovery default service-worker upgrade path remain limited or unexercised. Do not turn these into passes from unit tests. Unsigned Build19 has reviewed app-input validation, not installed-device acceptance; Build18 and prior archives remain preserved. Status/UI changes require refreshed candidate validation after final app inputs; a server-only change does not itself require new bundled assets. No signing, upload or distribution is authorized by this map.
+Premium DraftKit/draft access, installed Build18, authenticated digit-string HTTP replay, comprehensive zero/missing UI cases, independent full-roster score recomputation and the pre-recovery default service-worker upgrade path remain limited or unexercised. Do not turn these into passes from unit tests. Unsigned Build19 has reviewed app-input validation, not installed-device acceptance; Build18 and prior archives remain preserved. The availability client inputs have a separately identified unsigned candidate; its receipt records validation and preservation of prior archives. A server-only change does not itself require new bundled assets. No signing, upload or distribution is authorized by this map.
 
 Matchup performs fewer redundant requests through parallel loading, deduplication and caching. The [earned-scoring report](../../../docs/audits/2026-09-12-matchup-earned-scoring.md) contains deterministic request-graph and local fixture evidence. It is **not** a production before/after latency benchmark.
 
@@ -84,7 +97,7 @@ For a code defect, use ordinary reviewed redeployment of prior compatible code w
 
 ## Supporting evidence
 
-- [Final serving release and actual acceptance receipt](../../../outputs/projection-reconciliation-20260912/live-reader-repair/RESULT.md): current release facts and links to before/after fingerprints, browser and native evidence. Task-local receipts must remain available with the handoff.
+- [Current serving release and actual acceptance receipt](../../../docs/audits/2026-09-12-availability-release.md): current release facts and links to before/after fingerprints, browser and native evidence. The repository receipt retains the important public identities, exact comparison algorithms and acceptance limits; private raw recovery evidence stays out of git.
 - [Canonical publication contract and historical rehearsal](../../../docs/canonical-projection-pipeline-20260912.md): implementation/security boundaries and explicitly dated pre-publication evidence.
 - [Retirement inventory and guarded rehearsal](README.md): original inspection evidence and remaining external-caller gates.
 - Earlier plus-minus, source activation and guide editions remain provenance. Their release identities and pending-acceptance statements are superseded by the final receipt where later evidence exists.

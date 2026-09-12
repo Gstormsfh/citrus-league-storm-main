@@ -96,13 +96,13 @@ class Exposure(TypedDict):
     probability_semantics: Literal['metadata_only', 'already_in_exposure', 'unknown']
 
 class Availability(TypedDict):
-    status: Literal['active', 'out', 'ir', 'ltir', 'day_to_day', 'suspended', 'unknown']
+    status: Literal['active', 'healthy', 'injured', 'out', 'ir', 'ltir', 'day_to_day', 'suspended', 'unknown']
     as_of: str
     reason: str | None
     source: dict | None
     return_window: str | None
     review_after: str | None
-    authority: Literal['verified', 'imported_scenario', 'unknown']
+    authority: Literal['verified', 'reviewed_report', 'imported_scenario', 'unknown']
 
 
 class CanonicalPlayer(TypedDict):
