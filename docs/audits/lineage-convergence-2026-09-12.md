@@ -13,7 +13,11 @@ flowchart TB
   VALID["Validate edits and imports<br/>identity, units, evidence, team allocation, revision conflict"]
   SOURCE["ONE VERSIONED PLAYER + TEAM SOURCE<br/>effective rates, workload, structured status, notes and provenance"]
   DERIVE["ONE PROJECTION PIPELINE<br/>derive daily / weekly / season categories and expected exposure"]
+  RULES["Selected league configuration + scoring revision<br/>unloaded settings remain unavailable"]
   SCORE["Shared league scoring + versioned API/views"]
+  ACTUAL["Official live actual stats + period + eligible lineup<br/>actual earned points / never forecast probability"]
+  ACTSCORE["League-scored actual player/day + team totals"]
+  DISPLAY["Matchup state + raw cache / scoring-revision invalidation<br/>ScoreCard / phone ScoreBlock / PlayerCard / ScoreboardStrip"]
   APP["All cards and boards<br/>draft, roster, matchup, free agents, app Draft Kit"]
   EXPORT["Workbook + PDF guide<br/>same published revision"]
   NEWS["News Room<br/>cited, dated evidence"]
@@ -23,6 +27,12 @@ flowchart TB
   VALID -->|"publish a validated revision"| SOURCE
   SOURCE -->|"load current revision"| EDIT
   SOURCE --> DERIVE --> SCORE
+  RULES --> SCORE
+  INPUT -->|"official actual stats only"| ACTUAL
+  RULES --> ACTSCORE
+  ACTUAL --> ACTSCORE --> DISPLAY
+  SCORE -->|"forecast props kept separate"| DISPLAY
+  RULES -->|"league switch / scoring edit invalidates scores and ranks"| DISPLAY
   SCORE --> APP
   SCORE --> EXPORT
   SOURCE -->|"structured status + revision invalidation"| APP
@@ -98,3 +108,11 @@ The current local guide loads an immutable snapshot at startup. Its deliberate p
 ## Current implementation coordination
 
 Correctness commits `51b2c3ae` and `1365b357` fix several consumer contracts but are undeployed; they do not by themselves merge the workbook's manual decisions into production or establish a canonical rate/workload source. The reconciliation owner is implementing the newly requested convergence contract. The owner has accepted input contract v1: stable player identity; projected/rates_only/unresolved coverage; MODEL/MANUAL/DEFAULT provenance; true per-exposure rates and derived counts; exposure unit/baseline/used/kind; roster probability plus explicit probability semantics; role/PP notes and evidence; source hashes/locators/URLs; issues; and top-level season, schedule, revision hash, coverage and team ledger. Implementation and human status/edit mapping remain in progress; these accepted target fields are not claimed published. No single-source completion is claimed at this checkpoint.
+
+## Local canonical review checkpoint
+
+The [review interface](/Users/gstorms/.codex/worktrees/8265/citrus/scripts/projection-review/README.md) now reads canonical v1, displays every team/player and source notes, and exports revision-bound patches with reason/evidence. The reconciliation CLI owns validation, history, derived-field rebuild and publication. A browser-exported fixture passed that CLI in memory; no source was changed. The source editor is league-neutral and shows no FPTS/ranks.
+
+The canonical guide importer takes an explicit revision and produces a separate DRAFT snapshot. Scoring preserves unavailable values and uses rate × exposure once; roster metadata is not reapplied. PDF manifests carry selected scoring label, exact weights and their SHA-256. A missing live league identity never claims to be a live league: the generic preview explicitly selects Citrus default scoring. There is no verified published-run marker yet, so canonical review artifacts remain DRAFT.
+
+Both target actual and projected scoring branches must take the selected league configuration and scoring revision. A league switch or settings edit invalidates derived scores/ranks, while raw hockey data stays reusable. Missing settings must remain unavailable in league-bound consumers. Acceptance spans the exact desktop/phone totals, player rows/tooltips, day strip, league strip and dropdown documented in the consumer audit; negative/zero actual points must replace stale positive values. This requirement is a migration gate, not a claim that baseline duplicate arithmetic and defaults have already been retired.

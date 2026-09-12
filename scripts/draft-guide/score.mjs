@@ -15,7 +15,7 @@ for (const group of ['skater', 'goalie']) {
 const rows = data.players.map((p, i) => ({...p, sortId:i+1}));
 const result = [];
 for (const goalie of [false, true]) {
-  const cohort = rows.filter(p=>p.isGoalie===goalie);
+  const cohort = rows.filter(p=>p.isGoalie===goalie && (!p.forecastStatus || p.forecastStatus==='projected') && p.games!==null);
   const raw = cohort.map(p=>({playerId:p.sortId,playerName:p.name,position:p.position,isGoalie:goalie,...Object.fromEntries(Object.entries(p.stats).map(([k,v])=>[k,p.baseGames ? v*p.games/p.baseGames : 0]))}));
   const ranked=reweightProjections(raw,weights);
   const positions=new Map(); let previous=null,rank=0;
@@ -26,8 +26,11 @@ for (const goalie of [false, true]) {
     if(prev.score===null || Math.abs(prev.score-r.projectedPoints)>1e-9)prev.rank=prev.count+1;
     prev.count++;prev.score=r.projectedPoints;positions.set(p.position,prev);
     const factor=p.baseGames ? p.games/p.baseGames : 0;
-    result.push({...p,rank,positionRank:prev.rank,fantasyPoints:r.projectedPoints,pointsPerGame:p.games ? r.projectedPoints/p.games : 0,adjustedPoints:p.rosterProbability==null ? null:r.projectedPoints*p.rosterProbability,contributions:Object.entries(p.stats).map(([key,value])=>({key,raw:value,scaled:value*factor,weight:weights[goalie?'goalie':'skater'][key],points:value*factor*weights[goalie?'goalie':'skater'][key]}))});
+    result.push({...p,rank,positionRank:prev.rank,fantasyPoints:r.projectedPoints,pointsPerGame:p.games ? r.projectedPoints/p.games : 0,adjustedPoints:p.canonicalRates ? null : p.rosterProbability==null ? null:r.projectedPoints*p.rosterProbability,contributions:Object.entries(p.stats).map(([key,value])=>({key,raw:value,scaled:value*factor,weight:weights[goalie?'goalie':'skater'][key],points:value*factor*weights[goalie?'goalie':'skater'][key]}))});
     previous=r.projectedPoints;
   }
+}
+for (const p of rows.filter(p=>(p.forecastStatus && p.forecastStatus!=='projected') || p.games===null)) {
+  result.push({...p,rank:null,positionRank:null,fantasyPoints:null,pointsPerGame:null,adjustedPoints:null,contributions:[]});
 }
 process.stdout.write(JSON.stringify({weights,players:result}));

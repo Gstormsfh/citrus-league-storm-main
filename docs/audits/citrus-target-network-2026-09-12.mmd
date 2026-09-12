@@ -4,7 +4,11 @@ flowchart TB
   VALID["Validate edits and imports<br/>identity, units, evidence, team allocation, revision conflict"]
   SOURCE["ONE VERSIONED PLAYER + TEAM SOURCE<br/>effective rates, workload, structured status, notes and provenance"]
   DERIVE["ONE PROJECTION PIPELINE<br/>derive daily / weekly / season categories and expected exposure"]
+  RULES["Selected league configuration + scoring revision<br/>unloaded settings remain unavailable"]
   SCORE["Shared league scoring + versioned API/views"]
+  ACTUAL["Official live actual stats + period + eligible lineup<br/>actual earned points / never forecast probability"]
+  ACTSCORE["League-scored actual player/day + team totals"]
+  DISPLAY["Matchup state + raw cache / scoring-revision invalidation<br/>ScoreCard / phone ScoreBlock / PlayerCard / ScoreboardStrip"]
   APP["All cards and boards<br/>draft, roster, matchup, free agents, app Draft Kit"]
   EXPORT["Workbook + PDF guide<br/>same published revision"]
   NEWS["News Room<br/>cited, dated evidence"]
@@ -14,6 +18,12 @@ flowchart TB
   VALID -->|"publish a validated revision"| SOURCE
   SOURCE -->|"load current revision"| EDIT
   SOURCE --> DERIVE --> SCORE
+  RULES --> SCORE
+  INPUT -->|"official actual stats only"| ACTUAL
+  RULES --> ACTSCORE
+  ACTUAL --> ACTSCORE --> DISPLAY
+  SCORE -->|"forecast props kept separate"| DISPLAY
+  RULES -->|"league switch / scoring edit invalidates scores and ranks"| DISPLAY
   SCORE --> APP
   SCORE --> EXPORT
   SOURCE -->|"structured status + revision invalidation"| APP

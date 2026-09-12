@@ -41,6 +41,23 @@ flowchart TB
     API --> APPKIT
     FACT -->|"Draft v2 direct browser actuals read [R]"| CARD
   end
+  subgraph ActualMatchup[Actual earned matchup points / repository trace]
+    ELIG["League rules + matchup period + frozen eligible starters"]
+    SQLACT["calculate_daily_matchup_scores_v2 / score_matchup_lines<br/>fantasy_matchup_lines + matchups team totals"]
+    RAWACT["get_daily_game_stats API<br/>7 daily raw requests / configured 10s API cache"]
+    UIACT["Matchup.tsx dailyStatsByDate<br/>browser actual-score arithmetic + calculatedDailyTotals"]
+    SELECTACT["myTeamPoints / opponentTeamPoints<br/>loading + RPC fallback precedence"]
+    SCOREBOARD["Desktop ScoreCard / phone PressBoxScoreBlock<br/>WeeklySchedule / PlayerCard actual points + tooltip"]
+    STRIP["allWeekMatchups → ScoreboardStrip / dropdown"]
+    FACT --> SQLACT
+    ELIG --> SQLACT
+    FACT --> RAWACT --> UIACT
+    ELIG --> UIACT
+    SQLACT -->|"daily totals fallback"| SELECTACT
+    UIACT --> SELECTACT --> SCOREBOARD
+    SQLACT --> STRIP
+    UIACT -. "current-week poll configured 120s; end-to-end latency unmeasured" .-> RAWACT
+  end
   subgraph Publication[Separate publication branches]
     INPUT["Supplied workbook + dated qualitative evidence + production SELECT snapshots"]
     WB["Reconciled 707-player XLSX [local verified]"]
