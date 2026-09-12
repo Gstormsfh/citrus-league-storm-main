@@ -76,6 +76,14 @@ const LeagueDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [simulating, setSimulating] = useState(false);
   const [league, setLeague] = useState<League | null>(null);
+  // DRAFT TIME (2026-09-12). Nothing in the app could set
+  // leagues.scheduled_draft_time: the only control ever built sits in the v1
+  // draft room and the app ships v2, so 0 of 69 production leagues had a time
+  // on them. The column, the API and the 30-second sweep that ignites a due
+  // draft all exist; this is the missing end of it, on the draft card where
+  // the commissioner already is.
+  const [draftTimeInput, setDraftTimeInput] = useState('');
+  const [savingDraftTime, setSavingDraftTime] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
   const [userTeam, setUserTeam] = useState<Team | null>(null);
   /** Players on the signed-in manager's roster. null = not known yet or the
@@ -480,6 +488,78 @@ const LeagueDashboard = () => {
     }
   }, [activeSettingsTab, leagueId, teams]);
   
+  /**
+   * `datetime-local` speaks local wall time and the column stores an instant,
+   * so the two conversions live here rather than at the input.
+   */
+  useEffect(() => {
+    const scheduled = league?.scheduled_draft_time;
+    if (!scheduled) {
+      setDraftTimeInput('');
+      return;
+    }
+    const when = new Date(scheduled);
+    if (Number.isNaN(when.getTime())) {
+      setDraftTimeInput('');
+      return;
+    }
+    const pad = (n: number) => String(n).padStart(2, '0');
+    setDraftTimeInput(
+      `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}T${pad(when.getHours())}:${pad(when.getMinutes())}`,
+    );
+  }, [league?.scheduled_draft_time]);
+
+  const handleScheduleDraft = async (value: string | null) => {
+    if (!leagueId || !user?.id || savingDraftTime) return;
+
+    let iso: string | null = null;
+    if (value) {
+      const when = new Date(value);
+      if (Number.isNaN(when.getTime())) {
+        toast({
+          title: 'That date did not read',
+          description: 'Pick the day and time again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (when.getTime() <= Date.now()) {
+        toast({
+          title: 'Pick a time ahead',
+          description: 'A draft can only be scheduled for the future. To go now, use the draft room.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      iso = when.toISOString();
+    }
+
+    setSavingDraftTime(true);
+    try {
+      const { success, error: saveError } = await LeagueService.updateDraftSettings(leagueId, user.id, {
+        scheduled_draft_time: iso,
+      });
+      if (!success) {
+        throw new Error(userMessage(saveError, "Couldn't save the draft time."));
+      }
+      setLeague((prev) => (prev ? { ...prev, scheduled_draft_time: iso } : prev));
+      toast({
+        title: iso ? 'Draft scheduled' : 'Draft time cleared',
+        description: iso
+          ? `${new Date(iso).toLocaleString()}. Every manager sees it on their league page.`
+          : 'Nobody is waiting on a clock now.',
+      });
+    } catch (err) {
+      toast({
+        title: "Couldn't save the draft time",
+        description: userMessage(err, 'Try again in a moment.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingDraftTime(false);
+    }
+  };
+
   const handleSaveSettings = async () => {
     if (!leagueId || !user) return;
     
@@ -2226,6 +2306,48 @@ const LeagueDashboard = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {isCommissioner && league.draft_status !== 'in_progress' && (
+                    <div className="mb-4 rounded-xl bg-black/20 ring-1 ring-white/10 p-3">
+                      <Label
+                        htmlFor="draft-time"
+                        className="font-jbmono text-[11px] uppercase tracking-[0.18em] text-white/55"
+                      >
+                        Draft time
+                      </Label>
+                      <p className="mt-1 text-xs text-white/45">
+                        Managers see this on their league page, and the draft starts itself when the clock gets there.
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Input
+                          id="draft-time"
+                          type="datetime-local"
+                          value={draftTimeInput}
+                          onChange={(e) => setDraftTimeInput(e.target.value)}
+                          disabled={savingDraftTime}
+                          className="h-10 w-[230px] bg-black/30 border-white/10 text-pastel-cream"
+                        />
+                        <Button
+                          size="sm"
+                          disabled={savingDraftTime || !draftTimeInput}
+                          onClick={() => handleScheduleDraft(draftTimeInput)}
+                          className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold"
+                        >
+                          {league.scheduled_draft_time ? 'Update' : 'Set'}
+                        </Button>
+                        {league.scheduled_draft_time && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={savingDraftTime}
+                            onClick={() => handleScheduleDraft(null)}
+                            className="text-white/55 hover:text-pastel-cream"
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <Button
                     onClick={() => {
                       if (!leagueId) {
