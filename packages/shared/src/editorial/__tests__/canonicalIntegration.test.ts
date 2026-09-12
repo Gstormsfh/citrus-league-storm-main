@@ -65,3 +65,16 @@ describe('published canonical context in the shared writing pipeline', () => {
     expect(w.canonicalSources).toContainEqual(canonical.availability.source);
   });
 });
+
+it.each(['h2h-categories', 'roto'])('category source assembly keeps enabled categories without weighted totals: %s', scoringFormat => {
+  const source = { ...sources(), scoringFormat };
+  const extras = writeupExtrasFromSources(source);
+  expect(extras.scoringCategories).toEqual(['goals', 'assists']);
+  expect(extras.scoringWeights).toBeNull();
+  expect(extras.projFp).toBeNull();
+  expect(extras.posRank).toBeNull();
+  const a = buildWriteupFromSources(source);
+  const b = buildWriteupFromSources({ ...source, scoring: { skater: { goals: 400, assists: 1 } } });
+  expect(a.analysis).toBe(b.analysis);
+  expect(a.analysis).not.toMatch(/scoring points|fantasy points|Projects to/);
+});

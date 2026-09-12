@@ -209,3 +209,12 @@ describe('the player card falls back to the in-bundle writeup', () => {
     expect(paths.some((p) => p.includes('leagueId'))).toBe(false);
   });
 });
+
+it('category fallback keeps its hockey assessment without a weighted points valuation', async () => {
+  mocks.format.mockReturnValue({ scoringFormat: 'h2h-categories' });
+  openCard();
+  expect(await screen.findByText(LOCAL_SUMMARY)).toBeTruthy();
+  await waitFor(() => expect(mocks.league).toHaveBeenCalled());
+  expect(screen.queryByText(/scoring points|Projects to/)).toBeNull();
+  expect(await screen.findByText(/assist total is not directly rewarded/)).toBeTruthy();
+});

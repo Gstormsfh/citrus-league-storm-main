@@ -150,6 +150,8 @@ export interface WriteupSources {
    * production, and a wrong number is worse than a missing one.
    */
   scoring?: unknown | null;
+  /** Category and roto leagues compare stats, never weighted point totals. */
+  scoringFormat?: string | null;
   /** Injected so a test is not at the mercy of the day it runs on. */
   now?: Date;
 }
@@ -219,8 +221,8 @@ export function projectionLabelFor(now: Date, season = getProjectionsSeason(now)
 export function writeupExtrasFromSources(src: WriteupSources): WriteupExtras {
   const now = src.now ?? new Date();
   const scoring = src.scoring ?? null;
+  const pointsFormat = src.scoringFormat !== 'h2h-categories' && src.scoringFormat !== 'roto';
   // Additive active-view context is hydrated by the canonical source owner.
-  // The structural cast keeps this consumer compatible with older index types.
   const canonicalContext = src.entry.canonical_context;
   const projectionSeason = src.entry.projection_season ?? getProjectionsSeason(now);
 
@@ -231,7 +233,7 @@ export function writeupExtrasFromSources(src: WriteupSources): WriteupExtras {
 
   let projFp: number | null = null;
   let projGp: number | null = null;
-  if (scoring != null) {
+  if (scoring != null && pointsFormat) {
     const settings = projectionSettings(scoring);
     const projection = projectionFor(src.entry, new ScoringCalculator(settings), settings);
     if (projection) {
@@ -245,7 +247,7 @@ export function writeupExtrasFromSources(src: WriteupSources): WriteupExtras {
     ...(canonicalContext ? { canonicalContext, now } : {}),
     ...(src.entry.as_of ? { indexAsOf: src.entry.as_of } : {}),
     ...(src.newsItems ? { newsItems: src.newsItems, now } : {}),
-    ...(scoring != null ? { scoringCategories: editorialScoringCategories(scoring), scoringWeights: editorialScoringWeights(scoring) } : {}),
+    ...(scoring != null ? { scoringCategories: editorialScoringCategories(scoring), scoringWeights: pointsFormat ? editorialScoringWeights(scoring) : null } : {}),
     age: src.birthdate ? ageOn(src.birthdate, now) : null,
     goalsBySeason,
     ...cohortReads(src.entry, src.index),

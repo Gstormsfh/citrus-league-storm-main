@@ -50,12 +50,13 @@ function story(overrides: Partial<NewsItemRow> = {}): NewsItemRow {
   };
 }
 
-function setup() {
+function setup(scoringFormat = 'h2h-points') {
   const entry = profile();
   const dashboard = {
     getDashboardIndex: vi.fn().mockResolvedValue({ players: [entry], error: null }),
   };
   const supabase = createMockSupabase({
+    leagues: createChain({ data: { settings: { scoringFormat } }, error: null }),
     player_directory: createChain({ data: [{ season: 2026, birthdate: '1999-01-01', career: null }], error: null }),
     stat_catalog: createChain({ data: [
       { stat_key: 'goals', applies_to: 'skater' },
@@ -155,4 +156,12 @@ describe('PlayerWriteupService attached news integration', () => {
     expect(clearance!.summary).toContain('2026-09-12');
     expect(clearance!.analysis).not.toContain('practice is a step');
   });
+});
+
+it.each(['h2h-categories', 'roto'])('omits weighted points and ranks for %s while retaining category analysis', async scoringFormat => {
+  const { read } = setup(scoringFormat);
+  const result = await read();
+  expect(result?.analysis).not.toMatch(/fantasy points|scoring points|Projects to|\(C1\)/);
+  expect(result?.analysis).toContain('Shots are not rewarded directly');
+  expect(result?.summary).toContain('2025-26');
 });

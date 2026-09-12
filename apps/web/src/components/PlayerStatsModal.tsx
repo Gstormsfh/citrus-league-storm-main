@@ -668,7 +668,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
   // our books from the xG history, the cohort reads the XG tab draws, and
   // the projection with the framing the card uses. See WriteupExtras.
   const canonicalContext = (indexEntry as (CardEntry & { canonical_context?: EditorialCanonicalContext | null }) | undefined)?.canonical_context;
-  const writeupRevision = JSON.stringify([leagueScoring, indexEntry?.actuals_season, indexEntry?.projection_season, canonicalContext?.revision, wireItems]);
+  const writeupRevision = JSON.stringify([leagueScoring, pointsFormat, indexEntry?.actuals_season, indexEntry?.projection_season, canonicalContext?.revision, wireItems]);
   const xgHistory = usePlayerXgHistory(Number(player?.id) || null, { enabled: isOpen, leagueId, revision: writeupRevision });
   const positionRank = useMemo(() => {
     if (!indexEntry || !scoringReady || !pointsFormat) return null;
@@ -738,7 +738,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
       newsItems: wireItems,
       canonicalContext,
       indexAsOf: indexEntry?.as_of ?? null,
-      scoringWeights: scoringReady && leagueId ? editorialScoringWeights(leagueScoring) : null,
+      scoringWeights: scoringReady && pointsFormat && leagueId ? editorialScoringWeights(leagueScoring) : null,
       scoringCategories: scoringReady && leagueId ? editorialScoringCategories(leagueScoring) : null,
       age: Number.isFinite(age as number) ? age : null,
       projectionSeason: indexEntry?.projection_season ?? getProjectionsSeason(),
