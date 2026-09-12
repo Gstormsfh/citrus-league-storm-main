@@ -6,7 +6,7 @@ import { TrendingUp, Flame, Award } from 'lucide-react';
 import { CitrusSparkle, CitrusLeaf, CitrusSlice } from '@/components/icons/CitrusIcons';
 import { cn } from '@/lib/utils';
 import { MatchupPlayer } from './types';
-import { ScoringCalculator } from '@/utils/scoringUtils';
+import { sidebarFantasyPoints } from './sidebarPoints';
 import { AdSpace } from '@/components/AdSpace';
 
 /* 2026-08-19 visual audit — muted-text correction.
@@ -26,6 +26,8 @@ interface MatchupSidebarProps {
   opponentTeamName: string;
   myTeamProjection?: number;
   opponentTeamProjection?: number;
+  scoringSettings?: unknown;
+  scoringReady?: boolean;
   onPlayerClick?: (player: MatchupPlayer) => void;
 }
 
@@ -38,7 +40,9 @@ export const MatchupSidebar: React.FC<MatchupSidebarProps> = ({
   opponentTeamName,
   myTeamProjection,
   opponentTeamProjection,
-  onPlayerClick
+  onPlayerClick,
+  scoringSettings,
+  scoringReady = false,
 }) => {
   // Get top performers from both teams
   const topPerformers = useMemo(() => {
@@ -47,41 +51,12 @@ export const MatchupSidebar: React.FC<MatchupSidebarProps> = ({
       ...opponentStarters.map(p => ({ ...p, teamName: opponentTeamName, isMyTeam: false }))
     ];
     
-    // Sort by total points (check multiple possible sources)
-    const playersWithPoints = allPlayers.map(p => {
-      // Try multiple sources for points
-      let totalPoints = 0;
-      
-      // 1. Check total_points from DB
-      if (p.total_points && p.total_points > 0) {
-        totalPoints = p.total_points;
-      }
-      // 2. Check points property
-      else if (p.points && p.points > 0) {
-        totalPoints = p.points;
-      }
-      // 3. Check matchupStats for weekly totals — use centralized ScoringCalculator
-      else if (p.matchupStats) {
-        const stats = p.matchupStats;
-        const sidebarScorer = new ScoringCalculator();
-        const isGoalie = (stats.wins !== undefined && stats.wins !== null) && !stats.goals;
-        totalPoints = sidebarScorer.calculatePoints({
-          goals: stats.goals || 0, assists: stats.assists || 0, sog: stats.sog || 0,
-          blocks: stats.blocks || 0, ppp: stats.ppp || 0, shp: stats.shp || 0,
-          hits: stats.hits || 0, pim: stats.pim || 0,
-          wins: stats.wins || 0, saves: stats.saves || 0, shutouts: stats.shutouts || 0,
-          goals_against: stats.goals_against || 0
-        }, isGoalie);
-      }
-      
-      return { ...p, calculatedPoints: totalPoints };
-    });
-    
-    return playersWithPoints
-      .filter(p => p.calculatedPoints > 0)
+    return allPlayers
+      .map(player => ({ ...player, calculatedPoints: sidebarFantasyPoints(player, scoringSettings, scoringReady) }))
+      .filter((player): player is typeof player & { calculatedPoints: number } => player.calculatedPoints != null)
       .sort((a, b) => b.calculatedPoints - a.calculatedPoints)
       .slice(0, 5);
-  }, [myStarters, opponentStarters, myTeamName, opponentTeamName]);
+  }, [myStarters, opponentStarters, myTeamName, opponentTeamName, scoringSettings, scoringReady]);
 
 
   return (

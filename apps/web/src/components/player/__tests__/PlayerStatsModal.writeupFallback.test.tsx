@@ -122,7 +122,7 @@ beforeEach(() => {
   mocks.leagueId = '11111111-1111-1111-1111-111111111111';
   mocks.schedule.mockResolvedValue({ games: [], error: null });
   mocks.log.mockResolvedValue({ data: { games: [], projections: [] } });
-  mocks.league.mockResolvedValue({ league: { scoring_settings: { skater: { goals: 3 } } } });
+  mocks.league.mockResolvedValue({ league: { id: mocks.leagueId, scoring_settings: { skater: { goals: 3 } } } });
   mocks.format.mockReturnValue({ scoringFormat: 'h2h-points' });
   mocks.get.mockResolvedValue(xgHistory());
 });

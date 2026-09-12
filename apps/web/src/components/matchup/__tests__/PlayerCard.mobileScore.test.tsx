@@ -315,3 +315,20 @@ describe('PlayerCard — empty slot', () => {
     expect(theirs.container.firstElementChild!.className).toContain('opponent-team');
   });
 });
+
+
+describe('earned score availability and corrections', () => {
+  it.each([0, -3.5])('renders a corrected daily actual %s instead of season points', (actual) => {
+    const { container } = render(<PlayerCard player={player({ points: 999,
+      games: [game({ status: 'final' })], daily_total_points: actual })}
+      isUserTeam selectedDate={DATE} />);
+    expect(value(container)?.textContent).toBe(actual.toFixed(1));
+  });
+  it('renders an unavailable final actual without converting it to zero', () => {
+    const { container } = render(<PlayerCard player={player({ points: 999,
+      games: [game({ status: 'final' })], daily_total_points: undefined })}
+      isUserTeam selectedDate={DATE} />);
+    expect(value(container)?.textContent).toBe('N/A');
+    expect(stack(container).textContent).not.toContain('0.0');
+  });
+});

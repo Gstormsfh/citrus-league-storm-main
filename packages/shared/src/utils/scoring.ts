@@ -20,6 +20,7 @@ import { SCORING_DEFAULTS } from '../constants/scoringDefaults';
 
 export interface ScoringSettings {
   skater: {
+    [stat: string]: number | undefined;
     goals: number;
     assists: number;
     power_play_points: number;
@@ -31,12 +32,21 @@ export interface ScoringSettings {
     plus_minus?: number;
   };
   goalie: {
+    [stat: string]: number | undefined;
     wins: number;
     shutouts: number;
     saves: number;
     goals_against: number;
   };
 }
+
+/** Additional stat_catalog categories. Missing weights are disabled. */
+export const ADDITIONAL_SCORING_STATS = {
+  skater: ['faceoff_wins', 'faceoff_losses', 'takeaways', 'giveaways', 'power_play_goals',
+    'power_play_assists', 'short_handed_goals', 'short_handed_assists', 'shots_missed',
+    'shots_blocked_by_opp', 'shot_attempts', 'game_winning_goals', 'overtime_goals', 'shifts', 'toi_minutes'],
+  goalie: ['losses', 'ot_losses', 'shots_faced', 'even_saves', 'pp_saves', 'sh_saves', 'goalie_toi_minutes'],
+} as const;
 
 /**
  * Default scoring settings matching database defaults.
@@ -84,7 +94,8 @@ export class ScoringCalculator {
         (stats.wins || 0) * this.settings.goalie.wins +
         (stats.saves || 0) * this.settings.goalie.saves +
         (stats.shutouts || 0) * this.settings.goalie.shutouts +
-        (stats.goals_against || 0) * this.settings.goalie.goals_against
+        (stats.goals_against || 0) * this.settings.goalie.goals_against +
+        this.additionalPoints(stats, true)
       );
     } else {
       return (
@@ -96,9 +107,20 @@ export class ScoringCalculator {
         (stats.blocks || stats.blk || stats.blockedShots || 0) * this.settings.skater.blocks +
         (stats.hits || 0) * this.settings.skater.hits +
         (stats.pim || stats.penalty_minutes || 0) * this.settings.skater.penalty_minutes +
-        (stats.plus_minus || stats.plusMinus || 0) * (this.settings.skater.plus_minus || 0)
+        (stats.plus_minus || stats.plusMinus || 0) * (this.settings.skater.plus_minus || 0) +
+        this.additionalPoints(stats, false)
       );
     }
+  }
+
+  private additionalPoints(stats: Record<string, number>, isGoalie: boolean): number {
+    const group = isGoalie ? 'goalie' : 'skater';
+    return ADDITIONAL_SCORING_STATS[group].reduce((total, key) => {
+      const weight = this.settings[group][key];
+      const count = stats[key];
+      return total + (typeof weight === 'number' && Number.isFinite(weight)
+        && typeof count === 'number' && Number.isFinite(count) ? weight * count : 0);
+    }, 0);
   }
 
   /**

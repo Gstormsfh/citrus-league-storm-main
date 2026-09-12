@@ -246,7 +246,7 @@ describe('MatchupService.getLeagueScoreboard: the reads', () => {
     matchups: createChain({ data: rows, error: null }),
     fantasy_daily_rosters: createChain({ data: rosters, error: null }),
     team_lineups: createChain({ data: lineups, error: null }),
-    player_projected_stats: createChain({ data: projections.map(p => ({ ...p, projected_goals: Number(p.total_projected_points) / 6, projected_assists: 0 })), error: null }),
+    player_projected_stats: createChain({ data: projections.map(p => ({ ...p, projected_goals: Number(p.total_projected_points) / 6, projected_assists: 0, projected_sog: 0, projected_blocks: 0, projected_ppp: 0 })), error: null }),
     leagues: createChain({ data: { scoring_settings: null }, error: null }),
   });
 

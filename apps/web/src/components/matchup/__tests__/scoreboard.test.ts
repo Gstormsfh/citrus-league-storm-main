@@ -49,7 +49,9 @@ describe('scoreOf / formatScore — the API hands numerics back as strings on so
   it('prints one decimal like every other score on the page', () => {
     expect(formatScore(12)).toBe('12.0');
     expect(formatScore('9.86')).toBe('9.9');
-    expect(formatScore(null)).toBe('0.0');
+    expect(formatScore(null)).toBe('N/A');
+    expect(formatScore(0)).toBe('0.0');
+    expect(formatScore(-2)).toBe('-2.0');
   });
 });
 

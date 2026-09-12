@@ -7,6 +7,12 @@ export interface ScheduledGame { game_id: number; game_date: string; home_team: 
 
 /** Add units without mutating conditional category counts used by existing clients. */
 export function withGoalieExposure(row: Row, allocations: GoalieAllocation[], schedule: ScheduledGame[], today: string): Row {
+  if (row.calculation_method === 'canonical_expected_volume_v1') {
+    const p = row.projected_gp == null ? NaN : Number(row.projected_gp);
+    return Number.isFinite(p) && p >= 0 && p <= 1
+      ? { ...row, projection_basis: 'unconditional', expected_starts: row.is_goalie ? p : null, start_probability: row.is_goalie ? p : null, availability_source: row.is_goalie ? 'canonical_crease_share' : 'canonical_snapshot' }
+      : { ...row, projection_basis: 'unknown', expected_starts: null, availability_source: 'unavailable' };
+  }
   if (!row.is_goalie) return row;
   const unavailable = { ...row, projection_basis: 'unknown', expected_starts: null, start_probability: null, availability_source: 'unavailable' };
   if (row.calculation_method === 'probability_based_volume') {

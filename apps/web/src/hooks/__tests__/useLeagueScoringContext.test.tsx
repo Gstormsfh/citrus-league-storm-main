@@ -5,6 +5,11 @@ vi.mock('@/services/LeagueService', () => ({ LeagueService: { getLeague: mock.ge
 import { useLeagueScoringContext } from '../useLeagueScoringContext';
 beforeEach(() => { vi.clearAllMocks(); });
 describe('league scoring context refresh', () => {
+  it('keeps missing league and seed unavailable without crashing', () => {
+    const { result } = renderHook(() => useLeagueScoringContext());
+    expect(result.current.ready).toBe(false);
+    expect(mock.get).not.toHaveBeenCalled();
+  });
   it('withholds scoring until a matching league loads and updates on focus', async () => {
     mock.get.mockResolvedValue({ league: { id: 'a', scoring_settings: { skater: { goals: 1 } } } });
     const { result } = renderHook(() => useLeagueScoringContext('a'));
@@ -44,6 +49,8 @@ describe('league scoring context refresh', () => {
     await waitFor(() => expect(mock.get).toHaveBeenCalled());
     expect(result.current.ready).toBe(false);
     expect(renderHook(() => useLeagueScoringContext(null)).result.current.ready).toBe(false);
+    expect(renderHook(() => useLeagueScoringContext(undefined)).result.current.ready).toBe(false);
+    expect(renderHook(() => useLeagueScoringContext(undefined, undefined, true, true)).result.current.ready).toBe(true);
     expect(renderHook(() => useLeagueScoringContext(null, null, true, true)).result.current.ready).toBe(true);
   });
   it('accepts persisted null as an explicitly hydrated default configuration', () => {

@@ -159,24 +159,13 @@ describe('the game log asks the forward-looking question', () => {
     expect(body).toContain('seasonWindow(logSeason)');
   });
 
-  it('the stats season is only ever LABELLED, never used to fetch anything', () => {
-    // 2026-09-09: the season the stat tabs describe is getMetricsSeason()
-    // (the last season with a sample; see packages/shared season.ts), and
-    // the modal no longer reads getCurrentSeason() at all. Every
-    // getMetricsSeason() call site is a label or the comparison that drives
-    // one. Strike those two shapes out and nothing may remain, so no future
-    // read can quietly key a fetch on the labelled season.
+  it('labels actuals from their source and keeps the game-log fetch independently selected', () => {
     const executable = stripComments(MODAL);
-    expect(executable.includes('getCurrentSeason()'), 'the modal reads the season being played again').toBe(false);
-    const leftovers = executable
-      .replace(/seasonLabel\(getMetricsSeason\(\)\)/g, '')
-      .replace(/getProjectionsSeason\(\) !== getMetricsSeason\(\)/g, '');
-    expect(
-      leftovers.includes('getMetricsSeason()'),
-      'getMetricsSeason() is being read for something other than a season label',
-    ).toBe(false);
-    // And the labels really are there, so this does not pass by deletion.
-    expect(executable).toContain('seasonLabel(getMetricsSeason())');
+    expect(executable).not.toContain('getCurrentSeason()');
+    expect(executable).not.toContain('getMetricsSeason()');
+    expect(executable).toContain('actualsSeasonLabel(player.statsSeason)');
+    expect(gameLogEffect()).toContain('seasonWindow(logSeason)');
+    expect(gameLogEffect()).not.toContain('seasonWindow(player.statsSeason)');
   });
 
   it('opens the window at the real opener, not a hardcoded September 1st', () => {
@@ -197,11 +186,12 @@ describe('every tab says which season it is showing', () => {
     // exactly wrong during the run-up.
     expect(MODAL).toContain('data-testid="overview-season-label"');
     expect(MODAL).toContain('data-testid="advanced-season-label"');
-    expect(MODAL).toMatch(/\{seasonLabel\(getMetricsSeason\(\)\)\} season/);
+    expect(MODAL).toContain('actualsSeasonLabel(player.statsSeason)');
+    expect(MODAL).toContain('actualsSeasonLabel(indexEntry?.actuals_season)');
   });
 
   it('tells the reader when the other season starts, but only while they differ', () => {
-    expect(MODAL).toMatch(/getProjectionsSeason\(\) !== getMetricsSeason\(\)/);
+    expect(MODAL).toContain('getProjectionsSeason() !== player.statsSeason');
     expect(MODAL).toContain('openerLabel');
   });
 
@@ -209,7 +199,7 @@ describe('every tab says which season it is showing', () => {
     // The whole point of the split. If these ever collapse to one call the
     // card is lying on one half or the other for twenty-five days a year.
     expect(MODAL).toContain('getProjectionsSeason()');
-    expect(MODAL).toContain('getMetricsSeason()');
+    expect(MODAL).toContain('actualsSeasonLabel(player.statsSeason)');
   });
 });
 

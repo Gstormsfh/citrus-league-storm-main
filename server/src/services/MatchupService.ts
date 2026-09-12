@@ -1,3 +1,4 @@
+import { OFFICIAL_GAME_STAT_SELECT, officialGameStats } from './officialGameStats';
 import { addGoalieExposure } from './goalieProjectionExposure';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { resolveSlotConfig } from '../lib/leagueRules';
@@ -1489,12 +1490,21 @@ export class MatchupService {
 
   /** Get daily game stats for players on a specific date */
   async getDailyGameStats(playerIds: number[], gameDate: string) {
-    const { data, error } = await this.supabase.rpc('get_daily_game_stats', {
-      p_player_ids: playerIds,
-      p_game_date: gameDate,
-    });
-
-    return { stats: data || [], error };
+    if (playerIds.length === 0) return { stats: [], error: null };
+    const stats: Record<string, unknown>[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await this.supabase.from('player_game_stats')
+        .select(OFFICIAL_GAME_STAT_SELECT)
+        .in('player_id', playerIds)
+        .eq('game_date', gameDate)
+        .order('player_id', { ascending: true })
+        .order('game_id', { ascending: true })
+        .range(offset, offset + 999);
+      if (error) return { stats: [], error };
+      const rows = (data ?? []) as unknown as Record<string, unknown>[];
+      stats.push(...rows.map(officialGameStats));
+      if (rows.length < 1000) return { stats, error: null };
+    }
   }
 
   /**

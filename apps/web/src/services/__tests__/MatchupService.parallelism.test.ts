@@ -89,7 +89,8 @@ describe('Matchup page — no dead wall-clock, no double load', () => {
     // getDailyGameStats requests and re-arming the live-refresh effect, which
     // immediately fires 9 more.
     expect(PAGE).toMatch(/const scoringSignature = React\.useMemo\(/);
-    expect(PAGE).toMatch(/userLeagueState, scoringSignature, demoMyTeam, demoOpponentTeam\]/);
+    expect(PAGE).toMatch(/userLeagueState, scoringSignature, statsScope, demoMyTeam, demoOpponentTeam\]/);
+    expect(PAGE).not.toMatch(/userLeagueState, scoringSettings, statsScope/);
   });
 
   it('does not clear demo state that is already clear', () => {

@@ -105,14 +105,12 @@ function rosRow(id: number, pts: number) {
     games_remaining: 80,
     total_projected_points: pts,
     avg_points_per_game: pts / 80,
-    projected_goals: 30,
-    projected_assists: 40,
-    projected_sog: 240,
-    projected_ppp: 18,
-    projected_hits: 40,
-    projected_blocks: 60,
+    projected_goals: id === 6 ? 0 : pts / 6,
+    projected_assists: 0, projected_sog: 0, projected_ppp: 0,
+    projected_hits: 0, projected_blocks: 0, projected_pim: 0, projected_shp: 0,
     projected_wins_ros: 0,
-    projected_saves_ros: 0,
+    projected_saves_ros: id === 6 ? pts / 0.6 : 0,
+    projected_ga_ros: 0,
     projected_shutouts_ros: 0,
   };
 }
@@ -183,6 +181,8 @@ function mockTables(entitlements: unknown[]) {
         const rows = dirCalls.n === 1 ? DIR : dirCalls.n === 2 ? CURRENT_DIR : PRIOR_DIR;
         return createChain({ data: rows, error: null });
       }
+      case 'canonical_published_runs':
+        return createChain({ data: null, error: null });
       case 'player_season_stats':
         return createChain({ data: STATS, error: null });
       case 'player_gar_components':

@@ -50,9 +50,10 @@ import {
   type ScoresPlayerLine,
   // Root, not the /leagueProjection subpath: the server's vitest alias points
   // at src/index.ts, so a subpath import resolves to index.ts/leagueProjection.
-  projectedPointsFor,
+  expectedDailyProjection,
   type ProjectedStatRow,
 } from '@citrus/shared';
+import { addGoalieExposure } from './goalieProjectionExposure';
 import { pagedSelect } from '../lib/pagedSelect';
 
 // ── Column lists. Explicit, never `*`. ──────────────────────────────────
@@ -64,7 +65,7 @@ const GAME_COLUMNS =
 const TEAM_COLUMNS = 'team_id, abbreviation, city, name';
 
 const PROJECTION_COLUMNS =
-  'player_id, game_id, season, is_goalie, total_projected_points, confidence_label, updated_at, ' +
+  'player_id, game_id, season, projection_date, calculation_method, projected_gp, is_goalie, total_projected_points, confidence_label, updated_at, ' +
   // The components, so the projection can be scored under the league that is
   // looking at it rather than under the default the column was baked with.
   'projected_goals, projected_assists, projected_ppp, projected_shp, projected_sog, ' +
@@ -490,7 +491,8 @@ export class ScoresService {
     // already; the newest-wins tiebreak is defence against a backfill that
     // leaves two, which would otherwise double-count a player in the panel.
     const projByGame = new Map<number, Map<number, ProjectionRow>>();
-    for (const p of projectionsRead.data) {
+    const exposedRows = await addGoalieExposure(this.supabase, projectionsRead.data.map(p => ({ ...p })));
+    for (const p of exposedRows as unknown as ProjectionRow[]) {
       let forGame = projByGame.get(p.game_id);
       if (!forGame) {
         forGame = new Map();
@@ -547,6 +549,7 @@ export class ScoresService {
         directory,
         roster,
         scorer,
+        scoring: roster.scoring,
         perGameLimit,
       }),
     );
@@ -641,6 +644,7 @@ export class ScoresService {
       directory: Map<number, DirectoryRow>;
       roster: { byPlayer: Map<number, { teamId: string; teamName: string | null; isMine: boolean }> };
       scorer: ScoringCalculator;
+      scoring: ScoringSettings;
       perGameLimit: number;
     },
   ): ScoreboardGame {
@@ -676,7 +680,7 @@ export class ScoresService {
         // baked with default scoring - so this line printed a default-scored
         // projection directly above an actualPoints computed with the league's
         // own scorer, two numbers on two scales in one row.
-        projectedPoints: projectedPointsFor(proj, ctx.scorer),
+        projectedPoints: expectedDailyProjection({ ...proj }, ctx.scoring, Boolean(proj.is_goalie ?? dir?.is_goalie))?.total_projected_points ?? null,
         confidenceLabel: proj.confidence_label ?? null,
         actualPoints: actual
           ? ctx.scorer.calculatePoints(actualsToStatBag(actual), Boolean(actual.is_goalie))

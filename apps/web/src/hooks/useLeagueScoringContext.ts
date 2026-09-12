@@ -4,7 +4,7 @@ import { LeagueService, type League } from '@/services/LeagueService';
 type Seed = Pick<League, 'id' | 'scoring_settings'> & Partial<League>;
 /** League-keyed scoring hydration. Missing settings during a read never imply default scoring. */
 export function useLeagueScoringContext(leagueId?: string | null, seedLeague?: Seed | null, enabled = true, allowPreview = false) {
-  const seed = seedLeague?.id === leagueId && Object.prototype.hasOwnProperty.call(seedLeague, 'scoring_settings') && seedLeague.scoring_settings !== undefined ? seedLeague : null;
+  const seed = seedLeague != null && seedLeague.id === leagueId && Object.prototype.hasOwnProperty.call(seedLeague, 'scoring_settings') && seedLeague.scoring_settings !== undefined ? seedLeague : null;
   const seedKey = JSON.stringify(seed?.scoring_settings ?? null);
   const [state, setState] = useState<{ id: string; seedKey: string; league: Seed | null; ready: boolean } | null>(null);
   useEffect(() => {
@@ -34,7 +34,7 @@ export function useLeagueScoringContext(leagueId?: string | null, seedLeague?: S
     // Seed identity objects are recreated by context. Their scoring value is the invalidation key.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leagueId, seedKey, enabled]);
-  const current = state?.id === leagueId && state.seedKey === seedKey ? state : null;
+  const current = state != null && state.id === leagueId && state.seedKey === seedKey ? state : null;
   const league = current?.league ?? seed;
   return {
     league,

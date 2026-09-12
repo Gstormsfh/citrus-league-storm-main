@@ -30,6 +30,13 @@ describe('daily goalie exposure contract', () => {
     expect(actual.expected_starts).toBe(0.3);
     expect(actual.projected_saves).toBe(28);
   });
+  it('marks canonical counts unconditional without scaling again', () => {
+    const actual = apply({ ...row, calculation_method: 'canonical_expected_volume_v1', projected_gp: 0.125 });
+    expect(actual.projection_basis).toBe('unconditional');
+    expect(actual.availability_source).toBe('canonical_crease_share');
+    expect(actual.expected_starts).toBe(0.125);
+    expect(actual.projected_saves).toBe(28);
+  });
   it('retains valid zero allocation', () => {
     expect(apply(row, [{ ...allocations[0], games_remaining: 84 }, { ...allocations[2], games_remaining: 0 }]).expected_starts).toBe(0);
   });

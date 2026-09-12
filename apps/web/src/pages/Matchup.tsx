@@ -6,6 +6,7 @@ import { useParams, useNavigate, Navigate, Link } from "react-router-dom";
 import { HockeyFooter } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
+import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { cn } from '@/lib/utils';
 import Navbar from '@/components/Navbar';
@@ -43,7 +44,9 @@ import { MatchupScoreJobService } from '@/services/MatchupScoreJobService';
 import { DataCacheService, TTL } from '@/services/DataCacheService';
 import { calculateEligibleGamesRemaining, type PositionType } from '@/utils/rosterUtils';
 import { collectRemainingGames, computeWinProbability, enumerateWeekDates } from '@/utils/winProbability';
-import { ScoringCalculator, DEFAULT_SCORING } from '@/utils/scoringUtils';
+import { projectionSettings } from '@citrus/shared';
+import { aggregateEarnedStats, elapsedStatDates, finiteEarnedTotal, scopedEarnedPoints } from '@/utils/matchupEarnedStats';
+import { DEFAULT_SCORING } from '@/utils/scoringUtils';
 import { logger } from '@/utils/logger';
 import { useLoadCeiling } from '@/hooks/useLoadCeiling';
 import { readUntilPresent } from '@/utils/readUntilPresent';
@@ -194,7 +197,7 @@ const log = DEBUG_MATCHUP ? logger.log.bind(logger, '[Matchup]') : () => {};
 const Matchup = () => {
   const { user, loading: authLoading } = useAuth();
   const { data: profile } = useProfile();
-  const { userLeagueState, loading: leagueContextLoading, activeLeagueId, activeLeagueFormat, isChangingLeague, setActiveLeagueId } = useLeague();
+  const { userLeagueState, loading: leagueContextLoading, activeLeagueId, activeLeague, activeLeagueFormat, isChangingLeague, setActiveLeagueId } = useLeague();
 
   // OFFSEASON (2026-09-02). The win-chance bar, the "N left" chip and the word
   // "Final" are all claims about a week being played. With no games on the
@@ -478,14 +481,7 @@ const Matchup = () => {
         return;
       }
       
-      const cacheKey = DataCacheService.getCacheKey.frozenScores(currentMatchup.id);
-      
-      // Check cache first - avoid unnecessary database calls
-      const cachedData = DataCacheService.get<Map<string, { myScore: number; oppScore: number; isLocked: boolean }>>(cacheKey);
-      if (cachedData) {
-        setCachedDailyScores(cachedData);
-        return;
-      }
+      const cacheKey = `${DataCacheService.getCacheKey.frozenScores(currentMatchup.id)}:${JSON.stringify(scoringSettings ?? null)}`;
       
       // Use string comparison to avoid timezone issues
       const todayStr = getTodayMST();
@@ -560,7 +556,7 @@ const Matchup = () => {
           const team1PlayerIds = dateRosters.get(team1Id) || [];
           team1PlayerIds.forEach(playerId => {
             const stats = dayStats.get(playerId);
-            team1Score += stats?.daily_total_points ?? 0;
+            team1Score += stats?.daily_total_points ?? NaN;
           });
           
           // Calculate team2's score
@@ -568,7 +564,7 @@ const Matchup = () => {
             const team2PlayerIds = dateRosters.get(team2Id) || [];
             team2PlayerIds.forEach(playerId => {
               const stats = dayStats.get(playerId);
-              team2Score += stats?.daily_total_points ?? 0;
+              team2Score += stats?.daily_total_points ?? NaN;
             });
           }
         }
@@ -577,21 +573,15 @@ const Matchup = () => {
         const myScore = isViewingTeam1 ? team1Score : team2Score;
         const oppScore = isViewingTeam1 ? team2Score : team1Score;
         
+        if (!dayStats || scoringSettings == null || !dateRosters?.has(team1Id) || (team2Id && !dateRosters.has(team2Id))) continue;
         scores.set(dateStr, { myScore, oppScore, isLocked: true });
       }
       
-      // Merge with existing cachedDailyScores to preserve RPC-provided values.
-      // If this recalculation yields 0 for a team but RPC already set a non-zero score,
-      // keep the RPC value (prevents AI team scores from being clobbered).
+      // Replace only days with known frozen active lineups. Corrections may be zero or negative.
       setCachedDailyScores(prev => {
         const merged = new Map(prev);
         scores.forEach((newVal, dateStr) => {
-          const existing = prev.get(dateStr);
-          const finalMyScore = (newVal.myScore === 0 && existing && existing.myScore > 0)
-            ? existing.myScore : newVal.myScore;
-          const finalOppScore = (newVal.oppScore === 0 && existing && existing.oppScore > 0)
-            ? existing.oppScore : newVal.oppScore;
-          merged.set(dateStr, { myScore: finalMyScore, oppScore: finalOppScore, isLocked: newVal.isLocked });
+          merged.set(dateStr, newVal);
         });
         // Cache merged result
         DataCacheService.set(cacheKey, merged, TTL.VERY_LONG);
@@ -612,7 +602,7 @@ const Matchup = () => {
   const [selectedMatchupId, setSelectedMatchupId] = useState<string | null>(null);
   const [allWeekMatchups, setAllWeekMatchups] = useState<Array<MatchupType & { team1_name?: string; team2_name?: string }>>([]);
   // League scoring settings for dynamic goalie/skater scoring (ALL 8 categories)
-  const [scoringSettings, setScoringSettings] = useState<{
+  const [loadedScoringSettings, setScoringSettings] = useState<{
     goalie: { wins: number; saves: number; shutouts: number; goals_against: number };
     skater: { 
       goals: number; 
@@ -625,6 +615,13 @@ const Matchup = () => {
       penalty_minutes: number;        // PIM
     };
   } | null>(null);
+
+  const leagueScoring = useLeagueScoringContext(urlLeagueId ?? activeLeagueId, activeLeague,
+    userLeagueState === 'active-user');
+  const scoringSettings = useMemo(() => userLeagueState === 'active-user'
+    ? (leagueScoring.ready ? projectionSettings(leagueScoring.scoring ?? null) : null)
+    : loadedScoringSettings,
+  [userLeagueState, leagueScoring.ready, leagueScoring.scoring, loadedScoringSettings]);
 
   const expectedProjectionView = useMemo(
     () => expectedMatchupProjections(rawProjectionsByDate, scoringSettings),
@@ -1283,9 +1280,18 @@ const Matchup = () => {
     [scoringSettings],
   );
 
+  const statsScope = `${league?.id ?? ''}:${currentMatchup?.id ?? ''}:${scoringSignature}`;
+  const [loadedStatsScope, setLoadedStatsScope] = useState<string | null>(null);
+  const statsScopeRef = useRef(statsScope);
+  statsScopeRef.current = statsScope;
+  useEffect(() => {
+    setCalculatedDailyTotals(new Map());
+    setCachedDailyScores(new Map());
+  }, [statsScope]);
+  const statsLoadingScopeRef = useRef<string | null>(null);
   const fetchAllDailyStats = React.useCallback(async () => {
       // Prevent concurrent fetches that cause score flashing
-      if (statsLoadingRef.current) return;
+      if (statsLoadingRef.current && statsLoadingScopeRef.current === statsScope) return;
       
       if (!currentMatchup) {
         setDailyStatsByDate(new Map());
@@ -1293,6 +1299,7 @@ const Matchup = () => {
       }
       
       statsLoadingRef.current = true;
+      statsLoadingScopeRef.current = statsScope;
       
       // For guests/demo, we still need player IDs from demo teams
       // For active users, we use the real matchup
@@ -1338,23 +1345,21 @@ const Matchup = () => {
         const statsByDate = new Map<string, Map<number, any>>();
         const todayStr = getTodayMST();
         
-        await Promise.all(dates.map(async (date) => {
+        await Promise.all(elapsedStatDates(dates, todayStr).map(async (date) => {
           let data: any[] | null = null;
           try {
             const response = await matchupApi.getDailyGameStats(allPlayerIds, date);
             data = response.data as any[] | null;
           } catch (err) {
             log(`WARN: Error fetching stats for ${date}:`, err);
-            return;
+            throw err;
           }
 
           // Create map of player_id -> daily stats for this date
           const dayStatsMap = new Map<number, any>();
-          const isPastDate = date < todayStr;
-          
-          // CRITICAL: Only initialize with 0 stats for PAST dates
-          // For future dates, don't initialize - let projections show instead of 0.0
-          if (isPastDate) {
+          // A successful elapsed-date response establishes zero earned counts
+          // for roster players absent from that date's game records.
+          {
             // Initialize ALL players with 0 stats for past dates (ensures complete data)
             // This ensures players who didn't play still have entries with 0 points
             allPlayerIds.forEach(playerId => {
@@ -1372,136 +1377,28 @@ const Matchup = () => {
                 saves: 0,
                 shutouts: 0,
                 goals_against: 0,
-                daily_total_points: 0
+                daily_total_points: scoringSettings == null ? undefined : 0
               });
             });
           }
           
-          // CRITICAL: Aggregate across multiple games per day (goalies can't play multiple games per day, but skaters can)
-          // Now update with actual RPC data for players who played
-          ((data || []) as any[]).forEach((row: any) => {
-            // Determine if player is on my team (works for both active users and guests)
-            // For active users, use refs. For guests, use demo teams.
-            const myTeamIds = userLeagueState === 'active-user'
-              ? myTeamPlayerIdsRef.current
-              : (demoMyTeam.map(p => typeof p.id === 'string' ? parseInt(p.id) : p.id));
-            const isMyTeam = myTeamIds.includes(row.player_id);
-            // For goalie detection, we can use the row data or check position from a lookup
-            // Since we don't have direct access to player objects, use row.is_goalie as primary indicator
-            const isGoalie = row.is_goalie || false;
-            
-            // Get or initialize player's daily stats (aggregate across multiple games)
-            const existing = dayStatsMap.get(row.player_id) || {
-              goals: 0,
-              assists: 0,
-              points: 0,
-              shots_on_goal: 0,
-              blocks: 0,
-              ppp: 0,
-              shp: 0,
-              hits: 0,
-              pim: 0,
-              wins: 0,
-              saves: 0,
-              shutouts: 0,
-              goals_against: 0,
-            };
-            
-            // Aggregate stats across multiple games (if player has multiple games on same day)
-            const aggregated = {
-              goals: existing.goals + (row.goals || 0),
-              assists: existing.assists + (row.assists || 0),
-              points: existing.points + (row.points || 0),
-              shots_on_goal: existing.shots_on_goal + (row.shots_on_goal || 0),
-              blocks: existing.blocks + (row.blocks || 0),
-              ppp: existing.ppp + (row.ppp || 0),
-              shp: existing.shp + (row.shp || 0),
-              hits: existing.hits + (row.hits || 0),
-              pim: existing.pim + (row.pim || 0),
-              wins: existing.wins + (row.wins || 0),
-              saves: existing.saves + (row.saves || 0),
-              shutouts: existing.shutouts + (row.shutouts || 0),
-              goals_against: existing.goals_against + (row.goals_against || 0),
-            };
-            
-            // Calculate daily total points using league scoring settings
-            const goalieScoring = scoringSettings?.goalie || DEFAULT_SCORING.goalie;
-            const skaterScoring = scoringSettings?.skater || DEFAULT_SCORING.skater;
-            
-            let dailyTotalPoints = 0;
-            if (isGoalie) {
-              // Goalie Formula: Use league settings (defaults: DEFAULT_SCORING.goalie from @citrus/shared)
-              dailyTotalPoints = 
-                aggregated.wins * goalieScoring.wins + 
-                aggregated.saves * goalieScoring.saves + 
-                aggregated.shutouts * goalieScoring.shutouts + 
-                aggregated.goals_against * goalieScoring.goals_against;  // Already negative, so add
-              
-              // Debug logging for goalies with stats
-              if (aggregated.wins > 0 || aggregated.saves > 0 || aggregated.shutouts > 0 || aggregated.goals_against > 0) {
-                log('fetchAllDailyStats Goalie daily points (aggregated):', {
-                  date,
-                  player_id: row.player_id,
-                  wins: aggregated.wins,
-                  saves: aggregated.saves,
-                  shutouts: aggregated.shutouts,
-                  goals_against: aggregated.goals_against,
-                  weights: goalieScoring,
-                  calculated_points: dailyTotalPoints,
-                  games_count: ((data || []) as any[]).filter((r: any) => r.player_id === row.player_id).length
-                });
-              }
-            } else {
-              // Skater Formula: Use ALL 8 league settings
-              dailyTotalPoints = 
-                aggregated.goals * skaterScoring.goals + 
-                aggregated.assists * skaterScoring.assists + 
-                (aggregated.ppp || 0) * skaterScoring.power_play_points +
-                (aggregated.shp || 0) * skaterScoring.short_handed_points +
-                aggregated.shots_on_goal * skaterScoring.shots_on_goal + 
-                aggregated.blocks * skaterScoring.blocks +
-                (aggregated.hits || 0) * skaterScoring.hits +
-                (aggregated.pim || 0) * skaterScoring.penalty_minutes;
-            }
-            
-            // Build scoring breakdown for tooltip (same format as stats_breakdown)
-            const daily_stats_breakdown = isGoalie ? {
-              ...(aggregated.wins > 0 ? { wins: { count: aggregated.wins, points: aggregated.wins * goalieScoring.wins } } : {}),
-              ...(aggregated.saves > 0 ? { saves: { count: aggregated.saves, points: aggregated.saves * goalieScoring.saves } } : {}),
-              ...(aggregated.shutouts > 0 ? { shutouts: { count: aggregated.shutouts, points: aggregated.shutouts * goalieScoring.shutouts } } : {}),
-              ...(aggregated.goals_against > 0 ? { goals_against: { count: aggregated.goals_against, points: aggregated.goals_against * goalieScoring.goals_against } } : {}),
-            } : {
-              ...(aggregated.goals > 0 ? { goals: { count: aggregated.goals, points: aggregated.goals * skaterScoring.goals } } : {}),
-              ...(aggregated.assists > 0 ? { assists: { count: aggregated.assists, points: aggregated.assists * skaterScoring.assists } } : {}),
-              ...(aggregated.ppp > 0 ? { ppp: { count: aggregated.ppp, points: aggregated.ppp * skaterScoring.power_play_points } } : {}),
-              ...(aggregated.shp > 0 ? { shp: { count: aggregated.shp, points: aggregated.shp * skaterScoring.short_handed_points } } : {}),
-              ...(aggregated.shots_on_goal > 0 ? { shots_on_goal: { count: aggregated.shots_on_goal, points: aggregated.shots_on_goal * skaterScoring.shots_on_goal } } : {}),
-              ...(aggregated.blocks > 0 ? { blocks: { count: aggregated.blocks, points: aggregated.blocks * skaterScoring.blocks } } : {}),
-              ...(aggregated.hits > 0 ? { hits: { count: aggregated.hits, points: aggregated.hits * skaterScoring.hits } } : {}),
-              ...(aggregated.pim > 0 ? { pim: { count: aggregated.pim, points: aggregated.pim * skaterScoring.penalty_minutes } } : {}),
-            };
-            
-            dayStatsMap.set(row.player_id, {
-              ...aggregated,
-              // CRITICAL: For future dates, don't set daily_total_points (leave undefined)
-              // This ensures projections show instead of 0.0 for future dates
-              // For past dates, always set it (even if 0) so we show actual points
-              daily_total_points: isPastDate ? dailyTotalPoints : (dailyTotalPoints > 0 ? dailyTotalPoints : undefined),
-              daily_stats_breakdown,
-            });
-            
-          });
+          // Score measured NHL counts once per player. Zero and negative
+          // earned totals are valid, including games still in progress today.
+          for (const [playerId, earned] of aggregateEarnedStats(data ?? [], scoringSettings)) {
+            dayStatsMap.set(playerId, earned);
+          }
 
           statsByDate.set(date, dayStatsMap);
         }));
 
+        if (statsScopeRef.current !== statsScope) return;
+        setLoadedStatsScope(statsScope);
         setDailyStatsByDate(statsByDate);
         // Calculation will be triggered by useEffect when dailyStatsByDate updates
       } catch (error) {
         logger.error('[Matchup] Error fetching all daily stats:', error);
-        setDailyStatsByDate(new Map());
       } finally {
-        statsLoadingRef.current = false;
+        if (statsLoadingScopeRef.current === statsScope) statsLoadingRef.current = false;
       }
   // Player IDs are read from refs (myTeamPlayerIdsRef, opponentTeamPlayerIdsRef,
   // myStarterIdsRef, oppStarterIdsRef) which are stable references. demoMyTeam/demoOpponentTeam are
@@ -1514,7 +1411,7 @@ const Matchup = () => {
   // burst from the live-refresh effect that depends on this callback.
   // scoringSignature is the value of scoringSettings rather than its identity.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMatchup?.id, currentMatchup?.week_start_date, userLeagueState, scoringSignature, demoMyTeam, demoOpponentTeam]);
+  }, [currentMatchup?.id, currentMatchup?.week_start_date, userLeagueState, scoringSignature, statsScope, demoMyTeam, demoOpponentTeam]);
 
   // Initial fetch on mount and when dependencies change
   useEffect(() => {
@@ -1614,200 +1511,11 @@ const Matchup = () => {
   }, [dailyStatsByDate, selectedDate, currentMatchup]);
 
   useEffect(() => {
-    const fetchDailyStats = async () => {
-      // Prevent concurrent fetches
-      if (loadingRef.current) {
-        return;
-      }
+    const date = selectedDate ?? getTodayMST();
+    setDailyStatsMap(dailyStatsByDate.get(date) ?? new Map());
+  }, [dailyStatsByDate, selectedDate]);
 
-      if (!currentMatchup) {
-        setDailyStatsMap(new Map());
-        return;
-      }
-
-      // Determine which date to fetch stats for
-      let dateToFetch = selectedDate;
-      
-      // If no date selected, default to today if today is in the matchup week
-      if (!dateToFetch) {
-        const todayStr = getTodayMST();
-        const weekStart = currentMatchup.week_start_date;
-        const weekEnd = currentMatchup.week_end_date;
-        
-        if (todayStr >= weekStart && todayStr <= weekEnd) {
-          dateToFetch = todayStr;
-        } else {
-          // Today is not in the matchup week, don't fetch daily stats
-          setDailyStatsMap(new Map());
-          return;
-        }
-      }
-
-      loadingRef.current = true;
-
-      try {
-        // Get all player IDs (works for both active users and guests)
-        // For active users, use refs. For guests, use demo teams.
-        const allPlayerIds = userLeagueState === 'active-user'
-          ? [...myTeamPlayerIdsRef.current, ...opponentTeamPlayerIdsRef.current]
-          : [
-              ...(demoMyTeam.map(p => typeof p.id === 'string' ? parseInt(p.id) : p.id)),
-              ...(demoOpponentTeam.map(p => typeof p.id === 'string' ? parseInt(p.id) : p.id))
-            ];
-
-        if (allPlayerIds.length === 0) {
-          log('WARN: No player IDs available for daily stats fetch');
-          setDailyStatsMap(new Map());
-          return;
-        }
-        
-        log(' Fetching daily stats for date:', dateToFetch, 'playerIds:', allPlayerIds.length);
-
-        // Fetch comprehensive daily game stats using new RPC
-        
-        const response = await matchupApi.getDailyGameStats(allPlayerIds, dateToFetch);
-        const data = response.data as any[] | null;
-
-        if (!data) {
-          logger.error('[Matchup] No data returned from getDailyGameStats');
-          throw new Error('Daily stats came back empty');
-        }
-        
-        const statsDataArr = (data || []) as any[];
-        log(' get_daily_game_stats returned:', statsDataArr.length, 'rows');
-
-        // Create map of player_id -> comprehensive daily stats
-        const statsMap = new Map<number, any>();
-        statsDataArr.forEach((row: any) => {
-          // HARD CHECK: Use row.is_goalie for goalie detection (stable, no dependency on team arrays)
-          // This ensures accurate math for "Blowout" games where goalies earn negative points
-          const isGoalie = row.is_goalie || false;
-          
-          // Calculate daily total points using league scoring settings
-          const goalieScoring = scoringSettings?.goalie || DEFAULT_SCORING.goalie;
-          const skaterScoring = scoringSettings?.skater || DEFAULT_SCORING.skater;
-          
-          let dailyTotalPoints = 0;
-          if (isGoalie) {
-            // Goalie Formula: Use league settings (defaults: DEFAULT_SCORING.goalie from @citrus/shared)
-            dailyTotalPoints = 
-              (row.wins || 0) * goalieScoring.wins + 
-              (row.saves || 0) * goalieScoring.saves + 
-              (row.shutouts || 0) * goalieScoring.shutouts + 
-              (row.goals_against || 0) * goalieScoring.goals_against;  // Already negative, so add
-            
-            // Debug logging for goalies
-            if (row.wins > 0 || row.saves > 0 || row.shutouts > 0 || row.goals_against > 0) {
-              log(' Goalie daily points calculation:', {
-                player_id: row.player_id,
-                wins: row.wins,
-                saves: row.saves,
-                shutouts: row.shutouts,
-                goals_against: row.goals_against,
-                weights: goalieScoring,
-                calculated_points: dailyTotalPoints
-              });
-            }
-          } else {
-            // Skater Formula: Use ALL 8 league settings
-            dailyTotalPoints = 
-              (row.goals || 0) * skaterScoring.goals + 
-              (row.assists || 0) * skaterScoring.assists + 
-              (row.ppp || 0) * skaterScoring.power_play_points +
-              (row.shp || 0) * skaterScoring.short_handed_points +
-              (row.shots_on_goal || 0) * skaterScoring.shots_on_goal + 
-              (row.blocks || 0) * skaterScoring.blocks +
-              (row.hits || 0) * skaterScoring.hits +
-              (row.pim || 0) * skaterScoring.penalty_minutes;
-          }
-          
-          // Store ALL available stats for comprehensive display
-          statsMap.set(row.player_id, {
-            // Core stats
-            goals: row.goals || 0,
-            assists: row.assists || 0,
-            points: row.points || 0,
-            sog: row.shots_on_goal || 0,
-            pim: row.pim || 0,
-            plus_minus: row.plus_minus || 0,
-            toi_seconds: row.toi_seconds || 0,
-            
-            // Physical stats
-            hits: row.hits || 0,
-            blocks: row.blocks || 0,
-            
-            // Faceoffs
-            faceoff_wins: row.faceoff_wins || 0,
-            faceoff_losses: row.faceoff_losses || 0,
-            faceoff_taken: row.faceoff_taken || 0,
-            
-            // Possession
-            takeaways: row.takeaways || 0,
-            giveaways: row.giveaways || 0,
-            
-            // Power Play breakdown
-            ppp: row.ppp || 0,
-            ppg: row.ppg || 0,
-            ppa: row.ppa || 0,
-            
-            // Shorthanded breakdown
-            shp: row.shp || 0,
-            shg: row.shg || 0,
-            sha: row.sha || 0,
-            
-            // Shot metrics (Corsi components)
-            shots_missed: row.shots_missed || 0,
-            shots_blocked: row.shots_blocked || 0,
-            shot_attempts: row.shot_attempts || 0,
-            
-            // Game context
-            gwg: row.gwg || 0,
-            otg: row.otg || 0,
-            shifts: row.shifts || 0,
-            
-            // Goalie stats
-            wins: row.wins || 0,
-            losses: row.losses || 0,
-            ot_losses: row.ot_losses || 0,
-            saves: row.saves || 0,
-            shots_faced: row.shots_faced || 0,
-            goals_against: row.goals_against || 0,
-            shutouts: row.shutouts || 0,
-            save_pct: row.save_pct || 0,
-            
-            // Calculated values
-            daily_total_points: dailyTotalPoints,
-            is_goalie: isGoalie,
-            
-            // Build scoring breakdown for tooltip (same format as stats_breakdown)
-            // Use league scoring settings for accurate point calculations
-            daily_stats_breakdown: isGoalie ? {
-              ...(row.wins > 0 ? { wins: { count: row.wins, points: row.wins * goalieScoring.wins } } : {}),
-              ...(row.saves > 0 ? { saves: { count: row.saves, points: row.saves * goalieScoring.saves } } : {}),
-              ...(row.shutouts > 0 ? { shutouts: { count: row.shutouts, points: row.shutouts * goalieScoring.shutouts } } : {}),
-              ...(row.goals_against > 0 ? { goals_against: { count: row.goals_against, points: row.goals_against * goalieScoring.goals_against } } : {}),
-            } : {
-              ...(row.goals > 0 ? { goals: { count: row.goals, points: row.goals * skaterScoring.goals } } : {}),
-              ...(row.assists > 0 ? { assists: { count: row.assists, points: row.assists * skaterScoring.assists } } : {}),
-              ...(row.ppp > 0 ? { ppp: { count: row.ppp, points: row.ppp * skaterScoring.power_play_points } } : {}),
-              ...(row.shp > 0 ? { shp: { count: row.shp, points: row.shp * skaterScoring.short_handed_points } } : {}),
-              ...(row.shots_on_goal > 0 ? { shots_on_goal: { count: row.shots_on_goal, points: row.shots_on_goal * skaterScoring.shots_on_goal } } : {}),
-              ...(row.blocks > 0 ? { blocks: { count: row.blocks, points: row.blocks * skaterScoring.blocks } } : {}),
-              ...(row.hits > 0 ? { hits: { count: row.hits, points: row.hits * skaterScoring.hits } } : {}),
-              ...(row.pim > 0 ? { pim: { count: row.pim, points: row.pim * skaterScoring.penalty_minutes } } : {}),
-            },
-          });
-        });
-
-        setDailyStatsMap(statsMap);
-      } catch (error) {
-        logger.error('[Matchup] Error fetching daily stats:', error);
-        setDailyStatsMap(new Map());
-      } finally {
-        loadingRef.current = false;
-      }
-    };
-
+  useEffect(() => {
     // Fetch stats and projections in parallel.
     //
     // WEEK PROJECTIONS (2026-09-01, iPhone sim: "daily score projections do
@@ -1836,7 +1544,6 @@ const Matchup = () => {
       }
 
       await Promise.all([
-        fetchDailyStats(),
         ...weekDates.map(d => fetchProjectionsForDate(d)),
       ]);
     };
@@ -1979,7 +1686,7 @@ const Matchup = () => {
         return {
           ...player,
           ...mergedProjection,
-          daily_total_points: 0,
+          daily_total_points: undefined,
           daily_stats_breakdown: getDailyStatsBreakdown(),
           games: originalGames !== undefined ? originalGames : player.games,
           wasDropped: player.wasDropped
@@ -1989,7 +1696,7 @@ const Matchup = () => {
         return {
           ...player,
           ...mergedProjection,
-          daily_total_points: 0,
+          daily_total_points: undefined,
           daily_stats_breakdown: getDailyStatsBreakdown(),
           games: originalGames !== undefined ? originalGames : player.games,
           wasDropped: player.wasDropped
@@ -2032,7 +1739,7 @@ const Matchup = () => {
       // EXACT same logic as displayMyTeam (line 1995-1997)
       daily_total_points: dailyStats.daily_total_points !== undefined && dailyStats.daily_total_points !== null
         ? dailyStats.daily_total_points
-        : (isPastDate ? 0 : undefined),
+        : undefined,
       daily_stats_breakdown: getDailyStatsBreakdown(),
       games: originalGames !== undefined ? originalGames : player.games,
       wasDropped: player.wasDropped
@@ -2044,27 +1751,19 @@ const Matchup = () => {
   // Both initial load and date clicks use identical calculation logic
 
   // Callback to update calculated totals from MatchupComparison (works for selected date or any date)
-  // GUARD: Don't overwrite non-zero RPC-provided scores with 0.
-  // This prevents the initial-calc useEffect from clobbering server-calculated daily scores
-  // when frozen roster enrichment fails (e.g., AI teams where opponent roster is empty).
+  // A finite earned correction is authoritative regardless of sign.
   const handleTotalsCalculated = useCallback((userTotal: number, opponentTotal: number, date?: string) => {
     const targetDate = date || selectedDate;
     if (!targetDate) return;
 
     setCalculatedDailyTotals(prev => {
       const next = new Map(prev);
-      const existing = prev.get(targetDate);
 
-      // Preserve existing non-zero values when new calculation yields 0.
-      // The RPC daily-scores endpoint is the source of truth; if it already
-      // provided a non-zero score for a team, a later frontend recalculation
-      // that produces 0 (due to empty frozen roster) should not replace it.
-      const finalMyTotal = (userTotal === 0 && existing && existing.myTotal > 0)
-        ? existing.myTotal : userTotal;
-      const finalOppTotal = (opponentTotal === 0 && existing && existing.oppTotal > 0)
-        ? existing.oppTotal : opponentTotal;
-
-      next.set(targetDate, { myTotal: finalMyTotal, oppTotal: finalOppTotal });
+      if (!Number.isFinite(userTotal) || !Number.isFinite(opponentTotal)) {
+        next.delete(targetDate);
+        return next;
+      }
+      next.set(targetDate, { myTotal: userTotal, oppTotal: opponentTotal });
       return next;
     });
   }, [selectedDate]);
@@ -2077,7 +1776,7 @@ const Matchup = () => {
     // This ensures dropped players (like Nino and Jimmy) are included once frozen rosters load
     if (!currentMatchup) return;
     if (!myTeam.length && !demoMyTeam.length) return; // Wait for team data
-    if (dailyStatsByDate.size === 0) return; // Wait for stats to load
+    if (dailyStatsByDate.size === 0 || loadedStatsScope !== statsScope) return; // Wait for this scoring revision
     
     // CRITICAL: Wait for displayMyTeam to be computed at least once
     // This ensures we have the correct base team (displayMyTeam uses myTeam when selectedDate is null)
@@ -2127,7 +1826,7 @@ const Matchup = () => {
           const stats = dayStatsMap?.get(playerId);
           return {
             ...player,
-            daily_total_points: stats?.daily_total_points ?? 0,
+            daily_total_points: stats?.daily_total_points ?? NaN,
             daily_stats_breakdown: stats?.daily_stats_breakdown as StatBreakdown | undefined
           };
         });
@@ -2136,7 +1835,7 @@ const Matchup = () => {
           const stats = dayStatsMap?.get(playerId);
           return {
             ...player,
-            daily_total_points: stats?.daily_total_points ?? 0,
+            daily_total_points: stats?.daily_total_points ?? NaN,
             daily_stats_breakdown: stats?.daily_stats_breakdown as StatBreakdown | undefined
           };
         });
@@ -2256,7 +1955,7 @@ const Matchup = () => {
               return {
                 ...player,
                 ...mergedProjection,
-                daily_total_points: 0,
+                daily_total_points: undefined,
                 daily_stats_breakdown: getDailyStatsBreakdown(),
                 games: originalGames !== undefined ? originalGames : player.games,
                 wasDropped: player.wasDropped
@@ -2266,7 +1965,7 @@ const Matchup = () => {
               return {
                 ...player,
                 ...mergedProjection,
-                daily_total_points: 0,
+                daily_total_points: undefined,
                 daily_stats_breakdown: getDailyStatsBreakdown(),
                 games: originalGames !== undefined ? originalGames : player.games,
                 wasDropped: player.wasDropped
@@ -2307,7 +2006,7 @@ const Matchup = () => {
             } : player.goalieMatchupStats,
             daily_total_points: dailyStats.daily_total_points !== undefined && dailyStats.daily_total_points !== null
               ? dailyStats.daily_total_points
-              : (isPastDate ? 0 : undefined),
+              : undefined,
             daily_stats_breakdown: getDailyStatsBreakdown(),
             games: originalGames !== undefined ? originalGames : player.games,
             wasDropped: player.wasDropped
@@ -2404,7 +2103,7 @@ const Matchup = () => {
               return {
                 ...player,
                 ...mergedProjection,
-                daily_total_points: 0,
+                daily_total_points: undefined,
                 daily_stats_breakdown: getDailyStatsBreakdown(),
                 games: originalGames !== undefined ? originalGames : player.games,
                 wasDropped: player.wasDropped
@@ -2414,7 +2113,7 @@ const Matchup = () => {
               return {
                 ...player,
                 ...mergedProjection,
-                daily_total_points: 0,
+                daily_total_points: undefined,
                 daily_stats_breakdown: getDailyStatsBreakdown(),
                 games: originalGames !== undefined ? originalGames : player.games,
                 wasDropped: player.wasDropped
@@ -2455,7 +2154,7 @@ const Matchup = () => {
             } : player.goalieMatchupStats,
             daily_total_points: dailyStats.daily_total_points !== undefined && dailyStats.daily_total_points !== null
               ? dailyStats.daily_total_points
-              : (isPastDate ? 0 : undefined),
+              : undefined,
             daily_stats_breakdown: getDailyStatsBreakdown(),
             games: originalGames !== undefined ? originalGames : player.games,
             wasDropped: player.wasDropped
@@ -2492,55 +2191,14 @@ const Matchup = () => {
         allOpponentPlayers.push(...group.opponentPlayers);
       });
       
-      // Calculate totals using EXACT same logic as MatchupComparison (lines 58-102)
-      const isShowingDailyView = true; // Always true for daily calculations
-      
-      const userTotal = allUserPlayers.reduce((sum, player) => {
+      const sumEarned = (players: (MatchupPlayer | null)[]) => players.reduce((sum, player) => {
         if (!player) return sum;
-        if (isShowingDailyView) {
-          // For dropped players, use the same fallback chain as MatchupComparison
-          if (player.wasDropped) {
-            // Try dayStatsMap first
-            if (dayStatsMap) {
-              const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-              const stats = dayStatsMap.get(playerId);
-              if (stats?.daily_total_points !== undefined) {
-                return sum + stats.daily_total_points;
-              }
-            }
-            // Fallback to player properties (total_points = their daily contribution since dropped mid-game)
-            return sum + (player.daily_total_points ?? player.total_points ?? player.points ?? 0);
-          }
-          // Non-dropped: use daily_total_points
-          return sum + (player.daily_total_points ?? 0);
-        }
-        // Weekly view: use weekly points
-        return sum + (player.points || 0);
+        const id = Number(player.id);
+        return sum + (scopedEarnedPoints(player, true, dayStatsMap?.get(id)?.daily_total_points) ?? NaN);
       }, 0);
-      
-      const opponentTotal = allOpponentPlayers.reduce((sum, player) => {
-        if (!player) return sum;
-        if (isShowingDailyView) {
-          // For dropped players, use the same fallback chain as MatchupComparison
-          if (player.wasDropped) {
-            // Try dayStatsMap first
-            if (dayStatsMap) {
-              const playerId = typeof player.id === 'string' ? parseInt(player.id, 10) : player.id;
-              const stats = dayStatsMap.get(playerId);
-              if (stats?.daily_total_points !== undefined) {
-                return sum + stats.daily_total_points;
-              }
-            }
-            // Fallback to player properties (total_points = their daily contribution since dropped mid-game)
-            return sum + (player.daily_total_points ?? player.total_points ?? player.points ?? 0);
-          }
-          // Non-dropped: use daily_total_points
-          return sum + (player.daily_total_points ?? 0);
-        }
-        // Weekly view: use weekly points
-        return sum + (player.points || 0);
-      }, 0);
-      
+      const userTotal = sumEarned(allUserPlayers);
+      const opponentTotal = sumEarned(allOpponentPlayers);
+
       // Store calculated totals via handleTotalsCalculated (same as MatchupComparison does)
       handleTotalsCalculated(userTotal, opponentTotal, dateStr);
     }
@@ -2563,6 +2221,8 @@ const Matchup = () => {
     demoOpponentTeamSlotAssignments,
     userLeagueState,
     handleTotalsCalculated,
+    loadedStatsScope,
+    statsScope,
     leagueSlotPlan,
   ]);
 
@@ -2832,7 +2492,7 @@ const Matchup = () => {
           return {
             ...player,
             ...mergedProjection,
-            daily_total_points: 0,
+            daily_total_points: undefined,
             daily_stats_breakdown: getDailyStatsBreakdown(),
             // CRITICAL: Always preserve games - use originalGames if captured, otherwise preserve from spread
             games: originalGames !== undefined ? originalGames : player.games,
@@ -2845,7 +2505,7 @@ const Matchup = () => {
           return {
             ...player,
             ...mergedProjection,
-            daily_total_points: 0,
+            daily_total_points: undefined,
             daily_stats_breakdown: getDailyStatsBreakdown(),
             // CRITICAL: Always preserve games - use originalGames if captured, otherwise preserve from spread
             games: originalGames !== undefined ? originalGames : player.games,
@@ -2900,7 +2560,7 @@ const Matchup = () => {
         // This ensures projections are shown instead of 0.0 for future dates
         daily_total_points: dailyStats.daily_total_points !== undefined && dailyStats.daily_total_points !== null
           ? dailyStats.daily_total_points
-          : (isPastDate ? 0 : undefined),
+          : undefined,
         // Add daily stats breakdown for tooltip hover - check for empty objects
         daily_stats_breakdown: getDailyStatsBreakdown(),
         // CRITICAL: Always preserve games - use originalGames if captured, otherwise preserve from spread
@@ -3079,7 +2739,7 @@ const Matchup = () => {
           return {
             ...player,
             ...mergedProjection,
-            daily_total_points: 0,
+            daily_total_points: undefined,
             daily_stats_breakdown: getDailyStatsBreakdown(),
             // CRITICAL: Always preserve games - use originalGames if captured, otherwise preserve from spread
             games: originalGames !== undefined ? originalGames : player.games,
@@ -3092,7 +2752,7 @@ const Matchup = () => {
           return {
             ...player,
             ...mergedProjection,
-            daily_total_points: 0,
+            daily_total_points: undefined,
             daily_stats_breakdown: getDailyStatsBreakdown(),
             // CRITICAL: Always preserve games - use originalGames if captured, otherwise preserve from spread
             games: originalGames !== undefined ? originalGames : player.games,
@@ -3147,7 +2807,7 @@ const Matchup = () => {
         // This ensures projections are shown instead of 0.0 for future dates
         daily_total_points: dailyStats.daily_total_points !== undefined && dailyStats.daily_total_points !== null
           ? dailyStats.daily_total_points
-          : (isPastDate ? 0 : undefined),
+          : undefined,
         // Add daily stats breakdown for tooltip hover - check for empty objects
         daily_stats_breakdown: getDailyStatsBreakdown(),
         // CRITICAL: Always preserve games - use originalGames if captured, otherwise preserve from spread
@@ -3198,7 +2858,7 @@ const Matchup = () => {
       .map(p => ({
         ...p,
         // Use total_points (full week cumulative) for Top Performers
-        points: p.total_points || p.points || 0
+        points: p.total_points ?? NaN
       }));
   }, [baseCurrentRoster]);
 
@@ -3210,7 +2870,7 @@ const Matchup = () => {
       .map(p => ({
         ...p,
         // Use total_points (full week cumulative) for Top Performers
-        points: p.total_points || p.points || 0
+        points: p.total_points ?? NaN
       }));
   }, [baseCurrentRoster]);
 
@@ -3232,7 +2892,7 @@ const Matchup = () => {
           const stats = dayStatsMap?.get(playerId);
           return {
             ...player,
-            daily_total_points: stats?.daily_total_points ?? 0,
+            daily_total_points: stats?.daily_total_points ?? NaN,
             daily_stats_breakdown: stats?.daily_stats_breakdown
           };
         });
@@ -3257,7 +2917,7 @@ const Matchup = () => {
           const stats = dayStatsMap?.get(playerId);
           return {
             ...player,
-            daily_total_points: stats?.daily_total_points ?? 0,
+            daily_total_points: stats?.daily_total_points ?? NaN,
             daily_stats_breakdown: stats?.daily_stats_breakdown
           };
         });
@@ -3278,7 +2938,7 @@ const Matchup = () => {
           const stats = dayStatsMap?.get(playerId);
           return {
             ...player,
-            daily_total_points: stats?.daily_total_points ?? 0,
+            daily_total_points: stats?.daily_total_points ?? NaN,
             daily_stats_breakdown: stats?.daily_stats_breakdown
           };
         });
@@ -3299,7 +2959,7 @@ const Matchup = () => {
           const stats = dayStatsMap?.get(playerId);
           return {
             ...player,
-            daily_total_points: stats?.daily_total_points ?? 0,
+            daily_total_points: stats?.daily_total_points ?? NaN,
             daily_stats_breakdown: stats?.daily_stats_breakdown
           };
         });
@@ -3376,75 +3036,12 @@ const Matchup = () => {
   // ANTI-FLASH: Only update when stats are fully loaded (prevents 0.0 flashing)
   // =============================================================================
   const myTeamPoints = useMemo(() => {
-    if (!currentMatchup) {
-      return '0.0';
-    }
-
-    // PRIORITY 1: Use calculatedDailyTotals (same as weekly selector) - works for ALL users
-    if (calculatedDailyTotals && calculatedDailyTotals.size > 0) {
-      let total = 0;
-      calculatedDailyTotals.forEach((totals) => {
-        total += totals.myTotal;
-      });
-      if (total > 0.01) {
-        const score = total.toFixed(1);
-        if (!lastScoreRef.current) {
-          lastScoreRef.current = { myScore: score, oppScore: '0.0' };
-        } else {
-          lastScoreRef.current.myScore = score;
-        }
-        return score;
-      }
-    }
-
-    // For active users: If stats are currently loading, return last stable score to prevent flashing
-    if (statsLoadingRef.current && lastScoreRef.current) {
-      return lastScoreRef.current.myScore;
-    }
-
-    // PRIORITY 2: Use RPC daily points (server-calculated, most reliable)
-    if (myDailyPoints && myDailyPoints.length > 0) {
-      const total = myDailyPoints.reduce((sum, pts) => sum + pts, 0);
-      if (total > 0.01) {
-        const score = total.toFixed(1);
-        if (!lastScoreRef.current) {
-          lastScoreRef.current = { myScore: score, oppScore: '0.0' };
-        } else {
-          lastScoreRef.current.myScore = score;
-        }
-        return score;
-      }
-    }
-
-    // PRIORITY 3: If daily stats map is empty, use fallback
-    if (dailyStatsByDate.size === 0) {
-      const fallback = myStarters.reduce((sum, player) => {
-        const pts = player.total_points || player.points || 0;
-        return sum + pts;
-      }, 0);
-      const score = fallback.toFixed(1);
-      if (!lastScoreRef.current) {
-        lastScoreRef.current = { myScore: score, oppScore: '0.0' };
-      } else {
-        lastScoreRef.current.myScore = score;
-      }
-      return score;
-    }
-
-    // PRIORITY 4: Sum calculatedDailyTotals even if zero (final fallback)
-    let total = 0;
-    calculatedDailyTotals.forEach((totals) => {
-      total += totals.myTotal;
-    });
-
-    const score = total.toFixed(1);
-    if (!lastScoreRef.current) {
-      lastScoreRef.current = { myScore: score, oppScore: '0.0' };
-    } else {
-      lastScoreRef.current.myScore = score;
-    }
-    return score;
-  }, [currentMatchup, calculatedDailyTotals, dailyStatsByDate, myDailyPoints, myStarters]);
+    if (!currentMatchup?.id || scoringSettings == null || loadedStatsScope !== statsScope
+      || [...dailyStatsByDate.values()].some(day => [...day.values()].some(row => !Number.isFinite(row.daily_total_points)))) return 'N/A';
+    const total = finiteEarnedTotal([...calculatedDailyTotals.values()].map(day => day.myTotal))
+      ?? finiteEarnedTotal(myDailyPoints);
+    return total === null ? 'N/A' : total.toFixed(1);
+  }, [currentMatchup?.id, scoringSettings, loadedStatsScope, statsScope, dailyStatsByDate, calculatedDailyTotals, myDailyPoints]);
 
   /**
    * Is the LEFT column genuinely the viewer's own team?
@@ -3497,73 +3094,12 @@ const Matchup = () => {
   const opponentTeamAvatarUrl = opponentTeam?.avatar_url ?? teamAvatars.get(opponentTeam?.id ?? '') ?? null;
 
   const opponentTeamPoints = useMemo(() => {
-    if (!currentMatchup) {
-      return '0.0';
-    }
-
-    // PRIORITY 1: Use calculatedDailyTotals (same as weekly selector) - works for ALL users
-    if (calculatedDailyTotals && calculatedDailyTotals.size > 0) {
-      let total = 0;
-      calculatedDailyTotals.forEach((totals) => {
-        total += totals.oppTotal;
-      });
-      // Only use if non-zero (avoid overriding good RPC data with 0s from empty frozen rosters)
-      if (total > 0.01) {
-        const score = total.toFixed(1);
-        if (lastScoreRef.current) {
-          lastScoreRef.current.oppScore = score;
-        } else {
-          lastScoreRef.current = { myScore: '0.0', oppScore: score };
-        }
-        return score;
-      }
-    }
-
-    // For active users: If stats are currently loading, return last stable score to prevent flashing
-    if (statsLoadingRef.current && lastScoreRef.current) {
-      return lastScoreRef.current.oppScore;
-    }
-
-    // PRIORITY 2: Use RPC daily points (server-calculated, most reliable for opponent scores)
-    // This is critical for AI opponents where frontend enrichment may fail
-    if (opponentDailyPoints && opponentDailyPoints.length > 0) {
-      const total = opponentDailyPoints.reduce((sum, pts) => sum + pts, 0);
-      if (total > 0.01) {
-        const score = total.toFixed(1);
-        if (lastScoreRef.current) {
-          lastScoreRef.current.oppScore = score;
-        } else {
-          lastScoreRef.current = { myScore: '0.0', oppScore: score };
-        }
-        return score;
-      }
-    }
-
-    // PRIORITY 3: If daily stats map is empty, use fallback
-    if (dailyStatsByDate.size === 0) {
-      const fallback = opponentStarters.reduce((sum, player) => {
-        const pts = player.total_points || player.points || 0;
-        return sum + pts;
-      }, 0);
-      const score = fallback.toFixed(1);
-      if (lastScoreRef.current) {
-        lastScoreRef.current.oppScore = score;
-      }
-      return score;
-    }
-
-    // PRIORITY 4: Sum calculatedDailyTotals even if zero (final fallback)
-    let total = 0;
-    calculatedDailyTotals.forEach((totals) => {
-      total += totals.oppTotal;
-    });
-
-    const score = total.toFixed(1);
-    if (lastScoreRef.current) {
-      lastScoreRef.current.oppScore = score;
-    }
-    return score;
-  }, [currentMatchup, calculatedDailyTotals, dailyStatsByDate, opponentDailyPoints, opponentStarters]);
+    if (!currentMatchup?.id || scoringSettings == null || loadedStatsScope !== statsScope
+      || [...dailyStatsByDate.values()].some(day => [...day.values()].some(row => !Number.isFinite(row.daily_total_points)))) return 'N/A';
+    const total = finiteEarnedTotal([...calculatedDailyTotals.values()].map(day => day.oppTotal))
+      ?? finiteEarnedTotal(opponentDailyPoints);
+    return total === null ? 'N/A' : total.toFixed(1);
+  }, [currentMatchup?.id, scoringSettings, loadedStatsScope, statsScope, dailyStatsByDate, calculatedDailyTotals, opponentDailyPoints]);
 
   // ===========================================================================
   // WIN CHANCE + PROJECTED FINALS (2026-09-01, Sleeper parity audit M1/M2)
@@ -4048,31 +3584,9 @@ const Matchup = () => {
         log(' Found user team:', userTeamData.id);
         setUserTeam(userTeamData);
 
-        // Extract and store league scoring settings (falls back to shared defaults)
-        const goalieScoring = currentLeague.scoring_settings?.goalie || DEFAULT_SCORING.goalie;
-        const skaterScoring = currentLeague.scoring_settings?.skater || DEFAULT_SCORING.skater;
-        setScoringSettings({
-          goalie: {
-            wins: goalieScoring.wins ?? DEFAULT_SCORING.goalie.wins,
-            saves: goalieScoring.saves ?? DEFAULT_SCORING.goalie.saves,
-            shutouts: goalieScoring.shutouts ?? DEFAULT_SCORING.goalie.shutouts,
-            goals_against: goalieScoring.goals_against ?? DEFAULT_SCORING.goalie.goals_against
-          },
-          skater: {
-            goals: skaterScoring.goals ?? DEFAULT_SCORING.skater.goals,
-            assists: skaterScoring.assists ?? DEFAULT_SCORING.skater.assists,
-            power_play_points: skaterScoring.power_play_points ?? DEFAULT_SCORING.skater.power_play_points,
-            short_handed_points: skaterScoring.short_handed_points ?? DEFAULT_SCORING.skater.short_handed_points,
-            shots_on_goal: skaterScoring.shots_on_goal ?? DEFAULT_SCORING.skater.shots_on_goal,
-            blocks: skaterScoring.blocks ?? DEFAULT_SCORING.skater.blocks,
-            hits: skaterScoring.hits ?? DEFAULT_SCORING.skater.hits,
-            penalty_minutes: skaterScoring.penalty_minutes ?? DEFAULT_SCORING.skater.penalty_minutes
-          }
-        });
-        log(' Loaded scoring settings (all 8 categories):', {
-          goalie: goalieScoring,
-          skater: skaterScoring
-        });
+        // A loaded configured document disables omitted categories. Only a
+        // persisted null document receives the league's default scoring contract.
+        setScoringSettings(projectionSettings(currentLeague.scoring_settings));
 
         // Calculate first week start date
         const draftCompletionDate = getDraftCompletionDate(currentLeague);
@@ -5337,26 +4851,25 @@ const Matchup = () => {
       }
     };
     
-    // Refresh stats, game statuses, AND matchup scores immediately
-    // Note: dailyStatsMap will be synced from dailyStatsByDate via useEffect above
-    Promise.all([
-      fetchAllDailyStats(),
-      refreshGameStatuses(),
-      updateMatchupScores()
-    ]).catch(() => { /* non-blocking */ });
-    
-    // EGRESS OPTIMIZATION: Refresh every 120 seconds during live games
-    // Backend scraper runs every 90s, so 120s polling still catches all updates
-    // This reduces egress by ~60% compared to 45s polling
-    const intervalId = setInterval(() => {
-      Promise.all([
-        fetchAllDailyStats(),
-        refreshGameStatuses(),
-        updateMatchupScores()
-      ]).catch(() => { /* non-blocking */ });
-    }, 120000); // 120 seconds (was 45s - enterprise egress optimization)
-    
+    let refreshing = false;
+    let disposed = false;
+    const refresh = async () => {
+      if (disposed || refreshing || document.visibilityState === 'hidden') return;
+      refreshing = true;
+      try {
+        await Promise.all([fetchAllDailyStats(), refreshGameStatuses(), updateMatchupScores()]);
+      } finally {
+        refreshing = false;
+      }
+    };
+    void refresh();
+    const intervalId = setInterval(() => { void refresh(); }, 120_000);
+    const onFocus = () => { void refresh(); };
+    window.addEventListener('focus', onFocus);
+
     return () => {
+      disposed = true;
+      window.removeEventListener('focus', onFocus);
       clearInterval(intervalId);
       liveRefreshSetupRef.current = false;
       log(' Stopped live stats refresh (no live games or matchup ended)');
@@ -6081,7 +5594,7 @@ const Matchup = () => {
                     // Fallback to opponentTeamPoints
                     return parseFloat(opponentTeamPoints || '0');
                   })()}
-                  scoringSettings={scoringSettings}
+                  scoringSettings={loadedStatsScope === statsScope ? scoringSettings : null}
                   userTeamName={userLeagueState === 'active-user' ? (viewingTeamName || userTeam?.team_name || 'My Team') : 'Citrus Crushers'}
                   opponentTeamName={userLeagueState === 'active-user' ? (viewingOpponentTeamName || opponentTeam?.team_name || 'Bye Week') : 'Thunder Titans'}
                   isOwnTeam={isOwnTeamOnLeft}
@@ -6146,6 +5659,8 @@ const Matchup = () => {
                 themselves print every figure this card ranked. */}
             <div className="hidden order-3">
               <MatchupSidebar
+                  scoringSettings={loadedStatsScope === statsScope ? scoringSettings : null}
+                  scoringReady={scoringSettings !== null && loadedStatsScope === statsScope}
                 myStarters={weeklyMyStarters}
                 opponentStarters={weeklyOpponentStarters}
                 myTeamScore={parseFloat(myTeamPoints) || 0}
@@ -6179,6 +5694,8 @@ const Matchup = () => {
                   />
                 )}
                 <MatchupSidebar
+                  scoringSettings={loadedStatsScope === statsScope ? scoringSettings : null}
+                  scoringReady={scoringSettings !== null && loadedStatsScope === statsScope}
                   myStarters={weeklyMyStarters}
                   opponentStarters={weeklyOpponentStarters}
                   myTeamScore={parseFloat(myTeamPoints) || 0}

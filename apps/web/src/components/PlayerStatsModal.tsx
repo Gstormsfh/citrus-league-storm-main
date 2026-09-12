@@ -26,7 +26,7 @@ import { NewsItemRow } from '@/components/news/NewsItemRow';
 import { buildAdvancedCardData, type CardEntry } from '@/components/player/playerAdvancedMetrics';
 import { usePlayerXgHistory } from '@/components/player/usePlayerXgHistory';
 import { projectionFraming } from '@/components/player/projectionFraming';
-import { type EditorialCanonicalContext, editorialScoringCategories, editorialScoringWeights, actualsSeasonLabel, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
+import { type EditorialCanonicalContext, projectionSettings, editorialScoringCategories, editorialScoringWeights, actualsSeasonLabel, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
 import { citrusNoteContext } from '@/utils/sourceSeasonContext';
 import { PlayerAdvancedCard } from '@/components/player/PlayerAdvancedCard';
@@ -738,8 +738,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
       newsItems: wireItems,
       canonicalContext,
       indexAsOf: indexEntry?.as_of ?? null,
-      scoringWeights: scoringReady && pointsFormat && leagueId ? editorialScoringWeights(leagueScoring) : null,
-      scoringCategories: scoringReady && leagueId ? editorialScoringCategories(leagueScoring) : null,
+      scoringWeights: scoringReady && pointsFormat && leagueId ? editorialScoringWeights(projectionSettings(leagueScoring)) : null,
+      scoringCategories: scoringReady && leagueId ? editorialScoringCategories(projectionSettings(leagueScoring)) : null,
       age: Number.isFinite(age as number) ? age : null,
       projectionSeason: indexEntry?.projection_season ?? getProjectionsSeason(),
       goalsBySeason: [...goalsBySeason.entries()].sort((a, b) => a[0] - b[0]).map(([season, goals]) => ({ season, goals })),

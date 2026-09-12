@@ -535,17 +535,17 @@ describe('MatchupService', () => {
   });
 
   describe('getDailyGameStats', () => {
-    it('returns daily game stats via RPC', async () => {
-      const stats = [{ player_id: 1, goals: 2 }];
-      mockSupabase.rpc = vi.fn().mockResolvedValue({ data: stats, error: null });
-
+    it('reads official daily stats and preserves corrected zero instead of raw PBP fallback', async () => {
+      const chain = createChain({ data: [{ player_id: 1, game_id: 2025020001, is_goalie: true,
+        nhl_goals: 2, nhl_wins: 0, wins: 1, nhl_saves: 0, saves: 30 }], error: null });
+      mockSupabase.from = vi.fn(() => chain);
       const result = await service.getDailyGameStats([1, 2], '2026-01-15');
-
-      expect(mockSupabase.rpc).toHaveBeenCalledWith('get_daily_game_stats', {
-        p_player_ids: [1, 2],
-        p_game_date: '2026-01-15',
-      });
-      expect(result.stats).toEqual(stats);
+      expect(mockSupabase.from).toHaveBeenCalledWith('player_game_stats');
+      expect(chain.in).toHaveBeenCalledWith('player_id', [1, 2]);
+      expect(chain.eq).toHaveBeenCalledWith('game_date', '2026-01-15');
+      expect(mockSupabase.rpc).not.toHaveBeenCalled();
+      expect(result.stats).toHaveLength(1);
+      expect(result.stats[0]).toMatchObject({ player_id: 1, goals: 2, wins: 0, saves: 0 });
     });
 
     it('returns empty array when no stats', async () => {

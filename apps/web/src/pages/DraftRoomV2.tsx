@@ -2362,10 +2362,8 @@ function MainTabs({
       const queuedId = queue.find(id => availSet.has(id));
       let target = queuedId ? availablePlayers.find(p => p.id === queuedId) : undefined;
       if (!target) {
-        // Mirror PlayerPool's rankMap: season FPTS via the LEAGUE's
-        // scoring settings (wired 2026-08-23 — both the pool and this
-        // fallback previously used default scoring for every league),
-        // so autodraft still matches the visible #1 exactly.
+        // Match the visible pool: available league-scored ROS first,
+        // then historical league points for players without a forecast.
         const scorer = new ScoringCalculator(leagueScoring ?? undefined);
         const scoreActual = (p: Player) => {
           const isG = p.position === 'G';

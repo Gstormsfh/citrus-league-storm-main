@@ -69,7 +69,8 @@ describe('Draft Kit league scoring', () => {
   it('preserves a supported zero-start goalie as zero rather than a default-score fallback', () => {
     const service = new DraftKitService(createMockSupabase());
     const goalie = entry(2, { is_goalie: true, position: 'G', proj_gp: 0,
-      proj_wins: 0, proj_saves: 0, proj_shutouts: 0, proj_goals_against: 0 });
+      proj_wins: 0, proj_saves: 0, proj_shutouts: 0, proj_goals_against: 0,
+      proj_goals: 0, proj_hits: 0 });
     expect(service.buildCards([goalie], new Map(), new Map(),
       { goalie: { wins: 4, saves: 0.2, goals_against: -1 } }).cards[0])
       .toMatchObject({ projectedFantasyPoints: 0, projectedFantasyPpg: 0, projectedGames: 0 });

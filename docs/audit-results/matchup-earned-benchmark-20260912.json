@@ -1,0 +1,16 @@
+{
+  "kind": "local controlled request graph and CPU fixture; not live browser latency",
+  "players": 40,
+  "iterations": 1000,
+  "aggregation_total_ms": 125.57033299999998,
+  "aggregation_ms_per_40_players": 0.12557033299999998,
+  "weekday_fixture": "Wednesday 2026-10-07",
+  "previous_actual_requests_per_cycle": 8,
+  "revised_actual_requests_per_cycle": 3,
+  "previous_future_week_actual_requests": 8,
+  "revised_future_week_actual_requests": 0,
+  "previous_finished_week_actual_requests": 8,
+  "revised_finished_week_actual_requests": 7,
+  "configured_visible_poll_ms": 120000,
+  "network_latency_measured": false
+}
