@@ -1,3 +1,4 @@
+import { MatchupWeekBoundary } from '@/pages/MatchupWeekBoundary';
 import { DesktopProduct } from '@/components/DesktopProduct';
 import React, { Suspense, lazy, useEffect } from "react";
 import { CitrusToaster } from "@/components/notifications/CitrusToaster";
@@ -244,8 +245,8 @@ const App = () => {
                 <Route path="/blog" element={<Blog />} />
                 <Route path="/podcasts" element={<Podcasts />} />
                 <Route path="/guides" element={<Guides />} />
-                    <Route path="/matchup/:leagueId/:weekId?" element={<ErrorBoundary><Matchup /></ErrorBoundary>} />
-                    <Route path="/matchup" element={<ErrorBoundary><Matchup /></ErrorBoundary>} /> {/* Fallback for /matchup without params */}
+                    <Route path="/matchup/:leagueId/:weekId?" element={<MatchupWeekBoundary><ErrorBoundary><Matchup /></ErrorBoundary></MatchupWeekBoundary>} />
+                    <Route path="/matchup" element={<MatchupWeekBoundary><ErrorBoundary><Matchup /></ErrorBoundary></MatchupWeekBoundary>} /> {/* Fallback for /matchup without params */}
                     <Route path="/league/:leagueId/playoffs" element={<ProtectedRoute><ErrorBoundary><PlayoffBracket /></ErrorBoundary></ProtectedRoute>} />
                 {/* Live NHL scoreboard. Auth-only: the Citrus panel reads league rosters. */}
                 <Route path="/scores" element={<ProtectedRoute><ErrorBoundary><Scores /></ErrorBoundary></ProtectedRoute>} />
