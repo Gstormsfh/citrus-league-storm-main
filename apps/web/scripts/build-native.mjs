@@ -169,6 +169,28 @@ const SENTRY_RELEASE = `citrus-fantasy@${APP_VERSION}`;
 
 console.log(`\n▸ native build: VITE_APP_VERSION=${APP_VERSION}  (Sentry release ${SENTRY_RELEASE})\n`);
 
+// --- API origin, resolved BEFORE the build and FORWARDED into it ----------
+// 2026-09-11: this used to be resolved only AFTER the build, and a native
+// build shipped carrying no API origin at all. The repo-root .env sets
+// VITE_API_URL; .env.local overrides it with an EMPTY value, which is correct
+// for `npm run dev` against a local server. Vite loads .env then .env.local,
+// so the empty override won and import.meta.env.VITE_API_URL was "".
+// `fromEnvFiles` skips empty overrides, so this script reported the real
+// origin while the bundle carried none, and the app threw at module load on
+// the splash screen.
+//
+// Forwarding the resolved value into the child is the same remedy already
+// applied to NODE_ENV below, for the same reason: a native build's needs are
+// not the dev server's, and the env-file cascade must not decide them.
+const apiUrl = (process.env.VITE_API_URL || fromEnvFiles('VITE_API_URL') || '').replace(/\/+$/, '');
+
+if (!apiUrl)
+  fail(
+    'VITE_API_URL is not set. Every API call would be relative, and nothing is\n' +
+      'relative to capacitor://localhost. The app would load and then fail every request.\n\n' +
+      envHelp
+  );
+
 const run = spawnSync('npx', ['vite', 'build', '--mode', MODE], {
   stdio: 'inherit',
   cwd: WEB_DIR,
@@ -177,7 +199,7 @@ const run = spawnSync('npx', ['vite', 'build', '--mode', MODE], {
   // shell has not set one: the bundle then ships react-dom.development and
   // import.meta.env.PROD is false. That happened on 2026-09-03 (the
   // device build carried the dev warnings). Assertion 8 below refuses it.
-  env: { ...process.env, NODE_ENV: 'production', VITE_NATIVE: '1', VITE_APP_VERSION: APP_VERSION },
+  env: { ...process.env, NODE_ENV: 'production', VITE_NATIVE: '1', VITE_APP_VERSION: APP_VERSION, VITE_API_URL: apiUrl },
   shell: process.platform === 'win32',
 });
 if (run.status !== 0) process.exit(run.status ?? 1);
@@ -202,13 +224,19 @@ if (refs.length > 1)
 const supabaseRef = refs[0];
 const dbIsProd = supabaseRef === PRODUCTION_SUPABASE_REF;
 
-// --- 2. An API origin was set, and it survived into the bundle -------------
-const apiUrl = (process.env.VITE_API_URL || fromEnvFiles('VITE_API_URL') || '').replace(/\/+$/, '');
-
-if (!apiUrl)
+// --- 2. The API origin actually reached api/client, not just the bundle ----
+// `blob.includes(apiUrl)` on its own is NOT sufficient: openExternal resolves
+// relative links against the same origin, so that literal sits in the bundle
+// whether or not the env was injected. On 2026-09-11 that substring match
+// passed while api/client's own constant was "". Assert the constant. The
+// minified shape of the guard in api/client.ts is
+//   X="";if(C.isNativePlatform()&&!X)throw new Error(...)
+// so an empty constant feeding that guard is exactly the defect.
+const emptyApiConst = /([A-Za-z_$][\w$]*)\s*=\s*""\s*;[\s\S]{0,60}?isNativePlatform\(\)\s*&&\s*!\1\b/;
+if (emptyApiConst.test(blob))
   fail(
-    'VITE_API_URL is not set — every API call would be relative, and nothing is\n' +
-      'relative to capacitor://localhost. The app would load and then fail every request.\n\n' +
+    `api/client baked an EMPTY API origin. This build resolved ${apiUrl} but Vite\n` +
+      'did not inject it. Check for an empty VITE_API_URL override in .env.local.\n\n' +
       envHelp
   );
 if (!blob.includes(apiUrl))
