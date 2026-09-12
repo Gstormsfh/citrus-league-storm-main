@@ -1,5 +1,7 @@
 # Manual baseline publication and remaining release acceptance
 
+Later application serving and repaired Matchup navigation acceptance are recorded in the [Matchup release receipt](2026-09-12-matchup-week-navigation.md#production-release). Publication/export facts below remain unchanged; earlier application revisions remain historical evidence.
+
 This receipt records the actual September12 manual metadata publication, verified client header/API correction and durable export-tool change. Actual normal-cache browser acceptance is recorded separately from serving artifacts; no universal cached-client guarantee is implied.
 
 ## Published source and runtime
