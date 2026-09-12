@@ -8,6 +8,7 @@ import argparse
 from collections import Counter
 from hashlib import sha256
 import json
+import math
 from pathlib import Path
 
 import pymupdf as fitz
@@ -52,7 +53,12 @@ def verify(path, data):
             assert p['fantasyPoints'] is None and p['positionRank'] is None
             continue
         weights = manifest['weights']['goalie' if p['isGoalie'] else 'skater']
-        expected = sum(p['canonicalRates'].get(k, 0) * weight for k, weight in weights.items()) * p['games']
+        enabled = {k: weight for k, weight in weights.items() if weight != 0}
+        for key in enabled:
+            rate = p['canonicalRates'].get(key)
+            explicit_zero = p['games'] == 0 and p.get('canonicalCounts', {}).get(key) == 0
+            assert explicit_zero or (isinstance(rate, (int, float)) and not isinstance(rate, bool) and math.isfinite(rate)), ('ranked with missing enabled category', p['key'], key)
+        expected = 0 if p['games'] == 0 else sum(p['canonicalRates'][k] * weight for k, weight in enabled.items()) * p['games']
         assert abs(p['fantasyPoints'] - expected) < 1e-7, ('canonical rate/exposure score', p['key'])
     main = []; positions = []; team_entries = {}; row_count = 0
     for item in manifest['content']:
@@ -114,6 +120,12 @@ def verify(path, data):
         for label, key in [('Parent source revision:', 'parentSourceRevision'), ('Runtime revision:', 'runtimeRevision'),
                            ('Runtime run ID:', 'runtimeRunId'), ('As of:', 'asOf'), ('Horizon:', 'horizon')]:
             assert norm(label + ' ' + edition[key]) in text, ('missing full runtime metadata', key)
+        for label, key in [('Parent runtime revision:', 'parentRuntimeRevision'), ('Activated at:', 'activatedAt')]:
+            if edition.get(key):
+                assert norm(label + ' ' + edition[key]) in text, ('missing repair metadata', key)
+        if edition.get('componentRepair'):
+            assert 'Component repair metadata:' in text
+            assert norm('Inherited model refresh: ' + edition['refreshedAt']) in text, 'Refresh/activation chronology ambiguous'
         assert 'not an activated production projection run' not in text, 'Stale local-draft/runtime-inactive claim'
         assert 'Parent source full-season exposure' in text, 'Source/runtime exposure distinction missing'
         for item in manifest['content']:

@@ -108,7 +108,7 @@ def validate(document, revision, *, revision_preimage=None):
     return players
 
 
-def convert(document, editorial, revision, *, source_name='canonical.json', revision_preimage=None, runtime_run_id=None):
+def convert(document, editorial, revision, *, source_name='canonical.json', revision_preimage=None, runtime_run_id=None, runtime_activated_at=None):
     """No fuzzy identities, exposure guessing, probability scaling, or publication."""
     canonical = validate(document, revision, revision_preimage=revision_preimage)
     result = deepcopy(editorial)
@@ -136,6 +136,7 @@ def convert(document, editorial, revision, *, source_name='canonical.json', revi
             'canonicalCounts': deepcopy(p['counts']), 'canonicalRole': deepcopy(p['role']),
             'canonicalSources': deepcopy(p['sources']), 'canonicalIssues': deepcopy(p.get('issues', [])),
             'ratePolicy': p['rate_policy'], 'exposurePolicy': p['exposure_policy'],
+            'canonicalRateComponents': deepcopy(p.get('rate_components', {})),
             'legacyOverrides': deepcopy(p.get('legacy_overrides', [])),
             'unscoredCategories': sorted(set(p['rates']) - set(rates)),
             'zeroExposureWithoutRates': effective_exposure(p) == 0 and not p['rates'],
@@ -196,6 +197,11 @@ def convert(document, editorial, revision, *, source_name='canonical.json', revi
             'asOf': next(iter(dates)), 'refreshedAt': document['refresh_at'],
             'sourceAsOf': document['as_of'], 'horizon': 'remaining_season',
         }
+        if document.get('component_repair'):
+            result['edition']['componentRepair'] = deepcopy(document['component_repair'])
+            result['edition']['parentRuntimeRevision'] = document.get('parent_revision')
+        if runtime_activated_at:
+            result['edition']['activatedAt'] = runtime_activated_at
         result['source'].update({'sourceRevision': document['source_revision'],
                                 'asOf': result['edition']['asOf'],
                                 'revisionAlgorithm': document['revision_algorithm']})
@@ -226,6 +232,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--revision-preimage', type=Path, help='Exact PostgreSQL (payload-minus-revision)::text export')
     parser.add_argument('--runtime-run-id', help='Run ID from the matching runtime export receipt')
+    parser.add_argument('--runtime-activated-at', help='Activation timestamp from the verified published-run receipt')
     args = parser.parse_args()
     protected = {args.canonical.resolve(), args.editorial.resolve(), (ROOT / 'workbook-data.json').resolve()}
     if args.output.resolve() in protected:
@@ -234,7 +241,7 @@ def main():
     editorial = json.loads(args.editorial.read_text())
     result = convert(document, editorial, args.revision, source_name=args.canonical.name,
                      revision_preimage=args.revision_preimage.read_text() if args.revision_preimage else None,
-                     runtime_run_id=args.runtime_run_id)
+                     runtime_run_id=args.runtime_run_id, runtime_activated_at=args.runtime_activated_at)
     # Refuse accidental overwrite of an earlier review artifact.
     with args.output.open('x') as out:
         json.dump(result, out, ensure_ascii=False, indent=2, allow_nan=False)
