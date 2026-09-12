@@ -517,7 +517,7 @@ const LeagueDashboard = () => {
       const when = new Date(value);
       if (Number.isNaN(when.getTime())) {
         toast({
-          title: 'That date did not read',
+          title: "That date didn't read",
           description: 'Pick the day and time again.',
           variant: 'destructive',
         });
@@ -551,7 +551,7 @@ const LeagueDashboard = () => {
       });
     } catch (err) {
       toast({
-        title: "Couldn't save the draft time",
+        title: "Draft time didn't save",
         description: userMessage(err, 'Try again in a moment.'),
         variant: 'destructive',
       });
@@ -2314,7 +2314,7 @@ const LeagueDashboard = () => {
                       >
                         Draft time
                       </Label>
-                      <p className="mt-1 text-xs text-white/45">
+                      <p className="mt-1 text-xs text-white/55">
                         Managers see this on their league page, and the draft starts itself when the clock gets there.
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -2330,7 +2330,7 @@ const LeagueDashboard = () => {
                           size="sm"
                           disabled={savingDraftTime || !draftTimeInput}
                           onClick={() => handleScheduleDraft(draftTimeInput)}
-                          className="bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft font-bold"
+                          className="bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50 font-bold"
                         >
                           {league.scheduled_draft_time ? 'Update' : 'Set'}
                         </Button>
