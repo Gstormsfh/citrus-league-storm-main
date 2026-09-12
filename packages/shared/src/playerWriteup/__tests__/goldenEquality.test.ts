@@ -628,6 +628,11 @@ const fixtures: Fixture[] = [
   },
 ];
 
+// Browser and server now both pass the enabled scoring categories to the shared policy.
+for (const f of fixtures) {
+  if (f.sources.scoring != null) f.extras.scoringCategories = ['goals', 'assists', 'power_play_points', 'shots', 'blocks', 'wins', 'shutouts', 'saves', 'goals_against'];
+}
+
 describe('server-assembled writeup equals the one the browser used to build', () => {
   for (const f of fixtures) {
     describe(f.label, () => {
@@ -658,10 +663,10 @@ describe('server-assembled writeup equals the one the browser used to build', ()
     // instead of a number.
     const thin = buildWriteupFromSources(byLabel('a three-game call-up, below the rate floor').sources);
     expect(thin.hasEnoughData).toBe(false);
-    expect(thin.analysis).toMatch(/Too early to draw conclusions/);
+    expect(thin.analysis).toMatch(/cannot establish a sustainable rate/);
     expect(thin.analysis).not.toMatch(/percentile|Projects to/);
     expect(thin.summary).not.toMatch(/He is 22|Career:/);
-    expect(thin.tags).toEqual([{ label: 'Limited sample', tone: 'neutral' }]);
+    expect(thin.tags).toContainEqual({ label: 'Limited sample', tone: 'neutral' });
 
     // Availability outranks the stat line, and it takes the card's one line.
     const ir = buildWriteupFromSources(byLabel('a player on injured reserve').sources);
@@ -685,7 +690,7 @@ describe('server-assembled writeup equals the one the browser used to build', ()
     // A goalie is never placed on a skater's scale.
     const goalie = buildWriteupFromSources(byLabel('a goalie').sources);
     expect(goalie.analysis).not.toMatch(/xG\/60|GAR\/60/);
-    expect(goalie.analysis).toMatch(/Projects to \d+ fantasy points over 58 games for 2026-27 \(G1\)\./);
+    expect(goalie.analysis).toMatch(/Projects to \d+ fantasy points over 58 starts for 2026-27 \(G1\)\./);
   });
 });
 

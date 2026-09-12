@@ -1,3 +1,4 @@
+import { editorialScoringCategories, type EditorialNewsItem } from '../editorial';
 /**
  * THE SERVER'S HALF OF THE WRITEUP (2026-09-11).
  *
@@ -131,6 +132,7 @@ export function writeupPlayerFromIndex(entry: DashboardIndexEntry): WriteupPlaye
 
 /** Everything the assembly needs that is not the engine's own arithmetic. */
 export interface WriteupSources {
+  newsItems?: readonly EditorialNewsItem[] | null;
   /** The player's own row out of the dashboard index. */
   entry: DashboardIndexEntry;
   /** The whole index. The cohort is selected from it; do not pre-filter. */
@@ -237,6 +239,9 @@ export function writeupExtrasFromSources(src: WriteupSources): WriteupExtras {
 
   return {
     ...(src.entry.actuals_season != null || src.entry.projection_season != null ? { projectionSeason } : {}),
+    ...(src.entry.as_of ? { indexAsOf: src.entry.as_of } : {}),
+    ...(src.newsItems ? { newsItems: src.newsItems, now } : {}),
+    ...(scoring != null ? { scoringCategories: editorialScoringCategories(scoring) } : {}),
     age: src.birthdate ? ageOn(src.birthdate, now) : null,
     goalsBySeason,
     ...cohortReads(src.entry, src.index),

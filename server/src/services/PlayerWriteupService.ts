@@ -1,3 +1,4 @@
+import { NewsRoomService } from './NewsRoomService';
 import { SupabaseClient } from '@supabase/supabase-js';
 import {
   buildWriteupFromSources,
@@ -71,9 +72,13 @@ export class PlayerWriteupService {
       const entry = players.find((p: DashboardIndexEntry) => p.id === input.playerId);
       if (!entry) return null;
 
-      const [directory, scoring] = await Promise.all([
+      const [directory, scoring, newsItems] = await Promise.all([
         this.directoryFor(input.playerId),
         this.scoringFor(input.leagueId, input.userId),
+        new NewsRoomService(this.supabase).forPlayer(input.playerId, 20).catch((err) => {
+          logger.debug('[PlayerWriteupService] news unavailable:', err);
+          return [];
+        }),
       ]);
 
       return buildWriteupFromSources({
@@ -84,6 +89,7 @@ export class PlayerWriteupService {
         birthdate: directory.birthdate,
         scoring,
         now: input.now,
+        newsItems,
       });
     } catch (err) {
       logger.debug('[PlayerWriteupService] writeup unavailable:', err);

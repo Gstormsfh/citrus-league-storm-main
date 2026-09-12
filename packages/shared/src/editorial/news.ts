@@ -18,7 +18,7 @@ export interface EditorialNewsEvidence {
 export const EDITORIAL_NEWS_MAX_AGE_MS = 14 * 86400000;
 const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[’]/g, "'");
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const instructions = /ignore\s+(?:all\s+|previous\s+|prior\s+)?instructions|system\s*(?:prompt|message)|you are (?:an? |the )?(?:assistant|chatgpt)|<\/?(?:system|assistant)|guaranteed\s+(?:return|points)|output exactly/i;
+const instructions = /\b(?:ignore|disregard|override)\b.{0,60}\b(?:instructions?|prompts?|rules?)\b|ignore\s+(?:all\s+|previous\s+|prior\s+)?instructions|system\s*(?:prompt|message)|you are (?:an? |the )?(?:assistant|chatgpt)|<\/?(?:system|assistant)|guaranteed\s+(?:return|points)|output exactly/i;
 
 // A small deterministic parser cannot resolve editorial hypotheticals or a
 // retrospective inside fresh news. Omission is safer than inventing certainty.
@@ -54,7 +54,10 @@ export function canonicalNewsUrl(raw: string): string | null {
  */
 function eventFor(text: string, name: string): Pick<EditorialNewsEvidence, 'kind' | 'report' | 'implication'> | null {
   if (instructions.test(text)) return null;
-  if (qualified.test(text) || retrospective.test(text)) return null;
+  // A separate statement that no return date was announced does not negate
+  // the direct injury/practice report, and cannot supply a medical timeline.
+  const qualifications = text.replace(/(?:the team |the club |he )?(?:did not|has not|hasn't) (?:announce|announced|provide|provided) (?:a |an? exact )?(?:return date|timetable)[^.!?]*[.!?]?/gi, '');
+  if (qualified.test(qualifications) || retrospective.test(text)) return null;
   const tails = subjectTails(text, name);
   // Multiple conflicting health statements cannot be resolved by first-match
   // order. Suppress the story and let the latest-health barrier below apply.
@@ -67,7 +70,7 @@ function eventFor(text: string, name: string): Pick<EditorialNewsEvidence, 'kind
   }));
   if (healthStates.size > 1) return null;
   for (const tail of tails) {
-    if (/^(?:ruled out (?:a |the possibility)|(?:signed|signs) with (?:fans|supporters))/.test(tail)) continue;
+    if (/^(?:(?:(?:was|is|has been) )?ruled out (?:a |as |the possibility)|(?:signed|signs) with (?:fans|supporters))/.test(tail)) continue;
     if (/^(?:could|might|may|should|would|will not|won't|did not|didn't|is not|isn't|has not|hasn't|not|unlikely|hopes|expected|reportedly)/.test(tail)) continue;
     if (/^(?:(?:is|remains|was)\s+)?(?:day.to.day|questionable|a game.time decision)|^(?:has|faces)\s+no\s+(?:return\s+)?timetable/.test(tail)) return {
       kind: 'uncertain', report: 'has an uncertain availability report',

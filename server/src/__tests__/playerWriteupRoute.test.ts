@@ -235,7 +235,7 @@ describe('GET /api/players/:playerId/xg-history — the server-rendered writeup'
     expect(data.player_id).toBe(MCDAVID);
     expect(data.points).toHaveLength(3);
 
-    expect(data.writeup.headline).toBe('2025-26 production');
+    expect(data.writeup.headline).toBe('Dual scoring routes');
     expect(data.writeup.summary).toContain('2025-26');
     expect(data.writeup.summary).not.toContain('this season');
     expect(data.writeup.hasEnoughData).toBe(true);

@@ -26,7 +26,7 @@ import { NewsItemRow } from '@/components/news/NewsItemRow';
 import { buildAdvancedCardData, type CardEntry } from '@/components/player/playerAdvancedMetrics';
 import { usePlayerXgHistory } from '@/components/player/usePlayerXgHistory';
 import { projectionFraming } from '@/components/player/projectionFraming';
-import { actualsSeasonLabel, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
+import { editorialScoringCategories, actualsSeasonLabel, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
 import { citrusNoteContext } from '@/utils/sourceSeasonContext';
 import { PlayerAdvancedCard } from '@/components/player/PlayerAdvancedCard';
@@ -667,7 +667,8 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
   // one season's box score. Age from the directory strip, the seasons on
   // our books from the xG history, the cohort reads the XG tab draws, and
   // the projection with the framing the card uses. See WriteupExtras.
-  const xgHistory = usePlayerXgHistory(Number(player?.id) || null, { enabled: isOpen, leagueId });
+  const writeupRevision = JSON.stringify([leagueScoring, indexEntry?.actuals_season, indexEntry?.projection_season, wireItems]);
+  const xgHistory = usePlayerXgHistory(Number(player?.id) || null, { enabled: isOpen, leagueId, revision: writeupRevision });
   const positionRank = useMemo(() => {
     if (!indexEntry || !scoringReady || !pointsFormat) return null;
     const cohort = index.players.filter((p) => p.position === indexEntry.position);
@@ -733,6 +734,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
     const pct = (key: string) => advanced?.metrics.find((m) => m.spec.key === key)?.percentile ?? null;
     const framing = projectionFraming();
     return {
+      newsItems: wireItems,
+      indexAsOf: indexEntry?.as_of ?? null,
+      scoringCategories: scoringReady && leagueId ? editorialScoringCategories(leagueScoring) : null,
       age: Number.isFinite(age as number) ? age : null,
       projectionSeason: indexEntry?.projection_season ?? getProjectionsSeason(),
       goalsBySeason: [...goalsBySeason.entries()].sort((a, b) => a[0] - b[0]).map(([season, goals]) => ({ season, goals })),
@@ -1068,6 +1072,15 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                     <span className="font-bold text-pressbox-text">Analysis: </span>
                     {writeup.analysis}
                   </p>
+                )}
+                {(writeup.newsSources?.length ?? 0) > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-3 text-xs">
+                    {writeup.newsSources?.map((source) => (
+                      <a key={source.url} href={source.url} target="_blank" rel="noopener noreferrer" className="underline">
+                        {source.source} · {source.publishedAt.slice(0, 10)}
+                      </a>
+                    ))}
+                  </div>
                 )}
                 {writeup.tags.length > 0 && (
                   <div className="mt-2.5 flex flex-wrap gap-1.5">

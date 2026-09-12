@@ -1,0 +1,312 @@
+{
+  "baselineRef": "1365b357",
+  "metrics": {
+    "firstFourBeforeDistinctAnalyses": 1,
+    "firstFourAfterDistinctAnalyses": 4
+  },
+  "examples": [
+    {
+      "player": "Connor McDavid",
+      "source": "https://api-web.nhle.com/v1/player/8478402/landing",
+      "before": {
+        "headline": "2025-26 production",
+        "summary": "Connor McDavid recorded 138 points (48 goals, 90 assists) in 82 games in 2025-26. He averaged 1.68 points per game. He played 23 minutes per game. His totals included 306 shots, 54 power-play points.",
+        "analysis": "The 2025-26 rates provide a historical baseline. Current line assignment, power-play role and availability determine how much of that production can carry forward.",
+        "tags": [
+          {
+            "label": "2025-26 actuals",
+            "tone": "neutral"
+          }
+        ],
+        "hasEnoughData": true,
+        "cardNote": "2025-26 · 1.68 P/GP",
+        "cardTone": "positive"
+      },
+      "after": {
+        "headline": "Dual scoring routes",
+        "summary": "Connor McDavid paired 90 assists with 3.7 shots per game in 2025-26, combining setup points with his own shooting volume. Connor McDavid recorded 138 points (48 goals, 90 assists) in 82 games in 2025-26. He played 23 minutes per game.",
+        "analysis": "Assists supplied 65% of the points, but the 3.7-shot rate adds a separate route to contribution when shots count. A change in teammates' finishing can affect the assists without removing his own attempts. The 2025-26 rates are a historical baseline.",
+        "tags": [
+          {
+            "label": "2025-26 actuals",
+            "tone": "neutral"
+          }
+        ],
+        "hasEnoughData": true,
+        "cardNote": "2025-26 · 1.68 P/GP",
+        "cardTone": "positive",
+        "editorialVersion": "2026-09-12.1",
+        "sourceContext": {
+          "actualsSeason": 2025,
+          "projectionSeason": 2026,
+          "indexAsOf": null
+        },
+        "newsSources": []
+      }
+    },
+    {
+      "player": "Nathan MacKinnon",
+      "source": "https://api-web.nhle.com/v1/player/8477492/landing",
+      "before": {
+        "headline": "2025-26 production",
+        "summary": "Nathan MacKinnon recorded 127 points (53 goals, 74 assists) in 80 games in 2025-26. He averaged 1.59 points per game. He played 22.3 minutes per game. His totals included 350 shots, 30 power-play points.",
+        "analysis": "The 2025-26 rates provide a historical baseline. Current line assignment, power-play role and availability determine how much of that production can carry forward.",
+        "tags": [
+          {
+            "label": "2025-26 actuals",
+            "tone": "neutral"
+          }
+        ],
+        "hasEnoughData": true,
+        "cardNote": "2025-26 · 1.59 P/GP",
+        "cardTone": "positive"
+      },
+      "after": {
+        "headline": "Volume shooter",
+        "summary": "Nathan MacKinnon generated 4.4 shots per game in 2025-26, making shot volume the foundation of this scoring profile. Nathan MacKinnon recorded 127 points (53 goals, 74 assists) in 80 games in 2025-26. He played 22.3 minutes per game.",
+        "analysis": "The 4.4-shot rate offers a contribution in leagues counting shots even when goals dry up. Finishing can move independently of that volume; shot totals alone do not establish where the chances came from. The 2025-26 rates are a historical baseline.",
+        "tags": [
+          {
+            "label": "2025-26 actuals",
+            "tone": "neutral"
+          },
+          {
+            "label": "Shot volume",
+            "tone": "positive"
+          }
+        ],
+        "hasEnoughData": true,
+        "cardNote": "2025-26 · 1.59 P/GP",
+        "cardTone": "positive",
+        "editorialVersion": "2026-09-12.1",
+        "sourceContext": {
+          "actualsSeason": 2025,
+          "projectionSeason": 2026,
+          "indexAsOf": null
+        },
+        "newsSources": []
+      }
+    },
+    {
+      "player": "Nikita Kucherov",
+      "source": "https://api-web.nhle.com/v1/player/8476453/landing",
+      "before": {
+        "headline": "2025-26 production",
+        "summary": "Nikita Kucherov recorded 130 points (44 goals, 86 assists) in 76 games in 2025-26. He averaged 1.71 points per game. He played 20.3 minutes per game. His totals included 231 shots, 37 power-play points.",
+        "analysis": "The 2025-26 rates provide a historical baseline. Current line assignment, power-play role and availability determine how much of that production can carry forward.",
+        "tags": [
+          {
+            "label": "2025-26 actuals",
+            "tone": "neutral"
+          }
+        ],
+        "hasEnoughData": true,
+        "cardNote": "2025-26 · 1.71 P/GP",
+        "cardTone": "positive"
+      },
+      "after": {
+        "headline": "Assist-led production",
+        "summary": "Nikita Kucherov's 86 assists accounted for 66% of his points in 2025-26. Nikita Kucherov recorded 130 points (44 goals, 86 assists) in 76 games in 2025-26. He played 20.3 minutes per game.",
+        "analysis": "This profile contributes most directly through assists. Those points require a teammate to finish the play. Check the shooting contribution separately when the roster needs goals rather than treating all points as interchangeable. The 2025-26 rates are a historical baseline.",
+        "tags": [
+          {
+            "label": "2025-26 actuals",
+            "tone": "neutral"
+          }
+        ],
+        "hasEnoughData": true,
+        "cardNote": "2025-26 · 1.71 P/GP",
+        "cardTone": "positive",
+        "editorialVersion": "2026-09-12.1",
+        "sourceContext": {
+          "actualsSeason": 2025,
+          "projectionSeason": 2026,
+          "indexAsOf": null
+        },
+        "newsSources": []
+      }
+    },
+    {
+      "player": "Leon Draisaitl",
+      "source": "https://api-web.nhle.com/v1/player/8477934/landing",
+      "before": {
+        "headline": "2025-26 production",
+        "summary": "Leon Draisaitl recorded 97 points (35 goals, 62 assists) in 65 games in 2025-26. He averaged 1.49 points per game. He played 21.6 minutes per game. His totals included 186 shots, 42 power-play points.",
+        "analysis": "The 2025-26 rates provide a historical baseline. Current line assignment, power-play role and availability determine how much of that production can carry forward.",
+        "tags": [
+          {
+            "label": "2025-26 actuals",
+            "tone": "neutral"
+          }
+        ],
+        "hasEnoughData": true,
+        "cardNote": "2025-26 · 1.49 P/GP",
+        "cardTone": "positive"
+      },
+      "after": {
+        "headline": "Power-play exposure",
+        "summary": "Leon Draisaitl drew 43% of his points from the power play in 2025-26. Leon Draisaitl recorded 97 points (35 goals, 62 assists) in 65 games in 2025-26. He played 21.6 minutes per game.",
+        "analysis": "That scoring mix makes special-teams opportunity consequential: losing power-play time would remove one of the established scoring routes. The point share does not identify his unit or guarantee the next assignment. The 2025-26 rates are a historical baseline.",
+        "tags": [
+          {
+            "label": "2025-26 actuals",
+            "tone": "neutral"
+          },
+          {
+            "label": "PP-dependent",
+            "tone": "caution"
+          }
+        ],
+        "hasEnoughData": true,
+        "cardNote": "2025-26 · 1.49 P/GP",
+        "cardTone": "positive",
+        "editorialVersion": "2026-09-12.1",
+        "sourceContext": {
+          "actualsSeason": 2025,
+          "projectionSeason": 2026,
+          "indexAsOf": null
+        },
+        "newsSources": []
+      }
+    },
+    {
+      "player": "Cale Makar",
+      "source": "https://api-web.nhle.com/v1/player/8480069/landing",
+      "before": {
+        "headline": "2025-26 production",
+        "summary": "Cale Makar recorded 79 points (20 goals, 59 assists) in 75 games in 2025-26. He averaged 1.05 points per game. He played 24.9 minutes per game. His totals included 199 shots, 29 power-play points.",
+        "analysis": "The 2025-26 rates provide a historical baseline. Current line assignment, power-play role and availability determine how much of that production can carry forward.",
+        "tags": [
+          {
+            "label": "2025-26 actuals",
+            "tone": "neutral"
+          }
+        ],
+        "hasEnoughData": true,
+        "cardNote": "2025-26 · 1.05 P/GP",
+        "cardTone": "positive"
+      },
+      "after": {
+        "headline": "Blue-line playmaking",
+        "summary": "Cale Makar's 59 assists accounted for 75% of his points in 2025-26. Cale Makar recorded 79 points (20 goals, 59 assists) in 75 games in 2025-26. He played 24.9 minutes per game.",
+        "analysis": "From a defence slot, this profile contributes most directly through assists. Those points require a teammate to finish the play. Check the shooting contribution separately when the roster needs goals rather than treating all points as interchangeable. The 2025-26 rates are a historical baseline.",
+        "tags": [
+          {
+            "label": "2025-26 actuals",
+            "tone": "neutral"
+          }
+        ],
+        "hasEnoughData": true,
+        "cardNote": "2025-26 · 1.05 P/GP",
+        "cardTone": "positive",
+        "editorialVersion": "2026-09-12.1",
+        "sourceContext": {
+          "actualsSeason": 2025,
+          "projectionSeason": 2026,
+          "indexAsOf": null
+        },
+        "newsSources": []
+      }
+    },
+    {
+      "player": "Connor Hellebuyck",
+      "source": "https://api-web.nhle.com/v1/player/8476945/landing",
+      "before": {
+        "headline": "2025-26 goaltending",
+        "summary": "Connor Hellebuyck made 57 appearances in 2025-26. He finished with a .895 save percentage and a 2.86 goals-against average. His record was 23-23.",
+        "analysis": "The 2025-26 results inform his outlook, but recorded appearances do not establish his current share of starts. Check the current crease allocation and confirmed starter before setting a lineup.",
+        "tags": [
+          {
+            "label": "2025-26 actuals",
+            "tone": "neutral"
+          }
+        ],
+        "hasEnoughData": true,
+        "cardNote": "2025-26 · .895 SV%",
+        "cardTone": "caution"
+      },
+      "after": {
+        "headline": "Ratio recovery needed",
+        "summary": "Connor Hellebuyck made 57 appearances in 2025-26, with a .895 save percentage and a 2.86 goals-against average. His record was 23-23.",
+        "analysis": "At .895, adding starts can hurt save-percentage results even when it adds counting stats. A confirmed start is a decision to weigh against the roster's ratio position, not an automatic play. The 2025-26 rates are a historical baseline. Recorded appearances do not establish his current share of starts.",
+        "tags": [
+          {
+            "label": "2025-26 actuals",
+            "tone": "neutral"
+          }
+        ],
+        "hasEnoughData": true,
+        "cardNote": "2025-26 · .895 SV%",
+        "cardTone": "caution",
+        "editorialVersion": "2026-09-12.1",
+        "sourceContext": {
+          "actualsSeason": 2025,
+          "projectionSeason": 2026,
+          "indexAsOf": null
+        },
+        "newsSources": []
+      }
+    }
+  ],
+  "counterfactual": {
+    "plain": {
+      "headline": "Power-play exposure",
+      "summary": "Sample Forward drew 44% of his points from the power play in 2025-26. Sample Forward recorded 80 points (30 goals, 50 assists) in 80 games in 2025-26.",
+      "analysis": "That scoring mix makes special-teams opportunity consequential: losing power-play time would remove one of the established scoring routes. The point share does not identify his unit or guarantee the next assignment. The 2025-26 rates are a historical baseline.",
+      "tags": [
+        {
+          "label": "2025-26 actuals",
+          "tone": "neutral"
+        },
+        {
+          "label": "PP-dependent",
+          "tone": "caution"
+        }
+      ],
+      "hasEnoughData": true,
+      "cardNote": "2025-26 · 1 P/GP",
+      "cardTone": "positive",
+      "editorialVersion": "2026-09-12.1",
+      "sourceContext": {
+        "actualsSeason": 2025,
+        "projectionSeason": 2026,
+        "indexAsOf": null
+      },
+      "newsSources": []
+    },
+    "withNews": {
+      "headline": "Power-play exposure",
+      "summary": "example.com (2026-09-11): Sample Forward was reported working with the first power-play unit. Sample Forward drew 44% of his points from the power play in 2025-26. Sample Forward recorded 80 points (30 goals, 50 assists) in 80 games in 2025-26.",
+      "analysis": "Citrus read: that assignment creates a path to more power-play scoring if it carries into games. Track whether he keeps the unit; practice deployment alone does not justify raising the projection. That scoring mix makes special-teams opportunity consequential: losing power-play time would remove one of the established scoring routes. The point share does not identify his unit or guarantee the next assignment. The 2025-26 rates are a historical baseline.",
+      "tags": [
+        {
+          "label": "2025-26 actuals",
+          "tone": "neutral"
+        },
+        {
+          "label": "PP-dependent",
+          "tone": "caution"
+        }
+      ],
+      "hasEnoughData": true,
+      "cardNote": "2025-26 · 1 P/GP",
+      "cardTone": "positive",
+      "editorialVersion": "2026-09-12.1",
+      "sourceContext": {
+        "actualsSeason": 2025,
+        "projectionSeason": 2026,
+        "indexAsOf": null
+      },
+      "newsSources": [
+        {
+          "kind": "power-play",
+          "report": "was reported working with the first power-play unit",
+          "implication": "Citrus read: that assignment creates a path to more power-play scoring if it carries into games. Track whether he keeps the unit; practice deployment alone does not justify raising the projection.",
+          "source": "example.com",
+          "url": "https://example.com/hockey/practice",
+          "publishedAt": "2026-09-11T18:00:00.000Z"
+        }
+      ]
+    }
+  }
+}

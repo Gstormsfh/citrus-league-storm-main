@@ -46,7 +46,8 @@ describe('source-season context in generated writeups', () => {
     expect(result.summary).toContain('His record was 30-15');
     expect(result.analysis).toContain('do not establish his current share of starts');
     expect(result.analysis).not.toMatch(/job looks secure|confirm he's carrying/);
-    expect(result.headline).toBe('2025-26 goaltending');
+    expect(result.headline).toBe('Save-rate strength');
+    expect(result.tags).toContainEqual({ label: '2025-26 actuals', tone: 'neutral' });
   });
 
   it('a zero-game historical source does not imply no games played this season', () => {
