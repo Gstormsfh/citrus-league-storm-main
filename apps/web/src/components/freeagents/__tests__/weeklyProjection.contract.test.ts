@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { summarizeWeeklyProjection } from '../weeklyProjection';
 import finalsz from '../../../../../../packages/shared/src/leagueProjection/__tests__/fixtures/finalsz-scoring.json';
+import { DEFAULT_SCORING } from '@/utils/scoringUtils';
 
 const league = {
   goalie: { wins: 4, saves: 0.2, goals_against: -1, shutouts: 3 },
@@ -155,8 +156,8 @@ describe('free-agent weekly goalie contract', () => {
     const row = { projected_goals: 1, projected_assists: 1, projected_sog: 2,
       projected_blocks: 1, projected_hits: 1, projected_pim: 0,
       projected_ppp: 0, projected_shp: 0, projected_plus_minus: -2 };
-    const testNight = { skater: { goals: 6, assists: 4, shots_on_goal: 0.9, blocks: 1 },
-      goalie: { wins: 5, saves: 0.6, shutouts: 5, goals_against: -3 } };
+    // Test night9th's saved weights match the shared default scoring set.
+    const testNight = DEFAULT_SCORING;
     expect(summarizeWeeklyProjection([row], finalsz, false)?.points).toBeCloseTo(5.5);
     expect(summarizeWeeklyProjection([{ ...row, projected_plus_minus: 0 }], finalsz, false)?.points).toBeCloseTo(6.5);
     expect(summarizeWeeklyProjection([{ ...row, projected_plus_minus: null }], finalsz, false)).toBeNull();

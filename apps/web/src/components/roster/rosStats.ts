@@ -50,5 +50,5 @@ export function indexRosterRosStats(rows: readonly Record<string, unknown>[]): M
 
 /** Round only for display; unknown forecast values are not zero forecasts. */
 export function formatRosCount(value: number | undefined): string {
-  return value === undefined ? '—' : Math.round(value).toString();
+  return value === undefined ? '–' : Math.round(value).toString();
 }

@@ -21,10 +21,10 @@ describe('canonical roster ROS display', () => {
 
   it('renders absent rows/categories as unavailable but preserves genuine zero', () => {
     const { rerender } = render(<HockeyPlayerCard player={player()} />);
-    expect(cells()).toEqual(['GP—', 'G—', 'A—', 'SOG—']);
+    expect(cells()).toEqual(['GP–', 'G–', 'A–', 'SOG–']);
     rerender(<HockeyPlayerCard player={player({ rosStats: rosterRosStats({ games_remaining: 0,
       projected_goals: 0, projected_assists: null, projected_sog: '' }) })} />);
-    expect(cells()).toEqual(['GP0', 'G0', 'A—', 'SOG—']);
+    expect(cells()).toEqual(['GP0', 'G0', 'A–', 'SOG–']);
   });
 
   it('uses supported goalie totals without deriving GAA or weighting crease exposure twice', () => {
@@ -39,7 +39,7 @@ describe('canonical roster ROS display', () => {
   it('does not substitute selected-day actuals into a ROS view', () => {
     render(<HockeyPlayerCard player={player({ nextGame: { isToday: true, gameStatus: 'final' },
       daily_actual_stats: { goals: 9, assists: 8 }, rosStats: rosterRosStats({ projected_goals: 20 }) })} />);
-    expect(cells()).toEqual(['GP—', 'G20', 'A—', 'SOG—']);
+    expect(cells()).toEqual(['GP–', 'G20', 'A–', 'SOG–']);
   });
 
   it('keeps signed/zero/missing categories and total assists/PPP without inventing splits', () => {
