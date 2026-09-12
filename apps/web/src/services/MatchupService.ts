@@ -736,6 +736,31 @@ export const MatchupService = {
         return { data: null, error: new Error(`Week ${weekNumber} has no matchup yet.`) };
       }
 
+      // Week navigation needs no roster, scoring or daily-score response.
+      // Start these caller-scoped reads now, but consume their outcome at the
+      // original response boundary so an earlier roster failure still wins.
+      const navigationOutcome = (async () => {
+        const availableWeeks = getAvailableWeeks(firstWeekStart);
+        const currentWeekIndex = availableWeeks.indexOf(weekNumber);
+        const previousWeek = currentWeekIndex > 0 ? availableWeeks[currentWeekIndex - 1] : null;
+        const nextWeek = currentWeekIndex < availableWeeks.length - 1 ? availableWeeks[currentWeekIndex + 1] : null;
+
+        // Get previous/next matchup IDs
+        let previousMatchupId: string | null = null;
+        let nextMatchupId: string | null = null;
+
+        const [prevResult, nextResult] = await Promise.all([
+          previousWeek ? this.getUserMatchup(leagueId, userId, previousWeek) : Promise.resolve(null),
+          nextWeek ? this.getUserMatchup(leagueId, userId, nextWeek) : Promise.resolve(null),
+        ]);
+        previousMatchupId = prevResult?.matchup?.id || null;
+        nextMatchupId = nextResult?.matchup?.id || null;
+        return { previousWeek, nextWeek, previousMatchupId, nextMatchupId };
+      })().then(
+        (value) => ({ ok: true as const, value }),
+        (error: unknown) => ({ ok: false as const, error }),
+      );
+
       // Determine which team the user is (team1 or team2)
       const isTeam1 = matchup.team1_id === userTeamData.id;
       const opponentTeamId = isTeam1 ? matchup.team2_id : matchup.team1_id;
@@ -896,26 +921,9 @@ export const MatchupService = {
         opponentDailyPoints = Array(7).fill(0);
       }
 
-      // Calculate navigation metadata
-      const availableWeeks = getAvailableWeeks(firstWeekStart);
-      const currentWeekIndex = availableWeeks.indexOf(weekNumber);
-      const previousWeek = currentWeekIndex > 0 ? availableWeeks[currentWeekIndex - 1] : null;
-      const nextWeek = currentWeekIndex < availableWeeks.length - 1 ? availableWeeks[currentWeekIndex + 1] : null;
-
-      // Get previous/next matchup IDs
-      let previousMatchupId: string | null = null;
-      let nextMatchupId: string | null = null;
-
-      // These two only feed the previous/next arrows in the week switcher.
-      // They were awaited one after the other on the critical path — two round
-      // trips, ~700ms on the latency this page sees, to decide whether an arrow
-      // is enabled. At minimum they run together.
-      const [prevResult, nextResult] = await Promise.all([
-        previousWeek ? this.getUserMatchup(leagueId, userId, previousWeek) : Promise.resolve(null),
-        nextWeek ? this.getUserMatchup(leagueId, userId, nextWeek) : Promise.resolve(null),
-      ]);
-      previousMatchupId = prevResult?.matchup?.id || null;
-      nextMatchupId = nextResult?.matchup?.id || null;
+      const navigation = await navigationOutcome;
+      if (navigation.ok === false) throw navigation.error;
+      const { previousWeek, nextWeek, previousMatchupId, nextMatchupId } = navigation.value;
 
       // Build response
       const response: MatchupDataResponse = {
