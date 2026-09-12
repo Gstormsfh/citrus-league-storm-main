@@ -8,6 +8,7 @@ import { CitrusPuckPlayerData, AggregatedPlayerData } from "@/types/citruspuck";
 import { playerPositionsLabel } from "./positions";
 
 export interface HockeyPlayer {
+  statsSeason?: number | null;
   id: number | string;
   name: string;
   position: string; // 'Centre', 'Right Wing', 'Left Wing', 'Defence', 'Goalie', 'C', 'RW', 'LW', 'D', 'G'

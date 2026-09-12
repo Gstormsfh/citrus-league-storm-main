@@ -6,20 +6,23 @@ import type { Player } from '@/services/PlayerService';
 import { draftPoolSeasonLine, positionRanks } from '../draftPoolLine';
 
 const skater = (over: Partial<Player>): Player =>
-  ({ id: '1', full_name: 'A', position: 'D', team: 'COL', games_played: 80, points: 90, icetime_seconds: 80 * 1570, ...over }) as unknown as Player;
+  ({ id: '1', stats_season: 2025, full_name: 'A', position: 'D', team: 'COL', games_played: 80, points: 90, icetime_seconds: 80 * 1570, ...over }) as unknown as Player;
 
 describe('draftPoolSeasonLine', () => {
   it('a skater: points and TOI per game', () => {
-    expect(draftPoolSeasonLine(skater({}))).toBe('90 PTS · 26:10');
+    expect(draftPoolSeasonLine(skater({}))).toBe('2025-26 actuals · 90 PTS · 26:10');
   });
   it('a goalie: wins and save percentage, the way the sport writes it', () => {
-    expect(draftPoolSeasonLine(skater({ position: 'G', wins: 36, save_percentage: 0.917 }))).toBe('36 W · .917');
+    expect(draftPoolSeasonLine(skater({ position: 'G', wins: 36, save_percentage: 0.917 }))).toBe('2025-26 actuals · 36 W · .917');
   });
   it('no season behind him: nothing', () => {
     expect(draftPoolSeasonLine(skater({ games_played: 0 }))).toBeNull();
   });
   it('points alone when there is no ice time', () => {
-    expect(draftPoolSeasonLine(skater({ icetime_seconds: 0 }))).toBe('90 PTS');
+    expect(draftPoolSeasonLine(skater({ icetime_seconds: 0 }))).toBe('2025-26 actuals · 90 PTS');
+  });
+  it('does not infer a season for an older cached response', () => {
+    expect(draftPoolSeasonLine(skater({ stats_season: undefined }))).toBe('Actuals (season unavailable) · 90 PTS · 26:10');
   });
 });
 

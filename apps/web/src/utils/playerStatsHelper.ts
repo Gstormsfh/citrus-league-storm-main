@@ -47,6 +47,7 @@ export function servicePlayerToHockeyPlayer(player: Player): HockeyPlayer {
 
     const hockeyPlayer: HockeyPlayer = {
       id: player.id,
+      statsSeason: player.stats_season ?? null,
       name: player.full_name,
       position: player.position,
       number: parseInt(player.jersey_number || '0'),
@@ -125,4 +126,3 @@ export async function getPlayerWithSeasonStats(
     return null;
   }
 }
-

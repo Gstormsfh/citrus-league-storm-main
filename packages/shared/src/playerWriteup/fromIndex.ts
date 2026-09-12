@@ -105,6 +105,7 @@ export function writeupPlayerFromIndex(entry: DashboardIndexEntry): WriteupPlaye
     id: entry.id,
     name: entry.name,
     position: entry.position,
+    ...(entry.actuals_season != null ? { statsSeason: entry.actuals_season } : {}),
     status: rosterStatus === 'IR' || rosterStatus === 'LTIR' ? 'IR' : null,
     stats: {
       gamesPlayed: entry.gp,
@@ -206,17 +207,17 @@ export function positionRank(
  * after. The same two phrasings `projectionFraming` gives the card, so the
  * sentence under the bar matches the bar.
  */
-export function projectionLabelFor(now: Date): string {
-  const season = getProjectionsSeason(now);
+export function projectionLabelFor(now: Date, season = getProjectionsSeason(now)): string {
   const start = getSeasonStartDate(season);
   const beforeOpener = start ? now < new Date(`${start}T00:00:00`) : false;
-  return beforeOpener ? `for ${seasonLabel(season)}` : 'the rest of the way';
+  return beforeOpener ? `for ${seasonLabel(season)}` : `for the rest of ${seasonLabel(season)}`;
 }
 
 /** Assemble the extras the engine hangs its extra sentences on. */
 export function writeupExtrasFromSources(src: WriteupSources): WriteupExtras {
   const now = src.now ?? new Date();
   const scoring = src.scoring ?? null;
+  const projectionSeason = src.entry.projection_season ?? getProjectionsSeason(now);
 
   const goalsBySeason = (src.xgSeasons ?? [])
     .filter((p) => p.game_type === 'regular' && Number.isFinite(p.goals))
@@ -235,13 +236,14 @@ export function writeupExtrasFromSources(src: WriteupSources): WriteupExtras {
   }
 
   return {
+    ...(src.entry.actuals_season != null || src.entry.projection_season != null ? { projectionSeason } : {}),
     age: src.birthdate ? ageOn(src.birthdate, now) : null,
     goalsBySeason,
     ...cohortReads(src.entry, src.index),
     projFp,
     projGp,
     posRank: projFp == null ? null : positionRank(src.entry, src.index, scoring),
-    projectionLabel: projectionLabelFor(now),
+    projectionLabel: projectionLabelFor(now, projectionSeason),
     career: src.career ?? null,
   };
 }

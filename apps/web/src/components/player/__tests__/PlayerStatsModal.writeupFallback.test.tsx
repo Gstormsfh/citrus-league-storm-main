@@ -90,6 +90,7 @@ const PLAYER_ID = '8478402';
 function openCard() {
   const player = {
     id: PLAYER_ID,
+    statsSeason: 2024,
     name: 'Connor McTest',
     position: 'C',
     team: 'Edmonton Oilers',
@@ -119,7 +120,7 @@ const SERVER_WRITEUP = {
  * carries the split, which is the part no server fixture in this file
  * says.
  */
-const LOCAL_SUMMARY = /44 goals and 89 assists/;
+const LOCAL_SUMMARY = /recorded 133 points \(44 goals, 89 assists\).*2024-25/;
 
 function xgHistory(extra: Record<string, unknown> = {}) {
   return { data: { player_id: Number(PLAYER_ID), points: [], as_of: null, ...extra } };
@@ -151,6 +152,7 @@ describe('the player card falls back to the in-bundle writeup', () => {
     openCard();
 
     expect(await screen.findByText(LOCAL_SUMMARY)).toBeTruthy();
+    expect(screen.getByTestId('overview-season-label').textContent).toBe('2024-25 actuals');
     expect(screen.queryByText('Server-rendered headline')).toBeNull();
   });
 

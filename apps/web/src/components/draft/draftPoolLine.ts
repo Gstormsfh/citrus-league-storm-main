@@ -10,6 +10,7 @@
  * exists; a gap-based one would be an invented number).
  */
 import type { Player } from '@/services/PlayerService';
+import { actualsSeasonLabel } from '@citrus/shared';
 import { positionChipKey } from '@/components/roster/positionChip';
 
 const toi = (seconds: number, games: number): string | null => {
@@ -30,13 +31,13 @@ export function draftPoolSeasonLine(p: Player): string | null {
     if (typeof p.save_percentage === 'number' && p.save_percentage > 0) {
       parts.push(p.save_percentage < 1 ? p.save_percentage.toFixed(3).replace(/^0/, '') : `${p.save_percentage.toFixed(1)}%`);
     }
-    return parts.length ? parts.join(' · ') : null;
+    return parts.length ? `${actualsSeasonLabel(p.stats_season)} · ${parts.join(' · ')}` : null;
   }
   const parts: string[] = [];
   if (typeof p.points === 'number') parts.push(`${p.points} PTS`);
   const t = toi(Number(p.icetime_seconds ?? 0), gp);
   if (t) parts.push(t);
-  return parts.length ? parts.join(' · ') : null;
+  return parts.length ? `${actualsSeasonLabel(p.stats_season)} · ${parts.join(' · ')}` : null;
 }
 
 /**

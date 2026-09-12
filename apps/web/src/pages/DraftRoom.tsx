@@ -3577,6 +3577,7 @@ const DraftRoomInner = () => {
       // Convert to HockeyPlayer format
       // Uses the same stat mapping as Matchup tab to ensure consistency
       const hockeyPlayer: HockeyPlayer = {
+        statsSeason: player.stats_season ?? null,
         id: player.id,
         name: player.full_name,
         position: player.position,

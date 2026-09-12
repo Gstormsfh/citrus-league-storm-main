@@ -160,12 +160,12 @@ export function nextGameLine(
  * Ties break on name so the list is stable between renders — an unstable
  * order under a live projection refresh looks like the page is glitching.
  */
-export function sortByProjection<T extends { full_name: string; weeklyProjection?: number }>(
+export function sortByProjection<T extends { full_name: string; weeklyProjection?: number | null }>(
   rows: readonly T[],
 ): T[] {
   return [...rows].sort((a, b) => {
-    const d = (b.weeklyProjection ?? 0) - (a.weeklyProjection ?? 0);
-    return d !== 0 ? d : a.full_name.localeCompare(b.full_name);
+    const d = (b.weeklyProjection ?? Number.NEGATIVE_INFINITY) - (a.weeklyProjection ?? Number.NEGATIVE_INFINITY);
+    return Number.isNaN(d) || d === 0 ? a.full_name.localeCompare(b.full_name) : d;
   });
 }
 

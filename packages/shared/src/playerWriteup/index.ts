@@ -72,6 +72,8 @@
  * our own model's output, which is why every sentence that quotes it names
  * Citrus as the source.
  */
+import { getProjectionsSeason } from '../constants/season';
+
 export interface WriteupPlayerStats {
   // Skater
   goals?: number;
@@ -102,6 +104,8 @@ export interface WriteupPlayer {
   /** 'Centre', 'Right Wing', 'Defence', 'Goalie', 'C', 'RW', 'D', 'G', ... */
   position: string;
   stats?: WriteupPlayerStats;
+  /** Start year of the season that supplied stats; never the projection year by inference. */
+  statsSeason?: number | null;
   status?: 'IR' | 'SUSP' | 'GTD' | 'WVR' | null;
 }
 
@@ -640,6 +644,8 @@ function buildSkaterWriteup(player: WriteupPlayer): PlayerWriteup {
  * from a table; nothing is a claim about the league we cannot back.
  */
 export interface WriteupExtras {
+  /** Start year of the forecast being discussed, separate from historical actuals. */
+  projectionSeason?: number | null;
   /** From player_directory.birthdate. */
   age?: number | null;
   /** Regular-season goals per season on record, oldest first. From player_xg_season. */
@@ -730,6 +736,64 @@ function seasonWord(season: number): string {
   return `${season}-${String((season + 1) % 100).padStart(2, '0')}`;
 }
 
+function historicalStatsSeason(player: WriteupPlayer, extras?: WriteupExtras): number | null {
+  const season = player.statsSeason;
+  const projectionSeason = extras?.projectionSeason ?? getProjectionsSeason();
+  return Number.isInteger(season) && (season as number) >= 1900 && (season as number) < projectionSeason
+    ? season as number : null;
+}
+
+/** Generate dated actuals from fields, not by rewriting arbitrary stored prose. */
+function historicalWriteup(player: WriteupPlayer, base: PlayerWriteup, season: number | null): PlayerWriteup {
+  const s = player.stats ?? {};
+  const gp = s.gamesPlayed ?? 0;
+  const period = season === null ? 'the available stat record' : seasonWord(season);
+  const shortPeriod = season === null ? 'Recorded stats' : period;
+  const goalie = isGoalie(player.position);
+  const summary: string[] = [];
+  let rate = '';
+  if (gp === 0) {
+    summary.push(`${fullName(player)} had no NHL appearances recorded in ${period}.`);
+  } else if (goalie) {
+    const savePct = normalizeSavePct(s.savePct);
+    summary.push(`${fullName(player)} made ${gp} appearance${gp === 1 ? '' : 's'} in ${period}.`);
+    if (savePct !== null) {
+      const gaa = Number.isFinite(s.gaa) ? ` and a ${fmt(s.gaa as number, 2)} goals-against average` : '';
+      summary.push(`He finished with a ${fmtSavePct(savePct)} save percentage${gaa}.`);
+      rate = `${fmtSavePct(savePct)} SV%`;
+    }
+    if (s.wins != null && s.losses != null) summary.push(`His record was ${s.wins}-${s.losses}${s.shutouts ? ` with ${s.shutouts} shutouts` : ''}.`);
+    if (Number.isFinite(s.goalsSavedAboveExpected) && Math.abs(s.goalsSavedAboveExpected as number) >= 1) {
+      const gsax = s.goalsSavedAboveExpected as number;
+      summary.push(`Citrus GSAx credited him with ${fmt(Math.abs(gsax))} goals ${gsax >= 0 ? 'saved above' : 'allowed beyond'} expected.`);
+    }
+  } else {
+    const goals = s.goals ?? 0, assists = s.assists ?? 0;
+    const points = s.points ?? goals + assists;
+    summary.push(`${fullName(player)} recorded ${points} points (${goals} goals, ${assists} assists) in ${gp} games in ${period}.`);
+    rate = `${fmt(points / gp, 2)} P/GP`;
+    if (base.hasEnoughData) summary.push(`He averaged ${fmt(points / gp, 2)} points per game.`);
+    const toi = parseToiToMinutes(s.toi);
+    if (toi !== null && toi > 0) summary.push(`He played ${fmt(toi)} minutes per game.`);
+    const categories = [s.shots != null ? `${s.shots} shots` : null, s.powerPlayPoints != null ? `${s.powerPlayPoints} power-play points` : null,
+      s.hits != null ? `${s.hits} hits` : null, s.blockedShots != null ? `${s.blockedShots} blocks` : null].filter(Boolean);
+    if (categories.length) summary.push(`His totals included ${categories.join(', ')}.`);
+    if (Number.isFinite(s.xGoals) && (s.xGoals as number) > 0) summary.push(`He scored ${goals} goals against ${fmt(s.xGoals as number)} Citrus expected goals.`);
+  }
+  return {
+    ...base,
+    headline: `${shortPeriod}${season === null ? '' : ` ${goalie ? 'goaltending' : 'production'}`}`,
+    summary: summary.join(' '),
+    analysis: !base.hasEnoughData
+      ? `The ${season === null ? 'available' : period} sample was too small to establish a reliable NHL rate. Current role and availability need separate evidence.`
+      : goalie
+        ? `The ${season === null ? 'recorded' : period} results inform his outlook, but recorded appearances do not establish his current share of starts. Check the current crease allocation and confirmed starter before setting a lineup.`
+        : `The ${season === null ? 'recorded' : period} rates provide a historical baseline. Current line assignment, power-play role and availability determine how much of that production can carry forward.`,
+    cardNote: `${shortPeriod} · ${base.hasEnoughData && rate ? rate : `${gp} GP`}`,
+    tags: [{ label: season === null ? 'Season unspecified' : `${period} actuals`, tone: 'neutral' }],
+  };
+}
+
 function ordinalWord(n: number): string {
   const r = n % 100;
   if (r >= 11 && r <= 13) return `${n}th`;
@@ -786,7 +850,8 @@ export function applyWriteupExtras(writeup: PlayerWriteup, player: WriteupPlayer
     const bits: string[] = [];
     if (notable(extras.xgPercentile)) bits.push(`xG/60 in the ${ordinalWord(extras.xgPercentile as number)} percentile`);
     if (notable(extras.garPercentile)) bits.push(`GAR/60 in the ${ordinalWord(extras.garPercentile as number)}`);
-    analysis.push(`${bits.join(', ')} of ${noun}.`.replace(/^x/, 'X'));
+    const period = historicalStatsSeason(player, extras);
+    analysis.push(`${period === null ? '' : `In ${seasonWord(period)}, `}${bits.join(', ')} of ${noun}.`.replace(/^x/, 'X'));
     if ((extras.garPercentile ?? 0) >= 90) tags.push({ label: 'Elite GAR', tone: 'positive' });
   }
 
@@ -821,7 +886,10 @@ export function generatePlayerWriteup(player: WriteupPlayer | null | undefined, 
     };
   }
 
-  const base = isGoalie(player.position) ? buildGoalieWriteup(player) : buildSkaterWriteup(player);
+  const currentBase = isGoalie(player.position) ? buildGoalieWriteup(player) : buildSkaterWriteup(player);
+  const historicalSeason = historicalStatsSeason(player, extras);
+  const isCurrent = Number.isInteger(player.statsSeason) && player.statsSeason === (extras?.projectionSeason ?? getProjectionsSeason());
+  const base = isCurrent ? currentBase : historicalWriteup(player, currentBase, historicalSeason);
   const writeup = applyWriteupExtras(base, player, extras);
 
   // Injury status outranks anything the stat line says: a 1.2 PPG winger on IR

@@ -35,6 +35,10 @@ import type { PlayerWriteup } from '../playerWriteup';
  * same season.
  */
 export interface DashboardIndexEntry {
+  /** Season key of the actual-stat read. Null when this player has no stat row. */
+  actuals_season?: number | null;
+  /** Season key of the independently joined forecast. */
+  projection_season?: number | null;
   id: number;
   name: string;
   team: string;

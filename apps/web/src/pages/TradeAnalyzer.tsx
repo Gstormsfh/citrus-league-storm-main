@@ -445,6 +445,7 @@ const TradeAnalyzer = () => {
   const toHockeyPlayer = (p: Player): HockeyPlayer => ({
     id: p.id,
     name: p.full_name,
+          statsSeason: p.stats_season ?? null,
     position: p.position,
     number: parseInt(p.jersey_number || '0'),
     starter: false,

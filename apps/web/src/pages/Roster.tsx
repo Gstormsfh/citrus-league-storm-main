@@ -653,6 +653,7 @@ const Roster = () => {
         const transformedPlayers: HockeyPlayer[] = dbPlayers.map((p) => ({
           id: p.id,
           name: p.full_name,
+          statsSeason: p.stats_season ?? null,
           position: p.position,
           eligible_positions: p.eligible_positions || [p.position],
           number: parseInt(p.jersey_number || '0'),
@@ -1140,6 +1141,7 @@ const Roster = () => {
             const transformed = staticPlayers.map((p) => ({
               id: p.id,
               name: p.full_name,
+          statsSeason: p.stats_season ?? null,
               position: p.position,
               number: parseInt(p.jersey_number || '0'),
               starter: false,
@@ -4559,6 +4561,7 @@ const Roster = () => {
               const transformedPlayers: HockeyPlayer[] = dbPlayers.map((p) => ({
                 id: p.id,
                 name: p.full_name,
+          statsSeason: p.stats_season ?? null,
                 position: p.position,
                 number: parseInt(p.jersey_number || '0'),
                 starter: false,

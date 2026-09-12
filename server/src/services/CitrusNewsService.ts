@@ -205,7 +205,7 @@ const bounceBackDetector: Detector = {
         season,
         headline: `${person.full_name} generated ${fmt(xg)} goals' worth of chances and scored ${goals}`,
         body:
-          `${person.full_name} finished last season with ${goals} goals in ${row.games_played} games. ` +
+          `${person.full_name} finished ${seasonLabel(season)} with ${goals} goals in ${row.games_played} games. ` +
           `Citrus xG v3 had him at ${fmt(xg)} expected, a shortfall of ${fmt(shortfall)}. ` +
           `The chances were there. The finishing wasn't.`,
         analysis:
@@ -323,8 +323,8 @@ const usageSurgeDetector: Detector = {
         season,
         headline: `${person.full_name}'s ice time jumped ${fmt(delta)} minutes a night`,
         body:
-          `${person.full_name} averaged ${fmt(now)} minutes per game last season on the Citrus season ` +
-          `file, up from ${fmt(before)} the year before, a ${fmt(delta)}-minute jump across ${row.games_played} games.`,
+          `${person.full_name} averaged ${fmt(now)} minutes per game in ${seasonLabel(season)} on the Citrus season ` +
+          `file, up from ${fmt(before)} ${seasonLabel(season - 1)}, a ${fmt(delta)}-minute jump across ${row.games_played} games.`,
         analysis:
           `Ice time is the most stable input to fantasy production, and a jump this size is a coaching ` +
           `decision rather than a hot streak. Even if the point totals haven't caught up yet, the ` +
@@ -375,7 +375,7 @@ const goalieWorkloadDetector: Detector = {
         season,
         headline: `${person.full_name} carried a true starter's workload`,
         body:
-          `${person.full_name} appeared in ${row.goalie_gp} games last season with a ${savePctLabel} save ` +
+          `${person.full_name} appeared in ${row.goalie_gp} games in ${seasonLabel(season)} with a ${savePctLabel} save ` +
           `percentage${row.wins ? ` and ${row.wins} wins` : ''}` +
           `${row.shutouts ? `, including ${row.shutouts} shutout${row.shutouts === 1 ? '' : 's'}` : ''}.`,
         analysis:

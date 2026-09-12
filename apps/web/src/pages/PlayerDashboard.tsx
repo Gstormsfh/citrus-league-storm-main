@@ -1,3 +1,4 @@
+import { sourceSeasonLabel } from '@/utils/sourceSeasonContext';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Navbar from '@/components/Navbar';
@@ -929,7 +930,7 @@ export default function PlayerDashboard() {
             ignored. */}
         {xgRow && indexEntry && Math.abs((indexEntry.x_goals ?? 0) - xgRow.xg) >= 0.5 && (
           <p className="mt-3 max-w-[70ch] text-[11px] leading-snug text-white/70">
-            Expected goals here are summed over this season&apos;s scored shot events (
+            Expected goals here are summed over {sourceSeasonLabel(payload.season)} scored shot events (
             {xgRow.xg.toFixed(2)}). The card at the top of the page reads the season-stats rollup (
             {(indexEntry.x_goals ?? 0).toFixed(2)}): a separate pipeline over the same shots, so
             the two finishing figures do not match. Both are our model; neither is a measurement,
@@ -1011,7 +1012,7 @@ export default function PlayerDashboard() {
                 <p className="max-w-[24ch] text-[12px] leading-snug text-white/70">
                   {index.status === 'error'
                     ? 'The league payload is unavailable, so there is no cohort to rank against.'
-                    : 'No GAR components on record for this player this season.'}
+                    : `No GAR components on record for this player in ${sourceSeasonLabel(payload.season)}.`}
                 </p>
               </div>
             )}

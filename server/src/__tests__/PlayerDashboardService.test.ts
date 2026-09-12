@@ -14,6 +14,7 @@ import {
   SHOT_CAP,
 } from '../services/PlayerDashboardService';
 import { createChain, createMockSupabase } from './helpers';
+import { getMetricsSeason, getProjectionsSeason } from '@citrus/shared';
 
 const DIR = [
   {
@@ -178,6 +179,8 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     expect(am.name).toBe('Auston Matthews');
     expect(am.is_goalie).toBe(false);
     expect(am.gp).toBe(60); // skater gp = games_played
+    expect(am.actuals_season).toBe(getMetricsSeason());
+    expect(am.projection_season).toBe(getProjectionsSeason());
     expect(am.points).toBe(53);
     expect(am.gar_per_60).toBeCloseTo(0.497);
     expect(am.gar_ppo).toBeCloseTo(0.085);

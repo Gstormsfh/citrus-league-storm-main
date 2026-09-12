@@ -862,6 +862,8 @@ export class PlayerDashboardService {
       const isGoalie = d.position_code === 'G';
       return {
         id: d.player_id,
+        actuals_season: s ? season : null,
+        projection_season: r ? getProjectionsSeason() : null,
         name: d.full_name,
         team: d.team_abbrev,
         position: d.position_code,

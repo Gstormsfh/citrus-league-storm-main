@@ -1,3 +1,4 @@
+import { addGoalieExposure } from './goalieProjectionExposure';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { resolveSlotConfig } from '../lib/leagueRules';
 import {
@@ -1411,8 +1412,10 @@ export class MatchupService {
     });
 
     const projMap = new Map<number, Record<string, unknown>>();
-    for (const row of data || []) {
-      projMap.set(row.player_id, row);
+    // Add explicit exposure metadata; legacy conditional stats remain unchanged.
+    const rows = error ? [] : await addGoalieExposure(this.supabase, data || []);
+    for (const row of rows) {
+      projMap.set(Number(row.player_id), row);
     }
 
     return { projMap, error };

@@ -25,8 +25,9 @@ import { NewsItemRow } from '@/components/news/NewsItemRow';
 import { buildAdvancedCardData, type CardEntry } from '@/components/player/playerAdvancedMetrics';
 import { usePlayerXgHistory } from '@/components/player/usePlayerXgHistory';
 import { projectionFraming } from '@/components/player/projectionFraming';
-import { getMetricsSeason, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
+import { actualsSeasonLabel, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
+import { citrusNoteContext } from '@/utils/sourceSeasonContext';
 import { PlayerAdvancedCard } from '@/components/player/PlayerAdvancedCard';
 import {
   PressBoxPlayerCardHero,
@@ -741,6 +742,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
     const framing = projectionFraming();
     return {
       age: Number.isFinite(age as number) ? age : null,
+      projectionSeason: indexEntry?.projection_season ?? getProjectionsSeason(),
       goalsBySeason: [...goalsBySeason.entries()].sort((a, b) => a[0] - b[0]).map(([season, goals]) => ({ season, goals })),
       xgPercentile: pct('xg_per_60'),
       garPercentile: pct('gar_per_60'),
@@ -1035,9 +1037,9 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                   data-testid="overview-season-label"
                   className="font-plex font-medium text-[10px] uppercase tracking-[0.1em] text-pressbox-text/45"
                 >
-                  {seasonLabel(getMetricsSeason())} season
+                  {actualsSeasonLabel(player.statsSeason)}
                 </span>
-                {openerLabel && getProjectionsSeason() !== getMetricsSeason() && (
+                {openerLabel && getProjectionsSeason() !== player.statsSeason && (
                   <span className="font-plex font-medium text-[10px] text-pressbox-text/45">
                     {seasonLabel(getProjectionsSeason())} starts {openerLabel}
                   </span>
@@ -1136,7 +1138,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                 data-testid="advanced-season-label"
                 className="block font-plex font-medium text-[10px] uppercase tracking-[0.1em] text-pressbox-text/45 -mb-1"
               >
-                {seasonLabel(getMetricsSeason())} season
+                {actualsSeasonLabel(indexEntry?.actuals_season)}
               </span>
               {/* PWS-1 ADVANCED CARD (2026-09-02) — the highest-leverage
                   single integration of the player-dashboard design system,
@@ -1170,7 +1172,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
             {/* ─── Splits Tab: every season number the directory holds ─── */}
             <TabsContent value="splits" className="mt-0 space-y-4">
               <span className="block font-plex font-medium text-[10px] uppercase tracking-[0.1em] text-pressbox-text/45 -mb-1">
-                {seasonLabel(getMetricsSeason())} season
+                {actualsSeasonLabel(player.statsSeason)}
               </span>
               {isGoalie ? (
                 <>
@@ -1294,6 +1296,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                             <div className="font-barlow font-bold text-[14px] text-pressbox-text leading-snug">
                               {note.headline}
                             </div>
+                            <p className="mt-1 font-barlow text-[11px] text-pressbox-text/50">{citrusNoteContext(note)}</p>
                             <p className="mt-1 font-barlow text-[13px] leading-[1.45] text-pressbox-text/70">{note.body}</p>
                             {note.analysis && (
                               <p className="mt-1.5 font-barlow text-[13px] leading-[1.45] text-pressbox-text/70">

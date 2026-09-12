@@ -810,6 +810,7 @@ export const PlayerPool = memo(({
 
   return (
     <>
+    <p className="px-2 text-xs text-pastel-cream/70" data-testid="draft-actuals-season">{actualsCohortLabel(availablePlayers.map(p => p.stats_season))}. Projected points are labeled separately.</p>
     {phonePool}
     <Card className="hidden md:block p-2 sm:p-4 border-white/10 bg-pastel-surface-tile">
       <div className="flex items-center justify-between mb-3 px-1">
@@ -1292,3 +1293,4 @@ export const PlayerPool = memo(({
 });
 
 PlayerPool.displayName = 'PlayerPool';
+import { actualsCohortLabel } from '@citrus/shared';

@@ -17,11 +17,13 @@ import {
 } from '../playerWriteup';
 import type { PlayerWriteup } from '../playerWriteup';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
+import { getProjectionsSeason } from '@citrus/shared/constants';
 import aiVoice from '@citrus/shared/constants/aiVoice.json';
 
 const skater = (overrides: Partial<HockeyPlayer> = {}, stats: Record<string, unknown> = {}): HockeyPlayer =>
   ({
     id: 1,
+    statsSeason: getProjectionsSeason(),
     name: 'Connor McTest',
     position: 'C',
     number: 97,
@@ -166,7 +168,7 @@ describe('generatePlayerWriteup — skater banding uses rates, not totals', () =
 describe('generatePlayerWriteup — goalies', () => {
   const goalie = (stats: Record<string, unknown>): HockeyPlayer =>
     ({
-      id: 30, name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
+      id: 30, statsSeason: getProjectionsSeason(), name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
       stats: { gamesPlayed: 50, savePct: 0.925, gaa: 2.35, wins: 30, losses: 15, shutouts: 4, ...stats },
     }) as HockeyPlayer;
 
@@ -238,7 +240,7 @@ describe('cardNote — the one-liner roster cards render', () => {
 
   it('uses save percentage for goalies, in hockey notation', () => {
     const w = generatePlayerWriteup({
-      id: 30, name: 'Test Goalie', position: 'G', number: 1, starter: true, team: 'X',
+      id: 30, statsSeason: getProjectionsSeason(), name: 'Test Goalie', position: 'G', number: 1, starter: true, team: 'X',
       stats: { gamesPlayed: 50, savePct: 0.925, gaa: 2.35, wins: 30, losses: 15 },
     } as HockeyPlayer);
     expect(w.cardNote).toBe('Starting-calibre goalie · .925 SV%');
@@ -325,13 +327,13 @@ describe('analysis paragraph — the "what should I do" half', () => {
 
   it('gives goalies a workload verdict, not just a save-rate restatement', () => {
     const starter = generatePlayerWriteup({
-      id: 30, name: 'Test Goalie', position: 'G', number: 1, starter: true, team: 'X',
+      id: 30, statsSeason: getProjectionsSeason(), name: 'Test Goalie', position: 'G', number: 1, starter: true, team: 'X',
       stats: { gamesPlayed: 55, savePct: 0.925, gaa: 2.3, wins: 33, losses: 15 },
     } as HockeyPlayer);
     expect(starter.analysis).toMatch(/workload/i);
 
     const backup = generatePlayerWriteup({
-      id: 31, name: 'Backup Guy', position: 'G', number: 2, starter: false, team: 'X',
+      id: 31, statsSeason: getProjectionsSeason(), name: 'Backup Guy', position: 'G', number: 2, starter: false, team: 'X',
       stats: { gamesPlayed: 14, savePct: 0.915, gaa: 2.6, wins: 6, losses: 6 },
     } as HockeyPlayer);
     expect(backup.analysis).toMatch(/14 appearances/);
@@ -390,7 +392,7 @@ const QUOTES_EXPECTED_GOALS = /\bexpected\b|\bxG\b|\bGSAx\b/;
 
 const testGoalie = (stats: Record<string, unknown> = {}, overrides: Partial<HockeyPlayer> = {}): HockeyPlayer =>
   ({
-    id: 30, name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
+    id: 30, statsSeason: getProjectionsSeason(), name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
     stats: { gamesPlayed: 50, savePct: 0.925, gaa: 2.35, wins: 30, losses: 15, shutouts: 4, ...stats },
     ...overrides,
   }) as HockeyPlayer;
@@ -537,7 +539,7 @@ describe('player writeups: voice conformance', () => {
 describe('the voice (2026-09-05)', () => {
   const goalie = (overrides: Partial<HockeyPlayer> = {}): HockeyPlayer =>
     ({
-      id: 30, name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
+      id: 30, statsSeason: getProjectionsSeason(), name: 'Stuart Skinnertest', position: 'G', number: 74, starter: true, team: 'Edmonton Oilers',
       stats: { gamesPlayed: 50, savePct: 0.925, gaa: 2.35, wins: 30, losses: 15, shutouts: 4 },
       ...overrides,
     }) as HockeyPlayer;

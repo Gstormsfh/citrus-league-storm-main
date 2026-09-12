@@ -51,7 +51,7 @@ export interface FreeAgentRowProps {
    * `ScoringCalculator`/projection path; the row does not score anything
    * itself, because a second scoring path is a second set of numbers.
    */
-  projection: number;
+  projection: number | null;
   /** This player's team's games for the week, as the page already fetched them. */
   games?: readonly NHLGame[];
   /** Today in MST ("YYYY-MM-DD") — the page's `getTodayMST()`. */
@@ -215,7 +215,7 @@ export function FreeAgentRow({
       {/* The number the decision turns on. */}
       <div className="flex flex-col items-end shrink-0 text-right">
         <span className={FA_PROJ} data-testid="fa-projection">
-          {projection.toFixed(1)}
+          {projection == null ? '–' : projection.toFixed(1)}
         </span>
         {rosteredPct != null ? (
           <span className={FA_SUB} data-testid="fa-sub">

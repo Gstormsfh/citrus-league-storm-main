@@ -62,6 +62,8 @@ const NOW = new Date('2026-09-11T12:00:00-06:00');
 
 const ROW: DashboardIndexEntry = {
   id: 0,
+  actuals_season: 2026,
+  projection_season: 2026,
   name: '',
   team: 'EDM',
   position: 'C',
@@ -354,6 +356,7 @@ const fixtures: Fixture[] = [
       now: NOW,
     },
     player: {
+      statsSeason: 2026,
       id: 8478402,
       name: 'Connor McTest',
       position: 'C',
@@ -379,6 +382,7 @@ const fixtures: Fixture[] = [
       },
     },
     extras: {
+      projectionSeason: 2026,
       age: 29,
       goalsBySeason: [
         { season: 2021, goals: 44 },
@@ -408,6 +412,7 @@ const fixtures: Fixture[] = [
       now: NOW,
     },
     player: {
+      statsSeason: 2026,
       id: 8479361,
       name: 'Ilya Testov',
       position: 'G',
@@ -433,6 +438,7 @@ const fixtures: Fixture[] = [
       },
     },
     extras: {
+      projectionSeason: 2026,
       age: 28,
       goalsBySeason: [],
       // No xG/60 and no GAR row exists for a goalie anywhere in this
@@ -462,6 +468,7 @@ const fixtures: Fixture[] = [
       now: NOW,
     },
     player: {
+      statsSeason: 2026,
       id: 8484000,
       name: 'Rook Ledger',
       position: 'LW',
@@ -487,6 +494,7 @@ const fixtures: Fixture[] = [
       },
     },
     extras: {
+      projectionSeason: 2026,
       age: 21,
       goalsBySeason: [],
       // Four of the 23 qualified forwards sit at or below his 0.62 xG/60
@@ -518,6 +526,7 @@ const fixtures: Fixture[] = [
       now: NOW,
     },
     player: {
+      statsSeason: 2026,
       id: 8477500,
       name: 'Sidney Bench',
       position: 'C',
@@ -543,6 +552,7 @@ const fixtures: Fixture[] = [
       },
     },
     extras: {
+      projectionSeason: 2026,
       age: 29,
       goalsBySeason: [
         { season: 2021, goals: 44 },
@@ -572,6 +582,7 @@ const fixtures: Fixture[] = [
       now: NOW,
     },
     player: {
+      statsSeason: 2026,
       id: 8490000,
       name: 'Callup Kidd',
       position: 'RW',
@@ -597,6 +608,7 @@ const fixtures: Fixture[] = [
       },
     },
     extras: {
+      projectionSeason: 2026,
       age: 22,
       goalsBySeason: [],
       // Three games is below `DISTRIBUTION_MIN_GP`, so he is PLACED against
