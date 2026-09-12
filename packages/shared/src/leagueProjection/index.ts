@@ -262,6 +262,7 @@ export function projectionFor(
     projected_ppp: entry.proj_ppp, projected_shp: entry.proj_shp,
     projected_sog: entry.proj_sog, projected_blocks: entry.proj_blocks,
     projected_hits: entry.proj_hits, projected_pim: entry.proj_pim,
+    projected_plus_minus: entry.proj_plus_minus,
     projected_wins: entry.proj_wins, projected_saves: entry.proj_saves,
     projected_shutouts: entry.proj_shutouts,
     projected_goals_against: entry.proj_goals_against ?? projectedGoalsAgainst(entry.proj_saves, entry.save_pct),
@@ -300,7 +301,7 @@ export function expectedDailyProjection(
     multiplier = basis === 'conditional_on_start' ? exposure : 1;
   }
   const result: Record<string, unknown> = { ...row, is_goalie: isGoalie };
-  for (const key of ['projected_goals', 'projected_assists', 'projected_sog', 'projected_blocks', 'projected_hits', 'projected_pim', 'projected_ppp', 'projected_shp', 'projected_wins', 'projected_saves', 'projected_shutouts', 'projected_goals_against']) {
+  for (const key of ['projected_goals', 'projected_assists', 'projected_sog', 'projected_blocks', 'projected_hits', 'projected_pim', 'projected_plus_minus', 'projected_ppp', 'projected_shp', 'projected_wins', 'projected_saves', 'projected_shutouts', 'projected_goals_against']) {
     if (row[key] != null) result[key] = Number(row[key]) * multiplier;
   }
   // Conditional/default-scoring intervals are not expected custom-league

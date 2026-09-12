@@ -999,6 +999,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                 real name and shows a dash rather than a number it does not
                 have. */}
             {(cardTab === 'summary' || cardTab === 'log') && <PressBoxStatTiles className="mb-3" tiles={cardTiles} />}
+            {(cardTab === 'summary' || cardTab === 'log') && scoringReady && pointsFormat && !isGoalie && playerRos && !seasonProjection && hasUnprojectedPlusMinus(leagueScoring) && playerRos.projected_plus_minus == null && <p className="mb-3 text-xs text-pressbox-text/60">Projection unavailable: this league scores plus/minus, but that forecast is missing.</p>}
             {(cardTab === 'summary' || cardTab === 'log') && scoringReady && !pointsFormat && <p className="mb-3 text-xs text-pressbox-text/60">Category scoring: compare individual projected stats in Game log.</p>}
             {showProjectionBreakdown && hasProjection && (
               <section className="mt-2 rounded-xl border border-white/10 bg-pressbox-tile p-3 text-pressbox-text" aria-label="Projection breakdown">
@@ -1006,7 +1007,6 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                 {!scoringReady ? <p className="text-sm mt-2">League scoring is unavailable. Try reopening the player.</p> : <>
                   <p className="text-xs text-pressbox-text/60 mt-1">{leagueId ? 'Using this league’s scoring settings.' : 'Using default scoring; no league selected.'}</p>
                   <p className="text-xs text-pressbox-text/60 mt-1">{projectionFraming().eyebrow} · {seasonProjection?.gp} projected {isGoalie ? 'starts' : 'GP'}</p>
-                  {!isGoalie && hasUnprojectedPlusMinus(leagueScoring) && <p className="text-xs text-pressbox-text/60 mt-1">Plus/minus isn’t projected; this total excludes it.</p>}
                   <table className="w-full text-xs mt-2"><thead><tr><th className="text-left">Stat</th><th>Projected</th><th>Weight</th><th>Points</th></tr></thead><tbody>
                     {Object.entries(leagueProjection.breakdown).filter(([, b]) => b.points !== 0).map(([stat, b]) => <tr key={stat}><td className="py-1">{stat}</td><td className="text-center">{b.count.toFixed(2)}</td><td className="text-center">{(b.points / b.count).toLocaleString(undefined, { maximumFractionDigits: 4 })}</td><td className="text-right">{b.points.toFixed(1)}</td></tr>)}
                   </tbody></table>

@@ -1,19 +1,19 @@
 import type { GameLogEntry } from './gameLogRows';
 import { ScoringCalculator } from '@/utils/scoringUtils';
-import { expectedDailyProjection, projectionSettings } from '@citrus/shared/leagueProjection';
+import { expectedDailyProjection, projectionSettings, scoreProjectedStats } from '@citrus/shared/leagueProjection';
 
 export function projectionStats(row: Record<string, unknown>): Record<string, number> {
   const fields: Record<string, string[]> = {
     goals: ['projected_goals'], assists: ['projected_assists'], sog: ['projected_sog'],
     blocks: ['projected_blocks'], hits: ['projected_hits'], pim: ['projected_pim'],
-    ppp: ['projected_ppp'], shp: ['projected_shp'],
+    ppp: ['projected_ppp'], shp: ['projected_shp'], plus_minus: ['projected_plus_minus'],
     wins: ['projected_wins_ros', 'projected_wins'], saves: ['projected_saves_ros', 'projected_saves'],
     shutouts: ['projected_shutouts_ros', 'projected_shutouts'], goals_against: ['projected_ga_ros', 'projected_goals_against'],
   };
   return Object.fromEntries(Object.entries(fields).map(([stat, aliases]) => {
     const value = aliases.map(key => row[key]).find(v => v != null);
-    return [stat, Number.isFinite(Number(value)) ? Number(value) : 0];
-  }));
+    return [stat, value != null && value !== '' && typeof value !== 'boolean' && Number.isFinite(Number(value)) ? Number(value) : undefined];
+  }).filter((entry): entry is [string, number] => typeof entry[1] === 'number'));
 }
 
 /**
@@ -29,7 +29,10 @@ export function projectedSummary(rows: Record<string, unknown>[], scoring: unkno
   const stats: Record<string, number> = {};
   for (const row of rows) for (const [key, value] of Object.entries(projectionStats(row))) stats[key] = (stats[key] ?? 0) + value;
   const scorer = new ScoringCalculator(projectionSettings(scoring));
-  return { stats, points: scorer.calculatePoints(stats, goalie), breakdown: scorer.getStatBreakdown(stats, goalie) };
+  const totals = rows.map(row => scoreProjectedStats({ ...row, is_goalie: goalie }, scorer));
+  const points = rows.length && totals.every((value): value is number => value !== null)
+    ? totals.reduce((sum, value) => sum + value, 0) : null;
+  return { stats, points, breakdown: points === null ? {} : scorer.getStatBreakdown(stats, goalie) };
 }
 
 /** ROS already includes expected GP/starts. Daily conditional rows are not a
@@ -40,7 +43,8 @@ export function seasonProjectionSummary(row: Record<string, unknown> | null, sco
   if (!Number.isFinite(gp) || gp < 0) return null;
   const count = goalie ? row.projected_saves_ros : row.projected_goals;
   if (count == null || !Number.isFinite(Number(count))) return null;
-  return { ...projectedSummary([row], scoring, goalie), gp };
+  const summary = projectedSummary([row], scoring, goalie);
+  return summary.points === null ? null : { ...summary, points: summary.points, gp };
 }
 
 /** Keep cached raw games reusable when the manager switches league weights. */
@@ -53,8 +57,8 @@ export function scoreGameLog(entries: GameLogEntry[], scoring: unknown): GameLog
     return ({
     ...entry,
     projectedPoints: projection
-      ? scorer.calculatePoints(projectionStats(projection), entry.isGoalie)
-      : 0,
+      ? scoreProjectedStats({ ...projection, is_goalie: entry.isGoalie }, scorer)
+      : null,
     // Stored FPTS intervals are in default scoring units. Raw category
     // covariance is unavailable, so do not present them as league intervals.
     projection: projection && scoring != null ? {

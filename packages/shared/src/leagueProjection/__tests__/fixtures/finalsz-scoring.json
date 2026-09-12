@@ -1,0 +1,41 @@
+{
+  "goalie": {
+    "wins": 4,
+    "saves": 0.2,
+    "losses": 0,
+    "pp_saves": 0,
+    "sh_saves": 0,
+    "shutouts": 3,
+    "ot_losses": 0,
+    "even_saves": 0,
+    "shots_faced": 0,
+    "goals_against": -1,
+    "goalie_toi_minutes": 0
+  },
+  "skater": {
+    "hits": 0.2,
+    "goals": 3,
+    "blocks": 0.5,
+    "shifts": 0,
+    "assists": 2,
+    "giveaways": 0,
+    "takeaways": 0,
+    "plus_minus": 0.5,
+    "toi_minutes": 0,
+    "faceoff_wins": 0,
+    "shots_missed": 0,
+    "shot_attempts": 0,
+    "shots_on_goal": 0.4,
+    "faceoff_losses": 0,
+    "overtime_goals": 0,
+    "penalty_minutes": 0.5,
+    "power_play_goals": 0,
+    "power_play_points": 1,
+    "game_winning_goals": 0,
+    "power_play_assists": 0,
+    "short_handed_goals": 0,
+    "short_handed_points": 2,
+    "short_handed_assists": 0,
+    "shots_blocked_by_opp": 0
+  }
+}

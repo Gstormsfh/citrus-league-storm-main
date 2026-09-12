@@ -378,9 +378,8 @@ export class DraftKitService {
           : { goals: entry.proj_goals, assists: entry.proj_assists,
             power_play_points: entry.proj_ppp, short_handed_points: entry.proj_shp,
             shots_on_goal: entry.proj_sog, blocks: entry.proj_blocks,
-            hits: entry.proj_hits, penalty_minutes: entry.proj_pim };
-        // Missing enabled categories cannot silently become zero. Plus/minus
-        // has no projected component, so a league enabling it remains unavailable.
+            hits: entry.proj_hits, penalty_minutes: entry.proj_pim, plus_minus: entry.proj_plus_minus };
+        // Missing enabled categories cannot silently become zero.
         const complete = Object.entries(entry.is_goalie ? settings.goalie : settings.skater)
           .every(([category, weight]) => !weight || finite(available[category]));
         const projection = complete && components.some(finite)

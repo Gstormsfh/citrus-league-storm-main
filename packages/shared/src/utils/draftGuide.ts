@@ -71,6 +71,7 @@ export interface PlayerProjection {
   blocks?: number | null;
   hits?: number | null;
   penalty_minutes?: number | null;
+  plus_minus?: number | null;
 
   // Goalie categories.
   wins?: number | null;
@@ -148,7 +149,8 @@ function n(v: number | null | undefined): number {
  * SKATER contributions are summed as:
  *   goals × w.goals + assists × w.assists + PPP × w.power_play_points +
  *   SHP × w.short_handed_points + SOG × w.shots_on_goal +
- *   blocks × w.blocks + hits × w.hits + PIM × w.penalty_minutes
+ *   blocks × w.blocks + hits × w.hits + PIM × w.penalty_minutes +
+ *   plus_minus × w.plus_minus
  *
  * GOALIE contributions:
  *   W × w.wins + SO × w.shutouts + SV × w.saves + GA × w.goals_against
@@ -182,7 +184,8 @@ export function reweightProjections(
         n(p.shots_on_goal) * n(s.shots_on_goal) +
         n(p.blocks) * n(s.blocks) +
         n(p.hits) * n(s.hits) +
-        n(p.penalty_minutes) * n(s.penalty_minutes);
+        n(p.penalty_minutes) * n(s.penalty_minutes) +
+        n(p.plus_minus) * n(s.plus_minus);
     return {
       playerId: p.playerId,
       playerName: p.playerName,

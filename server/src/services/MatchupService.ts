@@ -465,7 +465,7 @@ export class MatchupService {
       columns:
         'player_id, projection_date, game_id, season, calculation_method, projected_gp, total_projected_points, game_start_time, is_goalie, ' +
         'projected_goals, projected_assists, projected_ppp, projected_shp, projected_sog, ' +
-        'projected_blocks, projected_hits, projected_pim, ' +
+        'projected_blocks, projected_hits, projected_pim, projected_plus_minus, ' +
         'projected_wins, projected_saves, projected_shutouts, projected_goals_against, ' +
         'game:nhl_games!game_id(status, period, period_time, home_score, away_score)',
       inFilters: [['player_id', Array.from(playerIds)]],
@@ -1587,7 +1587,7 @@ export class MatchupService {
       .from('player_projected_stats')
       .select(
         'player_id, game_id, season, calculation_method, projected_gp, projection_date, total_projected_points, projected_goals, projected_assists, ' +
-        'projected_sog, projected_blocks, projected_hits, projected_pim, projected_ppp, projected_shp, ' +
+        'projected_sog, projected_blocks, projected_hits, projected_pim, projected_plus_minus, projected_ppp, projected_shp, ' +
         'projected_wins, projected_saves, projected_shutouts, projected_goals_against, projected_gaa, projected_save_pct, ' +
         'is_goalie, opponent_abbrev, is_home_game, ' +
         // THE RANGE (2026-09-05). The card's "likely range" column read

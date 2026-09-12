@@ -38,7 +38,7 @@ export interface GameLogEntry {
   dateLabel: string; // e.g. "Feb 15"
   opponent: string; // e.g. "vs BOS" or "@ NYR"
   gameTime?: string;
-  projectedPoints: number;
+  projectedPoints: number | null;
   projection: Record<string, unknown> | null; // Full projection object (skater or goalie)
   isGoalie: boolean;
   isPast: boolean;
@@ -221,7 +221,7 @@ export function upcomingRows(entries: GameLogEntry[], isGoalie: boolean): LogRow
               fixed(p.projected_ppp, 2),
               fixed(p.projected_hits, 1),
             ];
-      const range = p ? likelyRange(p, e.projectedPoints) : null;
+      const range = p && e.projectedPoints !== null ? likelyRange(p, e.projectedPoints) : null;
       return {
         key: e.date,
         date: shortDate(e.date),

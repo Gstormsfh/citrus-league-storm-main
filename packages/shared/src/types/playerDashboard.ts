@@ -171,6 +171,7 @@ export interface DashboardIndexEntry {
   proj_hits: number | null;
   /** Optional for older cached index responses; current API carries these raw totals. */
   proj_pim?: number | null;
+  proj_plus_minus?: number | null;
   proj_shp?: number | null;
   proj_goals_against?: number | null;
   proj_wins: number | null;

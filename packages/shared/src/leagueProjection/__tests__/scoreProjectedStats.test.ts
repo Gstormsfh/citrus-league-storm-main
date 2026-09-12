@@ -122,3 +122,37 @@ describe('projectedPointsFor', () => {
       skater: { ...bangerLeague.skater, plus_minus: 1 } }))).toBeNull();
   });
 });
+
+// Saved Finalsz settings captured 2026-09-12. Totals below are synthetic category
+// fixtures, never player forecasts; expected sums are independent arithmetic.
+import finalsz from './fixtures/finalsz-scoring.json';
+import { reweightProjections } from '../../utils/draftGuide';
+import { projectionFor, expectedDailyProjection } from '../index';
+import type { DashboardIndexEntry } from '../../types/playerDashboard';
+describe('Finalsz plus/minus projection contract', () => {
+  const scorer = new ScoringCalculator(projectionSettings(finalsz));
+  const row = { ...skaterRow, projected_plus_minus: -2 };
+  // 1.2*3 + 2*2 + .5*1 + 4*.4 + 1.5*.5 + 3*.2 + .5*.5 + .1*2 - 2*.5
+  const expected = 10.5;
+  it('scores signed category counts and passes them through the dashboard and daily adapters', () => {
+    expect(scoreProjectedStats(row, scorer)).toBeCloseTo(expected);
+    const entry = { is_goalie: false, proj_gp: 10, proj_goals: 1.2, proj_assists: 2,
+      proj_ppp: .5, proj_sog: 4, proj_blocks: 1.5, proj_hits: 3, proj_pim: .5,
+      proj_shp: .1, proj_plus_minus: -2 } as DashboardIndexEntry;
+    expect(projectionFor(entry, scorer)?.total).toBeCloseTo(expected);
+    expect(projectionFor(entry, scorer)?.perGp).toBeCloseTo(expected / 10);
+    expect(projectionFor(entry, scorer)?.gamesRemaining).toBe(10);
+    const daily = expectedDailyProjection({...row, projection_basis: 'unconditional', projected_gp: .5}, finalsz, false);
+    expect(daily?.projected_plus_minus).toBe(-2);
+    expect(daily?.total_projected_points).toBeCloseTo(expected);
+    expect(row.projected_plus_minus).toBe(-2);
+    expect(reweightProjections([{playerId: 1, playerName: 'Fixture', position: 'C', isGoalie: false,
+      goals: 1.2, assists: 2, power_play_points: .5, shots_on_goal: 4, blocks: 1.5, hits: 3,
+      penalty_minutes: .5, short_handed_points: .1, plus_minus: -2}], projectionSettings(finalsz))[0].projectedPoints).toBeCloseTo(expected);
+  });
+  it('never substitutes cached points or zero for a missing weighted category', () => {
+    expect(scoreProjectedStats({...skaterRow, total_projected_points: 999}, scorer)).toBeNull();
+    expect(expectedDailyProjection(skaterRow, finalsz, false)).toBeNull();
+    expect(scoreProjectedStats({...row, projected_plus_minus: 0}, scorer)).toBeCloseTo(expected + 1);
+  });
+});

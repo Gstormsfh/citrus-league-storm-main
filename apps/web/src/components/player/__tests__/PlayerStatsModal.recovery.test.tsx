@@ -152,8 +152,8 @@ describe('player-card projection availability and request recovery', () => {
   it('discloses the missing plus/minus projection when that category is scored', async () => {
     mocks.league.mockResolvedValue({ league: { id: mocks.leagueId, scoring_settings: { skater: { goals: 1, plus_minus: 1 } } } });
     openCard();
-    fireEvent.click(await screen.findByRole('button', { name: 'PROJECTION breakdown' }));
-    expect(screen.getByText('Plus/minus isn’t projected; this total excludes it.')).toBeTruthy();
+    expect(await screen.findByText('Projection unavailable: this league scores plus/minus, but that forecast is missing.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'PROJECTION breakdown' })).toBeNull();
   });
   it('shows raw projections without a fantasy total in a category league', async () => {
     mocks.format.mockReturnValue({ scoringFormat: 'h2h-categories' });
