@@ -90,6 +90,84 @@ export function normalizeSavePctValue(v: number | null | undefined): number | nu
  * historical-rate fallback only for older responses missing the GA field.
  * Plus/minus has no projection. Missing projection rows return null.
  */
+/**
+ * The `projected_*` vocabulary of `player_projected_stats` and
+ * `player_ros_projections`, in either table's spelling.
+ */
+export interface ProjectedStatRow {
+  is_goalie?: boolean | null;
+  projected_goals?: number | string | null;
+  projected_assists?: number | string | null;
+  projected_ppp?: number | string | null;
+  projected_shp?: number | string | null;
+  projected_sog?: number | string | null;
+  projected_blocks?: number | string | null;
+  projected_hits?: number | string | null;
+  projected_pim?: number | string | null;
+  projected_wins?: number | string | null;
+  projected_saves?: number | string | null;
+  projected_shutouts?: number | string | null;
+  projected_goals_against?: number | string | null;
+  /** player_ros_projections spells the goalie columns with a _ros suffix. */
+  projected_wins_ros?: number | string | null;
+  projected_saves_ros?: number | string | null;
+  projected_shutouts_ros?: number | string | null;
+  projected_ga_ros?: number | string | null;
+}
+
+const projectedNumber = (value: unknown): number => {
+  const n = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+  return Number.isFinite(n) ? n : 0;
+};
+
+/**
+ * ONE PROJECTION ROW, SCORED UNDER ONE LEAGUE'S RULES.
+ *
+ * `total_projected_points` on both projection tables is baked with DEFAULT
+ * scoring - routes/players.ts:184 says so in as many words - so a surface
+ * that reads it puts the projection on a different scale than the actual
+ * points printed beside it. In a league that scores hits, or zeroes blocks,
+ * or pays 6 for a goal, that is not a rounding error. Sixteen distinct
+ * scoring shapes are in production.
+ *
+ * The component columns are on the row and fully populated, so the honest
+ * number is a rescore, not a lookup. This is the same calculation
+ * projectionFor does for a draft board, against the other table's column
+ * names.
+ */
+export function scoreProjectedStats(
+  row: ProjectedStatRow | null | undefined,
+  scorer: ScoringCalculator,
+): number {
+  if (!row) return 0;
+
+  if (row.is_goalie === true) {
+    return scorer.calculatePoints(
+      {
+        wins: projectedNumber(row.projected_wins ?? row.projected_wins_ros),
+        saves: projectedNumber(row.projected_saves ?? row.projected_saves_ros),
+        shutouts: projectedNumber(row.projected_shutouts ?? row.projected_shutouts_ros),
+        goals_against: projectedNumber(row.projected_goals_against ?? row.projected_ga_ros),
+      },
+      true,
+    );
+  }
+
+  return scorer.calculatePoints(
+    {
+      goals: projectedNumber(row.projected_goals),
+      assists: projectedNumber(row.projected_assists),
+      ppp: projectedNumber(row.projected_ppp),
+      sog: projectedNumber(row.projected_sog),
+      blocks: projectedNumber(row.projected_blocks),
+      hits: projectedNumber(row.projected_hits),
+      pim: projectedNumber(row.projected_pim),
+      shp: projectedNumber(row.projected_shp),
+    },
+    false,
+  );
+}
+
 export function projectionFor(
   entry: DashboardIndexEntry | null | undefined,
   scorer: ScoringCalculator,
