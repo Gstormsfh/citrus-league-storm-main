@@ -1,5 +1,5 @@
 /**
- * `League setup:` tokens (2026-09-11). See formatLeagueSetup in StormyService.
+ * `League setup:` tokens (2026-09-11). See src/services/stormy/leagueSetup.ts.
  *
  * The gap this closes, from stormy_chat_log on 2026-09-09: asked whether the
  * league changes lineups daily or weekly, Stormy answered that it had no
@@ -8,7 +8,7 @@
  * decide whether advice is legal in a league; none of it reached the model.
  */
 import { describe, it, expect } from 'vitest';
-import { formatLeagueSetup } from '../StormyService';
+import { formatLeagueSetup } from '../stormy/leagueSetup';
 
 describe('formatLeagueSetup', () => {
   it('writes the settings a recommendation has to obey, in order', () => {
