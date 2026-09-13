@@ -9,7 +9,7 @@ const migrations = [
   '20260912073340_canonical_projection_refresh.sql',
   '20260912073540_canonical_projection_write_boundary.sql',
   '20260912101242_canonical_plus_minus_propagation.sql',
-  '20260913225708_canonical_organization_prior_remaining.sql',
+  '20260913231808_canonical_organization_prior_remaining.sql',
 ].map(name => readFileSync(`supabase/migrations/${name}`, 'utf8'));
 
 async function setup() {
