@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { augmentCitrusNotesWithNews, DETECTORS } from '../CitrusNewsService';
+import { PlayerOutlookService } from '../PlayerOutlookService';
+import { fromRos } from './outlookFixtures';
 import { NewsRoomService } from '../NewsRoomService';
 import { getSupabaseAdmin } from '../../lib/supabase';
 import { newsRoutes } from '../../routes/news';
@@ -82,13 +84,12 @@ describe('first-party editorial detectors', () => {
     const base = { season: 2026, player_id: 1000, player_name: PLAYER.name, is_goalie: false, games_remaining: 83,
       avg_points_per_game: 3.5, total_projected_points: 290.5, projected_goals: 30, projected_assists: 60,
       projected_sog: 250, projected_hits: 20, projected_blocks: 30, projected_ppp: 35 };
-    const [result] = await run('season-outlook', { player_ros_projections: [base] });
+    const result = new PlayerOutlookService({} as never).render(fromRos(base), [], NOW)!;
     expect(result.season).toBe(2026);
-    expect(result.body).toContain('83 games in 2026-27');
-    expect(result.body).toContain('3.5 fantasy points per game');
-    expect(result.analysis).toContain('Assists lead');
-    expect(result.analysis).toContain('when your league rewards');
-    expect(result.analysis).toContain('do not confirm a first-unit assignment');
+    expect(result.headline).toContain('2026-27 Outlook');
+    expect(result.body).toContain('playmaking');
+    expect(result.analysis).toContain('power-play production');
+    expect(result.body + result.analysis).not.toContain('3.5 fantasy points');
     expect(result.analysis).not.toContain('start every week without checking');
   });
 });
@@ -97,12 +98,12 @@ describe('current reporting on first-party notes', () => {
   it('adds only to the newest note and preserves its historical publication date, stats, and season', () => {
     const notes = [note(), note({ id: 'older', published_at: '2026-08-01T12:00:00Z' })];
     const result = augmentCitrusNotesWithNews(notes, PLAYER, [story(), story()], NOW);
-    expect(result[0].body).toContain('Current report: nhl.com (2026-09-12)');
+    expect(result[0].body).toContain('Current report: NHL.com (2026-09-12)');
     expect(result[0].body).toContain('averaged 22 minutes per game in 2025-26');
     expect(result[0].published_at).toBe(notes[0].published_at);
     expect(result[0].season).toBe(2025);
     expect(result[1]).toEqual(notes[1]);
-    expect(result[0].news_sources).toEqual([{ source: 'nhl.com', url: story().url, published_at: '2026-09-12T09:00:00.000Z' }]);
+    expect(result[0].news_sources).toEqual([{ source: 'NHL.com', url: story().url, published_at: '2026-09-12T09:00:00.000Z' }]);
     expect(augmentCitrusNotesWithNews(result, PLAYER, [story()], NOW)).toEqual(result);
   });
 

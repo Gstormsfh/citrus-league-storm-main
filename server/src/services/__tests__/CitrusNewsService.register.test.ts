@@ -23,6 +23,8 @@
 // build. The lists are short and both files name the other.
 
 import { describe, it, expect } from 'vitest';
+import { PlayerOutlookService } from '../PlayerOutlookService';
+import { fromRos } from './outlookFixtures';
 import { DETECTORS, type Detector, type GeneratedNote } from '../CitrusNewsService';
 
 // ── Register rules ───────────────────────────────────────────────────
@@ -62,7 +64,7 @@ const REQUIRED_SOURCE: Record<string, RegExp> = {
   'regression-risk': /Citrus xG/,
   'usage-surge': /Citrus season file/,
   'goalie-workload': /appeared in \d+ games/,
-  'season-outlook': /Citrus ROS projection/,
+  'season-outlook': /forecast|Citrus/i,
 };
 
 function prose(n: GeneratedNote): string {
@@ -299,7 +301,8 @@ const FIXTURES: Record<string, { tables: Record<string, unknown[]>; now: Date }>
 
 async function notesFor(detector: Detector): Promise<GeneratedNote[]> {
   const fixture = FIXTURES[detector.kind];
-  const season = detector.kind === 'season-outlook' ? 2026 : 2025;
+  if (detector.kind === 'season-outlook') return fixture.tables.player_ros_projections.flatMap(row => { const note = new PlayerOutlookService({} as never).render(fromRos(row), [], fixture.now); return note ? [note] : []; });
+  const season = 2025;
   return detector.run(makeSupabase(fixture.tables), season, fixture.now);
 }
 

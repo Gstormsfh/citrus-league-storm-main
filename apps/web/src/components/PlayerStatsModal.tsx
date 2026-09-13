@@ -32,6 +32,7 @@ import { projectionFraming } from '@/components/player/projectionFraming';
 import { type EditorialCanonicalContext, projectionSettings, editorialScoringCategories, editorialScoringWeights, actualsSeasonLabel, getUpcomingSeasonStartDate, getProjectionsSeason, getSeasonStartDate } from '@citrus/shared';
 import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
 import { citrusNoteContext } from '@/utils/sourceSeasonContext';
+import { OutlookSources } from '@/components/player/OutlookSources';
 import { PlayerAdvancedCard } from '@/components/player/PlayerAdvancedCard';
 import {
   PressBoxPlayerCardHero,
@@ -1305,6 +1306,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                             </div>
                             <p className="mt-1 font-barlow text-[11px] text-pressbox-text/50">{citrusNoteContext(note)}</p>
                             <p className="mt-1 font-barlow text-[13px] leading-[1.45] text-pressbox-text/70">{note.body}</p>
+                            <OutlookSources note={note} />
                             {note.analysis && (
                               <p className="mt-1.5 font-barlow text-[13px] leading-[1.45] text-pressbox-text/70">
                                 <span className="font-bold text-pressbox-text">Analysis: </span>

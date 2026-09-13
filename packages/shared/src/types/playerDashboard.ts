@@ -41,6 +41,7 @@ export interface CanonicalProjectionContext {
   revision: string;
   activated_at: string;
   availability: Record<string, unknown> | null;
+  exposure?: Record<string, unknown> | null;
   role: Record<string, unknown> | null;
   sources: unknown[];
   team_notes: unknown;

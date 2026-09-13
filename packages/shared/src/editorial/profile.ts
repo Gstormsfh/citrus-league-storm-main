@@ -73,6 +73,10 @@ function currentDecision(extras: ProfileExtras | undefined, anchor: string, ppHe
     : 'The first-unit practice report puts power-play usage ahead of the old scoring split as the next thing to watch. Establish that the assignment carries into games before treating it as additional offence.';
   if (news.some(e => e.kind === 'starter') && goalie) return `The named start makes workload concrete for that dated game. Weigh the ${anchor} against the categories still needed before adding the appearance.`;
   if (news.some(e => e.kind === 'transaction')) return `After the transaction, the useful comparison is whether the new deployment can sustain the ${anchor}. Wait for line and power-play usage before assuming the move adds offence.`;
+  if (news.some(e => e.kind === 'trade-request')) return `The reported trade request leaves the future team context unresolved. The ${anchor} still describes this profile; a request alone does not change the current club, establish a new role, or justify changing the forecast.`;
+  if (news.some(e => e.kind === 'coaching')) return `The reported coaching discussion makes deployment a useful camp check for the ${anchor}. Comments about a coach do not establish a line or power-play change.`;
+  if (news.some(e => e.kind === 'retirement')) return 'The retirement report makes current playing availability the decisive issue. A retained historical record or numerical scenario is not evidence of a current playing commitment.';
+  if (news.some(e => e.kind === 'camp')) return 'The rookie-practice report adds current camp context. A lasting NHL role is still the question; practice participation does not establish opening-night linemates or a roster place.';
   return null;
 }
 
@@ -143,7 +147,7 @@ export function profileWriteup(player: WriteupPlayer, extras?: ProfileExtras): P
       const svWeight = weight(weights, 'save_pct', 'savePct', 'save_percentage', 'sv_pct');
       const wins = weight(weights, 'wins');
       const saves = weight(weights, 'saves');
-      const costs = [wins < 0 ? `each win costs ${fmt(-wins, 2)} points` : '', saves < 0 ? `each save costs ${fmt(-saves, 2)} points` : '', ga < 0 ? `each goal allowed costs ${fmt(-ga, 2)} points` : ''].filter(Boolean);
+      const costs = [wins < 0 ? `each win costs ${fmt(-wins, 2)} points` : '', saves < 0 ? `each save costs ${fmt(-saves, 2)} points` : '', ga < 0 ? `each goal allowed costs ${fmt(-ga, 2)} ${-ga === 1 ? 'point' : 'points'}` : ''].filter(Boolean);
       if (ga > 0 || gaa > 0 || svWeight < 0) conclusion = `These weights reward ${[ga > 0 ? 'goals allowed' : '', gaa > 0 ? 'a higher GAA' : '', svWeight < 0 ? 'a lower save percentage' : ''].filter(Boolean).join(' and ')}. Conventional goalie ratio advice would point the wrong way in this format; evaluate the configured scoring direction before selecting the start.`;
       else if (costs.length) conclusion = `Under these weights, ${costs.join(' and ')}.${wins > 0 ? ` A win adds ${fmt(wins, 2)} points` : ''}${wins > 0 && ga < 0 ? `, offsetting ${fmt(wins / -ga, 2)} goals allowed before other components` : ''}${wins > 0 ? '.' : ''} ${weakRatios ? 'The recorded save rate makes the scoring cost of extra shots faced consequential; a busier start needs enough saves or wins to offset it.' : 'The recorded save rate supports the performance case, while the full saves and goals-allowed line determines whether extra workload pays.'}`;
       else if (svWeight > 0 || gaa < 0) conclusion = `These weights reward ${[svWeight > 0 ? 'a higher save percentage' : '', gaa < 0 ? 'a lower GAA' : ''].filter(Boolean).join(' and ')}.${wins !== 0 ? ` Each win ${wins > 0 ? 'adds' : 'costs'} ${fmt(Math.abs(wins), 2)} points separately.` : ''} Keep the ratio contribution separate from volume; the supplied rates alone cannot price the next start.`;

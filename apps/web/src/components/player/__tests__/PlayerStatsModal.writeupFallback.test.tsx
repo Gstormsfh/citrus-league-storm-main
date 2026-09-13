@@ -185,7 +185,7 @@ describe('the player card falls back to the in-bundle writeup', () => {
     openCard();
     expect(await screen.findByText(/Connor McTest took part in practice or skating/)).toBeTruthy();
     expect(screen.getByText(/Practice alone settles neither game clearance/)).toBeTruthy();
-    const source = screen.getByRole('link', { name: /nhl.com/ });
+    const source = screen.getByRole('link', { name: /NHL.com/ });
     expect(source.getAttribute('href')).toBe('https://www.nhl.com/news/mctest-practice');
   });
 

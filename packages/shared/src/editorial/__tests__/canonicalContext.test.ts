@@ -86,9 +86,10 @@ describe('published canonical editorial context', () => {
       line: 1, pp: 'PP1', conditioned: true, notes: 'Offence-led deployment assumption', evidence: [provenance],
     } });
     expect(result.summary).toBe('');
-    expect(result.analysis).toContain('Imported role scenario, not verified deployment');
-    expect(result.analysis).toContain('line: 1; power play: PP1');
-    expect(result.analysis).toContain('Offence-led deployment assumption');
+    expect(result.analysis).toContain('working role scenario');
+    expect(result.analysis).toContain('first line and first power-play unit');
+    expect(result.analysis).not.toContain('Offence-led deployment assumption');
+    expect(result.analysis).not.toContain('edits.json');
     expect(result.analysis).not.toContain('role is conditional');
     expect(result.role).toEqual({ conditioned: true });
     expect(result.analysis).not.toContain('2026-09-11'); // availability date is not a role date
