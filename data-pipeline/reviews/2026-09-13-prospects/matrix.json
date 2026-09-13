@@ -1,0 +1,4422 @@
+{
+  "as_of": "2026-09-13",
+  "source_base_revision": "70badf9420160b354d9c083775c72524c16d36dacffe913ad20cc62a707248b5",
+  "dispositions": {
+    "existing_forecast_preserved": 18,
+    "documented_opportunity_prior": 31,
+    "conditional_rates_unallocated_workload": 20
+  },
+  "existing_forecasts_preserved": 674,
+  "capacity_factors": {
+    "WPG": 1,
+    "NSH": 0.9548967611081017,
+    "CAR": 0.374258329529895,
+    "CHI": 1,
+    "ANA": 1,
+    "SJS": 1,
+    "VAN": 1,
+    "NYI": 1,
+    "DET": 1,
+    "TBL": 1,
+    "DAL": 1,
+    "STL": 1,
+    "VGK": 1,
+    "CBJ": 1,
+    "TOR": 1,
+    "SEA": 1,
+    "WSH": 1,
+    "PIT": 1,
+    "NYR": 1,
+    "NJD": 1
+  },
+  "players": [
+    {
+      "player_id": "8486067",
+      "name": "Gavin McKenna",
+      "organization": "TOR",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "assists": 0.5125,
+        "blocks": 0.375,
+        "goals": 0.3,
+        "hits": 0.75,
+        "penalty_minutes": 0.375,
+        "power_play_points": 0.25,
+        "short_handed_points": 0.0,
+        "shots_on_goal": 2.75
+      },
+      "nhl_workload": 80.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8486103",
+      "name": "Ivar Stenberg",
+      "organization": "SJS",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "assists": 0.37105263157894736,
+        "blocks": 0.4223684210526316,
+        "goals": 0.25394736842105264,
+        "hits": 0.7907894736842106,
+        "penalty_minutes": 0.325,
+        "power_play_points": 0.16973684210526316,
+        "short_handed_points": 0.002631578947368421,
+        "shots_on_goal": 2.0723684210526314
+      },
+      "nhl_workload": 76.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8485406",
+      "name": "Porter Martone",
+      "organization": "PHI",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "assists": 0.45128205128205134,
+        "blocks": 0.4923076923076923,
+        "goals": 0.3141025641025641,
+        "hits": 1.4115384615384614,
+        "penalty_minutes": 0.6653846153846154,
+        "power_play_points": 0.2512820512820513,
+        "short_handed_points": 0.001282051282051282,
+        "shots_on_goal": 2.4974358974358974
+      },
+      "nhl_workload": 78.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8485391",
+      "name": "Anton Frondell",
+      "organization": "CHI",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "assists": 0.4333333333333333,
+        "blocks": 0.5448717948717948,
+        "goals": 0.29743589743589743,
+        "hits": 0.9435897435897436,
+        "penalty_minutes": 0.42051282051282046,
+        "power_play_points": 0.2217948717948718,
+        "short_handed_points": 0.010256410256410256,
+        "shots_on_goal": 2.3051282051282054
+      },
+      "nhl_workload": 78.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8484873",
+      "name": "Cole Hutson",
+      "organization": "WSH",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "assists": 0.4105263157894737,
+        "blocks": 1.1644736842105263,
+        "goals": 0.1131578947368421,
+        "hits": 0.6236842105263157,
+        "penalty_minutes": 0.39210526315789473,
+        "power_play_points": 0.19736842105263158,
+        "short_handed_points": 0.0,
+        "shots_on_goal": 1.8842105263157893
+      },
+      "nhl_workload": 76.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8484390",
+      "name": "Roman Kantserov",
+      "organization": "CHI",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "assists": 0.41923076923076924,
+        "blocks": 0.41025641025641024,
+        "goals": 0.28076923076923077,
+        "hits": 0.7192307692307692,
+        "penalty_minutes": 0.33076923076923076,
+        "power_play_points": 0.21153846153846154,
+        "short_handed_points": 0.001282051282051282,
+        "shots_on_goal": 2.1666666666666665
+      },
+      "nhl_workload": 78.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8483468",
+      "name": "Jiri Kulich",
+      "organization": "BUF",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "assists": 0.308974358974359,
+        "blocks": 0.6384615384615384,
+        "goals": 0.2717948717948718,
+        "hits": 0.7358974358974358,
+        "penalty_minutes": 0.37435897435897436,
+        "power_play_points": 0.12051282051282051,
+        "short_handed_points": 0.003846153846153846,
+        "shots_on_goal": 1.9512820512820512
+      },
+      "nhl_workload": 78.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8484999",
+      "name": "Ilya Protas",
+      "organization": "WSH",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "assists": 0.25675675675675674,
+        "blocks": 0.45135135135135135,
+        "goals": 0.19189189189189187,
+        "hits": 1.0567567567567568,
+        "penalty_minutes": 0.36486486486486486,
+        "power_play_points": 0.0527027027027027,
+        "short_handed_points": 0.0013513513513513514,
+        "shots_on_goal": 1.6216216216216217
+      },
+      "nhl_workload": 74.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8486025",
+      "name": "Viggo Björck",
+      "organization": "WPG",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.2778,
+        "blocks": 0.333,
+        "goals": 0.1772,
+        "hits": 0.508,
+        "penalty_minutes": 0.324,
+        "power_play_points": 0.1231,
+        "short_handed_points": 0.0082,
+        "shots_on_goal": 2.083,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": 24.44878,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 24.45 games. Conditional production rates are applied once; opportunity uncertainty is already included. Signed; arrival estimate only. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 30,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "1_to_15",
+        "unscaled_gp": 23.866666666666667,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 24.44878048780488,
+        "allocation_factor": 0.999999980047885,
+        "final_gp": 24.44878,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/winnipeg-jets-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-09-01"
+          },
+          {
+            "url": "https://www.nhl.com/jets/news/topic/jets-news/jets-sign-forward-viggo-bjorck-to-a-three-year-entry-level-contract",
+            "date": "2026-07-13"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 4,
+          "gameTypeId": 2,
+          "gamesPlayed": 4,
+          "goals": 1,
+          "leagueAbbrev": "U20 Nationell",
+          "pim": 25,
+          "plusMinus": 1,
+          "points": 5,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Djurgårdens IF U20"
+          }
+        },
+        {
+          "assists": 9,
+          "gameTypeId": 2,
+          "gamesPlayed": 42,
+          "goals": 6,
+          "leagueAbbrev": "SHL",
+          "pim": 12,
+          "plusMinus": 5,
+          "points": 15,
+          "season": 20252026,
+          "sequence": 12,
+          "teamName": {
+            "default": "Djurgårdens IF"
+          }
+        },
+        {
+          "assists": 6,
+          "gameTypeId": 2,
+          "gamesPlayed": 7,
+          "goals": 3,
+          "leagueAbbrev": "WJC-20",
+          "pim": 2,
+          "plusMinus": 5,
+          "points": 9,
+          "season": 20252026,
+          "sequence": 13,
+          "teamName": {
+            "default": "Sweden U20"
+          }
+        },
+        {
+          "assists": 0,
+          "gameTypeId": 2,
+          "gamesPlayed": 5,
+          "goals": 2,
+          "leagueAbbrev": "EHT",
+          "pim": 2,
+          "plusMinus": 4,
+          "points": 2,
+          "season": 20252026,
+          "sequence": 14,
+          "teamName": {
+            "default": "Sweden"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8486025/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Preserved existing rates; added signed plus/minus from project_ros for NHL-history players or existing project_rookies position prior for zero-history players.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8486025/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/winnipeg-jets-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-09-01"
+          },
+          {
+            "url": "https://www.nhl.com/jets/news/topic/jets-news/jets-sign-forward-viggo-bjorck-to-a-three-year-entry-level-contract",
+            "date": "2026-07-13"
+          }
+        ],
+        "limitations": "Signed component has its own stated fallback; existing production rates unchanged."
+      }
+    },
+    {
+      "player_id": "8482715",
+      "name": "Ryan Ufko",
+      "organization": "NSH",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.4818231751927369,
+        "blocks": 0.8326154981415393,
+        "goals": 0.068438160684852,
+        "hits": 0.6351152053659441,
+        "penalty_minutes": 0.3730267665107238,
+        "power_play_points": 0.10735834361536589,
+        "short_handed_points": 0.0006716942219547306,
+        "shots_on_goal": 0.6884204817185214,
+        "plus_minus": 0.016873541071680716
+      },
+      "nhl_workload": 16.915887,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 16.92 games. Conditional production rates are applied once; opportunity uncertainty is already included. Upcoming-season number assigned; role unconfirmed. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 116,
+        "prior_nhl_gp_min": 1,
+        "prior_nhl_gp_max": 24,
+        "draft_band": "32_plus_or_unknown",
+        "unscaled_gp": 17.29310344827586,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 17.714886459209417,
+        "allocation_factor": 0.9548967214072072,
+        "final_gp": 16.915887,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/predators/news/preds-announce-new-player-jersey-numbers-ahead-of-2026-27-season-2026-09-03",
+            "date": "2026-09-03"
+          },
+          {
+            "url": "https://www.nhl.com/scores/htmlreports/20252026/RO021287.HTM",
+            "date": "2026-04-13"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 33,
+          "gameTypeId": 2,
+          "gamesPlayed": 52,
+          "goals": 11,
+          "leagueAbbrev": "AHL",
+          "pim": 20,
+          "plusMinus": -15,
+          "points": 44,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Milwaukee Admirals"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8482715/landing",
+      "rate_basis": {
+        "provenance": "MODEL",
+        "method": "Preserved existing rates; added signed plus/minus from project_ros for NHL-history players or existing project_rookies position prior for zero-history players.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8482715/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911060000_project_ros_gp_last_falls_back.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/predators/news/preds-announce-new-player-jersey-numbers-ahead-of-2026-27-season-2026-09-03",
+            "date": "2026-09-03"
+          },
+          {
+            "url": "https://www.nhl.com/scores/htmlreports/20252026/RO021287.HTM",
+            "date": "2026-04-13"
+          }
+        ],
+        "limitations": "Signed component has its own stated fallback; existing production rates unchanged."
+      }
+    },
+    {
+      "player_id": "8484170",
+      "name": "Jacob Fowler",
+      "organization": "MTL",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "goals_against": 2.411764705882353,
+        "saves": 23.823529411764707,
+        "shutouts": 0.0,
+        "wins": 0.5294117647058824
+      },
+      "nhl_workload": 24.0,
+      "workload_unit": "starts",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8484203",
+      "name": "Bradly Nadeau",
+      "organization": "CAR",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.08109477209394209,
+        "blocks": 0.48613986074627785,
+        "goals": 0.2260914672726188,
+        "hits": 1.6846491250301372,
+        "penalty_minutes": 0.22936512644998303,
+        "power_play_points": 0.08371592366973503,
+        "short_handed_points": 0.0013815247695157218,
+        "shots_on_goal": 1.456682041761969,
+        "plus_minus": -0.02483029432422172
+      },
+      "nhl_workload": 14.26198,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 14.26 games. Conditional production rates are applied once; opportunity uncertainty is already included. Jarvis absence creates opportunity. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 30,
+        "prior_nhl_gp_min": 1,
+        "prior_nhl_gp_max": 24,
+        "draft_band": "1_to_31",
+        "unscaled_gp": 37.2,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 38.107317073170734,
+        "allocation_factor": 0.3742583077316948,
+        "final_gp": 14.26198,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/carolina-hurricanes-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-05"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 29,
+          "gameTypeId": 2,
+          "gamesPlayed": 52,
+          "goals": 27,
+          "leagueAbbrev": "AHL",
+          "pim": 24,
+          "plusMinus": 16,
+          "points": 56,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Chicago Wolves"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484203/landing",
+      "rate_basis": {
+        "provenance": "MODEL",
+        "method": "Preserved existing rates; added signed plus/minus from project_ros for NHL-history players or existing project_rookies position prior for zero-history players.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484203/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911060000_project_ros_gp_last_falls_back.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/carolina-hurricanes-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-05"
+          }
+        ],
+        "limitations": "Signed component has its own stated fallback; existing production rates unchanged."
+      }
+    },
+    {
+      "player_id": "8484793",
+      "name": "Sacha Boisvert",
+      "organization": "CHI",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.19121642769798075,
+        "blocks": 0.2822184361754028,
+        "goals": 0.15758561754249692,
+        "hits": 1.376024576184152,
+        "penalty_minutes": 1.0611811598251524,
+        "power_play_points": 0.02784548029221129,
+        "short_handed_points": 0.002439824875974935,
+        "shots_on_goal": 1.1325554548852887,
+        "plus_minus": -0.05316289900915228
+      },
+      "nhl_workload": 38.107317,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 38.11 games. Conditional production rates are applied once; opportunity uncertainty is already included. Camp performance determines opportunity. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 30,
+        "prior_nhl_gp_min": 1,
+        "prior_nhl_gp_max": 24,
+        "draft_band": "1_to_31",
+        "unscaled_gp": 37.2,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 38.107317073170734,
+        "allocation_factor": 0.9999999980798772,
+        "final_gp": 38.107317,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/chicago-blackhawks-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-06"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 14,
+          "gameTypeId": 2,
+          "gamesPlayed": 26,
+          "goals": 3,
+          "leagueAbbrev": "NCAA",
+          "pim": 28,
+          "plusMinus": -7,
+          "points": 17,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Boston Univ."
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484793/landing",
+      "rate_basis": {
+        "provenance": "MODEL",
+        "method": "Preserved existing rates; added signed plus/minus from project_ros for NHL-history players or existing project_rookies position prior for zero-history players.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484793/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911060000_project_ros_gp_last_falls_back.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/chicago-blackhawks-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-06"
+          }
+        ],
+        "limitations": "Signed component has its own stated fallback; existing production rates unchanged."
+      }
+    },
+    {
+      "player_id": "8483703",
+      "name": "Sergei Murashov",
+      "organization": "PIT",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "goals_against": 2.838709677419355,
+        "saves": 25.548387096774192,
+        "shutouts": 0.03225806451612903,
+        "wins": 0.4838709677419355
+      },
+      "nhl_workload": 31.0,
+      "workload_unit": "starts",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8482657",
+      "name": "Sebastian Cossa",
+      "organization": "UTA",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "goals_against": 2.888888888888889,
+        "saves": 25.444444444444443,
+        "shutouts": 0.037037037037037035,
+        "wins": 0.4444444444444444
+      },
+      "nhl_workload": 27.0,
+      "workload_unit": "starts",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8485405",
+      "name": "Brady Martin",
+      "organization": "NSH",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.35056345077963136,
+        "blocks": 0.6624078391866406,
+        "goals": 0.14275091480128105,
+        "hits": 0.46803391519768117,
+        "penalty_minutes": 0.2841656129476646,
+        "power_play_points": 0.051050047202387365,
+        "short_handed_points": 0.004473012272620714,
+        "shots_on_goal": 1.1963516672896959,
+        "plus_minus": -0.027377384670945505
+      },
+      "nhl_workload": 36.388553,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 36.39 games. Conditional production rates are applied once; opportunity uncertainty is already included. NHL or Milwaukee. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 30,
+        "prior_nhl_gp_min": 1,
+        "prior_nhl_gp_max": 24,
+        "draft_band": "1_to_31",
+        "unscaled_gp": 37.2,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 38.107317073170734,
+        "allocation_factor": 0.9548967441116232,
+        "final_gp": 36.388553,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/nashville-predators-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-16"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 16,
+          "gameTypeId": 2,
+          "gamesPlayed": 24,
+          "goals": 8,
+          "leagueAbbrev": "OHL",
+          "pim": 37,
+          "plusMinus": 6,
+          "points": 24,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Soo Greyhounds"
+          }
+        },
+        {
+          "assists": 4,
+          "gameTypeId": 2,
+          "gamesPlayed": 6,
+          "goals": 4,
+          "leagueAbbrev": "WJC-20",
+          "pim": 2,
+          "plusMinus": 5,
+          "points": 8,
+          "season": 20252026,
+          "sequence": 12,
+          "teamName": {
+            "default": "Canada U20"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485405/landing",
+      "rate_basis": {
+        "provenance": "MODEL",
+        "method": "Preserved existing rates; added signed plus/minus from project_ros for NHL-history players or existing project_rookies position prior for zero-history players.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485405/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911060000_project_ros_gp_last_falls_back.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/nashville-predators-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-16"
+          }
+        ],
+        "limitations": "Signed component has its own stated fallback; existing production rates unchanged."
+      }
+    },
+    {
+      "player_id": "8485395",
+      "name": "James Hagens",
+      "organization": "BOS",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "assists": 0.38235294117647056,
+        "blocks": 0.4411764705882353,
+        "goals": 0.22058823529411764,
+        "hits": 0.6617647058823529,
+        "penalty_minutes": 0.29411764705882354,
+        "power_play_points": 0.14705882352941177,
+        "short_handed_points": 0.0,
+        "shots_on_goal": 1.9852941176470589
+      },
+      "nhl_workload": 68.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8485388",
+      "name": "Victor Eklund",
+      "organization": "NYI",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "assists": 0.34342105263157896,
+        "blocks": 0.4486842105263158,
+        "goals": 0.21842105263157896,
+        "hits": 0.994736842105263,
+        "penalty_minutes": 0.3973684210526316,
+        "power_play_points": 0.12894736842105264,
+        "short_handed_points": 0.002631578947368421,
+        "shots_on_goal": 1.8407894736842105
+      },
+      "nhl_workload": 76.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8484797",
+      "name": "Konsta Helenius",
+      "organization": "BUF",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "assists": 0.35526315789473684,
+        "blocks": 0.4605263157894737,
+        "goals": 0.19736842105263158,
+        "hits": 0.7894736842105263,
+        "penalty_minutes": 0.32894736842105265,
+        "power_play_points": 0.13157894736842105,
+        "short_handed_points": 0.013157894736842105,
+        "shots_on_goal": 1.7105263157894737
+      },
+      "nhl_workload": 76.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8484759",
+      "name": "Carter Yakemchuk",
+      "organization": "OTT",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "assists": 0.3142857142857143,
+        "blocks": 1.2142857142857142,
+        "goals": 0.11428571428571428,
+        "hits": 1.0,
+        "penalty_minutes": 0.7142857142857143,
+        "power_play_points": 0.14285714285714285,
+        "short_handed_points": 0.0,
+        "shots_on_goal": 1.6428571428571428
+      },
+      "nhl_workload": 70.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8485387",
+      "name": "Caleb Desnoyers",
+      "organization": "UTA",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals": 0.2703,
+        "assists": 0.3871,
+        "shots_on_goal": 2.305,
+        "blocks": 0.415,
+        "power_play_points": 0.1636,
+        "hits": 0.7,
+        "penalty_minutes": 0.329,
+        "short_handed_points": 0.0082,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": null,
+      "workload_unit": "games",
+      "basis": "NHL games remain unallocated because current opportunity is not established. Leg injury complicates camp. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "assists": 56,
+          "gameTypeId": 2,
+          "gamesPlayed": 45,
+          "goals": 22,
+          "leagueAbbrev": "QMJHL",
+          "pim": 36,
+          "plusMinus": 36,
+          "points": 78,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Moncton Wildcats"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485387/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position F, draft pick 4, rate band 1.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485387/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/utah-mammoth-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-28"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8484795",
+      "name": "Tij Iginla",
+      "organization": "UTA",
+      "disposition": "existing_forecast_preserved",
+      "rates": {},
+      "nhl_workload": 0.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8484220",
+      "name": "David Reinbacher",
+      "organization": "MTL",
+      "disposition": "existing_forecast_preserved",
+      "rates": {},
+      "nhl_workload": 0.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8486052",
+      "name": "Nikita Klepov",
+      "organization": "ANA",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.2185,
+        "blocks": 0.392,
+        "goals": 0.1538,
+        "hits": 0.889,
+        "penalty_minutes": 0.329,
+        "power_play_points": 0.0385,
+        "short_handed_points": 0.0082,
+        "shots_on_goal": 1.605,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": 24.44878,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 24.45 games. Conditional production rates are applied once; opportunity uncertainty is already included. Junior fallback; AHL unavailable. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 30,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "1_to_15",
+        "unscaled_gp": 23.866666666666667,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 24.44878048780488,
+        "allocation_factor": 0.999999980047885,
+        "final_gp": 24.44878,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/anaheim-ducks-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-01"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 5,
+          "gameTypeId": 2,
+          "gamesPlayed": 5,
+          "goals": 1,
+          "leagueAbbrev": "Hlinka Gretzky Cup",
+          "pim": 0,
+          "plusMinus": -2,
+          "points": 6,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "USA U18"
+          }
+        },
+        {
+          "assists": 60,
+          "gameTypeId": 2,
+          "gamesPlayed": 67,
+          "goals": 37,
+          "leagueAbbrev": "OHL",
+          "pim": 43,
+          "plusMinus": 9,
+          "points": 97,
+          "season": 20252026,
+          "sequence": 12,
+          "teamName": {
+            "default": "Saginaw Spirit"
+          }
+        },
+        {
+          "assists": 0,
+          "gameTypeId": 2,
+          "gamesPlayed": 3,
+          "goals": 0,
+          "leagueAbbrev": "Prospects Challenge",
+          "pim": 2,
+          "plusMinus": -3,
+          "points": 0,
+          "season": 20252026,
+          "sequence": 13,
+          "teamName": {
+            "default": "Team CHL"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8486052/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Preserved existing rates; added signed plus/minus from project_ros for NHL-history players or existing project_rookies position prior for zero-history players.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8486052/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/anaheim-ducks-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-01"
+          }
+        ],
+        "limitations": "Signed component has its own stated fallback; existing production rates unchanged."
+      }
+    },
+    {
+      "player_id": "8485400",
+      "name": "Roger McQueen",
+      "organization": "ANA",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.2778,
+        "blocks": 0.333,
+        "goals": 0.1772,
+        "hits": 0.508,
+        "penalty_minutes": 0.324,
+        "plus_minus": -0.0185,
+        "power_play_points": 0.1231,
+        "short_handed_points": 0.0082,
+        "shots_on_goal": 2.083
+      },
+      "nhl_workload": 24.44878,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 24.45 games. Conditional production rates are applied once; opportunity uncertainty is already included. NHL/AHL competition. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 30,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "1_to_15",
+        "unscaled_gp": 23.866666666666667,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 24.44878048780488,
+        "allocation_factor": 0.999999980047885,
+        "final_gp": 24.44878,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/anaheim-ducks-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-01"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 16,
+          "gameTypeId": 2,
+          "gamesPlayed": 36,
+          "goals": 11,
+          "leagueAbbrev": "NCAA",
+          "pim": 45,
+          "plusMinus": 5,
+          "points": 27,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Providence College"
+          }
+        },
+        {
+          "assists": 2,
+          "gameTypeId": 2,
+          "gamesPlayed": 7,
+          "goals": 1,
+          "leagueAbbrev": "AHL",
+          "pim": 6,
+          "plusMinus": -2,
+          "points": 3,
+          "season": 20252026,
+          "sequence": 12,
+          "teamName": {
+            "default": "San Diego Gulls"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485400/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485400/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/anaheim-ducks-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-01"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484200",
+      "name": "Quentin Musty",
+      "organization": "SJS",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.2185,
+        "blocks": 0.378,
+        "goals": 0.1429,
+        "hits": 0.944,
+        "penalty_minutes": 0.289,
+        "plus_minus": -0.0185,
+        "power_play_points": 0.0287,
+        "short_handed_points": 0.0082,
+        "shots_on_goal": 1.571
+      },
+      "nhl_workload": 10.153515,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 10.15 games. Conditional production rates are applied once; opportunity uncertainty is already included. Competing after AHL development. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 34,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "16_to_31",
+        "unscaled_gp": 9.911764705882353,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 10.153515064562411,
+        "allocation_factor": 0.9999999936413735,
+        "final_gp": 10.153515,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/prospects/filip-bystedt-and-quentin-musty-aiming-to-join-san-jose-sharks-young-core",
+            "date": "2026-08-11"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 24,
+          "gameTypeId": 2,
+          "gamesPlayed": 61,
+          "goals": 21,
+          "leagueAbbrev": "AHL",
+          "pim": 46,
+          "plusMinus": -14,
+          "points": 45,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "San Jose Barracuda"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484200/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484200/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/prospects/filip-bystedt-and-quentin-musty-aiming-to-join-san-jose-sharks-young-core",
+            "date": "2026-08-11"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8485383",
+      "name": "Jake O'Brien",
+      "organization": "SEA",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "goals": 0.1772,
+        "assists": 0.2778,
+        "shots_on_goal": 2.083,
+        "blocks": 0.333,
+        "power_play_points": 0.1231,
+        "hits": 0.508,
+        "penalty_minutes": 0.324,
+        "short_handed_points": 0.0082,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": 24.44878,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 24.45 games. Conditional production rates are applied once; opportunity uncertainty is already included. Pro destination: Seattle or Coachella Valley. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 30,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "1_to_15",
+        "unscaled_gp": 23.866666666666667,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 24.44878048780488,
+        "allocation_factor": 0.999999980047885,
+        "final_gp": 24.44878,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/seattle-kraken-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-24"
+          },
+          {
+            "url": "https://www.nhl.com/kraken/news/topic/press-releases/seattle-kraken-sign-forward-jake-o-brien-to-three-year-entry-level-contract-pr",
+            "date": "2025-07-03"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 65,
+          "gameTypeId": 2,
+          "gamesPlayed": 53,
+          "goals": 28,
+          "leagueAbbrev": "OHL",
+          "pim": 28,
+          "plusMinus": 34,
+          "points": 93,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Brantford Bulldogs"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485383/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position F, draft pick 8, rate band 2.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485383/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/seattle-kraken-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-24"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8485385",
+      "name": "Braeden Cootes",
+      "organization": "VAN",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.13056345077963138,
+        "blocks": 0.47907450585330724,
+        "goals": 0.13473587509502427,
+        "hits": 1.1854252195455073,
+        "penalty_minutes": 0.2841656129476646,
+        "plus_minus": -0.09404405133761218,
+        "power_play_points": 0.051050047202387365,
+        "short_handed_points": 0.004473012272620714,
+        "shots_on_goal": 0.7563516672896959
+      },
+      "nhl_workload": 38.107317,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 38.11 games. Conditional production rates are applied once; opportunity uncertainty is already included. AHL likelier; camp opportunity. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 30,
+        "prior_nhl_gp_min": 1,
+        "prior_nhl_gp_max": 24,
+        "draft_band": "1_to_31",
+        "unscaled_gp": 37.2,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 38.107317073170734,
+        "allocation_factor": 0.9999999980798772,
+        "final_gp": 38.107317,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/vancouver-canucks-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-29"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 13,
+          "gameTypeId": 2,
+          "gamesPlayed": 17,
+          "goals": 10,
+          "leagueAbbrev": "WHL",
+          "pim": 2,
+          "plusMinus": 3,
+          "points": 23,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Seattle Thunderbirds"
+          }
+        },
+        {
+          "assists": 0,
+          "gameTypeId": 2,
+          "gamesPlayed": 7,
+          "goals": 2,
+          "leagueAbbrev": "WJC-20",
+          "pim": 2,
+          "plusMinus": 0,
+          "points": 2,
+          "season": 20252026,
+          "sequence": 12,
+          "teamName": {
+            "default": "Canada U20"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485385/landing",
+      "rate_basis": {
+        "provenance": "MODEL",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485385/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911060000_project_ros_gp_last_falls_back.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/vancouver-canucks-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-29"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484807",
+      "name": "Cole Eiserman",
+      "organization": "NYI",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.2185,
+        "blocks": 0.378,
+        "goals": 0.1429,
+        "hits": 0.944,
+        "penalty_minutes": 0.289,
+        "plus_minus": -0.0185,
+        "power_play_points": 0.0287,
+        "short_handed_points": 0.0082,
+        "shots_on_goal": 1.571
+      },
+      "nhl_workload": 10.153515,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 10.15 games. Conditional production rates are applied once; opportunity uncertainty is already included. Development determines placement. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 34,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "16_to_31",
+        "unscaled_gp": 9.911764705882353,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 10.153515064562411,
+        "allocation_factor": 0.9999999936413735,
+        "final_gp": 10.153515,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/new-york-islanders-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-18"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 10,
+          "gameTypeId": 2,
+          "gamesPlayed": 32,
+          "goals": 18,
+          "leagueAbbrev": "NCAA",
+          "pim": 14,
+          "plusMinus": -9,
+          "points": 28,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Boston Univ."
+          }
+        },
+        {
+          "assists": 1,
+          "gameTypeId": 2,
+          "gamesPlayed": 5,
+          "goals": 2,
+          "leagueAbbrev": "WJC-20",
+          "pim": 0,
+          "plusMinus": -4,
+          "points": 3,
+          "season": 20252026,
+          "sequence": 12,
+          "teamName": {
+            "default": "USA U20"
+          }
+        },
+        {
+          "assists": 7,
+          "gameTypeId": 2,
+          "gamesPlayed": 12,
+          "goals": 2,
+          "leagueAbbrev": "AHL",
+          "pim": 2,
+          "plusMinus": -4,
+          "points": 9,
+          "season": 20252026,
+          "sequence": 13,
+          "teamName": {
+            "default": "Bridgeport Islanders"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484807/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484807/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/new-york-islanders-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-18"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8485562",
+      "name": "Alexander Zharovsky",
+      "organization": "MTL",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals": 0.1027,
+        "assists": 0.1428,
+        "shots_on_goal": 1.333,
+        "blocks": 0.418,
+        "power_play_points": 0.0,
+        "hits": 0.976,
+        "penalty_minutes": 0.25,
+        "short_handed_points": 0.0082,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": null,
+      "workload_unit": "games",
+      "basis": "NHL games remain unallocated because current opportunity is not established. Russia expected for 2026-27. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "assists": 26,
+          "gameTypeId": 2,
+          "gamesPlayed": 59,
+          "goals": 16,
+          "leagueAbbrev": "KHL",
+          "pim": 38,
+          "plusMinus": 7,
+          "points": 42,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Salavat Yulaev Ufa"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485562/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position F, draft pick 34, rate band 5.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485562/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/montreal-canadiens-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-15"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8485362",
+      "name": "Carter Bear",
+      "organization": "DET",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.2185,
+        "blocks": 0.392,
+        "goals": 0.1538,
+        "hits": 0.889,
+        "penalty_minutes": 0.329,
+        "plus_minus": -0.0185,
+        "power_play_points": 0.0385,
+        "short_handed_points": 0.0082,
+        "shots_on_goal": 1.605
+      },
+      "nhl_workload": 24.44878,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 24.45 games. Conditional production rates are applied once; opportunity uncertainty is already included. Grand Rapids expected. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 30,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "1_to_15",
+        "unscaled_gp": 23.866666666666667,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 24.44878048780488,
+        "allocation_factor": 0.999999980047885,
+        "final_gp": 24.44878,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/detroit-red-wings-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-10"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 41,
+          "gameTypeId": 2,
+          "gamesPlayed": 53,
+          "goals": 36,
+          "leagueAbbrev": "WHL",
+          "pim": 56,
+          "plusMinus": 45,
+          "points": 77,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Everett Silvertips"
+          }
+        },
+        {
+          "assists": 0,
+          "gameTypeId": 2,
+          "gamesPlayed": 2,
+          "goals": 0,
+          "leagueAbbrev": "WJC-20",
+          "pim": 0,
+          "plusMinus": 0,
+          "points": 0,
+          "season": 20252026,
+          "sequence": 12,
+          "teamName": {
+            "default": "Canada U20"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485362/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485362/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/detroit-red-wings-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-10"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484769",
+      "name": "Terik Parascak",
+      "organization": "WSH",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "goals": 0.1429,
+        "assists": 0.2185,
+        "shots_on_goal": 1.571,
+        "blocks": 0.378,
+        "power_play_points": 0.0287,
+        "hits": 0.944,
+        "penalty_minutes": 0.289,
+        "short_handed_points": 0.0082,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": 10.153515,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 10.15 games. Conditional production rates are applied once; opportunity uncertainty is already included. Hershey development expected. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 34,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "16_to_31",
+        "unscaled_gp": 9.911764705882353,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 10.153515064562411,
+        "allocation_factor": 0.9999999936413735,
+        "final_gp": 10.153515,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/washington-capitals-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-31"
+          },
+          {
+            "url": "https://www.nhl.com/capitals/news/topic/press-releases/capitals-sign-terik-parascak",
+            "date": "2024-07-05"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 46,
+          "gameTypeId": 2,
+          "gamesPlayed": 61,
+          "goals": 33,
+          "leagueAbbrev": "WHL",
+          "pim": 53,
+          "plusMinus": 14,
+          "points": 79,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Prince George Cougars"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484769/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position F, draft pick 17, rate band 4.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484769/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/washington-capitals-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-31"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8485412",
+      "name": "Lynden Lakovic",
+      "organization": "WSH",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals": 0.1429,
+        "assists": 0.2185,
+        "shots_on_goal": 1.571,
+        "blocks": 0.378,
+        "power_play_points": 0.0287,
+        "hits": 0.944,
+        "penalty_minutes": 0.289,
+        "short_handed_points": 0.0082,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": null,
+      "workload_unit": "games",
+      "basis": "NHL games remain unallocated because current opportunity is not established. Shoulder recovery; AHL eligible. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "assists": 11,
+          "gameTypeId": 2,
+          "gamesPlayed": 22,
+          "goals": 18,
+          "leagueAbbrev": "WHL",
+          "pim": 8,
+          "plusMinus": -3,
+          "points": 29,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Moose Jaw Warriors"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485412/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position F, draft pick 27, rate band 4.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485412/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/washington-capitals-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-31"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8484770",
+      "name": "Sam O'Reilly",
+      "organization": "TBL",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.1428,
+        "blocks": 0.418,
+        "goals": 0.1027,
+        "hits": 0.976,
+        "penalty_minutes": 0.25,
+        "plus_minus": -0.0185,
+        "power_play_points": 0.0,
+        "short_handed_points": 0.0082,
+        "shots_on_goal": 1.333
+      },
+      "nhl_workload": 4.643902,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 4.64 games. Conditional production rates are applied once; opportunity uncertainty is already included. Turning pro; roster competition. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 315,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "32_plus_or_unknown",
+        "unscaled_gp": 4.533333333333333,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 4.643902439024391,
+        "allocation_factor": 0.9999999054621846,
+        "final_gp": 4.643902,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/tampa-bay-lightning-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-26"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 16,
+          "gameTypeId": 2,
+          "gamesPlayed": 28,
+          "goals": 12,
+          "leagueAbbrev": "OHL",
+          "pim": 11,
+          "plusMinus": -11,
+          "points": 28,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "London Knights"
+          }
+        },
+        {
+          "assists": 4,
+          "gameTypeId": 2,
+          "gamesPlayed": 7,
+          "goals": 4,
+          "leagueAbbrev": "WJC-20",
+          "pim": 0,
+          "plusMinus": 7,
+          "points": 8,
+          "season": 20252026,
+          "sequence": 12,
+          "teamName": {
+            "default": "Canada U20"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484770/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484770/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/tampa-bay-lightning-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-26"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484779",
+      "name": "Jett Luchanko",
+      "organization": "PHI",
+      "disposition": "existing_forecast_preserved",
+      "rates": {
+        "assists": 0.27297297297297296,
+        "blocks": 0.47027027027027024,
+        "goals": 0.18378378378378377,
+        "hits": 0.6432432432432432,
+        "penalty_minutes": 0.30270270270270266,
+        "power_play_points": 0.04594594594594594,
+        "short_handed_points": 0.004054054054054054,
+        "shots_on_goal": 1.545945945945946
+      },
+      "nhl_workload": 74.0,
+      "workload_unit": "games",
+      "basis": "Existing reviewed canonical forecast preserved exactly."
+    },
+    {
+      "player_id": "8485351",
+      "name": "Bill Zonnon",
+      "organization": "PIT",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "goals": 0.1429,
+        "assists": 0.2185,
+        "shots_on_goal": 1.571,
+        "blocks": 0.378,
+        "power_play_points": 0.0287,
+        "hits": 0.944,
+        "penalty_minutes": 0.289,
+        "short_handed_points": 0.0082,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": 10.153515,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 10.15 games. Conditional production rates are applied once; opportunity uncertainty is already included. AHL development expected. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 34,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "16_to_31",
+        "unscaled_gp": 9.911764705882353,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 10.153515064562411,
+        "allocation_factor": 0.9999999936413735,
+        "final_gp": 10.153515,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/pittsburgh-penguins-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-22"
+          },
+          {
+            "url": "https://www.nhl.com/penguins/news/penguins-sign-forward-bill-zonnon-to-a-three-year-entry-level-contract",
+            "date": "2026-03-22"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 32,
+          "gameTypeId": 2,
+          "gamesPlayed": 35,
+          "goals": 14,
+          "leagueAbbrev": "QMJHL",
+          "pim": 6,
+          "plusMinus": 24,
+          "points": 46,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Blainville-Boisbriand Armada"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485351/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position F, draft pick 22, rate band 4.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485351/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/pittsburgh-penguins-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-22"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8485415",
+      "name": "William Horcoff",
+      "organization": "PIT",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals": 0.1429,
+        "assists": 0.2185,
+        "shots_on_goal": 1.571,
+        "blocks": 0.378,
+        "power_play_points": 0.0287,
+        "hits": 0.944,
+        "penalty_minutes": 0.289,
+        "short_handed_points": 0.0082,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": null,
+      "workload_unit": "games",
+      "basis": "NHL games remain unallocated because current opportunity is not established. Michigan return; shoulder surgery. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "assists": 14,
+          "gameTypeId": 2,
+          "gamesPlayed": 40,
+          "goals": 25,
+          "leagueAbbrev": "NCAA",
+          "pim": 64,
+          "plusMinus": 10,
+          "points": 39,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Univ. of Michigan"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485415/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position F, draft pick 24, rate band 4.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485415/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/pittsburgh-penguins-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-22"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8484242",
+      "name": "Brayden Yager",
+      "organization": "WPG",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.12581568893309933,
+        "blocks": 0.2849869480647021,
+        "goals": 0.14167264559738643,
+        "hits": 0.45101450009958366,
+        "penalty_minutes": 0.5766894607885288,
+        "plus_minus": -0.02638184341018385,
+        "power_play_points": 0.049193681849573276,
+        "short_handed_points": 0.004310357280889052,
+        "shots_on_goal": 1.1528479702973433
+      },
+      "nhl_workload": 38.107317,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 38.11 games. Conditional production rates are applied once; opportunity uncertainty is already included. Further development expected. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 30,
+        "prior_nhl_gp_min": 1,
+        "prior_nhl_gp_max": 24,
+        "draft_band": "1_to_31",
+        "unscaled_gp": 37.2,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 38.107317073170734,
+        "allocation_factor": 0.9999999980798772,
+        "final_gp": 38.107317,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/winnipeg-jets-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-09-01"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 20,
+          "gameTypeId": 2,
+          "gamesPlayed": 68,
+          "goals": 10,
+          "leagueAbbrev": "AHL",
+          "pim": 10,
+          "plusMinus": -15,
+          "points": 30,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Manitoba Moose"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484242/landing",
+      "rate_basis": {
+        "provenance": "MODEL",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484242/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911060000_project_ros_gp_last_falls_back.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/winnipeg-jets-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-09-01"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484993",
+      "name": "Egor Surin",
+      "organization": "NSH",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals": 0.1429,
+        "assists": 0.2185,
+        "shots_on_goal": 1.571,
+        "blocks": 0.378,
+        "power_play_points": 0.0287,
+        "hits": 0.944,
+        "penalty_minutes": 0.289,
+        "short_handed_points": 0.0082,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": null,
+      "workload_unit": "games",
+      "basis": "NHL games remain unallocated because current opportunity is not established. Another overseas season. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "assists": 22,
+          "gameTypeId": 2,
+          "gamesPlayed": 57,
+          "goals": 15,
+          "leagueAbbrev": "KHL",
+          "pim": 43,
+          "plusMinus": 22,
+          "points": 37,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Lokomotiv Yaroslavl"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484993/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position F, draft pick 22, rate band 4.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484993/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/nashville-predators-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-16"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8485371",
+      "name": "Cole Reschny",
+      "organization": "CGY",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals": 0.1429,
+        "assists": 0.2185,
+        "shots_on_goal": 1.571,
+        "blocks": 0.378,
+        "power_play_points": 0.0287,
+        "hits": 0.944,
+        "penalty_minutes": 0.289,
+        "short_handed_points": 0.0082,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": null,
+      "workload_unit": "games",
+      "basis": "NHL games remain unallocated because current opportunity is not established. Returning to North Dakota. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "assists": 29,
+          "gameTypeId": 2,
+          "gamesPlayed": 36,
+          "goals": 6,
+          "leagueAbbrev": "NCAA",
+          "pim": 22,
+          "plusMinus": 13,
+          "points": 35,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Univ. of North Dakota"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485371/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position F, draft pick 18, rate band 4.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485371/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/calgary-flames-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-04"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8484870",
+      "name": "Max Plante",
+      "organization": "DET",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals": 0.1027,
+        "assists": 0.1428,
+        "shots_on_goal": 1.333,
+        "blocks": 0.418,
+        "power_play_points": 0.0,
+        "hits": 0.976,
+        "penalty_minutes": 0.25,
+        "short_handed_points": 0.0082,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": null,
+      "workload_unit": "games",
+      "basis": "NHL games remain unallocated because current opportunity is not established. Returning to Minnesota Duluth. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "assists": 27,
+          "gameTypeId": 2,
+          "gamesPlayed": 40,
+          "goals": 25,
+          "leagueAbbrev": "NCAA",
+          "pim": 23,
+          "plusMinus": 19,
+          "points": 52,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Univ. of Minnesota-Duluth"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484870/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position F, draft pick 47, rate band 5.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484870/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/redwings/news/when-my-name-was-called-it-was-just-super-special-plante-s-sophomore-campaign-at-minnesota-duluth-culminates-in-2026-hobey-baker-award",
+            "date": "2026-04-29"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8484879",
+      "name": "Dean Letourneau",
+      "organization": "BOS",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals": 0.1429,
+        "assists": 0.2185,
+        "shots_on_goal": 1.571,
+        "blocks": 0.378,
+        "power_play_points": 0.0287,
+        "hits": 0.944,
+        "penalty_minutes": 0.289,
+        "short_handed_points": 0.0082,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": null,
+      "workload_unit": "games",
+      "basis": "NHL games remain unallocated because current opportunity is not established. Returning to Boston College; late-season cameo possible. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "assists": 17,
+          "gameTypeId": 2,
+          "gamesPlayed": 36,
+          "goals": 22,
+          "leagueAbbrev": "NCAA",
+          "pim": 22,
+          "plusMinus": 9,
+          "points": 39,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Boston College"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484879/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position F, draft pick 25, rate band 4.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484879/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/boston-bruins-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-02"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8484796",
+      "name": "Emil Hemming",
+      "organization": "DAL",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.2185,
+        "blocks": 0.378,
+        "goals": 0.1429,
+        "hits": 0.944,
+        "penalty_minutes": 0.289,
+        "plus_minus": -0.0185,
+        "power_play_points": 0.0287,
+        "short_handed_points": 0.0082,
+        "shots_on_goal": 1.571
+      },
+      "nhl_workload": 10.153515,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 10.15 games. Conditional production rates are applied once; opportunity uncertainty is already included. May need AHL development. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 34,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "16_to_31",
+        "unscaled_gp": 9.911764705882353,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 10.153515064562411,
+        "allocation_factor": 0.9999999936413735,
+        "final_gp": 10.153515,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/dallas-stars-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-09"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 0,
+          "gameTypeId": 2,
+          "gamesPlayed": 5,
+          "goals": 0,
+          "leagueAbbrev": "AHL",
+          "pim": 0,
+          "plusMinus": -1,
+          "points": 0,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Texas Stars"
+          }
+        },
+        {
+          "assists": 37,
+          "gameTypeId": 2,
+          "gamesPlayed": 46,
+          "goals": 26,
+          "leagueAbbrev": "OHL",
+          "pim": 22,
+          "plusMinus": 33,
+          "points": 63,
+          "season": 20252026,
+          "sequence": 12,
+          "teamName": {
+            "default": "Barrie Colts"
+          }
+        },
+        {
+          "assists": 0,
+          "gameTypeId": 2,
+          "gamesPlayed": 7,
+          "goals": 3,
+          "leagueAbbrev": "WJC-20",
+          "pim": 2,
+          "plusMinus": -2,
+          "points": 3,
+          "season": 20252026,
+          "sequence": 13,
+          "teamName": {
+            "default": "Finland U20"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484796/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484796/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/dallas-stars-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-09"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484802",
+      "name": "Liam Greentree",
+      "organization": "NYR",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "goals": 0.1429,
+        "assists": 0.2185,
+        "shots_on_goal": 1.571,
+        "blocks": 0.378,
+        "power_play_points": 0.0287,
+        "hits": 0.944,
+        "penalty_minutes": 0.289,
+        "short_handed_points": 0.0082,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": 10.153515,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 10.15 games. Conditional production rates are applied once; opportunity uncertainty is already included. NYR acquisition; NHL role not guaranteed. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 34,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "16_to_31",
+        "unscaled_gp": 9.911764705882353,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 10.153515064562411,
+        "allocation_factor": 0.9999999936413735,
+        "final_gp": 10.153515,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/new-york-rangers-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-19"
+          },
+          {
+            "url": "https://www.nhl.com/kings/news/kings-sign-forward-liam-greentree-to-entry-level-contract",
+            "date": "2024-07-20"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 36,
+          "gameTypeId": 2,
+          "gamesPlayed": 52,
+          "goals": 38,
+          "leagueAbbrev": "OHL",
+          "pim": 63,
+          "plusMinus": 19,
+          "points": 74,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Windsor Spitfires"
+          }
+        },
+        {
+          "assists": 1,
+          "gameTypeId": 2,
+          "gamesPlayed": 3,
+          "goals": 0,
+          "leagueAbbrev": "WJC-20",
+          "pim": 0,
+          "plusMinus": 0,
+          "points": 1,
+          "season": 20252026,
+          "sequence": 12,
+          "teamName": {
+            "default": "Canada U20"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484802/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position F, draft pick 26, rate band 4.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484802/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/new-york-rangers-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-19"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8484143",
+      "name": "Colby Barlow",
+      "organization": "WPG",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.2185,
+        "blocks": 0.378,
+        "goals": 0.1429,
+        "hits": 0.944,
+        "penalty_minutes": 0.289,
+        "plus_minus": -0.0185,
+        "power_play_points": 0.0287,
+        "short_handed_points": 0.0082,
+        "shots_on_goal": 1.571
+      },
+      "nhl_workload": 10.153515,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 10.15 games. Conditional production rates are applied once; opportunity uncertainty is already included. Prospect tournament participant. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 34,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "16_to_31",
+        "unscaled_gp": 9.911764705882353,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 10.153515064562411,
+        "allocation_factor": 0.9999999936413735,
+        "final_gp": 10.153515,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/jets/news/topic/jets-news/jets-announce-2026-prospect-challenge-roster",
+            "date": "2026-09-09"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 8,
+          "gameTypeId": 2,
+          "gamesPlayed": 65,
+          "goals": 8,
+          "leagueAbbrev": "AHL",
+          "pim": 18,
+          "plusMinus": -3,
+          "points": 16,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Manitoba Moose"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484143/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484143/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/jets/news/topic/jets-news/jets-announce-2026-prospect-challenge-roster",
+            "date": "2026-09-09"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484159",
+      "name": "Andrew Cristall",
+      "organization": "WSH",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "goals": 0.1027,
+        "assists": 0.1428,
+        "shots_on_goal": 1.333,
+        "blocks": 0.418,
+        "power_play_points": 0.0,
+        "hits": 0.976,
+        "penalty_minutes": 0.25,
+        "short_handed_points": 0.0082,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": 4.643902,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 4.64 games. Conditional production rates are applied once; opportunity uncertainty is already included. Forward depth limits opportunity. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 315,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "32_plus_or_unknown",
+        "unscaled_gp": 4.533333333333333,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 4.643902439024391,
+        "allocation_factor": 0.9999999054621846,
+        "final_gp": 4.643902,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/washington-capitals-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-31"
+          },
+          {
+            "url": "https://www.nhl.com/capitals/news/capitals-sign-andrew-cristall-345251916",
+            "date": "2023-07-06"
+          },
+          {
+            "url": "https://www.nhl.com/capitals/news/topic/press-releases/capitals-announce-2026-rookie-camp-roster-and-schedule",
+            "date": "2026-09-09"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 40,
+          "gameTypeId": 2,
+          "gamesPlayed": 72,
+          "goals": 20,
+          "leagueAbbrev": "AHL",
+          "pim": 24,
+          "plusMinus": -6,
+          "points": 60,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Hershey Bears"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484159/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position F, draft pick 40, rate band 5.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484159/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/washington-capitals-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-31"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8484799",
+      "name": "Michael Hage",
+      "organization": "MTL",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals": 0.1429,
+        "assists": 0.2185,
+        "shots_on_goal": 1.571,
+        "blocks": 0.378,
+        "power_play_points": 0.0287,
+        "hits": 0.944,
+        "penalty_minutes": 0.289,
+        "short_handed_points": 0.0082,
+        "plus_minus": -0.0185
+      },
+      "nhl_workload": null,
+      "workload_unit": "games",
+      "basis": "NHL games remain unallocated because current opportunity is not established. Michigan return. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "assists": 39,
+          "gameTypeId": 2,
+          "gamesPlayed": 39,
+          "goals": 13,
+          "leagueAbbrev": "NCAA",
+          "pim": 14,
+          "plusMinus": 15,
+          "points": 52,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Univ. of Michigan"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484799/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position F, draft pick 21, rate band 4.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484799/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/montreal-canadiens-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-15"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8485382",
+      "name": "Justin Carbonneau",
+      "organization": "STL",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.1067,
+        "blocks": 0.37,
+        "goals": 0.1027,
+        "hits": 1.238,
+        "penalty_minutes": 0.286,
+        "plus_minus": -0.0185,
+        "power_play_points": 0.0,
+        "short_handed_points": 0.0082,
+        "shots_on_goal": 1.0
+      },
+      "nhl_workload": 10.153515,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 10.15 games. Conditional production rates are applied once; opportunity uncertainty is already included. Springfield expected. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 34,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "16_to_31",
+        "unscaled_gp": 9.911764705882353,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 10.153515064562411,
+        "allocation_factor": 0.9999999936413735,
+        "final_gp": 10.153515,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/st-louis-blues-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-25"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 29,
+          "gameTypeId": 2,
+          "gamesPlayed": 60,
+          "goals": 51,
+          "leagueAbbrev": "QMJHL",
+          "pim": 64,
+          "plusMinus": 31,
+          "points": 80,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Blainville-Boisbriand Armada"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485382/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485382/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/st-louis-blues-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-25"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484803",
+      "name": "Trevor Connelly",
+      "organization": "VGK",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.2185,
+        "blocks": 0.378,
+        "goals": 0.1429,
+        "hits": 0.944,
+        "penalty_minutes": 0.289,
+        "plus_minus": -0.0185,
+        "power_play_points": 0.0287,
+        "short_handed_points": 0.0082,
+        "shots_on_goal": 1.571
+      },
+      "nhl_workload": 10.153515,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 10.15 games. Conditional production rates are applied once; opportunity uncertainty is already included. AHL development; NHL possibility. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 34,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "16_to_31",
+        "unscaled_gp": 9.911764705882353,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 10.153515064562411,
+        "allocation_factor": 0.9999999936413735,
+        "final_gp": 10.153515,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/vegas-golden-knights-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-30"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 35,
+          "gameTypeId": 2,
+          "gamesPlayed": 46,
+          "goals": 14,
+          "leagueAbbrev": "AHL",
+          "pim": 18,
+          "plusMinus": 2,
+          "points": 49,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Henderson Silver Knights"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484803/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484803/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/vegas-golden-knights-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-30"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484987",
+      "name": "Anton Silaev",
+      "organization": "NJD",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.247,
+        "blocks": 1.111,
+        "goals": 0.0838,
+        "hits": 1.126,
+        "penalty_minutes": 0.496,
+        "plus_minus": -0.0232,
+        "power_play_points": 0.0999,
+        "short_handed_points": 0.004,
+        "shots_on_goal": 1.34
+      },
+      "nhl_workload": 24.44878,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 24.45 games. Conditional production rates are applied once; opportunity uncertainty is already included. Training-camp opportunity; AHL start possible. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 30,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "1_to_15",
+        "unscaled_gp": 23.866666666666667,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 24.44878048780488,
+        "allocation_factor": 0.999999980047885,
+        "final_gp": 24.44878,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/new-jersey-devils-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-17"
+          },
+          {
+            "url": "https://www.nhl.com/devils/news/topic/10-takeaways/devils-sign-defenseman-anton-silayev-release-6-1-26",
+            "date": "2026-06-01"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 2,
+          "gameTypeId": 2,
+          "gamesPlayed": 61,
+          "goals": 1,
+          "leagueAbbrev": "KHL",
+          "pim": 10,
+          "plusMinus": 1,
+          "points": 3,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Torpedo Nizhny Novgorod"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484987/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484987/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/new-jersey-devils-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-17"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8485352",
+      "name": "Kashawn Aitcheson",
+      "organization": "NYI",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.1865,
+        "blocks": 1.0,
+        "goals": 0.045,
+        "hits": 0.984,
+        "penalty_minutes": 0.314,
+        "plus_minus": -0.0232,
+        "power_play_points": 0.0169,
+        "short_handed_points": 0.004,
+        "shots_on_goal": 1.2441
+      },
+      "nhl_workload": 10.153515,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 10.15 games. Conditional production rates are applied once; opportunity uncertainty is already included. AHL likely; camp opportunity. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 34,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "16_to_31",
+        "unscaled_gp": 9.911764705882353,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 10.153515064562411,
+        "allocation_factor": 0.9999999936413735,
+        "final_gp": 10.153515,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/new-york-islanders-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-18"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 42,
+          "gameTypeId": 2,
+          "gamesPlayed": 56,
+          "goals": 28,
+          "leagueAbbrev": "OHL",
+          "pim": 97,
+          "plusMinus": 46,
+          "points": 70,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Barrie Colts"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485352/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485352/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/new-york-islanders-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-18"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8485361",
+      "name": "Jackson Smith",
+      "organization": "CBJ",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals": 0.0732,
+        "assists": 0.2286,
+        "shots_on_goal": 1.2441,
+        "blocks": 1.265,
+        "power_play_points": 0.0294,
+        "hits": 1.0,
+        "penalty_minutes": 0.418,
+        "short_handed_points": 0.004,
+        "plus_minus": -0.0232
+      },
+      "nhl_workload": null,
+      "workload_unit": "games",
+      "basis": "NHL games remain unallocated because current opportunity is not established. NCAA development continues. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "assists": 15,
+          "gameTypeId": 2,
+          "gamesPlayed": 35,
+          "goals": 11,
+          "leagueAbbrev": "NCAA",
+          "pim": 40,
+          "plusMinus": -2,
+          "points": 26,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Penn State Univ."
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485361/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position D, draft pick 14, rate band 3.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485361/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/columbus-blue-jackets-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-08"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8484790",
+      "name": "Adam Jiricek",
+      "organization": "STL",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.125,
+        "blocks": 1.0,
+        "goals": 0.0,
+        "hits": 1.0,
+        "penalty_minutes": 0.323,
+        "plus_minus": -0.0232,
+        "power_play_points": 0.0,
+        "short_handed_points": 0.004,
+        "shots_on_goal": 1.0
+      },
+      "nhl_workload": 10.153515,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 10.15 games. Conditional production rates are applied once; opportunity uncertainty is already included. Springfield likely; call-up possible. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 34,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "16_to_31",
+        "unscaled_gp": 9.911764705882353,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 10.153515064562411,
+        "allocation_factor": 0.9999999936413735,
+        "final_gp": 10.153515,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/st-louis-blues-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-25"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 40,
+          "gameTypeId": 2,
+          "gamesPlayed": 55,
+          "goals": 19,
+          "leagueAbbrev": "OHL",
+          "pim": 33,
+          "plusMinus": 31,
+          "points": 59,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Brantford Bulldogs"
+          }
+        },
+        {
+          "assists": 1,
+          "gameTypeId": 2,
+          "gamesPlayed": 7,
+          "goals": 5,
+          "leagueAbbrev": "WJC-20",
+          "pim": 2,
+          "plusMinus": 0,
+          "points": 6,
+          "season": 20252026,
+          "sequence": 12,
+          "teamName": {
+            "default": "Czechia U20"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484790/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484790/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/st-louis-blues-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-25"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484196",
+      "name": "Tanner Molendyk",
+      "organization": "NSH",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.1865,
+        "blocks": 1.0,
+        "goals": 0.045,
+        "hits": 0.984,
+        "penalty_minutes": 0.314,
+        "plus_minus": -0.0232,
+        "power_play_points": 0.0169,
+        "short_handed_points": 0.004,
+        "shots_on_goal": 1.2441
+      },
+      "nhl_workload": 9.695558,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 9.70 games. Conditional production rates are applied once; opportunity uncertainty is already included. AHL experience; camp opportunity. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 34,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "16_to_31",
+        "unscaled_gp": 9.911764705882353,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 10.153515064562411,
+        "allocation_factor": 0.954896697188074,
+        "final_gp": 9.695558,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/nashville-predators-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-16"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 19,
+          "gameTypeId": 2,
+          "gamesPlayed": 60,
+          "goals": 4,
+          "leagueAbbrev": "AHL",
+          "pim": 14,
+          "plusMinus": -10,
+          "points": 23,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Milwaukee Admirals"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484196/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484196/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/nashville-predators-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-16"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8485372",
+      "name": "Cameron Reid",
+      "organization": "NSH",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals": 0.045,
+        "assists": 0.1865,
+        "shots_on_goal": 1.2441,
+        "blocks": 1.0,
+        "power_play_points": 0.0169,
+        "hits": 0.984,
+        "penalty_minutes": 0.314,
+        "short_handed_points": 0.004,
+        "plus_minus": -0.0232
+      },
+      "nhl_workload": null,
+      "workload_unit": "games",
+      "basis": "NHL games remain unallocated because current opportunity is not established. Michigan commitment. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "assists": 41,
+          "gameTypeId": 2,
+          "gamesPlayed": 57,
+          "goals": 15,
+          "leagueAbbrev": "OHL",
+          "pim": 29,
+          "plusMinus": 25,
+          "points": 56,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Kitchener Rangers"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485372/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position D, draft pick 21, rate band 4.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485372/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/nashville-predators-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-16"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8484859",
+      "name": "Stian Solberg",
+      "organization": "ANA",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.1865,
+        "blocks": 1.0,
+        "goals": 0.045,
+        "hits": 0.984,
+        "penalty_minutes": 0.314,
+        "plus_minus": -0.0232,
+        "power_play_points": 0.0169,
+        "short_handed_points": 0.004,
+        "shots_on_goal": 1.2441
+      },
+      "nhl_workload": 10.153515,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 10.15 games. Conditional production rates are applied once; opportunity uncertainty is already included. AHL likely. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 34,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "16_to_31",
+        "unscaled_gp": 9.911764705882353,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 10.153515064562411,
+        "allocation_factor": 0.9999999936413735,
+        "final_gp": 10.153515,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/anaheim-ducks-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-01"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 12,
+          "gameTypeId": 2,
+          "gamesPlayed": 71,
+          "goals": 12,
+          "leagueAbbrev": "AHL",
+          "pim": 102,
+          "plusMinus": -16,
+          "points": 24,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "San Diego Gulls"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484859/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484859/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/anaheim-ducks-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-01"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484839",
+      "name": "Harrison Brunicke",
+      "organization": "PIT",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "goals": 0.06923346939378851,
+        "assists": 0.05339178336433658,
+        "shots_on_goal": 1.044263887873572,
+        "blocks": 1.5563505080645699,
+        "power_play_points": 0.012422065450582194,
+        "short_handed_points": 0.0013062808610182558,
+        "hits": 0.5844115856552463,
+        "penalty_minutes": 0.6734347127953955,
+        "plus_minus": -0.0889334708143398
+      },
+      "nhl_workload": 17.714886,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 17.71 games. Conditional production rates are applied once; opportunity uncertainty is already included. Competing for NHL opportunity. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 116,
+        "prior_nhl_gp_min": 1,
+        "prior_nhl_gp_max": 24,
+        "draft_band": "32_plus_or_unknown",
+        "unscaled_gp": 17.29310344827586,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 17.714886459209417,
+        "allocation_factor": 0.9999999740777669,
+        "final_gp": 17.714886,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/pittsburgh-penguins-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-22"
+          },
+          {
+            "url": "https://www.nhl.com/penguins/news/penguins-sign-harrison-brunicke-to-a-three-year-entry-level-contract",
+            "date": "2024-07-18"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 7,
+          "gameTypeId": 2,
+          "gamesPlayed": 11,
+          "goals": 1,
+          "leagueAbbrev": "AHL",
+          "pim": 2,
+          "plusMinus": 8,
+          "points": 8,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Wilkes-Barre/Scranton Penguins"
+          }
+        },
+        {
+          "assists": 2,
+          "gameTypeId": 2,
+          "gamesPlayed": 2,
+          "goals": 0,
+          "leagueAbbrev": "International-Jr",
+          "pim": 0,
+          "points": 2,
+          "season": 20252026,
+          "sequence": 13,
+          "teamName": {
+            "default": "Canada U20"
+          }
+        },
+        {
+          "assists": 22,
+          "gameTypeId": 2,
+          "gamesPlayed": 24,
+          "goals": 2,
+          "leagueAbbrev": "WHL",
+          "pim": 20,
+          "plusMinus": 0,
+          "points": 24,
+          "season": 20252026,
+          "sequence": 14,
+          "teamName": {
+            "default": "Kamloops Blazers"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484839/landing",
+      "rate_basis": {
+        "provenance": "MODEL",
+        "method": "Existing project_ros(2026), player-specific NHL model output captured2026-09-13.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484839/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911060000_project_ros_gp_last_falls_back.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/pittsburgh-penguins-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-22"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8486113",
+      "name": "Xavier Villeneuve",
+      "organization": "CHI",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals": 0.0328,
+        "assists": 0.1707,
+        "shots_on_goal": 1.0983,
+        "blocks": 1.104,
+        "power_play_points": 0.0,
+        "hits": 1.171,
+        "penalty_minutes": 0.375,
+        "short_handed_points": 0.004,
+        "plus_minus": -0.0232
+      },
+      "nhl_workload": null,
+      "workload_unit": "games",
+      "basis": "NHL games remain unallocated because current opportunity is not established. Boston University commitment; see separate league source. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "assists": 32,
+          "gameTypeId": 2,
+          "gamesPlayed": 37,
+          "goals": 6,
+          "leagueAbbrev": "QMJHL",
+          "pim": 35,
+          "plusMinus": 7,
+          "points": 38,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Blainville-Boisbriand Armada"
+          }
+        },
+        {
+          "assists": 0,
+          "gameTypeId": 2,
+          "gamesPlayed": 3,
+          "goals": 1,
+          "leagueAbbrev": "Prospects Challenge",
+          "pim": 4,
+          "plusMinus": 1,
+          "points": 1,
+          "season": 20252026,
+          "sequence": 12,
+          "teamName": {
+            "default": "Team CHL"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8486113/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies conditional NHL debut rates; position D, draft pick 34, rate band 5.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8486113/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/blackhawks/news/topic/training-camp/release-blackhawks-wrap-2026-nhl-draft-with-five-selections",
+            "date": "2026-06-27"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8484808",
+      "name": "Charlie Elick",
+      "organization": "CBJ",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.1707,
+        "blocks": 1.104,
+        "goals": 0.0328,
+        "hits": 1.171,
+        "penalty_minutes": 0.375,
+        "plus_minus": -0.0232,
+        "power_play_points": 0.0,
+        "short_handed_points": 0.004,
+        "shots_on_goal": 1.0983
+      },
+      "nhl_workload": 4.643902,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 4.64 games. Conditional production rates are applied once; opportunity uncertainty is already included. Prospect tournament participant. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 315,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "32_plus_or_unknown",
+        "unscaled_gp": 4.533333333333333,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 4.643902439024391,
+        "allocation_factor": 0.9999999054621846,
+        "final_gp": 4.643902,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/bluejackets/news/2026-prospects-tournament-roster",
+            "date": "2026-09-10"
+          },
+          {
+            "url": "https://www.nhl.com/bluejackets/news/defenseman-charlie-elick-loaned-to-cleveland",
+            "date": "2026-03-25"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 14,
+          "gameTypeId": 2,
+          "gamesPlayed": 63,
+          "goals": 6,
+          "leagueAbbrev": "WHL",
+          "pim": 46,
+          "plusMinus": -15,
+          "points": 20,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Tri-City Americans"
+          }
+        },
+        {
+          "assists": 1,
+          "gameTypeId": 2,
+          "gamesPlayed": 2,
+          "goals": 0,
+          "leagueAbbrev": "AHL",
+          "pim": 0,
+          "plusMinus": 0,
+          "points": 1,
+          "season": 20252026,
+          "sequence": 12,
+          "teamName": {
+            "default": "Cleveland Monsters"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484808/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484808/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/bluejackets/news/2026-prospects-tournament-roster",
+            "date": "2026-09-10"
+          },
+          {
+            "url": "https://www.nhl.com/bluejackets/news/defenseman-charlie-elick-loaned-to-cleveland",
+            "date": "2026-03-25"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484781",
+      "name": "Dominik Badinka",
+      "organization": "CAR",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.1707,
+        "blocks": 1.104,
+        "goals": 0.0328,
+        "hits": 1.171,
+        "penalty_minutes": 0.375,
+        "plus_minus": -0.0232,
+        "power_play_points": 0.0,
+        "short_handed_points": 0.004,
+        "shots_on_goal": 1.0983
+      },
+      "nhl_workload": 1.738019,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 1.74 games. Conditional production rates are applied once; opportunity uncertainty is already included. Wolves placement is editorial, not official. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 315,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "32_plus_or_unknown",
+        "unscaled_gp": 4.533333333333333,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 4.643902439024391,
+        "allocation_factor": 0.37425829306722685,
+        "final_gp": 1.738019,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/hurricanes/news/looking-ahead-the-2026-27-organizational-outlook",
+            "date": "2026-09-10"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 8,
+          "gameTypeId": 2,
+          "gamesPlayed": 68,
+          "goals": 6,
+          "leagueAbbrev": "AHL",
+          "pim": 16,
+          "plusMinus": 4,
+          "points": 14,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Chicago Wolves"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484781/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484781/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/hurricanes/news/looking-ahead-the-2026-27-organizational-outlook",
+            "date": "2026-09-10"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484805",
+      "name": "Ben Danford",
+      "organization": "TOR",
+      "disposition": "documented_opportunity_prior",
+      "rates": {
+        "assists": 0.1865,
+        "blocks": 1.0,
+        "goals": 0.045,
+        "hits": 0.984,
+        "penalty_minutes": 0.314,
+        "plus_minus": -0.0232,
+        "power_play_points": 0.0169,
+        "short_handed_points": 0.004,
+        "shots_on_goal": 1.2441
+      },
+      "nhl_workload": 10.153515,
+      "workload_unit": "games",
+      "basis": "Low-confidence NHL opportunity estimate: 10.15 games. Conditional production rates are applied once; opportunity uncertainty is already included. Marlies development continues. No NHL lineup slot is confirmed.",
+      "opportunity_prior": {
+        "method": "2025_directory_unconditional_transition_v1",
+        "measured_season": 2025,
+        "cohort_count": 34,
+        "prior_nhl_gp_min": 0,
+        "prior_nhl_gp_max": 0,
+        "draft_band": "16_to_31",
+        "unscaled_gp": 9.911764705882353,
+        "cohort_schedule_games": 82,
+        "pre_cap_gp": 10.153515064562411,
+        "allocation_factor": 0.9999999936413735,
+        "final_gp": 10.153515,
+        "probability_semantics": "already_in_exposure",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/toronto-maple-leafs-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-27"
+          }
+        ],
+        "limitations": "Descriptive2025 season-directory cohort includes zero NHL outcomes. Directory timing is not proven preseason; selection bias and one-season uncertainty remain. This is an assumed opportunity prior, not a confirmed role or calibrated individual prediction. Proportional capacity cap only reduces newly reviewed estimates."
+      },
+      "non_nhl_actuals": [
+        {
+          "assists": 3,
+          "gameTypeId": 2,
+          "gamesPlayed": 8,
+          "goals": 1,
+          "leagueAbbrev": "OHL",
+          "pim": 5,
+          "plusMinus": -10,
+          "points": 4,
+          "season": 20252026,
+          "sequence": 11,
+          "teamName": {
+            "default": "Oshawa Generals"
+          }
+        },
+        {
+          "assists": 1,
+          "gameTypeId": 2,
+          "gamesPlayed": 7,
+          "goals": 0,
+          "leagueAbbrev": "WJC-20",
+          "pim": 4,
+          "plusMinus": 1,
+          "points": 1,
+          "season": 20252026,
+          "sequence": 13,
+          "teamName": {
+            "default": "Canada U20"
+          }
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484805/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484805/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/toronto-maple-leafs-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-27"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484181",
+      "name": "Michael Hrabal",
+      "organization": "UTA",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals_against": 2.576,
+        "saves": 25.0,
+        "shutouts": 0.0574,
+        "wins": 0.406
+      },
+      "nhl_workload": null,
+      "workload_unit": "starts",
+      "basis": "NHL starts remain unallocated; existing team crease allocations are preserved. Contract begins 2026-27; prior AHL placement. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "gameTypeId": 2,
+          "gamesPlayed": 29,
+          "goalsAgainst": 56,
+          "goalsAgainstAvg": 1.95,
+          "leagueAbbrev": "NCAA",
+          "losses": 9,
+          "otLosses": 1,
+          "savePctg": 0.937,
+          "season": 20252026,
+          "sequence": 11300,
+          "shotsAgainst": 893,
+          "shutouts": 4,
+          "teamName": {
+            "default": "UMass"
+          },
+          "timeOnIce": "1721:00",
+          "wins": 19
+        },
+        {
+          "gameTypeId": 2,
+          "gamesPlayed": 5,
+          "goalsAgainst": 15,
+          "goalsAgainstAvg": 2.96,
+          "leagueAbbrev": "AHL",
+          "losses": 1,
+          "otLosses": 1,
+          "savePctg": 0.897,
+          "season": 20252026,
+          "sequence": 218897,
+          "shotsAgainst": 146,
+          "shutouts": 0,
+          "teamName": {
+            "default": "Tucson Roadrunners"
+          },
+          "timeOnIce": "303:59",
+          "wins": 3
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484181/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484181/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/utah/news/utah-signs-michael-hrabal-to-three-year-entry-level-contract-release-3-25-26",
+            "date": "2026-03-25"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484141",
+      "name": "Trey Augustine",
+      "organization": "DET",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals_against": 2.576,
+        "saves": 25.0,
+        "shutouts": 0.0574,
+        "wins": 0.406
+      },
+      "nhl_workload": null,
+      "workload_unit": "starts",
+      "basis": "NHL starts remain unallocated; existing team crease allocations are preserved. Grand Rapids competition. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "gameTypeId": 2,
+          "gamesPlayed": 2,
+          "goalsAgainst": 5,
+          "goalsAgainstAvg": 3.39,
+          "leagueAbbrev": "AHL",
+          "losses": 2,
+          "otLosses": 0,
+          "savePctg": 0.878,
+          "season": 20252026,
+          "sequence": 987,
+          "shotsAgainst": 41,
+          "shutouts": 0,
+          "teamName": {
+            "default": "Grand Rapids Griffins"
+          },
+          "timeOnIce": "88:34",
+          "wins": 0
+        },
+        {
+          "gameTypeId": 2,
+          "gamesPlayed": 34,
+          "goalsAgainst": 72,
+          "goalsAgainstAvg": 2.11,
+          "leagueAbbrev": "NCAA",
+          "losses": 9,
+          "otLosses": 1,
+          "savePctg": 0.929,
+          "season": 20252026,
+          "sequence": 12130,
+          "shotsAgainst": 1019,
+          "shutouts": 3,
+          "teamName": {
+            "default": "Michigan State Univ."
+          },
+          "timeOnIce": "2048:00",
+          "wins": 24
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484141/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484141/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/detroit-red-wings-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-10"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484996",
+      "name": "Ilya Nabokov",
+      "organization": "COL",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals_against": 2.576,
+        "saves": 25.0,
+        "shutouts": 0.0574,
+        "wins": 0.406
+      },
+      "nhl_workload": null,
+      "workload_unit": "starts",
+      "basis": "NHL starts remain unallocated; existing team crease allocations are preserved. Expected to share AHL crease. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "gameTypeId": 2,
+          "gamesPlayed": 38,
+          "goalsAgainst": 97,
+          "goalsAgainstAvg": 2.74,
+          "leagueAbbrev": "KHL",
+          "losses": 7,
+          "otLosses": 5,
+          "savePctg": 0.901,
+          "season": 20252026,
+          "sequence": 2374,
+          "shotsAgainst": 975,
+          "shutouts": 1,
+          "teamName": {
+            "default": "Metallurg Magnitogorsk"
+          },
+          "timeOnIce": "2121:23",
+          "wins": 22
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484996/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484996/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/colorado-avalanche-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-07"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8482949",
+      "name": "Arsenii Sergeev",
+      "organization": "CGY",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals_against": 2.14531221554706,
+        "saves": 25.05104678681959,
+        "shutouts": 0.03106984647126646,
+        "wins": 0.6500030341646944
+      },
+      "nhl_workload": null,
+      "workload_unit": "starts",
+      "basis": "NHL starts remain unallocated; existing team crease allocations are preserved. Prospect camp participant. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "gameTypeId": 2,
+          "gamesPlayed": 12,
+          "goalsAgainst": 35,
+          "goalsAgainstAvg": 2.94,
+          "leagueAbbrev": "ECHL",
+          "losses": 6,
+          "otLosses": 0,
+          "savePctg": 0.922,
+          "season": 20252026,
+          "sequence": 27275,
+          "shotsAgainst": 448,
+          "shutouts": 0,
+          "teamName": {
+            "default": "Rapid City Rush"
+          },
+          "timeOnIce": "713:47",
+          "wins": 6
+        },
+        {
+          "gameTypeId": 2,
+          "gamesPlayed": 29,
+          "goalsAgainst": 91,
+          "goalsAgainstAvg": 3.35,
+          "leagueAbbrev": "AHL",
+          "losses": 13,
+          "otLosses": 7,
+          "savePctg": 0.898,
+          "season": 20252026,
+          "sequence": 359017,
+          "shotsAgainst": 889,
+          "shutouts": 0,
+          "teamName": {
+            "default": "Calgary Wranglers"
+          },
+          "timeOnIce": "1629:06",
+          "wins": 6
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8482949/landing",
+      "rate_basis": {
+        "provenance": "MODEL",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8482949/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911060000_project_ros_gp_last_falls_back.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/flames/news/topic/transactions/flames-open-2026-prospects-training-camp",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/flames/news/sergeev-wins-nhl-debut-in-flames-finale",
+            "date": "2026-04-17"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8482515",
+      "name": "Artur Akhtyamov",
+      "organization": "TOR",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals_against": 3.287187329328236,
+        "saves": 23.830628072091752,
+        "shutouts": 0.018641907882759875,
+        "wins": 0.19000182049881667
+      },
+      "nhl_workload": null,
+      "workload_unit": "starts",
+      "basis": "NHL starts remain unallocated; existing team crease allocations are preserved. NHL possibility after AHL development. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "gameTypeId": 2,
+          "gamesPlayed": 37,
+          "goalsAgainst": 103,
+          "goalsAgainstAvg": 2.88,
+          "leagueAbbrev": "AHL",
+          "losses": 12,
+          "otLosses": 4,
+          "savePctg": 0.904,
+          "season": 20252026,
+          "sequence": 13377,
+          "shotsAgainst": 1073,
+          "shutouts": 1,
+          "teamName": {
+            "default": "Toronto Marlies"
+          },
+          "timeOnIce": "2146:39",
+          "wins": 21
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8482515/landing",
+      "rate_basis": {
+        "provenance": "MODEL",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8482515/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911060000_project_ros_gp_last_falls_back.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/toronto-maple-leafs-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-27"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484857",
+      "name": "Carter George",
+      "organization": "LAK",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "goals_against": 2.576,
+        "saves": 25.0,
+        "shutouts": 0.0574,
+        "wins": 0.406
+      },
+      "nhl_workload": null,
+      "workload_unit": "starts",
+      "basis": "NHL starts remain unallocated; existing team crease allocations are preserved. AHL development planned. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "gameTypeId": 2,
+          "gamesPlayed": 24,
+          "goalsAgainst": 58,
+          "goalsAgainstAvg": 2.4,
+          "leagueAbbrev": "OHL",
+          "losses": 8,
+          "otLosses": 3,
+          "savePctg": 0.913,
+          "season": 20252026,
+          "sequence": 6918,
+          "shotsAgainst": 670,
+          "shutouts": 3,
+          "teamName": {
+            "default": "Soo Greyhounds"
+          },
+          "timeOnIce": "1450:17",
+          "wins": 13
+        },
+        {
+          "gameTypeId": 2,
+          "gamesPlayed": 22,
+          "goalsAgainst": 63,
+          "goalsAgainstAvg": 3.12,
+          "leagueAbbrev": "OHL",
+          "losses": 9,
+          "otLosses": 2,
+          "savePctg": 0.899,
+          "season": 20252026,
+          "sequence": 9458,
+          "shotsAgainst": 625,
+          "shutouts": 1,
+          "teamName": {
+            "default": "Owen Sound Attack"
+          },
+          "timeOnIce": "1212:52",
+          "wins": 10
+        },
+        {
+          "gameTypeId": 2,
+          "gamesPlayed": 4,
+          "goalsAgainst": 13,
+          "goalsAgainstAvg": 3.25,
+          "leagueAbbrev": "WJC-20",
+          "losses": 0,
+          "otLosses": 0,
+          "savePctg": 0.869,
+          "season": 20252026,
+          "sequence": 17216,
+          "shotsAgainst": 99,
+          "shutouts": 0,
+          "teamName": {
+            "default": "Canada U20"
+          },
+          "timeOnIce": "240:00",
+          "wins": 4
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484857/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing reviewed canonical conditional rates preserved without numerical change.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484857/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/los-angeles-kings-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-13"
+          }
+        ],
+        "limitations": "NHL workload is reviewed separately; organization affiliation does not confirm a role."
+      }
+    },
+    {
+      "player_id": "8484843",
+      "name": "Mikhail Yegorov",
+      "organization": "NJD",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "wins": 0.406,
+        "saves": 25.0,
+        "shutouts": 0.0574,
+        "goals_against": 2.576
+      },
+      "nhl_workload": null,
+      "workload_unit": "starts",
+      "basis": "NHL starts remain unallocated; existing team crease allocations are preserved. Boston University return; professional transition later. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "gameTypeId": 2,
+          "gamesPlayed": 35,
+          "goalsAgainst": 92,
+          "goalsAgainstAvg": 2.73,
+          "leagueAbbrev": "NCAA",
+          "losses": 15,
+          "otLosses": 2,
+          "savePctg": 0.904,
+          "season": 20252026,
+          "sequence": 6890,
+          "shotsAgainst": 961,
+          "shutouts": 2,
+          "teamName": {
+            "default": "Boston Univ."
+          },
+          "timeOnIce": "2019:00",
+          "wins": 16
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8484843/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies pooled conditional NHL goalie rates per start.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8484843/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/devils/news/topic/prospects/new-jersey-devils-top-prospects-for-2026-27-season-32-in-32-x7330",
+            "date": "2026-08-17"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    },
+    {
+      "player_id": "8485560",
+      "name": "Pyotr Andreyanov",
+      "organization": "CBJ",
+      "disposition": "conditional_rates_unallocated_workload",
+      "rates": {
+        "wins": 0.406,
+        "saves": 25.0,
+        "shutouts": 0.0574,
+        "goals_against": 2.576
+      },
+      "nhl_workload": null,
+      "workload_unit": "starts",
+      "basis": "NHL starts remain unallocated; existing team crease allocations are preserved. CSKA contract through 2029-30. Conditional rates are available; unavailable season totals do not mean zero production.",
+      "opportunity_prior": null,
+      "non_nhl_actuals": [
+        {
+          "gameTypeId": 2,
+          "gamesPlayed": 26,
+          "goalsAgainst": 63,
+          "goalsAgainstAvg": 2.59,
+          "leagueAbbrev": "MHL",
+          "losses": 8,
+          "otLosses": 3,
+          "savePctg": 0.919,
+          "season": 20252026,
+          "sequence": 49712,
+          "shotsAgainst": 782,
+          "shutouts": 3,
+          "teamName": {
+            "default": "Krasnaya Armiya Moskva"
+          },
+          "timeOnIce": "1461:52",
+          "wins": 13
+        },
+        {
+          "gameTypeId": 2,
+          "gamesPlayed": 13,
+          "goalsAgainst": 26,
+          "goalsAgainstAvg": 2.13,
+          "leagueAbbrev": "VHL",
+          "losses": 8,
+          "otLosses": 0,
+          "savePctg": 0.918,
+          "season": 20252026,
+          "sequence": 77127,
+          "shotsAgainst": 319,
+          "shutouts": 1,
+          "teamName": {
+            "default": "Zvezda Moskva"
+          },
+          "timeOnIce": "733:02",
+          "wins": 4
+        }
+      ],
+      "actuals_source": "https://api-web.nhle.com/v1/player/8485560/landing",
+      "rate_basis": {
+        "provenance": "DEFAULT",
+        "method": "Existing project_rookies pooled conditional NHL goalie rates per start.",
+        "as_of": "2026-09-13",
+        "evidence": [
+          {
+            "url": "https://api-web.nhle.com/v1/player/8485560/landing",
+            "date": "2026-09-13"
+          },
+          {
+            "url": "https://github.com/Gstormsfh/citrus-league-storm-main/blob/f0e241ad162527436b9e4d0a1709bf8bc1b7bf66/supabase/migrations/20260911070000_project_rookies.sql",
+            "date": "2026-09-11"
+          },
+          {
+            "url": "https://www.nhl.com/news/topic/32-in-32/columbus-blue-jackets-top-prospects-for-2026-27-season-32-in-32",
+            "date": "2026-08-08"
+          }
+        ],
+        "limitations": "Conditional NHL production rate; no individual junior/NCAA/European translation or guaranteed NHL role. Non-NHL actuals are separately attributed context."
+      }
+    }
+  ]
+}

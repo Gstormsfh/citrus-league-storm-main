@@ -1,0 +1,4255 @@
+{
+  "groups": [
+    {
+      "n": 30,
+      "p10_gp": 2.9,
+      "p90_gp": 71.4,
+      "played": 28,
+      "mean_gp": 37.2,
+      "draft_band": "1_to_31",
+      "prior_band": "1_to_24"
+    },
+    {
+      "n": 116,
+      "p10_gp": 0,
+      "p90_gp": 56.5,
+      "played": 83,
+      "mean_gp": 17.29310344827586,
+      "draft_band": "32_plus_or_unknown",
+      "prior_band": "1_to_24"
+    },
+    {
+      "n": 30,
+      "p10_gp": 0,
+      "p90_gp": 76.1,
+      "played": 21,
+      "mean_gp": 23.866666666666667,
+      "draft_band": "1_to_15",
+      "prior_band": "none"
+    },
+    {
+      "n": 34,
+      "p10_gp": 0,
+      "p90_gp": 35.5,
+      "played": 13,
+      "mean_gp": 9.911764705882353,
+      "draft_band": "16_to_31",
+      "prior_band": "none"
+    },
+    {
+      "n": 315,
+      "p10_gp": 0,
+      "p90_gp": 12,
+      "played": 80,
+      "mean_gp": 4.533333333333333,
+      "draft_band": "32_plus_or_unknown",
+      "prior_band": "none"
+    }
+  ],
+  "method": "2025_directory_unconditional_transition_v1",
+  "members": [
+    {
+      "overall": 101,
+      "prior_gp": 6,
+      "player_id": 8476425,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 9,
+      "player_id": 8478173,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 10,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 22,
+      "player_id": 8478176,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 165,
+      "prior_gp": 2,
+      "player_id": 8478888,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 3,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 184,
+      "prior_gp": 22,
+      "player_id": 8479022,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 42,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 25,
+      "prior_gp": 24,
+      "player_id": 8479362,
+      "draft_band": "1_to_31",
+      "outcome_gp": 4,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 135,
+      "prior_gp": 20,
+      "player_id": 8479533,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 13,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 192,
+      "prior_gp": 23,
+      "player_id": 8479602,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8479656,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 5,
+      "player_id": 8479746,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 9,
+      "player_id": 8479942,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 18,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 81,
+      "prior_gp": 1,
+      "player_id": 8480054,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 82,
+      "prior_gp": 2,
+      "player_id": 8480075,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 6,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 177,
+      "prior_gp": 2,
+      "player_id": 8480291,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 4,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8480426,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 70,
+      "prior_band": "none"
+    },
+    {
+      "overall": 37,
+      "prior_gp": 0,
+      "player_id": 8480808,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 17,
+      "player_id": 8480825,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 3,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 142,
+      "prior_gp": 17,
+      "player_id": 8480828,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 5,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 67,
+      "prior_gp": 22,
+      "player_id": 8480831,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 29,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 58,
+      "prior_gp": 3,
+      "player_id": 8480842,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 13,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 50,
+      "prior_gp": 11,
+      "player_id": 8480874,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 5,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 106,
+      "prior_gp": 0,
+      "player_id": 8480876,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 43,
+      "prior_band": "none"
+    },
+    {
+      "overall": 65,
+      "prior_gp": 24,
+      "player_id": 8480890,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 193,
+      "prior_gp": 15,
+      "player_id": 8481004,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 2,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 126,
+      "prior_gp": 21,
+      "player_id": 8481065,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 8,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 138,
+      "prior_gp": 6,
+      "player_id": 8481070,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 3,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 181,
+      "prior_gp": 18,
+      "player_id": 8481133,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 59,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8481163,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8481219,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 61,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8481228,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 15,
+      "player_id": 8481491,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 17,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 49,
+      "prior_gp": 2,
+      "player_id": 8481525,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 72,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 38,
+      "prior_gp": 16,
+      "player_id": 8481534,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 145,
+      "prior_gp": 0,
+      "player_id": 8481538,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 51,
+      "prior_gp": 0,
+      "player_id": 8481547,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "none"
+    },
+    {
+      "overall": 75,
+      "prior_gp": 23,
+      "player_id": 8481550,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 90,
+      "prior_gp": 2,
+      "player_id": 8481562,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 166,
+      "prior_gp": 0,
+      "player_id": 8481569,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 8,
+      "prior_band": "none"
+    },
+    {
+      "overall": 99,
+      "prior_gp": 0,
+      "player_id": 8481570,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 19,
+      "prior_gp": 18,
+      "player_id": 8481575,
+      "draft_band": "1_to_31",
+      "outcome_gp": 11,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 80,
+      "prior_gp": 3,
+      "player_id": 8481578,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 35,
+      "prior_gp": 0,
+      "player_id": 8481587,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 21,
+      "prior_gp": 13,
+      "player_id": 8481591,
+      "draft_band": "1_to_31",
+      "outcome_gp": 2,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 74,
+      "prior_gp": 3,
+      "player_id": 8481594,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 136,
+      "prior_gp": 0,
+      "player_id": 8481662,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 187,
+      "prior_gp": 8,
+      "player_id": 8481679,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 195,
+      "prior_gp": 6,
+      "player_id": 8481683,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 151,
+      "prior_gp": 1,
+      "player_id": 8481699,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 100,
+      "prior_gp": 13,
+      "player_id": 8481712,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 4,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 112,
+      "prior_gp": 0,
+      "player_id": 8481715,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "none"
+    },
+    {
+      "overall": 120,
+      "prior_gp": 18,
+      "player_id": 8481719,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 35,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 124,
+      "prior_gp": 11,
+      "player_id": 8481720,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 129,
+      "prior_gp": 0,
+      "player_id": 8481721,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 66,
+      "prior_band": "none"
+    },
+    {
+      "overall": 188,
+      "prior_gp": 19,
+      "player_id": 8481732,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 7,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 63,
+      "prior_gp": 8,
+      "player_id": 8481737,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8481817,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 204,
+      "prior_gp": 2,
+      "player_id": 8481827,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 4,
+      "player_id": 8481848,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 4,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 11,
+      "player_id": 8482072,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 11,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 124,
+      "prior_gp": 6,
+      "player_id": 8482081,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 87,
+      "prior_gp": 4,
+      "player_id": 8482088,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 78,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 57,
+      "prior_gp": 1,
+      "player_id": 8482090,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 44,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 65,
+      "prior_gp": 13,
+      "player_id": 8482094,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 32,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 69,
+      "prior_gp": 0,
+      "player_id": 8482100,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 81,
+      "prior_band": "none"
+    },
+    {
+      "overall": 31,
+      "prior_gp": 5,
+      "player_id": 8482103,
+      "draft_band": "1_to_31",
+      "outcome_gp": 40,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 95,
+      "prior_gp": 0,
+      "player_id": 8482107,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 18,
+      "prior_band": "none"
+    },
+    {
+      "overall": 86,
+      "prior_gp": 0,
+      "player_id": 8482121,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 63,
+      "prior_gp": 2,
+      "player_id": 8482131,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 42,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 47,
+      "prior_gp": 0,
+      "player_id": 8482134,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 68,
+      "prior_gp": 2,
+      "player_id": 8482141,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 29,
+      "prior_gp": 24,
+      "player_id": 8482153,
+      "draft_band": "1_to_31",
+      "outcome_gp": 3,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 121,
+      "prior_gp": 0,
+      "player_id": 8482154,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 128,
+      "prior_gp": 0,
+      "player_id": 8482160,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 33,
+      "prior_gp": 7,
+      "player_id": 8482162,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 3,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 50,
+      "prior_gp": 1,
+      "player_id": 8482165,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 57,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 117,
+      "prior_gp": 0,
+      "player_id": 8482167,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 2,
+      "prior_band": "none"
+    },
+    {
+      "overall": 85,
+      "prior_gp": 0,
+      "player_id": 8482168,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 2,
+      "prior_band": "none"
+    },
+    {
+      "overall": 35,
+      "prior_gp": 6,
+      "player_id": 8482169,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 32,
+      "prior_gp": 0,
+      "player_id": 8482171,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 122,
+      "prior_gp": 0,
+      "player_id": 8482174,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 3,
+      "prior_band": "none"
+    },
+    {
+      "overall": 67,
+      "prior_gp": 3,
+      "player_id": 8482178,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 67,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8482184,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 208,
+      "prior_gp": 0,
+      "player_id": 8482187,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "none"
+    },
+    {
+      "overall": 120,
+      "prior_gp": 0,
+      "player_id": 8482194,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 121,
+      "prior_gp": 6,
+      "player_id": 8482206,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 7,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 174,
+      "prior_gp": 5,
+      "player_id": 8482209,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 4,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 182,
+      "prior_gp": 2,
+      "player_id": 8482213,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 130,
+      "prior_gp": 0,
+      "player_id": 8482214,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 9,
+      "player_id": 8482399,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 13,
+      "player_id": 8482408,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 58,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 164,
+      "prior_gp": 0,
+      "player_id": 8482459,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 190,
+      "prior_gp": 0,
+      "player_id": 8482466,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 205,
+      "prior_gp": 15,
+      "player_id": 8482470,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 30,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 89,
+      "prior_gp": 0,
+      "player_id": 8482479,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "none"
+    },
+    {
+      "overall": 101,
+      "prior_gp": 23,
+      "player_id": 8482482,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 58,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 203,
+      "prior_gp": 2,
+      "player_id": 8482507,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 159,
+      "prior_gp": 0,
+      "player_id": 8482518,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 213,
+      "prior_gp": 0,
+      "player_id": 8482525,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 2,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 16,
+      "player_id": 8482623,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 34,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8482631,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 14,
+      "player_id": 8482634,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 43,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 126,
+      "prior_gp": 2,
+      "player_id": 8482663,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 40,
+      "prior_gp": 16,
+      "player_id": 8482666,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 29,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 22,
+      "prior_gp": 0,
+      "player_id": 8482673,
+      "draft_band": "16_to_31",
+      "outcome_gp": 2,
+      "prior_band": "none"
+    },
+    {
+      "overall": 10,
+      "prior_gp": 0,
+      "player_id": 8482674,
+      "draft_band": "1_to_15",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 61,
+      "prior_gp": 0,
+      "player_id": 8482676,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 25,
+      "prior_gp": 0,
+      "player_id": 8482678,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 66,
+      "prior_gp": 0,
+      "player_id": 8482682,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 54,
+      "prior_gp": 0,
+      "player_id": 8482686,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 197,
+      "prior_gp": 0,
+      "player_id": 8482687,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 73,
+      "prior_gp": 0,
+      "player_id": 8482690,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 101,
+      "prior_gp": 0,
+      "player_id": 8482692,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 96,
+      "prior_gp": 0,
+      "player_id": 8482693,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 58,
+      "prior_gp": 0,
+      "player_id": 8482698,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "none"
+    },
+    {
+      "overall": 29,
+      "prior_gp": 0,
+      "player_id": 8482714,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 115,
+      "prior_gp": 1,
+      "player_id": 8482715,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 18,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 71,
+      "prior_gp": 0,
+      "player_id": 8482716,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 76,
+      "prior_gp": 0,
+      "player_id": 8482731,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 6,
+      "prior_band": "none"
+    },
+    {
+      "overall": 31,
+      "prior_gp": 8,
+      "player_id": 8482733,
+      "draft_band": "1_to_31",
+      "outcome_gp": 67,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 133,
+      "prior_gp": 13,
+      "player_id": 8482744,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 42,
+      "prior_gp": 0,
+      "player_id": 8482748,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 67,
+      "prior_gp": 21,
+      "player_id": 8482751,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 68,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 51,
+      "prior_gp": 8,
+      "player_id": 8482758,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 39,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 159,
+      "prior_gp": 0,
+      "player_id": 8482759,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 21,
+      "prior_gp": 12,
+      "player_id": 8482763,
+      "draft_band": "1_to_31",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 14,
+      "prior_gp": 15,
+      "player_id": 8482765,
+      "draft_band": "1_to_31",
+      "outcome_gp": 37,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 45,
+      "prior_gp": 0,
+      "player_id": 8482766,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 3,
+      "prior_band": "none"
+    },
+    {
+      "overall": 64,
+      "prior_gp": 18,
+      "player_id": 8482775,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 82,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 213,
+      "prior_gp": 0,
+      "player_id": 8482776,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 36,
+      "prior_gp": 0,
+      "player_id": 8482777,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 26,
+      "prior_gp": 0,
+      "player_id": 8482781,
+      "draft_band": "16_to_31",
+      "outcome_gp": 1,
+      "prior_band": "none"
+    },
+    {
+      "overall": 30,
+      "prior_gp": 9,
+      "player_id": 8482784,
+      "draft_band": "1_to_31",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 147,
+      "prior_gp": 2,
+      "player_id": 8482785,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 2,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 50,
+      "prior_gp": 5,
+      "player_id": 8482787,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 11,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 70,
+      "prior_gp": 1,
+      "player_id": 8482802,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 8,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 158,
+      "prior_gp": 0,
+      "player_id": 8482804,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 3,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8482839,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 44,
+      "prior_gp": 0,
+      "player_id": 8482860,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 55,
+      "prior_gp": 9,
+      "player_id": 8482861,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 27,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 86,
+      "prior_gp": 0,
+      "player_id": 8482863,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 106,
+      "prior_gp": 0,
+      "player_id": 8482868,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 129,
+      "prior_gp": 0,
+      "player_id": 8482873,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 2,
+      "prior_band": "none"
+    },
+    {
+      "overall": 131,
+      "prior_gp": 1,
+      "player_id": 8482874,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 36,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 144,
+      "prior_gp": 0,
+      "player_id": 8482877,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 28,
+      "prior_band": "none"
+    },
+    {
+      "overall": 156,
+      "prior_gp": 0,
+      "player_id": 8482881,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 170,
+      "prior_gp": 0,
+      "player_id": 8482888,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 174,
+      "prior_gp": 0,
+      "player_id": 8482890,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 193,
+      "prior_gp": 21,
+      "player_id": 8482896,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 46,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 219,
+      "prior_gp": 0,
+      "player_id": 8482911,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 38,
+      "prior_band": "none"
+    },
+    {
+      "overall": 172,
+      "prior_gp": 0,
+      "player_id": 8482915,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 41,
+      "prior_gp": 0,
+      "player_id": 8482918,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 79,
+      "prior_gp": 0,
+      "player_id": 8482919,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 84,
+      "prior_gp": 0,
+      "player_id": 8482922,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 91,
+      "prior_gp": 0,
+      "player_id": 8482923,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 128,
+      "prior_gp": 0,
+      "player_id": 8482933,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 186,
+      "prior_gp": 0,
+      "player_id": 8482941,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "none"
+    },
+    {
+      "overall": 192,
+      "prior_gp": 0,
+      "player_id": 8482942,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 203,
+      "prior_gp": 0,
+      "player_id": 8482947,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 60,
+      "prior_band": "none"
+    },
+    {
+      "overall": 211,
+      "prior_gp": 0,
+      "player_id": 8482951,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 220,
+      "prior_gp": 0,
+      "player_id": 8482953,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 12,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8482993,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 16,
+      "prior_band": "none"
+    },
+    {
+      "overall": 132,
+      "prior_gp": 1,
+      "player_id": 8483017,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8483039,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 4,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 1,
+      "player_id": 8483045,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 215,
+      "prior_gp": 0,
+      "player_id": 8483052,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8483085,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 187,
+      "prior_gp": 0,
+      "player_id": 8483086,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8483090,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8483100,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 174,
+      "prior_gp": 0,
+      "player_id": 8483104,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8483110,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 21,
+      "player_id": 8483395,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 28,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 4,
+      "player_id": 8483398,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 42,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 1,
+      "player_id": 8483406,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 36,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 33,
+      "prior_gp": 13,
+      "player_id": 8483424,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 15,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 88,
+      "prior_gp": 0,
+      "player_id": 8483427,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 27,
+      "prior_gp": 0,
+      "player_id": 8483428,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 46,
+      "prior_gp": 14,
+      "player_id": 8483429,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 2,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 44,
+      "prior_gp": 16,
+      "player_id": 8483432,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 14,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 221,
+      "prior_gp": 0,
+      "player_id": 8483433,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 6,
+      "prior_band": "none"
+    },
+    {
+      "overall": 136,
+      "prior_gp": 0,
+      "player_id": 8483435,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 2,
+      "prior_band": "none"
+    },
+    {
+      "overall": 200,
+      "prior_gp": 0,
+      "player_id": 8483438,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 166,
+      "prior_gp": 0,
+      "player_id": 8483439,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 78,
+      "prior_gp": 0,
+      "player_id": 8483441,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 22,
+      "prior_gp": 0,
+      "player_id": 8483444,
+      "draft_band": "16_to_31",
+      "outcome_gp": 3,
+      "prior_band": "none"
+    },
+    {
+      "overall": 57,
+      "prior_gp": 2,
+      "player_id": 8483450,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 81,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 47,
+      "prior_gp": 0,
+      "player_id": 8483452,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 9,
+      "prior_band": "none"
+    },
+    {
+      "overall": 66,
+      "prior_gp": 0,
+      "player_id": 8483453,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 31,
+      "prior_gp": 0,
+      "player_id": 8483455,
+      "draft_band": "16_to_31",
+      "outcome_gp": 29,
+      "prior_band": "none"
+    },
+    {
+      "overall": 40,
+      "prior_gp": 0,
+      "player_id": 8483459,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 69,
+      "prior_gp": 1,
+      "player_id": 8483461,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 73,
+      "prior_gp": 0,
+      "player_id": 8483463,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 5,
+      "prior_band": "none"
+    },
+    {
+      "overall": 17,
+      "prior_gp": 2,
+      "player_id": 8483465,
+      "draft_band": "1_to_31",
+      "outcome_gp": 16,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 208,
+      "prior_gp": 2,
+      "player_id": 8483467,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 3,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 30,
+      "prior_gp": 6,
+      "player_id": 8483471,
+      "draft_band": "1_to_31",
+      "outcome_gp": 25,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 29,
+      "prior_gp": 15,
+      "player_id": 8483472,
+      "draft_band": "1_to_31",
+      "outcome_gp": 5,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 15,
+      "prior_gp": 24,
+      "player_id": 8483476,
+      "draft_band": "1_to_31",
+      "outcome_gp": 13,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 56,
+      "prior_gp": 0,
+      "player_id": 8483478,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 124,
+      "prior_gp": 0,
+      "player_id": 8483479,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 39,
+      "prior_gp": 0,
+      "player_id": 8483480,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 34,
+      "prior_gp": 11,
+      "player_id": 8483481,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 53,
+      "prior_gp": 13,
+      "player_id": 8483482,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 14,
+      "prior_gp": 8,
+      "player_id": 8483487,
+      "draft_band": "1_to_31",
+      "outcome_gp": 24,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 26,
+      "prior_gp": 0,
+      "player_id": 8483488,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 74,
+      "prior_gp": 0,
+      "player_id": 8483496,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 49,
+      "prior_gp": 12,
+      "player_id": 8483497,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 28,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 65,
+      "prior_gp": 0,
+      "player_id": 8483498,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 16,
+      "prior_gp": 8,
+      "player_id": 8483500,
+      "draft_band": "1_to_31",
+      "outcome_gp": 60,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 25,
+      "prior_gp": 9,
+      "player_id": 8483506,
+      "draft_band": "1_to_31",
+      "outcome_gp": 54,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 148,
+      "prior_gp": 0,
+      "player_id": 8483509,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 55,
+      "prior_gp": 0,
+      "player_id": 8483510,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 32,
+      "prior_band": "none"
+    },
+    {
+      "overall": 48,
+      "prior_gp": 0,
+      "player_id": 8483511,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 9,
+      "prior_gp": 5,
+      "player_id": 8483512,
+      "draft_band": "1_to_31",
+      "outcome_gp": 82,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 32,
+      "prior_gp": 0,
+      "player_id": 8483513,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 47,
+      "prior_band": "none"
+    },
+    {
+      "overall": 179,
+      "prior_gp": 0,
+      "player_id": 8483514,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 23,
+      "prior_gp": 7,
+      "player_id": 8483516,
+      "draft_band": "1_to_31",
+      "outcome_gp": 70,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 60,
+      "prior_gp": 0,
+      "player_id": 8483519,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 175,
+      "prior_gp": 0,
+      "player_id": 8483520,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 42,
+      "prior_gp": 0,
+      "player_id": 8483521,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 24,
+      "prior_gp": 0,
+      "player_id": 8483525,
+      "draft_band": "16_to_31",
+      "outcome_gp": 73,
+      "prior_band": "none"
+    },
+    {
+      "overall": 77,
+      "prior_gp": 0,
+      "player_id": 8483526,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 6,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 4,
+      "player_id": 8483531,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 15,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 1,
+      "player_id": 8483538,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 2,
+      "player_id": 8483546,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 11,
+      "player_id": 8483549,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 10,
+      "player_id": 8483567,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 2,
+      "player_id": 8483569,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 24,
+      "player_id": 8483573,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 62,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 19,
+      "player_id": 8483630,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 24,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 45,
+      "prior_gp": 0,
+      "player_id": 8483666,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 63,
+      "prior_gp": 0,
+      "player_id": 8483669,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 11,
+      "prior_band": "none"
+    },
+    {
+      "overall": 99,
+      "prior_gp": 0,
+      "player_id": 8483672,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 72,
+      "prior_gp": 0,
+      "player_id": 8483673,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 103,
+      "prior_gp": 0,
+      "player_id": 8483675,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 2,
+      "prior_band": "none"
+    },
+    {
+      "overall": 104,
+      "prior_gp": 0,
+      "player_id": 8483676,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 30,
+      "prior_band": "none"
+    },
+    {
+      "overall": 81,
+      "prior_gp": 0,
+      "player_id": 8483677,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 105,
+      "prior_gp": 0,
+      "player_id": 8483679,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 92,
+      "prior_gp": 0,
+      "player_id": 8483686,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 15,
+      "prior_band": "none"
+    },
+    {
+      "overall": 93,
+      "prior_gp": 0,
+      "player_id": 8483687,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 4,
+      "prior_band": "none"
+    },
+    {
+      "overall": 96,
+      "prior_gp": 0,
+      "player_id": 8483688,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 111,
+      "prior_gp": 0,
+      "player_id": 8483690,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 74,
+      "prior_band": "none"
+    },
+    {
+      "overall": 223,
+      "prior_gp": 0,
+      "player_id": 8483692,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 113,
+      "prior_gp": 0,
+      "player_id": 8483695,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 114,
+      "prior_gp": 0,
+      "player_id": 8483696,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "none"
+    },
+    {
+      "overall": 116,
+      "prior_gp": 0,
+      "player_id": 8483699,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "none"
+    },
+    {
+      "overall": 119,
+      "prior_gp": 0,
+      "player_id": 8483704,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 120,
+      "prior_gp": 0,
+      "player_id": 8483705,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 209,
+      "prior_gp": 0,
+      "player_id": 8483709,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 4,
+      "prior_band": "none"
+    },
+    {
+      "overall": 125,
+      "prior_gp": 0,
+      "player_id": 8483712,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 4,
+      "prior_band": "none"
+    },
+    {
+      "overall": 192,
+      "prior_gp": 0,
+      "player_id": 8483727,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 130,
+      "prior_gp": 0,
+      "player_id": 8483728,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 10,
+      "prior_band": "none"
+    },
+    {
+      "overall": 133,
+      "prior_gp": 0,
+      "player_id": 8483731,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 17,
+      "prior_band": "none"
+    },
+    {
+      "overall": 134,
+      "prior_gp": 0,
+      "player_id": 8483732,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 135,
+      "prior_gp": 7,
+      "player_id": 8483733,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 55,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 184,
+      "prior_gp": 0,
+      "player_id": 8483741,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 140,
+      "prior_gp": 0,
+      "player_id": 8483745,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 173,
+      "prior_gp": 0,
+      "player_id": 8483752,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 43,
+      "prior_band": "none"
+    },
+    {
+      "overall": 170,
+      "prior_gp": 0,
+      "player_id": 8483755,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 169,
+      "prior_gp": 0,
+      "player_id": 8483756,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 23,
+      "prior_band": "none"
+    },
+    {
+      "overall": 165,
+      "prior_gp": 0,
+      "player_id": 8483760,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "none"
+    },
+    {
+      "overall": 163,
+      "prior_gp": 1,
+      "player_id": 8483763,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 152,
+      "prior_gp": 0,
+      "player_id": 8483764,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 153,
+      "prior_gp": 0,
+      "player_id": 8483766,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 2,
+      "prior_band": "none"
+    },
+    {
+      "overall": 157,
+      "prior_gp": 0,
+      "player_id": 8483771,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 19,
+      "prior_band": "none"
+    },
+    {
+      "overall": 103,
+      "prior_gp": 0,
+      "player_id": 8483787,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8483804,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8483841,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 5,
+      "prior_band": "none"
+    },
+    {
+      "overall": 175,
+      "prior_gp": 0,
+      "player_id": 8483844,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8483847,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8483878,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8483890,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 54,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8483921,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 12,
+      "player_id": 8484125,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 3,
+      "player_id": 8484135,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 15,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 56,
+      "prior_gp": 0,
+      "player_id": 8484139,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 95,
+      "prior_gp": 0,
+      "player_id": 8484142,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 43,
+      "prior_band": "none"
+    },
+    {
+      "overall": 18,
+      "prior_gp": 0,
+      "player_id": 8484143,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 61,
+      "prior_gp": 0,
+      "player_id": 8484146,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 22,
+      "prior_gp": 0,
+      "player_id": 8484148,
+      "draft_band": "16_to_31",
+      "outcome_gp": 1,
+      "prior_band": "none"
+    },
+    {
+      "overall": 34,
+      "prior_gp": 1,
+      "player_id": 8484149,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 56,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 75,
+      "prior_gp": 1,
+      "player_id": 8484150,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 34,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 74,
+      "prior_gp": 0,
+      "player_id": 8484151,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 123,
+      "prior_gp": 6,
+      "player_id": 8484152,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 3,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 70,
+      "prior_gp": 0,
+      "player_id": 8484154,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 120,
+      "prior_gp": 0,
+      "player_id": 8484156,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 28,
+      "prior_gp": 0,
+      "player_id": 8484158,
+      "draft_band": "16_to_31",
+      "outcome_gp": 66,
+      "prior_band": "none"
+    },
+    {
+      "overall": 9,
+      "prior_gp": 0,
+      "player_id": 8484160,
+      "draft_band": "1_to_15",
+      "outcome_gp": 28,
+      "prior_band": "none"
+    },
+    {
+      "overall": 73,
+      "prior_gp": 0,
+      "player_id": 8484161,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 54,
+      "prior_gp": 0,
+      "player_id": 8484163,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 10,
+      "prior_gp": 2,
+      "player_id": 8484164,
+      "draft_band": "1_to_31",
+      "outcome_gp": 71,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 32,
+      "prior_gp": 0,
+      "player_id": 8484165,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 52,
+      "prior_gp": 0,
+      "player_id": 8484168,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 13,
+      "prior_band": "none"
+    },
+    {
+      "overall": 90,
+      "prior_gp": 0,
+      "player_id": 8484169,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 9,
+      "prior_band": "none"
+    },
+    {
+      "overall": 37,
+      "prior_gp": 0,
+      "player_id": 8484173,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 42,
+      "prior_gp": 0,
+      "player_id": 8484174,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 58,
+      "prior_gp": 0,
+      "player_id": 8484177,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 33,
+      "prior_band": "none"
+    },
+    {
+      "overall": 64,
+      "prior_gp": 0,
+      "player_id": 8484178,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 16,
+      "prior_gp": 5,
+      "player_id": 8484180,
+      "draft_band": "1_to_31",
+      "outcome_gp": 18,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 68,
+      "prior_gp": 0,
+      "player_id": 8484183,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 53,
+      "prior_gp": 0,
+      "player_id": 8484184,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 67,
+      "prior_gp": 0,
+      "player_id": 8484185,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 41,
+      "prior_band": "none"
+    },
+    {
+      "overall": 8,
+      "prior_gp": 9,
+      "player_id": 8484186,
+      "draft_band": "1_to_31",
+      "outcome_gp": 75,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 46,
+      "prior_gp": 0,
+      "player_id": 8484187,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 29,
+      "prior_gp": 0,
+      "player_id": 8484188,
+      "draft_band": "16_to_31",
+      "outcome_gp": 17,
+      "prior_band": "none"
+    },
+    {
+      "overall": 86,
+      "prior_gp": 0,
+      "player_id": 8484192,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 125,
+      "prior_gp": 0,
+      "player_id": 8484194,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 55,
+      "prior_gp": 0,
+      "player_id": 8484195,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 24,
+      "prior_gp": 0,
+      "player_id": 8484196,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 19,
+      "prior_gp": 9,
+      "player_id": 8484197,
+      "draft_band": "1_to_31",
+      "outcome_gp": 51,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 48,
+      "prior_gp": 0,
+      "player_id": 8484198,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 26,
+      "prior_gp": 0,
+      "player_id": 8484200,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 33,
+      "prior_gp": 0,
+      "player_id": 8484201,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 89,
+      "prior_gp": 0,
+      "player_id": 8484202,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 30,
+      "prior_gp": 3,
+      "player_id": 8484203,
+      "draft_band": "1_to_31",
+      "outcome_gp": 12,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 43,
+      "prior_gp": 0,
+      "player_id": 8484206,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 113,
+      "prior_gp": 0,
+      "player_id": 8484208,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 23,
+      "prior_gp": 5,
+      "player_id": 8484210,
+      "draft_band": "1_to_31",
+      "outcome_gp": 49,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 91,
+      "prior_gp": 0,
+      "player_id": 8484213,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 114,
+      "prior_gp": 0,
+      "player_id": 8484214,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 3,
+      "prior_band": "none"
+    },
+    {
+      "overall": 65,
+      "prior_gp": 0,
+      "player_id": 8484216,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 5,
+      "prior_gp": 0,
+      "player_id": 8484220,
+      "draft_band": "1_to_15",
+      "outcome_gp": 2,
+      "prior_band": "none"
+    },
+    {
+      "overall": 27,
+      "prior_gp": 7,
+      "player_id": 8484221,
+      "draft_band": "1_to_31",
+      "outcome_gp": 65,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 17,
+      "prior_gp": 0,
+      "player_id": 8484223,
+      "draft_band": "16_to_31",
+      "outcome_gp": 68,
+      "prior_band": "none"
+    },
+    {
+      "overall": 63,
+      "prior_gp": 0,
+      "player_id": 8484224,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 106,
+      "prior_gp": 0,
+      "player_id": 8484229,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 25,
+      "prior_gp": 0,
+      "player_id": 8484230,
+      "draft_band": "16_to_31",
+      "outcome_gp": 32,
+      "prior_band": "none"
+    },
+    {
+      "overall": 21,
+      "prior_gp": 0,
+      "player_id": 8484231,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 45,
+      "prior_gp": 0,
+      "player_id": 8484233,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 80,
+      "prior_gp": 1,
+      "player_id": 8484234,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 6,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 39,
+      "prior_gp": 0,
+      "player_id": 8484238,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 11,
+      "prior_gp": 0,
+      "player_id": 8484240,
+      "draft_band": "1_to_15",
+      "outcome_gp": 70,
+      "prior_band": "none"
+    },
+    {
+      "overall": 15,
+      "prior_gp": 6,
+      "player_id": 8484241,
+      "draft_band": "1_to_31",
+      "outcome_gp": 71,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 14,
+      "prior_gp": 0,
+      "player_id": 8484242,
+      "draft_band": "1_to_15",
+      "outcome_gp": 3,
+      "prior_band": "none"
+    },
+    {
+      "overall": 78,
+      "prior_gp": 0,
+      "player_id": 8484243,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484248,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 9,
+      "player_id": 8484255,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 4,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 5,
+      "player_id": 8484256,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484262,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 9,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 6,
+      "player_id": 8484287,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 3,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484305,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 43,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484310,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484380,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 3,
+      "prior_band": "none"
+    },
+    {
+      "overall": 6,
+      "prior_gp": 0,
+      "player_id": 8484386,
+      "draft_band": "1_to_15",
+      "outcome_gp": 28,
+      "prior_band": "none"
+    },
+    {
+      "overall": 12,
+      "prior_gp": 0,
+      "player_id": 8484388,
+      "draft_band": "1_to_15",
+      "outcome_gp": 29,
+      "prior_band": "none"
+    },
+    {
+      "overall": 44,
+      "prior_gp": 0,
+      "player_id": 8484390,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 62,
+      "prior_gp": 0,
+      "player_id": 8484392,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "none"
+    },
+    {
+      "overall": 76,
+      "prior_gp": 0,
+      "player_id": 8484393,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 97,
+      "prior_gp": 0,
+      "player_id": 8484395,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 85,
+      "prior_gp": 0,
+      "player_id": 8484396,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 93,
+      "prior_gp": 0,
+      "player_id": 8484400,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 101,
+      "prior_gp": 0,
+      "player_id": 8484403,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 5,
+      "prior_band": "none"
+    },
+    {
+      "overall": 122,
+      "prior_gp": 0,
+      "player_id": 8484405,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 105,
+      "prior_gp": 2,
+      "player_id": 8484406,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 6,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 107,
+      "prior_gp": 0,
+      "player_id": 8484408,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 111,
+      "prior_gp": 0,
+      "player_id": 8484412,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 132,
+      "prior_gp": 0,
+      "player_id": 8484421,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 139,
+      "prior_gp": 0,
+      "player_id": 8484428,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 12,
+      "prior_band": "none"
+    },
+    {
+      "overall": 140,
+      "prior_gp": 0,
+      "player_id": 8484429,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 146,
+      "prior_gp": 0,
+      "player_id": 8484430,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 185,
+      "prior_gp": 0,
+      "player_id": 8484464,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 189,
+      "prior_gp": 0,
+      "player_id": 8484468,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 201,
+      "prior_gp": 0,
+      "player_id": 8484471,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 82,
+      "prior_band": "none"
+    },
+    {
+      "overall": 194,
+      "prior_gp": 0,
+      "player_id": 8484472,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 202,
+      "prior_gp": 0,
+      "player_id": 8484476,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 208,
+      "prior_gp": 0,
+      "player_id": 8484481,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 218,
+      "prior_gp": 0,
+      "player_id": 8484494,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484507,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484509,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 24,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484523,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 160,
+      "prior_gp": 0,
+      "player_id": 8484529,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 5,
+      "prior_band": "none"
+    },
+    {
+      "overall": 130,
+      "prior_gp": 0,
+      "player_id": 8484533,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484540,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484556,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484583,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 171,
+      "prior_gp": 0,
+      "player_id": 8484616,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484757,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 7,
+      "prior_gp": 0,
+      "player_id": 8484759,
+      "draft_band": "1_to_15",
+      "outcome_gp": 4,
+      "prior_band": "none"
+    },
+    {
+      "overall": 27,
+      "prior_gp": 0,
+      "player_id": 8484761,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 3,
+      "prior_gp": 0,
+      "player_id": 8484762,
+      "draft_band": "1_to_15",
+      "outcome_gp": 82,
+      "prior_band": "none"
+    },
+    {
+      "overall": 53,
+      "prior_gp": 0,
+      "player_id": 8484763,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 54,
+      "prior_gp": 0,
+      "player_id": 8484766,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 35,
+      "prior_gp": 0,
+      "player_id": 8484767,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 9,
+      "prior_gp": 1,
+      "player_id": 8484768,
+      "draft_band": "1_to_31",
+      "outcome_gp": 37,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 32,
+      "prior_gp": 0,
+      "player_id": 8484770,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 40,
+      "prior_gp": 0,
+      "player_id": 8484773,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 86,
+      "prior_gp": 0,
+      "player_id": 8484777,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 13,
+      "prior_gp": 4,
+      "player_id": 8484779,
+      "draft_band": "1_to_31",
+      "outcome_gp": 4,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 34,
+      "prior_gp": 0,
+      "player_id": 8484781,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 41,
+      "prior_gp": 0,
+      "player_id": 8484782,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 2,
+      "prior_gp": 18,
+      "player_id": 8484783,
+      "draft_band": "1_to_31",
+      "outcome_gp": 68,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 16,
+      "prior_gp": 0,
+      "player_id": 8484790,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 95,
+      "prior_gp": 0,
+      "player_id": 8484792,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 18,
+      "prior_gp": 0,
+      "player_id": 8484793,
+      "draft_band": "16_to_31",
+      "outcome_gp": 7,
+      "prior_band": "none"
+    },
+    {
+      "overall": 15,
+      "prior_gp": 0,
+      "player_id": 8484794,
+      "draft_band": "1_to_15",
+      "outcome_gp": 14,
+      "prior_band": "none"
+    },
+    {
+      "overall": 29,
+      "prior_gp": 0,
+      "player_id": 8484796,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 14,
+      "prior_gp": 0,
+      "player_id": 8484797,
+      "draft_band": "1_to_15",
+      "outcome_gp": 9,
+      "prior_band": "none"
+    },
+    {
+      "overall": 12,
+      "prior_gp": 0,
+      "player_id": 8484798,
+      "draft_band": "1_to_15",
+      "outcome_gp": 76,
+      "prior_band": "none"
+    },
+    {
+      "overall": 8,
+      "prior_gp": 0,
+      "player_id": 8484800,
+      "draft_band": "1_to_15",
+      "outcome_gp": 66,
+      "prior_band": "none"
+    },
+    {
+      "overall": 19,
+      "prior_gp": 0,
+      "player_id": 8484803,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 59,
+      "prior_gp": 0,
+      "player_id": 8484804,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 31,
+      "prior_gp": 0,
+      "player_id": 8484805,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 11,
+      "prior_gp": 0,
+      "player_id": 8484806,
+      "draft_band": "1_to_15",
+      "outcome_gp": 72,
+      "prior_band": "none"
+    },
+    {
+      "overall": 20,
+      "prior_gp": 0,
+      "player_id": 8484807,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 36,
+      "prior_gp": 0,
+      "player_id": 8484808,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 56,
+      "prior_gp": 0,
+      "player_id": 8484810,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 1,
+      "player_id": 8484821,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 3,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484822,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 5,
+      "player_id": 8484829,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 81,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484834,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 80,
+      "prior_gp": 0,
+      "player_id": 8484836,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 73,
+      "prior_gp": 0,
+      "player_id": 8484838,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 44,
+      "prior_gp": 0,
+      "player_id": 8484839,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 9,
+      "prior_band": "none"
+    },
+    {
+      "overall": 164,
+      "prior_gp": 0,
+      "player_id": 8484844,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 82,
+      "prior_gp": 0,
+      "player_id": 8484845,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 91,
+      "prior_gp": 0,
+      "player_id": 8484853,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 37,
+      "prior_gp": 0,
+      "player_id": 8484854,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 54,
+      "prior_gp": 0,
+      "player_id": 8484855,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 72,
+      "prior_gp": 0,
+      "player_id": 8484858,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 23,
+      "prior_gp": 0,
+      "player_id": 8484859,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 28,
+      "prior_gp": 0,
+      "player_id": 8484860,
+      "draft_band": "16_to_31",
+      "outcome_gp": 37,
+      "prior_band": "none"
+    },
+    {
+      "overall": 109,
+      "prior_gp": 0,
+      "player_id": 8484864,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 48,
+      "prior_gp": 0,
+      "player_id": 8484865,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 68,
+      "prior_gp": 0,
+      "player_id": 8484867,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 43,
+      "prior_gp": 0,
+      "player_id": 8484873,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 14,
+      "prior_band": "none"
+    },
+    {
+      "overall": 125,
+      "prior_gp": 0,
+      "player_id": 8484874,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 1,
+      "player_id": 8484901,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 23,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484906,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484928,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 18,
+      "player_id": 8484929,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8484933,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 4,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 5,
+      "player_id": 8484938,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 20,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 5,
+      "prior_gp": 2,
+      "player_id": 8484984,
+      "draft_band": "1_to_31",
+      "outcome_gp": 82,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": 10,
+      "prior_gp": 0,
+      "player_id": 8484987,
+      "draft_band": "1_to_15",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 33,
+      "prior_gp": 0,
+      "player_id": 8484994,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 28,
+      "prior_band": "none"
+    },
+    {
+      "overall": 69,
+      "prior_gp": 0,
+      "player_id": 8484998,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 75,
+      "prior_gp": 0,
+      "player_id": 8484999,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 4,
+      "prior_band": "none"
+    },
+    {
+      "overall": 77,
+      "prior_gp": 0,
+      "player_id": 8485000,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 97,
+      "prior_gp": 0,
+      "player_id": 8485004,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 94,
+      "prior_gp": 0,
+      "player_id": 8485005,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 102,
+      "prior_gp": 0,
+      "player_id": 8485008,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 158,
+      "prior_gp": 0,
+      "player_id": 8485041,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 148,
+      "prior_gp": 0,
+      "player_id": 8485045,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 151,
+      "prior_gp": 0,
+      "player_id": 8485049,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 187,
+      "prior_gp": 0,
+      "player_id": 8485070,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 193,
+      "prior_gp": 0,
+      "player_id": 8485071,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 186,
+      "prior_gp": 0,
+      "player_id": 8485072,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 173,
+      "prior_gp": 0,
+      "player_id": 8485073,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 174,
+      "prior_gp": 0,
+      "player_id": 8485074,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 196,
+      "prior_gp": 0,
+      "player_id": 8485087,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 199,
+      "prior_gp": 0,
+      "player_id": 8485091,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 217,
+      "prior_gp": 10,
+      "player_id": 8485105,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8485115,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8485163,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8485166,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 81,
+      "prior_gp": 0,
+      "player_id": 8485218,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8485251,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 3,
+      "prior_band": "none"
+    },
+    {
+      "overall": 17,
+      "prior_gp": 0,
+      "player_id": 8485352,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 13,
+      "prior_gp": 0,
+      "player_id": 8485362,
+      "draft_band": "1_to_15",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 1,
+      "prior_gp": 0,
+      "player_id": 8485366,
+      "draft_band": "1_to_15",
+      "outcome_gp": 82,
+      "prior_band": "none"
+    },
+    {
+      "overall": 62,
+      "prior_gp": 0,
+      "player_id": 8485368,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 31,
+      "prior_gp": 0,
+      "player_id": 8485381,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 19,
+      "prior_gp": 0,
+      "player_id": 8485382,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 59,
+      "prior_gp": 0,
+      "player_id": 8485384,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 15,
+      "prior_gp": 0,
+      "player_id": 8485385,
+      "draft_band": "1_to_15",
+      "outcome_gp": 3,
+      "prior_band": "none"
+    },
+    {
+      "overall": 56,
+      "prior_gp": 0,
+      "player_id": 8485386,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 16,
+      "prior_gp": 0,
+      "player_id": 8485388,
+      "draft_band": "16_to_31",
+      "outcome_gp": 1,
+      "prior_band": "none"
+    },
+    {
+      "overall": 3,
+      "prior_gp": 0,
+      "player_id": 8485391,
+      "draft_band": "1_to_15",
+      "outcome_gp": 12,
+      "prior_band": "none"
+    },
+    {
+      "overall": 7,
+      "prior_gp": 0,
+      "player_id": 8485395,
+      "draft_band": "1_to_15",
+      "outcome_gp": 2,
+      "prior_band": "none"
+    },
+    {
+      "overall": 10,
+      "prior_gp": 0,
+      "player_id": 8485400,
+      "draft_band": "1_to_15",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 2,
+      "prior_gp": 0,
+      "player_id": 8485402,
+      "draft_band": "1_to_15",
+      "outcome_gp": 45,
+      "prior_band": "none"
+    },
+    {
+      "overall": 9,
+      "prior_gp": 0,
+      "player_id": 8485404,
+      "draft_band": "1_to_15",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 5,
+      "prior_gp": 0,
+      "player_id": 8485405,
+      "draft_band": "1_to_15",
+      "outcome_gp": 3,
+      "prior_band": "none"
+    },
+    {
+      "overall": 6,
+      "prior_gp": 0,
+      "player_id": 8485406,
+      "draft_band": "1_to_15",
+      "outcome_gp": 9,
+      "prior_band": "none"
+    },
+    {
+      "overall": 11,
+      "prior_gp": 0,
+      "player_id": 8485414,
+      "draft_band": "1_to_15",
+      "outcome_gp": 77,
+      "prior_band": "none"
+    },
+    {
+      "overall": 42,
+      "prior_gp": 0,
+      "player_id": 8485448,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8485462,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8485467,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 4,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 1,
+      "player_id": 8485469,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8485472,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8485474,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8485490,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8485493,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 22,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8485509,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 2,
+      "player_id": 8485511,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 4,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 2,
+      "player_id": 8485512,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 39,
+      "prior_band": "1_to_24"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8485554,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 64,
+      "prior_gp": 0,
+      "player_id": 8485564,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 108,
+      "prior_gp": 0,
+      "player_id": 8485587,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 125,
+      "prior_gp": 0,
+      "player_id": 8485602,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 175,
+      "prior_gp": 0,
+      "player_id": 8485635,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 163,
+      "prior_gp": 0,
+      "player_id": 8485636,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8485691,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8485702,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 44,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486009,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 8,
+      "prior_gp": 0,
+      "player_id": 8486025,
+      "draft_band": "1_to_15",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 16,
+      "prior_gp": 0,
+      "player_id": 8486033,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 51,
+      "prior_gp": 0,
+      "player_id": 8486043,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 15,
+      "prior_gp": 0,
+      "player_id": 8486052,
+      "draft_band": "1_to_15",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486056,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 6,
+      "prior_band": "none"
+    },
+    {
+      "overall": 1,
+      "prior_gp": 0,
+      "player_id": 8486067,
+      "draft_band": "1_to_15",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 28,
+      "prior_gp": 0,
+      "player_id": 8486072,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 24,
+      "prior_gp": 0,
+      "player_id": 8486074,
+      "draft_band": "16_to_31",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 2,
+      "prior_gp": 0,
+      "player_id": 8486103,
+      "draft_band": "1_to_15",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486118,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486125,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486126,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486129,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486130,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486134,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486135,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486141,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486145,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486151,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486160,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486161,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486166,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 2,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486169,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 1,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486171,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486173,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486174,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486177,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486182,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486189,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": null,
+      "prior_gp": 0,
+      "player_id": 8486205,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    },
+    {
+      "overall": 90,
+      "prior_gp": 0,
+      "player_id": 8486241,
+      "draft_band": "32_plus_or_unknown",
+      "outcome_gp": 0,
+      "prior_band": "none"
+    }
+  ],
+  "limitations": "One-season directory cohort; current-directory selection and draft-band pooling; includes zero subsequent NHL appearances. Descriptive mean is not a calibrated individual prediction. Prior history uses available NHL game data.",
+  "measured_season": 2025,
+  "cohort_schedule_games": 82
+}

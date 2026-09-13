@@ -66,7 +66,7 @@ describe('published canonical context read', () => {
     const db = createMockSupabase();
     db.from = vi.fn((table: string) => {
       const data = table === 'canonical_published_runs' ? active :
-        table === 'canonical_published_players' ? [{ ...row, revision: active.revision }] :
+        table === 'canonical_published_players' ? [{ ...row, revision: active.revision, payload: { ...row.payload, rates: { goals: .2 }, rate_basis: { method: 'published' }, opportunity_prior: { final_gp: 12 }, exposure_policy: 'organization_prior_remaining' } }] :
         table === 'player_current_directory' ? [{ player_id: 1, full_name: 'Fixture', position_code: 'C', team_abbrev: 'NYR', eligible_positions: 'C,LW' }] :
         table === 'player_season_stats' ? [{ player_id: 1, games_played: 7, nhl_goals: 2 }] :
         table === 'player_ros_projections' ? [{ player_id: 1, games_remaining: 70, projected_goals: active.revision === 'rev1' ? 10 : 20, projection_run_id: active.run_id, projection_revision: active.revision }] : [];
@@ -78,6 +78,7 @@ describe('published canonical context read', () => {
     const second = (await service.getDashboardIndex()).players[0];
     expect(first.canonical_context?.revision).toBe('rev1');
     expect(second.canonical_context?.revision).toBe('rev2');
+    expect(second.canonical_context).toMatchObject({ rates: { goals: .2 }, rate_basis: { method: 'published' }, opportunity_prior: { final_gp: 12 }, exposure_policy: 'organization_prior_remaining' });
     expect(second.gp).toBe(7);
     expect(second.goals).toBe(2);
     expect(first.proj_goals).toBe(10);
@@ -121,4 +122,14 @@ describe('published canonical context read', () => {
     expect(result.players[0].canonical_context).toBeNull();
   });
 
+});
+
+it('wires conditional rates and opportunity metadata from the exact published player snapshot', async () => {
+ const metadata = { rates: { goals: .2, assists: .3, shots_on_goal: 2 }, rate_basis: { method: 'reviewed', as_of: '2026-09-13' }, opportunity_prior: { final_gp: 12 }, exposure_policy: 'organization_prior_remaining' };
+ const db = createMockSupabase({ canonical_published_runs: createChain({ data: run, error: null }), canonical_published_players: createChain({ data: [{ ...row, payload: { ...row.payload, ...metadata } }], error: null }) });
+ expect((await new CanonicalProjectionService(db).getPublishedContexts(2026)).get('1')).toMatchObject(metadata);
+ expect(db.from.mock.calls.every(([table]: [string]) => ['canonical_published_runs', 'canonical_published_players'].includes(table))).toBe(true);
+ clearCanonicalProjectionCache();
+ const malformed = createMockSupabase({ canonical_published_runs: createChain({ data: run, error: null }), canonical_published_players: createChain({ data: [{ ...row, payload: { ...row.payload, rates: [], rate_basis: 'legacy', opportunity_prior: 1, exposure_policy: {} } }], error: null }) });
+ expect((await new CanonicalProjectionService(malformed).getPublishedContexts(2026)).get('1')).toMatchObject({ rates: null, rate_basis: null, opportunity_prior: null, exposure_policy: null });
 });
