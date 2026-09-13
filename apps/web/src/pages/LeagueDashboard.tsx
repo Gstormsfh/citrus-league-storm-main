@@ -44,6 +44,7 @@ import { standingsLine, type StandingsLineRow } from '@/components/league/hqLine
 import { fantasyWeekAnchorFor, getCurrentWeekNumber, type WeekStartDay } from '@/utils/weekCalculator';
 import { WEEK_START_OPTIONS } from '@/components/league/createLeagueSections';
 import { LeagueTimelineCard } from '@/components/dashboard/LeagueTimelineCard';
+import { HistoryClaimBanner } from '@/components/history/HistoryClaimBanner';
 import { FEATURE_PRACTICE_DRAFT } from '@/lib/featureFlags';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1140,6 +1141,10 @@ const LeagueDashboard = () => {
         leagueName={league.name}
       />
       <div className="lg:hidden pb-app-chrome">
+        {/* IMPORT (2026-09-13): after a commissioner brings the league's
+            past over, "which one is you?" is the next real action for every
+            other manager. Draws its own answer; renders nothing otherwise. */}
+        {leagueId && <HistoryClaimBanner leagueId={leagueId} enabled={!!user} className="mx-3 mt-3" />}
         <LeagueHQPhone
           week={currentWeek !== null && leagueId ? { number: currentWeek, to: `/matchup/${leagueId}/${currentWeek}` } : null}
           seasonOpensOn={seasonOpensOn}
@@ -1162,6 +1167,7 @@ const LeagueDashboard = () => {
               stat: userTeam ? (myRosterCount !== null && myRosterCount > 0 ? `${myRosterCount} players` : userTeam.team_name) : null,
             },
             { title: 'GM office', to: '/gm-office', Icon: Briefcase },
+            { title: 'League history', to: `/league/${leagueId}/history`, Icon: Trophy },
             ...(league.draft_status === 'completed' && draftHistoryQuery.data === true
               ? [{
                   title: 'Draft results',
@@ -2495,6 +2501,7 @@ const LeagueDashboard = () => {
               feed assembled from data already recorded (draft
               completion + transaction_ledger + matchup results). Pure
               function in @citrus/shared; card handles fetch + render. */}
+          {leagueId && <HistoryClaimBanner leagueId={leagueId} enabled={!!user} className="mb-6" />}
           {leagueId && (
             <div className="mb-6">
               <LeagueTimelineCard
@@ -2721,6 +2728,9 @@ const LeagueDashboard = () => {
                       <Link to="/matchup" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> This week's matchup</Link>
                     )}
                     <Link to="/team-analytics" className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> Team analytics</Link>
+                    {/* LEAGUE HISTORY (2026-09-13): the trophy room, and for the
+                        commissioner the door to bringing past seasons over. */}
+                    <Link to={`/league/${leagueId}/history`} className="block text-xs text-white/70 hover:text-pastel-orange transition-colors flex items-center gap-2"><span className="text-pastel-orange/60">▸</span> League history</Link>
                     {inOffseason && (
                       <p className="text-[11px] text-white/55 pt-1.5 mt-0.5 border-t border-white/5">
                         {seasonOpensOn ? `Matchups start ${seasonOpensOn}.` : 'Matchups start when the season does.'}

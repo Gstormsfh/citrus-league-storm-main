@@ -48,6 +48,8 @@ vi.mock('@/components/matchup/LeagueNotifications', () => ({ default: () => null
 // The Report-a-name dialog imports the Supabase client, which throws without env in tests.
 vi.mock('@/components/moderation/ReportContentDialog', () => ({ default: () => null }));
 vi.mock('@/components/dashboard/LeagueTimelineCard', () => ({ LeagueTimelineCard: () => null }));
+// Draws its own read through api/imports (same api/client problem as matchups); covered by its own test.
+vi.mock('@/components/history/HistoryClaimBanner', () => ({ HistoryClaimBanner: () => null }));
 vi.mock('@/components/InvitePlayersButton', () => ({ InvitePlayersButton: () => null }));
 vi.mock('@/components/league/ScoringRulesEditor', () => ({ ScoringRulesEditor: () => null }));
 vi.mock('@/components/league/KeeperPanel', () => ({ KeeperPanel: () => null }));

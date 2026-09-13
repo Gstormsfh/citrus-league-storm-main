@@ -1,10 +1,14 @@
 /**
  * BRING YOUR LEAGUE (2026-09-09): the honest version of "we import your
- * settings". There is no Yahoo/ESPN import; what there is, is a founder who
- * will set the league up by hand from whatever the commissioner sends. So
- * the page asks for the league as it exists today and an email, and the
- * details land on the waitlist row (metadata['bring-your-league']). If this
- * form gets traffic, that is the case for building the import.
+ * settings". A founder sets the league up by hand from whatever the
+ * commissioner sends: the page asks for the league as it exists today and
+ * an email, and the details land on the waitlist row
+ * (metadata['bring-your-league']).
+ *
+ * 2026-09-13: Yahoo and ESPN leagues no longer need this form. A signed-in
+ * commissioner imports every season themselves at /import (the trophy room
+ * follows). This page stays for Fantrax, Sleeper, spreadsheets and group
+ * chats, and points the Yahoo/ESPN crowd at the door.
  */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -71,6 +75,9 @@ export default function BringYourLeague() {
               roster slots, scoring, keepers, draft format, the lot. Your first season is free.
             </p>
             <p className="text-[14px] text-pressbox-text/60">A person does this, not a script, so it takes a day. You get the invite link back by email.</p>
+            <p className="mt-3 text-[14px] text-pressbox-text/75">
+              On Yahoo or ESPN? <Link to="/import" className="text-pastel-orange font-bold">Bring every season over yourself</Link>: standings, champions, drafts, keepers and the records, in minutes.
+            </p>
           </div>
 
           <form onSubmit={submit} className="max-w-2xl mx-auto mt-10" data-testid="bring-your-league-form">
