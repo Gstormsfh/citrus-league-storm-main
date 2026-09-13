@@ -424,3 +424,9 @@ describe('the position filter row is ONE row that scrolls, never three that wrap
     expect(FA_CHIP_ROW).toContain('pr-6');
   });
 });
+
+
+it('shows both positions when eligibility omits the primary', () => {
+  row({ player: player({ position: 'C', eligible_positions: ['LW'] }) });
+  expect(screen.getByText('C/LW')).toBeInTheDocument();
+});

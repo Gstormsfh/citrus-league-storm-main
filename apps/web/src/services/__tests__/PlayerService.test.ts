@@ -428,6 +428,13 @@ describe('PlayerService', () => {
   // ===========================================================================
 
   describe('getPlayersByPosition', () => {
+    it('finds a primary C with secondary LW through the LW filter', async () => {
+      mockSearchPlayers.mockResolvedValueOnce({ data: [makeServerPlayer({ position: 'C', eligible_positions: ['LW'] })] });
+      const result = await PlayerService.getPlayersByPosition('LW');
+      expect(result).toHaveLength(1);
+      expect(result[0].eligible_positions).toEqual(['C', 'LW']);
+    });
+
     it('filters players by primary position', async () => {
       const center = makeServerPlayer({ id: 1, full_name: 'Center', position: 'C', points: 10 });
       const dman = makeServerPlayer({ id: 2, full_name: 'Defenseman', position: 'D', points: 5 });

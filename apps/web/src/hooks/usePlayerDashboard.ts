@@ -105,6 +105,7 @@ export interface DashboardIdentity {
   name: string;
   team: string;
   position: string;
+  eligible_positions?: string[];
   jersey: number | null;
   headshot_url: string | null;
   is_goalie: boolean;

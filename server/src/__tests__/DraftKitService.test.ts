@@ -31,7 +31,7 @@ import { createChain, createMockSupabase } from './helpers';
 // that pools the cohorts changes his percentile from 100 to something else.
 
 const DIR = [
-  { player_id: 1, full_name: 'Forward One', position_code: 'C', team_abbrev: 'EDM', jersey_number: '97', headshot_url: null, eligible_positions: ['C'] },
+  { player_id: 1, full_name: 'Forward One', position_code: 'C', team_abbrev: 'EDM', jersey_number: '97', headshot_url: null, eligible_positions: 'LW' },
   { player_id: 2, full_name: 'Forward Two', position_code: 'LW', team_abbrev: 'SJS', jersey_number: '29', headshot_url: null, eligible_positions: ['LW'] },
   { player_id: 3, full_name: 'Forward Three', position_code: 'RW', team_abbrev: 'TOR', jersey_number: '16', headshot_url: null, eligible_positions: ['RW'] },
   { player_id: 4, full_name: 'Defence One', position_code: 'D', team_abbrev: 'COL', jersey_number: '8', headshot_url: null, eligible_positions: ['D'] },
@@ -299,6 +299,7 @@ describe('DraftKitService.getBoard — percentiles stay inside the position coho
 
     const d1 = board!.cards.find((c) => c.playerId === 4)!;
     expect(d1.cohort).toBe('D');
+    expect(board!.cards.find(c => c.playerId === 1)!.eligible_positions).toEqual(['C', 'LW']);
 
     const gar = d1.metrics.find((m) => m.key === 'gar60')!;
     // Best of the two defencemen -> 100th among D.

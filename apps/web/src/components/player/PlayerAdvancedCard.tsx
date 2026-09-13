@@ -1,3 +1,4 @@
+import { playerEligiblePositionsLabel } from '@citrus/shared';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -320,7 +321,7 @@ export function PlayerAdvancedCard({
         <div className="min-w-0 flex-1">
           <div className={cn(ROW_NAME, 'text-pastel-cream max-lg:text-pressbox-text')}>{player.name}</div>
           <div className={cn(ROW_META, 'mt-1 font-jbmono max-lg:font-plex uppercase tracking-[0.12em] text-white/55')}>
-            {player.position} · {player.team}
+            {playerEligiblePositionsLabel(player)} · {player.team}
             {player.jersey != null && ` · #${player.jersey}`}
           </div>
           {/* THE SAMPLE. Games, then the minutes every per-60 row below is

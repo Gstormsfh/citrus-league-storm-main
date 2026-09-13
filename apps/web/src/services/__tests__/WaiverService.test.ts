@@ -504,6 +504,16 @@ describe('WaiverService.getLeagueWaiverSettings', () => {
 // =============================================================================
 
 describe('WaiverService.getAvailablePlayers', () => {
+  it('finds and transports the C/LW union through a secondary-position filter', async () => {
+    getLeagueRosters.mockResolvedValue({ data: [] });
+    (PlayerService.getAllPlayers as any).mockResolvedValue([
+      { id: 101, full_name: 'Dual fixture', position: 'C', eligible_positions: ['LW'], team: 'TOR', jersey_number: '' },
+    ]);
+    const result = await WaiverService.getAvailablePlayers('league-1', 'LW');
+    expect(result).toHaveLength(1);
+    expect(result[0].eligible_positions).toEqual(['C', 'LW']);
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });

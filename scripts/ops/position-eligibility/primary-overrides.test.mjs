@@ -1,0 +1,48 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { PGlite } from '@electric-sql/pglite';
+const migration = readFileSync(new URL('../../../supabase/migrations/20260913190000_governed_primary_position_corrections.sql', import.meta.url),'utf8');
+test('reviewed primary survives ingestion, preserves secondary evidence and limits access', async () => {
+ const db = new PGlite();
+ try {
+ await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
+ CREATE TABLE player_directory(season int,player_id int,full_name text,team_abbrev text,position_code text,is_goalie boolean,jersey_number text,headshot_url text,shoots_catches text,created_at timestamptz,updated_at timestamptz,height_in int,weight_lb int,birthdate date,nationality text,college_team text,prior_team text,bio_summary text,notes text,source_last_fetched_at timestamptz,eligible_positions text,career jsonb,career_fetched_at timestamptz);
+ CREATE TABLE canonical_projection_active(season int);
+ CREATE TABLE canonical_published_players(season int,player_id text,payload jsonb);
+ CREATE TABLE player_affiliation_events(id uuid,sequence bigint,season int,player_id int,recorded_at timestamptz,team_abbrev text,status text,authority text,effective_on date,organization text,source_urls jsonb,reason text);
+ GRANT SELECT ON player_directory,canonical_projection_active,canonical_published_players,player_affiliation_events TO authenticated,service_role;
+ INSERT INTO player_directory(season,player_id,position_code,is_goalie,eligible_positions,team_abbrev) VALUES(2026,1,'C',false,'LW','EDM'),(2026,2,'G',true,'G','WPG');
+ INSERT INTO canonical_published_players VALUES(2026,'1','{"position":"C","rates":{"goals":0.5},"team":"EDM"}');`);
+ await db.exec(migration);
+ const insert = (id,position,date='2026-01-01') => db.query(`INSERT INTO player_position_events(season,player_id,position_code,feed_position_at_review,effective_on,source_urls,reason,recorded_by) VALUES(2026,$1,$2,'C',$3,'["https://example.org/official"]','reviewed correction','test')`,[id,position,date]);
+ await insert(1,'RW'); await insert(2,'LW');
+ await db.exec("UPDATE player_directory SET position_code='C' WHERE player_id=1;");
+ let rows=(await db.query('SELECT player_id,position_code,eligible_positions,team_abbrev FROM player_current_directory ORDER BY player_id')).rows;
+ assert.deepEqual(rows,[{player_id:1,position_code:'RW',eligible_positions:'LW',team_abbrev:'EDM'},{player_id:2,position_code:'G',eligible_positions:'G',team_abbrev:'WPG'}]);
+ assert.equal((await db.query("SELECT payload->>'position' AS pos FROM canonical_published_players")).rows[0].pos,'C');
+ await insert(1,'D','2099-01-01');
+ assert.equal((await db.query('SELECT position_code FROM player_current_directory WHERE player_id=1')).rows[0].position_code,'RW');
+ await db.exec('SET ROLE authenticated');
+ assert.equal((await db.query('SELECT position_code FROM player_current_directory WHERE player_id=1')).rows[0].position_code,'RW');
+ await assert.rejects(insert(1,'C'),/permission denied/);
+ await db.exec('RESET ROLE; SET ROLE service_role;');
+ await assert.rejects(db.exec('UPDATE player_position_events SET position_code=\'C\''),/permission denied/);
+ await assert.rejects(db.exec('DELETE FROM player_position_events'),/permission denied/);
+ await db.exec(`RESET ROLE;
+ CREATE TABLE team_lineups(league_id uuid,team_id uuid,starters jsonb,slot_assignments jsonb);
+ CREATE TABLE fantasy_daily_rosters(player_id int,roster_date date,slot_type text,slot_id text);
+ INSERT INTO player_directory(season,player_id,position_code,is_goalie) VALUES(2026,8475692,'C',false),(2026,8475768,'C',false);
+ INSERT INTO team_lineups(starters,slot_assignments) VALUES('[8475692]','{"8475692":"slot-C-1"}');`);
+ const corrections=readFileSync(new URL('./reviewed-primary-corrections.sql',import.meta.url),'utf8');
+ await assert.rejects(db.exec(corrections),/active lineup needs a position-policy decision/);
+ await db.exec(`ROLLBACK; UPDATE team_lineups SET slot_assignments='{"8475692":"slot-RW-1"}';`);
+ await db.exec(corrections);
+ rows=(await db.query('SELECT player_id,position_code,eligible_positions FROM player_current_directory WHERE player_id IN (8475692,8475768) ORDER BY player_id')).rows;
+ assert.deepEqual(rows,[{player_id:8475692,position_code:'RW',eligible_positions:null},{player_id:8475768,position_code:'LW',eligible_positions:null}]);
+ assert.deepEqual((await db.query('SELECT slot_assignments FROM team_lineups')).rows[0].slot_assignments,{'8475692':'slot-RW-1'});
+ await assert.rejects(db.exec(corrections),/preimage changed/);
+ await db.exec('ROLLBACK');
+
+ } finally { await db.close(); }
+});

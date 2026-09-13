@@ -1,3 +1,4 @@
+import { isEligibleForPosition, playerEligiblePositions } from '@citrus/shared';
 import { useFantasyIrEligibility } from '@/hooks/useFantasyIrEligibility';
 import { indexRosterRosStats } from '@/components/roster/rosStats';
 import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
@@ -112,9 +113,7 @@ const getFantasyPosition = (position: string, posType: PositionType = 'individua
 // league), for the sentence that says why a slot doesn't fit. Same union
 // the server validates against: the listed position plus eligible_positions.
 const slotPositionsLabel = (player: HockeyPlayer, posType: PositionType): string => {
-  const own = player.eligible_positions && player.eligible_positions.length > 0
-    ? player.eligible_positions
-    : [player.position];
+  const own = playerEligiblePositions(player);
   return Array.from(new Set(own.map(p => getFantasyPosition(p, posType)))).join('/');
 };
 
@@ -660,7 +659,7 @@ const Roster = () => {
           name: p.full_name,
           statsSeason: p.stats_season ?? null,
           position: p.position,
-          eligible_positions: p.eligible_positions || [p.position],
+          eligible_positions: playerEligiblePositions(p),
           number: parseInt(p.jersey_number || '0'),
           starter: false, // Will determine below
           stats: {
@@ -940,9 +939,7 @@ const Roster = () => {
               if (missing > 0) {
                 // Find best available players eligible for this position (includes multi-pos)
                 const positionPlayers = availableBench.filter(p => {
-                  const eligible = (p.eligible_positions && p.eligible_positions.length > 0)
-                    ? p.eligible_positions.map(ep => getFantasyPosition(ep, loadedPositionType))
-                    : [getFantasyPosition(p.position, loadedPositionType)];
+                  const eligible = playerEligiblePositions(p).map(ep => getFantasyPosition(ep, loadedPositionType));
                   return eligible.includes(pos);
                 });
                 const bestOfPosition = positionPlayers
@@ -1078,9 +1075,7 @@ const Roster = () => {
             }
 
             // Use eligible_positions for multi-position slot assignment
-            const eligiblePos = (p.eligible_positions && p.eligible_positions.length > 0)
-              ? p.eligible_positions.map(ep => getFantasyPosition(ep, loadedPositionType))
-              : [getFantasyPosition(p.position, loadedPositionType)];
+            const eligiblePos = playerEligiblePositions(p).map(ep => getFantasyPosition(ep, loadedPositionType));
             const primaryPos = eligiblePos[0];
             let assigned = false;
 
@@ -2781,26 +2776,7 @@ const Roster = () => {
 
     if (!slotPosition) return false;
 
-    // Build the set of positions this player is eligible for (respects F/D/G mode)
-    const eligiblePositions = (player.eligible_positions && player.eligible_positions.length > 0)
-      ? player.eligible_positions.map(p => getFantasyPosition(p, leaguePositionType))
-      : [getFantasyPosition(player.position, leaguePositionType)];
-
-    const isGoalie = eligiblePositions.includes('G');
-
-    if (slotPosition === 'UTIL') {
-      return !isGoalie;
-    }
-
-    if (isGoalie && !eligiblePositions.some(p => p !== 'G')) {
-      return slotPosition === 'G';
-    }
-
-    if (slotPosition === 'G') {
-      return isGoalie;
-    }
-
-    return eligiblePositions.includes(slotPosition);
+    return isEligibleForPosition(player, slotPosition);
   }, [leaguePositionType, canUseIr]);
 
   // The move engine behind every lineup change on this page — used to be

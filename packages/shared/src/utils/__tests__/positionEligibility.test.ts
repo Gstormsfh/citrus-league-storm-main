@@ -12,7 +12,7 @@
 //   * boxscore L/R fold to LW/RW; blanks, case and duplicates are handled;
 //   * nothing usable is [] so callers can fail open on it.
 import { describe, it, expect } from 'vitest';
-import { formatEligiblePositions, parseEligiblePositions } from '../positionEligibility';
+import { formatEligiblePositions, parseEligiblePositions, isEligibleForPosition, playerEligiblePositionsLabel, matchEligibleSlots } from '../positionEligibility';
 
 describe('parseEligiblePositions', () => {
   it('THE regression: the comma-separated text cell parses instead of throwing', () => {
@@ -57,4 +57,33 @@ describe('formatEligiblePositions', () => {
     expect(formatEligiblePositions(['D'])).toBe('D');
     expect(formatEligiblePositions([])).toBe('');
   });
+});
+
+
+describe('eligibility consumers', () => {
+  it('uses the primary plus secondary in individual and aggregate slots', () => {
+    const player = { position: 'C', eligible_positions: ['LW'] };
+    for (const slot of ['C', 'LW', 'F', 'W', 'UTIL']) expect(isEligibleForPosition(player, slot)).toBe(true);
+    for (const slot of ['RW', 'D', 'G', 'IR', 'BN', 'garbage']) expect(isEligibleForPosition(player, slot)).toBe(false);
+    expect(playerEligiblePositionsLabel(player)).toBe('C/LW');
+    expect(playerEligiblePositionsLabel(player, 'forward')).toBe('F');
+  });
+  it('rejects slot names, unknown evidence and goalie/skater mixing', () => {
+    expect(parseEligiblePositions('LW,G,UTIL,IR,BN,garbage', 'C')).toEqual(['C', 'LW']);
+    expect(parseEligiblePositions(['C', 'G', 'LW'], 'G')).toEqual(['G']);
+    expect(parseEligiblePositions('C/G')).toEqual(['C']);
+    expect(isEligibleForPosition({ position: 'unknown' }, 'UTIL')).toBe(false);
+    expect(isEligibleForPosition({ position: 'G', eligible_positions: ['LW'] }, 'UTIL')).toBe(false);
+  });
+  it('does not turn a generic forward into individual eligibility', () => {
+    expect(isEligibleForPosition({ position: 'F' }, 'F')).toBe(true);
+    expect(isEligibleForPosition({ position: 'F' }, 'LW')).toBe(false);
+    expect(parseEligiblePositions('c/l/r', 'C')).toEqual(['C', 'LW', 'RW']);
+  });
+});
+
+
+it('matches secondaries without duplicates or invalid utility assignments', () => {
+  const result = matchEligibleSlots([{ position: 'C', eligible_positions: ['LW'] }, { position: 'C' }, { position: 'G' }, { position: 'unknown' }], ['C', 'LW', 'UTIL']);
+  expect([...result.entries()]).toEqual([[0, 1], [1, 0]]);
 });

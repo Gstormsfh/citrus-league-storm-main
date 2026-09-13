@@ -662,3 +662,33 @@ describe('MatchupService', () => {
     });
   });
 });
+
+it('builds a missing lineup using both primary and secondary positions', async () => {
+  const writes = createChain({ data: null, error: null });
+  const admin = { from: vi.fn((table: string) => table === 'leagues'
+    ? createChain({ data: { settings: { rosterSlots: { C: 1, LW: 1, RW: 0, D: 0, G: 0, UTIL: 0 } } }, error: null })
+    : writes) };
+  const service = new MatchupService(createMockSupabase());
+  const result = await (service as any).buildLineupFromPlayers(admin, 't1', 'league-1', [
+    { player_id: 1, position_code: 'C', eligible_positions: 'LW', is_goalie: false },
+    { player_id: 2, position_code: 'C', eligible_positions: null, is_goalie: false },
+    { player_id: 3, position_code: 'G', eligible_positions: 'LW', is_goalie: true },
+  ]);
+  expect(result).toBe(true);
+  expect(writes.upsert).toHaveBeenCalledWith(expect.objectContaining({
+    starters: [1, 2], bench: [3], slot_assignments: { '1': 'slot-LW-1', '2': 'slot-C-1' },
+  }), { onConflict: 'league_id,team_id' });
+});
+
+
+it('transports normalized eligibility with frozen roster identity', async () => {
+  const { getSupabaseAdmin } = await import('../lib/supabase');
+  const admin = createMockSupabase({
+    matchups: createChain({ data: null, error: null }),
+    fantasy_daily_rosters: createChain({ data: [{ player_id: 1, team_id: 't1', roster_date: '2026-09-13', slot_type: 'active', slot_id: 'slot-LW-1' }], error: null }),
+    player_current_directory: createChain({ data: [{ player_id: 1, full_name: 'Dual fixture', position_code: 'C', eligible_positions: 'LW', is_goalie: false, team_abbrev: 'EDM' }], error: null }),
+  });
+  vi.mocked(getSupabaseAdmin).mockReturnValueOnce(admin);
+  const result = await new MatchupService(createMockSupabase()).getFrozenRosterBatch('m1', ['2026-09-13']);
+  expect(result.entries[0]).toMatchObject({ player_position: 'C', eligible_positions: ['C', 'LW'], slot_id: 'slot-LW-1' });
+});

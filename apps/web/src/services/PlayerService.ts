@@ -1,3 +1,4 @@
+import { isEligibleForPosition, playerEligiblePositions } from '@citrus/shared';
 import type { PlayerAvailability } from '@citrus/shared';
 import { getHeadshotUrl } from "@/utils/seasonConstants";
 import { logger } from '@/utils/logger';
@@ -33,7 +34,7 @@ export interface Player {
   id: string; // Using string ID to be consistent with app usage, but will store NHL ID
   full_name: string;
   position: string; // Primary position (C, LW, RW, D, G)
-  eligible_positions: string[]; // All positions this player qualifies for (max 2). Industry standard dual-eligibility.
+  eligible_positions: string[]; // Listed primary plus validated maintained eligibility evidence.
   team: string;
   jersey_number: string | null;
   status: string | null;
@@ -128,9 +129,7 @@ interface ServerPlayer {
 function mapServerPlayer(sp: ServerPlayer): Player {
   const isGoalie = sp.is_goalie || sp.position === 'G';
   // Normalize eligible_positions (server may return raw position codes)
-  const eligiblePositions = Array.isArray(sp.eligible_positions)
-    ? sp.eligible_positions.map(p => normalizePosition(p)).filter(Boolean)
-    : [normalizePosition(sp.position)];
+  const eligiblePositions = playerEligiblePositions(sp);
 
   return {
     id: String(sp.id),
@@ -227,7 +226,7 @@ export const PlayerService = {
    */
   async getPlayersByPosition(position: string) {
     const all = await this.getAllPlayers();
-    return all.filter(p => p.position === position);
+    return all.filter(p => isEligibleForPosition(p, position));
   },
 
   /**

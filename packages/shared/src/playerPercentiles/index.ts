@@ -33,7 +33,7 @@
  * decides the cohort: fantasy rosters have D slots, so D is a cohort.
  *
  * FORWARDS ARE **NOT** SPLIT C / LW / RW. Two reasons, both practical.
- * Dual-position eligibility (`eligible_positions`, max 2) crosses centre and
+ * Dual-position eligibility (`eligible_positions`) crosses centre and
  * wing constantly, so the split would not be stable per player; and three
  * cohorts of roughly 200 qualified skaters each have noisy tails, where one
  * pooled forward cohort of ~600 does not. F is the honest granularity for

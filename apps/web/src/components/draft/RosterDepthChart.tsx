@@ -1,3 +1,5 @@
+import { isEligibleForPosition, playerEligiblePositionsLabel } from '@citrus/shared';
+import { assignMaxWeight } from '@/components/roster/autoLineup';
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -55,6 +57,27 @@ const positionColors: Record<string, string> = {
   'UTIL': 'bg-yellow-950/20',
 };
 
+/** Fill compatible slots without spending a dual-eligible player on the only
+ * slot a teammate can fill. Maximize filled slots, then existing points. */
+export function assignDepthChart(players: Player[], counts: Record<string, number>) {
+  const unique = [...new Map(players.map(p => [p.id, p])).values()];
+  const slots = Object.entries(counts).flatMap(([position, count]) =>
+    Array.from({ length: Math.max(0, Math.floor(count)) }, (_, slotIndex) => ({ position, slotIndex })));
+  const pointBound = unique.reduce((sum, p) => sum + Math.abs(Number(p.points) || 0), 0) + 1;
+  const weights = slots.map(slot => [
+    ...unique.map(p => isEligibleForPosition(p, slot.position)
+      ? pointBound + (Number(p.points) || 0) : -1e12),
+    ...slots.map(() => 0),
+  ]);
+  const starters: Array<{ player: Player; position: string; slotIndex: number }> = [];
+  assignMaxWeight(weights).forEach((column, row) => {
+    if (column < unique.length && weights[row][column] > 0)
+      starters.push({ player: unique[column], ...slots[row] });
+  });
+  const selected = new Set(starters.map(s => s.player.id));
+  return { starters, bench: unique.filter(p => !selected.has(p.id)).sort((a, b) => b.points - a.points) };
+}
+
 export const RosterDepthChart = ({
   draftedPlayers,
   draftPicks,
@@ -75,78 +98,10 @@ export const RosterDepthChart = ({
     const startingLineup: Record<string, number> = {};
     for (const k of keys) {
       const configured = rosterSlots?.[k];
-      startingLineup[k] = (typeof configured === 'number' && configured > 0) ? configured : (defaults[k] || 0);
+      startingLineup[k] = (typeof configured === 'number' && Number.isFinite(configured) && configured >= 0) ? Math.floor(configured) : (defaults[k] || 0);
     }
 
-    const primaryPositions: string[] = positionType === 'forward' ? ['F', 'D', 'G'] : ['C', 'LW', 'RW', 'D', 'G'];
-    // UTIL can be filled by any skater (never a goalie)
-    const utilCandidatePositions: string[] = positionType === 'forward' ? ['F', 'D'] : ['C', 'LW', 'RW', 'D'];
-
-    const starters: Array<{ player: Player; position: string; slotIndex: number }> = [];
-    const bench: Player[] = [];
-
-    // Group players by position — collapse C/LW/RW into F if league is forward format
-    const playersByPos: Record<string, Player[]> = {};
-    for (const p of primaryPositions) playersByPos[p] = [];
-    playersByPos['UTIL'] = [];
-
-    draftedPlayers.forEach(player => {
-      const raw = normalizePosition(player.position);
-      let bucket: string;
-      if (positionType === 'forward' && (raw === 'C' || raw === 'LW' || raw === 'RW')) {
-        bucket = 'F';
-      } else if (primaryPositions.includes(raw)) {
-        bucket = raw;
-      } else {
-        bucket = 'UTIL';
-      }
-      playersByPos[bucket].push(player);
-    });
-
-    // Sort each position by points (best players first)
-    Object.keys(playersByPos).forEach(pos => {
-      playersByPos[pos].sort((a, b) => b.points - a.points);
-    });
-
-    const slotsFilled: Record<string, number> = {};
-    for (const k of Object.keys(startingLineup)) slotsFilled[k] = 0;
-
-    // First, fill primary positions
-    primaryPositions.forEach(pos => {
-      const players = playersByPos[pos];
-      const slotsNeeded = startingLineup[pos] || 0;
-      for (let i = 0; i < Math.min(players.length, slotsNeeded); i++) {
-        starters.push({ player: players[i], position: pos, slotIndex: i });
-        slotsFilled[pos]++;
-      }
-      for (let i = slotsNeeded; i < players.length; i++) {
-        bench.push(players[i]);
-      }
-    });
-
-    // Fill UTIL slots with best available skater (not goalies)
-    const utilCandidates: Player[] = [];
-    utilCandidatePositions.forEach(pos => {
-      const players = playersByPos[pos];
-      const slotsNeeded = startingLineup[pos] || 0;
-      for (let i = slotsNeeded; i < players.length; i++) {
-        utilCandidates.push(players[i]);
-      }
-    });
-    utilCandidates.push(...(playersByPos['UTIL'] || []));
-    utilCandidates.sort((a, b) => b.points - a.points);
-
-    const utilSlots = startingLineup['UTIL'] || 0;
-    for (let i = 0; i < Math.min(utilSlots, utilCandidates.length); i++) {
-      const utilPlayer = utilCandidates[i];
-      starters.push({ player: utilPlayer, position: 'UTIL', slotIndex: i });
-      slotsFilled['UTIL']++;
-      const benchIndex = bench.findIndex(p => p.id === utilPlayer.id);
-      if (benchIndex >= 0) bench.splice(benchIndex, 1);
-    }
-    
-    // Any remaining players go to bench
-    // (already handled above, but double-check)
+    const { starters, bench } = assignDepthChart(draftedPlayers, startingLineup);
 
     return { starters, bench, startingLineup };
   }, [draftedPlayers, positionType, rosterSlots]);
@@ -199,7 +154,7 @@ export const RosterDepthChart = ({
                               !player && "opacity-50"
                             )}
                           >
-                            <td className="px-2 sm:px-3 py-1.5 text-xs font-medium">{pos}</td>
+                            <td className="px-2 sm:px-3 py-1.5 text-xs font-medium">{playerEligiblePositionsLabel(player, positionType)}</td>
                             <td className="px-2 sm:px-3 py-1.5 text-xs">
                               {player ? (
                                 <div className="font-medium truncate max-w-[120px] sm:max-w-none">{player.full_name}</div>
@@ -247,7 +202,7 @@ export const RosterDepthChart = ({
                         key={player.id}
                         className={cn("border-b", colors)}
                       >
-                        <td className="px-2 sm:px-3 py-1.5 text-xs font-medium">{pos}</td>
+                        <td className="px-2 sm:px-3 py-1.5 text-xs font-medium">{playerEligiblePositionsLabel(player, positionType)}</td>
                         <td className="px-2 sm:px-3 py-1.5 text-xs">
                           <div className="font-medium truncate max-w-[120px] sm:max-w-none">{player.full_name}</div>
                         </td>

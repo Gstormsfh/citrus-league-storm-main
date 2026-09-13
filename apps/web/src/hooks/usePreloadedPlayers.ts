@@ -1,3 +1,4 @@
+import { playerEligiblePositions } from '@citrus/shared';
 import { useMemo } from 'react';
 import type { DashboardIndexEntry } from '@citrus/shared';
 import type { Player } from '@/services/PlayerService';
@@ -19,7 +20,7 @@ function normalizePosition(position: string | null | undefined): string {
 /** Adapt the shared API's measured actuals; never substitute forecast counts. */
 export function dashboardEntryToPreloadedPlayer(entry: DashboardIndexEntry): Player {
   const position = normalizePosition(entry.position);
-  const eligible = entry.eligible_positions?.map(normalizePosition).filter(Boolean) ?? [];
+  const eligible = playerEligiblePositions(entry);
   const goalie = entry.is_goalie;
   const status = entry.roster_status;
   return {

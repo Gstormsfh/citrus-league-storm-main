@@ -16,7 +16,7 @@ export interface HockeyPlayer {
   id: number | string;
   name: string;
   position: string; // 'Centre', 'Right Wing', 'Left Wing', 'Defence', 'Goalie', 'C', 'RW', 'LW', 'D', 'G'
-  eligible_positions?: string[]; // Dual-position eligibility (max 2), e.g., ['C', 'LW']
+  eligible_positions?: string[]; // Maintained position eligibility, e.g., ['C', 'LW']
   number: number;
   starter: boolean;
   stats: {

@@ -1,3 +1,4 @@
+import { isEligibleForPosition, playerEligiblePositions } from '@citrus/shared';
 import { waiverApi } from '@/api/waivers';
 import { rosterApi } from '@/api/rosters';
 import { accountApi } from '@/api/account';
@@ -365,7 +366,7 @@ export class WaiverService {
 
       // Apply position filter
       if (position) {
-        players = players.filter(p => p.position === position);
+        players = players.filter(p => isEligibleForPosition(p, position));
       }
 
       // Apply search filter
@@ -408,6 +409,7 @@ export class WaiverService {
         player_id: Number(p.id),
         full_name: p.full_name,
         position_code: p.position,
+        eligible_positions: playerEligiblePositions(p),
         team_abbrev: p.team,
         // The face (2026-09-05): the wire's rows wear the Players row's mug.
         headshot_url: p.headshot_url ?? null,

@@ -1,3 +1,4 @@
+import { isEligibleForPosition, parseEligiblePositions } from '@citrus/shared';
 /**
  * BestBallService — Auto-lineup optimization for Best Ball leagues.
  *
@@ -99,12 +100,10 @@ export class BestBallService {
       if (!eligible) continue;
 
       // Find the highest-scoring unassigned player eligible for this slot
-      // Uses eligible_positions (multi-pos) when available, falls back to primary position
+      // Uses the primary plus maintained secondary positions
       const best = sorted.find(
         p => !assigned.has(p.player_id) && (
-          (p.eligible_positions && p.eligible_positions.length > 0)
-            ? p.eligible_positions.some(ep => eligible.includes(ep))
-            : eligible.some(pos => p.position === pos)
+          isEligibleForPosition(p, slotCode)
         )
       );
 
@@ -168,7 +167,7 @@ export class BestBallService {
       (players ?? []).forEach((p: { player_id: number; position_code: string | null; eligible_positions: string | null }) => {
         posMap.set(String(p.player_id), p.position_code || 'UTIL');
         if (p.eligible_positions) {
-          eligibleMap.set(String(p.player_id), p.eligible_positions.split(',').map(s => s.trim()).filter(Boolean));
+          eligibleMap.set(String(p.player_id), parseEligiblePositions(p.eligible_positions, p.position_code));
         }
       });
 

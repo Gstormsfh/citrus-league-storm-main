@@ -1,3 +1,4 @@
+import { playerEligiblePositions } from '@citrus/shared';
 /**
  * THE PLAYERS TAB, AS DATA (2026-09-04).
  *
@@ -87,6 +88,7 @@ export function dashboardEntryToHockeyPlayer(p: DashboardIndexEntry): HockeyPlay
     id: p.id,
     name: p.name,
     position: p.position,
+    eligible_positions: playerEligiblePositions(p),
     number: p.jersey ?? 0,
     starter: false,
     team: p.team,

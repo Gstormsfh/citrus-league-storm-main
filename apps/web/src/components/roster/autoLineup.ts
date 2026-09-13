@@ -1,3 +1,4 @@
+import { playerEligiblePositions } from '@citrus/shared';
 import type { HockeyPlayer } from './HockeyPlayerCard';
 import { resolveFantasyPosition, getSlotPositions, type PositionType } from '@/utils/rosterUtils';
 
@@ -101,10 +102,10 @@ const projected = (p: HockeyPlayer): number => {
 
 /** The position groups a player may start in, resolved for the league's position type. */
 function eligibleGroups(p: HockeyPlayer, positionType: PositionType): Set<string> {
-  const raw = p.eligible_positions && p.eligible_positions.length > 0 ? p.eligible_positions : [p.position];
+  const raw = playerEligiblePositions(p);
   const groups = new Set<string>();
   for (const r of raw) {
-    const g = resolveFantasyPosition(r, positionType);
+    const g = r === 'F' ? 'F' : resolveFantasyPosition(r, positionType);
     if (g !== 'OTHER') groups.add(g);
   }
   return groups;
@@ -112,7 +113,7 @@ function eligibleGroups(p: HockeyPlayer, positionType: PositionType): Set<string
 
 /** Same rule as Roster.tsx's `isPositionValid`: UTIL takes any skater; G takes goalies only. */
 function canPlay(groups: Set<string>, group: string): boolean {
-  if (group === 'UTIL') return !groups.has('G');
+  if (group === 'UTIL') return groups.size > 0 && !groups.has('G');
   return groups.has(group);
 }
 

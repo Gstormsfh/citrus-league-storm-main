@@ -1,3 +1,4 @@
+import { playerEligiblePositionsLabel } from '@citrus/shared';
 import { PlayerAffiliationDetails } from '@/components/player/PlayerAffiliationDetails';
 import { PlayerAvailabilityDetails } from '@/components/player/PlayerAvailabilityDetails';
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
@@ -779,7 +780,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
    */
   const writeup = xgHistory.writeup ?? generatePlayerWriteup(player, writeupExtras);
 
-  const posAbbr = getPositionAbbr(player.position);
+  const posAbbr = playerEligiblePositionsLabel(player) || getPositionAbbr(player.position);
   const teamAbbr = indexEntry ? indexEntry.team : player.teamAbbreviation || player.team?.split(' ').pop()?.substring(0, 3).toUpperCase() || '';
 
   // The hero uses ROS; the game-log sections retain their selected season.

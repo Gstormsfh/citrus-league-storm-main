@@ -1,3 +1,4 @@
+import { playerEligiblePositionsLabel } from '@citrus/shared';
 /**
  * THE PLAYERS TAB ON A PHONE (2026-09-04).
  *
@@ -236,7 +237,7 @@ export function PlayersBrowsePhone({
                       <span className="block font-barlow font-bold text-[14px] leading-tight text-pressbox-text truncate">{p.name}</span>
                       <span className="mt-0.5 flex items-center gap-1.5 font-plex font-medium text-[10px] text-pressbox-text/50 tabular-nums">
                         <span className={cn(pressBoxPositionChipClasses(positionChipKey(p.position)), 'w-auto h-[16px] px-1 text-[9px]')}>
-                          {p.position}
+                          {playerEligiblePositionsLabel(p)}
                         </span>
                         {p.team}
                         {p.jersey != null && ` · #${p.jersey}`}

@@ -615,6 +615,7 @@ const IDENTITY = [
     player_id: MCDAVID,
     full_name: 'Connor McDavid',
     position_code: 'C',
+    eligible_positions: 'LW',
     team_abbrev: 'EDM',
     jersey_number: '97',
     headshot_url: 'https://assets.nhle.com/mugs/nhl/20252026/EDM/8478402.png',
@@ -730,6 +731,7 @@ describe('PlayerDashboardService.getPlayerDashboard', () => {
     expect(payload!.talent!.avg_toi_per_game).toBeCloseTo(21.6);
     expect(payload!.player!.name).toBe('Connor McDavid');
     expect(payload!.player!.jersey).toBe(97);
+    expect(payload!.player!.eligible_positions).toEqual(['C', 'LW']);
     expect(payload!.player!.is_goalie).toBe(false);
   });
 

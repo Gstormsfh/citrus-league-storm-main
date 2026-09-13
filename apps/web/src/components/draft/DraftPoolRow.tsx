@@ -1,3 +1,4 @@
+import { playerEligiblePositionsLabel } from '@citrus/shared';
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { cn } from '@/lib/utils';
 import { Star } from 'lucide-react';
@@ -238,7 +239,7 @@ export function DraftPoolRow({
           <span className="block mt-[3px] font-plex font-medium text-[10px] text-pressbox-text/55 truncate">
             {posKey && (
               <b data-testid="draft-pool-position-chip" className="font-bold px-1.5 py-px rounded-[3px] bg-pressbox-sage/20 text-pressbox-sage-soft">
-                {posKey}
+                {playerEligiblePositionsLabel(player, positionType) || posKey}
               </b>
             )}
             {posKey && player.team ? ' ' : ''}

@@ -70,7 +70,7 @@ _CANONICAL_TO_API = {
 }
 
 # Minimum games at a secondary position to gain eligibility.
-# Industry standard: Yahoo = 5 GP, ESPN = 10 GP. We use 5 (Yahoo standard).
+# Existing Citrus policy: Yahoo = 5 GP, ESPN = 10 GP. We use 5 (Yahoo standard).
 MIN_GAMES_FOR_ELIGIBILITY = 5
 
 
@@ -210,12 +210,12 @@ def compute_multi_position_eligibility(
     """
     Compute multi-position eligibility from player_game_stats.
 
-    Industry standard (Yahoo Fantasy): A player gains eligibility at a position
+    Existing Citrus listing-count policy: A player gains eligibility at a position
     if they have played MIN_GAMES_FOR_ELIGIBILITY (5) games at that position
-    during the current season.
+    during the current season. This is not a published Yahoo NHL rule.
 
     Data sources (in priority order):
-    1. player_game_stats.position_code — actual game-by-game position data
+    1. player_game_stats.position_code — game-by-game listed position (not measured positional minutes)
     2. NHL API roster position — current official position (always included as primary)
 
     Rules:
@@ -477,7 +477,7 @@ def sync_rosters(
     else:
         print(f"   [sync_rosters] No new players to add")
 
-    # Step 7: Compute multi-position eligibility (industry standard: 5 GP threshold)
+    # Step 7: Compute multi-position eligibility (existing Citrus policy: 5 listed games)
     print(f"   [sync_rosters] Computing multi-position eligibility (threshold: {MIN_GAMES_FOR_ELIGIBILITY} GP)...")
     all_player_ids = list(set(list(api_players.keys()) + list(current_dir.keys())))
     eligibility = compute_multi_position_eligibility(db, season, all_player_ids, api_players)

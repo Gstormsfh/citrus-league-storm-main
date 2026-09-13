@@ -177,3 +177,9 @@ describe('PlayerCard — the family name on a phone, the full name on desktop', 
     expect(nameOf(container).textContent).toBe('Empty');
   });
 });
+
+
+it('shows secondary eligibility as readable row text, separate from the background watermark', () => {
+  const view = render(<PlayerCard player={player({ eligible_positions: ['LW'] })} isUserTeam />);
+  expect(view.getByTestId('matchup-player-eligibility').textContent).toBe('C/LW');
+});

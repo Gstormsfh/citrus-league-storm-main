@@ -7,6 +7,7 @@ from reportlab.platypus import Paragraph
 from reportlab.lib.styles import ParagraphStyle
 from layout import Guide,ROOT,ASSETS,INK,CREAM,ORANGE,MUTED,WHITE,RULE,pdfmetrics
 from scoring import calculate
+from eligibility import load as load_eligibility, presentation as eligibility_presentation, display_position
 from player_focus import BOARD_FOCUS, lens, category_lens
 from affiliations import load as load_affiliations, presentation, display_team, context as affiliation_context
 
@@ -69,7 +70,7 @@ class LeagueGuide(Guide):
   self.rect(36,y+156,147,43,INK)
   self.text(pname.upper(),45,y+182,min(18,130/pdfmetrics.stringWidth(pname.upper(),'Display',1)),'Display',CREAM)
   self.text('PLAYER CALL-OUT / RATES: '+str(p['source']),198,y+19,8,'Bold',ORANGE)
-  self.text(f'{display_team(p)} / {p["position"]}{p["positionRank"]}',564,y+22,8,'Semi',CREAM,'right')
+  self.text(f'{display_team(p)} / {display_position(p,ranked=True)}',564,y+22,8,'Semi',CREAM,'right')
   for x,label,value in [(198,'FP/START' if p['isGoalie'] else 'FP/GP',fmt(p['pointsPerGame'],2)),(331,'PROJECTED STARTS' if p['isGoalie'] else 'PROJECTED GP',fmt(p['games'],0)),(463,'PROJECTION TEAM GP' if p.get('projectionTeam') else 'TEAM GAMES LEFT',fmt((p.get('canonicalRemaining') or {}).get('team_games'),0))]:
    self.text(label,x,y+36,6.5,'Semi',CREAM);self.text(value,x,y+58,23,'Display',ORANGE)
   self.para(safe(workload_note(p)+((' Projection club: '+p['projectionTeam']+'.') if p.get('projectionTeam') and display_team(p)!=p['team'] else '')),198,y+64,366,6.5,8,CREAM)
@@ -91,7 +92,7 @@ class LeagueGuide(Guide):
   title,takeaway=lens(p)
   self.text(title,50,y+18,7,'Semi',ORANGE)
   self.text(p['name'].upper(),50,y+43,min(25,width/pdfmetrics.stringWidth(p['name'].upper(),'Display',1)),'Display',CREAM)
-  self.text(f"{display_team(p)} / {p['position']} / projection club {p['team']}",50,y+58,7.2,'Semi',CREAM)
+  self.text(f"{display_team(p)} / {display_position(p)} / projection club {p['team']}",50,y+58,7.2,'Semi',CREAM)
   self.para(safe(takeaway),50,y+68,width,8.2,10.5,CREAM)
   if height>=190:
    unit='START' if p['isGoalie'] else 'GP'
@@ -122,8 +123,9 @@ class LeagueGuide(Guide):
    self.heading(title,section,f'{self.name} / {start+1}-{start+len(chunk)} of {len(players)} / '+('Remaining-season totals; selected league weights.' if runtime_edition(self.data) else 'Rankings use your selected league weights.'))
    rows=[]
    for p in chunk:
-    s={key:(value/p['baseGames']*p['games'] if p['baseGames'] else 0) for key,value in p['stats'].items()};rows.append([str(p['rank']),p['name'],display_team(p),p['position']+str(p['positionRank']),fmt(p['games'],0),fmt(p['pointsPerGame'],2),fmt(p['fantasyPoints']),fmt(s.get('wins') if goalie else s.get('goals',0)+s.get('assists',0)),fmt(s.get('saves') if goalie else s.get('shots_on_goal'),0),fmt(s.get('goals_against') if goalie else s.get('blocks'),0),p['source'] or '-'])
-   self.table(['#','PLAYER','TEAM','POS',('RST' if goalie else 'RGP') if runtime_edition(self.data) else ('ST' if goalie else 'GP'),'FP/ST' if goalie else 'FP/GP','FPTS','W' if goalie else 'PTS','SV' if goalie else 'SOG','GA' if goalie else 'BLK','SOURCE'],rows,172,[24,127,40,37,31,43,51,49,39,39,60] if self.data.get('affiliationIdentity') else [24,139,28,37,31,43,51,49,39,39,60],row_height=18,featured=candidate['key'] if candidate else None,keys=[p['key'] for p in chunk])
+    s={key:(value/p['baseGames']*p['games'] if p['baseGames'] else 0) for key,value in p['stats'].items()};rows.append([str(p['rank']),p['name'],display_team(p),display_position(p,ranked=True),fmt(p['games'],0),fmt(p['pointsPerGame'],2),fmt(p['fantasyPoints']),fmt(s.get('wins') if goalie else s.get('goals',0)+s.get('assists',0)),fmt(s.get('saves') if goalie else s.get('shots_on_goal'),0),fmt(s.get('goals_against') if goalie else s.get('blocks'),0),p['source'] or '-'])
+   pos_width=52 if self.data.get('eligibilityIdentity') else 37;team_width=40 if self.data.get('affiliationIdentity') else 28
+   self.table(['#','PLAYER','TEAM','POS',('RST' if goalie else 'RGP') if runtime_edition(self.data) else ('ST' if goalie else 'GP'),'FP/ST' if goalie else 'FP/GP','FPTS','W' if goalie else 'PTS','SV' if goalie else 'SOG','GA' if goalie else 'BLK','SOURCE'],rows,172,[24,204-team_width-pos_width,team_width,pos_width,31,43,51,49,39,39,60],row_height=18,featured=candidate['key'] if candidate else None,keys=[p['key'] for p in chunk])
    if candidate:
     if candidate['name'] in self.photos:self.card(candidate)
     else:self.briefing(candidate)
@@ -170,7 +172,7 @@ class LeagueGuide(Guide):
     if y:self.footer('Rookies');self.end()
     tier=r['tier'];self.heading(tier.split('  -')[0],'Rookies',tier.split('  -')[-1] if '  -' in tier else '');y=176
    self.rect(36,y,540,h,WHITE);self.rect(36,y,3,h,ORANGE)
-   self.text(r['name'].upper(),50,y+26,25,'Display');self.text(f'{display_team(p) if p.get("team") else r["team"]} / {r["position"]}',561,y+24,10,'Semi',MUTED,'right')
+   self.text(r['name'].upper(),50,y+26,25,'Display');self.text(f'{display_team(p) if p.get("team") else r["team"]} / {display_position(p) if p.get("position") else r["position"]}',561,y+24,10,'Semi',MUTED,'right')
    values=f'#{p["rank"]} {"goalie" if p["isGoalie"] else "skater"}  /  {fmt(p["fantasyPoints"])} FPTS  /  Roster {fmt(p["rosterProbability"]*100,0)+"%" if p["rosterProbability"] is not None else "not supplied"}  /  Adj FPTS {fmt(p["adjustedPoints"])}'
    if p['rank'] is None: values='Projection not supplied in the main board / Ranking and FPTS unavailable'
    self.text(values,50,y+47,9,'Semi');self.text(f'FP/GP-ST {fmt(p.get('pointsPerGame'),2)}  /  Projected GP-ST {fmt(p.get('games'),0)}  /  NHL GP {r["nhlGames"]}  /  Draft {r["draft"]}',50,y+64,9,'Body',MUTED)
@@ -310,6 +312,9 @@ class LeagueGuide(Guide):
  def save_new(self,path,sections):
   self.notes('ADDITIONAL PHOTOGRAPHY','Credits',[
    a['player']+' / '+a['caption']+'. '+a['author']+'. '+a['license']+' / '+a['license_url']+'. Source: '+a['source']+'. Resized and cropped for the feature frame. Adaptations offered under the same license; no endorsement implied.' for a in self.action_photos.values()])
+  if self.data.get('eligibilityIdentity'):
+   ident=self.data['eligibilityIdentity'];sections.append(('Position eligibility',self.number+1))
+   self.notes('POSITION ELIGIBILITY / SOURCE BINDING','Eligibility',[f"Directory snapshot {ident['asOf']}, season {ident['season']}; SHA-256 {ident['sha256']}. POS shows the listed primary plus maintained secondary eligibility. Position boards remain grouped by projection primary, with overall league-weighted ranks. Unmatched identities retain their projection primary only. Eligibility does not alter forecasts, team lineup scenarios or scoring."])
   if self.data.get('affiliationIdentity'):
    ident=self.data['affiliationIdentity']
    sections.append(('Current affiliations',self.number+1))
@@ -328,7 +333,7 @@ class LeagueGuide(Guide):
     if page.number==1 or edition_stamp(self.data) not in page.get_text():page.insert_textbox(fitz.Rect(36,741,576,754),edition_stamp(self.data),fontsize=6,color=(1,.42,.1),align=1)
   path=Path(path);path.parent.mkdir(parents=True,exist_ok=True);doc.save(path,garbage=4,deflate=True)
   scoring_revision=hashlib.sha256(json.dumps(self.result['weights'],sort_keys=True,separators=(',',':')).encode()).hexdigest()
-  manifest={'affiliationIdentity':self.data.get('affiliationIdentity'),'scoringIdentity':{'label':self.name,'weightsSha256':scoring_revision,'kind':'explicit_local_preview'},'edition':self.data.get('edition'),'canonicalRevision':self.data.get('canonicalRevision'),'publication':self.data.get('publication'),'pages':len(doc),'source':self.data['source'],'weights':self.result['weights'],'league':self.name,'featured':sorted(self.featured),'content':self.manifest,'sections':sections}
+  manifest={'eligibilityIdentity':self.data.get('eligibilityIdentity'),'affiliationIdentity':self.data.get('affiliationIdentity'),'scoringIdentity':{'label':self.name,'weightsSha256':scoring_revision,'kind':'explicit_local_preview'},'edition':self.data.get('edition'),'canonicalRevision':self.data.get('canonicalRevision'),'publication':self.data.get('publication'),'pages':len(doc),'source':self.data['source'],'weights':self.result['weights'],'league':self.name,'featured':sorted(self.featured),'content':self.manifest,'sections':sections}
   path.with_suffix('.manifest.json').write_text(json.dumps(manifest,indent=2));return manifest
 
 def generate(data,weights,name,path):
@@ -337,7 +342,7 @@ def generate(data,weights,name,path):
   for key in ('parentSourceRevision','runtimeRevision','runtimeRunId','asOf'):
    if not isinstance(edition.get(key),str) or not edition[key].strip():raise ValueError('Effective runtime edition requires '+key)
   if edition.get('horizon')!='remaining_season':raise ValueError('Effective runtime edition requires remaining_season horizon')
- result=presentation(data,calculate(data,weights));g=LeagueGuide(data,result,name);g.cover_new();g.start('Contents');g.end();sections=[('League settings',3)];g.settings()
+ result=eligibility_presentation(data,presentation(data,calculate(data,weights)));g=LeagueGuide(data,result,name);g.cover_new();g.start('Contents');g.end();sections=[('League settings',3)];g.settings()
  sk=[p for p in result['players'] if not p['isGoalie'] and p['rank'] is not None];go=[p for p in result['players'] if p['isGoalie'] and p['rank'] is not None]
  sections.append(('Complete skater board',g.number+1));g.board(sk,'THE SKATER BOARD','Overall rankings',True)
  sections.append(('Complete goalie board',g.number+1));g.board(go,'GOALTENDERS','Goalie rankings',True,True)
@@ -345,14 +350,14 @@ def generate(data,weights,name,path):
  for pos,title in [('C','CENTRES'),('LW','LEFT WINGS'),('RW','RIGHT WINGS'),('D','DEFENCE')]:g.board([p for p in sk if p['position']==pos],title,'Position rankings',True)
  unavailable=[p for p in result['players'] if p['rank'] is None]
  if unavailable:
-  g.notes('FORECASTS TO REVIEW','Coverage',[f"{p['name']} / {display_team(p)} / {p['position']} — {p.get('forecastStatus','unavailable')}. Exposure: {fmt(p['games'])}. FPTS and rank unavailable. Availability: {p.get('availability',{}).get('status','unknown')}." for p in unavailable])
+  g.notes('FORECASTS TO REVIEW','Coverage',[f"{p['name']} / {display_team(p)} / {display_position(p)} — {p.get('forecastStatus','unavailable')}. Exposure: {fmt(p['games'])}. FPTS and rank unavailable. Availability: {p.get('availability',{}).get('status','unknown')}." for p in unavailable])
  sections.append(('The rookie class',g.number+1));intro=[' '.join(r['cells']) for r in data['rookieNarrative'] if r['row']<=8];g.notes('THE ROOKIE CLASS','Rookies',intro);g.rookie_profiles();g.notes('ROOKIE FIELD NOTES','Rookies',[' '.join(r['cells']) for r in data['rookieNarrative'] if r['row']>=46])
  sections.append(('All 32 team guides',g.number+1))
  for t in data['teams']:g.team(t)
  remaining=[p for p in result['players'] if p['rank'] is not None and (p['name'] in g.photos or p['name'] in g.action_photos) and p['name'] not in g.featured]
  for p in remaining:
   g.heading(p['name'],'Player focus',name+' / A closer look at the categories behind the ranking.')
-  rows=[[str(p['rank']),p['name'],display_team(p),p['position']+str(p['positionRank']),fmt(p['games'],0),fmt(p['pointsPerGame'],2),fmt(p['fantasyPoints']),p['source'] or '-']]
+  rows=[[str(p['rank']),p['name'],display_team(p),display_position(p,ranked=True),fmt(p['games'],0),fmt(p['pointsPerGame'],2),fmt(p['fantasyPoints']),p['source'] or '-']]
   g.table(['#','PLAYER','TEAM','POS','RGP/ST' if runtime_edition(data) else 'GP','FP/GP','FPTS','SOURCE'],rows,178,[28,180,40,47,45,55,70,75],featured=p['key'],keys=[p['key']])
   if p['name'] in g.photos:g.card(p,298)
   else:g.photo_focus(p)
@@ -361,5 +366,5 @@ def generate(data,weights,name,path):
  sections.append(('Credits & edition notes',g.number+1));g.colophon();return g.save_new(path,sections)
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('--data',type=Path,default=ROOT/'workbook-data.json');p.add_argument('--affiliations',type=Path);p.add_argument('--settings',type=Path);p.add_argument('--league');p.add_argument('--output',type=Path);a=p.parse_args();data=json.loads(a.data.read_text());data=load_affiliations(data,a.affiliations) if a.affiliations else data;settings=json.loads(a.settings.read_text()) if a.settings else {};weights=settings.get('weights',settings) if settings else data['weights'];name=a.league or settings.get('league','Citrus default scoring');output=a.output or ROOT.parent.parent/'output/pdf'/('Citrus-Effective-Runtime-LOCAL.pdf' if runtime_edition(data) else 'Citrus-Canonical-Review-DRAFT.pdf' if data.get('canonicalRevision') else 'Citrus-Draft-Kit-2026-27-Complete.pdf');m=generate(data,weights,name,output);print(f'Built {m["pages"]} pages / {len(m["featured"])} unique callouts: {output}')
+ p=argparse.ArgumentParser();p.add_argument('--data',type=Path,default=ROOT/'workbook-data.json');p.add_argument('--affiliations',type=Path);p.add_argument('--eligibility',type=Path);p.add_argument('--settings',type=Path);p.add_argument('--league');p.add_argument('--output',type=Path);a=p.parse_args();data=json.loads(a.data.read_text());data=load_affiliations(data,a.affiliations) if a.affiliations else data;data=load_eligibility(data,a.eligibility) if a.eligibility else data;settings=json.loads(a.settings.read_text()) if a.settings else {};weights=settings.get('weights',settings) if settings else data['weights'];name=a.league or settings.get('league','Citrus default scoring');output=a.output or ROOT.parent.parent/'output/pdf'/('Citrus-Effective-Runtime-LOCAL.pdf' if runtime_edition(data) else 'Citrus-Canonical-Review-DRAFT.pdf' if data.get('canonicalRevision') else 'Citrus-Draft-Kit-2026-27-Complete.pdf');m=generate(data,weights,name,output);print(f'Built {m["pages"]} pages / {len(m["featured"])} unique callouts: {output}')
 if __name__=='__main__':main()

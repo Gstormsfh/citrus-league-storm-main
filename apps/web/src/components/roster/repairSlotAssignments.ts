@@ -1,5 +1,6 @@
+import { isEligibleForPosition } from '@citrus/shared';
 import { buildSlotConfig } from './slotConfig';
-import { resolveFantasyPosition, type PositionType } from '@/utils/rosterUtils';
+import { type PositionType } from '@/utils/rosterUtils';
 
 interface SlotPlayer {
   id: string | number;
@@ -18,12 +19,7 @@ export function repairSlotAssignments(
   const config = buildSlotConfig(positionType, rosterSlots);
   const used = new Set(reserved);
   const result: Record<string, string> = {};
-  const fits = (player: SlotPlayer, slot: string) => {
-    const positions: string[] = (player.eligible_positions?.length ? player.eligible_positions : [player.position])
-      .map(p => resolveFantasyPosition(p, positionType));
-    const pos = config.labels[slot];
-    return pos === 'UTIL' ? !positions.includes('G') : positions.includes(pos);
-  };
+  const fits = (player: SlotPlayer, slot: string) => isEligibleForPosition(player, config.labels[slot]);
   // Reserve explicit valid placements before repairing aliases or holes.
   for (const player of starters) {
     const id = String(player.id), slot = assignments[id];
