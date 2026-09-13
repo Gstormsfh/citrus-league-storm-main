@@ -57,6 +57,7 @@ const PUBLIC_ALLOWLIST: Record<string, string> = {
   nhl_games: 'NHL schedule — published by the NHL',
   nhl_schedule: 'NHL schedule mirror',
   player_names: 'Player name lookup — public reference',
+  player_position_events: 'Reviewed NHL primary position evidence — global reference, authenticated read only; no fantasy ownership',
   player_talent_metrics:
     'xG projections — public by product design (unauth home page shows these)',
   team_mapping_config: 'Team abbreviation lookup — static config',
