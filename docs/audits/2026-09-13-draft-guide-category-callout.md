@@ -43,4 +43,8 @@ Static PDFs/XLSX do not update when a local workbook changes. Source publication
 
 ## Scope and follow-through
 
-The guide owner owns old/current artifact comparison and any narrow presentation edits, with prior artifacts retained and review before external deployment. The observed app actuals-grid missing-to-zero defaults are adjacent and were not implicated by the screenshot; no unrelated actuals repair was started. No production writes, manual refresh, model rate edits, roster transactions, merge, or deployment occurred in this investigation.
+The guide owner owns old/current artifact comparison and presentation edits, with prior artifacts retained and review before external deployment. The coordinator subsequently authorized FP/GP as the intended wording and resumed implementation, including the user's team-notes whitespace/photo improvements. The observed app actuals-grid missing-to-zero defaults are adjacent and were not implicated by the screenshot; no unrelated actuals repair was started. No production writes, manual refresh, model rate edits, roster transactions, merge, or deployment occurred in this investigation.
+
+Final bounded read at 17:22:58 UTC confirms all 1,325 published-player view payloads and run/revision stamps exactly match runtime 734, with zero mismatches. The complete teams array (including notes and slots) is identical between approved source aa5 and runtime 734. Raw receipt: `outputs/scheduled-cycle-20260913/published-view-alignment-172258.json`.
+
+The existing CanonicalProjectionService, PlayerDashboardService, DraftKitService and DraftKitScoring test suites passed: 104 tests in four files. These verify publication changes, cache behavior, forecast withholding and league scoring contracts; they do not establish fresh end-to-end authenticated app-screen acceptance or resolve the directory differences above.
