@@ -41,7 +41,7 @@ describe('PlayerService', () => {
       ];
       const talents = [
         { player_id: 1, xg_per_60: 1.5, xg_rating: 95 },
-        { player_id: 2, roster_status: 'IR' },
+        { player_id: 2, roster_status: 'IR', roster_status_source: 'espn-injuries', roster_status_updated_at: new Date().toISOString() },
       ];
 
       mockSupabase.from = vi.fn((table: string) => {
@@ -156,7 +156,7 @@ describe('PlayerService', () => {
       expect(players[0].games_played).toBe(0);
     });
 
-    it('refreshes published availability across stats-cache hits without changing eligibility or counts', async () => {
+    it('refreshes published availability across stats-cache hits and eligibility across stats-cache hits without changing counts', async () => {
       mockSupabase.from = vi.fn((table: string) => createChain({ data: table === 'player_current_directory'
         ? [{ player_id: 8477942, full_name: 'Kevin Fiala', position_code: 'LW', team_abbrev: 'LAK' }]
         : table === 'player_talent_metrics' ? [{ player_id: 8477942, roster_status: null, is_ir_eligible: false }] : [], error: null }));
@@ -175,10 +175,11 @@ describe('PlayerService', () => {
       expect(after.availability).toMatchObject({ status: 'out', revision: 'after' });
       expect(unavailable.availability?.status).toBe('unknown');
       expect(published).toHaveBeenCalledTimes(3);
-      const { availability: _before, ...baseBefore } = before;
-      const { availability: _after, ...baseAfter } = after;
+      const { availability: _before, is_ir_eligible: _beforeIr, ...baseBefore } = before;
+      const { availability: _after, is_ir_eligible: _afterIr, ...baseAfter } = after;
       expect(baseAfter).toEqual(baseBefore);
-      expect(after.is_ir_eligible).toBe(false);
+      expect(after.is_ir_eligible).toBe(true);
+      expect(unavailable.is_ir_eligible).toBe(false);
       expect(after.roster_status).toBeNull();
       expect(mockSupabase.from.mock.calls.filter(([table]: [string]) => table === 'player_current_directory')).toHaveLength(1);
     });

@@ -295,7 +295,7 @@ describe('validateIrPlacements: only the injured go on IR (2026-09-03, WORLD_CLA
     const v = validateIrPlacements({ irPlayerIds: ['1'], irEligibleById: { '1': false }, nameOf: names }, cfg);
     expect(v.ok).toBe(false);
     expect(v.error).toBe(
-      "Connor McDavid isn't listed IR or LTIR, so an IR slot can't hold him. Bench him, or move a player with official IR/LTIR status there.",
+      "Connor McDavid isn't currently listed IR, LTIR, OUT or INJ, so an IR slot can't hold him. Bench him, or move a player with current IR, LTIR, OUT or INJ status there.",
     );
   });
 
@@ -305,7 +305,7 @@ describe('validateIrPlacements: only the injured go on IR (2026-09-03, WORLD_CLA
 
   it('an unnamed player still gets a sentence, not a blank', () => {
     const v = validateIrPlacements({ irPlayerIds: ['9'], irEligibleById: { '9': false } }, cfg);
-    expect(v.error).toMatch(/^That player isn't listed IR or LTIR/);
+    expect(v.error).toMatch(/^That player isn't currently listed IR, LTIR, OUT or INJ/);
   });
 
   it('a player parked while injured stays tolerated after he heals (Yahoo: fix before your next add, not your next lineup change)', () => {
@@ -322,7 +322,7 @@ describe('validateIrPlacements: only the injured go on IR (2026-09-03, WORLD_CLA
       cfg,
     );
     expect(v.ok).toBe(false);
-    expect(v.error).toMatch(/^Evander Kane isn't listed IR or LTIR/);
+    expect(v.error).toMatch(/^Evander Kane isn't currently listed IR, LTIR, OUT or INJ/);
   });
 
   it('fails OPEN on a lookup gap: no map, or no entry for the player', () => {
@@ -372,7 +372,7 @@ describe('validateIrPlacements: only the injured go on IR (2026-09-03, WORLD_CLA
       { irPlayerIds: ['1', '2', '3', '4'], irEligibleById: { '1': true, '2': true, '3': true, '4': false }, nameOf: { '4': 'Bo Horvat' } },
       cfg,
     );
-    expect(v.error).toMatch(/^Bo Horvat isn't listed IR or LTIR/);
+    expect(v.error).toMatch(/^Bo Horvat isn't currently listed IR, LTIR, OUT or INJ/);
   });
 });
 

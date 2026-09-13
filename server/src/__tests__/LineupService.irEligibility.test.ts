@@ -23,6 +23,7 @@
  * configured result.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { CanonicalProjectionService } from '../services/CanonicalProjectionService';
 import { LineupService } from '../services/LineupService';
 
 type Result = { data: unknown; error: unknown };
@@ -92,7 +93,7 @@ const upserted = (chains: Record<string, ReturnType<typeof makeChain>[]>) =>
   (chains['team_lineups'] ?? []).some((ch) => ch.upsert.mock.calls.length > 0);
 
 describe('saveLineup reads eligible_positions as the text cell it is (gap A)', () => {
-  beforeEach(() => vi.restoreAllMocks());
+  beforeEach(() => { vi.restoreAllMocks(); vi.spyOn(CanonicalProjectionService.prototype, 'getPublishedContexts').mockResolvedValue(new Map()); });
 
   it('THE regression: a text cell no longer throws, so a goalie parked at C is refused instead of saved', async () => {
     const { client, chains } = makeSupabase({
@@ -158,10 +159,10 @@ describe('saveLineup reads eligible_positions as the text cell it is (gap A)', (
 });
 
 describe('saveLineup lets only the injured onto IR (gap B)', () => {
-  beforeEach(() => vi.restoreAllMocks());
+  beforeEach(() => { vi.restoreAllMocks(); vi.spyOn(CanonicalProjectionService.prototype, 'getPublishedContexts').mockResolvedValue(new Map()); });
 
   const talent = (rows: Array<{ id: string; ir: boolean; status?: string | null }>) => ({
-    data: rows.map((r) => ({ player_id: Number(r.id), is_ir_eligible: r.ir, roster_status: r.status ?? null })),
+    data: rows.map((r) => ({ player_id: Number(r.id), is_ir_eligible: r.ir, roster_status: r.status ?? (r.ir ? 'IR' : null), roster_status_source: 'espn-injuries', roster_status_updated_at: new Date().toISOString() })),
     error: null,
   });
 
@@ -173,13 +174,27 @@ describe('saveLineup lets only the injured onto IR (gap B)', () => {
       slot_assignments: Object.fromEntries(ir.map((id, i) => [id, `ir-slot-${i + 1}`])),
     });
 
-  it.each(['OUT', 'INJ', 'SUSP', 'DTD', 'unknown'])('%s alone does not qualify for standard IR slots', async (status) => {
+  it.each(['SUSP', 'DTD', 'unknown', 'ACT'])('%s alone does not qualify for standard IR slots', async (status) => {
     const { client, chains } = makeSupabase({ roster_assignments: ROSTER_ROWS, leagues: NO_SETTINGS,
       player_current_directory: DIRECTORY, player_talent_metrics: talent([{ id: KANE, ir: false, status }]),
       team_lineups: base(), fantasy_daily_rosters: { data: [], error: null }, matchups: { data: [], error: null } });
     const res = await new LineupService(client).saveLineup('team-1', 'league-1', irSave([KANE]));
     expect(res.success).toBe(false);
     expect(upserted(chains)).toBe(false);
+  });
+
+  it.each(['ir', 'ltir', 'out', 'injured'])('owner-maintained %s qualifies without a feed flag and persists', async (status) => {
+    vi.mocked(CanonicalProjectionService.prototype.getPublishedContexts).mockResolvedValue(new Map([[KANE, {
+      revision: 'owner-current', availability: { status, authority: 'reviewed_report', as_of: new Date(Date.now()-1000).toISOString(),
+        review_after: new Date(Date.now()+86400000).toISOString(), source: { file: 'owner-workbook', confirmation_scope: 'owner_adopted_workbook_baseline' } },
+    } as any]]));
+    const { client, chains } = makeSupabase({ roster_assignments: ROSTER_ROWS, leagues: NO_SETTINGS,
+      player_current_directory: DIRECTORY, player_talent_metrics: { data: [], error: null }, team_lineups: base(),
+      fantasy_daily_rosters: { data: [], error: null }, matchups: { data: [], error: null } });
+    const result = await new LineupService(client).saveLineup('team-1', 'league-1', irSave([KANE]));
+    expect(result.success).toBe(true);
+    const upsert = (chains['team_lineups'] ?? []).flatMap(ch => ch.upsert.mock.calls)[0];
+    expect(upsert[0].ir).toEqual([KANE]);
   });
 
   it('THE gap: a healthy player placed on IR is refused, and the sentence names him', async () => {
@@ -195,12 +210,12 @@ describe('saveLineup lets only the injured onto IR (gap B)', () => {
     const res = await new LineupService(client).saveLineup('team-1', 'league-1', irSave([MCDAVID]));
     expect(res.success).toBe(false);
     expect(res.error).toBe(
-      "Connor McDavid isn't listed IR or LTIR, so an IR slot can't hold him. Bench him, or move a player with official IR/LTIR status there.",
+      "Connor McDavid isn't currently listed IR, LTIR, OUT or INJ, so an IR slot can't hold him. Bench him, or move a player with current IR, LTIR, OUT or INJ status there.",
     );
     expect(upserted(chains)).toBe(false);
   });
 
-  it.each(['IR', 'LTIR'])('a player listed %s is accepted and written to IR', async (status) => {
+  it.each(['IR', 'LTIR', 'OUT', 'INJ'])('a player listed %s is accepted and written to IR', async (status) => {
     const { client, chains } = makeSupabase({
       roster_assignments: ROSTER_ROWS,
       leagues: NO_SETTINGS,
@@ -230,7 +245,7 @@ describe('saveLineup lets only the injured onto IR (gap B)', () => {
       'team-1', 'league-1', lineupWith({ starters: [DRAISAITL, SKINNER, HORVAT], bench: [KANE], ir: [MCDAVID] }),
     );
     expect(res.success).toBe(false);
-    expect(res.error).toMatch(/^Connor McDavid isn't listed IR or LTIR/);
+    expect(res.error).toMatch(/^Connor McDavid isn't currently listed IR, LTIR, OUT or INJ/);
   });
 
   it('no talent row means no designation, which means no IR', async () => {
@@ -245,7 +260,7 @@ describe('saveLineup lets only the injured onto IR (gap B)', () => {
     });
     const res = await new LineupService(client).saveLineup('team-1', 'league-1', irSave([HORVAT]));
     expect(res.success).toBe(false);
-    expect(res.error).toMatch(/^Bo Horvat isn't listed IR or LTIR/);
+    expect(res.error).toMatch(/^Bo Horvat isn't currently listed IR, LTIR, OUT or INJ/);
   });
 
   it('an occupant on record who has since been activated is tolerated (base lineup)', async () => {
@@ -288,7 +303,7 @@ describe('saveLineup lets only the injured onto IR (gap B)', () => {
     });
     const res = await new LineupService(client).saveLineup('team-1', 'league-1', irSave([KANE, MCDAVID]));
     expect(res.success).toBe(false);
-    expect(res.error).toMatch(/^Connor McDavid isn't listed IR or LTIR/);
+    expect(res.error).toMatch(/^Connor McDavid isn't currently listed IR, LTIR, OUT or INJ/);
   });
 
   it('a failed status read cannot authorize a new IR placement', async () => {

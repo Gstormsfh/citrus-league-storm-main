@@ -1,4 +1,4 @@
-import { availabilityDescription, currentPlayerAvailability, type CanonicalProjectionContext, type PlayerAvailability } from '@citrus/shared';
+import { availabilityDescription, currentPlayerAvailability, isFantasyIrEligible, type CanonicalProjectionContext, type PlayerAvailability } from '@citrus/shared';
 import { canonicalEditorialContext } from '@citrus/shared/editorial';
 
 /** Shared by modal entry points and the full dashboard. Data comes from the
@@ -18,5 +18,6 @@ export function PlayerAvailabilityDetails({ playerId, name, context, availabilit
   return <section aria-label="Availability explanation" className="rounded-xl border border-white/10 bg-pressbox-tile p-3 text-pressbox-text">
     <h3 className="text-sm font-semibold">{current.status === 'suspended' ? 'Suspension context' : 'Availability context'}</h3>
     <p className="mt-1 text-sm leading-relaxed text-pressbox-text/75">{explanation}</p>
+    <p className="mt-2 text-xs">Fantasy IR: {isFantasyIrEligible(current) ? 'eligible under the current IR, LTIR, OUT and INJ policy, subject to available slots.' : 'not currently eligible from this status evidence.'}</p>
   </section>;
 }

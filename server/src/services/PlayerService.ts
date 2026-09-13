@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, getCurrentSeason, getMetricsSeason, getProjectionsSeason, resolvePlayerAvailability, type PlayerAvailability, parseEligiblePositions, type EligiblePositionsRaw } from '@citrus/shared';
+import { COLUMNS, getCurrentSeason, getMetricsSeason, getProjectionsSeason, resolvePlayerAvailability, isFantasyIrEligible, type PlayerAvailability, parseEligiblePositions, type EligiblePositionsRaw } from '@citrus/shared';
 import { CanonicalProjectionService } from './CanonicalProjectionService';
 import { readAllPaged } from '../lib/pagedRead';
 
@@ -267,9 +267,10 @@ export class PlayerService {
     } catch {
       // Unavailable publication is unknown; independently dated reported facts may still apply.
     }
-    return players.map(player => ({ ...player, availability: resolvePlayerAvailability({
-      ...player, canonical_context: contexts?.get(String(player.id)) ?? null,
-    }) }));
+    return players.map(player => {
+      const availability = resolvePlayerAvailability({ ...player, canonical_context: contexts?.get(String(player.id)) ?? null });
+      return { ...player, availability, is_ir_eligible: isFantasyIrEligible(availability) };
+    });
   }
 
   /** The uncached read+merge behind `getAllPlayers`. */

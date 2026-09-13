@@ -5,12 +5,12 @@ const now = Date.parse('2026-09-12T12:00:00Z');
 const context = (availability: Record<string, unknown>) => ({ revision: 'reviewed-revision', availability } as CanonicalProjectionContext);
 const reviewed = { status: 'out', authority: 'reviewed_report', as_of: '2026-09-10', review_after: '2026-09-17', source: { url: 'https://www.nhl.com/news/evidence' } };
 describe('dated availability display contract', () => {
-  it('keeps a current reviewed absence distinct from IR eligibility', () => {
+  it('resolves reviewed evidence without mutating the input record', () => {
     const input = { canonical_context: context(reviewed), roster_status: null, is_ir_eligible: false, games_played: 60 };
     const result = resolvePlayerAvailability(input, now);
     expect(result).toMatchObject({ status: 'out', basis: 'reviewed_report', revision: 'reviewed-revision', stale: false });
     expect(availabilityLabel(result)).toBe('OUT');
-    expect(availabilityDescription(result)).toContain('not an IR eligibility decision');
+    expect(availabilityDescription(result)).toContain('Reviewed status report');
     expect(input.is_ir_eligible).toBe(false);
     expect(input.roster_status).toBeNull();
   });

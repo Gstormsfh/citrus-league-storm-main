@@ -171,29 +171,16 @@ export function validateSlotAssignments(
  * asked whether the player is hurt. And the cap only ever saw slot ids: the
  * `ir` LIST the snapshot writer stores is unbounded, so a direct API call could
  * park a healthy player, or six of them, on IR and free the roster spots.
- * Yahoo refuses the placement outright: only a player the NHL lists IR or LTIR
- * may enter an IR slot. The roster page has gated its IR slots on
- * `is_ir_eligible` since the column arrived (migration 20260103151931); this
- * makes the server the gate.
- *
- * Existing occupants and lookup handling:
- *   - a player placed while injured who has since been activated is
- *     TOLERATED. Yahoo flags that roster and blocks ADDS until it is fixed; it
- *     does not refuse every lineup change in between, and neither do we. The
- *     service hands us who is on IR on record; anyone in that set is not a
- *     new placement and is not re-checked.
- *   - the service refuses failed eligibility/history lookups before calling this helper.
- *     Legacy pure callers can omit the map; no map, or no entry
- *     for the player, means "the read did not answer", never "he is healthy".
- *     The service writes an entry for EVERY id it was asked about when the
- *     read succeeds, so an absent entry can only be a gap.
+ * Current user-approved policy accepts fresh IR, LTIR, OUT and INJ evidence.
+ * The service resolves that evidence before calling this capacity/placement
+ * helper and rejects failed lookups. Existing occupants remain tolerated after
+ * recovery so the user can reorganize or move them out of IR.
  */
 export interface IrPlacementCheck {
   /** Every player the save puts on IR: the `ir` list plus any `ir-slot-N` assignment. */
   irPlayerIds: string[];
   /**
-   * player id -> the NHL lists him IR/LTIR (player_talent_metrics.is_ir_eligible,
-   * the flag the roster page gates on). Absent map or entry = lookup gap.
+   * player id -> current resolved evidence qualifies for fantasy IR.
    */
   irEligibleById?: Record<string, boolean>;
   /** Players on IR in the lineup on record; not new placements, not re-checked. */
@@ -218,7 +205,7 @@ export function validateIrPlacements(check: IrPlacementCheck, config: RosterSlot
     if (check.irEligibleById?.[id] === false) {
       return {
         ok: false,
-        error: `${nameOf(id)} isn't listed IR or LTIR, so an IR slot can't hold him. Bench him, or move a player with official IR/LTIR status there.`,
+        error: `${nameOf(id)} isn't currently listed IR, LTIR, OUT or INJ, so an IR slot can't hold him. Bench him, or move a player with current IR, LTIR, OUT or INJ status there.`,
       };
     }
   }

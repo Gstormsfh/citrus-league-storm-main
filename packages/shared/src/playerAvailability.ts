@@ -24,7 +24,7 @@ const labels: Record<AvailabilityStatus, string> = {
 };
 const DAY = 86_400_000;
 const normalize = (value: unknown): AvailabilityStatus => ({
-  healthy: 'healthy', active: 'healthy', ACT: 'healthy', ACTIVE: 'healthy', injured: 'injured',
+  healthy: 'healthy', active: 'healthy', ACT: 'healthy', ACTIVE: 'healthy', injured: 'injured', INJ: 'injured', INJURED: 'injured',
   out: 'out', OUT: 'out', ir: 'ir', IR: 'ir', ltir: 'ltir', LTIR: 'ltir',
   day_to_day: 'day_to_day', DTD: 'day_to_day', GTD: 'day_to_day',
   suspended: 'suspended', SUSP: 'suspended', unknown: 'unknown',
@@ -93,6 +93,12 @@ export function availabilityDescription(value: PlayerAvailability): string {
     return value.projection_scenario ? `${current} ${value.projection_scenario.stale ? 'Expired projection scenario' : 'Projection scenario'}: ${labels[value.projection_scenario.status]}, as of ${value.projection_scenario.as_of.slice(0, 10)}. This does not establish current injury or IR eligibility.` : current;
   }
   const basis = value.basis === 'projection_scenario' ? 'Reviewed projection availability scenario; not an official roster designation'
-    : value.basis === 'reviewed_report' ? 'Reviewed status report; not an IR eligibility decision' : 'Reported status from ESPN; not an IR eligibility decision';
+    : value.basis === 'reviewed_report' ? 'Reviewed status report' : 'Reported status from ESPN';
   return `${labels[value.status]}. ${basis}. As of ${value.as_of?.slice(0, 10)}; review due ${value.expires_at?.slice(0, 10)}.${value.source ? ` Source: ${value.source}.` : ''}`;
+}
+
+/** User-approved fantasy policy: fresh owner/reviewed or reported IR, LTIR,
+ * OUT and INJ qualify. Workload scenarios and expired/unknown evidence do not. */
+export function isFantasyIrEligible(value: PlayerAvailability | null | undefined, now = Date.now()): boolean {
+  return ['ir', 'ltir', 'out', 'injured'].includes(currentPlayerAvailability(value, now).status);
 }

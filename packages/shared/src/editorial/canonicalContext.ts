@@ -135,7 +135,7 @@ export function canonicalEditorialContext(
         const note = text(rawNote, 1800);
         const historical = note?.split('Historical forecast reasoning:')[1]?.trim();
         if (historical) summaries.push(`Historical workload assumption, not a current recovery forecast: ${historical}`);
-        summaries.push('Return timing is unconfirmed. This baseline does not establish fantasy IR eligibility.');
+        summaries.push('Return timing is unconfirmed. Current IR, LTIR, OUT and INJ status qualifies for fantasy IR slots.');
       }
       result.availabilityExplanation = summaries.join(' ');
       result.availability = { status: String(availability.status), authority: reviewed ? 'reviewed_report' : scenario ? 'imported_scenario' : 'verified', asOf: new Date(String(availability.as_of)).toISOString() };

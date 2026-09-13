@@ -1,4 +1,5 @@
-import { getProjectionsSeason } from '@citrus/shared';
+import { CanonicalProjectionService } from './CanonicalProjectionService';
+import { getProjectionsSeason, getMetricsSeason, resolvePlayerAvailability, isFantasyIrEligible, type AvailabilityInput } from '@citrus/shared';
 import { SupabaseClient } from '@supabase/supabase-js';
 import {
   COLUMNS,
@@ -225,16 +226,9 @@ export class LineupService {
       delete lineup.slot_assignments[pid];
     }
 
-    // 1c. Only the injured go on IR (2026-09-03, WORLD_CLASS_READINESS gap B).
-    // The roster page has gated its IR slots on `is_ir_eligible` since the
-    // column arrived (migration 20260103151931); nothing on the server ever
-    // asked. Yahoo refuses a player who is not listed IR/LTIR outright, and
-    // so does this. Pure rule + tests in lib/leagueRules.ts
-    // (validateIrPlacements); the two reads below only happen when the save
-    // actually puts someone on IR, so the common save pays nothing. A player
-    // parked while injured who has since been activated is on record and
-    // tolerated (Yahoo blocks ADDS for that roster, not lineup changes).
-    // A failed eligibility/history read cannot authorize a new IR placement.
+    // Fresh owner/reviewed or reported IR/LTIR/OUT/INJ qualifies under the
+    // user-approved policy. Existing occupants remain tolerated after recovery;
+    // failed lookups cannot authorize new placements.
     if (irPlayerIds.length > 0) {
       const irEligibleById = await this.irEligibilityOf(irPlayerIds);
       const alreadyOnIr = await this.playersOnIrOnRecord(teamId, leagueId, targetDate ?? getTodayMST());
@@ -515,33 +509,23 @@ export class LineupService {
     return { locked, nameOf };
   }
 
-  /**
-   * player id -> the NHL lists him IR/LTIR, for EVERY id asked about, read
-   * from player_talent_metrics for the current season: the same flag and the
-   * same season PlayerService hands the roster page, so the server accepts
-   * exactly what the page offers and nothing the page would not. A row that
-   * is missing, or says false, is false: no designation means no IR. Null
-   * when the read itself fails, and the caller refuses an unverified placement.
-   */
+  /** Resolve the same fresh published/reported evidence used by player cards.
+   * Medical workload scenarios and stale flags cannot authorize a placement. */
   private async irEligibilityOf(playerIds: string[]): Promise<Record<string, boolean> | null> {
-    const ids = playerIds.map((id) => Number(id)).filter((n) => Number.isFinite(n));
+    const ids = playerIds.map(Number).filter(Number.isFinite);
     if (ids.length === 0) return {};
     try {
-      const { data, error } = await this.supabase
-        .from('player_talent_metrics')
-        .select('player_id, is_ir_eligible, roster_status')
-        .eq('season', getCurrentSeason())
-        .in('player_id', ids);
+      const [{ data, error }, contexts] = await Promise.all([
+        this.supabase.from('player_talent_metrics')
+          .select('player_id, roster_status, roster_status_source, roster_status_updated_at')
+          .eq('season', getMetricsSeason()).in('player_id', ids),
+        new CanonicalProjectionService(this.supabase).getPublishedContexts(getProjectionsSeason()),
+      ]);
       if (error) throw error;
-      const listed = new Set<string>();
-      for (const row of (data ?? []) as Array<{ player_id: number; is_ir_eligible: boolean | null; roster_status: string | null }>) {
-        if (row.is_ir_eligible === true || row.roster_status === 'IR' || row.roster_status === 'LTIR') {
-          listed.add(String(row.player_id));
-        }
-      }
-      const out: Record<string, boolean> = {};
-      for (const id of playerIds) out[id] = listed.has(id);
-      return out;
+      const rows = new Map<number, AvailabilityInput>((data ?? []).map((row: AvailabilityInput & { player_id: number }) => [row.player_id, row]));
+      return Object.fromEntries(playerIds.map(id => [id, isFantasyIrEligible(resolvePlayerAvailability({
+        ...rows.get(Number(id)), canonical_context: contexts?.get(id) ?? null,
+      }))]));
     } catch (err) {
       logger.warn('[LineupService.saveLineup] IR status lookup failed:', err);
       return null;

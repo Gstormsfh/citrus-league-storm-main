@@ -1,3 +1,4 @@
+import { useFantasyIrEligibility } from '@/hooks/useFantasyIrEligibility';
 import { indexRosterRosStats } from '@/components/roster/rosStats';
 import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 import { expectedDailyProjection } from '@citrus/shared';
@@ -293,6 +294,7 @@ const ROSTER_VIEW_TAB =
 
 const Roster = () => {
   const { user } = useAuth();
+  const canUseIr = useFantasyIrEligibility(Boolean(user));
   const { data: profile } = useProfile();
   const { userLeagueState, loading: leagueLoading, activeLeagueId, activeLeague, activeLeagueFormat, demoLeagueId, isChangingLeague } = useLeague();
   const { toast } = useToast();
@@ -2740,7 +2742,7 @@ const Roster = () => {
     // Check all players in IR slots
     for (const irPlayer of currentRoster.ir) {
       // If player has roster_status === 'ACT' but is still in IR slot, roster is invalid
-      if (irPlayer.roster_status === 'ACT' || !irPlayer.is_ir_eligible) {
+      if (!canUseIr(irPlayer)) {
         invalidPlayers.push(irPlayer);
       }
     }
@@ -2759,8 +2761,8 @@ const Roster = () => {
     if (targetSlot === 'bench-grid') return true;
 
     if (targetSlot.startsWith('ir-slot-')) {
-      // Only allow players with is_ir_eligible = true (official NHL IR/LTIR status)
-      if (!player.is_ir_eligible) {
+      // Fresh IR/LTIR/OUT/INJ evidence follows the user-approved fantasy policy.
+      if (!canUseIr(player)) {
         return false;
       }
       return true;
@@ -2799,7 +2801,7 @@ const Roster = () => {
     }
 
     return eligiblePositions.includes(slotPosition);
-  }, [leaguePositionType]);
+  }, [leaguePositionType, canUseIr]);
 
   // The move engine behind every lineup change on this page — used to be
   // reached only through a dnd-kit DragEndEvent (drag) or a fake one built
@@ -2956,7 +2958,7 @@ const Roster = () => {
         // the refusal there read the same; the position one is the
         // COPY_VOICE rewrite of "Player cannot be placed in that position."
         if (finalTargetSlotId.startsWith('ir-slot-')) {
-          toast({ title: "Invalid Move", description: `${player.name} isn't listed IR or LTIR, so an IR slot can't hold him. Bench him, or move a player with official IR/LTIR status there.`, variant: "destructive" });
+          toast({ title: "Invalid Move", description: `${player.name} isn't currently listed IR, LTIR, OUT or INJ, so an IR slot can't hold him. Bench him, or move a player with current IR, LTIR, OUT or INJ status there.`, variant: "destructive" });
         } else {
           const plays = slotPositionsLabel(player, leaguePositionType);
           toast({ title: "Invalid Position", description: `That slot doesn't fit. ${player.name} plays ${plays}, so try a ${plays} or bench slot.`, variant: "destructive" });
@@ -3097,8 +3099,8 @@ const Roster = () => {
       toast({
         title: "Invalid Roster State",
         description: healed.length === 1
-          ? `${invalidNames} isn't listed IR or LTIR anymore, so he can't stay on IR. Move him to the bench or an open slot.`
-          : `${invalidNames} aren't listed IR or LTIR anymore, so they can't stay on IR. Move them to the bench or an open slot.`,
+          ? `${invalidNames} isn't currently listed IR, LTIR, OUT or INJ anymore, so he can't stay on IR. Move him to the bench or an open slot.`
+          : `${invalidNames} aren't currently listed IR, LTIR, OUT or INJ anymore, so they can't stay on IR. Move them to the bench or an open slot.`,
         variant: "destructive",
         duration: 10000 // Show for 10 seconds
       });
@@ -3269,7 +3271,7 @@ const Roster = () => {
     // Validate the source player can go to that slot
     if (!tapEligibleSlots.has(targetSlotId)) {
       if (targetSlotId.startsWith('ir-slot-')) {
-        toast({ title: "Invalid Move", description: `${sourcePlayer.name} isn't listed IR or LTIR, so an IR slot can't hold him. Bench him, or move a player with official IR/LTIR status there.`, variant: "destructive" });
+        toast({ title: "Invalid Move", description: `${sourcePlayer.name} isn't currently listed IR, LTIR, OUT or INJ, so an IR slot can't hold him. Bench him, or move a player with current IR, LTIR, OUT or INJ status there.`, variant: "destructive" });
       } else {
         const plays = slotPositionsLabel(sourcePlayer, leaguePositionType);
         toast({ title: "Invalid Position", description: `That slot doesn't fit. ${sourcePlayer.name} plays ${plays}, so try a ${plays} or bench slot.`, variant: "destructive" });
