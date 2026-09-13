@@ -51,6 +51,8 @@ export interface WriteupTag {
 }
 
 export interface PlayerWriteup {
+  /** Full dated status context, also retained in summary for older clients. */
+  availabilityExplanation?: string;
   sourceContext?: {
     actualsSeason: number | null;
     projectionSeason: number | null;
@@ -134,7 +136,7 @@ export interface WriteupExtras {
   canonicalContext?: EditorialCanonicalContext | null;
   /** Internal validated context, replaced by generatePlayerWriteup before rendering. */
   selectedNews?: readonly EditorialNewsEvidence[];
-  selectedAvailability?: { status: string; authority: 'verified' | 'imported_scenario'; asOf: string };
+  selectedAvailability?: { status: string; authority: 'verified' | 'imported_scenario' | 'reviewed_report'; asOf: string };
   /** Injected as-of for deterministic freshness evaluation. */
   now?: Date;
   /** Enabled scoring categories; absent means recommendations stay conditional. */
@@ -351,6 +353,7 @@ export function generatePlayerWriteup(player: WriteupPlayer | null | undefined, 
     },
     ...(canonical.sources.length ? { canonicalSources: canonical.sources } : {}),
     newsSources: evidence,
+    availabilityExplanation: canonical.availabilityExplanation,
     summary: [news.summary, canonical.summary, profileSummary].filter(Boolean).join(' '),
     analysis: [enriched.analysis, canonical.analysis].filter(Boolean).join(' '),
   };

@@ -129,6 +129,12 @@ jobs:
           print('OK: all writer-tracked seasons populated above floor')
           "
 
+      - name: Verify reviewed current affiliations and flag new feed conflicts
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/utilities/check_player_affiliations.py
+
       - name: Verify orphan count post-refresh
         if: success()
         env:

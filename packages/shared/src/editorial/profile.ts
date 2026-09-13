@@ -8,7 +8,7 @@ const save = (n: number) => n.toFixed(3).replace(/^0/, '');
 type ProfileExtras = WriteupExtras & {
   scoringWeights?: Readonly<Record<string, number>> | null;
   selectedNews?: readonly EditorialNewsEvidence[];
-  selectedAvailability?: { status: string; authority: 'verified' | 'imported_scenario'; asOf: string };
+  selectedAvailability?: { status: string; authority: 'verified' | 'imported_scenario' | 'reviewed_report'; asOf: string };
 };
 
 type Contribution = { key: string; label: string; value: number };
@@ -59,7 +59,7 @@ function currentDecision(extras: ProfileExtras | undefined, anchor: string, ppHe
         return `If the imported availability scenario still applies, access to games comes before the ${anchor}. Confirm a current status before using a lineup spot.`;
       }
     } else if (['out', 'ir', 'ltir', 'suspended'].includes(availability.status)) kind = 'out';
-    else if (availability.status === 'day_to_day') kind = 'uncertain';
+    else if (['day_to_day', 'injured'].includes(availability.status)) kind = 'uncertain';
     else if (availability.status === 'active') kind = 'active';
   }
   if (kind === 'active') return `An active listing makes the ${anchor} relevant to the lineup discussion. Confirm ${goalie ? 'the start' : 'the game roster and minutes'}; an active designation is not medical clearance or a full-workload guarantee.`;

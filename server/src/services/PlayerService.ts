@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { COLUMNS, getCurrentSeason, getMetricsSeason, getProjectionsSeason, resolvePlayerAvailability, type PlayerAvailability, parseEligiblePositions, type EligiblePositionsRaw } from '@citrus/shared';
+import { COLUMNS, getCurrentSeason, getMetricsSeason, getProjectionsSeason, resolvePlayerAvailability, isFantasyIrEligible, type PlayerAvailability, parseEligiblePositions, type EligiblePositionsRaw } from '@citrus/shared';
 import { CanonicalProjectionService } from './CanonicalProjectionService';
 import { readAllPaged } from '../lib/pagedRead';
 
@@ -14,7 +14,9 @@ interface PlayerDirectoryRow {
   player_id: number;
   full_name: string;
   position_code: string;
-  team_abbrev: string;
+  team_abbrev: string | null;
+  current_affiliation?: Record<string, unknown>;
+  projection_team?: string | null;
   jersey_number: string | null;
   headshot_url: string | null;
   // `player_directory.eligible_positions` is a comma-separated TEXT cell
@@ -75,6 +77,8 @@ interface GoalieGsaxRow {
 
 interface NormalizedPlayer {
   availability?: PlayerAvailability;
+  current_affiliation?: Record<string, unknown>;
+  projection_team?: string | null;
   stats_season: number | null;
   id: number;
   full_name: string;
@@ -184,7 +188,8 @@ function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talen
     stats_season: stat.player_id != null ? statsSeason ?? null : null,
     full_name: p.full_name,
     position: p.position_code,
-    team: p.team_abbrev,
+    team: p.team_abbrev ?? '',
+    current_affiliation: p.current_affiliation, projection_team: p.projection_team,
     jersey_number: p.jersey_number ? parseInt(p.jersey_number, 10) : null,
     headshot_url: p.headshot_url,
     is_goalie: isGoalie,
@@ -192,7 +197,7 @@ function buildPlayer(p: PlayerDirectoryRow, stat: Partial<PlayerStatsRow>, talen
     roster_status: rosterStatus,
     roster_status_source: talent.roster_status_source ?? null,
     roster_status_updated_at: talent.roster_status_updated_at ?? null,
-    is_ir_eligible: talent?.is_ir_eligible || false,
+    is_ir_eligible: talent?.is_ir_eligible === true || rosterStatus === 'IR' || rosterStatus === 'LTIR',
     eligible_positions: parseEligiblePositions(p.eligible_positions, p.position_code),
     games_played: gamesPlayed,
     goals: stat.nhl_goals || 0,
@@ -262,9 +267,10 @@ export class PlayerService {
     } catch {
       // Unavailable publication is unknown; independently dated reported facts may still apply.
     }
-    return players.map(player => ({ ...player, availability: resolvePlayerAvailability({
-      ...player, canonical_context: contexts?.get(String(player.id)) ?? null,
-    }) }));
+    return players.map(player => {
+      const availability = resolvePlayerAvailability({ ...player, canonical_context: contexts?.get(String(player.id)) ?? null });
+      return { ...player, availability, is_ir_eligible: isFantasyIrEligible(availability) };
+    });
   }
 
   /** The uncached read+merge behind `getAllPlayers`. */
@@ -295,14 +301,14 @@ export class PlayerService {
     // stat rows do not exist until games are played, and keying the stat
     // reads on the current season put a 0/0/0 line beside every name for
     // the two weeks most leagues draft in.
-    const season = getCurrentSeason();
+    const season = getProjectionsSeason();
     const metricsSeason = getMetricsSeason();
 
     const { data: directory, error: dirError } = await readAllPaged<PlayerDirectoryRow>(
       this.supabase,
       {
-        table: 'player_directory',
-        columns: COLUMNS.PLAYER_DIRECTORY,
+        table: 'player_current_directory',
+        columns: COLUMNS.PLAYER_DIRECTORY + ',current_affiliation,projection_team',
         filters: [['season', season]],
         orderBy: ['player_id'],
       },
@@ -383,9 +389,9 @@ export class PlayerService {
     // one — the Free Agents player card showed a different stat line
     // (another season's) than the pool row for the same player.
     const { data: directory, error } = await this.supabase
-      .from('player_directory')
-      .select(COLUMNS.PLAYER_DIRECTORY)
-      .eq('season', getCurrentSeason())
+      .from('player_current_directory')
+      .select(COLUMNS.PLAYER_DIRECTORY + ',current_affiliation,projection_team')
+      .eq('season', getProjectionsSeason())
       .in('player_id', numericIds);
 
     if (error) {
@@ -440,12 +446,12 @@ export class PlayerService {
   /** Get a single player by ID */
   async getPlayer(playerId: string | number) {
     const { data, error } = await this.supabase
-      .from('player_directory')
-      .select(COLUMNS.PLAYER_DIRECTORY)
+      .from('player_current_directory')
+      .select(COLUMNS.PLAYER_DIRECTORY + ',current_affiliation,projection_team')
       // SEASON FILTER (2026-08-24 sweep): without it the per-season index
       // returns one row per season and .single() THROWS on any player
       // with more than one season row.
-      .eq('season', getCurrentSeason())
+      .eq('season', getProjectionsSeason())
       .eq('player_id', parseInt(String(playerId), 10))
       .single();
 

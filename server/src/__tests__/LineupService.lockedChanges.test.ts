@@ -82,7 +82,7 @@ describe('LineupService.findLockedLineupChanges', () => {
   beforeEach(() => vi.restoreAllMocks());
 
   it('names a locked starter the request would bench', async () => {
-    const { client } = makeSupabase({ fantasy_daily_rosters: TODAY_ROWS, player_directory: DIRECTORY, nhl_games: EDM_LIVE });
+    const { client } = makeSupabase({ fantasy_daily_rosters: TODAY_ROWS, player_current_directory: DIRECTORY, nhl_games: EDM_LIVE });
     const svc = new LineupService(client);
     const changes = await svc.findLockedLineupChanges(
       't1',
@@ -95,7 +95,7 @@ describe('LineupService.findLockedLineupChanges', () => {
   });
 
   it('lets an unlocked player move while the locked one stays put', async () => {
-    const { client, chains } = makeSupabase({ fantasy_daily_rosters: TODAY_ROWS, player_directory: DIRECTORY, nhl_games: EDM_LIVE });
+    const { client, chains } = makeSupabase({ fantasy_daily_rosters: TODAY_ROWS, player_current_directory: DIRECTORY, nhl_games: EDM_LIVE });
     const svc = new LineupService(client);
     const changes = await svc.findLockedLineupChanges(
       't1',
@@ -113,14 +113,14 @@ describe('LineupService.findLockedLineupChanges', () => {
   });
 
   it('a locked starter moved to another slot is still a move', async () => {
-    const { client } = makeSupabase({ fantasy_daily_rosters: TODAY_ROWS, player_directory: DIRECTORY, nhl_games: EDM_LIVE });
+    const { client } = makeSupabase({ fantasy_daily_rosters: TODAY_ROWS, player_current_directory: DIRECTORY, nhl_games: EDM_LIVE });
     const svc = new LineupService(client);
     const changes = await svc.findLockedLineupChanges('t1', 'l1', lineup({ slot_assignments: { [String(MCDAVID)]: 'slot-UTIL' } }), TODAY);
     expect(changes.map((c) => `${c.playerName} ${c.from}->${c.to}`)).toEqual(['Connor McDavid slot-C-1->slot-UTIL']);
   });
 
   it('does not query anything for a strictly future day — nothing can be locked there', async () => {
-    const { client, from } = makeSupabase({ fantasy_daily_rosters: TODAY_ROWS, player_directory: DIRECTORY, nhl_games: EDM_LIVE });
+    const { client, from } = makeSupabase({ fantasy_daily_rosters: TODAY_ROWS, player_current_directory: DIRECTORY, nhl_games: EDM_LIVE });
     const svc = new LineupService(client);
     const tomorrow = new Date(`${TODAY}T12:00:00`);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -131,7 +131,7 @@ describe('LineupService.findLockedLineupChanges', () => {
   });
 
   it('a base save (no date) is checked against today, because it propagates there', async () => {
-    const { client } = makeSupabase({ fantasy_daily_rosters: TODAY_ROWS, player_directory: DIRECTORY, nhl_games: EDM_LIVE });
+    const { client } = makeSupabase({ fantasy_daily_rosters: TODAY_ROWS, player_current_directory: DIRECTORY, nhl_games: EDM_LIVE });
     const svc = new LineupService(client);
     const changes = await svc.findLockedLineupChanges('t1', 'l1', lineup({ starters: [], bench: [String(MCDAVID), String(DRAISAITL)], slot_assignments: {} }));
     expect(changes.map((c) => c.playerName)).toEqual(['Connor McDavid']);
@@ -141,7 +141,7 @@ describe('LineupService.findLockedLineupChanges', () => {
     const { client, chains } = makeSupabase({
       fantasy_daily_rosters: { data: [], error: null },
       team_lineups: { data: { starters: [MCDAVID], bench: [DRAISAITL], ir: [], slot_assignments: { [String(MCDAVID)]: 'slot-C-1' } }, error: null },
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       nhl_games: EDM_LIVE,
     });
     const svc = new LineupService(client);
@@ -161,7 +161,7 @@ describe('LineupService.findLockedLineupChanges', () => {
   it('a recorded slot of null compares by list only, so a client-side repair is not a move', async () => {
     const { client } = makeSupabase({
       fantasy_daily_rosters: { data: [{ player_id: MCDAVID, slot_type: 'active', slot_id: null }], error: null },
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       nhl_games: EDM_LIVE,
     });
     const svc = new LineupService(client);
@@ -172,7 +172,7 @@ describe('LineupService.findLockedLineupChanges', () => {
   it('a scheduled game that has not started is not a lock', async () => {
     const { client } = makeSupabase({
       fantasy_daily_rosters: TODAY_ROWS,
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       nhl_games: { data: [{ game_time: IN_TWO_HOURS, status: 'scheduled', home_team: 'EDM', away_team: 'CGY' }], error: null },
     });
     const svc = new LineupService(client);
@@ -183,7 +183,7 @@ describe('LineupService.findLockedLineupChanges', () => {
   it('a scheduled game whose start time has passed IS a lock, even before the feed flips to live', async () => {
     const { client } = makeSupabase({
       fantasy_daily_rosters: TODAY_ROWS,
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       nhl_games: { data: [{ game_time: HOUR_AGO, status: 'scheduled', home_team: 'CGY', away_team: 'EDM' }], error: null },
     });
     const svc = new LineupService(client);
@@ -192,7 +192,7 @@ describe('LineupService.findLockedLineupChanges', () => {
   });
 
   it('a locked player absent from the request is a drop, not a move', async () => {
-    const { client, chains } = makeSupabase({ fantasy_daily_rosters: TODAY_ROWS, player_directory: DIRECTORY, nhl_games: EDM_LIVE });
+    const { client, chains } = makeSupabase({ fantasy_daily_rosters: TODAY_ROWS, player_current_directory: DIRECTORY, nhl_games: EDM_LIVE });
     const svc = new LineupService(client);
     const changes = await svc.findLockedLineupChanges('t1', 'l1', lineup({ starters: [], bench: [String(DRAISAITL)], slot_assignments: {} }), TODAY);
     expect(changes).toEqual([]);

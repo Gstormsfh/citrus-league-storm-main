@@ -67,7 +67,7 @@ describe('published canonical context read', () => {
     db.from = vi.fn((table: string) => {
       const data = table === 'canonical_published_runs' ? active :
         table === 'canonical_published_players' ? [{ ...row, revision: active.revision }] :
-        table === 'player_directory' ? [{ player_id: 1, full_name: 'Fixture', position_code: 'C', team_abbrev: 'NYR', eligible_positions: 'C,LW' }] :
+        table === 'player_current_directory' ? [{ player_id: 1, full_name: 'Fixture', position_code: 'C', team_abbrev: 'NYR', eligible_positions: 'C,LW' }] :
         table === 'player_season_stats' ? [{ player_id: 1, games_played: 7, nhl_goals: 2 }] :
         table === 'player_ros_projections' ? [{ player_id: 1, games_remaining: 70, projected_goals: active.revision === 'rev1' ? 10 : 20, projection_run_id: active.run_id, projection_revision: active.revision }] : [];
       return createChain({ data, error: null });
@@ -86,7 +86,7 @@ describe('published canonical context read', () => {
     active = { ...active, last_refresh_at: '2026-09-13T00:00:00Z' as any };
     const refreshed = (await service.getDashboardIndex()).players[0];
     expect(refreshed.canonical_context?.refresh.at).toBe('2026-09-13T00:00:00Z');
-    expect(db.from.mock.calls.filter(([table]: [string]) => table === 'player_directory')).toHaveLength(3);
+    expect(db.from.mock.calls.filter(([table]: [string]) => table === 'player_current_directory')).toHaveLength(3);
   });
 
   it('withholds legacy forecast counts beside published context while preserving actuals', async () => {
@@ -95,7 +95,7 @@ describe('published canonical context read', () => {
     const db = createMockSupabase({
       canonical_published_runs: createChain({ data: active, error: null }),
       canonical_published_players: createChain({ data: [row], error: null }),
-      player_directory: createChain({ data: [{ player_id: 1, full_name: 'Fixture', position_code: 'C', team_abbrev: 'NYR' }], error: null }),
+      player_current_directory: createChain({ data: [{ player_id: 1, full_name: 'Fixture', position_code: 'C', team_abbrev: 'NYR' }], error: null }),
       player_season_stats: createChain({ data: [{ player_id: 1, games_played: 7, nhl_goals: 2 }], error: null }),
       player_ros_projections: createChain({ data: [{ player_id: 1, projected_goals: 999, projection_run_id: 'old', projection_revision: 'old' }], error: null }),
     });
@@ -111,7 +111,7 @@ describe('published canonical context read', () => {
     clearDashboardIndexCache();
     const db = createMockSupabase({
       canonical_published_runs: createChain({ data: null, error: { message: 'Offline' } }),
-      player_directory: createChain({ data: [{ player_id: 1, full_name: 'Fixture', position_code: 'C', team_abbrev: 'NYR' }], error: null }),
+      player_current_directory: createChain({ data: [{ player_id: 1, full_name: 'Fixture', position_code: 'C', team_abbrev: 'NYR' }], error: null }),
       player_season_stats: createChain({ data: [{ player_id: 1, games_played: 7, nhl_goals: 2 }], error: null }),
       player_ros_projections: createChain({ data: [{ player_id: 1, projected_goals: 999 }], error: null }),
     });

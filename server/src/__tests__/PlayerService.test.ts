@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CanonicalProjectionService, clearCanonicalProjectionCache } from '../services/CanonicalProjectionService';
 import { PlayerService } from '../services/PlayerService';
 import { createChain, createMockSupabase } from './helpers';
-import { getMetricsSeason } from '@citrus/shared';
+import { getMetricsSeason, getProjectionsSeason } from '@citrus/shared';
 
 describe('PlayerService', () => {
   let service: PlayerService;
@@ -18,6 +18,19 @@ describe('PlayerService', () => {
   afterEach(() => vi.restoreAllMocks());
 
   describe('getAllPlayers', () => {
+    it('uses reviewed current club and preserves unknown affiliation without borrowing the projection club', async () => {
+      const affiliation = { status: 'affiliated', team: 'MTL', event_id: 'review-1' };
+      const dir = createChain({ data: [
+        { player_id: 1, full_name: 'Transferred Player', position_code: 'LW', team_abbrev: 'MTL', projection_team: 'ANA', current_affiliation: affiliation },
+        { player_id: 2, full_name: 'Unconfirmed Player', position_code: 'D', team_abbrev: null, projection_team: 'PIT', current_affiliation: { status: 'unknown', team: null } },
+      ], error: null });
+      mockSupabase.from = vi.fn((table: string) => table === 'player_current_directory' ? dir : createChain());
+      const result = await service.getAllPlayers();
+      expect(dir.eq).toHaveBeenCalledWith('season', getProjectionsSeason());
+      expect(result.players[0]).toMatchObject({ team: 'MTL', projection_team: 'ANA', current_affiliation: affiliation });
+      expect(result.players[1]).toMatchObject({ team: '', projection_team: 'PIT', current_affiliation: { status: 'unknown' } });
+    });
+
     it('fetches and merges player data from multiple tables', async () => {
       const directory = [
         { player_id: 1, full_name: 'Connor McDavid', position_code: 'C', team_abbrev: 'EDM', jersey_number: '97', headshot_url: '' },
@@ -28,11 +41,11 @@ describe('PlayerService', () => {
       ];
       const talents = [
         { player_id: 1, xg_per_60: 1.5, xg_rating: 95 },
-        { player_id: 2, roster_status: 'IR' },
+        { player_id: 2, roster_status: 'IR', roster_status_source: 'espn-injuries', roster_status_updated_at: new Date().toISOString() },
       ];
 
       mockSupabase.from = vi.fn((table: string) => {
-        if (table === 'player_directory') return createChain({ data: directory, error: null });
+        if (table === 'player_current_directory') return createChain({ data: directory, error: null });
         if (table === 'player_season_stats') return createChain({ data: stats, error: null });
         if (table === 'player_talent_metrics') return createChain({ data: talents, error: null });
         if (table === 'goalie_gsax_primary') return createChain({ data: [], error: null });
@@ -53,6 +66,7 @@ describe('PlayerService', () => {
       const matthews = result.players.find((p: any) => p.id === 2);
       expect(matthews.status).toBe('injured');
       expect(matthews.stats_season).toBeNull();
+      expect(matthews.is_ir_eligible).toBe(true); // Same raw IR designation accepted by lineup validation.
     });
 
     // ── goalie games played (2026-08-26) ─────────────────────────────────
@@ -79,7 +93,7 @@ describe('PlayerService', () => {
       ];
 
       mockSupabase.from = vi.fn((table: string) => {
-        if (table === 'player_directory') return createChain({ data: directory, error: null });
+        if (table === 'player_current_directory') return createChain({ data: directory, error: null });
         if (table === 'player_season_stats') return createChain({ data: stats, error: null });
         if (table === 'player_talent_metrics') return createChain({ data: [], error: null });
         if (table === 'goalie_gsax_primary') return createChain({ data: [], error: null });
@@ -108,7 +122,7 @@ describe('PlayerService', () => {
       const stats = [{ player_id: 10, games_played: 75, goalie_gp: 58, nhl_toi_seconds: 205845 }];
 
       mockSupabase.from = vi.fn((table: string) => {
-        if (table === 'player_directory') return createChain({ data: directory, error: null });
+        if (table === 'player_current_directory') return createChain({ data: directory, error: null });
         if (table === 'player_season_stats') return createChain({ data: stats, error: null });
         if (table === 'player_talent_metrics') return createChain({ data: [], error: null });
         if (table === 'goalie_gsax_primary') return createChain({ data: [], error: null });
@@ -131,7 +145,7 @@ describe('PlayerService', () => {
       const stats = [{ player_id: 12, games_played: 2, goalie_gp: 0, nhl_saves: 0, nhl_shots_faced: 0, nhl_toi_seconds: 0 }];
 
       mockSupabase.from = vi.fn((table: string) => {
-        if (table === 'player_directory') return createChain({ data: directory, error: null });
+        if (table === 'player_current_directory') return createChain({ data: directory, error: null });
         if (table === 'player_season_stats') return createChain({ data: stats, error: null });
         if (table === 'player_talent_metrics') return createChain({ data: [], error: null });
         if (table === 'goalie_gsax_primary') return createChain({ data: [], error: null });
@@ -142,8 +156,8 @@ describe('PlayerService', () => {
       expect(players[0].games_played).toBe(0);
     });
 
-    it('refreshes published availability across stats-cache hits without changing eligibility or counts', async () => {
-      mockSupabase.from = vi.fn((table: string) => createChain({ data: table === 'player_directory'
+    it('refreshes published availability across stats-cache hits and eligibility across stats-cache hits without changing counts', async () => {
+      mockSupabase.from = vi.fn((table: string) => createChain({ data: table === 'player_current_directory'
         ? [{ player_id: 8477942, full_name: 'Kevin Fiala', position_code: 'LW', team_abbrev: 'LAK' }]
         : table === 'player_talent_metrics' ? [{ player_id: 8477942, roster_status: null, is_ir_eligible: false }] : [], error: null }));
       const asOf = new Date(Date.now() - 1000).toISOString();
@@ -161,12 +175,13 @@ describe('PlayerService', () => {
       expect(after.availability).toMatchObject({ status: 'out', revision: 'after' });
       expect(unavailable.availability?.status).toBe('unknown');
       expect(published).toHaveBeenCalledTimes(3);
-      const { availability: _before, ...baseBefore } = before;
-      const { availability: _after, ...baseAfter } = after;
+      const { availability: _before, is_ir_eligible: _beforeIr, ...baseBefore } = before;
+      const { availability: _after, is_ir_eligible: _afterIr, ...baseAfter } = after;
       expect(baseAfter).toEqual(baseBefore);
-      expect(after.is_ir_eligible).toBe(false);
+      expect(after.is_ir_eligible).toBe(true);
+      expect(unavailable.is_ir_eligible).toBe(false);
       expect(after.roster_status).toBeNull();
-      expect(mockSupabase.from.mock.calls.filter(([table]: [string]) => table === 'player_directory')).toHaveLength(1);
+      expect(mockSupabase.from.mock.calls.filter(([table]: [string]) => table === 'player_current_directory')).toHaveLength(1);
     });
 
     it('returns cached data on second call', async () => {
@@ -224,7 +239,7 @@ describe('PlayerService', () => {
       });
 
       mockSupabase.from = vi.fn((table: string) => {
-        if (table === 'player_directory') return pagedDirectory;
+        if (table === 'player_current_directory') return pagedDirectory;
         return createChain({ data: [], error: null });
       });
 
@@ -260,7 +275,7 @@ describe('PlayerService', () => {
       slowDirectory.range = vi.fn(() => gate);
 
       mockSupabase.from = vi.fn((table: string) => {
-        if (table === 'player_directory') return slowDirectory;
+        if (table === 'player_current_directory') return slowDirectory;
         return createChain({ data: [], error: null });
       });
 
@@ -289,7 +304,7 @@ describe('PlayerService', () => {
 
     it('fetches and merges player data by IDs', async () => {
       mockSupabase.from = vi.fn((table: string) => {
-        if (table === 'player_directory') {
+        if (table === 'player_current_directory') {
           return createChain({ data: [{ player_id: 123, full_name: 'Test', position_code: 'C' }], error: null });
         }
         return createChain({ data: [], error: null });
@@ -303,7 +318,7 @@ describe('PlayerService', () => {
   describe('searchPlayers', () => {
     it('filters players by name (case-insensitive)', async () => {
       mockSupabase.from = vi.fn((table: string) => {
-        if (table === 'player_directory') {
+        if (table === 'player_current_directory') {
           return createChain({
             data: [
               { player_id: 1, full_name: 'Connor McDavid', position_code: 'C', team_abbrev: 'EDM' },

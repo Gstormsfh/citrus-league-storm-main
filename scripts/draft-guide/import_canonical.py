@@ -6,6 +6,7 @@ This offline adapter never establishes publication approval or writes production
 """
 import argparse
 from copy import deepcopy
+from affiliations import load as load_affiliations
 from hashlib import sha256
 import json
 import math
@@ -228,6 +229,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('canonical', type=Path)
     parser.add_argument('--revision', required=True, help='Exact canonical revision to import')
+    parser.add_argument('--affiliations', type=Path, help='Explicit current-affiliation overlay; never changes canonical teams')
     parser.add_argument('--editorial', type=Path, default=ROOT / 'workbook-data.json')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--revision-preimage', type=Path, help='Exact PostgreSQL (payload-minus-revision)::text export')
@@ -242,6 +244,8 @@ def main():
     result = convert(document, editorial, args.revision, source_name=args.canonical.name,
                      revision_preimage=args.revision_preimage.read_text() if args.revision_preimage else None,
                      runtime_run_id=args.runtime_run_id, runtime_activated_at=args.runtime_activated_at)
+    if args.affiliations:
+        result = load_affiliations(result, args.affiliations)
     # Refuse accidental overwrite of an earlier review artifact.
     with args.output.open('x') as out:
         json.dump(result, out, ensure_ascii=False, indent=2, allow_nan=False)

@@ -25,3 +25,10 @@ Attribution, license links and change descriptions appear in the PDF. Neither ph
 ## Fonts
 
 Barlow and Barlow Condensed, from the Google Fonts repository, under the SIL Open Font License. The corresponding OFL notices are bundled. Original Calistoga lettering and other embedded type inside preserved PDF artwork are retained from the supplied document.
+
+
+## Added individual features, 13 September 2026
+
+- `celebrini-action.jpg`: Macklin Celebrini; San Jose / January 2025. pucksandpics. [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/); [source](https://commons.wikimedia.org/wiki/File:Macklin_Celebrini_2025.jpg). Resized and cropped in the PDF. Adaptations retain the source license; no endorsement implied.
+- `caufield-action.jpg`: Cole Caufield; Montreal at Washington / 24 November 2021. All-Pro Reels / Alexander Jonesi. [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/); [source](https://commons.wikimedia.org/wiki/File:Cole_Caufield_-_51705958267_(cropped).jpg). Resized and cropped in the PDF. Adaptations retain the source license; no endorsement implied.
+- `devils-kraken-action.jpg`: Jesper Bratt; New Jersey at Seattle / 7 December 2023. Jenn G. [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/); [source](https://commons.wikimedia.org/wiki/File:New_Jersey_Devils_at_Seattle_Kraken_-_2023-12-07_-_Vince_Dunn_and_Jesper_Bratt_(53384406596).jpg). Resized and cropped in the PDF. Adaptations retain the source license; no endorsement implied.

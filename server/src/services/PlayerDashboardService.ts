@@ -45,6 +45,8 @@ interface DirectoryRow {
   full_name: string;
   position_code: string;
   team_abbrev: string;
+  current_affiliation?: Record<string, unknown>;
+  projection_team?: string | null;
   jersey_number: string | null;
   headshot_url: string | null;
   /**
@@ -809,12 +811,8 @@ export class PlayerDashboardService {
   }
 
   private async getBaseDashboardIndex(canonicalPublished: boolean): Promise<{ players: DashboardIndexEntry[]; error: Error | null }> {
-    // The index describes the METRICS season (see getMetricsSeason): the
-    // last season with a real sample. From the 2026-09-29 opener until
-    // three weeks in that is still 2025; the directory read below follows
-    // the same key so a player who changed clubs is shown at the club of
-    // the season the numbers describe. The projection join is on its own
-    // key already.
+    // Actuals/talent use their measured season. Identity uses the current
+    // affiliation view at the projection season, including missing-feed prospects.
     const season = getMetricsSeason();
 
     if (indexCache && indexCache.season === season && Date.now() - indexCache.timestamp < CACHE_TTL_MS) {
@@ -847,9 +845,9 @@ export class PlayerDashboardService {
     const [dirRes, statsRes, garRes, talentRes, rosRes, gsaxRes] = await Promise.all([
       selectAllPaged<DirectoryRow>(
         this.supabase,
-        'player_directory',
-        'player_id, full_name, position_code, team_abbrev, jersey_number, headshot_url, eligible_positions',
-        season,
+        'player_current_directory',
+        'player_id, full_name, position_code, team_abbrev, jersey_number, headshot_url, eligible_positions, current_affiliation, projection_team',
+        getProjectionsSeason(),
       ),
       selectAllPaged<StatsRow>(this.supabase, 'player_season_stats', INDEX_STATS_COLS, season),
       selectAllPaged<GarRow>(this.supabase, 'player_gar_components', GAR_COLS, season),
@@ -911,7 +909,8 @@ export class PlayerDashboardService {
         actuals_season: s ? season : null,
         projection_season: r ? getProjectionsSeason() : null,
         name: d.full_name,
-        team: d.team_abbrev,
+        team: d.team_abbrev ?? '',
+        current_affiliation: d.current_affiliation, projection_team: d.projection_team,
         position: d.position_code,
         eligible_positions: parseEligiblePositions(d.eligible_positions, d.position_code),
         jersey: d.jersey_number ? parseInt(d.jersey_number, 10) : null,
@@ -1075,9 +1074,9 @@ export class PlayerDashboardService {
       // (retired, unsigned, or simply not yet re-indexed on flip day) lose
       // his name; the newest row he has is the right identity.
       pagedSelect<Record<string, unknown>>(this.supabase, {
-        table: 'player_directory',
+        table: 'player_current_directory',
         columns: IDENTITY_COLS,
-        filters: [['player_id', playerId]],
+        filters: [['player_id', playerId], ['season', getProjectionsSeason()]],
         orderBy: ['season'],
       }),
     ]);

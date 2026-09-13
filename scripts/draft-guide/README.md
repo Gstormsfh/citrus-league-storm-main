@@ -31,6 +31,33 @@ Restart the local server and refresh the browser after importing a revised workb
 
 ## Scoring contract
 
+### Current affiliation overlay
+
+`import_canonical.py`, `server.py`, `build.py`, and `verify_canonical_pdf.py` accept
+an optional `--affiliations /absolute/path/to/reviewed-snapshot.json`. This is an
+explicit snapshot; the guide does not fetch or infer current clubs. Its envelope
+is `{schema_version: "citrus.current-affiliations.v1", as_of: "YYYY-MM-DD", players: {"<playerId>": row}}`.
+Each row carries `status`, `team`, `authority`, `as_of`, `recorded_at`, `event_id`,
+`organization`, `source_urls`, and `reason` from the reviewed directory view.
+Statuses are `affiliated`, `free_agent`, `retired`, `non_nhl`, and `unknown`.
+Only `affiliated` has a non-null NHL team. Affiliation does not assert an opening
+roster position. Reviewed authorities are `official_transaction`,
+`official_roster`, `reviewed_unknown`, and `owner_override`; fallback authorities
+are `nhl_roster_feed` and `unknown`. Fallback rows may have null dates, reasons,
+and event IDs and empty URLs. Missing dates or transaction evidence are explicitly
+labeled as not supplied; bio-fetch timestamps never substitute for source dates.
+
+Labels are added after scoring as `displayTeam` and `currentAffiliation`.
+`projectionTeam` retains the canonical club; original `team`, rates, exposure,
+rankings, and lineup slots remain untouched. Omitted IDs display as Unreviewed.
+Unsigned, Retired, Non-NHL, and Unknown remain distinct. Team pages retain their
+canonical scenarios with explanatory notes where current affiliation differs.
+PDFs include a separate affiliation appendix and manifest binding; the preview
+shows that identity separately from the runtime/source and scoring identities.
+The SHA-256 fingerprints all snapshot fields using canonical sorted JSON, with
+the original file SHA-256 retained separately. Existing XLSX exports are not
+rewritten by these flags.
+
 `score.mjs` executes the repository's actual shared `reweightProjections` scorer. Source category values divided by their source games define category rates (new per-game rows use a source exposure of 1); applying projected games/starts and fantasy weights derives fantasy points. Changing weights changes fantasy points, contributions and competition ranks. It does not change underlying category totals, source games, projected games, source labels, roster probabilities or editorial tiers. Source roster probability is applied separately to adjusted points.
 
 Source provenance is visible: MODEL, MANUAL, and DEFAULT. DEFAULT identifies a supplied rookie cohort prior; its projected games already include cohort availability assumptions. Ranking category columns show comparable projected season totals even when source exposure bases differ. The intentional skater model ceiling of 83 is preserved; the workbook’s season setting does not force every skater to 84 games. The interface changes fantasy weights, not season length or player games. Unsupported categories, missing weights and nonfinite numbers are rejected. Plus/minus is absent from this source. Ties use competition ranks; effectively identical Excel totals can have inconsistent cached ranks from floating-point artifacts.

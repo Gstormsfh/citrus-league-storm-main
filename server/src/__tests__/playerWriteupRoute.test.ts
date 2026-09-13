@@ -188,8 +188,9 @@ function wire(options: WireOptions = {}) {
   user.from = vi.fn((table: string) => {
     switch (table) {
       case 'player_directory':
+      case 'player_current_directory':
         return indexDown
-          ? createChain({ data: null, error: { message: 'player_directory unavailable' } })
+          ? createChain({ data: null, error: { message: 'player_current_directory unavailable' } })
           : createChain({ data: [DIRECTORY_ROW], error: null });
       case 'player_season_stats':
         return createChain({ data: [STATS_ROW], error: null });

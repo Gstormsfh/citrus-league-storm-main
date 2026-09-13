@@ -9,6 +9,10 @@ export interface PlayerAvailability {
   source: string | null;
   revision: string | null;
   stale: boolean;
+  /** Governed designation: review reminders do not clear it. */
+  maintained?: boolean;
+  review_due_at?: string | null;
+  valid_until?: string | null;
   /** Workload scenario, never evidence of a current injury/designation. */
   projection_scenario?: { status: AvailabilityStatus; as_of: string; expires_at: string; stale: boolean } | null;
 }
@@ -24,7 +28,7 @@ const labels: Record<AvailabilityStatus, string> = {
 };
 const DAY = 86_400_000;
 const normalize = (value: unknown): AvailabilityStatus => ({
-  healthy: 'healthy', active: 'healthy', ACT: 'healthy', ACTIVE: 'healthy', injured: 'injured',
+  healthy: 'healthy', active: 'healthy', ACT: 'healthy', ACTIVE: 'healthy', injured: 'injured', INJ: 'injured', INJURED: 'injured',
   out: 'out', OUT: 'out', ir: 'ir', IR: 'ir', ltir: 'ltir', LTIR: 'ltir',
   day_to_day: 'day_to_day', DTD: 'day_to_day', GTD: 'day_to_day',
   suspended: 'suspended', SUSP: 'suspended', unknown: 'unknown',
@@ -48,9 +52,16 @@ export function resolvePlayerAvailability(input: AvailabilityInput, now = Date.n
     const reviewAt = a.review_after == null ? asOf + (status === 'day_to_day' ? 2 : 7) * DAY : date(a.review_after);
     if (status !== 'unknown' && basis !== 'unknown' && Number.isFinite(asOf) && Number.isFinite(reviewAt) && reviewAt > asOf && asOf <= now) {
       const source = a.source && typeof a.source === 'object' ? a.source as Record<string, unknown> : {};
-      const evidence: PlayerAvailability = { status, basis, as_of: new Date(asOf).toISOString(), expires_at: new Date(reviewAt).toISOString(),
+      const maintained = basis === 'reviewed_report';
+      const expiresAt = maintained ? (a.valid_until == null ? null : date(a.valid_until)) : reviewAt;
+      if (expiresAt !== null && (!Number.isFinite(expiresAt) || expiresAt <= asOf)) return unknown();
+      const evidence: PlayerAvailability = { status, basis, as_of: new Date(asOf).toISOString(),
+        // Keep the legacy review timestamp for older clients; maintained clients
+        // use valid_until as the actual expiry contract.
+        expires_at: new Date(expiresAt ?? reviewAt).toISOString(),
+        ...(maintained ? { maintained: true, review_due_at: new Date(reviewAt).toISOString(), valid_until: expiresAt === null ? null : new Date(expiresAt).toISOString() } : {}),
         source: typeof source.url === 'string' ? source.url : typeof source.file === 'string' ? source.file : null,
-        revision: context.revision, stale: now >= reviewAt };
+        revision: context.revision, stale: expiresAt !== null && now >= expiresAt };
       if (basis === 'projection_scenario') scenario = { status, as_of: evidence.as_of!, expires_at: evidence.expires_at!, stale: evidence.stale };
       else candidates.push(evidence);
     }
@@ -74,13 +85,14 @@ export function resolvePlayerAvailability(input: AvailabilityInput, now = Date.n
 /** Re-evaluate cached display evidence at render time without inventing facts. */
 export function currentPlayerAvailability(value: PlayerAvailability | null | undefined, now = Date.now()): PlayerAvailability {
   if (!value) return unknown();
-  const expiresAt = date(value.expires_at);
+  const expiresAt = date(value.maintained ? value.valid_until : value.expires_at);
   const asOf = date(value.as_of);
   const projection_scenario = value.projection_scenario ? { ...value.projection_scenario,
     stale: !Number.isFinite(date(value.projection_scenario.expires_at)) || now >= date(value.projection_scenario.expires_at),
   } : null;
   if (value.status === 'unknown') return { ...value, projection_scenario };
-  const invalid = !Number.isFinite(expiresAt) || !Number.isFinite(asOf) || asOf > now || expiresAt <= asOf;
+  const maintained = value.maintained === true && value.basis === 'reviewed_report' && value.valid_until == null;
+  const invalid = (!maintained && (!Number.isFinite(expiresAt) || expiresAt <= asOf)) || !Number.isFinite(asOf) || asOf > now;
   if (invalid || value.basis === 'projection_scenario' || value.basis === 'unknown') return { ...unknown(), projection_scenario };
   return { ...value, projection_scenario, ...(now >= expiresAt ? { status: 'unknown' as const, stale: true } : {}) };
 }
@@ -93,6 +105,12 @@ export function availabilityDescription(value: PlayerAvailability): string {
     return value.projection_scenario ? `${current} ${value.projection_scenario.stale ? 'Expired projection scenario' : 'Projection scenario'}: ${labels[value.projection_scenario.status]}, as of ${value.projection_scenario.as_of.slice(0, 10)}. This does not establish current injury or IR eligibility.` : current;
   }
   const basis = value.basis === 'projection_scenario' ? 'Reviewed projection availability scenario; not an official roster designation'
-    : value.basis === 'reviewed_report' ? 'Reviewed status report; not an IR eligibility decision' : 'Reported status from ESPN; not an IR eligibility decision';
-  return `${labels[value.status]}. ${basis}. As of ${value.as_of?.slice(0, 10)}; review due ${value.expires_at?.slice(0, 10)}.${value.source ? ` Source: ${value.source}.` : ''}`;
+    : value.basis === 'reviewed_report' ? 'Reviewed status report' : 'Reported status from ESPN';
+  return `${labels[value.status]}. ${basis}. As of ${value.as_of?.slice(0, 10)}; review due ${(value.review_due_at ?? value.expires_at)?.slice(0, 10)}.${value.source ? ` Source: ${value.source}.` : ''}`;
+}
+
+/** User-approved fantasy policy: fresh owner/reviewed or reported IR, LTIR,
+ * OUT and INJ qualify. Workload scenarios and expired/unknown evidence do not. */
+export function isFantasyIrEligible(value: PlayerAvailability | null | undefined, now = Date.now()): boolean {
+  return ['ir', 'ltir', 'out', 'injured'].includes(currentPlayerAvailability(value, now).status);
 }

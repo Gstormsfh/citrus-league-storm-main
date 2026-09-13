@@ -14,6 +14,7 @@ from pathlib import Path
 import pymupdf as fitz
 from import_canonical import convert
 from scoring import calculate
+from affiliations import presentation, display_team, load as load_affiliations
 from verify_pdf import norm, fmt, row_text
 
 ROOT = Path(__file__).resolve().parent
@@ -41,7 +42,12 @@ def verify(path, data):
     assert identity['weightsSha256'] == expected_hash, 'Scoring fingerprint mismatch'
     assert identity['label'] == manifest['league'], 'Scoring label mismatch'
     assert identity['kind'] == 'explicit_local_preview'
-    scored = calculate(data, manifest['weights'])['players']
+    assert manifest.get('affiliationIdentity') == data.get('affiliationIdentity'), 'Affiliation binding mismatch'
+    if data.get('affiliationIdentity'):
+        visible = ''.join(page.get_text() for page in doc)
+        assert data['affiliationIdentity']['sha256'] in ''.join(visible.split()), 'Missing visible affiliation fingerprint'
+        assert data['affiliationIdentity']['asOf'] in visible, 'Missing visible affiliation date'
+    scored = presentation(data, calculate(data, manifest['weights']))['players']
     players = {p['key']: p for p in scored}
     projected = {k: p for k, p in players.items() if p['rank'] is not None}
     unavailable = {k: p for k, p in players.items() if p['rank'] is None}
@@ -69,7 +75,7 @@ def verify(path, data):
                 assert key in projected, ('unavailable player ranked', key)
                 p = projected[key]
                 text, _ = row_text(page, p['name'], 195, 196 + len(item['keys']) * 18)
-                prefix = norm(' '.join([str(p['rank']), p['name'], str(p['team']), p['position'] + str(p['positionRank']),
+                prefix = norm(' '.join([str(p['rank']), p['name'], display_team(p), p['position'] + str(p['positionRank']),
                                         fmt(p['games'], 0), fmt(p['pointsPerGame'], 2), fmt(p['fantasyPoints'])]))
                 assert text.startswith(prefix + ' '), ('PDF league score/rank', item['page'], key, text, prefix)
                 row_count += 1
@@ -79,11 +85,22 @@ def verify(path, data):
     assert Counter(main) == Counter(projected.keys()), 'Ranked main-board coverage'
     assert Counter(positions) == Counter(p['key'] for p in projected.values() if not p['isGoalie']), 'Position coverage'
     text = norm('\n'.join(page.get_text() for page in doc))
+    focuses = [item for item in manifest['content'] if item['type'] == 'individual-focus']
+    if focuses:
+        assert len({f['key'] for f in focuses}) == len(focuses), 'Repeated individual callout'
+        assert sorted(f['name'] for f in focuses) == manifest['featured'], 'Callout coverage mismatch'
+        for f in focuses:
+            assert f['name'] == players[f['key']]['name'], 'Callout identity mismatch'
+            assert f['name'].upper() in norm(doc[f['page'] - 1].get_text()), 'Callout name missing'
+        for item in manifest['content']:
+            if item['type'] in {'ranking', 'focus'} and item.get('featured'):
+                assert item['featured'] in item['keys'], 'Highlight absent from page table'
+                assert any(f['key'] == item['featured'] and f['page'] == item['page'] for f in focuses), 'Highlight and callout disagree'
     review_pages = [norm(p.get_text()) for p in doc if 'FORECASTS TO REVIEW' in p.get_text()]
     review_text = ' '.join(review_pages)
     for p in unavailable.values():
         assert p['name'] in review_text, ('unavailable player absent from review appendix', p['name'])
-        expected = f"{p['name']} / {p['team']} / {p['position']}"
+        expected = f"{p['name']} / {display_team(p)} / {p['position']}"
         assert norm(expected) in review_text, ('unavailable identity', p['key'])
     assert 'FPTS and rank unavailable' in review_text
     # Stable-ID team keys must equal canonical slots in source order, even when
@@ -158,6 +175,7 @@ def verify(path, data):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('pdf', type=Path)
+    parser.add_argument('--affiliations', type=Path)
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--data', type=Path)
     group.add_argument('--canonical', type=Path)
@@ -168,6 +186,8 @@ def main():
     else:
         canonical = json.loads(args.canonical.read_text())
         data = convert(canonical, json.loads(args.editorial.read_text()), canonical['revision'])
+    if args.affiliations:
+        data = load_affiliations(data, args.affiliations)
     verify(args.pdf, data)
 
 

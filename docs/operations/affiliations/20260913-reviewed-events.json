@@ -1,0 +1,322 @@
+[
+  {
+    "id": "f0f195ff-0910-4b5e-872f-da8d4ed4b9b2",
+    "season": 2026,
+    "player_id": 8471685,
+    "status": "retired",
+    "team_abbrev": null,
+    "organization": null,
+    "authority": "official_transaction",
+    "effective_on": "2026-09-10",
+    "source_urls": [
+      "https://www.nhl.com/news/topic/free-agency/free-agency-signings-nhl-2026-27"
+    ],
+    "reason": "Anze Kopitar is listed as retired in the NHL free-agency tracker.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "663bcda8-828c-4da7-82e4-059ce7bac16f",
+    "season": 2026,
+    "player_id": 8471734,
+    "status": "retired",
+    "team_abbrev": null,
+    "organization": null,
+    "authority": "official_transaction",
+    "effective_on": "2026-09-10",
+    "source_urls": [
+      "https://www.nhl.com/news/topic/free-agency/free-agency-signings-nhl-2026-27"
+    ],
+    "reason": "Jonathan Quick is listed as retired in the NHL free-agency tracker.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "9ad5f7a2-0450-4dd6-90e4-fc3e516ebfb9",
+    "season": 2026,
+    "player_id": 8475169,
+    "status": "free_agent",
+    "team_abbrev": null,
+    "organization": null,
+    "authority": "official_roster",
+    "effective_on": "2026-09-10",
+    "source_urls": [
+      "https://www.nhl.com/news/topic/free-agency/free-agency-signings-nhl-2026-27"
+    ],
+    "reason": "Evander Kane is listed as unsigned in the NHL free-agency tracker; no new NHL club is confirmed.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "cb7f83ac-22f3-42eb-92d5-80a0f813ad61",
+    "season": 2026,
+    "player_id": 8475184,
+    "status": "affiliated",
+    "team_abbrev": "MTL",
+    "organization": null,
+    "authority": "official_transaction",
+    "effective_on": "2026-09-12",
+    "source_urls": [
+      "https://www.nhl.com/news/chris-kreider-signs-with-montreal-canadiens-after-anaheim-ducks-terminate-contract"
+    ],
+    "reason": "Chris Kreider signed with Montreal after his Anaheim contract was terminated. His retained projection scenario is separate from this current club.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": "ANA"
+  },
+  {
+    "id": "b7ecc553-0b26-4daf-8ba0-6bb8c1b15b15",
+    "season": 2026,
+    "player_id": 8475660,
+    "status": "free_agent",
+    "team_abbrev": null,
+    "organization": null,
+    "authority": "official_roster",
+    "effective_on": "2026-09-10",
+    "source_urls": [
+      "https://www.nhl.com/news/topic/free-agency/free-agency-signings-nhl-2026-27"
+    ],
+    "reason": "Cam Talbot is listed as unsigned in the NHL free-agency tracker; no new NHL club is confirmed.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "1e45f018-c457-4320-a7de-b3ccdb3e7222",
+    "season": 2026,
+    "player_id": 8475765,
+    "status": "free_agent",
+    "team_abbrev": null,
+    "organization": null,
+    "authority": "official_roster",
+    "effective_on": "2026-09-10",
+    "source_urls": [
+      "https://www.nhl.com/news/topic/free-agency/free-agency-signings-nhl-2026-27"
+    ],
+    "reason": "Vladimir Tarasenko is listed as unsigned in the NHL free-agency tracker; no new NHL club is confirmed.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "b2b957cd-e84c-44f3-8e84-12867f4f04d2",
+    "season": 2026,
+    "player_id": 8476856,
+    "status": "unknown",
+    "team_abbrev": null,
+    "organization": null,
+    "authority": "reviewed_unknown",
+    "effective_on": "2026-09-13",
+    "source_urls": [
+      "https://www.nhl.com/penguins/news/penguins-acquire-defenseman-matt-dumba-and-a-2028-second-round-draft-pick-from-dallas"
+    ],
+    "reason": "Matt Dumba: the located Pittsburgh contract evidence covers only 2025\u201326. Current NHL affiliation is unconfirmed; retirement is not established.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "19c1101f-2d1e-49b5-a3a4-7e42d4c8da0d",
+    "season": 2026,
+    "player_id": 8478047,
+    "status": "free_agent",
+    "team_abbrev": null,
+    "organization": null,
+    "authority": "official_roster",
+    "effective_on": "2026-09-10",
+    "source_urls": [
+      "https://www.nhl.com/news/topic/free-agency/free-agency-signings-nhl-2026-27"
+    ],
+    "reason": "Michael Bunting is listed as unsigned in the NHL free-agency tracker; no new NHL club is confirmed.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "66d15729-22c8-48b8-bb97-d69925203f25",
+    "season": 2026,
+    "player_id": 8478971,
+    "status": "retired",
+    "team_abbrev": null,
+    "organization": null,
+    "authority": "official_transaction",
+    "effective_on": "2026-09-12",
+    "source_urls": [
+      "https://www.nhl.com/news/connor-ingram-retires-from-nhl-after-five-seasons"
+    ],
+    "reason": "The September 12 NHL report confirms Connor Ingram announced his retirement. He has no current NHL club in this affiliation record.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "96dba958-a81d-4843-859b-2b7b5720256f",
+    "season": 2026,
+    "player_id": 8479339,
+    "status": "free_agent",
+    "team_abbrev": null,
+    "organization": null,
+    "authority": "official_roster",
+    "effective_on": "2026-09-10",
+    "source_urls": [
+      "https://www.nhl.com/news/topic/free-agency/free-agency-signings-nhl-2026-27"
+    ],
+    "reason": "Patrik Laine is listed as unsigned in the NHL free-agency tracker; no new NHL club is confirmed.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "b90260e1-af9f-4f9c-92c3-341438641dc6",
+    "season": 2026,
+    "player_id": 8479370,
+    "status": "free_agent",
+    "team_abbrev": null,
+    "organization": null,
+    "authority": "official_roster",
+    "effective_on": "2026-09-10",
+    "source_urls": [
+      "https://www.nhl.com/news/topic/free-agency/free-agency-signings-nhl-2026-27"
+    ],
+    "reason": "Tyson Jost is listed as unsigned in the NHL free-agency tracker; no new NHL club is confirmed.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "e4b328bd-8082-4c07-be3d-a290629c9ac9",
+    "season": 2026,
+    "player_id": 8479414,
+    "status": "free_agent",
+    "team_abbrev": null,
+    "organization": null,
+    "authority": "official_roster",
+    "effective_on": "2026-09-10",
+    "source_urls": [
+      "https://www.nhl.com/news/topic/free-agency/free-agency-signings-nhl-2026-27"
+    ],
+    "reason": "Nathan Bastian is listed as unsigned in the NHL free-agency tracker; no new NHL club is confirmed.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "14423106-6b20-421b-b02e-4ce4edc0c3cc",
+    "season": 2026,
+    "player_id": 8481577,
+    "status": "affiliated",
+    "team_abbrev": "OTT",
+    "organization": null,
+    "authority": "official_transaction",
+    "effective_on": "2026-07-01",
+    "source_urls": [
+      "https://www.nhl.com/senators/news/senators-sign-five-players-to-two-way-contracts-x5257"
+    ],
+    "reason": "Philip Tomasino belongs to the OTT organization on the cited contract or roster evidence. An opening-night NHL role is not confirmed.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "98a4a827-1bc5-4f07-9208-0820b9faaf57",
+    "season": 2026,
+    "player_id": 8481704,
+    "status": "affiliated",
+    "team_abbrev": "NYR",
+    "organization": null,
+    "authority": "official_transaction",
+    "effective_on": "2025-05-02",
+    "source_urls": [
+      "https://www.nhl.com/rangers/news/rangers-agree-to-terms-with-juuso-parssinen"
+    ],
+    "reason": "Juuso Parssinen belongs to the NYR organization on the cited contract or roster evidence. An opening-night NHL role is not confirmed.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "644e1cde-eccc-40b4-8c03-0b6dbbe8912a",
+    "season": 2026,
+    "player_id": 8482446,
+    "status": "affiliated",
+    "team_abbrev": "PIT",
+    "organization": null,
+    "authority": "official_transaction",
+    "effective_on": "2026-07-05",
+    "source_urls": [
+      "https://www.nhl.com/penguins/news/penguins-avoid-arbitration-and-agree-to-contracts-with-four-players"
+    ],
+    "reason": "Joel Blomqvist belongs to the PIT organization on the cited contract or roster evidence. An opening-night NHL role is not confirmed.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "2ff7085e-b300-4c51-b6ce-298aa322a9c0",
+    "season": 2026,
+    "player_id": 8482484,
+    "status": "non_nhl",
+    "team_abbrev": null,
+    "organization": "Tucson Roadrunners",
+    "authority": "official_transaction",
+    "effective_on": "2026-07-07",
+    "source_urls": [
+      "https://www.tucsonroadrunners.com/news/roadrunners-sign-goaltender-jesper-vikman-to-one-year-ahl-contract"
+    ],
+    "reason": "Jesper Vikman has a one-year AHL contract with Tucson. This does not establish an NHL contract with Utah.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "b269626e-21b7-4907-81fe-c114b00ca9a6",
+    "season": 2026,
+    "player_id": 8482874,
+    "status": "affiliated",
+    "team_abbrev": "SEA",
+    "organization": null,
+    "authority": "official_transaction",
+    "effective_on": "2026-09-04",
+    "source_urls": [
+      "https://www.nhl.com/kraken/news/jacob-melanson-signs-three-year-deal"
+    ],
+    "reason": "Jacob Melanson belongs to the SEA organization on the cited contract or roster evidence. An opening-night NHL role is not confirmed.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "5f98837d-2493-430f-a28b-31980db2ea9e",
+    "season": 2026,
+    "player_id": 8483668,
+    "status": "affiliated",
+    "team_abbrev": "SEA",
+    "organization": null,
+    "authority": "official_roster",
+    "effective_on": "2026-07-23",
+    "source_urls": [
+      "https://www.nhl.com/news/topic/team-resets/seattle-kraken-roster-changes-for-2026-27-season"
+    ],
+    "reason": "Nikke Kokko belongs to the SEA organization on the cited contract or roster evidence. An opening-night NHL role is not confirmed.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "cfd7407c-793d-480c-bd21-da5385afdb67",
+    "season": 2026,
+    "player_id": 8484795,
+    "status": "affiliated",
+    "team_abbrev": "UTA",
+    "organization": null,
+    "authority": "official_roster",
+    "effective_on": "2026-09-01",
+    "source_urls": [
+      "https://www.nhl.com/utah/news/utah-mammoth-announce-2026-rookie-camp-roster-and-schedule-release-9-1-26"
+    ],
+    "reason": "Tij Iginla belongs to the UTA organization on the cited contract or roster evidence. An opening-night NHL role is not confirmed.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  },
+  {
+    "id": "395e29da-89ab-4a99-ab60-cb4b11406d79",
+    "season": 2026,
+    "player_id": 8485387,
+    "status": "affiliated",
+    "team_abbrev": "UTA",
+    "organization": null,
+    "authority": "official_roster",
+    "effective_on": "2026-09-01",
+    "source_urls": [
+      "https://www.nhl.com/utah/news/utah-mammoth-announce-2026-rookie-camp-roster-and-schedule-release-9-1-26"
+    ],
+    "reason": "Caleb Desnoyers belongs to the UTA organization on the cited contract or roster evidence. An opening-night NHL role is not confirmed.",
+    "recorded_by": "codex:roster-affiliation-alignment:2026-09-13",
+    "feed_team_at_review": null
+  }
+]
