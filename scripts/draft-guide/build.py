@@ -55,8 +55,8 @@ class LeagueGuide(Guide):
    hi=keys is not None and keys[index]==featured
    self.rect(36,y,540,row_height,ORANGE if hi else WHITE if index%2==0 else '#EFEEE5');x=36
    for j,(value,w) in enumerate(zip(row,widths)):
-    value=str(value);font='Bold' if hi or j==1 else 'Body';sz=min(size,(w-10)/max(pdfmetrics.stringWidth(value,font,1),1))
-    self.text(value,x+5 if j==1 else x+w-5,y+row_height*.70,sz,font,INK if hi or j in [1,6] else MUTED,'left' if j==1 else 'right');x+=w
+    value=str(value);font='Bold' if hi or j==1 or headers[j].startswith('FP/') else 'Body';sz=min(size,(w-10)/max(pdfmetrics.stringWidth(value,font,1),1))
+    self.text(value,x+5 if j==1 else x+w-5,y+row_height*.70,sz,font,INK if hi or j==1 or headers[j].startswith('FP/') else MUTED,'left' if j==1 else 'right');x+=w
    self.line(36,y+row_height,540);y+=row_height
   return y
  def card(self,p,y=541):
@@ -202,10 +202,10 @@ class LeagueGuide(Guide):
      notes.append(f"{p['name']}: {a['status']} / {a.get('authority','unknown')} / as of {a.get('as_of') or 'unknown'}. {a.get('reason') or ''} Source: {source_label}")
   for start in range(0,len(roster),29):
    chunk=roster[start:start+29];self.heading(t['title'],'Team guide',str(t['intro']))
-   rows=[[slot,p['name'],p.get('slotPosition',p['position']),('-' if p['rank'] is None else str(p['rank']))+(' G' if p['isGoalie'] else ''),fmt(p['games'],0),fmt(p['fantasyPoints']),p['source'] or '-',p['line'] or '-',p['powerPlay'] or '-'] for slot,p in chunk]
-   self.table(['SLOT','PLAYER','POS','#','RGP/ST' if runtime_edition(self.data) else 'GP/ST','FPTS','SOURCE','LINE','PP'],rows,186,[51,161,31,37,35,63,62,50,50],size=9,row_height=17)
-   self.para(('RGP/ST and FPTS cover the remaining season; parent source full-season exposure is separate. G marks goalie rank. Lineups and notes retain canonical review status.' if runtime_edition(self.data) else 'Ranks and fantasy points follow the selected scoring settings. G marks a goalie rank. Lineup assignments and notes retain canonical review status.' if self.data.get('canonicalRevision') else 'Ranks and fantasy points follow your scoring settings. G marks a goalie rank. Source lineup assignments and commentary remain the workbook author’s projections.'),36,718,540,8.5,11,MUTED)
-   self.manifest.append({'page':self.number,'type':'team','team':t['team'],'keys':[p['key'] for _,p in chunk]});self.footer(t['team']);self.end()
+   rows=[[slot,p['name'],p.get('slotPosition',p['position']),('-' if p['rank'] is None else str(p['rank']))+(' G' if p['isGoalie'] else ''),fmt(p['games'],0),fmt(p.get('pointsPerGame'),2),fmt(p['fantasyPoints']),p['source'] or '-',p['line'] or '-',p['powerPlay'] or '-'] for slot,p in chunk]
+   self.table(['SLOT','PLAYER','POS','#','RGP/ST' if runtime_edition(self.data) else 'GP/ST','FP/GP-ST','FPTS','SOURCE','LINE','PP'],rows,186,[51,161,25,29,35,44,47,50,49,49],size=9,row_height=17)
+   self.para('FP/GP-ST = points per game (skaters) or start (goalies). Rank uses projected season FPTS. '+('RGP/ST and FPTS cover the remaining season; parent source full-season exposure is separate. G marks goalie rank. Lineups and notes retain canonical review status.' if runtime_edition(self.data) else 'Ranks and fantasy points follow the selected scoring settings. G marks a goalie rank. Lineup assignments and notes retain canonical review status.' if self.data.get('canonicalRevision') else 'Ranks and fantasy points follow your scoring settings. G marks a goalie rank. Source lineup assignments and commentary remain the workbook author’s projections.'),36,718,540,8.5,11,MUTED)
+   self.manifest.append({'page':self.number,'type':'team','team':t['team'],'perGameColumn':True,'keys':[p['key'] for _,p in chunk]});self.footer(t['team']);self.end()
   self.team_notes(t['team'],notes)
  def cover_new(self):
   self.start('Cover',dark=True);self.logo(36,28,176);self.text('2026-27',576,60,23,'Display',ORANGE,'right')
