@@ -1,5 +1,6 @@
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { citrusNoteContext } from '@/utils/sourceSeasonContext';
+import { OutlookSources } from '@/components/player/OutlookSources';
 // Players — league-wide browse + advanced-metrics dashboard section.
 //
 // The section MLSE saw as a standalone Leafs demo (2026-08-18), built
@@ -239,6 +240,7 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
                 <div className="text-sm font-bold text-pastel-cream">{note.headline}</div>
                 <p className="mt-1 text-[11px] text-muted-foreground">{citrusNoteContext(note)}</p>
                 <p className="mt-1 text-[13px] leading-relaxed text-white/70">{note.body}</p>
+                <OutlookSources note={note} />
                 {note.analysis && (
                   <p className="mt-1.5 text-[13px] leading-relaxed text-white/70">
                     <span className="font-bold text-pastel-cream">Analysis: </span>

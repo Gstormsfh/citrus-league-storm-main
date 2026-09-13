@@ -27,7 +27,8 @@
  * a short attributed source excerpt.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { logger, getCurrentSeason, CITRUS_EDITORIAL_PROMPT } from '@citrus/shared';
+import { logger, getProjectionsSeason, CITRUS_EDITORIAL_PROMPT } from '@citrus/shared';
+import { readAllPaged } from '../lib/pagedRead';
 import { containsNewsInstructions, fallbackNewsSummary, newsAttribution, readableNewsItems, selectFreshWireItems, sourceDate, validNewsSummary } from './NewsRoomEditorial';
 import { plainDashes } from '../lib/stormy/plainDashes';
 
@@ -82,6 +83,7 @@ export interface IngestRun {
   matched: number;
   errors: number;
   error: string | null;
+  rematched?: number;
 }
 
 const FETCH_TIMEOUT_MS = 8000;
@@ -377,11 +379,10 @@ export class NewsRoomService {
   }
 
   async loadNameIndex(): Promise<NameIndex> {
-    const { data, error } = await this.supabase
-      .from('player_directory')
-      .select('player_id, full_name, team_abbrev')
-      .eq('season', getCurrentSeason())
-      .limit(5000);
+    const { data, error } = await readAllPaged<{ player_id: number; full_name: string; team_abbrev: string | null }>(this.supabase, {
+      table: 'player_current_directory', columns: 'player_id,full_name,team_abbrev',
+      filters: [['season', getProjectionsSeason()]], orderBy: ['player_id'],
+    });
     if (error) throw new Error(error.message);
     return buildNameIndex(
       ((data ?? []) as Array<{ player_id: number; full_name: string; team_abbrev: string | null }>).map((r) => ({
@@ -402,21 +403,24 @@ export class NewsRoomService {
   /** Every enabled source, one run row each; a failing source never stops the rest. */
   async ingest(): Promise<IngestRun[]> {
     const [sources, index] = await Promise.all([this.loadSources(), this.loadNameIndex()]);
+    const rematched = await this.rematchRecentItems(index);
     const runs: IngestRun[] = [];
     for (const src of sources) {
-      const run: IngestRun = { sourceId: src.id, seen: 0, inserted: 0, matched: 0, errors: 0, error: null };
+      const run: IngestRun = { sourceId: src.id, seen: 0, inserted: 0, matched: 0, errors: 0, error: null, rematched: rematched.get(src.id) ?? 0 };
       const startedAt = new Date().toISOString();
       try {
         const items = selectFreshWireItems(await this.fetchSource(src)).map((it) => ({ ...it, sourceName: src.name }));
         run.seen = items.length;
         if (items.length) {
-          const { data: existing, error: lookupError } = await this.supabase.from('news_items').select('url, title, snippet, published_at').in('url', items.map((i) => i.url));
+          const { data: existing, error: lookupError } = await this.supabase.from('news_items').select('url, title, snippet, published_at, player_ids').in('url', items.map((i) => i.url));
           if (lookupError) throw new Error(lookupError.message);
           const known = new Map(((existing ?? []) as Array<Pick<NewsItemRow, 'url' | 'title' | 'snippet' | 'published_at'>>).map((r) => [r.url, r]));
           // A corrected headline/snippet/date must invalidate the previous summary.
           const fresh = items.filter((i) => {
             const old = known.get(i.url);
-            return !old || old.title !== i.title.slice(0, 300) || (old.snippet || '') !== i.snippet || sourceDate(old.published_at) !== i.publishedAt;
+            const ids = Array.from(new Set([...i.taggedPlayerIds, ...matchPlayers(`${i.title}. ${i.snippet}`, index)])).sort((a, b) => a - b);
+            const previousIds = [...((old as NewsItemRow | undefined)?.player_ids ?? [])].sort((a, b) => a - b);
+            return !old || old.title !== i.title.slice(0, 300) || (old.snippet || '') !== i.snippet || sourceDate(old.published_at) !== i.publishedAt || JSON.stringify(ids) !== JSON.stringify(previousIds);
           });
           const summaries = await summarize(fresh, this.fetchImpl);
           const rows = fresh.map((it) => {
@@ -481,6 +485,29 @@ export class NewsRoomService {
 
   async forPlayer(playerId: number, limit = 10): Promise<NewsItemRow[]> {
     return this.list({ playerIds: [playerId], limit });
+  }
+
+  /** Repair older previews missed by a truncated/name-incomplete directory.
+   * Publisher IDs are retained; full-name matching adds identity only. Nothing
+   * here changes article dates, prose, medical status or forecast numbers.
+   */
+  async rematchRecentItems(index: NameIndex, now = new Date()): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    for (let page = 0; page < 25; page++) {
+      const { data, error } = await this.supabase.from('news_items')
+        .select('id,source_id,title,snippet,player_ids').gte('published_at', new Date(now.getTime() - 14 * 86400000).toISOString())
+        .lte('published_at', now.toISOString()).order('id').range(page * 1000, page * 1000 + 999);
+      if (error) throw new Error(`News identity refresh failed: ${error.message}`);
+      for (const row of data ?? []) {
+        const ids = [...new Set([...(row.player_ids ?? []), ...matchPlayers(`${row.title}. ${row.snippet ?? ''}`, index)])].sort((a, b) => a - b);
+        if (JSON.stringify(ids) === JSON.stringify([...(row.player_ids ?? [])].sort((a, b) => a - b))) continue;
+        const saved = await this.supabase.from('news_items').update({ player_ids: ids }).eq('id', row.id);
+        if (saved.error) throw new Error(`News identity repair failed: ${saved.error.message}`);
+        counts.set(row.source_id, (counts.get(row.source_id) ?? 0) + 1);
+      }
+      if ((data ?? []).length < 1000) return counts;
+    }
+    throw new Error('News identity refresh exceeded pagination limit');
   }
 
   /**

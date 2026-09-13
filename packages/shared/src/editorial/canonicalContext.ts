@@ -156,15 +156,17 @@ export function canonicalEditorialContext(
     retain(evidence);
     const line = text(role.line, 80) ?? (typeof role.line === 'number' && Number.isFinite(role.line) ? String(role.line) : null);
     const pp = text(role.pp, 80) ?? (typeof role.pp === 'number' && Number.isFinite(role.pp) ? String(role.pp) : null);
-    const notes = availability?.authority === 'reviewed_report' ? null : text(role.notes);
+
     if (typeof role.conditioned === 'boolean') result.role = { conditioned: role.conditioned };
     const safe = [role.line, role.pp, role.notes].every(value => typeof value !== 'string' || text(value) !== null);
     // Role has no authoritative deployment flag. Even a sourced published row
     // cannot promote it from a scenario to a current line/PP assignment.
     const roleDateSafe = role.as_of == null && role.review_after == null || freshDate(role.as_of, role.review_after, now) !== null;
-    if (safe && roleDateSafe && provenance.length && (line || pp || notes)) {
-      const parts = [line ? `line: ${line}` : null, pp ? `power play: ${pp}` : null, notes ? `note: ${notes}` : null].filter(Boolean);
-      analysis.push(`Imported role scenario, not verified deployment (${sourceLabel(provenance[0])}): ${parts.join('; ')}.`);
+    if (safe && roleDateSafe && provenance.length && (line || pp)) {
+      const lineLabels: Record<string, string> = { F1: 'first forward line', F2: 'second forward line', F3: 'third forward line', F4: 'fourth forward line', D1: 'first defence pair', D2: 'second defence pair', D3: 'third defence pair', '1': 'first line', '2': 'second line', '3': 'third line', '4': 'fourth line' };
+      const ppLabels: Record<string, string> = { PP1: 'first power-play unit', PP2: 'second power-play unit', '1': 'first power-play unit', '2': 'second power-play unit' };
+      const parts = [line ? lineLabels[line] : null, pp ? ppLabels[pp] : null].filter(Boolean);
+      if (parts.length) analysis.push(`The working role scenario includes the ${parts.join(' and ')}; current deployment still needs confirmation.`);
     }
   }
 

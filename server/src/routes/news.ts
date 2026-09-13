@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from '../lib/supabase';
 import { logger } from '@citrus/shared';
 import { NewsRoomService } from '../services/NewsRoomService';
 import { augmentCitrusNotesWithNews } from '../services/CitrusNewsService';
+import { PlayerOutlookService } from '../services/PlayerOutlookService';
 
 /**
  * News routes — server-side proxy for third-party NHL news feeds.
@@ -181,6 +182,7 @@ newsRoutes.get('/player/:playerId', async (c) => {
         .from('citrus_news')
         .select('id, kind, headline, body, analysis, severity, tags, published_at, season')
         .eq('player_id', playerId)
+        .eq('is_current', true)
         .order('published_at', { ascending: false })
         .limit(5),
       new NewsRoomService(supabase).forPlayer(playerId, 10).catch((err: unknown) => {
@@ -205,7 +207,29 @@ newsRoutes.get('/player/:playerId', async (c) => {
       logger.warn(`[news] player notes query failed for ${playerId}:`, notesRes.error.message);
       return ok(c, { notes: [], items });
     }
-    return ok(c, { notes: augmentCitrusNotesWithNews(notesRes.data || [], identity, items), items });
+    // Standing outlooks are evaluated from the current publication on every
+    // read, so ingest/status changes do not wait for the six-hour corpus job.
+    // Historical notes retain their original event/publication dates.
+    const historicalNotes = (notesRes.data || []).filter(note => note.kind !== 'season-outlook');
+    let notes = historicalNotes;
+    try {
+      const outlook = await new PlayerOutlookService(supabase).forPlayer(playerId, items);
+      if (outlook) {
+        const stored = (notesRes.data || []).find(n => n.kind === 'season-outlook' && n.season === outlook.season);
+        const sources = outlook.sourceContext?.newsSources as Array<{ source: string; url: string; publishedAt: string }> | undefined;
+        notes.unshift({ ...stored, id: stored?.id ?? outlook.dedupeKey, kind: outlook.kind,
+          season: outlook.season, headline: outlook.headline, body: outlook.body, analysis: outlook.analysis,
+          severity: outlook.severity, tags: outlook.tags, published_at: stored?.published_at ?? new Date().toISOString(),
+          editorial_version: outlook.editorialVersion, content_revision: outlook.contentRevision,
+          source_context: outlook.sourceContext, evaluated_at: new Date().toISOString(),
+          news_sources: sources?.map(s => ({ source: s.source, url: s.url, published_at: s.publishedAt })) } as typeof notes[number]);
+      }
+    } catch (error) {
+      logger.warn(`[news] current outlook unavailable for ${playerId}:`, error instanceof Error ? error.message : String(error));
+    }
+    if (!notes.some(note => note.kind === 'season-outlook')) notes = augmentCitrusNotesWithNews(historicalNotes, identity, items);
+    c.header('Cache-Control', 'no-store');
+    return ok(c, { notes, items });
   } catch (error) {
     logger.warn(`[news] player notes unavailable for ${playerId}:`, error);
     return ok(c, { notes: [] });

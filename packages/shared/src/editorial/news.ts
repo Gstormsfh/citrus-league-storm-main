@@ -8,7 +8,7 @@ export interface EditorialNewsItem {
   published_at: string;
 }
 export interface EditorialNewsEvidence {
-  kind: 'practice' | 'out' | 'uncertain' | 'cleared' | 'power-play' | 'transaction' | 'starter';
+  kind: 'practice' | 'out' | 'uncertain' | 'cleared' | 'power-play' | 'transaction' | 'starter' | 'trade-request' | 'coaching' | 'retirement' | 'camp';
   source: string;
   url: string;
   publishedAt: string;
@@ -35,6 +35,45 @@ function subjectTails(text: string, name: string): string[] {
     const match = new RegExp(`^\\s*${subject}\\s+(.+)$`).exec(clause);
     return match ? [match[1].trim()] : [];
   });
+}
+
+/** Narrow non-medical topics in actual link previews. A request is never a
+ * transaction; discussing a coach does not establish deployment or chemistry.
+ * Datelines are publisher formatting, not another grammatical subject.
+ */
+function contextEvent(text: string, name: string): Pick<EditorialNewsEvidence, 'kind' | 'report' | 'implication'> | null {
+  if (instructions.test(text)) return null;
+  const subject = escapeRe(fold(name.trim())).replace(/\s+/g, '\\s+');
+  const clauses = fold(text).split(/\.(?=\s|$)|[!?;\n]/).map(s => s.replace(/^\s*[a-z ]+\s+--\s*/, '').trim());
+  // A surname headline is usable only when the same preview identifies the
+  // full player. Its narrow camp verb cannot establish medical clearance.
+  const surname = escapeRe(fold(name.trim().split(/\s+/).at(-1) ?? ''));
+  const title = fold(text.split('\n')[0]);
+  if (clauses.some(clause => new RegExp(`^${subject}\\b`).test(clause)) &&
+      new RegExp(`^(?:${subject}|${surname}) (?:attends|attended|joins|joined) (?:his |the |a )?(?:1st |first )?rookie practice\\b`).test(title)) return {
+    kind: 'camp', report: 'took part in rookie practice',
+    implication: 'Citrus read: rookie practice is an opportunity to earn a role, not confirmation of an NHL roster spot or opening-night linemates.',
+  };
+  for (const clause of clauses) {
+    if (retrospective.test(clause) || /\b(?:denied|denies|false|rumou?r|could|might|reportedly)\b/.test(clause)) continue;
+    if (new RegExp(`^${subject}(?:'s request to be traded\\b| has publicly confirmed (?:his|a) (?:request to be traded|trade request)\\b| (?:has )?requested a trade\\b)`).test(clause)) return {
+      kind: 'trade-request', report: 'was reported to have requested a trade',
+      implication: 'Citrus read: a requested move leaves future team context unresolved. The current club and forecast allocation remain in place until a completed move or revised publication establishes otherwise.',
+    };
+    if (new RegExp(`^${subject} (?:speaks|spoke|talks|talked|discusses|discussed)\\b`).test(clause) && /\bnew (?:head )?coach\b/.test(clause)) return {
+      kind: 'coaching', report: 'discussed working with a new head coach',
+      implication: 'Citrus read: a coaching discussion adds context to camp, but it does not establish a line or power-play assignment. Judge the forecast against observed deployment once games begin.',
+    };
+    if (new RegExp(`^${subject} (?:has )?(?:announced (?:his )?retirement|announces (?:his )?retirement|retired from (?:the nhl|hockey))\\b`).test(clause)) return {
+      kind: 'retirement', report: 'announced retirement',
+      implication: 'Citrus read: a retirement report changes the opportunity question. A retained numerical scenario is not a current playing commitment; use the maintained affiliation record before assigning a roster slot.',
+    };
+    if (new RegExp(`^${subject} (?:signed|signs|re-signed|re-signs) (?:a |an )?[^!?]{0,70}contract with [a-z ]+$`).test(clause)) return {
+      kind: 'transaction', report: 'signed a contract, according to the dated report',
+      implication: 'Citrus read: the contract establishes a roster transaction, not a line or power-play assignment. Check the maintained club record and subsequent deployment before changing the opportunity assumption.',
+    };
+  }
+  return null;
 }
 
 export function canonicalNewsUrl(raw: string): string | null {
@@ -129,7 +168,7 @@ export function selectEditorialNews(
     if (seen.has(url) || seen.has(key)) continue;
     const raw = `${item.title}\n${item.snippet ?? ''}`;
     if (instructions.test(raw)) continue;
-    const event = eventFor(raw, player.name);
+    const event = eventFor(raw, player.name) ?? contextEvent(raw, player.name);
     if (!event) {
       // A newer direct health statement may use unsupported wording. Do not
       // fall through to an older injury just because that wording was parsable.
@@ -142,7 +181,9 @@ export function selectEditorialNews(
     // Starting-goalie confirmations have a shorter useful life than team news.
     if (event.kind === 'starter' && age > 36 * 3600000) continue;
     seen.add(url); seen.add(key); domains.add(domain);
-    result.push({ ...event, source: new URL(url).hostname.replace(/^www\./, ''), url, publishedAt: new Date(at).toISOString() });
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    const source = ({ 'nhl.com': 'NHL.com', 'sportsnet.ca': 'Sportsnet', 'dailyfaceoff.com': 'Daily Faceoff', 'espn.com': 'ESPN', 'dobberhockey.com': 'DobberHockey' } as Record<string, string>)[host] ?? host;
+    result.push({ ...event, source, url, publishedAt: new Date(at).toISOString() });
     if (result.length === 2) break;
   }
   return result;

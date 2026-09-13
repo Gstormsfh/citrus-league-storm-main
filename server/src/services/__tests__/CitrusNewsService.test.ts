@@ -13,6 +13,9 @@ import {
   type GeneratedNote,
 } from '../CitrusNewsService';
 
+// Standing forecasts have dedicated data-access and revision tests in PlayerOutlookService.test.ts.
+vi.mock('../PlayerOutlookService', () => ({ PlayerOutlookService: class { async generate() { return []; } } }));
+
 // ── A tiny fake of the PostgREST builder surface these detectors use ──
 // Chainable .select/.eq/.gte, resolved by .range(). Rows are filtered in the
 // fake exactly the way PostgREST would filter them, so a detector's own

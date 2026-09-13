@@ -25,6 +25,9 @@ export interface CitrusNote {
   tags: string[];
   published_at: string;
   season: number;
+  evaluated_at?: string;
+  content_revision?: string;
+  news_sources?: Array<{ source: string; url: string; published_at: string }>;
 }
 
 /**

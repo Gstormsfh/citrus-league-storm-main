@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { logger, getCurrentSeason, getProjectionsSeason, selectEditorialNews, editorialNewsText } from '@citrus/shared';
+import { logger, getCurrentSeason, selectEditorialNews, editorialNewsText } from '@citrus/shared';
 import type { EditorialNewsItem } from '@citrus/shared';
+import { PlayerOutlookService } from './PlayerOutlookService';
 
 /**
  * Citrus News Engine — first-party player notes generated from our own data.
@@ -61,6 +62,9 @@ export interface GeneratedNote {
    * the honest answer.
    */
   publishedAt?: string;
+  editorialVersion?: string;
+  contentRevision?: string;
+  sourceContext?: Record<string, unknown>;
 }
 
 interface ReadableCitrusNote {
@@ -139,6 +143,9 @@ export interface Detector {
 /** One decimal, without a trailing ".0" on whole numbers. */
 function fmt(n: number, decimals = 1): string {
   return Number(n.toFixed(decimals)).toString();
+}
+function seasonLabel(season: number): string {
+  return `${season}-${String(season + 1).slice(-2)}`;
 }
 
 interface SkaterRow {
@@ -709,202 +716,11 @@ const pointStreakDetector: Detector = {
 };
 
 
-// ── Detector 8: 2026-27 season outlook ───────────────────────────────
-// The forward-looking counterpart to the retrospective detectors above.
-// Everything else here describes a season that already happened; this is the
-// one that answers "what should I expect next year", which in the offseason
-// is the only question a manager actually has.
-//
-// TWO KINDS OF "POINTS" LIVE IN THIS TABLE AND THEY ARE NOT THE SAME.
-// total_projected_points / avg_points_per_game are FANTASY points from the
-// league scoring engine; projected_goals / projected_assists are real NHL
-// counting stats. McDavid reads 495.0 and 6.11 against 36.8G/89.9A — i.e.
-// 6.11 fantasy points across 81 games, not 495 NHL points. Copy that blurred
-// the two would be transparently wrong to anyone who follows hockey, so the
-// prose always labels the fantasy figures as fantasy.
-//
-// Tiers calibrated on the real 2026 projection set (654 skaters, >=40 games):
-// p90 = 3.96 fantasy PPG, p75 = 3.16, median = 2.45. 62 players clear 4.0,
-// which is about five per team in a 12-team league — a real top tier.
-//
-// Goalies get a different treatment on purpose: their per-game fantasy output
-// is tightly bunched (median 6.81, max 7.62), so rate says almost nothing.
-// Only 15 of 70 project 50+ appearances, and that workload gap is the whole
-// story for a fantasy goalie.
-interface RosProjectionRow {
-  player_id: number;
-  player_name: string | null;
-  team_abbrev: string | null;
-  position: string | null;
-  is_goalie: boolean;
-  games_remaining: number;
-  total_projected_points: number;
-  projected_goals: number;
-  projected_assists: number;
-  projected_sog: number;
-  projected_hits: number;
-  projected_blocks: number;
-  projected_ppp: number;
-  avg_points_per_game: number;
-  projected_wins_ros: number;
-  projected_saves_ros: number;
-  projected_shutouts_ros: number;
-}
-
-const ROS_COLUMNS =
-  'player_id, player_name, team_abbrev, position, is_goalie, games_remaining, ' +
-  'total_projected_points, projected_goals, projected_assists, projected_sog, ' +
-  'projected_hits, projected_blocks, projected_ppp, avg_points_per_game, ' +
-  'projected_wins_ros, projected_saves_ros, projected_shutouts_ros';
-
-/**
- * "a, b and c" — an English list, not a run of "and"s.
- *
- * The naive version produced "35 wins and 1336 saves and 3.0 shutouts",
- * which reads like a machine wrote it. It did, but it shouldn't sound like it.
- */
-function sentenceList(parts: string[]): string {
-  const items = parts.filter(Boolean);
-  if (items.length <= 1) return items[0] ?? '';
-  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
-}
-
-/** "2026-27" from 2026. */
-function seasonLabel(season: number): string {
-  return `${season}-${String((season + 1) % 100).padStart(2, '0')}`;
-}
-
+// Standing forecasts refresh in every phase from the governed index. Historical
+// event detectors below retain their original insert-only publication semantics.
 const seasonOutlookDetector: Detector = {
-  kind: 'season-outlook',
-  label: 'Season outlook',
-  phase: 'offseason',
-  async run(supabase, _season, now) {
-    // The season ROS projections DESCRIBE, which in the offseason run-up is
-    // the upcoming one — not getCurrentSeason(), which is still the season
-    // that just finished. This is exactly what getProjectionsSeason exists for.
-    const outlookSeason = getProjectionsSeason(now);
-    const label = seasonLabel(outlookSeason);
-
-    const rows = await fetchAllRows<RosProjectionRow>(
-      () =>
-        supabase
-          .from('player_ros_projections')
-          .select(ROS_COLUMNS)
-          .eq('season', outlookSeason),
-      'season-outlook query',
-    );
-
-    const notes: GeneratedNote[] = [];
-    for (const row of rows) {
-      const name = (row.player_name || '').trim();
-      if (!name) continue;
-      const gp = Number(row.games_remaining) || 0;
-      const surname = lastName(name);
-
-      if (row.is_goalie) {
-        // Workload first: starts are most of a fantasy goalie's value.
-        if (gp < 20) continue;
-        const wins = Number(row.projected_wins_ros) || 0;
-        const saves = Number(row.projected_saves_ros) || 0;
-        const shutouts = Number(row.projected_shutouts_ros) || 0;
-
-        let tier: string;
-        let verdict: string;
-        if (gp >= 55) {
-          tier = 'High projected volume';
-          verdict = `${gp} projected appearances create a substantial path to saves and wins if the workload materializes. This is a model volume estimate, not confirmation that ${surname} owns the crease; ratio value still depends on how he performs.`;
-        } else if (gp >= 45) {
-          tier = 'Regular projected workload';
-          verdict = `${gp} projected appearances put regular access to games at the center of ${surname}'s case. Compare that volume with your league's start requirements and the current goalie rotation; the projection does not identify his backup or guarantee the split.`;
-        } else if (gp >= 30) {
-          tier = 'Partial-season volume';
-          verdict = `${gp} projected appearances make the schedule and confirmed starts consequential for ${surname}'s weekly value. A limited volume estimate does not establish a committee; in leagues with start minimums, plan where the remaining games would come from.`;
-        } else {
-          tier = 'Limited projected volume';
-          verdict = `${gp} projected appearances limit the season's opportunities to accumulate saves and wins. ${surname} could fit a roster that needs selected starts, but this estimate alone does not establish his depth-chart position or another goalie's health.`;
-        }
-
-        notes.push({
-          dedupeKey: `season-outlook:${outlookSeason}:${row.player_id}`,
-          kind: 'season-outlook',
-          playerId: row.player_id,
-          season: outlookSeason,
-          headline: `${label} Outlook: ${tier}`,
-          body:
-            `The Citrus ROS projection has ${name} at ${gp} appearances in ${label}, with ` +
-            `${sentenceList([
-              `${Math.round(wins)} wins`,
-              `${Math.round(saves)} saves`,
-              // Shutouts are a projected average; a "3.0" reads like a
-              // measurement rather than an estimate, so round it.
-              shutouts >= 1 ? `${Math.round(shutouts)} shutouts` : '',
-            ])}.`,
-          analysis: verdict,
-          severity: gp >= 45 ? 'positive' : 'info',
-          tags: [`${label} Outlook`, 'Goalie', tier],
-        });
-        continue;
-      }
-
-      if (gp < 40) continue;
-      const fppg = Number(row.avg_points_per_game) || 0;
-      if (fppg <= 0) continue;
-
-      const goals = Number(row.projected_goals) || 0;
-      const assists = Number(row.projected_assists) || 0;
-      const totalFantasy = Number(row.total_projected_points) || 0;
-
-      let tier: string;
-      let verdict: string;
-      if (fppg >= 4.5) {
-        tier = 'Elite fantasy asset';
-        verdict = `${fmt(fppg, 2)} projected fantasy points per game make rate production central to the case. Draft value still depends on your scoring weights and the cost of this output relative to available alternatives.`;
-      } else if (fppg >= 4.0) {
-        tier = 'Top-tier starter';
-        verdict = `The ${fmt(fppg, 2)} projected fantasy-point rate supports a substantial contribution under the projection's scoring settings. Check which categories supply it before applying that valuation to a different league.`;
-      } else if (fppg >= 3.15) {
-        tier = 'Weekly starter';
-        verdict = `A ${fmt(fppg, 2)} projected fantasy-point rate can support regular use when the scoring mix fits your roster. Weekly games and confirmed availability still determine how much of that rate reaches the lineup.`;
-      } else if (fppg >= 2.45) {
-        tier = 'Depth piece';
-        verdict = `At ${fmt(fppg, 2)} projected fantasy points per game, extra usable games can make the difference between a bench role and a productive lineup choice. Compare the category mix and schedule with your replacement options.`;
-      } else {
-        tier = 'Streamer';
-        verdict = `The ${fmt(fppg, 2)} projected fantasy-point rate puts more pressure on schedule and category fit. A roster with a specific need may value ${surname} differently from one chasing total points.`;
-      }
-
-      // Peripherals are the whole case for a lot of otherwise ordinary
-      // players in leagues that count them.
-      const hits = Number(row.projected_hits) || 0;
-      const blocks = Number(row.projected_blocks) || 0;
-      const sog = Number(row.projected_sog) || 0;
-      const ppp = Number(row.projected_ppp) || 0;
-      const extras: string[] = [];
-      if (sog >= 200) extras.push(`${Math.round(sog)} shots`);
-      if (hits + blocks >= 200) extras.push(`${Math.round(hits)} hits and ${Math.round(blocks)} blocks`);
-      if (ppp >= 25) extras.push(`${Math.round(ppp)} power-play points`);
-
-      const extraSentence = extras.length
-        ? ` The projection also includes ${sentenceList(extras)}; those contributions matter when your league rewards those categories.`
-        : '';
-
-      notes.push({
-        dedupeKey: `season-outlook:${outlookSeason}:${row.player_id}`,
-        kind: 'season-outlook',
-        playerId: row.player_id,
-        season: outlookSeason,
-        headline: `${label} Outlook: ${tier}`,
-        body:
-          `The Citrus ROS projection has ${name} at ${Math.round(goals)} goals and ${Math.round(assists)} assists across ` +
-          `${gp} games in ${label}: ${fmt(fppg, 2)} fantasy points per game, ` +
-          `${Math.round(totalFantasy)} on the season.`,
-        analysis: `${goals > assists ? `Goals lead the projected scoring mix (${Math.round(goals)}G, ${Math.round(assists)}A), so finishing is a larger part of the offensive return. ` : assists > goals ? `Assists lead the projected scoring mix (${Math.round(assists)}A, ${Math.round(goals)}G), so goals-only formats would miss much of the offensive return. ` : `The projected goals and assists are balanced (${Math.round(goals)} each), splitting the offensive return across both categories. `}${verdict}${extraSentence}${ppp >= 25 ? ' Projected power-play points do not confirm a first-unit assignment.' : ''}`,
-        severity: fppg >= 3.15 ? 'positive' : 'info',
-        tags: [`${label} Outlook`, tier],
-      });
-    }
-    return notes;
-  },
+  kind: 'season-outlook', label: 'Season outlook', phase: 'always',
+  run: (supabase, _season, now) => new PlayerOutlookService(supabase).generate(now),
 };
 
 export const DETECTORS: Detector[] = [
@@ -941,6 +757,8 @@ export interface GenerationResult {
   skipped: string[];
   generated: number;
   inserted: number;
+  outlookRefresh?: { inserted: number; updated: number; unchanged: number };
+  outlookRetired?: number;
   errors: Array<{ kind: string; message: string }>;
 }
 
@@ -994,7 +812,18 @@ export async function generateCitrusNews(
   result.generated = notes.length;
   if (notes.length === 0) return result;
 
-  const rows = notes.map((n) => ({
+  const outlooks = notes.filter(n => n.kind === 'season-outlook');
+  if (outlooks.length) {
+    try {
+      result.outlookRefresh = await new PlayerOutlookService(supabase).persist(outlooks, now);
+      result.outlookRetired = await new PlayerOutlookService(supabase).retireMissing(outlooks, now);
+      result.inserted += result.outlookRefresh.inserted;
+      logger.info('[citrus-news] outlook refresh', { ...result.outlookRefresh, retired: result.outlookRetired });
+    } catch (error) {
+      result.errors.push({ kind: 'outlook-persist', message: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  const rows = notes.filter(n => n.kind !== 'season-outlook').map((n) => ({
     dedupe_key: n.dedupeKey,
     kind: n.kind,
     player_id: n.playerId,

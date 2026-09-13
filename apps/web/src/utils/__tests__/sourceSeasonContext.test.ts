@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { citrusNoteContext, sourceSeasonLabel } from '../sourceSeasonContext';
 
 describe('stored source season context', () => {
+  it('labels a current evaluation separately from the retained publication date', () => {
+    expect(citrusNoteContext({ season: 2026, published_at: '2026-08-25', evaluated_at: '2026-09-13' })).toBe('2026-27 · Evaluated Sep 13, 2026');
+  });
   it('uses source season independently of publication year', () => {
     expect(citrusNoteContext({ season: 2024, published_at: '2026-09-12T00:30:00Z' })).toBe('2024-25 · Published Sep 12, 2026');
   });

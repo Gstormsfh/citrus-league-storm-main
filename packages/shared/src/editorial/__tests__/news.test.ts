@@ -22,7 +22,7 @@ describe('attributed player news selection', () => {
   ])('retains direct report: %s', (title, kind) => {
     const result = select([item(title)]);
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ kind, source: 'nhl.com', publishedAt: '2026-09-12T09:00:00.000Z' });
+    expect(result[0]).toMatchObject({ kind, source: 'NHL.com', publishedAt: '2026-09-12T09:00:00.000Z' });
     expect(result[0].implication).not.toMatch(/will return|guaranteed|raise.*games/i);
   });
 
@@ -90,7 +90,7 @@ describe('attributed player news selection', () => {
     expect(editorialNewsText(player.name, select([item('Luke Hughes was ruled out')]))).toEqual(baseline);
     const changed = editorialNewsText(player.name, select([item('Jack Hughes practiced today')]));
     expect(changed).not.toEqual(baseline);
-    expect(changed.summary).toContain('nhl.com (2026-09-12)');
+    expect(changed.summary).toContain('NHL.com (2026-09-12)');
     expect(changed.analysis).toContain('not game clearance');
   });
 });

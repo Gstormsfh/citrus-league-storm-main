@@ -6,10 +6,11 @@ export function sourceSeasonLabel(season: unknown): string {
 }
 
 /** Publication context belongs beside stored prose, not inside quoted text. */
-export function citrusNoteContext(note: { season?: unknown; published_at?: unknown }): string {
-  const date = typeof note.published_at === 'string' ? new Date(note.published_at) : null;
+export function citrusNoteContext(note: { season?: unknown; published_at?: unknown; evaluated_at?: unknown }): string {
+  const value = note.evaluated_at ?? note.published_at;
+  const date = typeof value === 'string' ? new Date(value) : null;
   const published = date && Number.isFinite(date.getTime())
-    ? `Published ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}`
+    ? `${note.evaluated_at ? 'Evaluated' : 'Published'} ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}`
     : 'Publication date unavailable';
   return `${sourceSeasonLabel(note.season)} · ${published}`;
 }

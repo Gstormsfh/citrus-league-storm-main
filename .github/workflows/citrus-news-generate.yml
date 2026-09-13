@@ -74,7 +74,8 @@ jobs:
 
           # A detector throwing is reported inside the payload rather than by a
           # non-200, so one broken detector cannot discard the others' output.
-          # Surface it as a warning — the run itself is still a success.
+          # Failed coverage must be visible as a failed scheduled run.
           if grep -q '"errors":\[{' "$RESP"; then
-            echo "::warning::One or more detectors reported an error — see the payload above."
+            echo "::error::One or more detectors reported an error — see the payload above."
+            exit 1
           fi

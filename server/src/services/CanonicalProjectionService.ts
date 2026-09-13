@@ -69,7 +69,7 @@ export class CanonicalProjectionService {
       if (!p || String(p.player_id) !== row.player_id) throw new Error('Canonical player identity mismatch');
       contexts.set(row.player_id, {
         season: run.season, run_id: run.run_id, revision: run.revision, activated_at: run.activated_at,
-        availability: record(p.availability), role: record(p.role),
+        availability: record(p.availability), exposure: record(p.exposure), role: record(p.role),
         sources: Array.isArray(p.sources) ? p.sources : [],
         team_notes: run.teams?.find(team => team.team === p.team)?.notes ?? null,
         provenance: typeof p.provenance === 'string' ? p.provenance : null,

@@ -286,11 +286,12 @@ describe('newsroom correction freshness', () => {
     const upsert = vi.fn(async (_rows: unknown, _options: unknown) => ({ error: null }));
     const insert = vi.fn(async () => ({ error: null }));
     const existing = [changed, unchanged].map((it) => ({ url: it.url, title: it.title,
-      snippet: it === changed ? 'Connor McDavid could play in the opener.' : it.snippet, published_at: now }));
+      player_ids: matchPlayers(`${it.title}. ${it.snippet}`, buildNameIndex(NAMES)), snippet: it === changed ? 'Connor McDavid could play in the opener.' : it.snippet, published_at: now }));
     const supabase = { from: vi.fn((table: string) => table === 'news_items' ? {
       select: () => ({ in: async () => ({ data: existing, error: null }) }), upsert,
     } : { insert }) };
     const service = new NewsRoomService(supabase as never);
+    vi.spyOn(service, 'rematchRecentItems').mockResolvedValue(new Map());
     vi.spyOn(service, 'loadSources').mockResolvedValue([{ id: 'nhl', name: 'NHL.com', kind: 'nhl', url: 'https://nhl.com', team_abbrev: null, enabled: true }]);
     vi.spyOn(service, 'loadNameIndex').mockResolvedValue(buildNameIndex(NAMES));
     vi.spyOn(service, 'fetchSource').mockResolvedValue([changed, unchanged]);
@@ -366,4 +367,14 @@ it('does not assign a shared full-name mention to two different NHL identities',
     { playerId: 2, fullName: 'Sebastian Aho', teamAbbrev: 'NYI' },
   ]);
   expect(matchPlayers('Sebastian Aho practiced with the first unit.', ambiguous)).toEqual([]);
+});
+
+it('repairs missed full-name tags without changing publisher IDs or article content, then makes no repeat writes', async () => {
+ const rows=[{id:'a',source_id:'nhl',title:'Connor McDavid practiced',snippet:'',player_ids:[999]},{id:'b',source_id:'nhl',title:'Hughes practiced',snippet:'',player_ids:[]}];
+ const changes:any[]=[];const q:any={select:()=>q,gte:()=>q,lte:()=>q,order:()=>q,range:async()=>({data:rows,error:null})};
+ const service=new NewsRoomService({from:()=>({...q,update:(patch:any)=>({eq:async(_:string,id:string)=>{changes.push(patch);Object.assign(rows.find(r=>r.id===id)!,patch);return {error:null};}})})} as never);
+ expect(await service.rematchRecentItems(buildNameIndex(NAMES))).toEqual(new Map([['nhl',1]]));
+ expect(changes).toEqual([{player_ids:[999,8478402]}]);
+ expect(await service.rematchRecentItems(buildNameIndex(NAMES))).toEqual(new Map());
+ expect(changes).toHaveLength(1);
 });

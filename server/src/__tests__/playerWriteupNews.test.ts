@@ -93,7 +93,7 @@ describe('PlayerWriteupService attached news integration', () => {
     expect(informed!.summary).not.toBe(baseline!.summary);
     expect(informed!.analysis).not.toBe(baseline!.analysis);
     expect(informed!.summary).toMatch(report);
-    expect(informed!.summary).toContain('nhl.com');
+    expect(informed!.summary).toContain('NHL.com');
     expect(informed!.summary).toContain('2026-09-11');
     expect(informed!.analysis).toMatch(implication);
     expect(forPlayer).toHaveBeenCalledWith(PLAYER_ID, 20);
