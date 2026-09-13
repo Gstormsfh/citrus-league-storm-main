@@ -99,6 +99,21 @@ class LeagueGuide(Guide):
     self.text(label,x,y+126,6.5,'Semi',CREAM);self.text(value,x,y+150,23,'Display',ORANGE)
    self.para(safe(category_lens(p)),50,y+158,width,7.5,9.5,CREAM)
   self.manifest.append({'page':self.number,'type':'individual-focus','key':p['key'],'name':p['name'],'photo':asset['file'] if asset else None,'lens':title})
+ def photo_focus(self,p):
+  assert p['name'] not in self.featured;self.featured.add(p['name'])
+  asset=self.action_photos[p['name']];title,takeaway=lens(p)
+  self.photo(asset['file'],36,242,270,468,cover=True)
+  self.rect(36,691,270,19,INK);self.text(asset['caption'],44,703,6.2,'Semi',CREAM)
+  self.rect(321,242,255,468,INK);self.rect(321,242,255,3,ORANGE)
+  self.text(title,335,267,7.5,'Semi',ORANGE)
+  self.para(safe(takeaway),335,282,227,11,14,CREAM)
+  self.text('FANTASY POINTS / '+('START' if p['isGoalie'] else 'GAME'),335,414,8,'Semi',CREAM)
+  self.text(fmt(p.get('pointsPerGame'),2),335,452,39,'Display',ORANGE)
+  self.text('PROJECTED '+('STARTS' if p['isGoalie'] else 'GAMES'),335,484,8,'Semi',CREAM)
+  self.text(fmt(p.get('games'),0),335,522,39,'Display',ORANGE)
+  self.para(safe(category_lens(p)),335,546,227,10,13,CREAM)
+  self.para(safe(f"Current club: {display_team(p)}. Projection club: {p['team']}. Games and rates remain the supplied draft scenario."),335,652,227,8,10,CREAM)
+  self.manifest.append({'page':self.number,'type':'individual-focus','key':p['key'],'name':p['name'],'photo':asset['file'],'lens':title})
  def board(self,players,title,section,allow_features=False,goalie=False):
   start=0
   while start<len(players):
@@ -340,8 +355,8 @@ def generate(data,weights,name,path):
   rows=[[str(p['rank']),p['name'],display_team(p),p['position']+str(p['positionRank']),fmt(p['games'],0),fmt(p['pointsPerGame'],2),fmt(p['fantasyPoints']),p['source'] or '-']]
   g.table(['#','PLAYER','TEAM','POS','RGP/ST' if runtime_edition(data) else 'GP','FP/GP','FPTS','SOURCE'],rows,178,[28,180,40,47,45,55,70,75],featured=p['key'],keys=[p['key']])
   if p['name'] in g.photos:g.card(p,298)
-  else:g.briefing(p,298)
-  g.para(safe(p['note'] or ('The fantasy-point breakdown uses remaining-season games or starts and the selected league weights. Parent source full-season exposure is separate.' if runtime_edition(data) else 'The fantasy-point breakdown uses the selected league weights, the source model or manual category rates, and the workbook games projection. Underlying hockey rates and availability are kept separate.')),36,522,540,11,15)
+  else:g.photo_focus(p)
+  if p['name'] in g.photos:g.para(safe(p['note'] or ('The fantasy-point breakdown uses remaining-season games or starts and the selected league weights. Parent source full-season exposure is separate.' if runtime_edition(data) else 'The fantasy-point breakdown uses the selected league weights, the source model or manual category rates, and the workbook games projection. Underlying hockey rates and availability are kept separate.')),36,522,540,11,15)
   g.manifest.append({'page':g.number,'type':'focus','keys':[p['key']],'featured':p['key']});g.footer('Player focus');g.end()
  sections.append(('Credits & edition notes',g.number+1));g.colophon();return g.save_new(path,sections)
 
