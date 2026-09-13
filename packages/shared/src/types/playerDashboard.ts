@@ -51,6 +51,9 @@ export interface CanonicalProjectionContext {
 }
 
 export interface DashboardIndexEntry {
+  /** Dated current NHL affiliation, separate from the immutable forecast club. */
+  current_affiliation?: Record<string, unknown>;
+  projection_team?: string | null;
   availability?: PlayerAvailability;
   roster_status_source?: string | null;
   roster_status_updated_at?: string | null;

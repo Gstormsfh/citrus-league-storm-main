@@ -4,7 +4,7 @@
  * Two findings from re-verifying docs/apple/WORLD_CLASS_READINESS.md §1
  * against the tree and the databases:
  *
- *   A. `player_directory.eligible_positions` is a comma-separated TEXT cell
+ *   A. `player_current_directory.eligible_positions` is a comma-separated TEXT cell
  *      (migration 20260301000000). saveLineup typed it string[] and called
  *      .map on it, which threw for every non-null cell (787 of 2,035 staging
  *      rows, 797 of 1,909 production rows) and failed the whole position map
@@ -16,7 +16,7 @@
  *      capped at all. The roster page has gated IR on `is_ir_eligible` since
  *      the column arrived (migration 20260103151931); the server never did. It does now, with Yahoo's two
  *      softenings: an occupant placed while injured is tolerated after he
- *      heals, and a failed lookup never blocks a save.
+ *      heals; a failed status lookup cannot authorize a new placement.
  *
  * Mocks follow LineupService.silentNoop.test.ts: one chain per table read,
  * every builder method returns the chain, awaiting it resolves the table's
@@ -62,7 +62,7 @@ const ROSTER_ROWS = {
 };
 const NO_SETTINGS = { data: { settings: null }, error: null };
 
-/** player_directory rows exactly as PostgREST returns them: the cell is a string. */
+/** player_current_directory rows exactly as PostgREST returns them: the cell is a string. */
 const DIRECTORY = {
   data: [
     { player_id: Number(MCDAVID), full_name: 'Connor McDavid', position_code: 'C', eligible_positions: 'C' },
@@ -98,7 +98,7 @@ describe('saveLineup reads eligible_positions as the text cell it is (gap A)', (
     const { client, chains } = makeSupabase({
       roster_assignments: ROSTER_ROWS,
       leagues: NO_SETTINGS,
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       team_lineups: base(),
       matchups: { data: [], error: null },
     });
@@ -114,7 +114,7 @@ describe('saveLineup reads eligible_positions as the text cell it is (gap A)', (
     const { client, chains } = makeSupabase({
       roster_assignments: ROSTER_ROWS,
       leagues: NO_SETTINGS,
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       team_lineups: base(),
       matchups: { data: [], error: null },
     });
@@ -131,7 +131,7 @@ describe('saveLineup reads eligible_positions as the text cell it is (gap A)', (
     const { client } = makeSupabase({
       roster_assignments: ROSTER_ROWS,
       leagues: NO_SETTINGS,
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       team_lineups: base(),
       matchups: { data: [], error: null },
     });
@@ -145,7 +145,7 @@ describe('saveLineup reads eligible_positions as the text cell it is (gap A)', (
     const { client, from } = makeSupabase({
       roster_assignments: ROSTER_ROWS,
       leagues: NO_SETTINGS,
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       team_lineups: base(),
       matchups: { data: [], error: null },
     });
@@ -173,11 +173,20 @@ describe('saveLineup lets only the injured onto IR (gap B)', () => {
       slot_assignments: Object.fromEntries(ir.map((id, i) => [id, `ir-slot-${i + 1}`])),
     });
 
+  it.each(['OUT', 'INJ', 'SUSP', 'DTD', 'unknown'])('%s alone does not qualify for standard IR slots', async (status) => {
+    const { client, chains } = makeSupabase({ roster_assignments: ROSTER_ROWS, leagues: NO_SETTINGS,
+      player_current_directory: DIRECTORY, player_talent_metrics: talent([{ id: KANE, ir: false, status }]),
+      team_lineups: base(), fantasy_daily_rosters: { data: [], error: null }, matchups: { data: [], error: null } });
+    const res = await new LineupService(client).saveLineup('team-1', 'league-1', irSave([KANE]));
+    expect(res.success).toBe(false);
+    expect(upserted(chains)).toBe(false);
+  });
+
   it('THE gap: a healthy player placed on IR is refused, and the sentence names him', async () => {
     const { client, chains } = makeSupabase({
       roster_assignments: ROSTER_ROWS,
       leagues: NO_SETTINGS,
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       player_talent_metrics: talent([{ id: MCDAVID, ir: false }]),
       team_lineups: base(),
       fantasy_daily_rosters: { data: [], error: null },
@@ -191,12 +200,12 @@ describe('saveLineup lets only the injured onto IR (gap B)', () => {
     expect(upserted(chains)).toBe(false);
   });
 
-  it('a player the NHL lists IR is accepted and written to IR', async () => {
+  it.each(['IR', 'LTIR'])('a player listed %s is accepted and written to IR', async (status) => {
     const { client, chains } = makeSupabase({
       roster_assignments: ROSTER_ROWS,
       leagues: NO_SETTINGS,
-      player_directory: DIRECTORY,
-      player_talent_metrics: talent([{ id: KANE, ir: true, status: 'IR' }]),
+      player_current_directory: DIRECTORY,
+      player_talent_metrics: talent([{ id: KANE, ir: false, status }]),
       team_lineups: base(),
       fantasy_daily_rosters: { data: [], error: null },
       matchups: { data: [], error: null },
@@ -211,7 +220,7 @@ describe('saveLineup lets only the injured onto IR (gap B)', () => {
     const { client } = makeSupabase({
       roster_assignments: ROSTER_ROWS,
       leagues: NO_SETTINGS,
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       player_talent_metrics: talent([{ id: MCDAVID, ir: false }]),
       team_lineups: base(),
       fantasy_daily_rosters: { data: [], error: null },
@@ -228,7 +237,7 @@ describe('saveLineup lets only the injured onto IR (gap B)', () => {
     const { client } = makeSupabase({
       roster_assignments: ROSTER_ROWS,
       leagues: NO_SETTINGS,
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       player_talent_metrics: { data: [], error: null },
       team_lineups: base(),
       fantasy_daily_rosters: { data: [], error: null },
@@ -243,7 +252,7 @@ describe('saveLineup lets only the injured onto IR (gap B)', () => {
     const { client } = makeSupabase({
       roster_assignments: ROSTER_ROWS,
       leagues: NO_SETTINGS,
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       player_talent_metrics: talent([{ id: KANE, ir: false, status: 'ACT' }]),
       team_lineups: base([KANE]),
       fantasy_daily_rosters: { data: [], error: null },
@@ -257,7 +266,7 @@ describe('saveLineup lets only the injured onto IR (gap B)', () => {
     const { client } = makeSupabase({
       roster_assignments: ROSTER_ROWS,
       leagues: NO_SETTINGS,
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       player_talent_metrics: talent([{ id: KANE, ir: false, status: 'ACT' }]),
       team_lineups: base(),
       fantasy_daily_rosters: { data: [{ player_id: Number(KANE) }], error: null },
@@ -271,7 +280,7 @@ describe('saveLineup lets only the injured onto IR (gap B)', () => {
     const { client } = makeSupabase({
       roster_assignments: ROSTER_ROWS,
       leagues: NO_SETTINGS,
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       player_talent_metrics: talent([{ id: KANE, ir: false }, { id: MCDAVID, ir: false }]),
       team_lineups: base([KANE]),
       fantasy_daily_rosters: { data: [], error: null },
@@ -282,18 +291,19 @@ describe('saveLineup lets only the injured onto IR (gap B)', () => {
     expect(res.error).toMatch(/^Connor McDavid isn't listed IR or LTIR/);
   });
 
-  it('a failed status read fails OPEN: the save goes through', async () => {
+  it('a failed status read cannot authorize a new IR placement', async () => {
     const { client } = makeSupabase({
       roster_assignments: ROSTER_ROWS,
       leagues: NO_SETTINGS,
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       player_talent_metrics: { data: null, error: { message: 'boom' } },
       team_lineups: base(),
       fantasy_daily_rosters: { data: [], error: null },
       matchups: { data: [], error: null },
     });
     const res = await new LineupService(client).saveLineup('team-1', 'league-1', irSave([MCDAVID]));
-    expect(res.success).toBe(true);
+    expect(res.success).toBe(false);
+    expect(res.error).toContain('IR eligibility could not be verified');
   });
 
   it('the ir LIST is capped at the league count: a fourth injured player in a 3-IR league is refused', async () => {
@@ -301,7 +311,7 @@ describe('saveLineup lets only the injured onto IR (gap B)', () => {
     const { client } = makeSupabase({
       roster_assignments: ROSTER_ROWS,
       leagues: NO_SETTINGS,
-      player_directory: DIRECTORY,
+      player_current_directory: DIRECTORY,
       player_talent_metrics: talent(four.map((id) => ({ id, ir: true, status: 'IR' }))),
       team_lineups: base(),
       fantasy_daily_rosters: { data: [], error: null },

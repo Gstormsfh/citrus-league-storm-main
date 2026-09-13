@@ -6,7 +6,7 @@ describe('initial lineup commissioner slot counts', () => {
     const rows = {
       leagues: { settings: { rosterSlots: { C: 0, LW: 0, RW: 0, D: 0, G: 0, UTIL, IR: 0 } } },
       roster_assignments: [1, 2, 3, 4].map(player_id => ({ player_id: String(player_id) })),
-      player_directory: [1, 2, 3, 4].map(player_id => ({ player_id, position_code: 'LW' })),
+      player_current_directory: [1, 2, 3, 4].map(player_id => ({ player_id, position_code: 'LW' })),
       player_talent_metrics: [{ player_id: 4, roster_status: 'IR' }],
     };
     const client = { from(table: keyof typeof rows) {

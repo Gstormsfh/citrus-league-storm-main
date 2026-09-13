@@ -151,7 +151,7 @@ const ROS = [
 function mockTables(supabase: any, overrides: Record<string, { data: unknown; error: unknown }> = {}) {
   supabase.from = vi.fn((table: string) => {
     if (overrides[table]) return createChain(overrides[table]);
-    if (table === 'player_directory') return createChain({ data: DIR, error: null });
+    if (table === 'player_current_directory') return createChain({ data: DIR, error: null });
     if (table === 'player_season_stats') return createChain({ data: STATS, error: null });
     if (table === 'player_gar_components') return createChain({ data: GAR, error: null });
     if (table === 'player_talent_metrics') return createChain({ data: TALENT, error: null });
@@ -366,7 +366,7 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
     slowDirectory.range = vi.fn(() => gate);
 
     mockSupabase.from = vi.fn((table: string) => {
-      if (table === 'player_directory') return slowDirectory;
+      if (table === 'player_current_directory') return slowDirectory;
       if (table === 'player_season_stats') return createChain({ data: STATS, error: null });
       if (table === 'player_gar_components') return createChain({ data: GAR, error: null });
       if (table === 'player_talent_metrics') return createChain({ data: TALENT, error: null });
@@ -434,7 +434,7 @@ describe('PlayerDashboardService.getDashboardIndex', () => {
       Promise.resolve({ data: dirPages[dirCall++] ?? [], error: null }).then(resolve, reject);
 
     mockSupabase.from = vi.fn((table: string) => {
-      if (table === 'player_directory') return pagedDirChain;
+      if (table === 'player_current_directory') return pagedDirChain;
       if (table === 'player_season_stats') return createChain({ data: STATS, error: null });
       if (table === 'player_gar_components') return createChain({ data: GAR, error: null });
       if (table === 'player_talent_metrics') return createChain({ data: TALENT, error: null });
@@ -633,7 +633,7 @@ function userClient(overrides: Record<string, { data: unknown; error: unknown }>
     if (table === 'player_xg_season') return createChain({ data: XG_SEASONS, error: null });
     if (table === 'goalie_gsax_primary') return createChain({ data: [], error: null });
     if (table === 'player_talent_metrics') return createChain({ data: TALENT_DETAIL, error: null });
-    if (table === 'player_directory') return createChain({ data: IDENTITY, error: null });
+    if (table === 'player_current_directory') return createChain({ data: IDENTITY, error: null });
     if (table === 'nhl_shots') {
       return createChain({
         data: null,

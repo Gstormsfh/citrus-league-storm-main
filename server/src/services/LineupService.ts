@@ -1,3 +1,4 @@
+import { getProjectionsSeason } from '@citrus/shared';
 import { SupabaseClient } from '@supabase/supabase-js';
 import {
   COLUMNS,
@@ -197,8 +198,9 @@ export class LineupService {
         .filter((n) => Number.isFinite(n));
       if (lookupIds.length > 0) {
         const { data: posRows } = await this.supabase
-          .from('player_directory')
+          .from('player_current_directory')
           .select('player_id, full_name, position_code, eligible_positions')
+          .eq('season', getProjectionsSeason())
           .order('season', { ascending: false })
           .in('player_id', lookupIds);
         const seen = new Set<number>();
@@ -232,15 +234,18 @@ export class LineupService {
     // actually puts someone on IR, so the common save pays nothing. A player
     // parked while injured who has since been activated is on record and
     // tolerated (Yahoo blocks ADDS for that roster, not lineup changes).
-    // Both reads fail OPEN.
+    // A failed eligibility/history read cannot authorize a new IR placement.
     if (irPlayerIds.length > 0) {
       const irEligibleById = await this.irEligibilityOf(irPlayerIds);
       const alreadyOnIr = await this.playersOnIrOnRecord(teamId, leagueId, targetDate ?? getTodayMST());
+      if (irEligibleById === null || alreadyOnIr === null) {
+        return { success: false, error: 'IR eligibility could not be verified. Please retry before moving a player to IR.' };
+      }
       const irVerdict = validateIrPlacements(
         {
           irPlayerIds,
-          irEligibleById: irEligibleById ?? undefined,
-          alreadyOnIr: alreadyOnIr ?? new Set(irPlayerIds),
+          irEligibleById,
+          alreadyOnIr,
           nameOf,
         },
         slotConfig,
@@ -432,9 +437,9 @@ export class LineupService {
     if (playerIds.length === 0) return true;
 
     const { data: players } = await this.supabase
-      .from('player_directory')
+      .from('player_current_directory')
       .select('player_id, team_abbrev')
-      .eq('season', getCurrentSeason())
+      .eq('season', getProjectionsSeason())
       .in('player_id', playerIds);
 
     if (!players || players.length === 0) return true;
@@ -475,9 +480,9 @@ export class LineupService {
     if (ids.length === 0) return { locked, nameOf };
 
     const { data: players } = await this.supabase
-      .from('player_directory')
+      .from('player_current_directory')
       .select('player_id, full_name, team_abbrev')
-      .eq('season', getCurrentSeason())
+      .eq('season', getProjectionsSeason())
       .in('player_id', ids);
     if (!players || players.length === 0) return { locked, nameOf };
 
@@ -516,7 +521,7 @@ export class LineupService {
    * same season PlayerService hands the roster page, so the server accepts
    * exactly what the page offers and nothing the page would not. A row that
    * is missing, or says false, is false: no designation means no IR. Null
-   * when the read itself fails, and the caller fails open.
+   * when the read itself fails, and the caller refuses an unverified placement.
    */
   private async irEligibilityOf(playerIds: string[]): Promise<Record<string, boolean> | null> {
     const ids = playerIds.map((id) => Number(id)).filter((n) => Number.isFinite(n));
@@ -538,7 +543,7 @@ export class LineupService {
       for (const id of playerIds) out[id] = listed.has(id);
       return out;
     } catch (err) {
-      logger.warn('[LineupService.saveLineup] IR status lookup failed open:', err);
+      logger.warn('[LineupService.saveLineup] IR status lookup failed:', err);
       return null;
     }
   }
@@ -582,7 +587,7 @@ export class LineupService {
       }
       return onIr;
     } catch (err) {
-      logger.warn('[LineupService.saveLineup] IR on-record lookup failed open:', err);
+      logger.warn('[LineupService.saveLineup] IR on-record lookup failed:', err);
       return null;
     }
   }
@@ -869,9 +874,9 @@ export class LineupService {
 
     // Get player positions from player_directory
     const { data: players } = await this.supabase
-      .from('player_directory')
+      .from('player_current_directory')
       .select('player_id, position_code')
-      .eq('season', getCurrentSeason())
+      .eq('season', getProjectionsSeason())
       .in('player_id', playerIds.map((id: string) => parseInt(String(id))));
 
     // Get roster status from player_talent_metrics (roster_status lives here, not in player_directory)
@@ -1056,9 +1061,9 @@ export class LineupService {
     const playerTeamMap = new Map<number, string>();
     if (allPlayerIds.length > 0) {
       const { data: players } = await this.supabase
-        .from('player_directory')
+        .from('player_current_directory')
         .select('player_id, team_abbrev')
-        .eq('season', getCurrentSeason())
+        .eq('season', getProjectionsSeason())
         .in('player_id', allPlayerIds);
       if (players) {
         for (const p of players) {

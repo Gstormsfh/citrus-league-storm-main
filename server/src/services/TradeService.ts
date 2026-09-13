@@ -1,3 +1,4 @@
+import { getProjectionsSeason } from '@citrus/shared';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { isPastTradeDeadline, lockedTeamForTrade } from '../lib/leagueRules';
 import { getSupabaseAdmin } from '../lib/supabase';
@@ -87,9 +88,9 @@ export class TradeService {
         .in('id', Array.from(teamIds)),
       playerIds.size > 0
         ? this.supabase
-            .from('player_directory')
+            .from('player_current_directory')
             .select('player_id, full_name, position_code, team_abbrev')
-            .eq('season', getCurrentSeason())
+            .eq('season', getProjectionsSeason())
             .in('player_id', Array.from(playerIds).map((id) => parseInt(id, 10)).filter((n) => !isNaN(n)))
         : Promise.resolve({ data: [] as Array<{ player_id: number; full_name: string; position_code: string; team_abbrev: string }> }),
     ]);
@@ -415,8 +416,9 @@ export class TradeService {
         if (playerIds.length) {
           const admin = getSupabaseAdmin();
           const { data: dir } = await admin
-            .from('player_directory')
+            .from('player_current_directory')
             .select('player_id, team_abbrev, season')
+          .eq('season', getProjectionsSeason())
             .in('player_id', playerIds)
             .order('season', { ascending: false });
           const teamOf = new Map<number, string>();

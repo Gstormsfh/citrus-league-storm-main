@@ -55,7 +55,7 @@ function tables() {
     // season state: no matchups => not complete; snapshot writer: no matchup => base path
     matchups: createChain({ data: [], error: null }),
     roster_assignments: createChain({ data: [{ player_id: String(MCDAVID) }, { player_id: String(DRAISAITL) }], error: null }),
-    player_directory: createChain({
+    player_current_directory: createChain({
       data: [
         { player_id: MCDAVID, full_name: 'Connor McDavid', team_abbrev: 'EDM', position_code: 'C', eligible_positions: ['C'] },
         { player_id: DRAISAITL, full_name: 'Leon Draisaitl', team_abbrev: 'TOR', position_code: 'C', eligible_positions: ['C'] },

@@ -20,7 +20,7 @@ describe('TradeService', () => {
       mockSupabase.from = vi.fn((table: string) => {
         if (table === 'trade_offers') return createChain({ data: trades, error: null });
         if (table === 'teams') return createChain({ data: [{ id: 'team-a', team_name: 'Alpha' }, { id: 'team-b', team_name: 'Beta' }], error: null });
-        if (table === 'player_directory') {
+        if (table === 'player_current_directory') {
           return createChain({
             data: [
               { player_id: 101, full_name: 'Connor McDavid', position_code: 'C', team_abbrev: 'EDM' },

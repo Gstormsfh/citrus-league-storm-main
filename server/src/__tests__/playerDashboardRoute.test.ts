@@ -133,7 +133,7 @@ async function wire() {
   const user = createMockSupabase();
   user.from = vi.fn((table: string) => {
     if (table === 'player_xg_season') return createChain({ data: [XG_SEASON_ROW], error: null });
-    if (table === 'player_directory') return createChain({ data: [IDENTITY_ROW], error: null });
+    if (table === 'player_current_directory') return createChain({ data: [IDENTITY_ROW], error: null });
     return createChain({ data: [], error: null });
   });
   (createUserClient as any).mockReturnValue(user);
@@ -206,7 +206,7 @@ describe('GET /api/players/:playerId/dashboard', () => {
         'player_xg_season',
         'goalie_gsax_primary',
         'player_talent_metrics',
-        'player_directory',
+        'player_current_directory',
       ]),
     );
   });
@@ -309,7 +309,7 @@ describe('GET /api/players/:playerId/dashboard', () => {
     const { app } = await import('../app');
     const res = await get(app, '/api/players/dashboard-index');
     expect(res.status).toBe(200);
-    expect(user.from).toHaveBeenCalledWith('player_directory');
+    expect(user.from).toHaveBeenCalledWith('player_current_directory');
   });
 });
 

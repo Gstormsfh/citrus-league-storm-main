@@ -925,9 +925,9 @@ export class MatchupService {
     // of 1,076 players instead of the 2026 universe of 805 — silently, because
     // a season filter that matches nothing looks identical to a player who
     // simply is not in the directory.
-    const season = getCurrentSeason();
+    const season = getProjectionsSeason();
     const { data: players, error: pdErr } = await admin
-      .from('player_directory')
+      .from('player_current_directory')
       .select('player_id, position_code, is_goalie')
       .in('player_id', playerIds)
       .eq('season', season);
@@ -940,7 +940,7 @@ export class MatchupService {
       logger.error('[buildDefaultLineup] No player_directory rows for season', season, '— trying without season filter');
       // Fallback: get latest row per player without season filter
       const { data: fallbackPlayers } = await admin
-        .from('player_directory')
+        .from('player_current_directory')
         .select('player_id, position_code, is_goalie')
         .in('player_id', playerIds)
         .order('season', { ascending: false });
@@ -1676,9 +1676,9 @@ export class MatchupService {
     const uniquePlayerIds = [...new Set(entries.map((e: { player_id: number }) => Number(e.player_id)))];
 
     const { data: players } = await admin
-      .from('player_directory')
+      .from('player_current_directory')
       .select('player_id, full_name, position_code, is_goalie, team_abbrev, headshot_url')
-      .eq('season', getCurrentSeason())
+      .eq('season', getProjectionsSeason())
       .in('player_id', uniquePlayerIds);
 
     interface PlayerDirectoryRow {

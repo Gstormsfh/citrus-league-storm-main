@@ -463,7 +463,7 @@ export class DraftKitService {
         // club is only claimed when both answers exist and differ; a missing
         // row is not evidence of a move.
         const club = clubs.get(e.id);
-        const team = club?.current ?? e.team;
+        const team = club ? (club.current ?? '') : e.team;
         const previousTeam =
           club?.previous && club.previous !== team ? club.previous : null;
 
@@ -552,7 +552,7 @@ export class DraftKitService {
       ),
       selectSeasonPaged<DirectoryTeamRow>(
         this.supabase,
-        'player_directory',
+        'player_current_directory',
         'player_id, team_abbrev',
         projectionSeason,
         'player_id',

@@ -176,6 +176,7 @@ function mockTables(entitlements: unknown[]) {
   const supabase = createMockSupabase();
   supabase.from = vi.fn((table: string) => {
     switch (table) {
+      case 'player_current_directory':
       case 'player_directory': {
         dirCalls.n += 1;
         const rows = dirCalls.n === 1 ? DIR : dirCalls.n === 2 ? CURRENT_DIR : PRIOR_DIR;

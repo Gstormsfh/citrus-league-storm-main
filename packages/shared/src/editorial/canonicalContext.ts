@@ -10,11 +10,12 @@ export interface EditorialCanonicalContext {
 
 export interface CanonicalEditorialResult {
   summary: string;
+  availabilityExplanation?: string;
   analysis: string;
   sources: Record<string, unknown>[];
   revision?: string;
   runId?: string;
-  availability?: { status: string; authority: 'verified' | 'imported_scenario'; asOf: string };
+  availability?: { status: string; authority: 'verified' | 'imported_scenario' | 'reviewed_report'; asOf: string };
   /** Whether the model used role conditioning; not a claim about role certainty. */
   role?: { conditioned?: boolean };
 }
@@ -49,15 +50,17 @@ function freshDate(value: unknown, reviewAfter: unknown, now: Date): string | nu
 /** Preserve supplied locator/hash/URL provenance; never manufacture article URLs. */
 function source(value: unknown): Record<string, unknown> | null {
   if (!record(value)) return null;
+  const adopted = value.confirmation_scope === 'owner_adopted_workbook_baseline';
+  const input = { ...value, evidence_url: value.evidence_url ?? value.url, sha256: value.sha256 ?? (adopted ? value.workbook_sha256 : undefined) };
   const out: Record<string, unknown> = {};
   // Source objects are provenance, not freeform instructions or executable links.
   for (const key of ['file', 'sha256', 'locator', 'evidence_url', 'purpose', 'name', 'published_at', 'as_of']) {
     const limit = key === 'evidence_url' || key === 'file' ? 1000 : 240;
-    const raw = value[key];
+    const raw = input[key];
     const field = text(raw, limit);
     // Hashes, filenames, locators and URLs must not be clipped or rewritten.
     if (field && typeof raw === 'string' && raw.length <= limit && !/[\u0000-\u001f\u007f]/.test(raw)) out[key] = raw.trim();
-    else if (value[key] != null) return null;
+    else if (input[key] != null) return null;
   }
   if (typeof out.evidence_url === 'string') {
     try {
@@ -79,7 +82,7 @@ function evidenceSources(value: unknown): Record<string, unknown>[] {
 }
 
 const STATUS: Record<string, string> = {
-  active: 'listed active', out: 'listed out', ir: 'listed on injured reserve',
+  injured: 'listed injured', active: 'listed active', out: 'listed out', ir: 'listed on injured reserve',
   ltir: 'listed on long-term injured reserve', day_to_day: 'listed day-to-day', suspended: 'listed suspended',
 };
 
@@ -119,12 +122,23 @@ export function canonicalEditorialContext(
     if (provenance) retain([provenance]);
     const date = freshDate(availability.as_of, availability.review_after, now);
     const status = typeof availability.status === 'string' && Object.prototype.hasOwnProperty.call(STATUS, availability.status) ? STATUS[availability.status] : null;
-    const reason = text(availability.reason);
+    const reason = text(availability.reason, 1400);
     const reasonSafe = availability.reason == null || reason !== null;
-    if (date && provenance && status && reasonSafe && ['verified', 'imported_scenario'].includes(String(availability.authority))) {
+    if (date && provenance && status && reasonSafe && ['verified', 'imported_scenario', 'reviewed_report'].includes(String(availability.authority))) {
       const scenario = availability.authority === 'imported_scenario';
-      summaries.push(`${scenario ? 'Imported availability scenario, not a verified status' : 'Verified availability record'} (${date}; ${sourceLabel(provenance)}): ${name} ${status}.${reason ? ` ${scenario ? 'Scenario reason' : 'Reported reason'}: ${reason.replace(/[.!?]+$/, '')}.` : ''}`);
-      result.availability = { status: String(availability.status), authority: scenario ? 'imported_scenario' : 'verified', asOf: new Date(String(availability.as_of)).toISOString() };
+      const reviewed = availability.authority === 'reviewed_report';
+      const adopted = record(availability.source) && availability.source.confirmation_scope === 'owner_adopted_workbook_baseline';
+      const label = adopted ? 'Owner-maintained availability baseline' : reviewed ? 'Reviewed availability record' : scenario ? 'Imported availability scenario, not a verified status' : 'Verified availability record';
+      summaries.push(`${label} (${date}; ${sourceLabel(provenance)}): ${name} ${status}.${reason ? ` ${scenario ? 'Scenario reason' : adopted ? 'Baseline context' : 'Reported reason'}: ${reason.replace(/[.!?]+$/, '')}.` : ''}`);
+      if (adopted) {
+        const rawNote = record(context.role) ? context.role.notes : null;
+        const note = text(rawNote, 1800);
+        const historical = note?.split('Historical forecast reasoning:')[1]?.trim();
+        if (historical) summaries.push(`Historical workload assumption, not a current recovery forecast: ${historical}`);
+        summaries.push('Return timing is unconfirmed. This baseline does not establish fantasy IR eligibility.');
+      }
+      result.availabilityExplanation = summaries.join(' ');
+      result.availability = { status: String(availability.status), authority: reviewed ? 'reviewed_report' : scenario ? 'imported_scenario' : 'verified', asOf: new Date(String(availability.as_of)).toISOString() };
     }
   }
 
@@ -135,7 +149,7 @@ export function canonicalEditorialContext(
     retain(evidence);
     const line = text(role.line, 80) ?? (typeof role.line === 'number' && Number.isFinite(role.line) ? String(role.line) : null);
     const pp = text(role.pp, 80) ?? (typeof role.pp === 'number' && Number.isFinite(role.pp) ? String(role.pp) : null);
-    const notes = text(role.notes);
+    const notes = availability?.authority === 'reviewed_report' ? null : text(role.notes);
     if (typeof role.conditioned === 'boolean') result.role = { conditioned: role.conditioned };
     const safe = [role.line, role.pp, role.notes].every(value => typeof value !== 'string' || text(value) !== null);
     // Role has no authoritative deployment flag. Even a sourced published row

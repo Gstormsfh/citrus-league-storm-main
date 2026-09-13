@@ -1,3 +1,5 @@
+import { PlayerAffiliationDetails } from '@/components/player/PlayerAffiliationDetails';
+import { PlayerAvailabilityDetails } from '@/components/player/PlayerAvailabilityDetails';
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 import { useLeague } from '@/contexts/LeagueContext';
@@ -777,7 +779,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
   const writeup = xgHistory.writeup ?? generatePlayerWriteup(player, writeupExtras);
 
   const posAbbr = getPositionAbbr(player.position);
-  const teamAbbr = player.teamAbbreviation || player.team?.split(' ').pop()?.substring(0, 3).toUpperCase() || '';
+  const teamAbbr = indexEntry ? indexEntry.team : player.teamAbbreviation || player.team?.split(' ').pop()?.substring(0, 3).toUpperCase() || '';
 
   // The hero uses ROS; the game-log sections retain their selected season.
   const futureGames = gameLog.filter(g => !g.isPast);
@@ -893,6 +895,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
           })()}
 
           <PlayerAvailabilityBadge availability={indexEntry?.availability ?? player.availability} />
+          <PlayerAffiliationDetails affiliation={indexEntry?.current_affiliation} projectionTeam={indexEntry?.projection_team} />
 
           {/* THE ACTION BAR (2026-09-05, artboard 1a · player card):
               TRADE · DROP · watch · share, under the vitals. DROP only when
@@ -1012,6 +1015,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
 
             {/* ─── Overview Tab ─── */}
             <TabsContent value="summary" className="mt-0 space-y-4">
+              <PlayerAvailabilityDetails playerId={player.id} name={player.name} context={indexEntry?.canonical_context} availability={indexEntry?.availability ?? player.availability} />
               {/* WHICH SEASON THESE NUMBERS ARE (2026-09-04).
                   
                   The Game Log carries a season picker and these two tabs do
@@ -1063,7 +1067,7 @@ const PlayerStatsModal = ({ player, isOpen, onClose, leagueId: suppliedLeagueId,
                   {writeup.headline}
                 </div>
                 <p className="mt-1 font-barlow text-[13px] leading-[1.45] text-pressbox-text/70">
-                  {writeup.summary}
+                  {writeup.summary.replace(writeup.availabilityExplanation ?? '', '').trim() || writeup.summary}
                 </p>
                 {writeup.analysis && (
                   <p className="mt-2 font-barlow text-[13px] leading-[1.45] text-pressbox-text/70">

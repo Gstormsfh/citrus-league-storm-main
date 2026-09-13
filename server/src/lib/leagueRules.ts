@@ -176,13 +176,14 @@ export function validateSlotAssignments(
  * `is_ir_eligible` since the column arrived (migration 20260103151931); this
  * makes the server the gate.
  *
- * Two deliberate softenings, both Yahoo's own behaviour:
+ * Existing occupants and lookup handling:
  *   - a player placed while injured who has since been activated is
  *     TOLERATED. Yahoo flags that roster and blocks ADDS until it is fixed; it
  *     does not refuse every lineup change in between, and neither do we. The
  *     service hands us who is on IR on record; anyone in that set is not a
  *     new placement and is not re-checked.
- *   - lookup gaps fail OPEN, exactly like `eligibleById`: no map, or no entry
+ *   - the service refuses failed eligibility/history lookups before calling this helper.
+ *     Legacy pure callers can omit the map; no map, or no entry
  *     for the player, means "the read did not answer", never "he is healthy".
  *     The service writes an entry for EVERY id it was asked about when the
  *     read succeeds, so an absent entry can only be a gap.

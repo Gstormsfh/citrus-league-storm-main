@@ -1,3 +1,4 @@
+import { getProjectionsSeason } from '@citrus/shared';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { COLUMNS, logger, getCurrentSeason } from '@citrus/shared';
 import { resolveAddLimits, evaluateGameLock, currentWeekStart } from '../lib/leagueRules';
@@ -700,8 +701,9 @@ export class WaiverService {
 
         // Enforce goalie limit (match RPC: GREATEST(starting_G + 2, 4))
         const { data: playerInfo } = await admin
-          .from('player_directory')
+          .from('player_current_directory')
           .select('is_goalie')
+          .eq('season', getProjectionsSeason())
           .eq('player_id', addPlayerId)
           // Per-season index: prefer the newest season's row.
           .order('season', { ascending: false })
@@ -827,8 +829,9 @@ export class WaiverService {
     const playerIds = assignments.map((a: { player_id: string }) => parseInt(String(a.player_id), 10));
 
     const { data: goalies } = await admin
-      .from('player_directory')
+      .from('player_current_directory')
       .select('player_id')
+          .eq('season', getProjectionsSeason())
       .in('player_id', playerIds)
       .eq('is_goalie', true);
 
@@ -868,8 +871,9 @@ export class WaiverService {
       if (lockLeague?.waiver_game_lock) {
         const admin0 = getSupabaseAdmin();
         const { data: dirRow } = await admin0
-          .from('player_directory')
+          .from('player_current_directory')
           .select('team_abbrev')
+          .eq('season', getProjectionsSeason())
           .eq('player_id', playerId)
           .order('season', { ascending: false })
           .limit(1)

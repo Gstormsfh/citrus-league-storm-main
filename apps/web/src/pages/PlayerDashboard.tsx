@@ -1,3 +1,5 @@
+import { PlayerAffiliationDetails } from '@/components/player/PlayerAffiliationDetails';
+import { PlayerAvailabilityDetails } from '@/components/player/PlayerAvailabilityDetails';
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { sourceSeasonLabel } from '@/utils/sourceSeasonContext';
 import { useMemo, useState } from 'react';
@@ -588,7 +590,7 @@ export default function PlayerDashboard() {
   );
 
   const identity: DashboardIdentity | null = useMemo(() => {
-    if (payload?.player) return payload.player;
+    if (payload?.player) return indexEntry ? { ...payload.player, team: indexEntry.team } : payload.player;
     if (indexEntry) {
       return {
         player_id: indexEntry.id,
@@ -791,6 +793,8 @@ export default function PlayerDashboard() {
 
       <section aria-label="Player overview" className="relative px-4 sm:px-6">
         <PlayerAvailabilityBadge availability={indexEntry?.availability} className="mb-2" />
+          <PlayerAffiliationDetails affiliation={indexEntry?.current_affiliation} projectionTeam={indexEntry?.projection_team} />
+        <PlayerAvailabilityDetails playerId={playerId} name={indexEntry?.name ?? ""} context={indexEntry?.canonical_context} availability={indexEntry?.availability} />
         {showRink ? (
           <>
             <RinkHeatmap

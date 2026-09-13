@@ -1,0 +1,902 @@
+[
+  {
+    "id": "8473419",
+    "name": "Brad Marchand",
+    "context": {
+      "revision": "734ca84cbf8c3c5bb8b52c4f4be50aaeb7304df6b84f9da029f186a7725aa669",
+      "run_id": "9c6ffc26-1e7e-476e-afbc-e8de55f9b0c2",
+      "availability": {
+        "as_of": "2026-09-12",
+        "reason": "Owner-adopted working ltir baseline from retained explicit workbook status/notes. Original injury observation date is not established by the import timestamp; not independently verified. Return timing is undetermined unless separately supported. No official designation verification or fantasy IR eligibility decision is implied.",
+        "source": {
+          "file": "Manual confirmation by Citrus owner (workbook adoption only): Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Brad Marchand; FLA!row30; not independently verified",
+          "kind": "manual_confirmation",
+          "reference": "Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Brad Marchand; FLA!row30; not independently verified",
+          "adopted_at": "2026-09-12",
+          "reviewed_at": "2026-09-12",
+          "source_date": "2026-09-12",
+          "confirmed_by": "Citrus owner (workbook adoption only)",
+          "review_policy": "Operational freshness deadline, not a predicted recovery date.",
+          "date_semantics": "as_of/source_date are the effective date of owner adoption, not a newly observed injury date or fresh primary reporting",
+          "workbook_sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "confirmation_scope": "owner_adopted_workbook_baseline",
+          "original_report_date": null,
+          "independently_verified": false,
+          "superseded_availability": {
+            "as_of": "2026-09-12",
+            "reason": "on LTIR, return around 10 Oct",
+            "source": {
+              "file": "workbook-full.json",
+              "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+              "locator": "FLA!row30"
+            },
+            "status": "ltir",
+            "authority": "imported_scenario",
+            "review_after": null,
+            "return_window": null
+          },
+          "original_observation_date": null
+        },
+        "status": "ltir",
+        "authority": "reviewed_report",
+        "review_after": "2026-09-19",
+        "return_window": null
+      },
+      "role": {
+        "pp": "PP2",
+        "line": "F3",
+        "notes": "Current availability is the owner-adopted working baseline, with return timing undetermined and no independently verified recovery date. Dates in the following retained forecast reasoning are historical assumptions, superseded as current availability promises; numerical allocations remain unchanged. Historical forecast reasoning: CONFIRMED correct. August hip surgery, expected to open on LTIR, return around 10 Oct.",
+        "evidence": [],
+        "conditioned": false,
+        "not_conditioned_reason": "No measured role conditioning; inherited manual judgment preserved."
+      },
+      "sources": [
+        {
+          "file": "edits.json",
+          "sha256": "eda90bdae4b11ba9ed1c5cf6d21aefa3d8482ef415fcbaf2904221f6cb62117f",
+          "locator": "players[185]"
+        },
+        {
+          "file": "workbook-full.json",
+          "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "locator": "Draft Board!row187"
+        },
+        {
+          "file": "overrides.json",
+          "sha256": "e29a32c59eb04fb3b3e9a2df21d9f94b736b46ffacd00689057b3cfaf75c5f89",
+          "locator": "Brad Marchand"
+        }
+      ]
+    }
+  },
+  {
+    "id": "8475883",
+    "name": "Frederik Andersen",
+    "context": {
+      "revision": "734ca84cbf8c3c5bb8b52c4f4be50aaeb7304df6b84f9da029f186a7725aa669",
+      "run_id": "9c6ffc26-1e7e-476e-afbc-e8de55f9b0c2",
+      "availability": {
+        "as_of": "2026-09-12",
+        "reason": "Owner-adopted working out baseline from retained explicit workbook status/notes. Original injury observation date is not established by the import timestamp; not independently verified. Return timing is undetermined unless separately supported. No official designation verification or fantasy IR eligibility decision is implied.",
+        "source": {
+          "file": "Manual confirmation by Citrus owner (workbook adoption only): Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Frederik Andersen; EDM!row30; not independently verified",
+          "kind": "manual_confirmation",
+          "reference": "Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Frederik Andersen; EDM!row30; not independently verified",
+          "adopted_at": "2026-09-12",
+          "reviewed_at": "2026-09-12",
+          "source_date": "2026-09-12",
+          "confirmed_by": "Citrus owner (workbook adoption only)",
+          "review_policy": "Operational freshness deadline, not a predicted recovery date.",
+          "date_semantics": "as_of/source_date are the effective date of owner adoption, not a newly observed injury date or fresh primary reporting",
+          "workbook_sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "confirmation_scope": "owner_adopted_workbook_baseline",
+          "original_report_date": null,
+          "independently_verified": false,
+          "superseded_availability": {
+            "as_of": "2026-09-12",
+            "reason": "Expected back: out to roughly 20 Oct",
+            "source": {
+              "file": "workbook-full.json",
+              "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+              "locator": "EDM!row30"
+            },
+            "status": "out",
+            "authority": "imported_scenario",
+            "review_after": null,
+            "return_window": null
+          },
+          "original_observation_date": null
+        },
+        "status": "out",
+        "authority": "reviewed_report",
+        "review_after": "2026-09-19",
+        "return_window": null
+      },
+      "role": {
+        "pp": null,
+        "line": null,
+        "notes": null,
+        "evidence": [],
+        "conditioned": false,
+        "not_conditioned_reason": "No measured role conditioning; inherited manual judgment preserved."
+      },
+      "sources": [
+        {
+          "file": "edits.json",
+          "sha256": "eda90bdae4b11ba9ed1c5cf6d21aefa3d8482ef415fcbaf2904221f6cb62117f",
+          "locator": "players[626]"
+        },
+        {
+          "file": "workbook-full.json",
+          "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "locator": "Goalies!row48"
+        }
+      ]
+    }
+  },
+  {
+    "id": "8476456",
+    "name": "Jonathan Huberdeau",
+    "context": {
+      "revision": "734ca84cbf8c3c5bb8b52c4f4be50aaeb7304df6b84f9da029f186a7725aa669",
+      "run_id": "9c6ffc26-1e7e-476e-afbc-e8de55f9b0c2",
+      "availability": {
+        "as_of": "2026-09-12",
+        "reason": "Owner-adopted working out baseline from retained explicit workbook status/notes. Original injury observation date is not established by the import timestamp; not independently verified. Return timing is undetermined unless separately supported. No official designation verification or fantasy IR eligibility decision is implied.",
+        "source": {
+          "file": "Manual confirmation by Citrus owner (workbook adoption only): Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Jonathan Huberdeau; CGY!row30; not independently verified",
+          "kind": "manual_confirmation",
+          "reference": "Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Jonathan Huberdeau; CGY!row30; not independently verified",
+          "adopted_at": "2026-09-12",
+          "reviewed_at": "2026-09-12",
+          "source_date": "2026-09-12",
+          "confirmed_by": "Citrus owner (workbook adoption only)",
+          "review_policy": "Operational freshness deadline, not a predicted recovery date.",
+          "date_semantics": "as_of/source_date are the effective date of owner adoption, not a newly observed injury date or fresh primary reporting",
+          "workbook_sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "confirmation_scope": "owner_adopted_workbook_baseline",
+          "original_report_date": null,
+          "independently_verified": false,
+          "superseded_availability": {
+            "as_of": "2026-09-12",
+            "reason": "Expected back: return around 8 Oct",
+            "source": {
+              "file": "workbook-full.json",
+              "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+              "locator": "CGY!row30"
+            },
+            "status": "out",
+            "authority": "imported_scenario",
+            "review_after": null,
+            "return_window": null
+          },
+          "original_observation_date": null
+        },
+        "status": "out",
+        "authority": "reviewed_report",
+        "review_after": "2026-09-19",
+        "return_window": null
+      },
+      "role": {
+        "pp": "PP1",
+        "line": null,
+        "notes": "Current availability is the owner-adopted working baseline, with return timing undetermined and no independently verified recovery date. Dates in the following retained forecast reasoning are historical assumptions, superseded as current availability promises; numerical allocations remain unchanged. Historical forecast reasoning: Hip injury, will miss the start of the season, projected return around 8 Oct. The 62 games already covers it.",
+        "evidence": [],
+        "conditioned": false,
+        "not_conditioned_reason": "No measured role conditioning; inherited manual judgment preserved."
+      },
+      "sources": [
+        {
+          "file": "edits.json",
+          "sha256": "eda90bdae4b11ba9ed1c5cf6d21aefa3d8482ef415fcbaf2904221f6cb62117f",
+          "locator": "players[265]"
+        },
+        {
+          "file": "workbook-full.json",
+          "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "locator": "Draft Board!row267"
+        },
+        {
+          "file": "overrides.json",
+          "sha256": "e29a32c59eb04fb3b3e9a2df21d9f94b736b46ffacd00689057b3cfaf75c5f89",
+          "locator": "Jonathan Huberdeau"
+        }
+      ]
+    }
+  },
+  {
+    "id": "8477503",
+    "name": "Max Domi",
+    "context": {
+      "revision": "734ca84cbf8c3c5bb8b52c4f4be50aaeb7304df6b84f9da029f186a7725aa669",
+      "run_id": "9c6ffc26-1e7e-476e-afbc-e8de55f9b0c2",
+      "availability": {
+        "as_of": "2026-09-12",
+        "reason": "Owner-adopted working out baseline from retained explicit workbook status/notes. Original injury observation date is not established by the import timestamp; not independently verified. Return timing is undetermined unless separately supported. No official designation verification or fantasy IR eligibility decision is implied.",
+        "source": {
+          "file": "Manual confirmation by Citrus owner (workbook adoption only): Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Max Domi; retained player/team notes; not independently verified",
+          "kind": "manual_confirmation",
+          "reference": "Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Max Domi; retained player/team notes; not independently verified",
+          "adopted_at": "2026-09-12",
+          "reviewed_at": "2026-09-12",
+          "source_date": "2026-09-12",
+          "confirmed_by": "Citrus owner (workbook adoption only)",
+          "review_policy": "Operational freshness deadline, not a predicted recovery date.",
+          "date_semantics": "as_of/source_date are the effective date of owner adoption, not a newly observed injury date or fresh primary reporting",
+          "workbook_sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "confirmation_scope": "owner_adopted_workbook_baseline",
+          "original_report_date": "2026-05-25",
+          "independently_verified": false,
+          "superseded_availability": {
+            "as_of": "2026-09-12",
+            "reason": null,
+            "source": null,
+            "status": "unknown",
+            "authority": "unknown",
+            "review_after": null,
+            "return_window": null
+          },
+          "original_observation_date": null
+        },
+        "status": "out",
+        "authority": "reviewed_report",
+        "review_after": "2026-09-17",
+        "return_window": null
+      },
+      "role": {
+        "pp": null,
+        "line": null,
+        "notes": null,
+        "evidence": [],
+        "conditioned": false,
+        "not_conditioned_reason": "Historical/cohort rates; no opening roster or role conditioning."
+      },
+      "sources": [
+        {
+          "file": "directory.json",
+          "sha256": "9bd19e235299218aa3b0c2377da4384026518a341086ddd27157d4286404dc4d",
+          "locator": "player_id=8477503"
+        },
+        {
+          "file": "model.json",
+          "sha256": "25735f88db665c3d57c52937158be7ceccb4f7a49a4d3b6a7346b5a98c858c6c",
+          "locator": "player_id=8477503"
+        }
+      ]
+    }
+  },
+  {
+    "id": "8477942",
+    "name": "Kevin Fiala",
+    "context": {
+      "revision": "734ca84cbf8c3c5bb8b52c4f4be50aaeb7304df6b84f9da029f186a7725aa669",
+      "run_id": "9c6ffc26-1e7e-476e-afbc-e8de55f9b0c2",
+      "availability": {
+        "as_of": "2026-09-10",
+        "reason": "Misses the start of training camp; return timeline undetermined. No official IR designation established.",
+        "source": {
+          "url": "https://www.nhl.com/news/kings-kevin-fiala-to-miss-start-of-training-camp-after-procedure-for-leg-injury",
+          "publisher": "NHL.com",
+          "reviewed_at": "2026-09-12",
+          "source_date": "2026-09-10",
+          "review_policy": "Review seven days after the dated report; this is a freshness deadline, not a return estimate.",
+          "superseded_availability": {
+            "as_of": "2026-09-12",
+            "reason": "Expected back: return around 30 Sept",
+            "source": {
+              "file": "workbook-full.json",
+              "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+              "locator": "LAK!row30"
+            },
+            "status": "out",
+            "authority": "imported_scenario",
+            "review_after": null,
+            "return_window": null
+          }
+        },
+        "status": "out",
+        "authority": "reviewed_report",
+        "review_after": "2026-09-17",
+        "return_window": null
+      },
+      "role": {
+        "pp": "PP2",
+        "line": "F2",
+        "notes": "Additional procedure; misses camp start; return timeline undetermined. Replace definite return narrative with uncertainty; retain60 GP as existing conditional scenario pending recovery update, not medically validated availability. https://www.nhl.com/news/kings-kevin-fiala-to-miss-start-of-training-camp-after-procedure-for-leg-injury",
+        "evidence": [
+          {
+            "name": "Kevin Fiala",
+            "action": "Replace definite return narrative with uncertainty; retain60 GP as existing conditional scenario pending recovery update, not medically validated availability.",
+            "source_url": "https://www.nhl.com/news/kings-kevin-fiala-to-miss-start-of-training-camp-after-procedure-for-leg-injury",
+            "established": "Additional procedure; misses camp start; return timeline undetermined.",
+            "source_date": "2026-09-10",
+            "workbook_conflict": "Draft Board K166 implies September30 return and little missed time; that timeline is unsupported."
+          }
+        ],
+        "conditioned": false,
+        "not_conditioned_reason": "No measured role conditioning; inherited manual judgment preserved."
+      },
+      "sources": [
+        {
+          "file": "edits.json",
+          "sha256": "eda90bdae4b11ba9ed1c5cf6d21aefa3d8482ef415fcbaf2904221f6cb62117f",
+          "locator": "players[164]"
+        },
+        {
+          "file": "workbook-full.json",
+          "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "locator": "Draft Board!row166"
+        },
+        {
+          "file": "overrides.json",
+          "sha256": "e29a32c59eb04fb3b3e9a2df21d9f94b736b46ffacd00689057b3cfaf75c5f89",
+          "locator": "Kevin Fiala"
+        }
+      ]
+    }
+  },
+  {
+    "id": "8477967",
+    "name": "Thatcher Demko",
+    "context": {
+      "revision": "734ca84cbf8c3c5bb8b52c4f4be50aaeb7304df6b84f9da029f186a7725aa669",
+      "run_id": "9c6ffc26-1e7e-476e-afbc-e8de55f9b0c2",
+      "availability": {
+        "as_of": "2026-09-12",
+        "reason": "Owner-adopted recovery baseline is injured with return undetermined. An exact first-month absence, opening readiness or official LTIR designation is not established. Existing goalie workload remains a conditional projection, unchanged.",
+        "source": {
+          "file": "Manual confirmation by Citrus owner (workbook adoption only): Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Thatcher Demko; retained player/team notes; not independently verified",
+          "kind": "manual_confirmation",
+          "reference": "Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Thatcher Demko; retained player/team notes; not independently verified",
+          "adopted_at": "2026-09-12",
+          "reviewed_at": "2026-09-12",
+          "source_date": "2026-09-12",
+          "confirmed_by": "Citrus owner (workbook adoption only)",
+          "review_policy": "Operational freshness deadline, not a predicted recovery date.",
+          "date_semantics": "as_of/source_date are the effective date of owner adoption, not a newly observed injury date or fresh primary reporting",
+          "workbook_sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "confirmation_scope": "owner_adopted_workbook_baseline",
+          "original_report_date": "2026-08-29",
+          "independently_verified": false,
+          "superseded_availability": {
+            "as_of": "2026-09-12",
+            "reason": null,
+            "source": null,
+            "status": "unknown",
+            "authority": "unknown",
+            "review_after": null,
+            "return_window": null
+          },
+          "original_observation_date": null
+        },
+        "status": "injured",
+        "authority": "reviewed_report",
+        "review_after": "2026-09-19",
+        "return_window": null
+      },
+      "role": {
+        "pp": null,
+        "line": null,
+        "notes": null,
+        "evidence": [],
+        "conditioned": false,
+        "not_conditioned_reason": "No measured role conditioning; inherited manual judgment preserved."
+      },
+      "sources": [
+        {
+          "file": "edits.json",
+          "sha256": "eda90bdae4b11ba9ed1c5cf6d21aefa3d8482ef415fcbaf2904221f6cb62117f",
+          "locator": "players[636]"
+        },
+        {
+          "file": "workbook-full.json",
+          "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "locator": "Goalies!row58"
+        }
+      ]
+    }
+  },
+  {
+    "id": "8478007",
+    "name": "Elvis Merzlikins",
+    "context": {
+      "revision": "734ca84cbf8c3c5bb8b52c4f4be50aaeb7304df6b84f9da029f186a7725aa669",
+      "run_id": "9c6ffc26-1e7e-476e-afbc-e8de55f9b0c2",
+      "availability": {
+        "as_of": "2026-09-12",
+        "reason": "Owner-adopted explicit surgery/absence note supports a working OUT status; it does not establish season-ending absence, an exact return date or IR eligibility. Zero projected starts are not evidence of injury.",
+        "source": {
+          "file": "Manual confirmation by Citrus owner (workbook adoption only): Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Elvis Merzlikins; retained player/team notes; not independently verified",
+          "kind": "manual_confirmation",
+          "reference": "Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Elvis Merzlikins; retained player/team notes; not independently verified",
+          "adopted_at": "2026-09-12",
+          "reviewed_at": "2026-09-12",
+          "source_date": "2026-09-12",
+          "confirmed_by": "Citrus owner (workbook adoption only)",
+          "review_policy": "Operational freshness deadline, not a predicted recovery date.",
+          "date_semantics": "as_of/source_date are the effective date of owner adoption, not a newly observed injury date or fresh primary reporting",
+          "workbook_sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "confirmation_scope": "owner_adopted_workbook_baseline",
+          "original_report_date": "2026-08-20",
+          "independently_verified": false,
+          "superseded_availability": {
+            "as_of": "2026-09-12",
+            "reason": null,
+            "source": null,
+            "status": "unknown",
+            "authority": "unknown",
+            "review_after": null,
+            "return_window": null
+          },
+          "original_observation_date": null
+        },
+        "status": "out",
+        "authority": "reviewed_report",
+        "review_after": "2026-09-19",
+        "return_window": null
+      },
+      "role": {
+        "pp": null,
+        "line": null,
+        "notes": "Shoulder surgery; no return timetable. Retain0 starts as conservative unavailable scenario; explicitly flag reviewable assumption, not confirmed season-ending injury. https://www.nhl.com/bluejackets/news/elvis-merlikings-underwent-surgery | Depth-chart context: SHOULDER SURGERY Aug 2026, out indefinitely with no timetable. Zero projected starts.",
+        "evidence": [
+          {
+            "name": "Elvis Merzlikins",
+            "action": "Retain0 starts as conservative unavailable scenario; explicitly flag reviewable assumption, not confirmed season-ending injury.",
+            "source_url": "https://www.nhl.com/bluejackets/news/elvis-merlikings-underwent-surgery",
+            "established": "Shoulder surgery; no return timetable.",
+            "source_date": "2026-08-20",
+            "workbook_conflict": "No primary evidence establishes full-season absence."
+          }
+        ],
+        "conditioned": false,
+        "not_conditioned_reason": "No measured role conditioning; inherited manual judgment preserved."
+      },
+      "sources": [
+        {
+          "file": "edits.json",
+          "sha256": "eda90bdae4b11ba9ed1c5cf6d21aefa3d8482ef415fcbaf2904221f6cb62117f",
+          "locator": "players[629]"
+        },
+        {
+          "file": "workbook-full.json",
+          "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "locator": "Goalies!row51"
+        }
+      ]
+    }
+  },
+  {
+    "id": "8478873",
+    "name": "Troy Terry",
+    "context": {
+      "revision": "734ca84cbf8c3c5bb8b52c4f4be50aaeb7304df6b84f9da029f186a7725aa669",
+      "run_id": "9c6ffc26-1e7e-476e-afbc-e8de55f9b0c2",
+      "availability": {
+        "as_of": "2026-09-12",
+        "reason": "Owner-adopted working out baseline from retained explicit workbook status/notes. Original injury observation date is not established by the import timestamp; not independently verified. Return timing is undetermined unless separately supported. No official designation verification or fantasy IR eligibility decision is implied.",
+        "source": {
+          "file": "Manual confirmation by Citrus owner (workbook adoption only): Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Troy Terry; ANA!row30; not independently verified",
+          "kind": "manual_confirmation",
+          "reference": "Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Troy Terry; ANA!row30; not independently verified",
+          "adopted_at": "2026-09-12",
+          "reviewed_at": "2026-09-12",
+          "source_date": "2026-09-12",
+          "confirmed_by": "Citrus owner (workbook adoption only)",
+          "review_policy": "Operational freshness deadline, not a predicted recovery date.",
+          "date_semantics": "as_of/source_date are the effective date of owner adoption, not a newly observed injury date or fresh primary reporting",
+          "workbook_sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "confirmation_scope": "owner_adopted_workbook_baseline",
+          "original_report_date": null,
+          "independently_verified": false,
+          "superseded_availability": {
+            "as_of": "2026-09-12",
+            "reason": "Expected back: Back early-to-mid Nov, 20-30 games missed",
+            "source": {
+              "file": "workbook-full.json",
+              "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+              "locator": "ANA!row30"
+            },
+            "status": "out",
+            "authority": "imported_scenario",
+            "review_after": null,
+            "return_window": null
+          },
+          "original_observation_date": null
+        },
+        "status": "out",
+        "authority": "reviewed_report",
+        "review_after": "2026-09-19",
+        "return_window": null
+      },
+      "role": {
+        "pp": null,
+        "line": null,
+        "notes": "Current availability is the owner-adopted working baseline, with return timing undetermined and no independently verified recovery date. Dates in the following retained forecast reasoning are historical assumptions, superseded as current availability promises; numerical allocations remain unchanged. Historical forecast reasoning: Hip surgery 9 Jun. Back early-to-mid Nov, 20-30 games missed.",
+        "evidence": [],
+        "conditioned": false,
+        "not_conditioned_reason": "No measured role conditioning; inherited manual judgment preserved."
+      },
+      "sources": [
+        {
+          "file": "edits.json",
+          "sha256": "eda90bdae4b11ba9ed1c5cf6d21aefa3d8482ef415fcbaf2904221f6cb62117f",
+          "locator": "players[150]"
+        },
+        {
+          "file": "workbook-full.json",
+          "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "locator": "Draft Board!row152"
+        },
+        {
+          "file": "overrides.json",
+          "sha256": "e29a32c59eb04fb3b3e9a2df21d9f94b736b46ffacd00689057b3cfaf75c5f89",
+          "locator": "Troy Terry"
+        }
+      ]
+    }
+  },
+  {
+    "id": "8479406",
+    "name": "Filip Gustavsson",
+    "context": {
+      "revision": "734ca84cbf8c3c5bb8b52c4f4be50aaeb7304df6b84f9da029f186a7725aa669",
+      "run_id": "9c6ffc26-1e7e-476e-afbc-e8de55f9b0c2",
+      "availability": {
+        "as_of": "2026-09-12",
+        "reason": "Owner-adopted recovery baseline is injured with return undetermined. An exact first-month absence, opening readiness or official LTIR designation is not established. Existing goalie workload remains a conditional projection, unchanged.",
+        "source": {
+          "file": "Manual confirmation by Citrus owner (workbook adoption only): Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Filip Gustavsson; retained player/team notes; not independently verified",
+          "kind": "manual_confirmation",
+          "reference": "Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Filip Gustavsson; retained player/team notes; not independently verified",
+          "adopted_at": "2026-09-12",
+          "reviewed_at": "2026-09-12",
+          "source_date": "2026-09-12",
+          "confirmed_by": "Citrus owner (workbook adoption only)",
+          "review_policy": "Operational freshness deadline, not a predicted recovery date.",
+          "date_semantics": "as_of/source_date are the effective date of owner adoption, not a newly observed injury date or fresh primary reporting",
+          "workbook_sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "confirmation_scope": "owner_adopted_workbook_baseline",
+          "original_report_date": "2026-08-14",
+          "independently_verified": false,
+          "superseded_availability": {
+            "as_of": "2026-09-12",
+            "reason": null,
+            "source": null,
+            "status": "unknown",
+            "authority": "unknown",
+            "review_after": null,
+            "return_window": null
+          },
+          "original_observation_date": null
+        },
+        "status": "injured",
+        "authority": "reviewed_report",
+        "review_after": "2026-09-19",
+        "return_window": null
+      },
+      "role": {
+        "pp": null,
+        "line": null,
+        "notes": "Hip surgery puts season-start availability in doubt. Retain24 starts as manual workload scenario; annotate surgery/uncertain return without second injury deduction. https://www.nhl.com/news/topic/32-in-32/minnesota-wild-three-questions-for-2026-27-season-32-in-32 | Depth-chart context: OFFSEASON HIP SURGERY, questionable opening night",
+        "evidence": [
+          {
+            "name": "Filip Gustavsson",
+            "action": "Retain24 starts as manual workload scenario; annotate surgery/uncertain return without second injury deduction.",
+            "source_url": "https://www.nhl.com/news/topic/32-in-32/minnesota-wild-three-questions-for-2026-27-season-32-in-32",
+            "established": "Hip surgery puts season-start availability in doubt.",
+            "source_date": "2026-08-14",
+            "workbook_conflict": "Exact month-long absence not established by this primary source."
+          }
+        ],
+        "conditioned": false,
+        "not_conditioned_reason": "No measured role conditioning; inherited manual judgment preserved."
+      },
+      "sources": [
+        {
+          "file": "edits.json",
+          "sha256": "eda90bdae4b11ba9ed1c5cf6d21aefa3d8482ef415fcbaf2904221f6cb62117f",
+          "locator": "players[589]"
+        },
+        {
+          "file": "workbook-full.json",
+          "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "locator": "Goalies!row11"
+        }
+      ]
+    }
+  },
+  {
+    "id": "8480873",
+    "name": "Rasmus Sandin",
+    "context": {
+      "revision": "734ca84cbf8c3c5bb8b52c4f4be50aaeb7304df6b84f9da029f186a7725aa669",
+      "run_id": "9c6ffc26-1e7e-476e-afbc-e8de55f9b0c2",
+      "availability": {
+        "as_of": "2026-09-12",
+        "reason": "Owner-adopted working out baseline from retained explicit workbook status/notes. Original injury observation date is not established by the import timestamp; not independently verified. Return timing is undetermined unless separately supported. No official designation verification or fantasy IR eligibility decision is implied.",
+        "source": {
+          "file": "Manual confirmation by Citrus owner (workbook adoption only): Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Rasmus Sandin; retained player/team notes; not independently verified",
+          "kind": "manual_confirmation",
+          "reference": "Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Rasmus Sandin; retained player/team notes; not independently verified",
+          "adopted_at": "2026-09-12",
+          "reviewed_at": "2026-09-12",
+          "source_date": "2026-09-12",
+          "confirmed_by": "Citrus owner (workbook adoption only)",
+          "review_policy": "Operational freshness deadline, not a predicted recovery date.",
+          "date_semantics": "as_of/source_date are the effective date of owner adoption, not a newly observed injury date or fresh primary reporting",
+          "workbook_sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "confirmation_scope": "owner_adopted_workbook_baseline",
+          "original_report_date": "2026-08-31",
+          "independently_verified": false,
+          "superseded_availability": {
+            "as_of": "2026-08-31",
+            "reason": "Recovering from ACL surgery and expected to miss the season opening. Return clearance and remaining-season workload are unknown. The original 73-game prior and unchanged rates remain preserved; no injury-adjusted games or official IR placement is inferred.",
+            "source": {
+              "finding": "Primary reporting establishes recovery and opening absence; return workload unknown.",
+              "evidence": [
+                {
+                  "url": "https://www.nhl.com/news/baggie-day-buzz-latest-news-from-eliminated-nhl-teams-april-20-2026",
+                  "date": "2026-04-22",
+                  "finding": "Capitals announced ACL surgery and a season-opening absence."
+                },
+                {
+                  "url": "https://frontend.d3.nhle.com/news/topic/32-in-32/washington-capitals-three-questions-for-2026-27-season-32-in-32",
+                  "date": "2026-08-31",
+                  "finding": "NHL reports continuing recovery; GM expects training camp assessment to clarify progress. No fixed clearance date."
+                }
+              ]
+            },
+            "status": "out",
+            "authority": "verified",
+            "review_after": null,
+            "return_window": null
+          },
+          "original_observation_date": null
+        },
+        "status": "out",
+        "authority": "reviewed_report",
+        "review_after": "2026-09-19",
+        "return_window": null
+      },
+      "role": {
+        "pp": null,
+        "line": null,
+        "notes": null,
+        "evidence": [],
+        "conditioned": false,
+        "not_conditioned_reason": "Historical/cohort rates; no opening roster or role conditioning."
+      },
+      "sources": [
+        {
+          "file": "directory.json",
+          "sha256": "9bd19e235299218aa3b0c2377da4384026518a341086ddd27157d4286404dc4d",
+          "locator": "player_id=8480873"
+        },
+        {
+          "file": "model.json",
+          "sha256": "25735f88db665c3d57c52937158be7ceccb4f7a49a4d3b6a7346b5a98c858c6c",
+          "locator": "player_id=8480873"
+        },
+        {
+          "file": "/Users/gstorms/.codex/worktrees/8265/citrus/output/canonical-review/fourteen-case-dispositions.json",
+          "sha256": "24c3a282213ee73776c36386c2165d68b0ec8479459d48e83f370adcbcb19888",
+          "locator": "8480873",
+          "evidence": [
+            {
+              "url": "https://www.nhl.com/news/baggie-day-buzz-latest-news-from-eliminated-nhl-teams-april-20-2026",
+              "date": "2026-04-22",
+              "finding": "Capitals announced ACL surgery and a season-opening absence."
+            },
+            {
+              "url": "https://frontend.d3.nhle.com/news/topic/32-in-32/washington-capitals-three-questions-for-2026-27-season-32-in-32",
+              "date": "2026-08-31",
+              "finding": "NHL reports continuing recovery; GM expects training camp assessment to clarify progress. No fixed clearance date."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "8482093",
+    "name": "Seth Jarvis",
+    "context": {
+      "revision": "734ca84cbf8c3c5bb8b52c4f4be50aaeb7304df6b84f9da029f186a7725aa669",
+      "run_id": "9c6ffc26-1e7e-476e-afbc-e8de55f9b0c2",
+      "availability": {
+        "as_of": "2026-09-11",
+        "reason": "The Hurricanes reported an opening-season absence on September 11; return remains uncertain. No single late-October or January return promise is established.",
+        "source": {
+          "url": "https://www.nhl.com/hurricanes/news/jarvis-to-miss-the-start-of-the-season-now-what",
+          "publisher": "Carolina Hurricanes",
+          "reviewed_at": "2026-09-12",
+          "source_date": "2026-09-11",
+          "review_policy": "Seven-day evidence review; not a recovery date.",
+          "superseded_availability": {
+            "as_of": "2026-09-12",
+            "reason": "Expected back: Misses the start, possible return before January",
+            "source": {
+              "file": "workbook-full.json",
+              "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+              "locator": "CAR!row30"
+            },
+            "status": "out",
+            "authority": "imported_scenario",
+            "review_after": null,
+            "return_window": null
+          }
+        },
+        "status": "out",
+        "authority": "reviewed_report",
+        "review_after": "2026-09-18",
+        "return_window": null
+      },
+      "role": {
+        "pp": null,
+        "line": null,
+        "notes": "Shoulder surgery post-Cup, 4-6 months. Misses the start, possible return before January.",
+        "evidence": [],
+        "conditioned": false,
+        "not_conditioned_reason": "No measured role conditioning; inherited manual judgment preserved."
+      },
+      "sources": [
+        {
+          "file": "edits.json",
+          "sha256": "eda90bdae4b11ba9ed1c5cf6d21aefa3d8482ef415fcbaf2904221f6cb62117f",
+          "locator": "players[42]"
+        },
+        {
+          "file": "workbook-full.json",
+          "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "locator": "Draft Board!row44"
+        },
+        {
+          "file": "overrides.json",
+          "sha256": "e29a32c59eb04fb3b3e9a2df21d9f94b736b46ffacd00689057b3cfaf75c5f89",
+          "locator": "Seth Jarvis"
+        }
+      ]
+    }
+  },
+  {
+    "id": "8483512",
+    "name": "Matt Savoie",
+    "context": {
+      "revision": "734ca84cbf8c3c5bb8b52c4f4be50aaeb7304df6b84f9da029f186a7725aa669",
+      "run_id": "9c6ffc26-1e7e-476e-afbc-e8de55f9b0c2",
+      "availability": {
+        "as_of": "2026-09-12",
+        "reason": "Owner-adopted working out baseline from retained explicit workbook status/notes. Original injury observation date is not established by the import timestamp; not independently verified. Return timing is undetermined unless separately supported. No official designation verification or fantasy IR eligibility decision is implied.",
+        "source": {
+          "file": "Manual confirmation by Citrus owner (workbook adoption only): Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Matt Savoie; EDM!row31; not independently verified",
+          "kind": "manual_confirmation",
+          "reference": "Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Matt Savoie; EDM!row31; not independently verified",
+          "adopted_at": "2026-09-12",
+          "reviewed_at": "2026-09-12",
+          "source_date": "2026-09-12",
+          "confirmed_by": "Citrus owner (workbook adoption only)",
+          "review_policy": "Operational freshness deadline, not a predicted recovery date.",
+          "date_semantics": "as_of/source_date are the effective date of owner adoption, not a newly observed injury date or fresh primary reporting",
+          "workbook_sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "confirmation_scope": "owner_adopted_workbook_baseline",
+          "original_report_date": null,
+          "independently_verified": false,
+          "superseded_availability": {
+            "as_of": "2026-09-12",
+            "reason": "Expected back: OUT FOR TRAINING CAMP, projected return around 20 Oct",
+            "source": {
+              "file": "workbook-full.json",
+              "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+              "locator": "EDM!row31"
+            },
+            "status": "out",
+            "authority": "imported_scenario",
+            "review_after": null,
+            "return_window": null
+          },
+          "original_observation_date": null
+        },
+        "status": "out",
+        "authority": "reviewed_report",
+        "review_after": "2026-09-19",
+        "return_window": null
+      },
+      "role": {
+        "pp": null,
+        "line": null,
+        "notes": "Current availability is the owner-adopted working baseline, with return timing undetermined and no independently verified recovery date. Dates in the following retained forecast reasoning are historical assumptions, superseded as current availability promises; numerical allocations remain unchanged. Historical forecast reasoning: RULED OUT FOR TRAINING CAMP, projected return around 20 Oct. Board had him at 83 games, which assumed a full healthy season. Cut to 66.",
+        "evidence": [],
+        "conditioned": false,
+        "not_conditioned_reason": "No measured role conditioning; inherited manual judgment preserved."
+      },
+      "sources": [
+        {
+          "file": "edits.json",
+          "sha256": "eda90bdae4b11ba9ed1c5cf6d21aefa3d8482ef415fcbaf2904221f6cb62117f",
+          "locator": "players[209]"
+        },
+        {
+          "file": "workbook-full.json",
+          "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "locator": "Draft Board!row211"
+        },
+        {
+          "file": "overrides.json",
+          "sha256": "e29a32c59eb04fb3b3e9a2df21d9f94b736b46ffacd00689057b3cfaf75c5f89",
+          "locator": "Matt Savoie"
+        }
+      ]
+    }
+  },
+  {
+    "id": "8484144",
+    "name": "Connor Bedard",
+    "context": {
+      "revision": "734ca84cbf8c3c5bb8b52c4f4be50aaeb7304df6b84f9da029f186a7725aa669",
+      "run_id": "9c6ffc26-1e7e-476e-afbc-e8de55f9b0c2",
+      "availability": {
+        "as_of": "2026-09-12",
+        "reason": "Owner-adopted working out baseline from retained explicit workbook status/notes. Original injury observation date is not established by the import timestamp; not independently verified. Return timing is undetermined unless separately supported. No official designation verification or fantasy IR eligibility decision is implied.",
+        "source": {
+          "file": "Manual confirmation by Citrus owner (workbook adoption only): Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Connor Bedard; CHI!row30; not independently verified",
+          "kind": "manual_confirmation",
+          "reference": "Owner adoption on 2026-09-12 of Citrus-authored workbook baseline; Connor Bedard; CHI!row30; not independently verified",
+          "adopted_at": "2026-09-12",
+          "reviewed_at": "2026-09-12",
+          "source_date": "2026-09-12",
+          "confirmed_by": "Citrus owner (workbook adoption only)",
+          "review_policy": "Operational freshness deadline, not a predicted recovery date.",
+          "date_semantics": "as_of/source_date are the effective date of owner adoption, not a newly observed injury date or fresh primary reporting",
+          "workbook_sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "confirmation_scope": "owner_adopted_workbook_baseline",
+          "original_report_date": null,
+          "independently_verified": false,
+          "superseded_availability": {
+            "as_of": "2026-09-12",
+            "reason": "Expected back: back around November, so roughly 20 games missed",
+            "source": {
+              "file": "workbook-full.json",
+              "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+              "locator": "CHI!row30"
+            },
+            "status": "out",
+            "authority": "imported_scenario",
+            "review_after": null,
+            "return_window": null
+          },
+          "original_observation_date": null
+        },
+        "status": "out",
+        "authority": "reviewed_report",
+        "review_after": "2026-09-19",
+        "return_window": null
+      },
+      "role": {
+        "pp": null,
+        "line": null,
+        "notes": "Current availability is the owner-adopted working baseline, with return timing undetermined and no independently verified recovery date. Dates in the following retained forecast reasoning are historical assumptions, superseded as current availability promises; numerical allocations remain unchanged. Historical forecast reasoning: Shoulder surgery 8 Jul. Reported back around November, so roughly 20 games missed.",
+        "evidence": [],
+        "conditioned": false,
+        "not_conditioned_reason": "No measured role conditioning; inherited manual judgment preserved."
+      },
+      "sources": [
+        {
+          "file": "edits.json",
+          "sha256": "eda90bdae4b11ba9ed1c5cf6d21aefa3d8482ef415fcbaf2904221f6cb62117f",
+          "locator": "players[38]"
+        },
+        {
+          "file": "workbook-full.json",
+          "sha256": "a99f8e4c34ff30efb9e451007205fa3b0ae0862d4e12a21a0315bddccf23974f",
+          "locator": "Draft Board!row40"
+        },
+        {
+          "file": "overrides.json",
+          "sha256": "e29a32c59eb04fb3b3e9a2df21d9f94b736b46ffacd00689057b3cfaf75c5f89",
+          "locator": "Connor Bedard"
+        }
+      ]
+    }
+  }
+]
