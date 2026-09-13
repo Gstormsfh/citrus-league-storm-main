@@ -84,10 +84,13 @@ export class PlayerOutlookService {
     for (const item of items) for (const id of item.player_ids ?? []) {
       const list = byPlayer.get(id) ?? []; list.push(item); byPlayer.set(id, list);
     }
-    return index.players.flatMap(entry => {
+    const notes = index.players.flatMap(entry => {
       const note = this.render(entry, byPlayer.get(entry.id) ?? [], now);
+      if (!note && (entry.projection_season != null || entry.canonical_context?.season != null)) throw new Error(`Incomplete outlook evidence for player ${entry.id}`);
       return note ? [note] : [];
     });
+    if (!notes.length) throw new Error('No published outlook coverage; refusing corpus refresh');
+    return notes;
   }
 
   private async recentNews(now: Date): Promise<EditorialNewsItem[]> {
