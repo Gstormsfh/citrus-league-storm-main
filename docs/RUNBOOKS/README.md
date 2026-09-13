@@ -36,6 +36,7 @@ is muscle memory from a runtime that no longer exists.
 | Recovering from roster / data-pipeline data loss (NOT a draft incident) | [`../EMERGENCY_RUNBOOK.md`](../EMERGENCY_RUNBOOK.md) |
 | Landing a bundle from Claude as a PR (which terminal, the one line, what each failure means) | [`DELIVERY.md`](./DELIVERY.md) |
 | Asking "did CI / the deploy / last night's batch pass?" without a pasted log, or reviewing a weekly prod schema snapshot PR | [`CI_TELEMETRY.md`](./CI_TELEMETRY.md) |
+| Turning on Yahoo / ESPN league history import (the Yahoo developer application, secrets, migrations, what an import job's status means) | [`LEAGUE_IMPORT.md`](./LEAGUE_IMPORT.md) |
 
 The boundary between draft-engine runbooks and `EMERGENCY_RUNBOOK.md` is
 load-bearing. **Draft-engine runbooks** cover the live draft hot path:

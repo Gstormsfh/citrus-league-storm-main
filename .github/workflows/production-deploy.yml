@@ -442,6 +442,10 @@ jobs:
             APPLE_CLIENT_ID=${{ secrets.APPLE_CLIENT_ID }}
             APPLE_CLIENT_SECRET=${{ secrets.APPLE_CLIENT_SECRET }}
             APPLE_TOKEN_ENCRYPTION_KEY=${{ secrets.APPLE_TOKEN_ENCRYPTION_KEY }}
+            YAHOO_CLIENT_ID=${{ secrets.YAHOO_CLIENT_ID }}
+            YAHOO_CLIENT_SECRET=${{ secrets.YAHOO_CLIENT_SECRET }}
+            YAHOO_TOKEN_ENCRYPTION_KEY=${{ secrets.YAHOO_TOKEN_ENCRYPTION_KEY }}
+            YAHOO_REDIRECT_URI=https://citrusfantasysports.com/import/yahoo/callback
             APNS_PRODUCTION=true
             FCM_PROJECT_ID=citrus-fantasy-prod
             DRAFT_WS_HOST=draft.citrusfantasysports.com

@@ -18,6 +18,10 @@ import { NeedsCredentialsError, SourceThrottledError } from '../../import/types'
 import { EspnClient, ESPN_VIEWS, type EspnCredentials } from '../../import/espn/client';
 import { parseEspnSeason, type EspnPlayerInfo } from '../../import/espn/parse';
 import { citrusSeasonToEspn, espnSeasonToCitrus } from '../../import/espn/maps';
+import type { YahooClient } from '../../import/yahoo/client';
+import { parseYahooSeason, mapYahooScoringType, playerIdFromKey, type YahooPlayerInfo } from '../../import/yahoo/parse';
+import { renewToLeagueKey, splitLeagueKey } from '../../import/yahoo/maps';
+import { asList, num, bool, str } from '../../import/yahoo/normalize';
 import { ExternalIdentityService } from './ExternalIdentityService';
 import { PlayerCrosswalkService } from './PlayerCrosswalkService';
 import { TrophyService } from './TrophyService';
@@ -31,7 +35,7 @@ export interface ImportJobRow {
 }
 
 export interface SeasonWriteResult {
-  season: number; members_created: number; teams: number; matchups: number; picks: number; unmatched_players: number; warnings: string[];
+  season: number; members_created: number; teams: number; matchups: number; picks: number; transactions: number; unmatched_players: number; warnings: string[];
 }
 
 export interface EspnRunOptions {
@@ -54,6 +58,38 @@ export interface EspnDiscovery {
   isPublic: boolean | null;
   scoringType: string;
   teamCount: number;
+}
+
+export interface YahooRunOptions {
+  leagueId: string;
+  /** The league_key of whichever season the user picked; the chain is walked from there. */
+  leagueKey: string;
+  requestedBy: string;
+  client: YahooClient;
+  /** The importer's Yahoo guid, from the connection, so their own row is claimed on the spot. */
+  importerGuid?: string | null;
+  /** Citrus start years to import; every season in the chain when omitted. */
+  seasons?: number[];
+}
+
+export interface YahooLeagueSeason {
+  leagueKey: string; leagueId: string; gameId: string; season: number; name: string;
+  isFinished: boolean; scoringType: string; numTeams: number | null; renew: string | null; renewed: string | null;
+}
+
+export interface YahooChain {
+  /** league_key of the newest season; what the client sends back to start an import. */
+  key: string;
+  name: string;
+  latestSeason: number;
+  scoringType: string;
+  numTeams: number | null;
+  seasons: YahooLeagueSeason[];
+}
+
+export interface YahooDiscovery {
+  guid: string | null;
+  chains: YahooChain[];
 }
 
 const JOB_COLUMNS = 'id, league_id, platform, external_league_id, requested_by, status, seasons_discovered, seasons_imported, seasons_needing_credentials, progress, error, started_at, finished_at, created_at';
@@ -125,7 +161,7 @@ export class LeagueImportService {
   ): Promise<SeasonWriteResult> {
     const warnings = [...season.warnings];
     if (opts.locked && (await this.seasonExists(leagueId, season.season))) {
-      return { season: season.season, members_created: 0, teams: 0, matchups: 0, picks: 0, unmatched_players: 0, warnings: [...warnings, 'League history is locked; existing season left untouched.'] };
+      return { season: season.season, members_created: 0, teams: 0, matchups: 0, picks: 0, transactions: 0, unmatched_players: 0, warnings: [...warnings, 'League history is locked; existing season left untouched.'] };
     }
 
     const ids = await this.identity.resolveSeason(leagueId, season, { importerUserId: opts.importerUserId, importerExternalId: opts.importerExternalId ?? null });
@@ -210,6 +246,27 @@ export class LeagueImportService {
       if (error) throw new Error(`league_season_drafts upsert failed: ${error.message}`);
     }
 
+    // league_season_transactions: the dedupe index is an expression index, which
+    // PostgREST's on_conflict cannot target, so a season's rows from this source
+    // are replaced as a set. They are source facts, re-derivable from the raw payload.
+    let transactionRows = 0;
+    if (season.transactions.length) {
+      const txRefs = season.transactions.map((t) => t.player).filter((p): p is ImportedPlayerRef => p != null && Boolean(p.externalPlayerId));
+      const txResolved = txRefs.length ? await this.crosswalk.resolve(season.platform, txRefs, season.season) : new Map();
+      const rows = season.transactions.map((t) => ({
+        league_id: leagueId, season: season.season, occurred_at: t.occurredAt, type: t.type,
+        member_id: memberFor(t.externalTeamId), counterparty_member_id: memberFor(t.counterpartyExternalTeamId),
+        nhl_player_id: t.player ? txResolved.get(t.player.externalPlayerId)?.nhlPlayerId ?? null : null,
+        external_player_id: t.player?.externalPlayerId ?? null, external_player_name: t.player?.name || null,
+        faab_bid: t.faabBid, external_transaction_id: t.externalTransactionId, source: season.platform,
+      }));
+      const { error: dErr } = await this.supabase.from('league_season_transactions').delete().eq('league_id', leagueId).eq('season', season.season).eq('source', season.platform);
+      if (dErr) throw new Error(`league_season_transactions replace failed: ${dErr.message}`);
+      const { error: iErr } = await this.supabase.from('league_season_transactions').insert(rows);
+      if (iErr) throw new Error(`league_season_transactions insert failed: ${iErr.message}`);
+      transactionRows = rows.length;
+    }
+
     // external_league_links
     const { error: lErr } = await this.supabase.from('external_league_links').upsert({
       league_id: leagueId, platform: season.platform, external_league_id: season.externalLeagueId, external_season_key: season.externalSeasonKey,
@@ -218,7 +275,7 @@ export class LeagueImportService {
     }, { onConflict: 'league_id,platform,external_league_id,external_season_key' });
     if (lErr) throw new Error(`external_league_links upsert failed: ${lErr.message}`);
 
-    return { season: season.season, members_created: ids.created, teams: teamRows.length, matchups: matchupRows.length, picks: pickRows.length, unmatched_players: unmatched, warnings };
+    return { season: season.season, members_created: ids.created, teams: teamRows.length, matchups: matchupRows.length, picks: pickRows.length, transactions: transactionRows, unmatched_players: unmatched, warnings };
   }
 
   // ---- ESPN --------------------------------------------------------------------
@@ -338,7 +395,8 @@ export class LeagueImportService {
     } catch (e) {
       const message = (e as Error).message ?? String(e);
       logger.error('[import] espn run failed', { jobId: job.id, message });
-      await this.updateJob(job.id, { status: 'failed', seasons_imported: imported, error: { code: 'IMPORT_FAILED', message }, finished_at: new Date().toISOString() });
+      const credentials = e instanceof NeedsCredentialsError;
+      await this.updateJob(job.id, { status: credentials ? 'needs_credentials' : 'failed', seasons_imported: imported, error: { code: credentials ? 'NEEDS_CREDENTIALS' : 'IMPORT_FAILED', message }, finished_at: new Date().toISOString() });
     }
     return (await this.getJob(job.id))!;
   }
@@ -354,6 +412,234 @@ export class LeagueImportService {
     const { error: uErr } = await this.supabase.from('leagues').update(patch).eq('id', leagueId);
     if (uErr) throw new Error(`leagues update failed: ${uErr.message}`);
   }
+
+  // ---- Yahoo -------------------------------------------------------------------
+
+  /**
+   * Every NHL league the connected Yahoo account has been in, grouped into
+   * chains by renew/renewed so "The Puck Stops Here" shows once with its
+   * eleven seasons rather than eleven times.
+   */
+  async discoverYahoo(client: YahooClient): Promise<YahooDiscovery> {
+    const res = await client.userLeagues();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const content: any = res.content ?? {};
+    const user = asList<any>(content.users)[0] ?? {}; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const guid = str(user.guid);
+    const leagues = new Map<string, YahooLeagueSeason>();
+    for (const game of asList<any>(user.games)) { // eslint-disable-line @typescript-eslint/no-explicit-any
+      if (str(game?.code) && str(game.code) !== 'nhl') continue;
+      for (const l of asList<any>(game?.leagues)) { // eslint-disable-line @typescript-eslint/no-explicit-any
+        const key = str(l?.league_key);
+        const parts = key ? splitLeagueKey(key) : null;
+        const season = num(l?.season) ?? num(game?.season);
+        if (!key || !parts || season == null) continue;
+        leagues.set(key, {
+          leagueKey: key, leagueId: parts.leagueId, gameId: parts.gameId, season, name: str(l.name) ?? 'Untitled league',
+          isFinished: bool(l.is_finished) ?? false, scoringType: mapYahooScoringType(str(l.scoring_type)),
+          numTeams: num(l.num_teams), renew: renewToLeagueKey(l.renew), renewed: renewToLeagueKey(l.renewed),
+        });
+      }
+    }
+    return { guid, chains: chainYahooLeagues(Array.from(leagues.values())) };
+  }
+
+  async runYahoo(opts: YahooRunOptions): Promise<ImportJobRow> {
+    const job = await this.createJob(opts.leagueId, 'yahoo', opts.leagueKey, opts.requestedBy);
+    return this.runYahooJob(job, opts);
+  }
+
+  async startYahoo(opts: YahooRunOptions): Promise<ImportJobRow> {
+    const job = await this.createJob(opts.leagueId, 'yahoo', opts.leagueKey, opts.requestedBy);
+    void this.runYahooJob(job, opts).catch((e) => logger.error('[import] background yahoo job crashed', { jobId: job.id, message: (e as Error).message }));
+    return job;
+  }
+
+  /**
+   * Walk the renew chain from the picked season to the league's first season,
+   * then import every season oldest first: one bundle, one scoreboard per
+   * week, the keeper list, player names for the draft, the transaction log.
+   */
+  async runYahooJob(job: ImportJobRow, opts: YahooRunOptions): Promise<ImportJobRow> {
+    const results: SeasonWriteResult[] = [];
+    const needsCreds: number[] = [];
+    const imported: number[] = [];
+    const locked = await this.isHistoryLocked(opts.leagueId);
+    try {
+      await this.updateJob(job.id, { status: 'discovering', started_at: new Date().toISOString() });
+      const chain = await this.walkYahooChain(job, opts);
+      const wanted = new Set(opts.seasons ?? []);
+      const seasons = chain.filter((s) => !wanted.size || wanted.has(s.season)).sort((a, b) => a.season - b.season);
+      await this.updateJob(job.id, { status: 'importing', seasons_discovered: seasons.map((s) => s.season) });
+
+      for (const s of seasons) {
+        try {
+          const bundle = await opts.client.league(s.leagueKey);
+          await this.storeRawPayload(job.id, opts.leagueId, 'yahoo', bundle.endpoint, s.gameId, bundle.raw);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const league: any = (bundle.content as any)?.league ?? {};
+          const scoringType = mapYahooScoringType(str(league.scoring_type) ?? str(league.settings?.scoring_type));
+          const hasMatchups = scoringType === 'h2h_categories' || scoringType === 'h2h_one_win' || scoringType === 'h2h_points';
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const scoreboards: any[] = [];
+          if (hasMatchups) {
+            const start = num(league.start_week) ?? 1;
+            const end = num(league.end_week) ?? num(league.current_week) ?? start;
+            for (let w = start; w <= end; w++) {
+              const sb = await opts.client.scoreboard(s.leagueKey, w);
+              await this.storeRawPayload(job.id, opts.leagueId, 'yahoo', sb.endpoint, s.gameId, sb.raw);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              scoreboards.push((sb.content as any)?.league ?? {});
+            }
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let keepers: any = undefined;
+          try {
+            const k = await opts.client.keepers(s.leagueKey);
+            await this.storeRawPayload(job.id, opts.leagueId, 'yahoo', k.endpoint, s.gameId, k.raw);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            keepers = (k.content as any)?.league;
+          } catch (e) {
+            if (e instanceof SourceThrottledError) throw e;
+            logger.warn('[import] yahoo keeper list unavailable', { season: s.season, message: (e as Error).message });
+          }
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let transactions: any = undefined;
+          try {
+            const t = await opts.client.transactions(s.leagueKey);
+            await this.storeRawPayload(job.id, opts.leagueId, 'yahoo', t.endpoint, s.gameId, t.raw);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            transactions = (t.content as any)?.league;
+          } catch (e) {
+            if (e instanceof SourceThrottledError) throw e;
+            logger.warn('[import] yahoo transactions unavailable', { season: s.season, message: (e as Error).message });
+          }
+
+          // Draft picks carry only player keys; fetch the names the crosswalk needs.
+          const playerKeys = Array.from(new Set(asList<any>(league.draft_results).map((p) => str(p?.player_key)).filter((k): k is string => Boolean(k)))); // eslint-disable-line @typescript-eslint/no-explicit-any
+          const playersById = new Map<string, YahooPlayerInfo>();
+          if (playerKeys.length) {
+            try {
+              for (const page of await opts.client.players(s.leagueKey, playerKeys)) {
+                await this.storeRawPayload(job.id, opts.leagueId, 'yahoo', page.endpoint, s.gameId, page.raw);
+                for (const p of asList<any>((page.content as any)?.league?.players)) { // eslint-disable-line @typescript-eslint/no-explicit-any
+                  const id = str(p?.player_id) ?? playerIdFromKey(p?.player_key);
+                  if (!id) continue;
+                  playersById.set(id, {
+                    playerId: id, fullName: str(p?.name?.full) ?? '', teamAbbr: str(p?.editorial_team_abbr),
+                    uniformNumber: str(p?.uniform_number), position: str(p?.display_position) ?? str(p?.primary_position),
+                  });
+                }
+              }
+            } catch (e) {
+              if (e instanceof SourceThrottledError) throw e;
+              logger.warn('[import] yahoo player names unavailable', { season: s.season, message: (e as Error).message });
+            }
+          }
+
+          const parsed = parseYahooSeason({ league, scoreboards, keepers, transactions, playersById });
+          const r = await this.writeSeason(opts.leagueId, job.id, parsed, { importerUserId: opts.requestedBy, importerExternalId: opts.importerGuid ?? null, locked });
+          results.push(r);
+          imported.push(s.season);
+          await this.updateJob(job.id, { seasons_imported: imported, progress: { seasons: results } });
+        } catch (e) {
+          if (e instanceof NeedsCredentialsError) {
+            needsCreds.push(s.season);
+            await this.updateJob(job.id, { seasons_needing_credentials: needsCreds });
+            continue;
+          }
+          if (e instanceof SourceThrottledError) {
+            await this.updateJob(job.id, { status: 'partial', seasons_imported: imported, seasons_needing_credentials: needsCreds, error: { code: 'THROTTLED', message: e.message, retry_after_ms: e.retryAfterMs, season: s.season } });
+            return (await this.getJob(job.id))!;
+          }
+          throw e;
+        }
+      }
+
+      await this.updateJob(job.id, { status: 'computing' });
+      await this.trophies.recompute(opts.leagueId, job.id);
+      await this.markFounded(opts.leagueId, imported, 'yahoo');
+
+      const status: ImportJobStatus = imported.length === 0 && needsCreds.length > 0 ? 'needs_credentials' : needsCreds.length > 0 ? 'partial' : 'done';
+      await this.updateJob(job.id, { status, seasons_imported: imported, seasons_needing_credentials: needsCreds, progress: { seasons: results, chain: chain.map((c) => ({ leagueKey: c.leagueKey, season: c.season, name: c.name })) }, finished_at: new Date().toISOString() });
+    } catch (e) {
+      const message = (e as Error).message ?? String(e);
+      logger.error('[import] yahoo run failed', { jobId: job.id, message });
+      const code = e instanceof NeedsCredentialsError ? 'NEEDS_CREDENTIALS' : 'IMPORT_FAILED';
+      await this.updateJob(job.id, { status: e instanceof NeedsCredentialsError ? 'needs_credentials' : 'failed', seasons_imported: imported, error: { code, message }, finished_at: new Date().toISOString() });
+    }
+    return (await this.getJob(job.id))!;
+  }
+
+  /** Every season of the league, oldest first, by following renew backward and renewed forward from the picked key. */
+  private async walkYahooChain(job: ImportJobRow, opts: YahooRunOptions): Promise<YahooLeagueSeason[]> {
+    const seen = new Map<string, YahooLeagueSeason>();
+    const read = async (key: string): Promise<YahooLeagueSeason | null> => {
+      if (seen.has(key)) return seen.get(key)!;
+      const res = await opts.client.leagueMeta(key);
+      const parts = splitLeagueKey(key);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const l: any = (res.content as any)?.league ?? {};
+      const season = num(l.season);
+      if (!parts || season == null) return null;
+      await this.storeRawPayload(job.id, opts.leagueId, 'yahoo', res.endpoint, parts.gameId, res.raw);
+      const row: YahooLeagueSeason = {
+        leagueKey: key, leagueId: parts.leagueId, gameId: parts.gameId, season, name: str(l.name) ?? '',
+        isFinished: bool(l.is_finished) ?? false, scoringType: mapYahooScoringType(str(l.scoring_type)),
+        numTeams: num(l.num_teams), renew: renewToLeagueKey(l.renew), renewed: renewToLeagueKey(l.renewed),
+      };
+      seen.set(key, row);
+      return row;
+    };
+    const start = await read(opts.leagueKey);
+    if (!start) throw new Error(`Yahoo league ${opts.leagueKey} could not be read`);
+    for (let prev = start.renew, hops = 0; prev && hops < 40; hops++) {
+      const row = await read(prev);
+      if (!row) break;
+      prev = row.renew;
+    }
+    for (let next = start.renewed, hops = 0; next && hops < 40; hops++) {
+      const row = await read(next);
+      if (!row) break;
+      next = row.renewed;
+    }
+    return Array.from(seen.values()).sort((a, b) => a.season - b.season);
+  }
+}
+
+/** Group seasons into leagues by their renew/renewed links; newest chain first. */
+export function chainYahooLeagues(leagues: YahooLeagueSeason[]): YahooChain[] {
+  const byKey = new Map(leagues.map((l) => [l.leagueKey, l]));
+  const parent = new Map<string, string>();
+  const find = (k: string): string => {
+    let r = k;
+    while (parent.get(r) && parent.get(r) !== r) r = parent.get(r)!;
+    return r;
+  };
+  const union = (a: string, b: string) => {
+    const ra = find(a), rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  };
+  for (const l of leagues) {
+    parent.set(l.leagueKey, find(l.leagueKey));
+    if (l.renew && byKey.has(l.renew)) union(l.leagueKey, l.renew);
+    if (l.renewed && byKey.has(l.renewed)) union(l.leagueKey, l.renewed);
+  }
+  const groups = new Map<string, YahooLeagueSeason[]>();
+  for (const l of leagues) {
+    const root = find(l.leagueKey);
+    groups.set(root, [...(groups.get(root) ?? []), l]);
+  }
+  return Array.from(groups.values())
+    .map((seasons) => {
+      const sorted = [...seasons].sort((a, b) => a.season - b.season);
+      const latest = sorted[sorted.length - 1];
+      return { key: latest.leagueKey, name: latest.name, latestSeason: latest.season, scoringType: latest.scoringType, numTeams: latest.numTeams, seasons: sorted };
+    })
+    .sort((a, b) => b.latestSeason - a.latestSeason || a.name.localeCompare(b.name));
 }
 
 /** Ids that will need names: every pick and every keeper designation. */
