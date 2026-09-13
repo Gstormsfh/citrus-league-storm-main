@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
-const migration = readFileSync(new URL('../../../supabase/migrations/20260913190000_governed_primary_position_corrections.sql', import.meta.url),'utf8');
+const migration = readFileSync(new URL('../../../supabase/migrations/20260913231943_governed_primary_position_corrections.sql', import.meta.url),'utf8');
 test('reviewed primary survives ingestion, preserves secondary evidence and limits access', async () => {
  const db = new PGlite();
  try {

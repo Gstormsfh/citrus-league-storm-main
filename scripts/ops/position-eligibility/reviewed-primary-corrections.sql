@@ -1,5 +1,6 @@
--- REVIEWED CANDIDATE ONLY: not applied by the propagation change.
--- Requires 20260913190000_governed_primary_position_corrections.sql.
+-- Applied to production 2026-09-13T23:19:49Z; retained as the reviewed operation.
+-- Do not rerun: the preimage gate intentionally rejects already-corrected identities.
+-- Requires 20260913231943_governed_primary_position_corrections.sql.
 -- Verified 2026-09-13. No raw directory, projection or roster UPDATEs.
 BEGIN;
 SET LOCAL lock_timeout='5s';
