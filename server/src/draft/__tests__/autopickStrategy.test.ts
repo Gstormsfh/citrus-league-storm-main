@@ -1,769 +1,119 @@
-// Phase 4.5 chunk 11g.4 step 6c — autopickStrategy unit tests.
-//
-// 5 tests covering:
-//   - selectAutopickPlayer walks the chain in order; first ok wins
-//   - selectAutopickPlayer returns no_eligible_players when every
-//     strategy returns ok:false
-//   - projectionsStrategy picks highest-projected available
-//   - projectionsStrategy excludes already-drafted players
-//   - projectionsStrategy returns no_eligible_players when all
-//     projected players are already drafted
-
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import {
-  selectAutopickPlayer,
-  projectionsStrategy,
-  type AutopickStrategy,
-} from '../autopickStrategy';
+import type { DashboardIndexEntry } from '@citrus/shared';
+import { projectionsStrategy, selectAutopickPlayer } from '../autopickStrategy';
 
-// ── Test helpers ─────────────────────────────────────────────────────
-
-interface MockProjections {
-  drafted: number[];
-  projections: Array<{
-    player_id: number;
-    total_projected_points: number;
-    /** E117: per-game rate — the draft-value ranking's primary input. */
-    avg_points_per_game?: number;
-  }>;
-  /**
-   * E117: prior-season games played per player. Absent players fall
-   * back to DEFAULT_EXPECTED_GAMES (55) inside the strategy.
-   */
-  seasonGames?: Array<{ player_id: number; games_played: number }>;
-  /** AUTOPICK-TRUNCATION-2: simulate a failed player_ros_projections read. */
-  projectionsError?: { message?: string | null };
-  /** E117: simulate a failed player_season_stats read. */
-  seasonStatsError?: { message: string };
-  /**
-   * E118 roster-shape guard: position per player_id, as the
-   * player_directory would report it (C/LW/RW/D/G).
-   */
-  positions?: Record<number, string>;
-  /**
-   * CAPS-INFLATION FIX (2026-08-23): player_directory is a per-season
-   * index — prod carries ~2 rows per player. Setting this to N serves
-   * every directory row N times, which is what the owned-positions
-   * read actually sees in production.
-   */
-  directoryDuplicateSeasons?: number;
-  /** E118: player_ids this team already holds. */
-  teamOwned?: number[];
-  /** E118: league settings.rosterSlots override. */
-  rosterSlots?: Record<string, number>;
-  /** VORP: league settings.teamsCount override (defaults to 12 in the strategy). */
-  teamsCount?: number;
+const index = vi.hoisted(() => vi.fn());
+vi.mock('../../services/PlayerDashboardService', () => ({ PlayerDashboardService: class { getDashboardIndex = index; } }));
+const LEAGUE = 'league';
+const TEAM = 'team';
+const context = { status: 'projected', run_id: 'current', revision: 'r1' };
+function player(id: number, overrides: Partial<DashboardIndexEntry> = {}): DashboardIndexEntry {
+  return { id, team: 'TOR', position: 'C', is_goalie: false,
+    canonical_context: context, projection_run_id: 'current', projection_revision: 'r1',
+    gp: 0, goals: 0, assists: 0, sog: 0, blocks: 0, hits: 0, pim: 0, ppp: 0, shp: 0,
+    wins: 0, saves: 0, shutouts: 0, goals_against: 0,
+    proj_gp: 84, proj_goals: 20, proj_assists: 0, proj_sog: 0, proj_blocks: 0,
+    proj_hits: 0, proj_pim: 0, proj_ppp: 0, proj_shp: 0, proj_plus_minus: 0,
+    ...overrides } as DashboardIndexEntry;
 }
-
-function makeMockSupabase(opts: MockProjections): SupabaseClient {
-  // Two-table mock: from('draft_picks_v2') returns drafted rows;
-  // from('player_ros_projections') returns projection rows. Each
-  // returns a chainable thenable that resolves to { data, error }.
-  const stub: Record<string, unknown> = {};
-  stub.from = (table: string) => {
-    if (table === 'draft_picks_v2') {
-      // E118: the strategy issues TWO reads of this table — the
-      // league-wide drafted set (one .eq) and the team's own picks
-      // (two .eq calls). Count .eq calls to tell them apart.
-      let eqCount = 0;
-      const chain: Record<string, unknown> = {};
-      chain.select = () => chain;
-      chain.eq = () => {
-        eqCount += 1;
-        return chain;
-      };
-      chain.then = (resolve: (val: unknown) => void) => {
-        const data =
-          eqCount >= 2
-            ? (opts.teamOwned ?? []).map((player_id) => ({ player_id }))
-            : opts.drafted.map((player_id) => ({ player_id }));
-        return resolve({ data, error: null });
-      };
-      return chain;
-    }
-    // E118: league roster-slot config.
-    if (table === 'leagues') {
-      const chain: Record<string, unknown> = {};
-      chain.select = () => chain;
-      chain.eq = () => chain;
-      chain.maybeSingle = () =>
-        Promise.resolve({
-          data: {
-            settings: {
-              ...(opts.rosterSlots ? { rosterSlots: opts.rosterSlots } : {}),
-              ...(opts.teamsCount !== undefined ? { teamsCount: opts.teamsCount } : {}),
-            },
-          },
-          error: null,
-        });
-      return chain;
-    }
-    // E118: positions for cap accounting.
-    //
-    // AUTOPICK-TRUNCATION (2026-08-12) — two DIFFERENT query shapes hit
-    // this table and the mock must serve both:
-    //   a) the team's own picks .....  .select().in('player_id', owned)
-    //   b) the board-wide position map .select().order().range()  <- paged
-    //
-    // (b) used to be an unbounded .select() and silently truncated at
-    // PostgREST's 1,000-row default against a 2,035-row table. `range` is
-    // honoured here rather than ignored so the paging loop is genuinely
-    // exercised — a mock that returns everything regardless of range
-    // would pass a loop that pages wrongly.
-    if (table === 'player_directory') {
-      const perPlayer = Object.entries(opts.positions ?? {}).map(([id, pos]) => ({
-        player_id: Number(id),
-        position_code: pos,
-      }));
-      // CAPS-INFLATION FIX (2026-08-23): serve one row per season per
-      // player, like the real per-season directory does.
-      const copies = Math.max(1, opts.directoryDuplicateSeasons ?? 1);
-      const all = perPlayer.flatMap((row) => Array.from({ length: copies }, () => ({ ...row })));
-      const chain: Record<string, unknown> = {};
-      let rangeFrom: number | null = null;
-      let rangeTo = 0;
-      // CAPS-INFLATION FIX (2026-08-23): the owned-positions read filters
-      // with .in('player_id', ownedIds); a mock that ignores the filter
-      // hands the guard every player's rows and silently breaks the cap
-      // accounting the regression test exists to pin. Honour the filter.
-      let inFilter: number[] | null = null;
-      chain.select = () => chain;
-      chain.in = (_col: string, ids: number[]) => {
-        inFilter = ids;
-        return chain;
-      };
-      chain.order = () => chain;
-      chain.range = (from: number, to: number) => {
-        rangeFrom = from;
-        rangeTo = to;
-        return chain;
-      };
-      chain.then = (resolve: (val: unknown) => void) => {
-        const filtered = inFilter === null
-          ? all
-          : all.filter((row) => (inFilter as number[]).includes(row.player_id));
-        return resolve({
-          data: rangeFrom === null ? filtered : filtered.slice(rangeFrom, rangeTo + 1),
-          error: null,
-        });
-      };
-      return chain;
-    }
-    // AUTOPICK-TRUNCATION-2 (2026-08-13) — the projections read is paged
-    // now too. `range` is HONOURED here, not ignored: a mock that returns
-    // the full set regardless of range would happily pass a paging loop
-    // that pages wrongly, which is the entire failure mode being guarded.
-    // See player_directory above for the same reasoning.
-    if (table === 'player_ros_projections') {
-      const all = opts.projections ?? [];
-      const chain: Record<string, unknown> = {};
-      let rangeFrom: number | null = null;
-      let rangeTo = 0;
-      chain.select = () => chain;
-      // Season-sweep 2026-08-24: the strategy now filters .eq('season', …).
-      chain.eq = () => chain;
-      chain.order = () => chain;
-      chain.range = (from: number, to: number) => {
-        rangeFrom = from;
-        rangeTo = to;
-        return chain;
-      };
-      // Faithful to PostgREST: a select with NO range is clamped
-      // server-side at `db-max-rows` (1,000). Returning `all` here
-      // instead would let an unpaged read pass — which is precisely the
-      // hole that let the original bug ship, and which a first cut of
-      // this mock reproduced exactly.
-      chain.then = (resolve: (val: unknown) => void) =>
-        resolve(
-          opts.projectionsError
-            ? { data: null, error: opts.projectionsError }
-            : {
-                data:
-                  rangeFrom === null
-                    ? all.slice(0, 1000)
-                    : all.slice(rangeFrom, rangeTo + 1),
-                error: null,
-              },
-        );
-      return chain;
-    }
-    // E117 draft-value ranking reads prior-season games played.
-    // AUTOPICK-TRUNCATION (2026-08-12) — now paged; see player_directory
-    // above for why range() is honoured rather than ignored. The error
-    // fixture must still short-circuit on the FIRST page, which is what
-    // pins that a read failure degrades to DEFAULT_EXPECTED_GAMES rather
-    // than looping.
-    if (table === 'player_season_stats') {
-      const all = opts.seasonGames ?? [];
-      const chain: Record<string, unknown> = {};
-      let rangeFrom: number | null = null;
-      let rangeTo = 0;
-      chain.select = () => chain;
-      chain.eq = () => chain;
-      chain.order = () => chain;
-      chain.range = (from: number, to: number) => {
-        rangeFrom = from;
-        rangeTo = to;
-        return chain;
-      };
-      chain.then = (resolve: (val: unknown) => void) =>
-        resolve(
-          opts.seasonStatsError
-            ? { data: null, error: opts.seasonStatsError }
-            : {
-                data: rangeFrom === null ? all : all.slice(rangeFrom, rangeTo + 1),
-                error: null,
-              },
-        );
-      return chain;
-    }
-    throw new Error(`unexpected table: ${table}`);
-  };
-  return stub as unknown as SupabaseClient;
+function db(opts: { drafted?: number[]; owned?: number[]; queue?: number[]; scoring?: unknown;
+  caps?: Record<string, number>; error?: string } = {}): SupabaseClient {
+  return { from(table: string) {
+    if (!['leagues', 'draft_picks_v2', 'draft_queues'].includes(table)) throw new Error(`Unexpected legacy read: ${table}`);
+    let team = false;
+    const query = {
+      select: () => query,
+      eq: (key: string) => { if (key === 'team_id') team = true; return query; },
+      order: () => query,
+      maybeSingle: async () => ({ data: { settings: { teamsCount: 12, rosterSlots: opts.caps },
+        scoring_settings: opts.scoring ?? { skater: { goals: 1 } } }, error: opts.error === table ? { message: 'failed' } : null }),
+      then: (resolve: (value: unknown) => void) => resolve({
+        data: (table === 'draft_queues' ? opts.queue ?? [] : team ? opts.owned ?? [] : opts.drafted ?? []).map(player_id => ({ player_id })),
+        error: opts.error === table ? { message: 'failed' } : null }),
+    };
+    return query;
+  } } as unknown as SupabaseClient;
 }
+const run = (supabase = db(), excludePlayerIds?: Set<number>) => projectionsStrategy({ leagueId: LEAGUE, teamId: TEAM, supabase, excludePlayerIds });
+beforeEach(() => index.mockReset());
+function board(players: DashboardIndexEntry[]) { index.mockResolvedValue({ players, error: null }); }
 
-// ── Tests ─────────────────────────────────────────────────────────────
-
-describe('selectAutopickPlayer chain (chunk 11g.4 step 6c)', () => {
-  it('walks the chain in order; first ok:true wins', async () => {
-    const winningStrategy: AutopickStrategy = vi.fn(async () => ({
-      ok: true as const,
-      playerId: 100,
-      source: 'queue',
-    }));
-    const fallbackStrategy: AutopickStrategy = vi.fn(async () => ({
-      ok: true as const,
-      playerId: 200,
-      source: 'draft_value',
-    }));
-
-    const result = await selectAutopickPlayer(
-      { leagueId: 'league-1', teamId: 'team-1', supabase: {} as SupabaseClient },
-      [winningStrategy, fallbackStrategy],
-    );
-
-    expect(result).toEqual({ ok: true, playerId: 100, source: 'queue' });
-    expect(winningStrategy).toHaveBeenCalledTimes(1);
-    expect(fallbackStrategy).not.toHaveBeenCalled();
+describe('published league-scored timeout autopick', () => {
+  it('changes the pick with league weights, including omitted categories being disabled', async () => {
+    board([player(1, { proj_goals: 30, proj_hits: 2 }), player(2, { proj_goals: 2, proj_hits: 100 })]);
+    expect(await run()).toMatchObject({ playerId: 1 });
+    expect(await run(db({ scoring: { skater: { hits: 1 } } }))).toMatchObject({ playerId: 2 });
   });
-
-  it('returns no_eligible_players when every strategy returns ok:false', async () => {
-    const stratA: AutopickStrategy = vi.fn(async () => ({
-      ok: false as const,
-      reason: 'no_eligible_players' as const,
-    }));
-    const stratB: AutopickStrategy = vi.fn(async () => ({
-      ok: false as const,
-      reason: 'no_eligible_players' as const,
-    }));
-
-    const result = await selectAutopickPlayer(
-      { leagueId: 'league-1', teamId: 'team-1', supabase: {} as SupabaseClient },
-      [stratA, stratB],
-    );
-
-    expect(result).toEqual({ ok: false, reason: 'no_eligible_players' });
-    expect(stratA).toHaveBeenCalledTimes(1);
-    expect(stratB).toHaveBeenCalledTimes(1);
+  it('uses the published full workload for a zero-history rookie without a prior-games cap', async () => {
+    board([player(1, { gp: 82, proj_goals: 20 }), player(2, { gp: 0, proj_gp: 84, proj_goals: 21 })]);
+    expect(await run()).toMatchObject({ playerId: 2 });
   });
-});
-
-describe('projectionsStrategy (chunk 11g.4 step 6c)', () => {
-  it('picks the highest-projected available player', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        { player_id: 8478402, total_projected_points: 105.5 }, // McDavid
-        { player_id: 8478420, total_projected_points: 88.2 },
-        { player_id: 8478001, total_projected_points: 60.0 },
-      ],
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    expect(result).toEqual({
-      ok: true,
-      playerId: 8478402,
-      source: 'draft_value',
-    });
+  it('scores goalie season components once, without an extra appearance multiplier or VORP', async () => {
+    board([player(1, { proj_goals: 50 }), player(2, { is_goalie: true, position: 'G', proj_gp: 20,
+      proj_wins: 10, proj_saves: 100, proj_shutouts: 0, proj_goals_against: 20 })]);
+    expect(await run(db({ scoring: { skater: { goals: 1 }, goalie: { wins: 1, saves: 0.2, goals_against: -1 } } }))).toMatchObject({ playerId: 1 });
   });
-
-  it('excludes already-drafted players and picks the next highest', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [8478402], // McDavid drafted
-      projections: [
-        { player_id: 8478402, total_projected_points: 105.5 },
-        { player_id: 8478420, total_projected_points: 88.2 }, // → next
-        { player_id: 8478001, total_projected_points: 60.0 },
-      ],
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    expect(result).toEqual({
-      ok: true,
-      playerId: 8478420,
-      source: 'draft_value',
-    });
+  it('keeps zero and negative forecasts ahead of missing forecasts', async () => {
+    board([player(1, { canonical_context: null, goals: 100 }), player(2, { proj_goals: 5 }), player(3, { proj_gp: 0, proj_goals: 0 })]);
+    const scoring = { skater: { goals: -1 } };
+    expect(await run(db({ scoring }))).toMatchObject({ playerId: 3 });
+    expect(await run(db({ scoring, drafted: [3] }))).toMatchObject({ playerId: 2 });
   });
-
-  it('returns no_eligible_players when every projected player is already drafted', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [8478402, 8478420, 8478001],
-      projections: [
-        { player_id: 8478402, total_projected_points: 105.5 },
-        { player_id: 8478420, total_projected_points: 88.2 },
-        { player_id: 8478001, total_projected_points: 60.0 },
-      ],
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    expect(result).toEqual({ ok: false, reason: 'no_eligible_players' });
+  it('withholds mixed-revision or missing enabled components instead of using benchmark totals', async () => {
+    board([player(1, { projection_revision: 'stale', proj_goals: 500 }), player(2, { proj_hits: null, proj_goals: 999 }), player(3)]);
+    expect(await run(db({ scoring: { skater: { goals: 1, hits: 1 } } }))).toMatchObject({ playerId: 3 });
   });
-
-  // ── E117 draft-value ranking (2026-08-12) ────────────────────────
-  //
-  // Field defect these pin: ordering by `total_projected_points`
-  // collapses to PER-GAME rate in the preseason window (games_remaining
-  // is uniform), which put FOUR goalies — two of them backups — in the
-  // top 12 of the live staging board. Ranking by per-game x expected
-  // games (prior-season GP, capped 82) is what a real draft board does.
-
-  it('E117: ranks by per-game x prior-season games, not per-game alone', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        // Backup goalie: elite per-game rate, third of a season played.
-        { player_id: 900001, total_projected_points: 17.8, avg_points_per_game: 5.9 },
-        // Workhorse forward: lower rate, full season.
-        { player_id: 900002, total_projected_points: 16.0, avg_points_per_game: 5.3 },
-      ],
-      seasonGames: [
-        { player_id: 900001, games_played: 25 }, // 5.9 x 25 = 147.5
-        { player_id: 900002, games_played: 82 }, // 5.3 x 82 = 434.6  ← wins
-      ],
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    expect(result).toEqual({ ok: true, playerId: 900002, source: 'draft_value' });
+  it('uses measured historical order only after forecasts, retaining unprojected rookies', async () => {
+    board([player(1, { canonical_context: null, goals: 10 }), player(2, { canonical_context: null, goals: 0 })]);
+    expect(await run()).toMatchObject({ playerId: 1 });
+    expect(await run(db({ drafted: [1] }))).toMatchObject({ playerId: 2 });
   });
-
-  it('E117: caps expected games at a full 82-game season', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        { player_id: 900003, total_projected_points: 1, avg_points_per_game: 4.0 },
-        { player_id: 900004, total_projected_points: 1, avg_points_per_game: 3.9 },
-      ],
-      seasonGames: [
-        // A corrupt/over-length row must not buy extra value.
-        { player_id: 900004, games_played: 200 }, // capped to 82 → 319.8
-        { player_id: 900003, games_played: 82 }, //             → 328.0 ← wins
-      ],
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    expect(result).toEqual({ ok: true, playerId: 900003, source: 'draft_value' });
+  it('scores measured plus/minus when forecasts are unavailable', async () => {
+    board([player(1, { canonical_context: null, plus_minus: -10 }), player(2, { canonical_context: null, plus_minus: 5 })]);
+    expect(await run(db({ scoring: { skater: { plus_minus: 1 } } }))).toMatchObject({ playerId: 2 });
   });
-
-  // AUTOPICK-TRUNCATION-2 (2026-08-13) — the regression guard.
-  //
-  // `player_ros_projections` is 926 rows on staging, i.e. UNDER
-  // PostgREST's 1,000-row cap, so an unpaged read looks perfectly
-  // healthy there. Prod's copy is 1,361. The obvious pre-draft move —
-  // freshen staging's projections from prod — is exactly what would
-  // have armed the bug, silently and on draft night.
-  //
-  // So this fixture is deliberately 1,200 rows: bigger than the cap,
-  // and the correct answer lives at index 1,150, past it. If the read
-  // ever reverts to unpaged, the mock returns the first 1,000 rows and
-  // the best player is simply not in the board.
-  // AUTOPICK-TRUNCATION-2 (2026-08-13) — the regression guard.
-  //
-  // `player_ros_projections` is 926 rows on staging, i.e. UNDER
-  // PostgREST's 1,000-row cap, so an unpaged read looks perfectly
-  // healthy there. Prod's copy is 1,361. The obvious pre-draft move —
-  // freshen staging's projections from prod — is exactly what would
-  // have armed this bug, silently, on draft night.
-  //
-  // The fixture is deliberately 1,200 rows with the correct answer at
-  // index 1,150, past the cap. Revert the read to unpaged and the mock
-  // hands back only the first 1,000 rows, so the best player is simply
-  // absent from the board and this fails.
-  it('AUTOPICK-TRUNCATION-2: reads past the 1,000-row cap', async () => {
-    const projections = Array.from({ length: 1200 }, (_, i) => ({
-      player_id: 90000 + i,
-      total_projected_points: 10,
-    }));
-    projections[1150] = { player_id: 91150, total_projected_points: 400 };
-
-    const supabase = makeMockSupabase({ drafted: [], projections });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    expect(result).toEqual({
-      ok: true,
-      playerId: 91150,
-      source: 'draft_value',
-    });
+  it('excludes drafted and keeper IDs, deduplicates identities, and excludes teamless players', async () => {
+    board([player(1), player(1), player(2), player(3, { team: ' ' }), player(4)]);
+    expect(await run(db({ drafted: [1] }), new Set([2]))).toMatchObject({ playerId: 4 });
   });
-
-  it('ROOKIE-VALUE FIX (2026-08-23): no prior-season row ranks conservatively, never beats a proven starter on rate alone', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        // Rookie, no season row → conservative legacy value (1). Under the
-        // pre-fix behaviour this was 6.0 × 55 = 330 and prospect goalies
-        // drained the live board (prod, 2026-08-23: nine straight goalie
-        // autopicks after caps exhausted).
-        { player_id: 900005, total_projected_points: 1, avg_points_per_game: 6.0 },
-        // Veteran with a real row → 2.0 x 82 = 164 — must outrank the rookie.
-        { player_id: 900006, total_projected_points: 1, avg_points_per_game: 2.0 },
-      ],
-      seasonGames: [{ player_id: 900006, games_played: 82 }],
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    expect(result).toEqual({ ok: true, playerId: 900006, source: 'draft_value' });
+  it('uses deterministic numeric player-ID ties regardless of index order', async () => {
+    board([player(10), player(2)]);
+    expect(await run()).toMatchObject({ playerId: 2 });
   });
-
-  it('ROOKIE-VALUE FIX: a rookie alone on the board is still ranked and picked, never zeroed', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        { player_id: 900005, total_projected_points: 1, avg_points_per_game: 6.0 },
-      ],
-      seasonGames: [],
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    expect(result).toEqual({ ok: true, playerId: 900005, source: 'draft_value' });
+  it('retains the whole paged dashboard cohort past 1,000 players', async () => {
+    board(Array.from({ length: 1300 }, (_, i) => player(i + 1, { proj_goals: i })));
+    expect(await run()).toMatchObject({ playerId: 1300 });
   });
-
-  it('E117: season-stats read failure degrades to conservative ROS order, still picks', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        { player_id: 900007, total_projected_points: 5, avg_points_per_game: 7.0 },
-        { player_id: 900008, total_projected_points: 9, avg_points_per_game: 3.0 },
-      ],
-      seasonStatsError: { message: 'boom' },
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    // With no durability signal at all, everyone falls back to the
-    // conservative legacy column (never per-game × an assumed 55 games,
-    // which is how prospect goalies used to jump the board) — degraded,
-    // but never stuck (a stuck autopick freezes a draft).
-    expect(result).toEqual({ ok: true, playerId: 900008, source: 'draft_value' });
+  it('honors grouped forward caps and counts an owned identity once', async () => {
+    board([player(1), player(2, { position: 'LW', proj_goals: 100 }), player(3, { position: 'D' })]);
+    expect(await run(db({ owned: [1, 1], drafted: [1], caps: { F: 1, D: 1 } }))).toMatchObject({ playerId: 3 });
+    expect(await run(db({ owned: [1, 1], drafted: [1], caps: { F: 2, D: 1 } }))).toMatchObject({ playerId: 2 });
   });
-
-  it('E117: falls back to total_projected_points when per-game is absent', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        { player_id: 900009, total_projected_points: 42 },
-        { player_id: 900010, total_projected_points: 41 },
-      ],
-      seasonGames: [],
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    expect(result).toEqual({ ok: true, playerId: 900009, source: 'draft_value' });
+  it('uses the best remaining player after all position caps are exhausted', async () => {
+    board([player(1)]);
+    expect(await run(db({ caps: { C: 0 } }))).toMatchObject({ playerId: 1, source: 'draft_value_caps_exhausted' });
   });
-
-  // ── E118 roster-shape guard (2026-08-12) ─────────────────────────
-  //
-  // Value ranking alone is position-blind: a manager who misses every
-  // pick could end up with twelve goalies. These pin the guard that
-  // shapes the roster WITHOUT ever letting the draft stall.
-
-  it('E118: skips a position whose cap this team has already filled', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        { player_id: 700001, total_projected_points: 1, avg_points_per_game: 9.0 }, // G, best
-        { player_id: 700002, total_projected_points: 1, avg_points_per_game: 8.0 }, // C
-      ],
-      seasonGames: [
-        { player_id: 700001, games_played: 82 },
-        { player_id: 700002, games_played: 82 },
-      ],
-      positions: { 700001: 'G', 700002: 'C', 700010: 'G', 700011: 'G' },
-      teamOwned: [700010, 700011], // two goalies already → G cap (2) met
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    expect(result).toEqual({ ok: true, playerId: 700002, source: 'draft_value' });
+  it('preserves explicit queue priority over scoring and caps without reading the dashboard', async () => {
+    expect(await selectAutopickPlayer({ leagueId: LEAGUE, teamId: TEAM, supabase: db({ queue: [2, 1] }) })).toMatchObject({ playerId: 2 });
+    expect(index).not.toHaveBeenCalled();
   });
-
-  it('E118: honours a league-configured rosterSlots cap over the default', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        { player_id: 700003, total_projected_points: 1, avg_points_per_game: 9.0 }, // G
-        { player_id: 700004, total_projected_points: 1, avg_points_per_game: 8.0 }, // D
-      ],
-      seasonGames: [
-        { player_id: 700003, games_played: 82 },
-        { player_id: 700004, games_played: 82 },
-      ],
-      positions: { 700003: 'G', 700004: 'D', 700012: 'G' },
-      teamOwned: [700012], // one goalie
-      rosterSlots: { G: 1, D: 6 }, // league allows only ONE goalie
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    expect(result).toEqual({ ok: true, playerId: 700004, source: 'draft_value' });
+  it.each(['leagues', 'draft_picks_v2'])('does not guess after %s read failure', async error => {
+    board([player(1)]);
+    expect(await run(db({ error }))).toEqual({ ok: false, reason: 'no_eligible_players' });
   });
-
-  it('E118: when every remaining position is capped it still picks (never stalls)', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        { player_id: 700005, total_projected_points: 1, avg_points_per_game: 9.0 },
-        { player_id: 700006, total_projected_points: 1, avg_points_per_game: 8.0 },
-      ],
-      seasonGames: [
-        { player_id: 700005, games_played: 82 },
-        { player_id: 700006, games_played: 82 },
-      ],
-      positions: { 700005: 'G', 700006: 'G', 700013: 'G', 700014: 'G' },
-      teamOwned: [700013, 700014], // G cap met, and only goalies remain
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    // Best available anyway — an unbalanced bench beats a frozen draft.
-    expect(result).toEqual({
-      ok: true,
-      playerId: 700005,
-      source: 'draft_value_caps_exhausted',
-    });
+  it('reports exhaustion and index failure without fabricating a pick', async () => {
+    board([player(1)]);
+    expect(await run(db({ drafted: [1] }))).toEqual({ ok: false, reason: 'no_eligible_players' });
+    index.mockResolvedValue({ players: [], error: new Error('unavailable') });
+    expect(await run()).toEqual({ ok: false, reason: 'no_eligible_players' });
   });
-
-  it('E118: an unknown position code is never blocked', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        { player_id: 700007, total_projected_points: 1, avg_points_per_game: 9.0 },
-      ],
-      seasonGames: [{ player_id: 700007, games_played: 82 }],
-      positions: { 700007: 'XYZ' }, // not in the capped vocabulary
-      teamOwned: [],
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    expect(result).toEqual({ ok: true, playerId: 700007, source: 'draft_value' });
-  });
-
-  it('E118: with an empty roster the best player is still the pick', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        { player_id: 700008, total_projected_points: 1, avg_points_per_game: 9.0 },
-        { player_id: 700009, total_projected_points: 1, avg_points_per_game: 8.0 },
-      ],
-      seasonGames: [
-        { player_id: 700008, games_played: 82 },
-        { player_id: 700009, games_played: 82 },
-      ],
-      positions: { 700008: 'G', 700009: 'C' },
-      teamOwned: [],
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    expect(result).toEqual({ ok: true, playerId: 700008, source: 'draft_value' });
-  });
-
-  it('CAPS-INFLATION FIX (2026-08-23): per-season directory duplicates must not double-count positions toward caps', async () => {
-    // Prod regression (Claude Linear League, 2026-08-23): the directory
-    // carries ~2 season rows per player, so a team holding ONE center
-    // counted as TWO and every cap looked exhausted mid-draft — the guard
-    // fell through to the value board and an ownerless seat drafted eleven
-    // goalies. Setup: cap C=2, team owns ONE center, directory serves TWO
-    // rows per player. The best available is another center: with the
-    // dedupe he MUST be eligible (held 1 < cap 2) and picked; the pre-fix
-    // code counted held=2 and skipped him for the defenseman.
-    const supabase = makeMockSupabase({
-      drafted: [800001],
-      projections: [
-        { player_id: 800002, total_projected_points: 1, avg_points_per_game: 9.0 }, // C — best available
-        { player_id: 800003, total_projected_points: 1, avg_points_per_game: 5.0 }, // D — the wrong pick
-      ],
-      seasonGames: [
-        { player_id: 800002, games_played: 82 },
-        { player_id: 800003, games_played: 82 },
-      ],
-      positions: { 800001: 'C', 800002: 'C', 800003: 'D' },
-      teamOwned: [800001],
-      rosterSlots: { C: 2, D: 4 },
-      directoryDuplicateSeasons: 2,
-    });
-
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-
-    expect(result).toEqual({ ok: true, playerId: 800002, source: 'draft_value' });
+  it('walks custom strategies until the first success', async () => {
+    const last = vi.fn();
+    expect(await selectAutopickPlayer({ leagueId: LEAGUE, teamId: TEAM, supabase: db() }, [
+      async () => ({ ok: false, reason: 'no_eligible_players' }),
+      async () => ({ ok: true, playerId: 8, source: 'test' }), last,
+    ])).toMatchObject({ playerId: 8 });
+    expect(last).not.toHaveBeenCalled();
   });
 });
-
-// ── VORP — positional value adjustment (2026-09-01) ─────────────────
-//
-// Field evidence, first live engine draft: the board drained the entire
-// goalie pool in the opening rounds. Raw season value ranks a workhorse
-// goalie beside the elite centers; what a draft actually prices is value
-// over the best free player at that position once starters are gone
-// (teams × starting slots deep). These tests pin that behavior.
-describe('projectionsStrategy — positional value (VORP)', () => {
-  it('does not open the draft with a goalie run when skaters carry the scarcer edge', async () => {
-    // 2 teams, 1 G slot, 1 C slot. Goalies out-earn centers in raw value
-    // (100/95/90 vs 98/60), but the goalie waterline (index 2 → 90) makes
-    // the elite G worth +10 while the elite C (waterline 60) is worth +38.
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        { player_id: 1, total_projected_points: 100, avg_points_per_game: 0 },
-        { player_id: 2, total_projected_points: 95, avg_points_per_game: 0 },
-        { player_id: 3, total_projected_points: 90, avg_points_per_game: 0 },
-        { player_id: 4, total_projected_points: 98, avg_points_per_game: 0 },
-        { player_id: 5, total_projected_points: 60, avg_points_per_game: 0 },
-      ],
-      positions: { 1: 'G', 2: 'G', 3: 'G', 4: 'C', 5: 'C' },
-      rosterSlots: { C: 1, G: 1 },
-      teamsCount: 2,
-    });
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-    expect(result).toEqual({ ok: true, playerId: 4, source: 'draft_value' });
-  });
-
-  it('honors the league shape — more teams push the waterline deeper and can flip the pick', async () => {
-    // Same pool, but with enough teams the positional waterlines both hit
-    // the tail of their pools; adjustment shrinks toward raw order and the
-    // top raw value (the goalie) is the pick again.
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        { player_id: 1, total_projected_points: 100, avg_points_per_game: 0 },
-        { player_id: 2, total_projected_points: 95, avg_points_per_game: 0 },
-        { player_id: 3, total_projected_points: 90, avg_points_per_game: 0 },
-        { player_id: 4, total_projected_points: 98, avg_points_per_game: 0 },
-        { player_id: 5, total_projected_points: 60, avg_points_per_game: 0 },
-      ],
-      positions: { 1: 'G', 2: 'G', 3: 'G', 4: 'C', 5: 'C' },
-      rosterSlots: { C: 1, G: 1 },
-      teamsCount: 12,
-    });
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-    // With 12 teams both waterline indices exceed their pools and clamp
-    // to each pool's tail (G→90, C→60) — same edges as the 2-team case,
-    // same winner. What this pins: deep-league clamping is safe — the
-    // index math can never run off the board or refuse to rank.
-    expect(result).toEqual({ ok: true, playerId: 4, source: 'draft_value' });
-  });
-
-  it('keeps unknown-position players rankable via the global waterline', async () => {
-    const supabase = makeMockSupabase({
-      drafted: [],
-      projections: [
-        { player_id: 7, total_projected_points: 80, avg_points_per_game: 0 },
-        { player_id: 8, total_projected_points: 50, avg_points_per_game: 0 },
-      ],
-      positions: {}, // directory knows neither player
-      rosterSlots: { C: 1 },
-      teamsCount: 2,
-    });
-    const result = await projectionsStrategy({
-      leagueId: 'league-1',
-      teamId: 'team-1',
-      supabase,
-    });
-    // Both unknown → both adjusted against the same global waterline →
-    // raw order preserved, highest value picked, nothing refuses.
-    expect(result).toEqual({ ok: true, playerId: 7, source: 'draft_value' });
-  });
-});
-
