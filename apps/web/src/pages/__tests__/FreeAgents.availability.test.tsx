@@ -30,10 +30,10 @@ const renderPlayer = (availability = evidence) => render(<table><tbody><tr>{rend
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 describe('Free Agents available-player row current availability', () => {
-  it('shows dated OUT instead of the legacy active flag, with the same eligibility distinction as the modal', () => {
+  it('shows dated OUT instead of the legacy active flag, with the same source provenance as the modal', () => {
     vi.useFakeTimers(); vi.setSystemTime(now);
     renderPlayer();
-    expect(screen.getByText('OUT').getAttribute('aria-label')).toContain('not an IR eligibility decision');
+    expect(screen.getByText('OUT').getAttribute('aria-label')).toContain('Reported status from ESPN');
     expect(screen.queryByText(/^active$/i)).toBeNull();
     expect(screen.getByText('Kevin Fiala')).toBeTruthy();
   });
