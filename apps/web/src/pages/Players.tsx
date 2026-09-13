@@ -318,7 +318,7 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
         </h3>
         {player.proj_fantasy_points == null ? (
           <p className="mt-2 text-sm text-muted-foreground">
-            No projection yet. Projections populate from the nightly pipeline once a player has a season sample.
+            Season totals unavailable. A season-total forecast requires supported production rates and an NHL workload estimate.
           </p>
         ) : (
           <div className="mt-2 space-y-1.5 text-sm">
