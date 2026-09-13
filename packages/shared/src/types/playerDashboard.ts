@@ -42,6 +42,11 @@ export interface CanonicalProjectionContext {
   activated_at: string;
   availability: Record<string, unknown> | null;
   exposure?: Record<string, unknown> | null;
+  /** Conditional rates and opportunity assumptions from this exact published snapshot. */
+  rates?: Record<string, unknown> | null;
+  rate_basis?: Record<string, unknown> | null;
+  opportunity_prior?: Record<string, unknown> | null;
+  exposure_policy?: string | null;
   role: Record<string, unknown> | null;
   sources: unknown[];
   team_notes: unknown;

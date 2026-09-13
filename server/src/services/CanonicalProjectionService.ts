@@ -70,6 +70,8 @@ export class CanonicalProjectionService {
       contexts.set(row.player_id, {
         season: run.season, run_id: run.run_id, revision: run.revision, activated_at: run.activated_at,
         availability: record(p.availability), exposure: record(p.exposure), role: record(p.role),
+        rates: record(p.rates), rate_basis: record(p.rate_basis), opportunity_prior: record(p.opportunity_prior),
+        exposure_policy: typeof p.exposure_policy === 'string' ? p.exposure_policy : null,
         sources: Array.isArray(p.sources) ? p.sources : [],
         team_notes: run.teams?.find(team => team.team === p.team)?.notes ?? null,
         provenance: typeof p.provenance === 'string' ? p.provenance : null,

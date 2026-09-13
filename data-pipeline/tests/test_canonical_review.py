@@ -220,3 +220,134 @@ class OptionalCoverageTests(unittest.TestCase):
             self.assertEqual([b['code'] for b in d['publish_blockers']], ['ROSTER_ROLE_SCENARIOS_NOT_CONFIRMED'])
             s=self.optional('L1');s['player_id']='2';d['teams'][0]['lineup_slots']=[s];rebuild(d);d['revision']=digest(d)
             with self.assertRaises(ContractError):validate(d)
+
+class CanonicalAdditionTests(unittest.TestCase):
+    def setUp(self):
+        self.doc = fixture()
+        self.doc['scope_player_ids'] = ['1']
+        self.doc['revision'] = digest(self.doc)
+        player = deepcopy(self.doc['players'][0])
+        player.update(player_id='8485560', name='Prospect', provenance='DEFAULT', directory_present=True,
+                      rate_policy='preserve_override', issues=['Conditional debut prior; no allocated NHL starts'])
+        player['exposure'].update(used=0, baseline=0)
+        self.addition = {'player': player,
+            'identity_evidence': {'player_id': '8485560', 'name': 'Prospect', 'team': 'AAA',
+                                  'as_of': '2026-09-12', 'url': 'https://www.nhl.com/player/8485560'},
+            'method': 'Measured debut prior, explicit zero NHL workload scenario'}
+        self.patch = {'base_revision': self.doc['revision'], 'reason': 'Reviewed organization prospect',
+                      'evidence': ['Official dated organization report'], 'player_additions': [self.addition]}
+
+    def test_addition_preserves_existing_forecasts_and_crease(self):
+        before = deepcopy(self.doc)
+        result = apply_patch(self.doc, self.patch, now='fixed')
+        self.assertEqual(self.doc, before)
+        self.assertEqual(result['players'][0], before['players'][0])
+        added = result['players'][1]
+        self.assertEqual(added['provenance'], 'DEFAULT')
+        self.assertEqual(added['rates']['saves'], 20)
+        self.assertEqual(added['counts'], {'saves': 0, 'wins': 0})
+        self.assertEqual(result['team_ledger'][0]['starts_delta'], 0)
+        self.assertEqual(result['scope_player_ids'], ['1', '8485560'])
+        self.assertIsNone(result['review_history'][0]['updates'][0]['before'])
+        self.assertFalse(result['contract']['publication_ready'])
+        validate(result)
+
+    def test_duplicate_existing_or_new_identity_is_rejected(self):
+        for pid, repeat in [('1', False), ('8485560', True)]:
+            patch = deepcopy(self.patch)
+            patch['player_additions'][0]['player']['player_id'] = pid
+            if repeat:
+                patch['player_additions'].append(deepcopy(patch['player_additions'][0]))
+            with self.subTest(pid=pid), self.assertRaises(ContractError):
+                apply_patch(self.doc, patch)
+
+    def test_unaudited_or_model_labeled_addition_is_rejected(self):
+        for field, value in [('provenance', 'MODEL'), ('rate_policy', 'refresh_cohort'), ('sources', [])]:
+            patch = deepcopy(self.patch)
+            patch['player_additions'][0]['player'][field] = value
+            with self.subTest(field=field), self.assertRaises(ContractError):
+                apply_patch(self.doc, patch)
+        for field, value in [('team', 'BBB'), ('name', 'Another Player'), ('as_of', '2099-01-01'), ('url', 'file:///tmp/source')]:
+            patch = deepcopy(self.patch)
+            patch['player_additions'][0]['identity_evidence'][field] = value
+            with self.subTest(field=field), self.assertRaises(ContractError):
+                apply_patch(self.doc, patch)
+        patch = deepcopy(self.patch)
+        patch['player_additions'][0]['method'] = ''
+        with self.assertRaises(ContractError):
+            apply_patch(self.doc, patch)
+
+    def test_addition_cannot_overallocate_crease_or_activate_publication(self):
+        self.addition['player']['exposure']['used'] = 1
+        result = apply_patch(self.doc, self.patch)
+        self.assertIn('GOALIE_BUDGET_MISMATCH', [b['code'] for b in result['publish_blockers']])
+        self.assertFalse(result['contract']['publication_ready'])
+
+class OrganizationOpportunityReviewTests(unittest.TestCase):
+    def setUp(self):
+        self.doc = fixture()
+        p = deepcopy(self.doc['players'][0])
+        p.update(player_id='2', name='Prospect', position='C', is_goalie=False,
+                 rates={'goals': .2}, counts=None, status='rates_only', provenance='DEFAULT',
+                 exposure_policy='unallocated', rate_policy='preserve_override')
+        p['exposure'].update(unit='games', used=None, baseline=None, kind='unallocated',
+                             roster_probability=None, probability_semantics='unknown')
+        self.doc['players'].append(p)
+        rebuild(self.doc); self.doc['revision'] = digest(self.doc)
+        self.prior = {'method': '2025_directory_unconditional_transition_v1', 'measured_season': 2025,
+                      'cohort_count': 30, 'prior_nhl_gp_min': 0, 'prior_nhl_gp_max': 0,
+                      'draft_band': '1_to_15', 'unscaled_gp': 20.5, 'cohort_schedule_games': 82,
+                      'pre_cap_gp': 21, 'allocation_factor': .5, 'final_gp': 10.5,
+                      'probability_semantics': 'already_in_exposure', 'as_of': '2026-09-13',
+                      'evidence': [{'url': 'https://www.nhl.com/example', 'date': '2026-09-01'}],
+                      'limitations': 'Descriptive prior, not a confirmed role.'}
+
+    def patch(self, prior=None):
+        return {'base_revision': self.doc['revision'], 'reason': 'Reviewed opportunity scenario',
+                'evidence': ['Official source and unconditional cohort receipt'],
+                'player_updates': [{'player_id': '2', 'changes': {
+                    'status': 'projected', 'exposure': {'used': 10.5, 'kind': 'model_prior',
+                      'roster_probability': None, 'probability_semantics': 'already_in_exposure'},
+                    'exposure_policy': 'organization_prior_remaining',
+                    'opportunity_prior': prior or self.prior}}]}
+
+    def test_review_keeps_rate_and_applies_volume_once(self):
+        result = apply_patch(self.doc, self.patch())
+        p = result['players'][1]
+        self.assertEqual(p['exposure_policy'], 'organization_prior_remaining')
+        self.assertEqual(p['counts']['goals'], 2.1)
+        self.assertEqual(p['rates'], self.doc['players'][1]['rates'])
+        self.assertEqual(result['players'][0], self.doc['players'][0])
+        self.assertEqual(result['review_history'][-1]['updates'][0]['before'], self.doc['players'][1])
+
+    def test_invalid_prior_rejected(self):
+        for key, value in [('cohort_count', 19), ('cohort_count', True), ('measured_season', 2026),
+                           ('prior_nhl_gp_min', 25), ('unscaled_gp', -1), ('allocation_factor', 2),
+                           ('pre_cap_gp', 20.5), ('final_gp', 21), ('as_of', '2099-01-01'),
+                           ('probability_semantics', 'metadata_only'), ('limitations', ''),
+                           ('evidence', [{'url': 'http://example.com', 'date': '2026-09-01'}])]:
+            prior = deepcopy(self.prior); prior[key] = value
+            with self.subTest(key=key), self.assertRaises(ContractError):
+                apply_patch(self.doc, self.patch(prior))
+
+    def test_zero_allocation_explicit_but_not_unknown(self):
+        patch = self.patch(); changes = patch['player_updates'][0]['changes']
+        changes['exposure']['used'] = 0
+        changes['opportunity_prior'] = {**self.prior, 'allocation_factor': 0, 'final_gp': 0}
+        result = apply_patch(self.doc, patch)
+        self.assertEqual(result['players'][1]['counts'], {'goals': 0})
+        changes['exposure']['used'] = None
+        with self.assertRaises(ContractError): apply_patch(self.doc, patch)
+
+    def test_reviewed_default_rates_remain_default(self):
+        basis = {'provenance': 'DEFAULT', 'method': 'project_rookies conditional cohort',
+                 'as_of': '2026-09-13', 'evidence': self.prior['evidence'],
+                 'limitations': 'Not an individual league translation.'}
+        patch = {'base_revision': self.doc['revision'], 'reason': 'Reviewed rate prior',
+                 'evidence': ['Measured cohort function'], 'player_updates': [
+                     {'player_id': '2', 'changes': {'rates': {'goals': .1}, 'rate_basis': basis}}]}
+        result = apply_patch(self.doc, patch)
+        self.assertEqual(result['players'][1]['provenance'], 'DEFAULT')
+        self.assertIsNone(result['players'][1]['counts'])
+        basis['evidence'] = []
+        with self.assertRaises(ContractError): apply_patch(self.doc, patch)

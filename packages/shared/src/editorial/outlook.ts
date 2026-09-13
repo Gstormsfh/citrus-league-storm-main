@@ -9,6 +9,29 @@ const number = (v: unknown): v is number => typeof v === 'number' && Number.isFi
 const f = (v: number, digits = 1) => String(Number(v.toFixed(digits)));
 const seasonName = (v: number) => `${v}-${String(v + 1).slice(-2)}`;
 
+// Published metadata is still untrusted text. Only dated, attributable plain text
+// enters prose; rates remain numbers and are never multiplied into an allocation here.
+const safeText = (value: unknown): string | null => {
+  if (typeof value !== 'string' || value.length > 900 || /[<>\[\]`]|https?:|javascript:|data:|ignore.{0,30}instructions|system\s*(?:prompt|message)|developer\s+message|you are (?:an? |the )?(?:assistant|chatgpt)|output exactly|follow (?:these|my) instructions|guaranteed\s+(?:return|points)/i.test(value)) return null;
+  return value.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim() || null;
+};
+const datedEvidence = (metadata: Record<string, unknown> | null | undefined, now: Date) => {
+  const date = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)
+    && Number.isFinite(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v && v <= now.toISOString().slice(0, 10);
+  if (!metadata || !date(metadata.as_of) || !Array.isArray(metadata.evidence)) return [];
+  const asOf = metadata.as_of;
+  return metadata.evidence.flatMap((item: unknown) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const evidence = item as Record<string, unknown>;
+    if (!date(evidence.date) || evidence.date > asOf || typeof evidence.url !== 'string') return [];
+    try {
+      const url = new URL(evidence.url);
+      return url.protocol === 'https:' && !url.username && !url.password
+        ? [{ url: url.href, as_of: evidence.date }] : [];
+    } catch { return []; }
+  });
+};
+
 /** One evidence-led forecast argument, shared by remote card summaries and
  * persisted season outlooks. Never uses a precomputed default fantasy score.
  * The same facts deliberately produce the same thesis; no name/ID rotation.
@@ -20,7 +43,7 @@ export function seasonOutlookWriteup(
   extras?: WriteupExtras,
 ): PlayerWriteup | null {
   const season = entry.projection_season ?? entry.canonical_context?.season;
-  if (!number(season)) return null;
+  if (!number(season) || !Number.isFinite(now.getTime())) return null;
   const seasonLabel = seasonName(season);
   const start = getSeasonStartDate(season);
   const inSeason = start !== null && now.toISOString().slice(0, 10) >= start;
@@ -30,7 +53,23 @@ export function seasonOutlookWriteup(
   const news = selectEditorialNews(entry, items, now);
   const gp = number(entry.proj_gp) ? entry.proj_gp : null;
   const publication = entry.canonical_context;
-  if (publication?.status === 'projected' && (gp === null || entry.projection_run_id !== publication.run_id || entry.projection_revision !== publication.revision)) return null;
+  if (publication?.status === 'projected' && (publication.season !== season || gp === null || entry.projection_run_id !== publication.run_id || entry.projection_revision !== publication.revision)) return null;
+  const coherent = publication && publication.season === season && canonical.runId && canonical.revision
+    && (entry.projection_run_id == null || entry.projection_run_id === publication.run_id)
+    && (entry.projection_revision == null || entry.projection_revision === publication.revision);
+  const rates = coherent && publication.status === 'rates_only' ? publication.rates : null;
+  const rateKeys = entry.is_goalie ? ['wins', 'saves', 'goals_against'] : ['goals', 'assists', 'shots_on_goal'];
+  const conditionalRates = rates && rateKeys.every(key => number(rates[key])) ? rates : null;
+  const prior = coherent && !entry.is_goalie && publication.status === 'projected'
+    && publication.exposure_policy === 'organization_prior_remaining' ? publication.opportunity_prior : null;
+  const priorEvidence = datedEvidence(prior, now);
+  const priorValid = prior && priorEvidence.length > 0 && safeText(prior.method)
+    && prior.probability_semantics === 'already_in_exposure'
+    && publication?.exposure?.probability_semantics === 'already_in_exposure'
+    && publication.exposure.kind === 'model_prior' && number(prior.final_gp)
+    && number(publication.exposure.used) && Math.abs(prior.final_gp - publication.exposure.used) < 1e-5;
+  if (publication?.exposure_policy === 'organization_prior_remaining' && !priorValid) return null;
+  if (publication?.status === 'rates_only' && gp !== null && gp > 0) return null;
   const allocated = gp !== null && gp > 0;
   const retired = entry.current_affiliation?.status === 'retired';
   const exposureUnit = entry.canonical_context?.exposure?.unit === 'starts' ? 'starts' : 'appearances';
@@ -46,6 +85,18 @@ export function seasonOutlookWriteup(
     summary = `${name} is retired in Citrus's maintained affiliation record. The ${label} outlook therefore has no active playing opportunity to value.`;
     analysis = 'A retained historical or numerical scenario does not establish a return to play. An updated affiliation record and a supported playing commitment would be needed before treating him as an active roster option.';
     anchor = 'an active playing commitment';
+  } else if (!allocated && conditionalRates) {
+    thesis = 'Conditional NHL rates; workload unallocated';
+    summary = `${name}'s published ${seasonLabel} rates are conditional on NHL ${entry.is_goalie ? 'starts' : 'games'}: ${entry.is_goalie
+      ? `${f(conditionalRates.wins as number, 2)} wins, ${f(conditionalRates.saves as number, 2)} saves and ${f(conditionalRates.goals_against as number, 2)} goals against per start`
+      : `${f(conditionalRates.goals as number, 2)} goals, ${f(conditionalRates.assists as number, 2)} assists and ${f(conditionalRates.shots_on_goal as number, 2)} shots on goal per game`}. Citrus has not allocated an NHL workload for ${label}.`;
+    analysis = 'These conditional production estimates describe what participation could yield; they are not season totals or a confirmed NHL role. A supported workload is still needed for a season-total valuation.';
+    anchor = 'a supported NHL workload';
+  } else if (priorValid) {
+    thesis = 'Organization opportunity assumption';
+    summary = `${name}'s ${label} forecast uses ${f(gp!)} expected NHL games from a low-confidence, descriptive organization opportunity assumption. This allocation does not establish a confirmed NHL lineup role.`;
+    analysis = 'Opportunity probability is already included in the workload; conditional production rates are applied once to that volume. The estimate describes a historical prospect cohort, with uncertainty about how well that group represents this player.';
+    anchor = 'the assumed NHL opportunity';
   } else if (!allocated) {
     thesis = 'Opportunity not allocated';
     summary = `${name} needs a path to ${entry.is_goalie ? 'the crease' : 'the NHL lineup'} before there is a useful season-total case. Citrus has not allocated ${label} ${entry.is_goalie ? 'starts' : 'games'} to him.`;
@@ -159,6 +210,7 @@ export function seasonOutlookWriteup(
 
   }
 
+  const conditionalSummary = conditionalRates ? summary : null;
   const status = canonical.availability;
   const unavailable = status && status.authority !== 'imported_scenario' && ['ir', 'ltir', 'out', 'inj', 'injured'].includes(status.status.toLowerCase());
   const statusLabel = status?.status === 'injured' ? 'INJ' : status?.status.toUpperCase();
@@ -199,9 +251,34 @@ export function seasonOutlookWriteup(
     }
   }
   if (unavailable && !summary.includes(`remains ${statusLabel}`)) summary += ` He remains ${statusLabel} in the maintained record (${status.asOf.slice(0, 10)}); return timing is unconfirmed.`;
-  if (typeof extras?.projFp === 'number' && Number.isFinite(extras.projFp) && number(extras?.projGp)) analysis += ` Under this league's configured scoring, the forecast totals ${f(extras.projFp)} fantasy points over ${f(extras.projGp)} ${entry.is_goalie ? 'appearances' : 'games'}.`;
+  if (!retired && news[0]?.kind !== 'retirement' && priorValid) {
+    // Keep the assumption visible even when a dated news event replaces the thesis.
+    if (!summary.includes('organization opportunity assumption')) analysis += ' The workload remains a low-confidence, descriptive organization opportunity assumption, not a confirmed NHL role; opportunity probability is already included.';
+
+  }
+  const review = priorValid ? prior : conditionalRates && datedEvidence(publication?.rate_basis, now).length ? publication?.rate_basis : null;
+  if (!retired && news[0]?.kind !== 'retirement' && review && now.getTime() - Date.parse(review.as_of as string) <= 14 * 86400000) {
+    const notes = safeText(publication?.role?.notes);
+    // Avoid repeating an immutable baseline allocation beside refreshed volume.
+    const constraint = notes?.split(/(?<=[.!?])\s+/).filter(sentence =>
+      !/^(Organization prospect:|Low-confidence NHL opportunity estimate:|Conditional production rates are applied once;)/.test(sentence)).join(' ');
+    if (constraint) analysis += ` Published opportunity review (${review.as_of}): ${constraint}`;
+  }
+  if (conditionalSummary && news[0]?.kind === 'trade-request' && !retired) analysis += ` ${conditionalSummary.replace(`${name}'s`, 'His')}`;
+  if (!conditionalRates && typeof extras?.projFp === 'number' && Number.isFinite(extras.projFp) && number(extras?.projGp)) analysis += ` Under this league's configured scoring, the forecast totals ${f(extras.projFp)} fantasy points over ${f(extras.projGp)} ${entry.is_goalie ? 'appearances' : 'games'}.`;
   const affiliation = entry.current_affiliation;
   if (affiliation && entry.projection_team && entry.team !== entry.projection_team) analysis += ` Current affiliation: ${entry.team || String(affiliation.status ?? 'unconfirmed')}; the retained forecast scenario uses ${entry.projection_team}.`;
+  const extraEvidence = coherent ? [...datedEvidence(publication?.rate_basis, now), ...(priorValid ? priorEvidence : [])] : [];
+  const extraSources = extraEvidence.length ? canonicalEditorialContext(entry, {
+    run_id: publication!.run_id, revision: publication!.revision, sources: extraEvidence,
+  }, now).sources : [];
+  const seenSources = new Set(canonical.sources.map(source => JSON.stringify(source)));
+  const canonicalSources = [...canonical.sources, ...extraSources.filter(source => {
+    const key = JSON.stringify(source);
+    if (seenSources.has(key)) return false;
+    seenSources.add(key);
+    return true;
+  })];
   return {
     headline: `${seasonLabel} Outlook: ${thesis}`, summary, analysis,
     tags: [{ label: `${label} forecast`, tone: 'neutral' }, { label: thesis, tone: unavailable ? 'caution' : 'neutral' }],
@@ -209,7 +286,7 @@ export function seasonOutlookWriteup(
     editorialVersion: CITRUS_EDITORIAL_VERSION,
     sourceContext: { actualsSeason: entry.actuals_season ?? null, projectionSeason: season, indexAsOf: entry.as_of,
       canonicalRevision: entry.canonical_context?.revision, canonicalRunId: entry.canonical_context?.run_id },
-    newsSources: news, canonicalSources: canonical.sources,
+    newsSources: news, canonicalSources,
     availabilityExplanation: canonical.availabilityExplanation,
   };
 }

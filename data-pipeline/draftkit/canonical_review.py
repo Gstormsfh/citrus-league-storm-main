@@ -7,6 +7,7 @@ from datetime import date, datetime, timezone
 from urllib.parse import urlparse
 from hashlib import sha256
 import json
+import re
 from pathlib import Path
 
 from canonical_inputs import VERSION, GOALIE_COLS, SKATER_COLS, number, unique_ids, coverage_blockers, optional_lineup_context, has_evidence
@@ -22,6 +23,86 @@ def strict_number(value, label):
     if type(value) not in (int, float):
         raise ContractError(f'{label}: JSON number required')
     return number(value, label)
+
+
+def dated_evidence(value, as_of, label):
+    if not isinstance(value, list) or not value:
+        raise ContractError(f'{label}: dated source evidence required')
+    for source in value:
+        try:
+            if not isinstance(source['date'], str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', source['date']):
+                raise ValueError()
+            observed = date.fromisoformat(source['date'])
+            url = urlparse(source['url'])
+            valid = observed <= as_of and url.scheme == 'https' and bool(url.hostname) and not url.username and not url.password
+        except (KeyError, TypeError, ValueError):
+            valid = False
+        if not valid:
+            raise ContractError(f'{label}: invalid dated HTTPS evidence')
+
+
+def validate_opportunity_prior(p, document):
+    pid = p['player_id']
+    prior = p.get('opportunity_prior')
+    required = {'method', 'measured_season', 'cohort_count', 'prior_nhl_gp_min', 'prior_nhl_gp_max',
+                'draft_band', 'unscaled_gp', 'cohort_schedule_games', 'pre_cap_gp', 'allocation_factor',
+                'final_gp', 'probability_semantics', 'as_of', 'evidence', 'limitations'}
+    if not isinstance(prior, dict) or set(prior) != required:
+        raise ContractError(f'{pid}: complete opportunity prior required')
+    if (p['is_goalie'] or p['status'] != 'projected' or p['rate_policy'] != 'preserve_override'
+            or p['exposure']['kind'] != 'model_prior'
+            or p['exposure']['probability_semantics'] != 'already_in_exposure'
+            or p['exposure'].get('roster_probability') is not None
+            or prior['probability_semantics'] != 'already_in_exposure'):
+        raise ContractError(f'{pid}: invalid opportunity prior semantics')
+    for k in ('method', 'draft_band', 'limitations'):
+        if not isinstance(prior[k], str) or not prior[k].strip():
+            raise ContractError(f'{pid}: opportunity {k} required')
+    for k in ('measured_season', 'cohort_count', 'prior_nhl_gp_min', 'prior_nhl_gp_max'):
+        if type(prior[k]) is not int:
+            raise ContractError(f'{pid}: opportunity {k} must be integer')
+    if not (1900 <= prior['measured_season'] < document['season'] and prior['cohort_count'] >= 20
+            and 0 <= prior['prior_nhl_gp_min'] <= prior['prior_nhl_gp_max']):
+        raise ContractError(f'{pid}: invalid opportunity cohort')
+    try:
+        if not isinstance(prior['as_of'], str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', prior['as_of']):
+            raise ValueError()
+        observed = date.fromisoformat(prior['as_of'])
+        if observed > date.today():
+            raise ValueError()
+    except (TypeError, ValueError):
+        raise ContractError(f'{pid}: invalid opportunity review date') from None
+    dated_evidence(prior['evidence'], observed, pid)
+    values = {k: strict_number(prior[k], k) for k in
+              ('unscaled_gp', 'cohort_schedule_games', 'pre_cap_gp', 'allocation_factor', 'final_gp')}
+    schedule = document['schedule'][p['team']]
+    if not (values['cohort_schedule_games'] > 0 and 0 <= values['unscaled_gp'] <= values['cohort_schedule_games']
+            and 0 <= values['allocation_factor'] <= 1 and 0 <= values['final_gp'] <= schedule
+            and abs(values['pre_cap_gp'] - values['unscaled_gp'] * schedule / values['cohort_schedule_games']) < 1e-8
+            and abs(values['final_gp'] - values['pre_cap_gp'] * values['allocation_factor']) < 1e-8
+            and abs(values['final_gp'] - strict_number(p['exposure']['used'], 'exposure.used')) < 1e-8):
+        raise ContractError(f'{pid}: opportunity scaling or allocation mismatch')
+
+
+def validate_rate_basis(p):
+    basis = p.get('rate_basis')
+    if basis is None:
+        return
+    if not isinstance(basis, dict) or set(basis) != {'provenance', 'method', 'as_of', 'evidence', 'limitations'}:
+        raise ContractError('Complete reviewed rate basis required')
+    if basis['provenance'] not in {'DEFAULT', 'MODEL'} or basis['provenance'] != p['provenance']:
+        raise ContractError('Reviewed rate provenance mismatch')
+    if any(not isinstance(basis[k], str) or not basis[k].strip() for k in ('method', 'limitations')):
+        raise ContractError('Reviewed rate method and limitations required')
+    try:
+        if not isinstance(basis['as_of'], str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}', basis['as_of']):
+            raise ValueError()
+        observed = date.fromisoformat(basis['as_of'])
+        if observed > date.today():
+            raise ValueError()
+    except (TypeError, ValueError):
+        raise ContractError('Invalid rate review date') from None
+    dated_evidence(basis['evidence'], observed, 'rate basis')
 
 
 def validate(document):
@@ -67,6 +148,8 @@ def validate(document):
             raise ContractError(f'{pid}: unavailable forecast requires source evidence')
         elif p['counts'] is not None or used is not None:
             raise ContractError(f'{pid}: unavailable forecasts must not carry exposure or counts')
+        if 'issues' in p and (not isinstance(p['issues'], list) or any(not ((isinstance(x, str) and x.strip()) or (isinstance(x, dict) and x)) for x in p['issues'])):
+            raise ContractError(f'{pid}: issues must be nonempty evidence records')
         a = p['availability']
         for field in ['as_of', 'reason', 'return_window', 'review_after']:
             if a.get(field) is not None and not isinstance(a[field], str):
@@ -103,8 +186,11 @@ def validate(document):
                     or not provenance_valid
                     or not isinstance(a.get('reason'), str) or not a['reason'].strip()):
                 raise ContractError(f'{pid}: invalid reviewed report provenance or freshness boundary')
-        if p.get('rate_policy') not in {'refresh_model', 'refresh_cohort', 'preserve_override'} or p.get('exposure_policy') not in {'preserve_season_override', 'model_remaining', 'unallocated'}:
+        if p.get('rate_policy') not in {'refresh_model', 'refresh_cohort', 'preserve_override'} or p.get('exposure_policy') not in {'preserve_season_override', 'model_remaining', 'organization_prior_remaining', 'unallocated'}:
             raise ContractError(f'{pid}: explicit refresh policies required')
+        validate_rate_basis(p)
+        if p.get('exposure_policy') == 'organization_prior_remaining':
+            validate_opportunity_prior(p, document)
     teams = [t['team'] for t in document['teams']]
     if len(set(teams)) != len(teams) or set(teams) != set(schedule):
         raise ContractError('Team records must exactly cover schedule')
@@ -141,6 +227,11 @@ def rebuild(document):
             'interpretation': 'Reviewed exposure ledger; publication blockers remain explicit.'})
     document['team_ledger'] = ledger
     document['coverage']['status_counts'] = dict(Counter(p['status'] for p in players))
+    document['coverage']['canonical_players'] = len(players)
+    if 'scope_player_ids' in document:
+        scope = set(document['scope_player_ids'])
+        document['coverage']['current_directory_players'] = len(scope)
+        document['coverage']['directory_covered'] = len(scope & {p['player_id'] for p in players})
     document['publish_blockers'] = coverage_blockers(players, document['teams']) + [
         {'code': 'OVERLAPPING_SKATER_SCENARIOS', 'teams': [t['team'] for t in ledger if t['skater_capacity_delta'] > 1e-8]},
         {'code': 'GOALIE_BUDGET_MISMATCH', 'teams': [t['team'] for t in ledger if abs(t['starts_delta']) > 1e-8]},
@@ -150,7 +241,7 @@ def rebuild(document):
     document['contract']['publication_ready'] = False
 
 
-PLAYER_FIELDS = {'rates', 'exposure', 'availability', 'role', 'status', 'rate_policy', 'exposure_policy', 'team', 'team_assignment'}
+PLAYER_FIELDS = {'rates', 'exposure', 'availability', 'role', 'status', 'rate_policy', 'exposure_policy', 'team', 'team_assignment', 'opportunity_prior', 'rate_basis', 'issues'}
 TEAM_FIELDS = {'notes', 'lineup_slots', 'special_teams', 'snapshot_status'}
 NESTED_FIELDS = {
     'exposure': {'used', 'roster_probability', 'probability_semantics', 'kind'},
@@ -165,10 +256,44 @@ def apply_patch(document, patch, *, now=None):
         raise ContractError('Stale patch: reload the current canonical revision before editing')
     if not isinstance(patch.get('reason'), str) or not patch['reason'].strip() or not isinstance(patch.get('evidence'), list) or not patch['evidence'] or any(not isinstance(e, str) or not e.strip() for e in patch['evidence']):
         raise ContractError('Every review needs a reason and evidence')
-    if set(patch) - {'base_revision', 'reason', 'evidence', 'player_updates', 'team_updates'}:
+    if set(patch) - {'base_revision', 'reason', 'evidence', 'player_updates', 'team_updates', 'player_additions'}:
         raise ContractError('Unsupported patch field')
     result = deepcopy(document)
     history = []
+    known = {p['player_id'] for p in result['players']}
+    for addition in patch.get('player_additions', []):
+        if not isinstance(addition, dict) or set(addition) != {'player', 'identity_evidence', 'method'}:
+            raise ContractError('Player addition requires a player, identity evidence and method')
+        player, identity = deepcopy(addition['player']), addition['identity_evidence']
+        pid = player.get('player_id') if isinstance(player, dict) else None
+        if not isinstance(pid, str) or not pid.isdigit() or int(pid) <= 0 or pid in known:
+            raise ContractError(f'Duplicate or invalid added player ID: {pid}')
+        required = {'name', 'team', 'position', 'is_goalie', 'status', 'provenance', 'rates', 'counts',
+                    'exposure', 'rate_policy', 'exposure_policy', 'availability', 'role', 'sources', 'issues'}
+        if required - set(player) or type(player['is_goalie']) is not bool:
+            raise ContractError(f'{pid}: complete canonical player record required')
+        if not isinstance(identity, dict) or any(identity.get(k) != player.get(k) for k in ('player_id', 'name', 'team')):
+            raise ContractError(f'{pid}: identity evidence must match the player and organization')
+        try:
+            observed = date.fromisoformat(identity['as_of'])
+            url = urlparse(identity['url'])
+            valid_url = (observed <= date.today() and url.scheme == 'https' and bool(url.hostname)
+                         and not url.username and not url.password)
+        except (KeyError, TypeError, ValueError):
+            valid_url = False
+        if not valid_url or not player.get('name') or player.get('team') not in result['schedule']:
+            raise ContractError(f'{pid}: dated identity evidence and scheduled organization required')
+        if (player.get('provenance') not in {'DEFAULT', 'MANUAL'} or
+                player.get('rate_policy') != 'preserve_override' or
+                player.get('exposure_policy') != ('preserve_season_override' if player.get('status') == 'projected' else 'unallocated') or
+                not isinstance(addition['method'], str) or not addition['method'].strip() or
+                not has_evidence(player.get('sources'))):
+            raise ContractError(f'{pid}: addition requires preserved, documented non-MODEL estimates')
+        result['players'].append(player)
+        known.add(pid)
+        if 'scope_player_ids' in result and player.get('directory_present') is True:
+            result['scope_player_ids'] = sorted(set(result['scope_player_ids']) | {pid})
+        history.append({'player_id': pid, 'before': None, 'addition': deepcopy(addition)})
     for field, key, allowed in [('player_updates', 'player_id', PLAYER_FIELDS), ('team_updates', 'team', TEAM_FIELDS)]:
         records = {r[key]: r for r in result['players' if key == 'player_id' else 'teams']}
         seen = set()
@@ -223,9 +348,13 @@ def apply_patch(document, patch, *, now=None):
                     record[name] = deepcopy(value)
             if key == 'player_id' and 'rates' in changes:
                 record['rate_policy'] = 'preserve_override'
-                record['provenance'] = 'MANUAL'
+                if 'rate_basis' in changes:
+                    record['provenance'] = changes['rate_basis'].get('provenance')
+                else:
+                    record['provenance'] = 'MANUAL'
+                    record.pop('rate_basis', None)
             if key == 'player_id' and 'used' in changes.get('exposure', {}):
-                record['exposure_policy'] = 'preserve_season_override'
+                record['exposure_policy'] = changes.get('exposure_policy', 'preserve_season_override')
                 if record['exposure']['used'] is not None:
                     strict_number(record['exposure']['used'], 'exposure.used')
             history.append({key: identity, 'before': before, 'changes': deepcopy(changes)})
