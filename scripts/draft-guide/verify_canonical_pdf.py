@@ -85,6 +85,17 @@ def verify(path, data):
     assert Counter(main) == Counter(projected.keys()), 'Ranked main-board coverage'
     assert Counter(positions) == Counter(p['key'] for p in projected.values() if not p['isGoalie']), 'Position coverage'
     text = norm('\n'.join(page.get_text() for page in doc))
+    focuses = [item for item in manifest['content'] if item['type'] == 'individual-focus']
+    if focuses:
+        assert len({f['key'] for f in focuses}) == len(focuses), 'Repeated individual callout'
+        assert sorted(f['name'] for f in focuses) == manifest['featured'], 'Callout coverage mismatch'
+        for f in focuses:
+            assert f['name'] == players[f['key']]['name'], 'Callout identity mismatch'
+            assert f['name'].upper() in norm(doc[f['page'] - 1].get_text()), 'Callout name missing'
+        for item in manifest['content']:
+            if item['type'] in {'ranking', 'focus'} and item.get('featured'):
+                assert item['featured'] in item['keys'], 'Highlight absent from page table'
+                assert any(f['key'] == item['featured'] and f['page'] == item['page'] for f in focuses), 'Highlight and callout disagree'
     review_pages = [norm(p.get_text()) for p in doc if 'FORECASTS TO REVIEW' in p.get_text()]
     review_text = ' '.join(review_pages)
     for p in unavailable.values():
