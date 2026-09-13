@@ -7,7 +7,7 @@ import type { Player } from '@/services/PlayerService';
 export function assignDepthChart(players: Player[], counts: Record<string, number>) {
   const unique = [...new Map(players.map(p => [p.id, p])).values()];
   const slots = Object.entries(counts).flatMap(([position, count]) =>
-    Array.from({ length: Math.max(0, Math.floor(count)) }, (_, slotIndex) => ({ position, slotIndex })));
+    Array.from({ length: Math.min(unique.length, Math.max(0, Math.floor(count))) }, (_, slotIndex) => ({ position, slotIndex })));
   const pointBound = unique.reduce((sum, p) => sum + Math.abs(Number(p.points) || 0), 0) + 1;
   const weights = slots.map(slot => [
     ...unique.map(p => isEligibleForPosition(p, slot.position)

@@ -983,7 +983,7 @@ export class MatchupService {
     const initCfg = resolveSlotConfig(leagueData?.settings as Record<string, unknown>);
     const slotsNeeded: Record<string, number> = { ...initCfg.slots, UTIL: initCfg.utilCount };
     const slots = Object.entries(slotsNeeded).flatMap(([position, count]) =>
-      Array.from({ length: count }, (_, index) => ({ position,
+      Array.from({ length: Math.min(count, players.length) }, (_, index) => ({ position,
         id: position === 'UTIL' && count === 1 ? 'slot-UTIL' : `slot-${position}-${index + 1}` })));
     const eligiblePlayers = players.map(p => ({ position: p.is_goalie ? 'G' : p.position_code, eligible_positions: p.eligible_positions }));
     const slotAssignments: Record<string, string> = {};

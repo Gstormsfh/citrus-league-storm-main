@@ -21,3 +21,9 @@ describe('draft depth chart eligibility', () => {
     expect(result.bench.map(p => p.id)).toEqual(['center']);
   });
 });
+
+
+it('bounds assignment work by the player pool even with an excessive configured count', () => {
+  const result = assignDepthChart([player('one', 'C', [])], { C: 1_000_000_000 });
+  expect(result.starters.map(s => s.player.id)).toEqual(['one']);
+});
