@@ -19,3 +19,19 @@ export function expectedMatchupProjections<T extends { is_goalie?: boolean }>(
   }
   return { projections, unavailable };
 }
+
+/** Attach an already league-scored, unconditional date row to a saved lineup.
+ * Never rescore or apply goalie exposure here; missing rows clear stale values.
+ */
+export function expectedProjectionFields(
+  player: { isGoalie?: boolean; position: string },
+  projection: { is_goalie?: boolean } | undefined,
+): Pick<import('@/components/matchup/types').MatchupPlayer, 'daily_projection' | 'goalieProjection'> {
+  const goalie = player.isGoalie || player.position === 'G' || player.position === 'Goalie';
+  return {
+    daily_projection: !goalie && projection && !projection.is_goalie
+      ? projection as import('@/components/matchup/types').MatchupPlayer['daily_projection'] : undefined,
+    goalieProjection: goalie && projection?.is_goalie
+      ? projection as import('@/components/matchup/types').MatchupPlayer['goalieProjection'] : undefined,
+  };
+}

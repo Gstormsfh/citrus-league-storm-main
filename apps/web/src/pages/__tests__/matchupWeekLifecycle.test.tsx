@@ -65,6 +65,7 @@ function Harness({ week }: { week: number }) {
     setTimeout, clearTimeout, window: routeWindow,
   });
   const scope = new Proxy({ ...stable.current, loadLifetimeRef, loadingRef, urlLeagueId: 'league', urlWeekId: String(week),
+    resetDate: () => setState(previous => ({ ...previous, SelectedDate: null })),
     selectedMatchupId: null, currentMatchup: state.CurrentMatchup, userTeam: { id: 'home' }, error: state.Error, loading: state.Loading,
   } as Record<string, any>, {
     has: (target, key) => typeof key === 'string' && (key in target || key.endsWith('Ref') || key.startsWith('set')),
