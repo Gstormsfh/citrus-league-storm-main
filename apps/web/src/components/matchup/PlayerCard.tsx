@@ -521,7 +521,13 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
         )}
 
         {/* Daily Points Bar OR Projection Bar - VARSITY SCOREBOARD STYLE - COMPACT */}
-        {!hasGameOnDate && !hasDailyStats ? (
+        {!isInDailyViewMode ? (
+          <div className="player-projection-bar-container">
+            <div className="w-full py-1 text-center font-display text-xs text-white/60 bg-[#1A2A20] backdrop-blur-sm/50 rounded border border-dashed border-pastel-sage/30 italic">
+              Select a day for daily projections
+            </div>
+          </div>
+        ) : !hasGameOnDate && !hasDailyStats ? (
           // CASE 1: NO GAME scheduled for this date AND no daily stats - Show "No game today"
           <div className="player-projection-bar-container">
             <div className="w-full py-1 text-center font-display text-xs text-white/60 bg-[#1A2A20] backdrop-blur-sm/50 rounded border border-dashed border-pastel-sage/30 italic">
