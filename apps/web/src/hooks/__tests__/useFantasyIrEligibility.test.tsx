@@ -23,7 +23,7 @@ describe('live roster IR affordance', () => {
     mock.players = [{ id: 1, availability: availability('out') }]; rerender();
     vi.setSystemTime(new Date('2026-09-18'));
     expect(result.current(player)).toBe(true); // A review reminder is not a clearance.
-    mock.players = [{ id: 1, availability: { ...availability('out'), expires_at: '2026-09-17' } }]; rerender();
+    mock.players = [{ id: 1, availability: { ...availability('out'), valid_until: '2026-09-17' } }]; rerender();
     expect(result.current(player)).toBe(false); // Explicit validity boundary.
   });
 });

@@ -12,6 +12,7 @@ export interface PlayerAvailability {
   /** Governed designation: review reminders do not clear it. */
   maintained?: boolean;
   review_due_at?: string | null;
+  valid_until?: string | null;
   /** Workload scenario, never evidence of a current injury/designation. */
   projection_scenario?: { status: AvailabilityStatus; as_of: string; expires_at: string; stale: boolean } | null;
 }
@@ -55,8 +56,10 @@ export function resolvePlayerAvailability(input: AvailabilityInput, now = Date.n
       const expiresAt = maintained ? (a.valid_until == null ? null : date(a.valid_until)) : reviewAt;
       if (expiresAt !== null && (!Number.isFinite(expiresAt) || expiresAt <= asOf)) return unknown();
       const evidence: PlayerAvailability = { status, basis, as_of: new Date(asOf).toISOString(),
-        expires_at: expiresAt === null ? null : new Date(expiresAt).toISOString(),
-        ...(maintained ? { maintained: true, review_due_at: new Date(reviewAt).toISOString() } : {}),
+        // Keep the legacy review timestamp for older clients; maintained clients
+        // use valid_until as the actual expiry contract.
+        expires_at: new Date(expiresAt ?? reviewAt).toISOString(),
+        ...(maintained ? { maintained: true, review_due_at: new Date(reviewAt).toISOString(), valid_until: expiresAt === null ? null : new Date(expiresAt).toISOString() } : {}),
         source: typeof source.url === 'string' ? source.url : typeof source.file === 'string' ? source.file : null,
         revision: context.revision, stale: expiresAt !== null && now >= expiresAt };
       if (basis === 'projection_scenario') scenario = { status, as_of: evidence.as_of!, expires_at: evidence.expires_at!, stale: evidence.stale };
@@ -82,13 +85,13 @@ export function resolvePlayerAvailability(input: AvailabilityInput, now = Date.n
 /** Re-evaluate cached display evidence at render time without inventing facts. */
 export function currentPlayerAvailability(value: PlayerAvailability | null | undefined, now = Date.now()): PlayerAvailability {
   if (!value) return unknown();
-  const expiresAt = date(value.expires_at);
+  const expiresAt = date(value.maintained ? value.valid_until : value.expires_at);
   const asOf = date(value.as_of);
   const projection_scenario = value.projection_scenario ? { ...value.projection_scenario,
     stale: !Number.isFinite(date(value.projection_scenario.expires_at)) || now >= date(value.projection_scenario.expires_at),
   } : null;
   if (value.status === 'unknown') return { ...value, projection_scenario };
-  const maintained = value.maintained === true && value.basis === 'reviewed_report' && value.expires_at === null;
+  const maintained = value.maintained === true && value.basis === 'reviewed_report' && value.valid_until == null;
   const invalid = (!maintained && (!Number.isFinite(expiresAt) || expiresAt <= asOf)) || !Number.isFinite(asOf) || asOf > now;
   if (invalid || value.basis === 'projection_scenario' || value.basis === 'unknown') return { ...unknown(), projection_scenario };
   return { ...value, projection_scenario, ...(now >= expiresAt ? { status: 'unknown' as const, stale: true } : {}) };

@@ -23,6 +23,8 @@ describe('user-approved fantasy IR eligibility', () => {
   });
   it('a newer explicit clear, expiry, or unreviewed scenario removes eligibility', () => {
     const value = resolvePlayerAvailability({ canonical_context: evidence('out') }, now);
+    expect(value.expires_at).toBe('2026-09-17T00:00:00.000Z'); // Preserve legacy payload compatibility.
+    expect(value.valid_until).toBeNull();
     expect(isFantasyIrEligible(value, Date.parse('2026-09-18'))).toBe(true);
     const expiring = resolvePlayerAvailability({ canonical_context: evidence('out', { valid_until: '2026-09-17' }) }, now);
     expect(isFantasyIrEligible(expiring, Date.parse('2026-09-18'))).toBe(false);
