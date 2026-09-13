@@ -111,6 +111,8 @@ def verify(path, data):
                           rank + (' G' if goalie else ''), fmt(p['games'], 0) if p else '-',
                           fmt(p['fantasyPoints']) if p else '-', (p['source'] or '-') if p else 'UNRESOLVED',
                           (p['line'] or '-') if p else '-', (p['powerPlay'] or '-') if p else '-']
+                if item.get('perGameColumn'):
+                    values.insert(5, fmt(p['pointsPerGame'], 2) if p else '-')
                 assert actual_row == norm(' '.join(values)), ('team rendered score/ID', team['team'], values, actual_row)
             offset += len(slots); slot_count += len(slots)
     if effective:
