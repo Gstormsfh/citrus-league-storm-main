@@ -5,7 +5,7 @@ const mock = vi.hoisted(() => ({ players: [] as Array<{ id: number; availability
 vi.mock('../usePlayerDashboardIndex', () => ({ usePlayerDashboardIndex: () => mock }));
 import { useFantasyIrEligibility } from '../useFantasyIrEligibility';
 const availability = (status: PlayerAvailability['status']): PlayerAvailability => ({ status, basis: 'reviewed_report',
-  as_of: '2026-09-12', expires_at: '2026-09-17', revision: 'current', source: 'Owner-reviewed record', stale: false });
+  as_of: '2026-09-12', expires_at: null, maintained: true, review_due_at: '2026-09-17', revision: 'current', source: 'Owner-reviewed record', stale: false });
 afterEach(() => { vi.useRealTimers(); });
 describe('live roster IR affordance', () => {
   it('enables all four statuses and follows a clear/expiry without remounting or trusting stored flags', () => {
@@ -22,6 +22,8 @@ describe('live roster IR affordance', () => {
     expect(result.current(storedEligible)).toBe(false);
     mock.players = [{ id: 1, availability: availability('out') }]; rerender();
     vi.setSystemTime(new Date('2026-09-18'));
-    expect(result.current(player)).toBe(false);
+    expect(result.current(player)).toBe(true); // A review reminder is not a clearance.
+    mock.players = [{ id: 1, availability: { ...availability('out'), expires_at: '2026-09-17' } }]; rerender();
+    expect(result.current(player)).toBe(false); // Explicit validity boundary.
   });
 });

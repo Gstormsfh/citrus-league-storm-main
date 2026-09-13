@@ -9,6 +9,9 @@ export interface PlayerAvailability {
   source: string | null;
   revision: string | null;
   stale: boolean;
+  /** Governed designation: review reminders do not clear it. */
+  maintained?: boolean;
+  review_due_at?: string | null;
   /** Workload scenario, never evidence of a current injury/designation. */
   projection_scenario?: { status: AvailabilityStatus; as_of: string; expires_at: string; stale: boolean } | null;
 }
@@ -48,9 +51,14 @@ export function resolvePlayerAvailability(input: AvailabilityInput, now = Date.n
     const reviewAt = a.review_after == null ? asOf + (status === 'day_to_day' ? 2 : 7) * DAY : date(a.review_after);
     if (status !== 'unknown' && basis !== 'unknown' && Number.isFinite(asOf) && Number.isFinite(reviewAt) && reviewAt > asOf && asOf <= now) {
       const source = a.source && typeof a.source === 'object' ? a.source as Record<string, unknown> : {};
-      const evidence: PlayerAvailability = { status, basis, as_of: new Date(asOf).toISOString(), expires_at: new Date(reviewAt).toISOString(),
+      const maintained = basis === 'reviewed_report';
+      const expiresAt = maintained ? (a.valid_until == null ? null : date(a.valid_until)) : reviewAt;
+      if (expiresAt !== null && (!Number.isFinite(expiresAt) || expiresAt <= asOf)) return unknown();
+      const evidence: PlayerAvailability = { status, basis, as_of: new Date(asOf).toISOString(),
+        expires_at: expiresAt === null ? null : new Date(expiresAt).toISOString(),
+        ...(maintained ? { maintained: true, review_due_at: new Date(reviewAt).toISOString() } : {}),
         source: typeof source.url === 'string' ? source.url : typeof source.file === 'string' ? source.file : null,
-        revision: context.revision, stale: now >= reviewAt };
+        revision: context.revision, stale: expiresAt !== null && now >= expiresAt };
       if (basis === 'projection_scenario') scenario = { status, as_of: evidence.as_of!, expires_at: evidence.expires_at!, stale: evidence.stale };
       else candidates.push(evidence);
     }
@@ -80,7 +88,8 @@ export function currentPlayerAvailability(value: PlayerAvailability | null | und
     stale: !Number.isFinite(date(value.projection_scenario.expires_at)) || now >= date(value.projection_scenario.expires_at),
   } : null;
   if (value.status === 'unknown') return { ...value, projection_scenario };
-  const invalid = !Number.isFinite(expiresAt) || !Number.isFinite(asOf) || asOf > now || expiresAt <= asOf;
+  const maintained = value.maintained === true && value.basis === 'reviewed_report' && value.expires_at === null;
+  const invalid = (!maintained && (!Number.isFinite(expiresAt) || expiresAt <= asOf)) || !Number.isFinite(asOf) || asOf > now;
   if (invalid || value.basis === 'projection_scenario' || value.basis === 'unknown') return { ...unknown(), projection_scenario };
   return { ...value, projection_scenario, ...(now >= expiresAt ? { status: 'unknown' as const, stale: true } : {}) };
 }
@@ -94,7 +103,7 @@ export function availabilityDescription(value: PlayerAvailability): string {
   }
   const basis = value.basis === 'projection_scenario' ? 'Reviewed projection availability scenario; not an official roster designation'
     : value.basis === 'reviewed_report' ? 'Reviewed status report' : 'Reported status from ESPN';
-  return `${labels[value.status]}. ${basis}. As of ${value.as_of?.slice(0, 10)}; review due ${value.expires_at?.slice(0, 10)}.${value.source ? ` Source: ${value.source}.` : ''}`;
+  return `${labels[value.status]}. ${basis}. As of ${value.as_of?.slice(0, 10)}; review due ${(value.review_due_at ?? value.expires_at)?.slice(0, 10)}.${value.source ? ` Source: ${value.source}.` : ''}`;
 }
 
 /** User-approved fantasy policy: fresh owner/reviewed or reported IR, LTIR,

@@ -21,12 +21,13 @@ describe('dynamic card status and affiliation context', () => {
     expect(screen.getByText(/Owner updated the injury explanation/)).toBeTruthy();
     expect(screen.getByRole('region').textContent).toContain('Return timing is unconfirmed');
   });
-  it('does not resurrect an expired injury explanation', () => {
+  it('does not resurrect an review-due injury explanation', () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-20'));
     const availability = resolvePlayerAvailability({ canonical_context: context });
     render(<PlayerAvailabilityDetails playerId="123" name="Example Player" context={context} availability={availability} />);
-    expect(screen.getByRole('region').textContent).toContain('current availability is unknown');
-    expect(screen.getByRole('region').textContent).not.toContain('upper-body injury');
+    expect(screen.getByRole('region').textContent).toContain('maintained designation has not been cleared');
+    expect(screen.getByRole('region').textContent).toContain('Fantasy IR: eligible');
+    expect(screen.getByRole('region').textContent).toContain('upper-body injury');
   });
   it('keeps retirement, unknown club and projection scenario distinct', () => {
     const view = render(<PlayerAffiliationDetails affiliation={{ status: 'retired', team: null, authority: 'official_transaction' }} projectionTeam="FA" />);

@@ -18,9 +18,9 @@ describe('complete owner-maintained injury baseline, September 12', () => {
       expect(result.analysis, player.name).not.toContain('note: Current availability');
     }
   });
-  it('expires old evidence and reflects a changed published reason without changing code or rates', () => {
+  it('retains a designation past its review reminder and reflects a changed published reason without changing code or rates', () => {
     const player = ownerSet[0];
-    expect(canonicalEditorialContext(player, player.context, new Date('2026-09-20')).availabilityExplanation).toBeUndefined();
+    expect(canonicalEditorialContext(player, player.context, new Date('2026-09-20')).availabilityExplanation).toContain('maintained designation has not been cleared');
     const context = structuredClone(player.context);
     context.revision = 'new-publication';
     context.availability.reason = 'Owner updated the working injury context; return timing remains unknown.';

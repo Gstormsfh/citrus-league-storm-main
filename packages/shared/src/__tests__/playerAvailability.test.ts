@@ -36,9 +36,11 @@ describe('dated availability display contract', () => {
   it('does not resurrect older injury after newer evidence expires', () => {
     expect(resolvePlayerAvailability({ canonical_context: context(reviewed), roster_status: 'ACT', roster_status_source: 'espn-injuries', roster_status_updated_at: '2026-09-11' }, now)).toMatchObject({ status: 'unknown', stale: true, basis: 'reported_status' });
   });
-  it('expires cached evidence to unknown at the boundary, never recovery', () => {
+  it('review reminders retain designation; explicit validity boundaries expire to unknown', () => {
     const value = resolvePlayerAvailability({ canonical_context: context(reviewed) }, now);
-    expect(currentPlayerAvailability(value, Date.parse('2026-09-17')).status).toBe('unknown');
+    expect(currentPlayerAvailability(value, Date.parse('2026-09-17')).status).toBe('out');
+    const expiring = resolvePlayerAvailability({ canonical_context: context({ ...reviewed, valid_until: '2026-09-17' }) }, now);
+    expect(currentPlayerAvailability(expiring, Date.parse('2026-09-17')).status).toBe('unknown');
     expect(currentPlayerAvailability(value, Date.parse('2026-09-16')).status).toBe('out');
   });
   it.each([{ as_of: '2026-09-13' }, { as_of: 'bad' }, { review_after: 'bad' }, { review_after: '2026-09-09' }])('rejects future or malformed evidence %j', (invalid) => {

@@ -8,6 +8,11 @@ const evidence = (status: string, extra = {}) => ({ revision: 'current', availab
 describe('user-approved fantasy IR eligibility', () => {
   it('all 13 current owner/reviewed injury cards qualify under the new policy', () => {
     expect(fixtures).toHaveLength(13);
+    for (const player of fixtures) {
+      const afterReview = Date.parse('2026-10-01');
+      const status = resolvePlayerAvailability({ canonical_context: player.context as unknown as CanonicalProjectionContext }, afterReview);
+      expect(isFantasyIrEligible(status, afterReview), player.name).toBe(true);
+    }
     for (const player of fixtures) expect(isFantasyIrEligible(resolvePlayerAvailability({ canonical_context: player.context as unknown as CanonicalProjectionContext }, now), now), player.name).toBe(true);
   });
   it.each(['ir', 'IR', 'ltir', 'LTIR', 'out', 'OUT', 'injured', 'INJ'])('%s qualifies from current reviewed evidence', status => {
@@ -18,7 +23,9 @@ describe('user-approved fantasy IR eligibility', () => {
   });
   it('a newer explicit clear, expiry, or unreviewed scenario removes eligibility', () => {
     const value = resolvePlayerAvailability({ canonical_context: evidence('out') }, now);
-    expect(isFantasyIrEligible(value, Date.parse('2026-09-18'))).toBe(false);
+    expect(isFantasyIrEligible(value, Date.parse('2026-09-18'))).toBe(true);
+    const expiring = resolvePlayerAvailability({ canonical_context: evidence('out', { valid_until: '2026-09-17' }) }, now);
+    expect(isFantasyIrEligible(expiring, Date.parse('2026-09-18'))).toBe(false);
     expect(isFantasyIrEligible(resolvePlayerAvailability({ canonical_context: evidence('healthy') }, now), now)).toBe(false);
     expect(isFantasyIrEligible(resolvePlayerAvailability({ canonical_context: evidence('out', { authority: 'imported_scenario' }) }, now), now)).toBe(false);
   });

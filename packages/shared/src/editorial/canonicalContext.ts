@@ -120,7 +120,13 @@ export function canonicalEditorialContext(
   if (availability) {
     const provenance = source(availability.source);
     if (provenance) retain([provenance]);
-    const date = freshDate(availability.as_of, availability.review_after, now);
+    const maintained = availability.authority === 'reviewed_report';
+    const observed = Date.parse(String(availability.as_of));
+    const until = availability.valid_until == null ? null : Date.parse(String(availability.valid_until));
+    const date = maintained && Number.isFinite(observed) && observed <= now.getTime()
+      && (until === null || Number.isFinite(until) && until > now.getTime())
+      ? new Date(observed).toISOString().slice(0, 10)
+      : maintained ? null : freshDate(availability.as_of, availability.review_after, now);
     const status = typeof availability.status === 'string' && Object.prototype.hasOwnProperty.call(STATUS, availability.status) ? STATUS[availability.status] : null;
     const reason = text(availability.reason, 1400);
     const reasonSafe = availability.reason == null || reason !== null;
@@ -137,6 +143,7 @@ export function canonicalEditorialContext(
         if (historical) summaries.push(`Historical workload assumption, not a current recovery forecast: ${historical}`);
         summaries.push('Return timing is unconfirmed. Current IR, LTIR, OUT and INJ status qualifies for fantasy IR slots.');
       }
+      if (maintained && typeof availability.review_after === 'string' && Date.parse(availability.review_after) <= now.getTime()) summaries.push(`Review due since ${availability.review_after.slice(0, 10)}; the maintained designation has not been cleared.`);
       result.availabilityExplanation = summaries.join(' ');
       result.availability = { status: String(availability.status), authority: reviewed ? 'reviewed_report' : scenario ? 'imported_scenario' : 'verified', asOf: new Date(String(availability.as_of)).toISOString() };
     }
