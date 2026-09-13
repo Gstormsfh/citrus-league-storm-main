@@ -68,3 +68,11 @@ it('keeps maintained retirement decisive after its news report expires', () => {
  expect(result.summary+result.analysis).not.toContain('path to the crease');
  expect(result.headline).toContain('Playing opportunity withdrawn');
 });
+
+it('does not mistake a short current-season slice for a thin NHL history', () => {
+ const entry={...base,actuals_season:2026,gp:3,points:4};
+ const result=seasonOutlookWriteup(entry,[],new Date('2026-10-05'))!;
+ expect(result.headline).toContain('Playmaking');
+ expect(result.summary).toContain('rest-of-season');
+ expect(result.summary).not.toMatch(/opportunity bet|too thin/);
+});

@@ -57,7 +57,7 @@ export function seasonOutlookWriteup(
       analysis = 'The supplied NHL record does not establish a dependable rate. A confirmed roster place and usable workload are the missing inputs for a season-total valuation.';
     }
     anchor = 'access to a roster role';
-  } else if (!historical && !entry.is_goalie) {
+  } else if (!historical && entry.actuals_season !== season && !entry.is_goalie) {
     thesis = 'Opportunity ahead of NHL evidence';
     summary = `${name} is an opportunity bet: the available NHL record is too thin to validate the ${label} forecast. The working plan gives him ${f(gp)} games, so earning and keeping a lineup place carries more weight than a precise scoring pace.`;
     analysis = entry.canonical_context?.role?.pp === 'PP2'
