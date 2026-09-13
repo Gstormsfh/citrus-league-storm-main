@@ -1,3 +1,4 @@
+import { isEligibleForPosition, playerEligiblePositionsLabel } from '@citrus/shared';
 import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 import { actualsSeasonLabel, actualsCohortLabel } from '@citrus/shared';
 import { summarizeWeeklyProjection, weeklyPointsLabel, weeklyProjectionOrder, weeklyExposureLabel, freeAgentMatchupWeek } from '@/components/freeagents/weeklyProjection';
@@ -1120,13 +1121,7 @@ const FreeAgents = () => {
       const matchesSearch = player.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             player.team.toLowerCase().includes(searchQuery.toLowerCase());
       
-      // Normalize player position for comparison
-      const normalizedPlayerPos = formatPositionForDisplay(player.position);
-      
-      const matchesPosition = positionFilter === 'ALL' ||
-        (positionFilter === 'W' ? (normalizedPlayerPos === 'LW' || normalizedPlayerPos === 'RW') :
-         positionFilter === 'F' ? (normalizedPlayerPos === 'C' || normalizedPlayerPos === 'LW' || normalizedPlayerPos === 'RW') :
-         normalizedPlayerPos === positionFilter);
+      const matchesPosition = isEligibleForPosition(player, positionFilter);
 
       return matchesSearch && matchesPosition;
     });
@@ -1519,14 +1514,7 @@ const FreeAgents = () => {
     const q = searchQuery.toLowerCase();
     return scheduleMaximizers
       .filter((p) => {
-        const pos = formatPositionForDisplay(p.position);
-        const okPos =
-          positionFilter === 'ALL' ||
-          (positionFilter === 'W'
-            ? pos === 'LW' || pos === 'RW'
-            : positionFilter === 'F'
-              ? pos === 'C' || pos === 'LW' || pos === 'RW'
-              : pos === positionFilter);
+        const okPos = isEligibleForPosition(p, positionFilter);
         const okSearch = !q || p.full_name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q);
         return okPos && okSearch;
       })
@@ -1918,7 +1906,7 @@ const FreeAgents = () => {
                                     </div>
                                   </div>
                                 </TableCell>
-                                <TableCell className="text-right">{formatPositionForDisplay(player.position)}</TableCell>
+                                <TableCell className="text-right">{playerEligiblePositionsLabel(player, leaguePosType)}</TableCell>
                                 <TableCell className="text-right font-bold text-green-600">
                                   {player.adds.toLocaleString()}
                                 </TableCell>
@@ -2044,7 +2032,7 @@ const FreeAgents = () => {
                                     </div>
                                   </div>
                                 </TableCell>
-                                <TableCell className="text-right">{formatPositionForDisplay(player.position)}</TableCell>
+                                <TableCell className="text-right">{playerEligiblePositionsLabel(player, leaguePosType)}</TableCell>
                                 <TableCell className="text-center">
                                   {player.games && player.games.length > 0 ? (
                                     <div className="flex justify-center gap-1">
@@ -2311,7 +2299,7 @@ const FreeAgents = () => {
                                       </div>
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-right text-sm whitespace-nowrap">{formatPositionForDisplay(player.position)}</TableCell>
+                                  <TableCell className="text-right text-sm whitespace-nowrap">{playerEligiblePositionsLabel(player, leaguePosType)}</TableCell>
                                   <TableCell className="text-right text-sm whitespace-nowrap">{player.team}</TableCell>
                                   <TableCell className="text-right text-sm whitespace-nowrap">{player.games_played || 0}</TableCell>
                                   {/* Skater Stats - only render for skaters */}
@@ -2468,11 +2456,7 @@ const FreeAgents = () => {
                       {(() => {
                         // Filter by position first
                         const positionFiltered = scheduleMaximizers.filter(player => {
-                          const normalizedPos = formatPositionForDisplay(player.position);
-                          return positionFilter === 'ALL' ||
-                            (positionFilter === 'W' ? (normalizedPos === 'LW' || normalizedPos === 'RW') :
-                             positionFilter === 'F' ? (normalizedPos === 'C' || normalizedPos === 'LW' || normalizedPos === 'RW') :
-                             normalizedPos === positionFilter);
+                          return isEligibleForPosition(player, positionFilter);
                         });
                         
                         // Sort by weekly projection (highest first) by default.
@@ -2538,7 +2522,7 @@ const FreeAgents = () => {
                                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                                    isGoalie ? 'bg-pastel-orange/20 text-pastel-orange-soft' : 'bg-pastel-sage/20 text-pastel-sage-soft'
                                  }`}>
-                                   {formatPositionForDisplay(player.position)}
+                                   {playerEligiblePositionsLabel(player, leaguePosType)}
                                  </span>
                                </TableCell>
                                <TableCell className="text-center">
@@ -2650,11 +2634,7 @@ const FreeAgents = () => {
                  {/* Schedule tab: count + infinite scroll sentinel */}
                  {(() => {
                    const totalSchedule = scheduleMaximizers.filter(player => {
-                     const normalizedPos = formatPositionForDisplay(player.position);
-                     return positionFilter === 'ALL' ||
-                       (positionFilter === 'W' ? (normalizedPos === 'LW' || normalizedPos === 'RW') :
-                        positionFilter === 'F' ? (normalizedPos === 'C' || normalizedPos === 'LW' || normalizedPos === 'RW') :
-                        normalizedPos === positionFilter);
+                     return isEligibleForPosition(player, positionFilter);
                    }).length;
                    return (
                      <>
@@ -2847,7 +2827,7 @@ const FreeAgents = () => {
                                 </Badge>
                               </div>
                             </TableCell>
-                            <TableCell className="text-right text-sm whitespace-nowrap">{formatPositionForDisplay(player.position)}</TableCell>
+                            <TableCell className="text-right text-sm whitespace-nowrap">{playerEligiblePositionsLabel(player, leaguePosType)}</TableCell>
                             <TableCell className="text-right text-sm whitespace-nowrap">{player.team}</TableCell>
                             <TableCell className="text-right text-sm whitespace-nowrap">{player.games_played || 0}</TableCell>
                             {/* Skater Stats - only render for skaters */}

@@ -1,3 +1,4 @@
+import { playerEligiblePositions } from '@citrus/shared';
 import { scoreProjectedStats } from '@citrus/shared/leagueProjection';
 import { scoreEarnedWeek } from '@/utils/matchupEarnedStats';
 // NOTE: Direct Supabase usage removed — all DB queries now go through matchupApi (3-tier architecture)
@@ -1122,6 +1123,7 @@ export const MatchupService = {
       id: p.id,
       name: p.full_name,
       position: p.position,
+      eligible_positions: playerEligiblePositions(p),
       number: parseInt(p.jersey_number || '0'),
       starter: false, // Will be determined by lineup
       availability: p.availability,
@@ -1364,6 +1366,7 @@ export const MatchupService = {
         id: typeof player.id === 'string' ? parseInt(player.id) || 0 : player.id || 0,
         name: player.name,
         position: player.position,
+        eligible_positions: playerEligiblePositions(player),
         team: teamAbbrev,
         image: player.image || undefined,
         points: fantasyPoints,
@@ -1517,6 +1520,7 @@ export const MatchupService = {
         id: typeof player.id === 'string' ? parseInt(player.id) || 0 : player.id || 0,
         name: player.name,
         position: player.position,
+        eligible_positions: playerEligiblePositions(player),
         team: teamAbbrev,
         image: player.image || undefined,
         points: 0, // Matchup points start at 0

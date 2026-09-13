@@ -333,3 +333,10 @@ describe('BestBallService.triggerServerOptimization', () => {
     expect(result.error).toContain('Function not found');
   });
 });
+
+it('keeps primary C eligible even when transported secondary evidence contains only LW', () => {
+  const result = BestBallService.optimizeLineup([
+    { player_id: 'dual', position: 'C', eligible_positions: ['LW'], points: 20, is_goalie: false },
+  ], [{ slot: 'C', label: 'Center', count: 1 }]);
+  expect(result.starters).toEqual(['dual']);
+});

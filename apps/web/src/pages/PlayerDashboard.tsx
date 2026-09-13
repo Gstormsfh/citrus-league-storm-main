@@ -1,3 +1,4 @@
+import { playerEligiblePositionsLabel } from '@citrus/shared';
 import { PlayerAffiliationDetails } from '@/components/player/PlayerAffiliationDetails';
 import { PlayerAvailabilityDetails } from '@/components/player/PlayerAvailabilityDetails';
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
@@ -741,7 +742,7 @@ export default function PlayerDashboard() {
   const heroIdentity: HeroIdentity = {
     name: identity?.name ?? `NHL #${playerId}`,
     eyebrow: identity
-      ? `${identity.position} · ${identity.team}${activeSeason != null ? ` · ${seasonLabel(activeSeason)}` : ''}`
+      ? `${playerEligiblePositionsLabel(identity)} · ${identity.team}${activeSeason != null ? ` · ${seasonLabel(activeSeason)}` : ''}`
       : `Not in the ${activeSeason != null ? seasonLabel(activeSeason) : 'current'} directory`,
     jersey: identity?.jersey ?? null,
   };

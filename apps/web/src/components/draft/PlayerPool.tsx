@@ -1,3 +1,4 @@
+import { isEligibleForPosition } from '@citrus/shared';
 import { rankDraftCandidates } from './draftDecision';
 import { useState, useMemo, useRef, useEffect, memo } from 'react';
 import { Card } from '@/components/ui/card';
@@ -128,13 +129,7 @@ const EMPTY_SIGNALS: ReadonlyMap<string, QualitySignal> = new Map();
 const EMPTY_PROJECTIONS: Map<string, DraftProjection> = new Map();
 
 // Normalize position (L -> LW, R -> RW)
-const normalizePosition = (pos: string): string => {
-  if (!pos) return '';
-  const upper = pos.toUpperCase();
-  if (upper === 'L' || upper === 'LEFT' || upper === 'LEFTWING') return 'LW';
-  if (upper === 'R' || upper === 'RIGHT' || upper === 'RIGHTWING') return 'RW';
-  return upper;
-};
+
 
 export const PlayerPool = memo(({
   positionType = 'individual',
@@ -296,15 +291,11 @@ export const PlayerPool = memo(({
 
   const filteredAndSortedPlayers = useMemo(() => {
     const lowerSearch = debouncedSearch.toLowerCase();
-    const normalizedFilterPos = normalizePosition(selectedPosition);
 
     const filtered = availablePlayers.filter(player => {
       const matchesSearch = player.full_name.toLowerCase().includes(lowerSearch) ||
                            player.team.toLowerCase().includes(lowerSearch);
-      const normalizedPlayerPos = normalizePosition(player.position);
-      const matchesPosition = selectedPosition === 'All' ||
-        normalizedPlayerPos === normalizedFilterPos ||
-        (selectedPosition === 'F' && ['C', 'LW', 'RW'].includes(normalizedPlayerPos));
+      const matchesPosition = isEligibleForPosition(player, selectedPosition);
       const isDrafted = draftedSet.has(player.id);
       const matchesDraftStatus = showDrafted ? true : !isDrafted;
       const matchesQueue = !queuedOnly || queue.includes(player.id);

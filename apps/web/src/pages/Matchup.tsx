@@ -1,3 +1,4 @@
+import { playerEligiblePositions } from '@citrus/shared';
 import { useMatchupRouteLifetime } from '@/hooks/useMatchupRouteLifetime';
 import { expectedDailyProjection } from '@citrus/shared';
 import { expectedMatchupProjections } from '@/utils/matchupExpectedProjections';
@@ -1142,6 +1143,7 @@ const Matchup = () => {
       id: p.id.toString(),
       name: p.name,
       position: p.position,
+      eligible_positions: playerEligiblePositions(p),
       number: 0,
       starter: p.isStarter,
       stats: {
@@ -3381,6 +3383,7 @@ const Matchup = () => {
         id: p.id as number,
         name: p.full_name || p.name || '',
         position: p.position,
+        eligible_positions: playerEligiblePositions(p),
         team: p.team || '',
         teamAbbreviation: p.team_abbreviation || p.team || '',
         points: p.fantasy_points || 0,
@@ -4299,6 +4302,7 @@ const Matchup = () => {
                   id: p.id as number,
                   name: p.full_name || p.name || '',
                   position: p.position,
+                  eligible_positions: playerEligiblePositions(p),
                   team: p.team || '',
                   teamAbbreviation: p.team_abbreviation || p.team || '',
                   points: p.fantasy_points || 0,
@@ -4378,6 +4382,7 @@ const Matchup = () => {
                     id: Number(entry.player_id),
                     name: entry.player_name,
                     position: entry.player_position || '',
+                    eligible_positions: playerEligiblePositions({ position: entry.player_position, eligible_positions: entry.eligible_positions }),
                     team: entry.player_team || '',
                     teamAbbreviation: entry.player_team_abbreviation || entry.player_team || '',
                     points: 0,
@@ -4433,6 +4438,7 @@ const Matchup = () => {
                     id: Number(entry.player_id),
                     name: entry.player_name,
                     position: entry.player_position || '',
+                    eligible_positions: playerEligiblePositions({ position: entry.player_position, eligible_positions: entry.eligible_positions }),
                     team: entry.player_team || '',
                     teamAbbreviation: entry.player_team_abbreviation || entry.player_team || '',
                     points: 0,
@@ -4645,6 +4651,7 @@ const Matchup = () => {
                 id: Number(entry.player_id),
                 name: entry.player_name,
                 position: entry.player_position || '',
+                eligible_positions: playerEligiblePositions({ position: entry.player_position, eligible_positions: entry.eligible_positions }),
                 team: entry.player_team || '',
                 teamAbbreviation: entry.player_team_abbreviation || entry.player_team || '',
                 points: 0, total_points: 0,

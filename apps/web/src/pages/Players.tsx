@@ -1,3 +1,4 @@
+import { isEligibleForPosition, playerEligiblePositionsLabel } from '@citrus/shared';
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { citrusNoteContext } from '@/utils/sourceSeasonContext';
 import { OutlookSources } from '@/components/player/OutlookSources';
@@ -178,7 +179,7 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
         <div className="min-w-0">
           <h2 className="truncate text-xl font-bold">{player.name}</h2>
           <p className="text-sm text-muted-foreground">
-            #{player.jersey ?? '-'} · {player.position} · {player.team}
+            #{player.jersey ?? '-'} · {playerEligiblePositionsLabel(player)} · {player.team}
           </p>
           {player.xg_rating && (
             <Badge variant="secondary" className="mt-1.5">
@@ -413,7 +414,7 @@ const Players = () => {
     return players.filter((p) => {
       if (group === 'skaters' ? p.is_goalie : !p.is_goalie) return false;
       if (team !== 'ALL' && p.team !== team) return false;
-      if (position !== 'ALL' && p.position !== position) return false;
+      if (!isEligibleForPosition(p, position)) return false;
       if (q && !p.name.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -633,7 +634,7 @@ const Players = () => {
                             <div className="min-w-0 max-w-[160px]">
                               <div className="truncate font-medium">{p.name}</div>
                               <div className="text-xs text-muted-foreground">
-                                {p.team} · #{p.jersey ?? '-'} · {p.position}
+                                {p.team} · #{p.jersey ?? '-'} · {playerEligiblePositionsLabel(p)}
                               </div>
                             </div>
                             {/* The row itself still SELECTS (the panel beside

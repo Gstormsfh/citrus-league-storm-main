@@ -1,3 +1,4 @@
+import { isEligibleForPosition } from '@citrus/shared';
 /**
  * SETTINGS-ENFORCEMENT (2026-08-16) — pure league-rule resolvers.
  *
@@ -126,9 +127,9 @@ export function validateSlotAssignments(
     // slot (forward-family leagues) accepts C/LW/RW.
     const eligible = eligibleById?.[playerId];
     if (eligible && eligible.length > 0) {
-      const isGoalieOnly = eligible.every((e) => e === 'G');
+      const fits = isEligibleForPosition({ eligible_positions: eligible }, pos);
       if (pos === 'UTIL') {
-        if (isGoalieOnly) {
+        if (!fits) {
           return {
             ok: false,
             strip,
@@ -136,14 +137,14 @@ export function validateSlotAssignments(
           };
         }
       } else if (pos === 'F') {
-        if (!eligible.some((e) => e === 'C' || e === 'LW' || e === 'RW' || e === 'F')) {
+        if (!fits) {
           return {
             ok: false,
             strip,
             error: `A ${eligible.join('/')} player cannot fill forward slot ${slotId}.`,
           };
         }
-      } else if (!eligible.includes(pos)) {
+      } else if (!fits) {
         return {
           ok: false,
           strip,

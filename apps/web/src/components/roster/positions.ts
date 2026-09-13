@@ -1,3 +1,4 @@
+import { playerEligiblePositions } from '@citrus/shared';
 /**
  * A player's own positions, for every roster row that names them (2026-09-03,
  * WORLD_CLASS_READINESS gap A: multi-position eligibility).
@@ -21,15 +22,7 @@ type Positioned = Pick<HockeyPlayer, 'position' | 'eligible_positions'>;
 
 /** Every position the player may start at, as chip keys, primary first: ['C'] or ['C', 'LW']. */
 export function playerPositions(p: Positioned, positionType: PositionType = 'individual'): string[] {
-  const out: string[] = [];
-  const push = (raw: string | null | undefined) => {
-    const key = positionChipKey(raw, positionType);
-    // UTIL is a slot, never a position a player holds.
-    if (key && key !== 'UTIL' && !out.includes(key)) out.push(key);
-  };
-  push(p.position);
-  for (const e of p.eligible_positions ?? []) push(e);
-  return out;
+  return [...new Set(playerEligiblePositions(p).map(raw => positionChipKey(raw, positionType)))];
 }
 
 /** "C/LW" for a player who can start at two positions, "C" for everyone else. */

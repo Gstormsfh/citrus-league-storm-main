@@ -25,3 +25,9 @@ describe('commissioner roster settings and legacy assignments', () => {
     expect(repairSlotAssignments([player(1, 'C')], {}, 'individual', { C: 2 }, new Set(['slot-C-1']))).toEqual({ 1: 'slot-C-2' });
   });
 });
+
+
+it('retains the primary when secondaries omit it, and rejects unknown utility evidence', () => {
+  expect(repairSlotAssignments([{ id: 1, position: 'C', eligible_positions: ['LW'] }], {}, 'individual', { C: 1, LW: 0, RW: 0, D: 0, G: 0, UTIL: 0 })).toEqual({ 1: 'slot-C-1' });
+  expect(repairSlotAssignments([{ id: 1, position: '' }], {}, 'individual', { C: 0, LW: 0, RW: 0, D: 0, G: 0, UTIL: 1 })).toEqual({});
+});

@@ -74,3 +74,8 @@ describe('V2 shared dashboard preload', () => {
     expect(current.is_ir_eligible).toBe(false);
     expect({ ...current, availability: undefined }).toEqual(baseline);
   });
+
+
+it('retains the primary when the dashboard supplies secondary positions only', () => {
+  expect(dashboardEntryToPreloadedPlayer(entry({ eligible_positions: ['LW'] })).eligible_positions).toEqual(['C', 'LW']);
+});

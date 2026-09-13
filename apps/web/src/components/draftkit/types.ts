@@ -34,6 +34,7 @@ export interface DraftKitCard {
   name: string;
   team: string;
   position: string;
+  eligible_positions?: string[];
   cohort: Cohort;
   jersey: number | null;
   headshotUrl: string | null;

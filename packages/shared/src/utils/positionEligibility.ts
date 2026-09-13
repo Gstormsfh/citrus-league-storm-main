@@ -1,30 +1,7 @@
-/**
- * POSITION ELIGIBILITY (2026-09-03): the one reader for
- * `player_directory.eligible_positions`.
- *
- * THE COLUMN IS TEXT, NOT AN ARRAY. Migration 20260301000000 added it as a
- * comma-separated string ("C,LW", primary first) and
- * scripts/utilities/sync_rosters.py writes it that way. The web client has
- * always split it (usePreloadedPlayers.ts, apps/web BestBallService.ts). The
- * server typed the same cell `string[]` and called `.map` on it
- * (LineupService.saveLineup, PlayerService.buildPlayer). For every player
- * whose cell is non-null that is a TypeError on a string, and in the lineup
- * save the surrounding catch then failed the WHOLE position map open. Read on
- * 2026-09-03: staging 787 of 2,035 directory rows non-null, production 797 of
- * 1,909. The 2026-08-23 position-match fix was therefore live only for the
- * players with a NULL cell and silently off for the rest.
- *
- * Contract, so both sides agree:
- *   - accepts the text form, an array (test fixtures; a future text[] column),
- *     or null/undefined;
- *   - trims, upper-cases, dedupes, drops blanks; folds the NHL boxscore codes
- *     L and R to LW and RW;
- *   - the listed primary position (`position_code`) is ALWAYS included and
- *     comes first. The sync ranks positions by games played and can leave the
- *     API's listed position out entirely: 13 staging rows and 9 production
- *     rows carry a single eligible position that differs from position_code.
- *     Without the union those players would be refused their own slot;
- *   - nothing usable gives [], and every caller fails OPEN on [].
+/** Shared reader for directory CSV evidence and transported eligibility arrays.
+ * Includes the listed primary, normalizes aliases, and keeps goalie/skater
+ * families separate. Empty evidence stays empty; each caller owns its policy
+ * for missing identity data.
  */
 
 /** What a `player_directory.eligible_positions` cell may arrive as. */
@@ -38,33 +15,87 @@ export interface PlayerDirectoryEligibilityRow {
   eligible_positions: EligiblePositionsRaw;
 }
 
-const BOXSCORE_CODES: Record<string, string> = { L: 'LW', R: 'RW' };
+const POSITION_ALIASES: Record<string, string> = {
+  L: 'LW', LEFT: 'LW', LEFTWING: 'LW', 'LEFT WING': 'LW',
+  R: 'RW', RIGHT: 'RW', RIGHTWING: 'RW', 'RIGHT WING': 'RW',
+  CENTER: 'C', CENTRE: 'C', DEFENSE: 'D', DEFENCE: 'D',
+  DEFENSEMAN: 'D', DEFENCEMAN: 'D', GOALIE: 'G', GOALTENDER: 'G', FORWARD: 'F',
+};
+const POSITIONS = new Set(['C', 'LW', 'RW', 'D', 'G', 'F']);
 
-function positionCode(raw: unknown): string {
+/** A player position, never a lineup slot such as UTIL, BN or IR. */
+export function normalizeHockeyPosition(raw: unknown): string {
   if (typeof raw !== 'string') return '';
-  const code = raw.trim().toUpperCase();
-  return BOXSCORE_CODES[code] ?? code;
+  const value = raw.trim().toUpperCase();
+  const code = POSITION_ALIASES[value] ?? value;
+  return POSITIONS.has(code) ? code : '';
 }
 
-/**
- * Every position the player may start at, primary first: ['C'] or ['C', 'LW'].
- */
-export function parseEligiblePositions(raw: EligiblePositionsRaw, primary?: string | null): string[] {
+/** Normalize existing evidence, without earning or granting new positions. */
+export function parseEligiblePositions(raw: unknown, primary?: unknown): string[] {
   const out: string[] = [];
   const push = (value: unknown) => {
-    const code = positionCode(value);
+    const code = normalizeHockeyPosition(value);
     if (code && !out.includes(code)) out.push(code);
   };
   push(primary);
-  if (typeof raw === 'string') {
-    for (const part of raw.split(',')) push(part);
-  } else if (Array.isArray(raw)) {
-    for (const part of raw) push(part);
-  }
-  return out;
+  if (typeof raw === 'string') raw.split(/[,/]/).forEach(push);
+  else if (Array.isArray(raw)) raw.forEach(push);
+  // A valid listed primary determines the family. Without one, mixed evidence
+  // is ambiguous: retain skater evidence instead of granting a goalie slot.
+  if (normalizeHockeyPosition(primary) === 'G') return ['G'];
+  return out.some(p => p !== 'G') ? out.filter(p => p !== 'G') : out;
 }
 
-/** "C/LW" for a dual-eligible player, "C" for a single one, "" for nothing. */
+export interface EligiblePlayer {
+  position?: string | null;
+  eligible_positions?: EligiblePositionsRaw;
+}
+
+export function playerEligiblePositions(player: EligiblePlayer): string[] {
+  return parseEligiblePositions(player.eligible_positions, player.position);
+}
+
+/** F/W/UTIL are compatible slots or filters; they never grant C/LW/RW. */
+export function isEligibleForPosition(player: EligiblePlayer, slot: string): boolean {
+  const target = slot.trim().toUpperCase();
+  if (target === 'ALL') return true;
+  const positions = playerEligiblePositions(player);
+  if (target === 'UTIL') return positions.some(p => p !== 'G');
+  if (target === 'F' || target === 'FORWARD') return positions.some(p => ['C', 'LW', 'RW', 'F'].includes(p));
+  if (target === 'W' || target === 'WINGERS') return positions.some(p => p === 'LW' || p === 'RW');
+  const position = normalizeHockeyPosition(target);
+  return !!position && positions.includes(position);
+}
+
+export function playerEligiblePositionsLabel(player: EligiblePlayer, positionType: 'individual' | 'forward' = 'individual'): string {
+  const positions = playerEligiblePositions(player).map(p =>
+    positionType === 'forward' && ['C', 'LW', 'RW'].includes(p) ? 'F' : p);
+  return formatEligiblePositions([...new Set(positions)]);
+}
+
+/** "C/LW" for a dual-eligible player. */
 export function formatEligiblePositions(positions: readonly string[]): string {
   return positions.join('/');
+}
+
+
+/** Maximum-cardinality matching for missing slot assignments. Input order
+ * breaks ties; callers pass only unassigned players and available slots. */
+export function matchEligibleSlots<T extends EligiblePlayer>(players: readonly T[], slots: readonly string[]): Map<number, number> {
+  const occupants = new Map<number, number>();
+  const visit = (playerIndex: number, seen: Set<number>): boolean => {
+    for (let slot = 0; slot < slots.length; slot++) {
+      if (seen.has(slot) || !isEligibleForPosition(players[playerIndex], slots[slot])) continue;
+      seen.add(slot);
+      const current = occupants.get(slot);
+      if (current === undefined || visit(current, seen)) {
+        occupants.set(slot, playerIndex);
+        return true;
+      }
+    }
+    return false;
+  };
+  players.forEach((_, index) => visit(index, new Set()));
+  return occupants;
 }

@@ -1,3 +1,4 @@
+import { playerEligiblePositions, playerEligiblePositionsLabel } from '@citrus/shared';
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { scopedEarnedPoints } from '@/utils/matchupEarnedStats';
 import { memo } from "react";
@@ -334,6 +335,9 @@ export const PlayerCard = memo(({ player, isUserTeam, isBench = false, onPlayerC
                 <span className="player-team-name" title={player.team}>
                   {player.team}
                 </span>
+              )}
+              {playerEligiblePositions(player).length > 1 && (
+                <span className="text-[9px] text-white/65" data-testid="matchup-player-eligibility">{playerEligiblePositionsLabel(player)}</span>
               )}
               {/* Today's Game Info - MOBILE ONLY - Show game status, time, and live score */}
               {(() => {

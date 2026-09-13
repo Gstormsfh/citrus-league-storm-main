@@ -66,3 +66,10 @@ describe('saved utility compatibility', () => {
     expect(groups.flatMap(g => g.userPlayers).some(p => p?.id === 3)).toBe(false);
   });
 });
+
+
+it('fills C and LW with C-only plus C/LW players when slots are missing', () => {
+  const groups = organizeMatchupData([{ ...p(1, 'C'), eligible_positions: ['LW'] }, p(2, 'C')], [], {}, {}, 'individual', { C: 1, LW: 1, RW: 0, D: 0, G: 0, UTIL: 0 });
+  expect(groups.find(g => g.position === 'C')!.userPlayers[0]?.id).toBe(2);
+  expect(groups.find(g => g.position === 'LW')!.userPlayers[0]?.id).toBe(1);
+});

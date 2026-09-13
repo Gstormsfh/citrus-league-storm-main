@@ -1,3 +1,4 @@
+import { playerEligiblePositionsLabel } from '@citrus/shared';
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { useState } from 'react';
 // Direct module import, not the citrus2 barrel: the barrel re-exports
@@ -129,7 +130,7 @@ export function DraftKitPlayerCard({
             {card.name}
           </h3>
           <p className="mt-0.5 font-jbmono text-[11px] uppercase tracking-[0.14em] text-white/50">
-            {card.position} · {card.team}
+            {playerEligiblePositionsLabel(card)} · {card.team}
             {card.jersey != null ? ` · #${card.jersey}` : ''}
           </p>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">

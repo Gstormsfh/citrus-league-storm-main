@@ -460,6 +460,7 @@ export interface DashboardTalent {
 
 /** Identity, so a deep link renders a name even when the browse index 401s. */
 export interface DashboardIdentity {
+  eligible_positions?: string[];
   player_id: number;
   name: string;
   team: string;
@@ -506,7 +507,7 @@ const GSAX_COLS =
 const TALENT_DETAIL_COLS =
   'player_id, xg_per_60, xg_rating, vopa_score, avg_toi_per_game, positional_replacement_level, positional_std_dev, updated_at';
 const IDENTITY_COLS =
-  'player_id, full_name, position_code, team_abbrev, jersey_number, headshot_url';
+  'player_id, full_name, position_code, eligible_positions, team_abbrev, jersey_number, headshot_url';
 
 interface RawShotRow {
   game_id: number;
@@ -1178,6 +1179,7 @@ export class PlayerDashboardService {
           name: String(identityRow.full_name),
           team: String(identityRow.team_abbrev ?? ''),
           position: String(identityRow.position_code ?? ''),
+          eligible_positions: parseEligiblePositions(identityRow.eligible_positions, identityRow.position_code),
           jersey: identityRow.jersey_number ? parseInt(String(identityRow.jersey_number), 10) : null,
           headshot_url: (identityRow.headshot_url as string | null) ?? null,
           is_goalie: identityRow.position_code === 'G',

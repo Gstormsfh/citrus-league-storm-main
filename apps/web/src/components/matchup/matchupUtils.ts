@@ -1,3 +1,4 @@
+import { matchEligibleSlots } from '@citrus/shared';
 import { MatchupPlayer } from "./types";
 import { resolveFantasyPosition, type PositionType } from "@/utils/rosterUtils";
 import { buildSlotConfig } from "@/components/roster/slotConfig";
@@ -62,29 +63,13 @@ const autoAssignSlots = (
   rosterSlots?: Record<string, number>,
 ): Record<string, string> => {
   const config = buildSlotConfig(positionType, rosterSlots);
-  // Open slot ids per position, in render order; UTIL keeps its own list
-  // because its ids are `slot-UTIL` or `slot-UTIL-n` (see slotConfig.ts).
-  const open = new Map<string, string[]>();
-  for (const slot of config.allSlots) {
-    const label = config.labels[slot];
-    if (!open.has(label)) open.set(label, []);
-    open.get(label)!.push(slot);
-  }
+  return matchOpenSlots(starters, config.allSlots, config.labels);
+};
+
+function matchOpenSlots(players: MatchupPlayer[], slots: string[], labels: Record<string, string>): Record<string, string> {
   const assignments: Record<string, string> = {};
-
-  starters.forEach(player => {
-    const pos = normalizePosition(player.position, positionType);
-    const own = pos !== 'UTIL' ? open.get(pos) : undefined;
-    if (own && own.length > 0) {
-      assignments[String(player.id)] = own.shift()!;
-      return;
-    }
-    const util = open.get('UTIL');
-    if (pos !== 'G' && util && util.length > 0) {
-      assignments[String(player.id)] = util.shift()!;
-    }
-  });
-
+  for (const [slot, player] of matchEligibleSlots(players, slots.map(s => labels[s])))
+    assignments[String(players[player].id)] = slots[slot];
   return assignments;
 };
 
@@ -128,16 +113,10 @@ export const organizeMatchupData = (
     // Keep explicit placements, then use the same position/UTIL fallback as
     // the all-unassigned path, limited to still-open configured slots.
     const occupied = new Set(players.map(p => resolved[String(p.id)]));
-    for (const player of players) {
-      if (resolved[String(player.id)]) continue;
-      const position = normalizePosition(player.position, positionType);
-      const slot = config.allSlots.find(s => !occupied.has(s) && config.labels[s] === position)
-        ?? (position !== 'G' ? utilSlots.find(s => !occupied.has(s)) : undefined);
-      if (slot) {
-        resolved[String(player.id)] = slot;
-        occupied.add(slot);
-      }
-    }
+    Object.assign(resolved, matchOpenSlots(
+      players.filter(p => !resolved[String(p.id)]),
+      config.allSlots.filter(slot => !occupied.has(slot)), config.labels,
+    ));
     return resolved;
   };
   const userSlots = resolveSavedSlots(userStarters, effectiveUserSlots);

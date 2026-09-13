@@ -1,3 +1,4 @@
+import { playerEligiblePositionsLabel } from '@citrus/shared';
 import type { PlayerAvailability } from '@citrus/shared';
 import { PlayerAvailabilityBadge } from '@/components/player/PlayerAvailabilityBadge';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ export interface FreeAgentRowPlayer {
   id: string;
   full_name: string;
   position: string;
+  eligible_positions?: string[];
   team: string;
   headshot_url?: string | null;
   status?: string | null;
@@ -168,7 +170,7 @@ export function FreeAgentRow({
                 'w-auto h-[18px] min-w-[26px] px-1.5 rounded text-[10px]',
               )}
             >
-              {posKey}
+              {playerEligiblePositionsLabel(player, positionType) || posKey}
             </span>
             <span className="text-white/55 font-semibold shrink-0">{player.team}</span>
             {game ? (

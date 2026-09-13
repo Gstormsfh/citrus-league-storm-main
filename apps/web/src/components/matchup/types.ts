@@ -19,6 +19,7 @@ export type MatchupPlayer = {
   id: number;
   name: string;
   position: string;
+  eligible_positions?: string[];
   team: string;
   /**
    * Headshot URL (NHL CDN mug), the same field `HockeyPlayer.image` carries.

@@ -116,6 +116,7 @@ export interface CardMetric {
 }
 
 export interface DraftKitCard {
+  eligible_positions?: string[];
   playerId: number;
   name: string;
   team: string;
@@ -472,6 +473,7 @@ export class DraftKitService {
           name: e.name,
           team,
           position: e.position,
+          eligible_positions: e.eligible_positions,
           cohort,
           jersey: e.jersey,
           headshotUrl: e.headshot_url,

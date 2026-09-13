@@ -4,6 +4,8 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { resolveSlotConfig } from '../lib/leagueRules';
 import {
   COLUMNS,
+  parseEligiblePositions,
+  matchEligibleSlots,
   getCurrentSeason,
   logger,
   getTodayMST,
@@ -928,7 +930,7 @@ export class MatchupService {
     const season = getProjectionsSeason();
     const { data: players, error: pdErr } = await admin
       .from('player_current_directory')
-      .select('player_id, position_code, is_goalie')
+      .select('player_id, position_code, eligible_positions, is_goalie')
       .in('player_id', playerIds)
       .eq('season', season);
 
@@ -941,7 +943,7 @@ export class MatchupService {
       // Fallback: get latest row per player without season filter
       const { data: fallbackPlayers } = await admin
         .from('player_current_directory')
-        .select('player_id, position_code, is_goalie')
+        .select('player_id, position_code, eligible_positions, is_goalie')
         .in('player_id', playerIds)
         .order('season', { ascending: false });
 
@@ -969,7 +971,7 @@ export class MatchupService {
     admin: ReturnType<typeof getSupabaseAdmin>,
     teamId: string,
     leagueId: string,
-    players: Array<{ player_id: number; position_code: string; is_goalie: boolean }>,
+    players: Array<{ player_id: number; position_code: string; eligible_positions?: string | string[] | null; is_goalie: boolean }>,
   ): Promise<boolean> {
     // Fetch league position type
     const { data: leagueData } = await admin
@@ -978,58 +980,20 @@ export class MatchupService {
       .eq('id', leagueId)
       .single();
     // SETTINGS-ENFORCEMENT (2026-08-16) — config-driven, was hardcoded.
-    const posType = (leagueData?.settings as Record<string, unknown>)?.positionType === 'forward' ? 'forward' : 'individual';
     const initCfg = resolveSlotConfig(leagueData?.settings as Record<string, unknown>);
     const slotsNeeded: Record<string, number> = { ...initCfg.slots, UTIL: initCfg.utilCount };
-    const slotsFilled: Record<string, number> = Object.fromEntries(
-      Object.keys(slotsNeeded).map((k) => [k, 0]),
-    );
-    const starters: number[] = [];
-    const bench: number[] = [];
+    const slots = Object.entries(slotsNeeded).flatMap(([position, count]) =>
+      Array.from({ length: Math.min(count, players.length) }, (_, index) => ({ position,
+        id: position === 'UTIL' && count === 1 ? 'slot-UTIL' : `slot-${position}-${index + 1}` })));
+    const eligiblePlayers = players.map(p => ({ position: p.is_goalie ? 'G' : p.position_code, eligible_positions: p.eligible_positions }));
     const slotAssignments: Record<string, string> = {};
-
-    const getPos = (p: { position_code: string; is_goalie: boolean }): string => {
-      if (p.is_goalie || p.position_code === 'G') return 'G';
-      const code = (p.position_code || '').toUpperCase();
-      let normalized: string;
-      if (code === 'C') normalized = 'C';
-      else if (code === 'LW' || code === 'L') normalized = 'LW';
-      else if (code === 'RW' || code === 'R') normalized = 'RW';
-      else if (code === 'D') normalized = 'D';
-      else return 'UTIL';
-
-      // In F/D/G mode, merge C/LW/RW into F
-      if (posType === 'forward' && (normalized === 'C' || normalized === 'LW' || normalized === 'RW')) {
-        return 'F';
-      }
-      return normalized;
-    };
-
-    for (const player of players) {
-      const pos = getPos(player);
-      let assigned = false;
-
-      if (pos !== 'UTIL' && slotsFilled[pos] < (slotsNeeded[pos] || 0)) {
-        slotsFilled[pos]++;
-        assigned = true;
-        slotAssignments[String(player.player_id)] = `slot-${pos}-${slotsFilled[pos]}`;
-      } else if (pos !== 'G' && slotsFilled['UTIL'] < slotsNeeded['UTIL']) {
-        slotsFilled['UTIL']++;
-        assigned = true;
-        // UTIL SLOT ID (2026-09-11): the id depends on how many UTIL slots
-        // the league has. This wrote a bare 'slot-UTIL' unconditionally, so
-        // in a UTIL:2 league BOTH utility players landed on ONE slot key --
-        // 22 of 33 fantasy leagues are UTIL:2, and every colliding team in
-        // production is one of them. Same rule as LineupService.ts:983.
-        slotAssignments[String(player.player_id)] = slotsNeeded['UTIL'] === 1 ? 'slot-UTIL' : `slot-UTIL-${slotsFilled['UTIL']}`;
-      }
-
-      if (assigned) {
-        starters.push(player.player_id);
-      } else {
-        bench.push(player.player_id);
-      }
+    const selected = new Set<number>();
+    for (const [slot, player] of matchEligibleSlots(eligiblePlayers, slots.map(s => s.position))) {
+      selected.add(player);
+      slotAssignments[String(players[player].player_id)] = slots[slot].id;
     }
+    const starters = players.filter((_, index) => selected.has(index)).map(p => p.player_id);
+    const bench = players.filter((_, index) => !selected.has(index)).map(p => p.player_id);
 
     if (starters.length === 0) {
       logger.error('[buildLineupFromPlayers] No starters generated for team', teamId);
@@ -1677,7 +1641,7 @@ export class MatchupService {
 
     const { data: players } = await admin
       .from('player_current_directory')
-      .select('player_id, full_name, position_code, is_goalie, team_abbrev, headshot_url')
+      .select('player_id, full_name, position_code, eligible_positions, is_goalie, team_abbrev, headshot_url')
       .eq('season', getProjectionsSeason())
       .in('player_id', uniquePlayerIds);
 
@@ -1685,6 +1649,7 @@ export class MatchupService {
       player_id: number;
       full_name: string;
       position_code: string;
+      eligible_positions?: string | string[] | null;
       is_goalie: boolean;
       team_abbrev: string;
       headshot_url: string;
@@ -1702,6 +1667,7 @@ export class MatchupService {
         // Player details (used by frontend to render without enrichment)
         player_name: player?.full_name || '',
         player_position: player?.position_code || '',
+        eligible_positions: parseEligiblePositions(player?.eligible_positions, player?.position_code),
         player_team: player?.team_abbrev || '',
         player_team_abbreviation: player?.team_abbrev || '',
         player_headshot_url: player?.headshot_url || '',
