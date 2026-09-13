@@ -30,3 +30,15 @@ Independent arithmetic and script: `/Users/gstorms/.codex/worktrees/matchup-load
 A sanitized fixture keeps exact public player category values, saved per-date active/bench membership, slots, scoring weights and independent totals; it excludes league owner IDs and join codes. Tests run shared scoring, actual slot organization, date projection attachment and PlayerCard rendering against it. The page's four actual saved-roster selector callbacks are AST-extracted and executed to verify wiring and membership, alongside existing route-lifetime tests. Additional cases cover explicit-slot reservations, constrained missing-slot fallback, zero/negative/missing projections, and day→Full Week→day plus next-matchup initialization.
 
 This receipt records local repair evidence. Production repair acceptance and release remain pending exact review and CI; no deployed-fix claim is made here.
+
+## Production release
+
+PR479 head `7b476a0ec3dffa5e31a0fd71af729a3f545f152c` passed all16 normal CI checks ([CI34738982418](https://github.com/Gstormsfh/citrus-league-storm-main/actions/runs/34738982418), conventions34738982354) and coordinator exact-diff review. Local focused suite passed41 tests across6 files; full web TypeScript passed, targeted lint had0 errors and3 existing page warnings.
+
+Normal squash merge `951d9b4c9a0a163634715711713d9284ad340b4d` at04:58:49 UTC has the exact reviewed tree. Normal push [Production34739158860](https://github.com/Gstormsfh/citrus-league-storm-main/actions/runs/34739158860) succeeded. Draft guard passed04:59:25–26 UTC without an exception. API-first serving verification identified `citrus-api-00322-qzk` with serving=expected digest `sha256:fdaabf929e883eb7440c15ad0f46bb2ecfc9b0ca02cf4b6524764a9756b56655`. Firebase hosting version is `2d96cd350e5ca6ce`.
+
+Independent public check05:09:41.507743 UTC matched all8 selected assets to the workflow artifact and health/root returned200. New client assets: `index-Cki4FUhO.js`, `index-CIJw1wsI.js`, `Matchup-BVq4HfSJ.js`. Matchup SHA256 `8ad77933f2f3323a2c1d2b18222284c2f2815ba82232f92fea74981c560b8732`; index HTML `5a99b0050dd86ba1b9418d69f61213b442e66490796948ce4011d4da4e22ae64`; sw `86af33cb3b7d7d599256eba9a172aa1673489c240a51976cf220ad6331b0ef94`. Index/sw retain no-cache,no-store,must-revalidate.
+
+Independent database read05:09:47.284071 UTC confirms unchanged sourceaa5/runtime30e/run06f1e1b4, inherited September12 10:02:13.183476 UTC refresh, initial_activation and null error. This application repair did not refresh or edit forecast data. Raw release log, workflow metadata, exact web artifact and independent public result remain in `outputs/projection-total-reconciliation/release/` in the integration worktree.
+
+Evidence attribution correction: retained Finalsz team metadata confirms G Daddy/89a2b930 is128.6 (Thompson/Necas), AI Team3/4d9238e5 is108.9 (Schmaltz/Keller). The guide corrected an inverted team-ID join in its derived membership report and preserved the earlier version. Raw captures, all8 missing-player findings, fixture arithmetic and implementation are unchanged.
