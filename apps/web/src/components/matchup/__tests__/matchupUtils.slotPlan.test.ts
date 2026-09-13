@@ -50,3 +50,19 @@ describe('organizeMatchupData — the slot plan comes from the league', () => {
     ]);
   });
 });
+
+describe('saved utility compatibility', () => {
+  it('keeps explicit slots reserved and fills only remaining utility aliases', () => {
+    const players = [p(1, 'C'), p(2, 'LW'), p(3, 'D')];
+    const assignments = { '1': 'slot-UTIL', '2': 'slot-UTIL-1', '3': 'slot-UTIL' };
+    const groups = organizeMatchupData(players, [], assignments, {}, 'individual', { UTIL: 2 });
+    expect(groups.find(g => g.position === 'Util')!.userPlayers.map(p => p?.id)).toEqual([2, 1]);
+    expect(assignments).toEqual({ '1': 'slot-UTIL', '2': 'slot-UTIL-1', '3': 'slot-UTIL' });
+  });
+  it('retains single-UTIL IDs and fills a missing compatible slot without moving assigned players', () => {
+    const groups = organizeMatchupData([p(1, 'C'), p(2, 'C'), p(3, 'G')], [], { '1': 'slot-UTIL' }, {}, 'individual', { C: 1, G: 0 });
+    expect(groups.find(g => g.position === 'Util')!.userPlayers[0]?.id).toBe(1);
+    expect(groups.find(g => g.position === 'C')!.userPlayers[0]?.id).toBe(2);
+    expect(groups.flatMap(g => g.userPlayers).some(p => p?.id === 3)).toBe(false);
+  });
+});

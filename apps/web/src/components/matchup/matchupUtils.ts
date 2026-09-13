@@ -110,19 +110,52 @@ export const organizeMatchupData = (
     !opponentStarters.some(p => opponentSlotAssignments[String(p.id)])
   ) ? autoAssignSlots(opponentStarters, positionType, rosterSlots) : opponentSlotAssignments;
 
+  // Older saved lineups use slot-UTIL for each utility starter even when
+  // the league has multiple UTIL slots. Seat those aliases in open utility
+  // slots without changing persisted membership or overwriting explicit slots.
+  const resolveSavedSlots = (players: MatchupPlayer[], assignments: Record<string, string>) => {
+    const config = buildSlotConfig(positionType, rosterSlots);
+    const { utilSlots } = config;
+    const resolved = { ...assignments };
+    const reserved = new Set(players.map(p => assignments[String(p.id)]));
+    const open = utilSlots.filter(slot => !reserved.has(slot));
+    for (const player of players) {
+      if (utilSlots.length > 1 && assignments[String(player.id)] === 'slot-UTIL' && open.length > 0) {
+        resolved[String(player.id)] = open.shift()!;
+      }
+    }
+    // A captured historical active row can have no slot while its peers do.
+    // Keep explicit placements, then use the same position/UTIL fallback as
+    // the all-unassigned path, limited to still-open configured slots.
+    const occupied = new Set(players.map(p => resolved[String(p.id)]));
+    for (const player of players) {
+      if (resolved[String(player.id)]) continue;
+      const position = normalizePosition(player.position, positionType);
+      const slot = config.allSlots.find(s => !occupied.has(s) && config.labels[s] === position)
+        ?? (position !== 'G' ? utilSlots.find(s => !occupied.has(s)) : undefined);
+      if (slot) {
+        resolved[String(player.id)] = slot;
+        occupied.add(slot);
+      }
+    }
+    return resolved;
+  };
+  const userSlots = resolveSavedSlots(userStarters, effectiveUserSlots);
+  const opponentSlots = resolveSavedSlots(opponentStarters, effectiveOpponentSlots);
+
   // Create maps of slot -> player for both teams
   const userSlotToPlayer = new Map<string, MatchupPlayer>();
   const opponentSlotToPlayer = new Map<string, MatchupPlayer>();
 
   userStarters.forEach(player => {
-    const slot = effectiveUserSlots[String(player.id)];
+    const slot = userSlots[String(player.id)];
     if (slot) {
       userSlotToPlayer.set(slot, player);
     }
   });
 
   opponentStarters.forEach(player => {
-    const slot = effectiveOpponentSlots[String(player.id)];
+    const slot = opponentSlots[String(player.id)];
     if (slot) {
       opponentSlotToPlayer.set(slot, player);
     }

@@ -61,6 +61,8 @@ import { leagueApi } from '@/api/leagues';
 import { playerApi } from '@/api/players';
 import { publicApi } from '@/api/public';
 import { syncLeagueFromUrl } from './matchupUrlSync';
+import { useMatchupDateSelection } from '@/hooks/useMatchupDateSelection';
+import { expectedProjectionFields } from '@/utils/matchupExpectedProjections';
 import { defaultMatchupDay } from './matchupDefaultDay';
 
 /** How long the FIRST matchup load may run before the page admits failure.
@@ -210,7 +212,7 @@ const Matchup = () => {
   const { status: seasonStatus } = useSeasonStatus();
   const { leagueId: urlLeagueId, weekId: urlWeekId } = useParams<{ leagueId?: string; weekId?: string }>();
   const navigate = useNavigate();
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const { selectedDate, selectDate: setSelectedDate, initializeDate, resetDate } = useMatchupDateSelection();
   /** PRESS BOX (2026-09-04): the phone's league menu and its LINEUPS / BENCH tab. */
   const [phoneSection, setPhoneSection] = useState<'lineups' | 'bench' | 'categories'>('lineups');
   const isMobile = useIsMobile();
@@ -1442,8 +1444,8 @@ const Matchup = () => {
       datesWithStats,
     });
 
-    if (day) setSelectedDate(day);
-  }, [currentMatchup, dailyStatsByDate, selectedDate]);
+    initializeDate(day);
+  }, [currentMatchup, dailyStatsByDate, selectedDate, initializeDate]);
 
   // Fetch projections for a specific date - memoized to prevent recreation
   // CRITICAL: Works for BOTH active users AND demo/guest users
@@ -1592,8 +1594,8 @@ const Matchup = () => {
       datesWithStats: null,
     });
 
-    if (day) setSelectedDate(day);
-  }, [currentMatchup, selectedDate]);
+    initializeDate(day);
+  }, [currentMatchup, selectedDate, initializeDate]);
 
   // Helper function to enrich a player with daily stats for a specific date
   // Replicates displayMyTeam's enrichment logic (lines 1803-2194) for use in calculations
@@ -2895,6 +2897,7 @@ const Matchup = () => {
           const stats = dayStatsMap?.get(playerId);
           return {
             ...player,
+            ...expectedProjectionFields(player, projectionsByDate.get(selectedDate)?.get(Number(player.id))),
             daily_total_points: stats?.daily_total_points ?? NaN,
             daily_stats_breakdown: stats?.daily_stats_breakdown
           };
@@ -2906,7 +2909,7 @@ const Matchup = () => {
 
     // Otherwise use enriched displayMyTeam
     return displayMyTeam.filter(p => p.isStarter);
-  }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayMyTeam]);
+  }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayMyTeam, projectionsByDate]);
   
   const myBench = useMemo(() => {
     if (selectedDate && frozenRostersByDate.has(selectedDate)) {
@@ -2920,6 +2923,7 @@ const Matchup = () => {
           const stats = dayStatsMap?.get(playerId);
           return {
             ...player,
+            ...expectedProjectionFields(player, projectionsByDate.get(selectedDate)?.get(Number(player.id))),
             daily_total_points: stats?.daily_total_points ?? NaN,
             daily_stats_breakdown: stats?.daily_stats_breakdown
           };
@@ -2927,7 +2931,7 @@ const Matchup = () => {
       }
     }
     return displayMyTeam.filter(p => !p.isStarter);
-  }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayMyTeam]);
+  }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayMyTeam, projectionsByDate]);
   
   const opponentStarters = useMemo(() => {
     if (selectedDate && frozenRostersByDate.has(selectedDate)) {
@@ -2941,6 +2945,7 @@ const Matchup = () => {
           const stats = dayStatsMap?.get(playerId);
           return {
             ...player,
+            ...expectedProjectionFields(player, projectionsByDate.get(selectedDate)?.get(Number(player.id))),
             daily_total_points: stats?.daily_total_points ?? NaN,
             daily_stats_breakdown: stats?.daily_stats_breakdown
           };
@@ -2948,7 +2953,7 @@ const Matchup = () => {
       }
     }
     return displayOpponentTeam.filter(p => p.isStarter);
-  }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayOpponentTeam]);
+  }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayOpponentTeam, projectionsByDate]);
   
   const opponentBench = useMemo(() => {
     if (selectedDate && frozenRostersByDate.has(selectedDate)) {
@@ -2962,6 +2967,7 @@ const Matchup = () => {
           const stats = dayStatsMap?.get(playerId);
           return {
             ...player,
+            ...expectedProjectionFields(player, projectionsByDate.get(selectedDate)?.get(Number(player.id))),
             daily_total_points: stats?.daily_total_points ?? NaN,
             daily_stats_breakdown: stats?.daily_stats_breakdown
           };
@@ -2969,7 +2975,7 @@ const Matchup = () => {
       }
     }
     return displayOpponentTeam.filter(p => !p.isStarter);
-  }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayOpponentTeam]);
+  }, [selectedDate, frozenRostersByDate, dailyStatsByDate, displayOpponentTeam, projectionsByDate]);
   
   // Update starter ID refs (includes dropped players from frozen rosters)
   // This is done via ref so it doesn't cause dependency loops in fetchAllDailyStats
@@ -4148,7 +4154,7 @@ const Matchup = () => {
         const isMatchupChange = !previousMatchupId || previousMatchupId !== matchupData.matchup.id;
         if (isMatchupChange) {
           log(' Matchup changed, resetting selectedDate');
-          setSelectedDate(null);
+          resetDate();
           setDailyStatsMap(new Map());
         }
         
@@ -4931,7 +4937,7 @@ const Matchup = () => {
     // a stale selectedMatchupId would load LAST week's matchup, and a
     // stale selectedDate would pin the day tabs outside the new week.
     setSelectedMatchupId(null);
-    setSelectedDate(null);
+    resetDate();
     setCurrentMatchup(null);
     setDailyStatsByDate(new Map());
     setDailyStatsMap(new Map());
@@ -4939,7 +4945,7 @@ const Matchup = () => {
     projectionFreshnessRef.current.clear();
 
     navigate(`/matchup/${leagueId}/${weekNumber}`);
-  }, [userLeagueState, league?.id, navigate]);
+  }, [userLeagueState, league?.id, navigate, resetDate]);
 
   // Switch the viewed matchup in place (2026-09-01, Sleeper parity audit M7).
   // One handler for both the scoreboard strip and the "View Matchup" select:
@@ -4951,13 +4957,13 @@ const Matchup = () => {
     log(' Matchup switched to:', matchupId);
     loadedMatchupDataRef.current = null;
     setSelectedMatchupId(matchupId);
-    setSelectedDate(null);
+    resetDate();
     setCurrentMatchup(null);
     setCalculatedDailyTotals(new Map());
     setMyTeam([]);
     setOpponentTeamPlayers([]);
     setLoading(true);
-  }, []);
+  }, [resetDate]);
 
   // The strip's LIVE dot. The live-refresh interval writes fresh game
   // statuses into these two rosters every 120s, and between them they cover
