@@ -2777,7 +2777,7 @@ const Roster = () => {
     if (!slotPosition) return false;
 
     return isEligibleForPosition(player, slotPosition);
-  }, [leaguePositionType, canUseIr]);
+  }, [canUseIr]);
 
   // The move engine behind every lineup change on this page — used to be
   // reached only through a dnd-kit DragEndEvent (drag) or a fake one built

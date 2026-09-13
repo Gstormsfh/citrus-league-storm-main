@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { assignDepthChart } from '../RosterDepthChart';
+import { assignDepthChart } from '../depthChart';
 import type { Player } from '@/services/PlayerService';
 const player = (id: string, position: string, eligible_positions: string[], points = 100) =>
   ({ id, position, eligible_positions, points } as Player);
