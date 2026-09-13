@@ -39,3 +39,32 @@ describe('evidence-led season outlooks',()=>{
   expect(selectEditorialNews(base,[{...camp,title:'Forward might attend rookie practice'}],NOW)).toEqual([]);
  });
 });
+
+it.each([
+ "Sample Forward's request to be traded has not been confirmed",
+ 'Sample Forward announced retirement?',
+ 'Sample Forward requested a trade but later withdrew it',
+ 'Sample Forward requested a trade. The report was later retracted.',
+ 'Sample Forward attends rookie practice?',
+ 'Forward attends rookie practice but the report is false',
+ 'Sample Forward signed a contract with the Maple Leafs?',
+])('rejects qualified or corrected context: %s', title => {
+ const item={player_ids:[1000],url:'https://www.nhl.com/news/sample',source_id:'nhl',published_at:'2026-09-13T08:00:00Z',title,snippet:'Sample Forward spoke after camp.'};
+ expect(selectEditorialNews(base,[item],NOW)).toEqual([]);
+ expect(seasonOutlookWriteup(base,[item],NOW)?.headline).not.toMatch(/withdrawn|uncertainty/);
+});
+
+it('withholds a projected publication whose forecast row is missing or mismatched', () => {
+ const context={season:2026,status:'projected',run_id:'run',revision:'revision',exposure:{used:80}} as never;
+ expect(seasonOutlookWriteup({...base,proj_gp:null,canonical_context:context},[],NOW)).toBeNull();
+ expect(seasonOutlookWriteup({...base,canonical_context:context,projection_run_id:'other',projection_revision:'revision'},[],NOW)).toBeNull();
+ expect(seasonOutlookWriteup({...base,canonical_context:context,projection_run_id:'run',projection_revision:'revision'},[],NOW)).not.toBeNull();
+ expect(render({proj_gp:null,canonical_context:{season:2026,status:'rates_only'} as never}).summary).toContain('has not allocated');
+});
+it('keeps maintained retirement decisive after its news report expires', () => {
+ const entry={...base,is_goalie:true,proj_gp:null,current_affiliation:{status:'retired'} as never};
+ const result=seasonOutlookWriteup(entry,[],new Date('2026-10-01'))!;
+ expect(result.summary).toContain('is retired');
+ expect(result.summary+result.analysis).not.toContain('path to the crease');
+ expect(result.headline).toContain('Playing opportunity withdrawn');
+});

@@ -42,20 +42,20 @@ function subjectTails(text: string, name: string): string[] {
  * Datelines are publisher formatting, not another grammatical subject.
  */
 function contextEvent(text: string, name: string): Pick<EditorialNewsEvidence, 'kind' | 'report' | 'implication'> | null {
-  if (instructions.test(text)) return null;
+  if (instructions.test(text) || /\b(?:withdrew|withdrawn|withdraws|retracted|retracts|rescinded|rescinds|correction|corrected|unconfirmed|false|denied|denies)\b/i.test(text)) return null;
   const subject = escapeRe(fold(name.trim())).replace(/\s+/g, '\\s+');
-  const clauses = fold(text).split(/\.(?=\s|$)|[!?;\n]/).map(s => s.replace(/^\s*[a-z ]+\s+--\s*/, '').trim());
+  const clauses = fold(text).split(/\.(?=\s|$)|[!;\n]/).map(s => s.replace(/^\s*[a-z ]+\s+--\s*/, '').trim());
   // A surname headline is usable only when the same preview identifies the
   // full player. Its narrow camp verb cannot establish medical clearance.
   const surname = escapeRe(fold(name.trim().split(/\s+/).at(-1) ?? ''));
   const title = fold(text.split('\n')[0]);
-  if (clauses.some(clause => new RegExp(`^${subject}\\b`).test(clause)) &&
+  if (!qualified.test(text) && clauses.some(clause => new RegExp(`^${subject}\\b`).test(clause)) &&
       new RegExp(`^(?:${subject}|${surname}) (?:attends|attended|joins|joined) (?:his |the |a )?(?:1st |first )?rookie practice\\b`).test(title)) return {
     kind: 'camp', report: 'took part in rookie practice',
     implication: 'Citrus read: rookie practice is an opportunity to earn a role, not confirmation of an NHL roster spot or opening-night linemates.',
   };
   for (const clause of clauses) {
-    if (retrospective.test(clause) || /\b(?:denied|denies|false|rumou?r|could|might|reportedly)\b/.test(clause)) continue;
+    if (retrospective.test(clause) || qualified.test(clause)) continue;
     if (new RegExp(`^${subject}(?:'s request to be traded\\b| has publicly confirmed (?:his|a) (?:request to be traded|trade request)\\b| (?:has )?requested a trade\\b)`).test(clause)) return {
       kind: 'trade-request', report: 'was reported to have requested a trade',
       implication: 'Citrus read: a requested move leaves future team context unresolved. The current club and forecast allocation remain in place until a completed move or revised publication establishes otherwise.',

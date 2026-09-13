@@ -29,7 +29,10 @@ export function seasonOutlookWriteup(
   const canonical = canonicalEditorialContext(entry, entry.canonical_context, now);
   const news = selectEditorialNews(entry, items, now);
   const gp = number(entry.proj_gp) ? entry.proj_gp : null;
+  const publication = entry.canonical_context;
+  if (publication?.status === 'projected' && (gp === null || entry.projection_run_id !== publication.run_id || entry.projection_revision !== publication.revision)) return null;
   const allocated = gp !== null && gp > 0;
+  const retired = entry.current_affiliation?.status === 'retired';
   const exposureUnit = entry.canonical_context?.exposure?.unit === 'starts' ? 'starts' : 'appearances';
   const historical = number(entry.actuals_season) && entry.actuals_season <= season && entry.gp >= 8;
   const actualLabel = historical ? seasonName(entry.actuals_season!) : null;
@@ -38,7 +41,12 @@ export function seasonOutlookWriteup(
   let analysis = '';
   let anchor = '';
 
-  if (!allocated) {
+  if (retired) {
+    thesis = 'Playing opportunity withdrawn';
+    summary = `${name} is retired in Citrus's maintained affiliation record. The ${label} outlook therefore has no active playing opportunity to value.`;
+    analysis = 'A retained historical or numerical scenario does not establish a return to play. An updated affiliation record and a supported playing commitment would be needed before treating him as an active roster option.';
+    anchor = 'an active playing commitment';
+  } else if (!allocated) {
     thesis = 'Opportunity not allocated';
     summary = `${name} needs a path to ${entry.is_goalie ? 'the crease' : 'the NHL lineup'} before there is a useful season-total case. Citrus has not allocated ${label} ${entry.is_goalie ? 'starts' : 'games'} to him.`;
     if (historical && entry.is_goalie) {
@@ -163,7 +171,7 @@ export function seasonOutlookWriteup(
   }
   // Integrate the newest relevant report into the argument. Do not append a
   // generic news verdict or a methodology warning to every player.
-  if (news.length) {
+  if (news.length && (!retired || news[0].kind === 'retirement')) {
     const event = news[0];
     const source = `${event.source} (${event.publishedAt.slice(0, 10)})`;
     if (event.kind === 'trade-request') {

@@ -67,3 +67,11 @@ it('retires only missing current-season coverage and refuses incomplete reads', 
  await expect(service.retireMissing([note],NOW)).rejects.toThrow('offline');
  expect(writes).toHaveLength(1);
 });
+
+it('refuses a corpus with temporarily withheld projected rows before any writes', async () => {
+ const q:any={select:()=>q,gte:()=>q,lte:()=>q,order:()=>q,range:async()=>({data:[],error:null})};
+ const entry=outlookEntry({proj_gp:null,canonical_context:{season:2026,status:'projected',run_id:'run',revision:'rev',exposure:{used:80}} as never});
+ const service=new PlayerOutlookService({from:()=>q} as never,{getDashboardIndex:async()=>({players:[entry],error:null})} as never);
+ expect(await service.forPlayer(1000,[],NOW)).toBeNull();
+ await expect(service.generate(NOW)).rejects.toThrow('Incomplete outlook evidence');
+});
