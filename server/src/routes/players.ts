@@ -1,5 +1,6 @@
 import { addGoalieExposure } from '../services/goalieProjectionExposure';
 import { Hono } from 'hono';
+import { compress } from 'hono/compress';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Env } from '../app';
 import { authMiddleware } from '../middleware/auth';
@@ -298,7 +299,9 @@ playerRoutes.get('/directory', authMiddleware, async (c) => {
 //   team     — filter by NHL team abbrev (e.g. TOR)
 //   position — filter by position_code (C/LW/RW/D/G)
 //   search   — case-insensitive substring match on name
-playerRoutes.get('/dashboard-index', authMiddleware, async (c) => {
+// The full index repeats canonical team evidence; compress transport without
+// changing its DTO. Keep this after auth and scoped away from streaming routes.
+playerRoutes.get('/dashboard-index', authMiddleware, compress({ contentTypeFilter: /^application\/json/ }), async (c) => {
   const supabase = createUserClient(c.get('userToken'));
   const service = new PlayerDashboardService(supabase);
 

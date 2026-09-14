@@ -51,6 +51,7 @@ import { planAutoLineup, type AutoLineupPlan } from '@/components/roster/autoLin
 import { irSlotIds, resolveIrSlotCount } from '@/components/roster/irSlots';
 import { gameOnDate, rowGameFor } from '@/components/roster/gameDay';
 import { ApiError } from '@/api/client';
+import { startDeferredRead } from '@/lib/deferredRead';
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { useToast } from '@/hooks/use-toast';
 import { PlayerService, Player } from '@/services/PlayerService';
@@ -292,8 +293,7 @@ const ROSTER_VIEW_TAB =
   'lg:data-[state=active]:bg-transparent lg:data-[state=active]:text-pressbox-text lg:data-[state=active]:border-b-2 lg:data-[state=active]:border-pressbox-sage lg:hover:text-pressbox-text';
 
 const Roster = () => {
-  const { user } = useAuth();
-  const canUseIr = useFantasyIrEligibility(Boolean(user));
+  const { user, loading: authLoading } = useAuth();
   const { data: profile } = useProfile();
   const { userLeagueState, loading: leagueLoading, activeLeagueId, activeLeague, activeLeagueFormat, demoLeagueId, isChangingLeague } = useLeague();
   const { toast } = useToast();
@@ -411,6 +411,10 @@ const Roster = () => {
     ir: [],
     slotAssignments: {}
   });
+  const canUseIr = useFantasyIrEligibility(
+    [...roster.starters, ...roster.bench, ...roster.ir].map(player => player.id),
+    Boolean(user) && !authLoading && !leagueLoading && !isChangingLeague,
+  );
 
   // Component lifecycle logging
   useEffect(() => {
@@ -419,7 +423,7 @@ const Roster = () => {
     };
   }, []);
 
-  const rosterDisplayLoading = useMinimumLoadingTime(loading || leagueLoading, PB_LOADING_MIN_MS);
+  const rosterDisplayLoading = useMinimumLoadingTime(loading || authLoading || leagueLoading, PB_LOADING_MIN_MS);
 
   // Calculate positional stats
   const posStats = useMemo(() => calculateTeamCategoryStats(roster.starters), [roster.starters]);
@@ -433,9 +437,10 @@ const Roster = () => {
   // Fetch and adapt players from staging files (SINGLE SOURCE OF TRUTH)
   // Extract loadRoster so it can be called manually for refresh
   const loadRoster = useCallback(async (keepCurrentRoster = false) => {
-    // For guests, load immediately. For logged-in users, wait for league context to finish loading
-    if (user && leagueLoading) {
-      return; // Don't load roster until we know the user's league state
+    // The initial guest label is provisional until authentication settles.
+    // A signed-in user must also wait for LeagueContext to leave that label.
+    if (authLoading || (user && (leagueLoading || userLeagueState === 'guest'))) {
+      return;
     }
     
     // For guests, userLeagueState should be 'guest' immediately, so proceed
@@ -473,6 +478,7 @@ const Roster = () => {
           repairSlotAssignments(players, {}, loadedPositionType, loadedRosterSlots ?? undefined, reserved);
         let teamId: string | number | null = null;
         let userTeamData: { id: string; league_id: string; team_name: string } | null = null;
+        let readTransactions: (() => ReturnType<typeof LeagueService.fetchTransactions>) | null = null;
 
         // ═══════════════════════════════════════════════════════════════════
         // DEMO STATE: Guest or Logged-in without league
@@ -606,6 +612,11 @@ const Roster = () => {
           teamId = userTeamData.id;
           setUserTeamId(teamId);
           setUserTeam(userTeamData);
+          // The league/team and completed draft are verified. Transactions do
+          // not depend on roster IDs or player enrichment; consume their
+          // captured outcome at the original boundary below.
+          const transactionLeagueId = userTeamData.league_id;
+          readTransactions = startDeferredRead(() => LeagueService.fetchTransactions(transactionLeagueId));
           // Draft is completed - get roster player IDs via API (Source of Truth)
           try {
             const rosterResponse = await rosterApi.getPlayerIds(userTeamData.league_id, userTeamData.id);
@@ -639,7 +650,9 @@ const Roster = () => {
         
         // Load real transactions if user has a team
         if (userTeamData?.league_id) {
-          const { transactions: realTransactions } = await LeagueService.fetchTransactions(userTeamData.league_id);
+          const { transactions: realTransactions } = await (readTransactions
+            ? readTransactions()
+            : LeagueService.fetchTransactions(userTeamData.league_id));
           setTransactions(realTransactions);
         } else {
           setTransactions([]);
@@ -1267,16 +1280,16 @@ const Roster = () => {
         setLoading(false);
       }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- userTeam.league_id and userTeamId derived from state set within this callback
-  }, [user, profile, toast, userLeagueState, leagueLoading, activeLeagueId, selectedDate, currentMatchup]);
+  }, [user, authLoading, profile, toast, userLeagueState, leagueLoading, activeLeagueId, selectedDate, currentMatchup]);
 
   // Initial load on mount and when userLeagueState changes
   useEffect(() => {
     // Skip if league is changing
-    if (isChangingLeague) {
+    if (isChangingLeague || authLoading || (user && (leagueLoading || userLeagueState === 'guest'))) {
       return;
     }
 
-    // For guests, load immediately. For logged-in users, wait for league context
+    // Resolved guests can load the demo; signed-in users wait for league context.
     if (userLeagueState === 'guest' || !leagueLoading) {
       try {
         loadRoster();
@@ -1291,7 +1304,7 @@ const Roster = () => {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- loadRoster excluded to prevent double-fire when selectedDate changes (date-change useEffect handles that)
-  }, [userLeagueState, leagueLoading, isChangingLeague, toast]);
+  }, [authLoading, user?.id, userLeagueState, leagueLoading, isChangingLeague, toast]);
 
   // Listen for cross-page roster-change events (fired by FreeAgents, WaiverWire,
   // Roster drop dialog, etc.) and refresh without requiring a hard reset.

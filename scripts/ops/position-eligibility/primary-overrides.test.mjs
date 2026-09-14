@@ -43,7 +43,7 @@ test('reviewed primary survives ingestion, preserves secondary evidence and limi
  assert.deepEqual((await db.query('SELECT slot_assignments FROM team_lineups')).rows[0].slot_assignments,{'8475692':'slot-RW-1'});
  await assert.rejects(db.exec(corrections),/preimage changed/);
  await db.exec('ROLLBACK');
- const restoreMigration=readFileSync(new URL('../../../supabase/migrations/20260914010000_position_override_return_to_feed.sql',import.meta.url),'utf8');
+ const restoreMigration=readFileSync(new URL('../../../supabase/migrations/20260914010154_position_override_return_to_feed.sql',import.meta.url),'utf8');
  await db.exec(restoreMigration);
  await db.exec("UPDATE player_position_events SET id='4ec90dbc-a2ee-4d86-89a6-15956f0275e6' WHERE player_id=8475768");
  const restoration=readFileSync(new URL('./restore-schwartz-nhl-baseline.sql',import.meta.url),'utf8');
