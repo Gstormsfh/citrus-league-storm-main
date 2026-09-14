@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { importApi, type ImportJob } from '@/api/imports';
 import { seasonLabel } from './trophyLabels';
-import { isSettled, progressLine } from './importProgress';
+import { isSettled, progressLine } from './importProgressStatus';
 import { Chip, Eyebrow, Panel } from './ui';
 
 export interface ImportProgressProps {
