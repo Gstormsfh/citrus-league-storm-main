@@ -90,7 +90,7 @@ export default function LeagueHistory() {
     <div className="min-h-screen bg-pressbox-surface text-pressbox-text flex flex-col">
       <div className="hidden lg:block"><Navbar /></div>
       <PressBoxLeagueChrome leagueId={leagueId} leagueName={leagueName || null} />
-      <main className="pb-app-chrome lg:pt-24 lg:pb-16">
+      <main className="pb-app-chrome lg:pt-app-header lg:pb-16">
         <div className="pb-type mx-auto w-full max-w-3xl px-3.5 pt-4 lg:px-6">
           <Eyebrow>✦ League history</Eyebrow>
           <h1 className="mt-1 font-condensed font-extrabold text-[26px] uppercase tracking-[0.02em] leading-none text-pressbox-text">{leagueName || 'Trophy room'}</h1>

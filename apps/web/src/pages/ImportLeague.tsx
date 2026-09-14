@@ -152,7 +152,7 @@ export default function ImportLeague() {
       <div className="lg:hidden pt-[var(--safe-area-inset-top,env(safe-area-inset-top))]">
         <PressBoxAppHeader title="Bring your league" logoSrc="/favicon.svg" />
       </div>
-      <main className="pb-app-chrome lg:pt-24 lg:pb-16">
+      <main className="pb-app-chrome lg:pt-app-header lg:pb-16">
         <div className="pb-type mx-auto w-full max-w-3xl px-3.5 pt-4 lg:px-6">
           <Eyebrow>✦ Bring your league</Eyebrow>
           <h1 className="mt-1 font-condensed font-extrabold text-[26px] uppercase tracking-[0.02em] leading-none text-pressbox-text">Every season. Every champion. Every record.</h1>
