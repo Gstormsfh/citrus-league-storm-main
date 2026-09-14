@@ -1,3 +1,4 @@
+import { useLoadTiming } from '@/hooks/useLoadTiming';
 import { playerEligiblePositions } from '@citrus/shared';
 import { useMatchupRouteLifetime } from '@/hooks/useMatchupRouteLifetime';
 import { expectedDailyProjection } from '@citrus/shared';
@@ -3452,6 +3453,9 @@ const Matchup = () => {
         return;
       }
       
+      const timingToken = loadTiming.begin();
+      const markTiming = (stage: string) => loadTiming.timing.mark(timingToken, stage);
+
       // Set loading state immediately to prevent duplicate calls
       loadingRef.current = true;
       
@@ -3459,6 +3463,7 @@ const Matchup = () => {
       let timeoutId: NodeJS.Timeout | null = null;
       let matchupTimeoutId: NodeJS.Timeout | null = null;
       timeoutId = setTimeout(() => {
+        markTiming('error');
         logger.error('[MATCHUP] Load timeout after 15s - FORCING STOP');
         setError('Loading took too long. Please refresh the page or try again later.');
         setLoading(false);
@@ -3948,14 +3953,18 @@ const Matchup = () => {
         const matchupIdForEnsure = selectedMatchupId || existingMatchup?.id;
         if (matchupIdForEnsure && currentLeague?.id !== DEMO_LEAGUE_ID_FOR_GUESTS) {
           try {
+            markTiming('ensureStarted');
             await awaitCurrentRoute(matchupApi.ensureRosters(matchupIdForEnsure));
+            markTiming('ensureFinished');
           } catch (err) {
             if (!lifetime.active) return;
             // Non-fatal — roster data may already exist
+            markTiming('ensureFailed');
             logger.error('[Matchup] ensure-rosters pre-load failed:', err);
           }
         }
 
+        markTiming('serviceStarted');
         let matchupDataPromise: Promise<{ data: any; error: any }>;
 
         if (selectedMatchupId) {
@@ -4005,7 +4014,9 @@ const Matchup = () => {
           timeoutPromise
         ]));
 
+        markTiming('serviceFinished');
         if (matchupError) {
+          markTiming('error');
           logger.error('[MATCHUP] Error getting matchup data:', matchupError);
           
           // Enhanced error handling for dropdown selections
@@ -4048,6 +4059,7 @@ const Matchup = () => {
         }
         
         if (!matchupData) {
+          markTiming('error');
           logger.error('[MATCHUP] No matchup data returned', {
             selectedMatchupId,
             weekToShow,
@@ -4251,7 +4263,9 @@ const Matchup = () => {
           // Fetch any players in saved rosters who are no longer on the team
           // Query ONLY past dates (not today/future)
           // ============================================================
+          markTiming('frozenStarted');
           const frozenBatchResponse = await awaitCurrentRoute(matchupApi.getFrozenRosterBatch(matchupData.matchup.id, datesToLoad));
+          markTiming('frozenFinished');
           const allFrozenEntries = frozenBatchResponse.data as any[] | null;
 
           if (allFrozenEntries && allFrozenEntries.length > 0) {
@@ -4286,10 +4300,12 @@ const Matchup = () => {
               log(' Found players in frozen rosters missing from enrichment maps:', missingIds.length);
 
               // Fetch missing players from player directory
+              markTiming('missingRecoveryStarted');
               const missingPlayers = await awaitCurrentRoute(PlayerService.getPlayersByIds(missingIds as string[]));
               log(' Fetched', missingPlayers.length, 'missing players for enrichment');
 
               // Transform to MatchupPlayer and add to appropriate lookup map
+              markTiming('missingRecoveryFinished');
               missingPlayers.forEach(player => {
                 // Determine which team this player was on based on frozen roster entries
                 const playerEntries = (allFrozenEntries as any).filter((e: any) => String(e.player_id) === String(player.id));
@@ -4476,6 +4492,7 @@ const Matchup = () => {
             }
           });
 
+          loadTiming.timing.delivered(timingToken, frozenMap);
           setFrozenRostersByDate(frozenMap);
           log(` Pre-loaded ${frozenMap.size} saved rosters for week (Yahoo/Sleeper style)`);
         } else {
@@ -4485,6 +4502,7 @@ const Matchup = () => {
 
       } catch (err: any) {
         if (!lifetime.active) return;
+        markTiming('error');
         logger.error('[MATCHUP] CRITICAL ERROR loading matchup data:', err);
         logger.error('[MATCHUP] Error details:', {
           message: err.message,
@@ -4511,6 +4529,8 @@ const Matchup = () => {
           lifetime.timers.delete(matchupTimeoutId);
         }
         if (lifetime.active) {
+          markTiming('loadSettled');
+          markTiming('loadingReleased');
           log(' Finally block - clearing loading state');
           setLoading(false); // Always complete the current route's loading
           hasInitializedRef.current = true;
@@ -5173,6 +5193,15 @@ const Matchup = () => {
   // Apply minimum display time (1000ms) to prevent jarring flash effect
   // This ensures a single, smooth loading screen without cycling
   const shouldShowLoading = useMinimumLoadingTime(actualLoading, PB_LOADING_MIN_MS);
+  // This measures the main week loader, including frozen-roster recovery.
+  // Day selection has its own effects and can initialize during this loader;
+  // it must not invalidate the week loader's diagnostic token. Ancillary daily
+  // scores/projections are deliberately outside `usableDataComplete`.
+  const loadTiming = useLoadTiming(
+    JSON.stringify([user?.id, urlLeagueId ?? activeLeagueId, urlWeekId]),
+    frozenRostersByDate, shouldShowLoading, myTeam.length > 0,
+    !authLoading, !leagueContextLoading && !isChangingLeague,
+  );
   
   // Playoff champion / in-progress banner data (fantasy leagues only)
   const playoffChampion = usePlayoffChampion(
@@ -5190,16 +5219,18 @@ const Matchup = () => {
   if (shouldShowLoading) {
     // PR3: the league chrome over the match's skeleton below lg; Stormy from lg.
     return (
-      <PressBoxPageLoading
-        kind="matchup"
-        message="Loading the matchup…"
-        chrome={{ leagueId: league?.id ?? activeLeagueId ?? '', leagueName: league?.name ?? '' }}
-      />
+      <div ref={loadTiming.rootRef} style={{ display: 'contents' }}>
+        <PressBoxPageLoading
+          kind="matchup"
+          message="Loading the matchup…"
+          chrome={{ leagueId: league?.id ?? activeLeagueId ?? '', leagueName: league?.name ?? '' }}
+        />
+      </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-pastel-surface relative w-full">
+    <div ref={loadTiming.rootRef} className="min-h-screen bg-pastel-surface relative w-full">
       {/* Desktop Navbar - Hidden on mobile */}
       <div className="hidden lg:block">
         <Navbar />

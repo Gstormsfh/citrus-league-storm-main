@@ -11,6 +11,7 @@ import { clampToSeasonStart, fantasyWeekAnchorFor, weekStartDowFor, getWeekStart
 import { HockeyPlayer } from '@/components/roster/HockeyPlayerCard';
 import { ScheduleService, NHLGame, GameInfo } from './ScheduleService';
 import { withTimeout } from '@/utils/promiseUtils';
+import { startScopedRead, consumeScopedRead, normalizedPlayerScope, type ScopedRead } from '@/lib/scopedRead';
 import { getTodayMST, getTodayMSTDate, formatDateToString, isDateInRange } from '@/utils/timezoneUtils';
 
 import { ScoringCalculator, DEFAULT_SCORING, extractScoringSettings } from '@/utils/scoringUtils';
@@ -559,6 +560,11 @@ export const MatchupService = {
 
       // Load all players for both teams
       const allPlayerIds = [...new Set([...viewingPlayerIds, ...opponentPlayerIds])];
+      const projectionDate = getTodayMST();
+      const projectionPrefetch = userId && allPlayerIds.length > 0
+        ? startScopedRead(normalizedPlayerScope(allPlayerIds, projectionDate),
+          () => this.getDailyProjectionsForMatchup(allPlayerIds, projectionDate))
+        : undefined;
       const allPlayers = allPlayerIds.length > 0 
         ? await PlayerService.getPlayersByIds(allPlayerIds.map(String))
         : [];
@@ -566,7 +572,7 @@ export const MatchupService = {
       // Get matchup rosters using existing function
       // getMatchupDataById always loads current rosters (no targetDate parameter)
       const { team1Roster, team2Roster, team1SlotAssignments, team2SlotAssignments, error: rostersError } =
-        await this.getMatchupRosters(matchup, allPlayers, timezone, userId);
+        await this.getMatchupRosters(matchup, allPlayers, timezone, userId, undefined, projectionPrefetch);
 
       if (rostersError) {
         return { data: null, error: rostersError };
@@ -779,6 +785,7 @@ export const MatchupService = {
       const isPastDate = targetDate && targetDate < todayStr;
       
       let rosterPlayers: Player[];
+      let projectionPrefetch: ScopedRead<Map<number, DailyProjectionRow>> | undefined;
       if (isPastDate) {
         // For past dates: Load ALL players (needed to find dropped players in frozen lineups)
         rosterPlayers = await withTimeout(
@@ -799,6 +806,11 @@ export const MatchupService = {
           
           // Combine and deduplicate player IDs
           const allRosterPlayerIds = [...new Set([...team1PlayerIds, ...team2PlayerIds])];
+          const projectionDate = getTodayMST();
+          if (userId && allRosterPlayerIds.length > 0) {
+            projectionPrefetch = startScopedRead(normalizedPlayerScope(allRosterPlayerIds, projectionDate),
+              () => this.getDailyProjectionsForMatchup(allRosterPlayerIds, projectionDate));
+          }
           
           if (allRosterPlayerIds.length === 0) {
             logger.warn('[MatchupService] No roster player IDs found. Roster may be empty.');
@@ -837,7 +849,7 @@ export const MatchupService = {
         team1SlotAssignments,
         team2SlotAssignments,
         error: rostersError
-      } = await this.getMatchupRosters(matchup, rosterPlayers, timezone, userId, targetDate);
+      } = await this.getMatchupRosters(matchup, rosterPlayers, timezone, userId, targetDate, projectionPrefetch);
 
       logger.debug('[getMatchupData] getMatchupRosters returned:', {
         team1Roster: team1Roster.length,
@@ -1580,7 +1592,8 @@ export const MatchupService = {
     allPlayers: Player[],
     timezone: string = 'America/Denver',
     userId?: string, // Optional: required for logged-in users, not needed for guests viewing demo league
-    targetDate?: string // Optional: if provided and is past date, use frozen roster for that date
+    targetDate?: string, // Optional: if provided and is past date, use frozen roster for that date
+    projectionPrefetch?: ScopedRead<Map<number, DailyProjectionRow>>
   ): Promise<{
     team1Roster: MatchupPlayer[];
     team2Roster: MatchupPlayer[];
@@ -1634,6 +1647,22 @@ export const MatchupService = {
       // which in MST (UTC-7) becomes Feb 28 5pm — shifting the query window back 1 day.
       const weekStart = new Date(matchup.week_start_date + 'T00:00:00');
       const weekEnd = new Date(matchup.week_end_date + 'T00:00:00');
+
+      // Read-only enrichment may overlap lineup construction. Historical loads
+      // can recover a different roster, so retain their original read boundary.
+      const earlyIds = allPlayers.map(player => player.id);
+      const earlyTeams = [...new Set(allPlayers.map(player =>
+        player.team || '').filter(Boolean))];
+      const weekScope = `${matchup.league_id}:${matchup.id}:${weekStart.toISOString()}:${weekEnd.toISOString()}`;
+      const canPrefetch = !targetDate && !(isDemoLeague && !userId);
+      const statsPrefetch = canPrefetch ? startScopedRead(normalizedPlayerScope(earlyIds, weekScope),
+        () => this.fetchMatchupStatsForPlayers(earlyIds.map(Number), weekStart, weekEnd, false)) : undefined;
+      const linesPrefetch = canPrefetch ? startScopedRead(weekScope,
+        () => this.getMatchupLines(matchup.id)) : undefined;
+      const scheduleScope = (teams: string[]) => JSON.stringify([weekScope, [...new Set(teams)].sort()]);
+      const schedulePrefetch = canPrefetch ? startScopedRead(scheduleScope(earlyTeams),
+        () => withTimeout(ScheduleService.getGamesForTeams(earlyTeams, weekStart, weekEnd),
+          10000, 'getGamesForTeams timeout')) : undefined;
 
       // =============================================================================
       // YAHOO/SLEEPER FROZEN ROSTER LOGIC: Use daily lineup for past dates
@@ -2056,32 +2085,23 @@ export const MatchupService = {
       const todayMST = getTodayMST();
       const skipAuthedReads = isDemoLeague && !userId;
 
-      /*
-       * THESE FOUR ARE INDEPENDENT. THEY USED TO RUN ONE AFTER ANOTHER.
-       *
-       * Schedule, matchup lines, week stats and today's projections each need
-       * only `allTeams` or `allPlayerIds`, both of which are known above — none
-       * of them reads another's result. Run serially they cost four round
-       * trips; on the ~350ms median this page sees, that is ~1.4s of the
-       * ten-second load, spent waiting rather than fetching.
-       *
-       * Each keeps its own catch so the graceful degradation is unchanged: a
-       * failure in any one still leaves an empty Map and a page that renders.
-       * Promise.all is safe here precisely because nothing can reject.
-       */
+      // Consume independent reads together at the original enrichment boundary.
+      // Roster recovery can change IDs or teams: exact scope matching falls back
+      // to fresh reads. Schedule failures remain fatal; the other reads retain
+      // their existing empty-map fallback. No scoring or state is published early.
       const [gamesResult, matchupLines, matchupStatsMap, dailyProjectionsMap] = await Promise.all([
-        withTimeout(
+        consumeScopedRead(schedulePrefetch, scheduleScope(allTeams), () => withTimeout(
           ScheduleService.getGamesForTeams(allTeams, weekStart, weekEnd),
           10000,
           'getGamesForTeams timeout'
-        ),
+        )),
 
         // Skip for demo league guests — requires auth, and the page renders
         // fine without lines.
         (async (): Promise<Map<number, MatchupLineRow>> => {
           if (skipAuthedReads) return new Map<number, MatchupLineRow>();
           try {
-            return await this.getMatchupLines(matchup.id);
+            return await consumeScopedRead(linesPrefetch, weekScope, () => this.getMatchupLines(matchup.id));
           } catch (error: unknown) {
             logger.warn('[MatchupService] Failed to fetch matchup lines, continuing with empty data:', error);
             return new Map<number, MatchupLineRow>();
@@ -2090,7 +2110,8 @@ export const MatchupService = {
 
         (async () => {
           try {
-            return await this.fetchMatchupStatsForPlayers(allPlayerIds, weekStart, weekEnd, skipAuthedReads);
+            return await consumeScopedRead(statsPrefetch, normalizedPlayerScope(allPlayerIds, weekScope),
+              () => this.fetchMatchupStatsForPlayers(allPlayerIds, weekStart, weekEnd, skipAuthedReads));
           } catch (error: unknown) {
             logger.error('[MatchupService] ❌ Failed to fetch matchup stats:', error);
             return new Map<number, MatchupWeekStats>();
@@ -2102,7 +2123,8 @@ export const MatchupService = {
         (async (): Promise<Map<number, DailyProjectionRow>> => {
           if (skipAuthedReads) return new Map<number, DailyProjectionRow>();
           try {
-            return await this.getDailyProjectionsForMatchup(allPlayerIds, todayMST);
+            return await consumeScopedRead(projectionPrefetch, normalizedPlayerScope(allPlayerIds, todayMST),
+              () => this.getDailyProjectionsForMatchup(allPlayerIds, todayMST));
           } catch (error: unknown) {
             logger.warn('[MatchupService] Failed to fetch daily projections, continuing without them:', error);
             return new Map<number, DailyProjectionRow>();

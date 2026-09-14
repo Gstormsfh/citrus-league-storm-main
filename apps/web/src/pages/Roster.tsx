@@ -1,3 +1,4 @@
+import { useLoadTiming } from '@/hooks/useLoadTiming';
 import { isEligibleForPosition, playerEligiblePositions } from '@citrus/shared';
 import { useFantasyIrEligibility } from '@/hooks/useFantasyIrEligibility';
 import { indexRosterRosStats } from '@/components/roster/rosStats';
@@ -424,6 +425,12 @@ const Roster = () => {
   }, []);
 
   const rosterDisplayLoading = useMinimumLoadingTime(loading || authLoading || leagueLoading, PB_LOADING_MIN_MS);
+  const loadTiming = useLoadTiming(
+    JSON.stringify([user?.id, activeLeagueId, selectedDate, currentMatchup?.id]),
+    roster, rosterDisplayLoading,
+    roster.starters.length + roster.bench.length + roster.ir.length > 0,
+    !authLoading, !leagueLoading && !isChangingLeague && (!user || userLeagueState !== 'guest'),
+  );
 
   // Calculate positional stats
   const posStats = useMemo(() => calculateTeamCategoryStats(roster.starters), [roster.starters]);
@@ -443,6 +450,13 @@ const Roster = () => {
       return;
     }
     
+    const timingToken = loadTiming.begin();
+    const markTiming = (stage: string) => loadTiming.timing.mark(timingToken, stage);
+    const deliverRoster = (value: typeof roster) => {
+      loadTiming.timing.delivered(timingToken, value);
+      setRoster(value);
+    };
+
     // For guests, userLeagueState should be 'guest' immediately, so proceed
 
     // Only set loading if not keeping current roster (prevents flash during refresh)
@@ -464,6 +478,7 @@ const Roster = () => {
         // serial ones. It now starts here and is awaited only where a branch
         // actually needs the list, so the team/league/roster-id reads overlap
         // it instead of queueing behind it.
+        markTiming('playerReadStarted');
         const allPlayersPromise = PlayerService.getAllPlayers();
         // A branch that returns early never awaits it; keep a rejection from
         // surfacing as an unhandled promise. The awaiting branches still throw.
@@ -490,7 +505,8 @@ const Roster = () => {
 
           if (!leagueResponse.data) {
             logger.error('[Roster] Error loading demo league: no data returned');
-            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            deliverRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            markTiming('loadingReleased');
             setLoading(false);
             return;
           }
@@ -502,7 +518,8 @@ const Roster = () => {
 
           if (demoTeamsData.length === 0) {
             logger.error('[Roster] Error loading demo team: no teams returned');
-            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            deliverRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            markTiming('loadingReleased');
             setLoading(false);
             return;
           }
@@ -523,7 +540,8 @@ const Roster = () => {
 
           if (!playerIds) {
             logger.error('[Roster] Error loading demo roster: no player IDs returned');
-            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            deliverRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            markTiming('loadingReleased');
             setLoading(false);
             return;
           }
@@ -534,7 +552,8 @@ const Roster = () => {
           
           if (teamPlayers.length === 0) {
             logger.warn('[Roster] Demo team has no players in roster — expected for new/demo users');
-            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            deliverRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            markTiming('loadingReleased');
             setLoading(false);
             return;
           }
@@ -547,9 +566,10 @@ const Roster = () => {
           const targetLeagueId = activeLeagueId;
           if (!targetLeagueId) {
             // No active league - show empty roster
-            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            deliverRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setUserTeamId(null);
             setUserTeam(null);
+            markTiming('loadingReleased');
             setLoading(false);
             return;
           }
@@ -560,9 +580,10 @@ const Roster = () => {
 
             if (!teamDataResult) {
               // User doesn't have a team yet - show empty roster
-              setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+              deliverRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
               setUserTeamId(null);
               setUserTeam(null);
+              markTiming('loadingReleased');
               setLoading(false);
               return;
             }
@@ -570,9 +591,10 @@ const Roster = () => {
             userTeamData = teamDataResult;
           } catch {
             // User doesn't have a team yet - show empty roster
-            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            deliverRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setUserTeamId(null);
             setUserTeam(null);
+            markTiming('loadingReleased');
             setLoading(false);
             return;
           }
@@ -581,9 +603,10 @@ const Roster = () => {
           const { league: leagueData, error: leagueError } = await LeagueService.getLeague(userTeamData.league_id, user.id);
           if (leagueError || !leagueData || leagueData.draft_status !== 'completed') {
             // Draft not completed - show empty roster
-            setRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
+            deliverRoster({ starters: [], bench: [], ir: [], slotAssignments: {} });
             setUserTeamId(userTeamData.id);
             setUserTeam(userTeamData);
+            markTiming('loadingReleased');
             setLoading(false);
             return;
           }
@@ -609,6 +632,7 @@ const Roster = () => {
             setLeaguePositionType('forward');
           }
 
+          markTiming('teamLeagueVerified');
           teamId = userTeamData.id;
           setUserTeamId(teamId);
           setUserTeam(userTeamData);
@@ -620,11 +644,13 @@ const Roster = () => {
           // Draft is completed - get roster player IDs via API (Source of Truth)
           try {
             const rosterResponse = await rosterApi.getPlayerIds(userTeamData.league_id, userTeamData.id);
+            markTiming('rosterIdsRead');
             const playerIds = (rosterResponse.data || []) as string[];
 
             // CRITICAL: player_id is TEXT in DB, and p.id is STRING in allPlayers (PlayerService line 287)
             // Compare strings to strings directly — ensure both sides are strings
             const allPlayers = await allPlayersPromise;
+            markTiming('playersRead');
             dbPlayers = allPlayers.filter(p => playerIds.includes(String(p.id)));
 
             if (dbPlayers.length < playerIds.length) {
@@ -642,6 +668,7 @@ const Roster = () => {
               }
             }
           } catch (rosterError) {
+            markTiming('error');
             logger.error('[Roster] Error fetching roster_assignments:', rosterError);
             // Last resort: empty roster
             dbPlayers = [];
@@ -653,6 +680,7 @@ const Roster = () => {
           const { transactions: realTransactions } = await (readTransactions
             ? readTransactions()
             : LeagueService.fetchTransactions(userTeamData.league_id));
+          markTiming('transactionsRead');
           setTransactions(realTransactions);
         } else {
           setTransactions([]);
@@ -728,6 +756,7 @@ const Roster = () => {
           ScheduleService.getNextGamesForTeams(uniqueTeams)
         ]);
         
+        markTiming('scheduleRead');
         // Map schedule data back to players
         transformedPlayers.forEach(player => {
           const teamAbbrev = player.teamAbbreviation || player.team || '';
@@ -788,6 +817,7 @@ const Roster = () => {
             !!isPastDate  // Only fetch missing/dropped players for past dates
           );
           
+          markTiming('dailyRosterRead');
           if (dailyRoster) {
             // Transform to HockeyPlayer format with starter flag
             const starters = dailyRoster.starters.map(p => ({ ...p, starter: true }));
@@ -823,12 +853,13 @@ const Roster = () => {
               if (slot?.startsWith('ir-slot-')) repairedSlotAssignments[String(player.id)] = slot;
             }
 
-            setRoster({
+            deliverRoster({
               starters,
               bench,
               ir,
               slotAssignments: repairedSlotAssignments
             });
+            markTiming('loadingReleased');
             setLoading(false);
             return; // Exit early - we've loaded from daily roster
           }
@@ -841,6 +872,7 @@ const Roster = () => {
         } else if (teamId && leagueIdForLineup && !isDemoLeague(leagueIdForLineup)) {
           // Real user team - use actual league_id from local variable (not stale state)
           savedLineup = await LeagueService.getLineup(teamId, leagueIdForLineup);
+          markTiming('defaultLineupRead');
           
           if (savedLineup) {
             // Trust the saved lineup - the save protection guard prevents bad data from being saved
@@ -1033,7 +1065,7 @@ const Roster = () => {
             if (slot?.startsWith('ir-slot-')) normalizedSlotAssignments[String(player.id)] = slot;
           }
 
-          setRoster({ starters, bench, ir, slotAssignments: normalizedSlotAssignments });
+          deliverRoster({ starters, bench, ir, slotAssignments: normalizedSlotAssignments });
 
           // Persist recovered lineup if new players were added from roster_assignments
           // This prevents players from disappearing on subsequent saves
@@ -1046,7 +1078,7 @@ const Roster = () => {
                 normalizedSlotAssignments[String(pid)] = slot;
               });
               // Update UI state with repaired assignments
-              setRoster({ starters, bench, ir, slotAssignments: normalizedSlotAssignments });
+              deliverRoster({ starters, bench, ir, slotAssignments: normalizedSlotAssignments });
             }
 
             logger.info('[Roster] Persisting recovered lineup with newly added players');
@@ -1122,7 +1154,7 @@ const Roster = () => {
             }
           });
           
-          setRoster({ starters, bench, ir, slotAssignments: assignments });
+          deliverRoster({ starters, bench, ir, slotAssignments: assignments });
 
           // Save initial lineup ONLY on first load (selectedDate is null).
           // Do NOT save during date switches — that overwrites team_lineups base
@@ -1142,6 +1174,7 @@ const Roster = () => {
           // Verify roster has players - if not, something went wrong
         }
       } catch (e: any) {
+        markTiming('error');
         // For demo state, try to set roster even if there was an error
         if ((userLeagueState === 'guest' || userLeagueState === 'logged-in-no-league')) {
           logger.error('[Roster] Error in loadRoster for demo state, attempting fallback:', e);
@@ -1245,7 +1278,7 @@ const Roster = () => {
             }
             
             const slotAssignments = repairSlotAssignments(starters, {}, leaguePositionType, leagueRosterSlots ?? undefined);
-            setRoster({ starters, bench, ir: [], slotAssignments });
+            deliverRoster({ starters, bench, ir: [], slotAssignments });
             
             // Set demo team data
             setUserTeamId(`${DEMO_LEAGUE_ID_FOR_GUESTS}-team-3`);
@@ -1276,7 +1309,9 @@ const Roster = () => {
           // Silently ignore demo league errors
         }
       } finally {
+        markTiming('loadSettled');
         // Always set loading to false at the end
+        markTiming('loadingReleased');
         setLoading(false);
       }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- userTeam.league_id and userTeamId derived from state set within this callback
@@ -3344,7 +3379,7 @@ const Roster = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1F15] max-lg:bg-pressbox-surface text-pastel-cream relative">
+    <div ref={loadTiming.rootRef} className="min-h-screen bg-[#0F1F15] max-lg:bg-pressbox-surface text-pastel-cream relative">
       {/* Loading overlay during league switch - non-blocking. DESKTOP ONLY
           since PR3 (2026-09-05): below lg the roster skeleton is already on
           screen for the same state, and a blurred spinner sheet over a
