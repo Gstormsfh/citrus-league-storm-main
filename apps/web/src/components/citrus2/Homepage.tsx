@@ -308,15 +308,6 @@ export function Homepage() {
           and playoff bracket access. Sits above the dark page. */}
       <Navbar />
 
-      {/* Promo banner below the nav */}
-      <div className="relative z-10 bg-gradient-to-r from-pressbox-orange/15 via-pressbox-orange/25 to-pressbox-orange/15 border-y border-pressbox-orange/30">
-        <div className="max-w-[1280px] mx-auto px-6 py-2 text-center">
-          <span className="font-plex font-semibold text-[11px] tracking-[0.16em] uppercase text-pressbox-orange-soft">
-            Free to play · No card required
-          </span>
-        </div>
-      </div>
-
       <RotatingHero slides={slides} />
 
       {/* Fact strip. Every item is a fact about the product today, none of them a stat. */}
