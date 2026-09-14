@@ -28,14 +28,20 @@ import { TrophyService } from './TrophyService';
 
 export type ImportJobStatus = 'queued' | 'discovering' | 'importing' | 'matching' | 'computing' | 'done' | 'partial' | 'failed' | 'needs_credentials';
 
+export type ImportJobMethod = 'api' | 'screenshot' | 'paste';
+
 export interface ImportJobRow {
-  id: string; league_id: string; platform: string; external_league_id: string; requested_by: string;
+  id: string; league_id: string; platform: string; external_league_id: string; requested_by: string; method: ImportJobMethod;
   status: ImportJobStatus; seasons_discovered: number[]; seasons_imported: number[]; seasons_needing_credentials: number[];
   progress: Record<string, unknown>; error: Record<string, unknown> | null; started_at: string | null; finished_at: string | null; created_at: string;
 }
 
 export interface SeasonWriteResult {
   season: number; members_created: number; teams: number; matchups: number; picks: number; transactions: number; unmatched_players: number; warnings: string[];
+  /** Future picks recorded as having changed hands (screenshot imports; API parsers cannot see them). */
+  pick_ownership?: number;
+  /** The league's own named awards written for this season. */
+  awards?: number;
 }
 
 export interface EspnRunOptions {
@@ -92,7 +98,7 @@ export interface YahooDiscovery {
   chains: YahooChain[];
 }
 
-const JOB_COLUMNS = 'id, league_id, platform, external_league_id, requested_by, status, seasons_discovered, seasons_imported, seasons_needing_credentials, progress, error, started_at, finished_at, created_at';
+const JOB_COLUMNS = 'id, league_id, platform, external_league_id, requested_by, method, status, seasons_discovered, seasons_imported, seasons_needing_credentials, progress, error, started_at, finished_at, created_at';
 
 export class LeagueImportService {
   private readonly identity: ExternalIdentityService;
@@ -111,10 +117,10 @@ export class LeagueImportService {
 
   // ---- jobs -----------------------------------------------------------------
 
-  async createJob(leagueId: string, platform: ImportPlatform, externalLeagueId: string, requestedBy: string): Promise<ImportJobRow> {
+  async createJob(leagueId: string, platform: ImportPlatform, externalLeagueId: string, requestedBy: string, method: ImportJobMethod = 'api'): Promise<ImportJobRow> {
     const { data, error } = await this.supabase
       .from('import_jobs')
-      .insert({ league_id: leagueId, platform, external_league_id: externalLeagueId, requested_by: requestedBy, status: 'queued' })
+      .insert({ league_id: leagueId, platform, external_league_id: externalLeagueId, requested_by: requestedBy, status: 'queued', method })
       .select(JOB_COLUMNS)
       .single();
     if (error) throw new Error(`import_jobs insert failed: ${error.message}`);
@@ -161,7 +167,7 @@ export class LeagueImportService {
   ): Promise<SeasonWriteResult> {
     const warnings = [...season.warnings];
     if (opts.locked && (await this.seasonExists(leagueId, season.season))) {
-      return { season: season.season, members_created: 0, teams: 0, matchups: 0, picks: 0, transactions: 0, unmatched_players: 0, warnings: [...warnings, 'League history is locked; existing season left untouched.'] };
+      return { season: season.season, members_created: 0, teams: 0, matchups: 0, picks: 0, transactions: 0, unmatched_players: 0, pick_ownership: 0, warnings: [...warnings, 'League history is locked; existing season left untouched.'] };
     }
 
     const ids = await this.identity.resolveSeason(leagueId, season, { importerUserId: opts.importerUserId, importerExternalId: opts.importerExternalId ?? null });
@@ -246,6 +252,24 @@ export class LeagueImportService {
       if (error) throw new Error(`league_season_drafts upsert failed: ${error.message}`);
     }
 
+    // league_season_keepers: the keeper list as the source showed it, kept for
+    // the carry-over into the next Citrus draft. Replaced as a set per season
+    // and source; a keeper the crosswalk could not place keeps its name.
+    if (season.keepers.length) {
+      const keeperRows = season.keepers.map((k) => ({
+        league_id: leagueId, season: season.season, member_id: memberFor(k.externalTeamId),
+        external_player_id: k.player.externalPlayerId, external_player_name: k.player.name || null,
+        nhl_player_id: resolved.get(k.player.externalPlayerId)?.nhlPlayerId ?? null,
+        round: k.round, round_next: k.roundNext, years_kept: null, source: season.platform,
+      })).filter((r): r is typeof r & { member_id: string } => Boolean(r.member_id));
+      const { error: kdErr } = await this.supabase.from('league_season_keepers').delete().eq('league_id', leagueId).eq('season', season.season).eq('source', season.platform);
+      if (kdErr) throw new Error(`league_season_keepers replace failed: ${kdErr.message}`);
+      if (keeperRows.length) {
+        const { error: kErr } = await this.supabase.from('league_season_keepers').upsert(keeperRows, { onConflict: 'league_id,season,member_id,external_player_id' });
+        if (kErr) throw new Error(`league_season_keepers upsert failed: ${kErr.message}`);
+      }
+    }
+
     // league_season_transactions: the dedupe index is an expression index, which
     // PostgREST's on_conflict cannot target, so a season's rows from this source
     // are replaced as a set. They are source facts, re-derivable from the raw payload.
@@ -258,6 +282,9 @@ export class LeagueImportService {
         member_id: memberFor(t.externalTeamId), counterparty_member_id: memberFor(t.counterpartyExternalTeamId),
         nhl_player_id: t.player ? txResolved.get(t.player.externalPlayerId)?.nhlPlayerId ?? null : null,
         external_player_id: t.player?.externalPlayerId ?? null, external_player_name: t.player?.name || null,
+        // A traded draft pick is an asset like any other; dynasty trades are mostly picks.
+        pick_season: t.pick?.season ?? null, pick_round: t.pick?.round ?? null,
+        pick_original_member_id: t.pick?.originalExternalTeamId ? memberFor(t.pick.originalExternalTeamId) : null,
         faab_bid: t.faabBid, external_transaction_id: t.externalTransactionId, source: season.platform,
       }));
       const { error: dErr } = await this.supabase.from('league_season_transactions').delete().eq('league_id', leagueId).eq('season', season.season).eq('source', season.platform);
@@ -265,6 +292,58 @@ export class LeagueImportService {
       const { error: iErr } = await this.supabase.from('league_season_transactions').insert(rows);
       if (iErr) throw new Error(`league_season_transactions insert failed: ${iErr.message}`);
       transactionRows = rows.length;
+    }
+
+    // league_pick_ownership: who owns which future pick, the state a dynasty
+    // league carries into its next draft. A page of traded picks is a full
+    // snapshot for the draft seasons it shows, so this source's unapplied rows
+    // for those seasons are replaced as a set; a row already applied to a
+    // Citrus draft order is history and stays.
+    let ownershipRows = 0;
+    if (season.pickOwnership?.length) {
+      const rows = season.pickOwnership.map((o) => ({
+        league_id: leagueId, draft_season: o.draftSeason, round: o.round,
+        original_member_id: memberFor(o.originalExternalTeamId), owner_member_id: memberFor(o.ownerExternalTeamId), source: season.platform,
+      })).filter((r): r is typeof r & { original_member_id: string; owner_member_id: string } => Boolean(r.original_member_id && r.owner_member_id));
+      const draftSeasons = Array.from(new Set(rows.map((r) => r.draft_season)));
+      if (draftSeasons.length) {
+        const { error: dErr } = await this.supabase.from('league_pick_ownership').delete().eq('league_id', leagueId).eq('source', season.platform).in('draft_season', draftSeasons).is('applied_at', null);
+        if (dErr) throw new Error(`league_pick_ownership replace failed: ${dErr.message}`);
+      }
+      if (rows.length) {
+        const { error: oErr } = await this.supabase.from('league_pick_ownership').upsert(rows, { onConflict: 'league_id,draft_season,round,original_member_id' });
+        if (oErr) throw new Error(`league_pick_ownership upsert failed: ${oErr.message}`);
+      }
+      ownershipRows = rows.length;
+      if (rows.length < season.pickOwnership.length) warnings.push(`${season.pickOwnership.length - rows.length} traded pick(s) named a team no manager matched and were not recorded.`);
+    }
+
+    // league_trophies: the league's own awards, under the league's own names.
+    // trophy_key 'custom' with source 'imported'; a recompute leaves these
+    // alone (nothing in the season tables could rebuild them). Re-importing
+    // the same season replaces its imported awards; all-time awards (season
+    // null) are replaced as a set too, since they ride on one page.
+    let awardRows = 0;
+    if (season.awards?.length) {
+      const dated = season.awards.filter((a) => a.season != null);
+      const allTime = season.awards.filter((a) => a.season == null);
+      const retire = async (seasonFilter: number | null) => {
+        let q = this.supabase.from('league_trophies').update({ retired_at: new Date().toISOString() })
+          .eq('league_id', leagueId).eq('trophy_key', 'custom').eq('source', 'imported').is('retired_at', null);
+        q = seasonFilter == null ? q.is('season', null) : q.eq('season', seasonFilter);
+        const { error } = await q;
+        if (error) throw new Error(`league_trophies retire failed: ${error.message}`);
+      };
+      if (dated.length) await retire(season.season);
+      if (allTime.length) await retire(null);
+      const rows = [...dated, ...allTime].map((a) => ({
+        league_id: leagueId, season: a.season, member_id: a.externalTeamId ? memberFor(a.externalTeamId) : null,
+        trophy_key: 'custom', rank: null, value: null, source: 'imported', computed_from_job_id: jobId,
+        display_name: a.name, detail: { award: a.name, winner_name: a.winnerName, note: a.note, platform: season.platform },
+      }));
+      const { error: aErr } = await this.supabase.from('league_trophies').insert(rows);
+      if (aErr) throw new Error(`league_trophies insert failed: ${aErr.message}`);
+      awardRows = rows.length;
     }
 
     // external_league_links
@@ -275,7 +354,7 @@ export class LeagueImportService {
     }, { onConflict: 'league_id,platform,external_league_id,external_season_key' });
     if (lErr) throw new Error(`external_league_links upsert failed: ${lErr.message}`);
 
-    return { season: season.season, members_created: ids.created, teams: teamRows.length, matchups: matchupRows.length, picks: pickRows.length, transactions: transactionRows, unmatched_players: unmatched, warnings };
+    return { season: season.season, members_created: ids.created, teams: teamRows.length, matchups: matchupRows.length, picks: pickRows.length, transactions: transactionRows, unmatched_players: unmatched, pick_ownership: ownershipRows, awards: awardRows, warnings };
   }
 
   // ---- ESPN --------------------------------------------------------------------
@@ -399,6 +478,11 @@ export class LeagueImportService {
       await this.updateJob(job.id, { status: credentials ? 'needs_credentials' : 'failed', seasons_imported: imported, error: { code: credentials ? 'NEEDS_CREDENTIALS' : 'IMPORT_FAILED', message }, finished_at: new Date().toISOString() });
     }
     return (await this.getJob(job.id))!;
+  }
+
+  /** The record book, recomputed from the season tables; every import path ends here. */
+  async recomputeTrophies(leagueId: string, jobId: string): Promise<void> {
+    await this.trophies.recompute(leagueId, jobId);
   }
 
   async markFounded(leagueId: string, seasons: number[], platform: ImportPlatform): Promise<void> {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Trophy } from '@/api/imports';
-import { careerLine, groupTrophies, memberNamer, ordinal, seasonLabel, statName, trophyLabel, trophyValueLine, TROPHY_LABELS } from '../trophyLabels';
+import { careerLine, groupAwards, groupTrophies, memberNamer, ordinal, seasonLabel, statName, trophyLabel, trophyValueLine, TROPHY_LABELS } from '../trophyLabels';
 
 const trophy = (over: Partial<Trophy>): Trophy => ({
   id: 't', season: null, member_id: 'A', trophy_key: 'champion', rank: null, value: null, detail: {}, source: 'computed', display_name: null, icon_key: null, is_hidden: false, ...over,
@@ -91,5 +91,21 @@ describe('groupTrophies', () => {
     expect(g.record.map((t) => t.id)).toEqual(['5', '4']);
     expect(g.career.map((t) => t.id)).toEqual(['8', '7']);
     expect(g.h2h.map((t) => t.id)).toEqual(['9']);
+  });
+});
+
+describe('groupAwards', () => {
+  it('groups the league\'s own awards by name, newest first, whoever handed them out, and skips hidden ones', () => {
+    const g = groupAwards([
+      trophy({ id: '1', trophy_key: 'custom', season: 2019, member_id: 'B', source: 'imported', display_name: 'The Sacko', detail: { award: 'The Sacko', winner_name: 'Bob', note: 'Last place' } }),
+      trophy({ id: '2', trophy_key: 'custom', season: 2023, member_id: 'A', source: 'manual', display_name: 'the sacko', detail: {} }),
+      trophy({ id: '3', trophy_key: 'custom', season: null, member_id: null, source: 'imported', display_name: 'Commissioner of the Decade', detail: { winner_name: 'Alice' } }),
+      trophy({ id: '4', trophy_key: 'custom', season: 2020, member_id: 'A', source: 'imported', display_name: 'Hidden one', is_hidden: true }),
+      trophy({ id: '5', trophy_key: 'champion', season: 2020, member_id: 'A' }),
+    ]);
+    expect(g.map((a) => a.name)).toEqual(['The Sacko', 'Commissioner of the Decade']);
+    expect(g[0].winners.map((w) => [w.season, w.member_id])).toEqual([[2023, 'A'], [2019, 'B']]);
+    expect(g[1].winners[0]).toEqual({ season: null, member_id: null, winner: 'Alice', note: null });
+    expect(groupTrophies([trophy({ id: '6', trophy_key: 'custom', season: 2018 })]).awards).toHaveLength(1);
   });
 });

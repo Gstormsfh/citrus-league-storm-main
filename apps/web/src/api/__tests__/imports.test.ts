@@ -60,6 +60,24 @@ describe('importApi', () => {
     expect(mockPost).toHaveBeenLastCalledWith(`/api/leagues/${LEAGUE}/imports/yahoo`, { leagueKey: '453.l.200' });
   });
 
+  it('screenshots: status, a long-timeout read, confirm, season detail and the carry-over', async () => {
+    await importApi.screenshotStatus();
+    expect(mockGet).toHaveBeenCalledWith('/api/imports/screenshots/status');
+    const images = [{ data: 'AAAA', mediaType: 'image/jpeg' as const }];
+    await importApi.readScreenshots(LEAGUE, { platform: 'fantrax', leagueName: 'Puck', season: null, images });
+    expect(mockPost).toHaveBeenLastCalledWith(`/api/leagues/${LEAGUE}/imports/screenshots/read`, { platform: 'fantrax', leagueName: 'Puck', season: null, images }, { timeoutMs: 180_000 });
+    await importApi.confirmScreenshots(LEAGUE, 'job-9', { platform: 'fantrax', pages: [], finished: { '2023': true }, rostersAsKeepers: true });
+    expect(mockPost).toHaveBeenLastCalledWith(`/api/leagues/${LEAGUE}/imports/screenshots/job-9/confirm`, { platform: 'fantrax', pages: [], finished: { '2023': true }, rostersAsKeepers: true }, { timeoutMs: 60_000 });
+    await importApi.getSeasonDetail(LEAGUE, 2023);
+    expect(mockGet).toHaveBeenLastCalledWith(`/api/leagues/${LEAGUE}/history/seasons/2023`);
+    await importApi.getCarryover(LEAGUE);
+    expect(mockGet).toHaveBeenLastCalledWith(`/api/leagues/${LEAGUE}/history/carryover`);
+    await importApi.applyKeepers(LEAGUE);
+    expect(mockPost).toHaveBeenLastCalledWith(`/api/leagues/${LEAGUE}/history/carryover/keepers`, {});
+    await importApi.applyTradedPicks(LEAGUE, 2026);
+    expect(mockPost).toHaveBeenLastCalledWith(`/api/leagues/${LEAGUE}/history/carryover/picks`, { draftSeason: 2026 });
+  });
+
   it('reads the job and the room', async () => {
     await importApi.getJob(LEAGUE, 'job-1');
     expect(mockGet).toHaveBeenCalledWith(`/api/leagues/${LEAGUE}/imports/job-1`);

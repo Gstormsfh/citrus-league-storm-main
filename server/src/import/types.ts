@@ -18,7 +18,13 @@
  *     a points record from a category matchup.
  */
 
-export type ImportPlatform = 'espn' | 'yahoo';
+/**
+ * espn and yahoo are API imports. The rest arrive as screenshots (any
+ * platform's pages, read by the vision model and confirmed by the
+ * commissioner); 'manual' is a screenshot whose platform the commissioner
+ * could not name, or a spreadsheet.
+ */
+export type ImportPlatform = 'espn' | 'yahoo' | 'fantrax' | 'cbs' | 'sleeper' | 'manual';
 
 export type ImportedScoringType =
   | 'points'
@@ -110,14 +116,50 @@ export interface ImportedKeeperDesignation {
   roundNext: number | null;
 }
 
+/** A draft pick moving in a trade: dynasty leagues trade these as freely as players. */
+export interface ImportedPickAsset {
+  /** START year of the season whose draft the pick belongs to. */
+  season: number;
+  round: number;
+  /** Whose slot it originally was; null when the source did not say. */
+  originalExternalTeamId: string | null;
+}
+
 export interface ImportedTransaction {
   externalTransactionId: string | null;
   occurredAt: string | null;
   type: 'add' | 'drop' | 'trade' | 'waiver' | 'commish' | 'keeper' | 'unknown';
   externalTeamId: string | null;
   counterpartyExternalTeamId: string | null;
+  /** One asset per row: a player, or a pick, never both. */
   player: ImportedPlayerRef | null;
+  pick?: ImportedPickAsset | null;
   faabBid: number | null;
+}
+
+/**
+ * One of the league's own honours, as the league names it: the Sacko, the
+ * Golden Stick, Best Trade. Carried as a named trophy so the same award can
+ * keep being handed out on Citrus.
+ */
+export interface ImportedAward {
+  /** START year the award was for; null for an all-time award. */
+  season: number | null;
+  name: string;
+  /** The winner's team in that season, when the winner could be placed; null otherwise. */
+  externalTeamId: string | null;
+  /** The winner exactly as printed, kept even when no team could be placed. */
+  winnerName: string | null;
+  note: string | null;
+}
+
+/** Who owns a future pick as of the end of this season: the dynasty state that sets the next draft's order. */
+export interface ImportedPickOwnership {
+  /** START year of the season whose draft the pick belongs to. */
+  draftSeason: number;
+  round: number;
+  originalExternalTeamId: string;
+  ownerExternalTeamId: string;
 }
 
 export interface ImportedScoringItem {
@@ -167,6 +209,10 @@ export interface ImportedSeason {
   picks: ImportedPick[];
   keepers: ImportedKeeperDesignation[];
   transactions: ImportedTransaction[];
+  /** Future picks that have changed hands, where the source shows them. Absent from API parsers that cannot see it. */
+  pickOwnership?: ImportedPickOwnership[];
+  /** The league's own awards for this season (screenshot imports; season null rows are all-time awards carried on the newest season). */
+  awards?: ImportedAward[];
   /** Seasons the source says exist before this one, when it says. */
   previousSeasons: number[];
   /** Parser notes worth surfacing to the commissioner: unknown stat ids, missing views. */

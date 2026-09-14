@@ -9,7 +9,8 @@
  */
 import { apiClient } from './client';
 
-export type ImportPlatform = 'espn' | 'yahoo';
+export type ImportPlatform = 'espn' | 'yahoo' | 'fantrax' | 'cbs' | 'sleeper' | 'manual';
+export type ImportJobMethod = 'api' | 'screenshot' | 'paste';
 export type ImportJobStatus = 'queued' | 'discovering' | 'importing' | 'matching' | 'computing' | 'done' | 'partial' | 'failed' | 'needs_credentials';
 
 export interface EspnCredentials { espnS2: string; swid?: string }
@@ -31,6 +32,7 @@ export interface ImportJob {
   id: string;
   league_id: string;
   platform: ImportPlatform;
+  method?: ImportJobMethod;
   external_league_id: string;
   status: ImportJobStatus;
   seasons_discovered: number[];
@@ -84,6 +86,45 @@ export interface UnclaimedMember { id: string; display_name: string; first_seaso
 export interface ClaimQuestion { members: UnclaimedMember[]; attached: boolean }
 export interface ClaimResult { member_id: string; league_id: string; display_name: string; claim_method: string }
 
+// ---- screenshots -------------------------------------------------------------
+/**
+ * One league page as the reader saw it, and as the commissioner edits it.
+ * Mirrors server/src/import/screenshot/schema.ts; the server re-validates
+ * on confirm, so a field the reader left null can be filled here.
+ */
+export type PageKind = 'champions' | 'awards' | 'standings' | 'playoffs' | 'draft' | 'transactions' | 'keepers' | 'roster' | 'pick_ownership' | 'settings' | 'scoreboard' | 'other';
+export interface ChampionRow { season: number; championTeam: string; championManager?: string | null; runnerUpTeam?: string | null; runnerUpManager?: string | null; note?: string | null }
+export interface AwardRow { season?: number | null; award: string; winnerTeam?: string | null; winnerManager?: string | null; note?: string | null }
+export type PagePlatform = 'yahoo' | 'espn' | 'fantrax' | 'cbs' | 'sleeper' | 'unknown';
+export interface StandingsRow { rank?: number | null; teamName: string; managerName?: string | null; wins?: number | null; losses?: number | null; ties?: number | null; pointsFor?: number | null; pointsAgainst?: number | null; categoryRecord?: string | null; playoffSeed?: number | null; playoffFinish?: number | null; madePlayoffs?: boolean | null; isChampion?: boolean | null }
+export interface PlayoffRow { round: 'final' | 'third_place' | 'semifinal' | 'quarterfinal' | 'consolation' | 'other'; week?: number | null; homeTeam: string; awayTeam?: string | null; homeScore?: number | null; awayScore?: number | null; winner?: 'home' | 'away' | 'tie' | null }
+export interface DraftPickRow { overall?: number | null; round?: number | null; pickInRound?: number | null; teamName: string; playerName: string; playerTeamAbbr?: string | null; position?: string | null; isKeeper?: boolean | null; keeperCost?: string | null; auctionCost?: number | null }
+export interface TransactionRow { date?: string | null; type: 'add' | 'drop' | 'trade' | 'waiver' | 'commish' | 'keeper' | 'unknown'; teamName: string; counterpartyTeamName?: string | null; playerName?: string | null; playerTeamAbbr?: string | null; position?: string | null; pickSeason?: number | null; pickRound?: number | null; pickOriginalTeamName?: string | null; faabBid?: number | null }
+export interface KeeperRow { teamName: string; playerName: string; playerTeamAbbr?: string | null; position?: string | null; round?: number | null; roundNext?: number | null; yearsKept?: number | null }
+export interface RosterRow { teamName: string; players: Array<{ playerName: string; playerTeamAbbr?: string | null; position?: string | null }> }
+export interface PickOwnershipRow { draftSeason: number; round: number; originalTeamName: string; ownerTeamName: string }
+export interface PageSettings { scoringType?: 'points' | 'h2h_points' | 'h2h_categories' | 'h2h_one_win' | 'roto' | 'unknown' | null; categories?: string[] | null; pointValues?: Array<{ stat: string; points: number }> | null; rosterSlots?: Array<{ slot: string; count: number }> | null; keeperCount?: number | null; keeperRule?: string | null; draftType?: string | null; usesFaab?: boolean | null; regularSeasonWeeks?: number | null; playoffTeams?: number | null; playoffWeeks?: number | null; teamCount?: number | null }
+export interface ScoreboardPage { week: number; isPlayoff?: boolean | null; matchups: Array<{ homeTeam: string; awayTeam?: string | null; homeScore?: number | null; awayScore?: number | null; homeCatWins?: number | null; homeCatLosses?: number | null; homeCatTies?: number | null; winner?: 'home' | 'away' | 'tie' | null }> }
+export interface ScreenshotPage {
+  index: number; platform: PagePlatform; kind: PageKind; season: number | null; leagueName?: string | null; confidence: 'high' | 'medium' | 'low'; notes?: string | null;
+  champions?: ChampionRow[] | null; awards?: AwardRow[] | null;
+  standings?: StandingsRow[] | null; playoffs?: PlayoffRow[] | null; picks?: DraftPickRow[] | null; transactions?: TransactionRow[] | null; keepers?: KeeperRow[] | null;
+  roster?: RosterRow[] | null; pickOwnership?: PickOwnershipRow[] | null; settings?: PageSettings | null; scoreboard?: ScoreboardPage | null;
+}
+export interface ScreenshotImage { data: string; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' }
+export interface ScreenshotReadOutcome { job: ImportJob; pages: ScreenshotPage[]; usage: { inputTokens: number; outputTokens: number } }
+export interface ScreenshotStatus { configured: boolean; maxImages: number; platforms: ImportPlatform[] }
+
+// ---- one season's long parts, and the keeper/dynasty carry-over ----------------
+export interface SeasonPick { overall_pick: number; round: number | null; pick_in_round: number | null; member_id: string | null; nhl_player_id: number | null; external_player_id: string | null; external_player_name: string | null; is_keeper: boolean; keeper_cost: string | null; auction_cost: number | null; source: string }
+export interface SeasonTransaction { id: string; occurred_at: string | null; type: string; member_id: string | null; counterparty_member_id: string | null; nhl_player_id: number | null; external_player_id: string | null; external_player_name: string | null; pick_season: number | null; pick_round: number | null; pick_original_member_id: string | null; faab_bid: number | null; external_transaction_id: string | null; source: string }
+export interface SeasonMatchup { week: number; home_member_id: string; away_member_id: string | null; home_score: number | null; away_score: number | null; home_cat_wins: number | null; home_cat_losses: number | null; home_cat_ties: number | null; is_playoff: boolean; is_consolation: boolean; is_championship: boolean; winner_member_id: string | null; is_tie: boolean }
+export interface SeasonKeeper { member_id: string; external_player_id: string; external_player_name: string | null; nhl_player_id: number | null; round: number | null; round_next: number | null; years_kept: number | null; source: string }
+export interface SeasonDetail { season: number; picks: SeasonPick[]; transactions: SeasonTransaction[]; matchups: SeasonMatchup[]; keepers: SeasonKeeper[] }
+export interface KeeperPlanRow { memberId: string; memberName: string; teamId: string | null; teamName: string | null; playerName: string | null; nhlPlayerId: number | null; externalPlayerId: string; round: number | null; yearsKept: number | null; blocker: 'unclaimed' | 'unmatched' | null }
+export interface TradedPickRow { draftSeason: number; round: number; originalMemberId: string; originalName: string; originalTeamId: string | null; ownerMemberId: string; ownerName: string; ownerTeamId: string | null; appliedAt: string | null; source: string; blocker: 'unclaimed' | null }
+export interface Carryover { draftSeason: number; keepers: { season: number | null; seasonYear: number; rows: KeeperPlanRow[]; ready: number; blocked: number }; picks: TradedPickRow[] }
+
 export const importApi = {
   // ---- ESPN ---------------------------------------------------------------
   discoverEspn(league: string, credentials?: EspnCredentials) {
@@ -111,6 +152,30 @@ export const importApi = {
   },
   startYahoo(leagueId: string, body: { leagueKey: string; seasons?: number[] }) {
     return apiClient.post<ImportJob>(`/api/leagues/${leagueId}/imports/yahoo`, body);
+  },
+
+  // ---- screenshots, any platform -------------------------------------------
+  screenshotStatus() {
+    return apiClient.get<ScreenshotStatus>('/api/imports/screenshots/status');
+  },
+  /** The images go up once and are read once; the reply is the pages to review. Vision reads take a while. */
+  readScreenshots(leagueId: string, body: { platform: ImportPlatform; leagueName?: string | null; season?: number | null; images: ScreenshotImage[] }) {
+    return apiClient.post<ScreenshotReadOutcome>(`/api/leagues/${leagueId}/imports/screenshots/read`, body, { timeoutMs: 180_000 });
+  },
+  confirmScreenshots(leagueId: string, jobId: string, body: { platform: ImportPlatform; leagueName?: string | null; pages: ScreenshotPage[]; finished?: Record<string, boolean>; rostersAsKeepers?: boolean }) {
+    return apiClient.post<ImportJob>(`/api/leagues/${leagueId}/imports/screenshots/${jobId}/confirm`, body, { timeoutMs: 60_000 });
+  },
+  getSeasonDetail(leagueId: string, season: number) {
+    return apiClient.get<SeasonDetail>(`/api/leagues/${leagueId}/history/seasons/${season}`);
+  },
+  getCarryover(leagueId: string) {
+    return apiClient.get<Carryover>(`/api/leagues/${leagueId}/history/carryover`);
+  },
+  applyKeepers(leagueId: string) {
+    return apiClient.post<{ seasonYear: number; written: number; skippedLocked: number; blocked: number }>(`/api/leagues/${leagueId}/history/carryover/keepers`, {});
+  },
+  applyTradedPicks(leagueId: string, draftSeason: number) {
+    return apiClient.post<{ applied: number; alreadyApplied: number; skipped: Array<{ round: number; reason: string }> }>(`/api/leagues/${leagueId}/history/carryover/picks`, { draftSeason });
   },
 
   // ---- jobs and the room --------------------------------------------------

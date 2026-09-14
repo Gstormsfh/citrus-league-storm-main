@@ -16,6 +16,9 @@ const api = vi.hoisted(() => ({
   yahooLeagues: vi.fn(),
   yahooConnectUrl: vi.fn(),
   startYahoo: vi.fn(),
+  screenshotStatus: vi.fn(),
+  readScreenshots: vi.fn(),
+  confirmScreenshots: vi.fn(),
 }));
 vi.mock('@/api/imports', () => ({ importApi: api }));
 vi.mock('@/components/Navbar', () => ({ default: () => null }));
@@ -49,6 +52,7 @@ const job = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   for (const fn of Object.values(api)) fn.mockReset();
   api.yahooConnection.mockResolvedValue({ data: { connected: false, guid: null, grantedAt: null, revokedAt: null, configured: true } });
+  api.screenshotStatus.mockResolvedValue({ data: { configured: true, maxImages: 12, platforms: ['yahoo', 'espn', 'fantrax', 'cbs', 'sleeper', 'manual'] } });
 });
 
 describe('ImportLeague: ESPN', () => {
@@ -94,6 +98,17 @@ describe('ImportLeague: ESPN', () => {
     fireEvent.click(again);
     await waitFor(() => expect(api.discoverEspn).toHaveBeenLastCalledWith('777', { espnS2: 'AEB' + 'x'.repeat(40), swid: '{9F2C1B22-8E2A-4D2A-9B3F-1A2B3C4D5E6F}' }));
     expect((await screen.findByTestId('espn-found')).textContent).toContain('Private League');
+  });
+});
+
+describe('ImportLeague: screenshots', () => {
+  it('the screenshot path is on the page for any platform, with the target league name prefilled', async () => {
+    mount();
+    const panel = await screen.findByTestId('import-screenshots');
+    expect(panel.textContent).toContain('Yahoo, Fantrax, CBS, anywhere');
+    expect(await screen.findByText('Screenshots. Any platform. No login.')).toBeInTheDocument();
+    expect(screen.getByLabelText('League name on the other platform')).toHaveValue('The Puck Stops Here');
+    expect(Array.from((screen.getByLabelText('Platform') as HTMLSelectElement).options).map((o) => o.value)).toEqual(['yahoo', 'espn', 'fantrax', 'cbs', 'sleeper', 'manual']);
   });
 });
 

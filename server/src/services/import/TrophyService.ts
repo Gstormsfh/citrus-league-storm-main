@@ -1,8 +1,9 @@
 /**
  * Reads the season tables, runs the pure record-book computation, and
  * replaces the league's computed/imported trophies. Manual trophies (source
- * = 'manual') are never touched by a recompute. Old rows are retired, not
- * deleted.
+ * = 'manual') and the league's own named awards (trophy_key = 'custom',
+ * however they arrived) are never touched by a recompute: nothing in the
+ * season tables could rebuild them. Old rows are retired, not deleted.
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { computeTrophies, type SeasonRow, type TeamRow, type MatchupRow, type TrophyRow } from '../../import/trophies';
@@ -37,13 +38,14 @@ export class TrophyService {
     const input = await this.loadInput(leagueId);
     const rows = computeTrophies(input);
 
-    // Retire every non-manual live row, then insert the new set.
+    // Retire every non-manual, non-custom live row, then insert the new set.
     const { error: rErr } = await this.supabase
       .from('league_trophies')
       .update({ retired_at: new Date().toISOString() })
       .eq('league_id', leagueId)
       .is('retired_at', null)
-      .neq('source', 'manual');
+      .neq('source', 'manual')
+      .neq('trophy_key', 'custom');
     if (rErr) throw new Error(`league_trophies retire failed: ${rErr.message}`);
 
     if (!rows.length) return 0;

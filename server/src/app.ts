@@ -143,6 +143,8 @@ app.use('/api/*', cacheControlMiddleware);
 app.use('/api/*', standardRateLimit);
 // Stricter limit on AI chat — 10 req/min per IP
 app.use('/api/stormy/*', aiRateLimit);
+// Screenshot import reads go to the same model; same budget.
+app.use('/api/leagues/*/imports/screenshots/*', aiRateLimit);
 // Strict brute-force protection on signup/login — 5 req/min per IP
 // Applied per-path (not per-prefix) because /api/auth/* may grow to
 // include non-mutating endpoints later; we explicitly protect the

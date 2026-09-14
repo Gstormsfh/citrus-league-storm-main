@@ -12,7 +12,8 @@ and migrations `20260914110000`, `20260914110100`, `20260914110200`.
 | ESPN, public league | Paste the league link. Done. | None. ESPN serves 2018-19 onward with no session. |
 | ESPN, private league | Same paste; Citrus answers "this league is private" with two ways forward: the commissioner flips **Make League Viewable to Public** in ESPN settings, or the user finishes on the web with their ESPN sign-in. | `espn_s2` + `SWID`, web only, held in the job's memory for the run, never stored, never logged, never in the iOS binary (App Store 5.1.1(v)). |
 | ESPN, seasons before 2018-19 | Imported when the user signs in on the web; otherwise the job parks those seasons as `needs_credentials` and the newer history is live immediately. | As above. |
-| Yahoo | One tap: **Connect Yahoo** opens Yahoo's sign-in in the system browser, comes back, Citrus lists their NHL leagues with season counts, they tap one. | OAuth, read-only (`fspt-r`). Refresh token sealed server-side; access tokens in memory only. |
+| Yahoo | One tap: **Connect Yahoo** opens Yahoo's sign-in in the system browser, comes back, Citrus lists their NHL leagues with season counts, they tap one. | OAuth, read-only (`fspt-r`). Refresh token sealed server-side; access tokens in memory only. Off until the Yahoo developer application clears; screenshots are the Yahoo path until then. |
+| Screenshots, any platform (Yahoo, Fantrax, CBS, ESPN, a spreadsheet) | Start with the page that lists every past champion (Yahoo and ESPN call it **League History**; Fantrax **History**; Sleeper **Trophy Room**): one screenshot gives every season, every champion and runner-up, career titles and droughts. Then the league's own awards (a spreadsheet, a chat message, a photo of the list) and, per season if wanted, standings, playoffs, draft results (**Draft Results** on Yahoo and Fantrax, **Draft Recap** on ESPN), transactions, this year's keepers and traded picks (**Draft Picks** on Fantrax and Sleeper), settings. The upload panel lists the pages in the chosen platform's own menu words. Pick them from the camera roll, tap **Read**, check the table it read, tap **Import**. Up to 12 images per read; more seasons in another go. | None. Images are scaled to 1600 px in the browser, sent once to the API, read by the same Claude model Stormy uses (`ANTHROPIC_API_KEY`, already on the API server), and never stored; the reading is kept on the job as a raw payload. |
 
 Then, for everyone: the trophy room opens on their own career, "which one is
 you?" attaches other managers to their history when they sign up, and the
@@ -89,12 +90,52 @@ Any screen that shows Yahoo-derived data carries "Fantasy data provided by
 Yahoo Fantasy" and the Yahoo Fantasy logo, per Yahoo's terms. The UI branch
 owns this; it is a condition of the app approval.
 
+## Screenshots: what is read, what is written, what to watch
+
+The reader answers only through a tool call whose schema is
+`server/src/import/screenshot/schema.ts`; the answer is validated again with
+zod, and validated a third time when the commissioner sends it back edited.
+`assemble.ts` turns pages into `ImportedSeason` and names every decision it
+had to make in `warnings` (a team on a draft page that matched no standings
+row, a traded pick with no draft year, a standings row with no manager name).
+The review screen shows those before the import.
+
+A champions page becomes one season per row (the champion at rank 1 with
+playoff finish 1, the runner-up at 2), so no standings page is needed for a
+season to exist. An awards page becomes named trophies (`trophy_key =
+'custom'`, `source = 'imported'`, `display_name` = the award as the league
+writes it); a recompute never touches custom rows, and the trophy room groups
+them by name with the roll of winners so the same award continues on Citrus
+through the commissioner's "add a trophy" tool.
+
+Identity from a screenshot is the printed manager name (`name:<normalised>`),
+the same key the foundation's pasted-standings path uses. Two spellings of one
+person become two rows; the commissioner's merge tool fixes it in one tap.
+
+Keeper and dynasty carry-over is on the trophy room, commissioner only
+(`GET /history/carryover`): the keeper list the source showed becomes Citrus
+`keeper_designations` (as `designated`; the keeper panel locks them) once each
+manager has claimed a team and each player is matched, and traded future picks
+rewrite `draft_order.team_order` for the coming draft (the owner's team takes
+the original team's slot) once both managers have claimed. Apply after setting
+the draft order; apply again after any reset of it. The draft engine reads the
+order as it is, so a team drafting twice in a round is just the order.
+
+`IMPORT_VISION_MODEL` overrides the model (default: Stormy's). Reads are
+rate-limited like Stormy (`aiRateLimit`). A read of a dozen phone screenshots
+costs roughly 20k input tokens.
+
+Not verified with a live model call before landing: the reader's prompt and
+schema were exercised against recorded tool outputs. First real run: a staging
+commissioner uploads a real Yahoo standings page and checks the table.
+
 ## Migrations
 
 Apply in order: `20260914110000_league_history_foundation.sql` (a no-op on
 production, which already has these objects from 2026-08-26; new for staging),
-`20260914110100_league_import_platform.sql`, `20260914110200_yahoo_oauth.sql`.
-All three are idempotent and were verified twice on a Supabase branch database.
+`20260914110100_league_import_platform.sql`, `20260914110200_yahoo_oauth.sql`,
+`20260914120000_league_import_screenshots.sql`.
+All four are idempotent and were verified on a Supabase branch database.
 Every new table has RLS on; `external_player_ids` and `yahoo_provider_tokens`
 have no client write policy by design (see `DATA_INVENTORY.md` §1.5).
 
@@ -119,9 +160,13 @@ retention job is needed before scale; nothing is scheduled yet.
 
 ## Things the sources cannot give us
 
-Stated plainly so nobody promises them: keeper cost rules (both platforms;
-the commissioner confirms them on import), future draft-pick ownership in
-dynasty leagues (entered by the commissioner), ESPN league history before the
-league's creation on ESPN, and Yahoo transaction logs older than whatever
-Yahoo has pruned (unverified). A season still in play imports as unfinished
-and earns no champion until a re-import sees it finished.
+Stated plainly so nobody promises them: keeper cost rules (the APIs do not
+state them; the commissioner confirms them on import), future draft-pick
+ownership from the APIs (a screenshot of the platform's traded-picks page
+carries it), ESPN league history before the league's creation on ESPN, and
+Yahoo transaction logs older than whatever Yahoo has pruned (unverified). A
+screenshot import gives season honours and whatever pages were sent; weekly
+records (highest week, streaks, head-to-head) need a scoreboard screenshot per
+week, so a screenshot-only league's record book is season-level. A season
+still in play imports as unfinished and earns no champion until a re-import
+sees it finished.
