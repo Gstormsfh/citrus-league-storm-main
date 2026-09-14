@@ -13,10 +13,13 @@ const standings = [
 const byKey = (tiles: ReturnType<typeof leagueMenuTiles>) => Object.fromEntries(tiles.map((t) => [t.key, t]));
 
 describe('leagueMenuTiles', () => {
-  it('with nothing in hand: the four routes and the simulator, no lines', () => {
+  it('with nothing in hand: the four routes, the trophy room and the simulator, no lines', () => {
     const tiles = leagueMenuTiles({ leagueId: 'lg' });
-    expect(tiles.map((t) => t.key)).toEqual(['standings', 'trades', 'waivers', 'schedule', 'mockdraft']);
+    expect(tiles.map((t) => t.key)).toEqual(['standings', 'trades', 'waivers', 'schedule', 'history', 'mockdraft']);
     for (const t of tiles) expect(t.stat ?? null).toBeNull();
+    // LEAGUE HISTORY (2026-09-13): routed at /league/:leagueId/history; no stat
+    // line until the room can say one honestly.
+    expect(tiles.find((t) => t.key === 'history')?.to).toBe('/league/lg/history');
   });
 
   it('the lines the artboard prints, from the reads the screens already make', () => {

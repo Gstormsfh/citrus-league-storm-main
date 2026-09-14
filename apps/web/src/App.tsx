@@ -107,6 +107,9 @@ const CreateLeague = lazyWithErrorHandling(() => import("./pages/CreateLeague"))
 const InviteAccept = lazyWithErrorHandling(() => import("./pages/InviteAccept"));
 const OpeningNight = lazyWithErrorHandling(() => import("./pages/OpeningNight"));
 const BringYourLeague = lazyWithErrorHandling(() => import("./pages/BringYourLeague"));
+const ImportLeague = lazyWithErrorHandling(() => import("./pages/ImportLeague"));
+const ImportYahooCallback = lazyWithErrorHandling(() => import("./pages/ImportYahooCallback"));
+const LeagueHistory = lazyWithErrorHandling(() => import("./pages/LeagueHistory"));
 const Dangle = lazyWithErrorHandling(() => import("./pages/Dangle"));
 const Features = lazyWithErrorHandling(() => import("./pages/Features"));
 const Pricing = lazyWithErrorHandling(() => import("./pages/Pricing"));
@@ -300,6 +303,11 @@ const App = () => {
                 {/* 2026-09-09: lead gen that needs no app: the opening-night pick'em and the concierge league move. */}
                 <Route path="/opening-night" element={<ErrorBoundary><OpeningNight /></ErrorBoundary>} />
                 <Route path="/bring-your-league" element={<ErrorBoundary><BringYourLeague /></ErrorBoundary>} />
+                {/* LEAGUE HISTORY IMPORT (2026-09-13): bring a league over from
+                    ESPN or Yahoo, the Yahoo OAuth return, and the trophy room. */}
+                <Route path="/import" element={<ProtectedRoute><ErrorBoundary><ImportLeague /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/import/yahoo/callback" element={<ProtectedRoute><ErrorBoundary><ImportYahooCallback /></ErrorBoundary></ProtectedRoute>} />
+                <Route path="/league/:leagueId/history" element={<ProtectedRoute><ErrorBoundary><LeagueHistory /></ErrorBoundary></ProtectedRoute>} />
                 {/* Campaign door (2026-09-09): the URL read on the Steve Dangle Podcast. */}
                 <Route path="/dangle" element={<ErrorBoundary><Dangle /></ErrorBoundary>} />
                 <Route path="/game-day" element={<ErrorBoundary><GameDay /></ErrorBoundary>} />

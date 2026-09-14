@@ -34,10 +34,9 @@ export interface LeagueMenuTile {
  * /standings, /trade-analyzer, /waiver-wire, /schedule-manager all resolve.
  *
  * Missing ON PURPOSE, each needing a route AND a page before it can appear:
- * Commish note, Draft results, Scoring & legend, League history, Managers &
- * invites. The spec names ten tiles; six of them have nowhere to go in this
- * codebase yet. Shipping them as dead tiles would fail both linkGraphIntegrity
- * and the rule that every tap target routes. See PROGRESS.md.
+ * Commish note, Scoring & legend. The spec names ten tiles; two still have
+ * nowhere to go in this codebase. Shipping them as dead tiles would fail both
+ * linkGraphIntegrity and the rule that every tap target routes. See PROGRESS.md.
  */
 export function defaultLeagueTiles(leagueId: string): LeagueMenuTile[] {
   return leagueMenuTiles({ leagueId });
@@ -76,8 +75,8 @@ const DRAFT_LABEL: Record<string, string> = { snake: 'Snake', auction: 'Auction'
  * 2026-09-05: /standings, /trade-analyzer, /waiver-wire,
  * /schedule-manager, /draft-v2/:leagueId, /league/:leagueId (the teams and
  * the invite control; `?settings=1` opens the commissioner's sheet),
- * /armchair-gm. Still missing, each needing a route AND a page: Commish
- * note, Scoring & legend, League history. See PROGRESS.md.
+ * /armchair-gm, /league/:leagueId/history (2026-09-13). Still missing, each
+ * needing a route AND a page: Commish note, Scoring & legend. See PROGRESS.md.
  */
 export function leagueMenuTiles(input: LeagueMenuInput): LeagueMenuTile[] {
   const { leagueId, myTeamId } = input;
@@ -139,6 +138,12 @@ export function leagueMenuTiles(input: LeagueMenuInput): LeagueMenuTile[] {
       stat: [max ? `${count}/${max}` : `${count} teams`, canInvite ? 'share link' : null].filter(Boolean).join(' · '),
     });
   }
+
+  // LEAGUE HISTORY (2026-09-13): the trophy room. Every season the league
+  // has played, wherever it played it, and the record book. Routed at
+  // /league/:leagueId/history; no stat line until the room can say one
+  // honestly (a title count would need the history read on every open).
+  tiles.push({ key: 'history', title: 'League history', to: `/league/${leagueId}/history`, Icon: Trophy });
 
   if (input.commissioner) {
     tiles.push({
