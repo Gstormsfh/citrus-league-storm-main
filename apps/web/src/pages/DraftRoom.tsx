@@ -1,7 +1,7 @@
 import { projectionSettings } from '@citrus/shared';
 import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 import { usePlayerDashboardIndex } from '@/hooks/usePlayerDashboardIndex';
-import { buildDraftProjectionMap } from '@/components/draft/draftDecision';
+import { buildDraftProjectionMap, forecastNoteFor, type ForecastNote } from '@/components/draft/draftDecision';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate, Navigate } from 'react-router-dom';
 import { DEFAULT_PICK_TIME_LIMIT_SECONDS } from '@citrus/shared';
@@ -229,6 +229,14 @@ const DraftRoomInner = () => {
   const leagueScoringContext = useLeagueScoringContext(leagueId, league);
   const { players: canonicalDashboard } = usePlayerDashboardIndex();
   const projectedFptsMap = useMemo(() => leagueScoringContext.ready ? buildDraftProjectionMap(canonicalDashboard, projectionSettings(leagueScoringContext.scoring)) : new Map(), [canonicalDashboard, leagueScoringContext.scoring, leagueScoringContext.ready]);
+  const forecastNotes = useMemo(() => {
+    const map = new Map<string, ForecastNote>();
+    for (const entry of canonicalDashboard) {
+      const note = forecastNoteFor(entry);
+      if (note) map.set(String(entry.id), note);
+    }
+    return map;
+  }, [canonicalDashboard]);
   
   const [draftPhase, setDraftPhase] = useState<DraftPhase>(() => {
     // Restore previous phase from sessionStorage on mount so users who refresh
@@ -4314,6 +4322,7 @@ const DraftRoomInner = () => {
                         scoringSettings={projectionSettings(leagueScoringContext.scoring)}
                         scoringReady={leagueScoringContext.ready}
                         projectedFptsMap={projectedFptsMap}
+                        forecastNotes={forecastNotes}
                       />
                     </TabsContent>
 

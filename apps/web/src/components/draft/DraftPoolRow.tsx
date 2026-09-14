@@ -10,8 +10,8 @@ import { PB_TYPE } from '@/components/pressbox/rowScale';
 import { getTeamColor } from '@/utils/teamColors';
 import type { PoolHeadline } from './draftPoolHeadline';
 import type { Player } from '@/services/PlayerService';
-import type { DraftProjection, QualitySignal } from './draftDecision';
-import { ordinalPercentile } from './draftDecision';
+import type { DraftProjection, ForecastNote, QualitySignal } from './draftDecision';
+import { forecastHeadlineLabel, forecastHeadlineTitle, ordinalPercentile } from './draftDecision';
 
 /**
  * ONE DRAFT-POOL ROW ON A PHONE — the Press Box cut (2026-09-04).
@@ -67,6 +67,12 @@ export interface DraftPoolRowProps {
   /** The one cohort-relative advanced read. Null when absent. */
   signal: QualitySignal | null;
   /**
+   * Forecast provenance and status for the row (2026-09-14). Sets the
+   * headline label (`proj` / `manual` / `prior`) and, for a player with
+   * conditional rates and no allocated workload, says so on the meta line.
+   */
+  forecast?: ForecastNote | null;
+  /**
    * The stat the pool is currently sorted by, already resolved to a number
    * and a label by `poolHeadlineFor`. When set it REPLACES the projection as
    * the row's headline, because on a phone that number is the only thing the
@@ -118,6 +124,7 @@ export function DraftPoolRow({
   seasonFpts,
   projection,
   signal,
+  forecast = null,
   headlineOverride,
   selected,
   drafted,
@@ -142,12 +149,17 @@ export function DraftPoolRow({
   const headlineDecimals = headlineOverride ? headlineOverride.decimals : 1;
   const headlineLabel = headlineOverride
     ? headlineOverride.label
-    : (projection ? 'proj' : 'fpts');
+    : (projection ? forecastHeadlineLabel(forecast) : 'fpts');
+  const headlineTitle = !headlineOverride && projection ? forecastHeadlineTitle(forecast) : undefined;
+  const ratesOnly = !projection && forecast?.status === 'rates_only';
   // +/- is the one stat where a leading sign carries meaning.
   const headlineText =
-    headlineOverride?.label === '+/-' && headline > 0
-      ? `+${headline.toFixed(headlineDecimals)}`
-      : headline.toFixed(headlineDecimals);
+    ratesOnly && !headlineOverride
+      ? '\u2013'
+      : headlineOverride?.label === '+/-' && headline > 0
+        ? `+${headline.toFixed(headlineDecimals)}`
+        : headline.toFixed(headlineDecimals);
+  const headlineLabelText = ratesOnly && !headlineOverride ? 'rates' : headlineLabel;
 
   return (
     <div
@@ -265,9 +277,19 @@ export function DraftPoolRow({
                   {signal.lowSample ? '*' : ''}
                 </span>
                 {positionRank ? <span> · {positionRank}</span> : null}
+                {ratesOnly ? <span> · </span> : null}
               </>
             ) : positionRank ? (
-              <span>{positionRank}</span>
+              <span>{positionRank}{ratesOnly ? ' · ' : ''}</span>
+            ) : null}
+            {ratesOnly ? (
+              <span
+                data-testid="draft-pool-rates-only"
+                className="text-pressbox-orange-soft"
+                title="Conditional per-game rates are published, but no NHL workload is allocated, so there is no season projection. The headline is last season's points."
+              >
+                rates only · no NHL workload
+              </span>
             ) : null}
           </span>
         </span>
@@ -284,8 +306,9 @@ export function DraftPoolRow({
         <span
           className="block font-plex font-medium text-[8px] uppercase tracking-[0.04em] text-pressbox-text/45"
           data-testid="draft-pool-projection-label"
+          title={headlineTitle}
         >
-          {headlineLabel}
+          {headlineLabelText}
         </span>
       </span>
 

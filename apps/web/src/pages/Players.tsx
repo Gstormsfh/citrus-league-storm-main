@@ -52,6 +52,7 @@ import { useCitrusPlayerNotes } from '@/hooks/useCitrusPlayerNotes';
 import { Mug } from '@/components/roster/Mug';
 import type { MugPlayer } from '@/components/roster/headshot';
 import { playerDashboardHref } from '@/components/player/playerAdvancedMetrics';
+import { ProjectionProvenance } from '@/components/player/ProjectionProvenance';
 import {
   usePlayerDashboardIndex,
   type DashboardIndexEntry,
@@ -316,6 +317,7 @@ function PlayerDashboardPanel({ player, skaters, goalies }: { player: DashboardP
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Rolled-forward projection{player.proj_gp != null ? ` · ${player.proj_gp} proj GP` : ''}
         </h3>
+        <ProjectionProvenance className="mt-2" context={player.canonical_context} isGoalie={!!player.is_goalie} />
         {player.proj_fantasy_points == null ? (
           <p className="mt-2 text-sm text-muted-foreground">
             Season totals unavailable. A season-total forecast requires supported production rates and an NHL workload estimate.
