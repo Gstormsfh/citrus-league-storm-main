@@ -161,7 +161,7 @@ const MobileBottomNav = () => {
     '/auth', '/profile-setup', '/verify-email', '/reset-password',
     '/draft', '/draft-v2', '/draft-room',
   ];
-  if (hideOnRoutes.some(route => location.pathname.startsWith(route))) {
+  if (location.pathname === '/' || hideOnRoutes.some(route => location.pathname.startsWith(route))) {
     return null;
   }
 
