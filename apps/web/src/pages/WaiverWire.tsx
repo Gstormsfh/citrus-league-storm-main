@@ -14,7 +14,6 @@ import { isGuestMode } from '@/utils/guestHelpers';
 import { LeagueCreationCTA } from '@/components/LeagueCreationCTA';
 import { WaiverService, type WaiverClaim, type WaiverPriority } from '@/services/WaiverService';
 import { PlayerService, type Player } from '@/services/PlayerService';
-import { LeagueService } from '@/services/LeagueService';
 import { leagueApi } from '@/api/leagues';
 import { rosterApi } from '@/api/rosters';
 import { waiverApi } from '@/api/waivers';
@@ -157,10 +156,6 @@ const WaiverWire = () => {
           setMyRoster([]);
         }
       }
-
-      // Load league to get team count
-      const { league, error: leagueError } = await LeagueService.getLeague(activeLeagueId, user.id);
-      const maxTeams = league?.settings?.teamsCount || 12;
 
       // Get actual team count from teams table (more reliable than waiver_priority length)
       const { data: teams } = await leagueApi.getTeams(activeLeagueId) as { data?: { id: string }[] };
