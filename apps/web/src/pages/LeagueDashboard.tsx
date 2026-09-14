@@ -1,6 +1,7 @@
 import { DesktopProduct } from '@/components/DesktopProduct';
 import { userMessage } from '@/lib/userMessage';
 import { instantToLocalInput, localInputToInstant } from '@/lib/draftTime';
+import { draftReadiness, sizeForLayout } from '@/lib/draftReadiness';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
@@ -87,6 +88,12 @@ const LeagueDashboard = () => {
   const [draftTimeInput, setDraftTimeInput] = useState('');
   const [savingDraftTime, setSavingDraftTime] = useState(false);
   const [teams, setTeams] = useState<Team[]>([]);
+  // ONE OWNER OF TRUTH (2026-09-14): every "can the draft start" question on
+  // this page — the HQ card, the desktop card, the seats tile, the invite
+  // prompt, the settings tab — reads leagues.league_size through this one
+  // value, the same column start_draft_v2 and the scheduled sweep read.
+  // Never settings.teamsCount, never `|| 12`: see lib/draftReadiness.
+  const readiness = useMemo(() => draftReadiness(league, teams), [league, teams]);
   const [userTeam, setUserTeam] = useState<Team | null>(null);
   /** Players on the signed-in manager's roster. null = not known yet or the
    *  request failed — deliberately distinct from 0, so the UI can decline to
@@ -530,7 +537,9 @@ const LeagueDashboard = () => {
       toast({
         title: iso ? 'Draft scheduled' : 'Draft time cleared',
         description: iso
-          ? `${new Date(iso).toLocaleString()}. Every manager sees it on their league page.`
+          ? readiness.ready
+            ? `${new Date(iso).toLocaleString()}. Every manager sees it on their league page.`
+            : `${new Date(iso).toLocaleString()}. ${readiness.have} of ${readiness.size} teams are in. The draft won't start until the league is full.`
           : 'Nobody is waiting on a clock now.',
       });
     } catch (err) {
@@ -1028,23 +1037,26 @@ const LeagueDashboard = () => {
   /** The draft card, in the states the desktop card has (see it below). */
   const hqDraft = useMemo(() => {
     if (!league || !leagueId || league.draft_status === 'completed') return null;
-    const maxTeams = league.settings?.teamsCount || 12;
     let description: string;
     if (league.draft_status === 'in_progress') {
       description = 'The draft is live. Join the room to make your picks.';
     } else if (league.scheduled_draft_time && new Date(league.scheduled_draft_time) > new Date()) {
       const at = new Date(league.scheduled_draft_time);
       description = `Draft scheduled for ${at.toLocaleDateString()} at ${at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      // A scheduled time on a short roster is a join deadline, not a start:
+      // the sweep will decline roster_incomplete at that minute. Say so now,
+      // to the one person who can fill the seats.
+      if (isCommissioner && !readiness.ready) description += ` ${readiness.message}`;
     } else if (isCommissioner) {
-      description = teams.length >= maxTeams
+      description = readiness.ready
         ? 'All teams are ready. Set up and start the draft.'
-        : `Need ${maxTeams - teams.length} more team${maxTeams - teams.length === 1 ? '' : 's'} to start the draft.`;
+        : readiness.message;
     } else {
       description = 'The commissioner starts the draft when every team is in. Join the lobby to wait.';
     }
     return {
       label: league.draft_status === 'in_progress' ? 'Join draft room' : isCommissioner ? 'Go to draft room' : 'Enter draft lobby',
-      hot: league.draft_status === 'in_progress' || (isCommissioner && league.draft_status === 'not_started' && teams.length >= maxTeams),
+      hot: league.draft_status === 'in_progress' || (isCommissioner && league.draft_status === 'not_started' && readiness.ready),
       description,
       // DRAFT CUTOVER (2026-08-31): the live-engine room is /draft-v2/:leagueId.
       to: `/draft-v2/${leagueId}`,
@@ -1055,7 +1067,7 @@ const LeagueDashboard = () => {
         ? { label: 'Run a mock draft', to: '/armchair-gm?tab=mockdraft', note: 'Practice against the computer. Nothing there touches this league.' }
         : null,
     };
-  }, [league, leagueId, isCommissioner, teams.length]);
+  }, [league, leagueId, isCommissioner, readiness]);
 
   if (loading) {
     // PR3: the league chrome over HQ's skeleton below lg; Stormy from lg.
@@ -1099,6 +1111,7 @@ const LeagueDashboard = () => {
   const settingsFieldSections = buildLeagueSettingsSections({
     draftCompleted: league.draft_status === 'completed',
     teamCount: teams.length,
+    draftReadiness: readiness,
     isCategoryLeague,
     waiver: waiverSettings,
     setWaiver: setWaiverSettings,
@@ -1194,11 +1207,11 @@ const LeagueDashboard = () => {
             <InvitePlayersButton
               joinCode={league.join_code}
               leagueName={league.name}
-              defaultOpen={teams.length < (league.settings?.teamsCount || 12)}
-              fill={teams.length < (league.settings?.teamsCount || 12)}
+              defaultOpen={readiness.reason === 'roster_incomplete'}
+              fill={readiness.reason === 'roster_incomplete'}
             />
           )}
-          seats={{ filled: teams.length, max: league.settings?.teamsCount || 12 }}
+          seats={{ filled: teams.length, max: sizeForLayout(readiness) }}
           report={
             teams.length > 0 ? (
               <ReportContentDialog items={teams.map((t) => ({ id: t.id, type: 'team_name' as const, text: t.team_name }))} />
@@ -2309,10 +2322,9 @@ const LeagueDashboard = () => {
                         }
                       }
                       if (isCommissioner) {
-                        const maxTeams = league.settings?.teamsCount || 12;
-                        return teams.length >= maxTeams
+                        return readiness.ready
                           ? 'All teams are ready. Set up and start the draft.'
-                          : `Need ${maxTeams - teams.length} more team${maxTeams - teams.length === 1 ? '' : 's'} to start the draft.`;
+                          : readiness.message;
                       }
                       return 'The commissioner will start the draft when all teams are ready. Join the lobby to wait.';
                     })()}
@@ -2382,7 +2394,7 @@ const LeagueDashboard = () => {
                     // "nothing to do here."
                     className={`w-full font-bold ${
                       league.draft_status === 'in_progress' ||
-                      (isCommissioner && league.draft_status === 'not_started' && teams.length >= (league.settings?.teamsCount || 12))
+                      (isCommissioner && league.draft_status === 'not_started' && readiness.ready)
                         ? 'bg-pastel-orange text-[#581E00] hover:bg-pastel-orange-soft shadow-[0_8px_24px_-8px_rgba(255,168,87,0.5)]'
                         : 'bg-transparent border border-pastel-cream/30 text-pastel-cream hover:bg-white/5 hover:border-pastel-cream/50'
                     } disabled:opacity-50`}
@@ -2608,14 +2620,16 @@ const LeagueDashboard = () => {
                 <div className="font-calistoga text-4xl md:text-5xl text-pastel-cream tabular-nums leading-none">
                   {teams.length}
                   <span className="text-white/55 mx-1.5 text-2xl md:text-3xl">/</span>
-                  <span className="text-pastel-orange">{league.settings?.teamsCount || 12}</span>
+                  <span className="text-pastel-orange">{readiness.size ?? '–'}</span>
                 </div>
-                <p className="text-xs text-white/55 mt-2">Filled · max {league.settings?.teamsCount || 12}</p>
+                <p className="text-xs text-white/55 mt-2">
+                  {readiness.size == null ? 'League size not set' : `Filled · max ${readiness.size}`}
+                </p>
                 {/* Mini fill bar — actual visualization of how many slots are filled */}
                 <div className="mt-3 h-1.5 rounded-full bg-white/10 overflow-hidden">
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-pastel-orange to-pastel-orange-soft transition-all"
-                    style={{ width: `${Math.min(100, (teams.length / (league.settings?.teamsCount || 12)) * 100)}%` }}
+                    style={{ width: `${readiness.size ? Math.min(100, (teams.length / readiness.size) * 100) : 0}%` }}
                   />
                 </div>
               </CardContent>
@@ -2689,7 +2703,7 @@ const LeagueDashboard = () => {
                     </div>
                     <div className="font-calistoga text-xl text-pastel-cream mb-2">League pulse</div>
                     <p className="text-xs text-white/70 leading-relaxed">
-                      <span className="font-bold text-pastel-cream tabular-nums">{teams.length}</span> of <span className="font-bold text-pastel-cream tabular-nums">{league.settings?.teamsCount || 12}</span> teams in.
+                      <span className="font-bold text-pastel-cream tabular-nums">{teams.length}</span> of <span className="font-bold text-pastel-cream tabular-nums">{readiness.size ?? '–'}</span> teams in.
                       {' '}
                       {league.draft_status === 'not_started' && 'Draft is on deck.'}
                       {league.draft_status === 'in_progress' && 'Draft is live. Get in there.'}

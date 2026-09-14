@@ -21,6 +21,7 @@
  * when a change lands only where that is known.
  */
 import { AVAILABLE_CATEGORIES, DEFAULT_ROSTER_SLOTS } from '@/types/leagueTypes';
+import type { DraftReadiness } from '@/lib/draftReadiness';
 import type { ScoringRules } from './useScoringRules';
 
 export interface SettingOption {
@@ -162,6 +163,11 @@ type Set<T> = (update: (prev: T) => T) => void;
 export interface LeagueSettingsInput {
   draftCompleted: boolean;
   teamCount: number;
+  /** ONE OWNER OF TRUTH (2026-09-14): whether the draft can start, read
+   *  from leagues.league_size by lib/draftReadiness. The draft-time field
+   *  tells the commissioner the shortfall here, at the moment they set a
+   *  time, rather than by notification at the scheduled minute. */
+  draftReadiness: DraftReadiness;
   isCategoryLeague: boolean;
   waiver: WaiverState;
   setWaiver: Set<WaiverState>;
@@ -447,7 +453,11 @@ export function buildLeagueSettingsSections(input: LeagueSettingsInput): Setting
             kind: 'text',
             key: 'scheduledDraftTime',
             label: 'Draft time',
-            help: 'Managers see this on their league page, and the draft starts itself when the clock gets there. Leave it empty for no scheduled draft',
+            help: input.draftReadiness.ready
+              ? 'Managers see this on their league page, and the draft starts itself when the clock gets there. Leave it empty for no scheduled draft'
+              : input.draftReadiness.reason === 'size_unset'
+                ? "Set the league size first. The draft can't start, on a clock or by hand, without it"
+                : `${input.draftReadiness.have} of ${input.draftReadiness.size} teams are in. Managers see this time on their league page, but the draft only starts itself if the league is full when the clock gets there`,
             value: draft.scheduledDraftTime,
             inputType: 'datetime-local',
             onChange: (v) => setDraft((p) => ({ ...p, scheduledDraftTime: v })),
