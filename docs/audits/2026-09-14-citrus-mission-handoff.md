@@ -21,6 +21,8 @@ flowchart LR
   S --> V
   C --> X[Versioned guide and export snapshots]
   N[Attributed news and dated evidence] --> T[Remote player-specific editorial]
+  C --> T
+  M --> T
   T --> V
 ```
 
