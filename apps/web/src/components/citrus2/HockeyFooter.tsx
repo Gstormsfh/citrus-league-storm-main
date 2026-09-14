@@ -81,6 +81,7 @@ export function HockeyFooter({
   columns = DEFAULT_COLUMNS,
   socials = ['X', 'IG', 'YT', 'RD'],
   variant = 'marketing',
+  showSquad = true,
 }: {
   columns?: FooterColumn[];
   socials?: string[];
@@ -93,6 +94,8 @@ export function HockeyFooter({
    * the squad, the legal row — and drops the pitch.
    */
   variant?: 'marketing' | 'app';
+  /** Storefronts can keep the product, rather than the mascot roster, in focus. */
+  showSquad?: boolean;
 }) {
   const isApp = variant === 'app';
   return (
@@ -160,24 +163,27 @@ export function HockeyFooter({
           ))}
         </div>
 
-        {/* Squad lineup — Sleeper-style brand layering */}
+        {/* The homepage is deliberately product-led; other marketing and app
+            surfaces may still introduce the squad here. */}
         <div className="border-t border-white/5 pt-6 mb-6 flex items-center justify-between gap-6 flex-wrap">
-          <div className="flex items-center gap-3">
-            <span className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-white/55 font-bold">
-              The Squad
-            </span>
-            <Link to="/about" className="flex items-center -space-x-2 group">
-              {MASCOT_LIST.map((m) => (
-                <img
-                  key={m.id}
-                  src={m.image}
-                  alt={m.name}
-                  className="w-9 h-9 rounded-full ring-2 ring-pastel-surface object-cover transition-transform group-hover:scale-105 hover:!scale-110 hover:z-10 relative"
-                  loading="lazy"
-                />
-              ))}
-            </Link>
-          </div>
+          {showSquad && (
+            <div className="flex items-center gap-3">
+              <span className="font-jbmono text-[10px] tracking-[0.32em] uppercase text-white/55 font-bold">
+                The Squad
+              </span>
+              <Link to="/about" className="flex items-center -space-x-2 group">
+                {MASCOT_LIST.map((m) => (
+                  <img
+                    key={m.id}
+                    src={m.image}
+                    alt={m.name}
+                    className="w-9 h-9 rounded-full ring-2 ring-pastel-surface object-cover transition-transform group-hover:scale-105 hover:!scale-110 hover:z-10 relative"
+                    loading="lazy"
+                  />
+                ))}
+              </Link>
+            </div>
+          )}
           {/* 2026-08-18 launch audit: these were four <a href="#"> stubs
               rendered as real, aria-labelled social buttons on the public
               homepage and eight other pages. Clicking one jumped the user

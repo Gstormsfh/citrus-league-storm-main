@@ -5,10 +5,10 @@
  * Edit copy / structure here once and both routes update together.
  */
 
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import Navbar from '@/components/Navbar';
-import { MASCOT_LIST } from '@/constants/mascots';
 // Siblings are imported by module, not through '@/components/citrus2'. The
 // barrel (index.ts) re-exports this file, so importing the barrel from here
 // makes Homepage <-> index a cycle. Rollup reported it as a cyclic cross-chunk
@@ -23,7 +23,6 @@ import { CtaBanner } from './CtaBanner';
 import { Faq, type FaqEntry } from './Faq';
 import { GameModeCard } from './GameModeCard';
 import { FeatureCard } from './FeatureCard';
-import { MascotCard } from './MascotCard';
 import { StormyChatTile } from './StormyChatTile';
 import { MascotAvatar } from './MascotAvatar';
 // Real hockey iconography, replacing generic lucide
@@ -41,18 +40,80 @@ import {
   RangeIcon,
 } from './HockeyIcons';
 import type { AccentName } from './tokens';
-import { OPENING_NIGHT_LABEL } from '@/lib/season';
 
 // =============================================================================
 // HERO
 // =============================================================================
 
-// Inline component to render a mascot action scene as the hero visual.
-function SceneVisual({ src, alt }: { src: string; alt: string }) {
+// The storefront leads with the product, not a character. These are captures
+// of real shipped mobile components running against the local fixture harness:
+// public NHL identity where available, generated demo values, and no league or
+// account data. They show the product in use, not a fabricated dashboard.
+function ProductVisual() {
+  const [screen, setScreen] = useState<'overview' | 'breakdown'>('overview');
+  const isOverview = screen === 'overview';
+  const activeScreen = isOverview
+    ? {
+        src: '/product-demo/player-dashboard-demo-390.png',
+        alt: 'Citrus player dashboard on mobile, showing a player decision view, expected-goals context, and shot profile.',
+        label: 'Player decision view',
+        detail: 'See the context behind a start-or-sit call.',
+      }
+    : {
+        src: '/product-demo/player-analysis-demo-390.png',
+        alt: 'Citrus player analysis on mobile, showing expected goals, finishing context, and a shot breakdown.',
+        label: 'Shot breakdown',
+        detail: 'Turn a box score into the shots that created it.',
+      };
+
   return (
-    <div className="relative w-full aspect-square max-w-[520px] mx-auto rounded-[28px] overflow-hidden ring-1 ring-white/10 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
-      <img src={src} alt={alt} className="w-full h-full object-cover" loading="eager" />
-    </div>
+    <figure className="relative mx-auto h-[470px] w-full max-w-[520px] overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_75%_12%,rgba(255,107,26,0.25),transparent_38%),linear-gradient(135deg,#101c14,#07110b)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] sm:h-[500px]">
+      <div className="absolute left-5 top-5 z-10 rounded-md border border-white/10 bg-black/45 px-3 py-2 backdrop-blur-sm">
+        <p className="font-plex text-[10px] font-semibold uppercase tracking-[0.16em] text-pressbox-orange-soft">Actual product screens</p>
+        <p className="mt-0.5 font-barlow text-xs text-pressbox-text/70">Demo data · mobile layout</p>
+      </div>
+      <div className={`absolute left-1/2 top-[92px] w-[250px] -translate-x-1/2 overflow-hidden rounded-[25px] border-[5px] border-[#07110b] bg-[#07110b] shadow-[0_24px_36px_-12px_rgba(0,0,0,0.8)] transition-transform duration-300 motion-reduce:transition-none sm:top-[96px] sm:w-[276px] ${
+        isOverview ? '' : 'pt-20'
+      }`}>
+        <img
+          key={activeScreen.src}
+          src={activeScreen.src}
+          alt={activeScreen.alt}
+          width="390"
+          height="844"
+          className="block h-auto w-full object-top animate-fade-in motion-reduce:animate-none"
+          fetchPriority="high"
+        />
+      </div>
+      <div className="absolute bottom-4 left-1/2 z-10 w-[calc(100%-2.5rem)] -translate-x-1/2 rounded-xl border border-white/10 bg-[#0a150d]/90 p-2.5 backdrop-blur-sm sm:w-[calc(100%-3rem)]">
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-white/[0.06] p-1" role="tablist" aria-label="Explore Citrus player screens">
+          {([
+            ['overview', 'Player view'],
+            ['breakdown', 'Shot breakdown'],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={screen === value}
+              aria-controls="product-screen-preview"
+              onClick={() => setScreen(value)}
+              className={`rounded-md px-2 py-2 font-plex text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors motion-reduce:transition-none ${
+                screen === value
+                  ? 'bg-pressbox-orange text-pressbox-orange-ink'
+                  : 'text-pressbox-text/65 hover:bg-white/[0.08] hover:text-pressbox-text'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p id="product-screen-preview" className="mt-2 px-1 font-barlow text-xs text-pressbox-text/70">
+          <span className="font-semibold text-pressbox-text">{activeScreen.label}.</span> {activeScreen.detail}{' '}
+          <span className="text-pressbox-orange-soft/80">Demo data.</span>
+        </p>
+      </div>
+    </figure>
   );
 }
 
@@ -64,18 +125,16 @@ function SceneVisual({ src, alt }: { src: string; alt: string }) {
 // verified (the "31-feature" claim is gone until the model artifact confirms
 // it). Opening night is the first scheduled row in `nhl_games` as of
 // 2026-09-09: 2026-09-29, five games.
-export { OPENING_NIGHT_LABEL };
-
 function getHeroSlides(): HeroSlide[] {
   return [
     {
       id: 'fantasy',
-      eyebrow: `Season-long fantasy hockey · Free · ${OPENING_NIGHT_LABEL}`,
+      eyebrow: '',
       headline: { lead: 'Fantasy hockey', accent: 'for people who watch hockey.' },
-      sub: 'Season-long leagues with your buddies, live scoring on every shift, and projections from an expected-goals model built for the NHL. There are no entry fees and no payouts. It is just hockey.',
+      sub: 'Set up a season-long league with your friends, make lineup decisions with expected-goals context, and follow the scores as games unfold. There are no entry fees and no payouts. It is just hockey.',
       primary: { label: 'Create a league', to: '/create-league' },
       secondary: { label: 'Try a mock draft first', to: '/armchair-gm?tab=mockdraft' },
-      visual: <SceneVisual src="/mascots/scene-squad.webp" alt="The Citrus Squad on the bench" />,
+      visual: <ProductVisual />,
     },
   ];
 }
@@ -84,7 +143,7 @@ function getHeroSlides(): HeroSlide[] {
 // SECTION DATA
 // =============================================================================
 
-const FACT_STRIP = ['Drafts are open', OPENING_NIGHT_LABEL, 'Snake, auction and salary-cap drafts', 'No card, no fees'];
+const FACT_STRIP = ['Snake, auction and salary-cap drafts', 'Custom scoring', 'No card, no fees'];
 
 const GAME_MODES: Array<{
   label: string;
@@ -93,61 +152,61 @@ const GAME_MODES: Array<{
   accent: AccentName;
   icon: React.ComponentType<{ className?: string }>;
   to: string;
-  scene?: string;
+  ctaLabel: string;
 }> = [
   {
     label: 'Fantasy Hockey',
-    scene: '/mascots/scene-squad.webp',
     sub: 'Snake, auction or salary-cap draft, your own scoring, and a live draft room. This is the main event.',
     badge: 'Season',
     accent: 'orange',
     icon: CrossedSticksIcon,
     to: '/create-league',
+    ctaLabel: 'Create a league',
   },
   {
     label: 'Daily Pickem',
-    scene: '/mascots/scene-pickem.webp',
     sub: "Pick the winner of every game on tonight's slate. It locks at puck drop and settles at the final horn.",
     badge: 'Daily',
     accent: 'sage',
     icon: PickemIcon,
     to: '/pool/pickem',
+    ctaLabel: 'Make picks',
   },
   {
     label: 'Survivor Pool',
-    scene: '/mascots/scene-survivor.webp',
     sub: "One team a week, and you can only use each team once. Lose and you're out. The last manager standing takes it.",
     badge: 'Weekly',
     accent: 'butter',
     icon: SurvivorIcon,
     to: '/pool/survivor',
+    ctaLabel: 'Start a pool',
   },
   {
     label: 'Confidence Pool',
-    scene: '/mascots/scene-confidence.webp',
     sub: 'Rank your weekly picks by how sure you are. The ones you are most confident in are worth the most.',
     badge: 'Weekly',
     accent: 'peach',
     icon: ScoreboardIcon,
     to: '/pool/confidence',
+    ctaLabel: 'Start a pool',
   },
   {
     label: 'Stanley Cup Brackets',
-    scene: '/mascots/scene-cup.webp',
     sub: 'Fill in the whole bracket before the first round starts and score it round by round through the Cup Final.',
     badge: 'Apr–Jun',
     accent: 'orange',
     icon: CupIcon,
     to: '/nhl/playoffs',
+    ctaLabel: 'Fill a bracket',
   },
   {
     label: 'Mock Draft',
-    scene: '/mascots/scene-draft.webp',
     sub: 'A 12-team mock against AI managers, no account needed. Good for testing a strategy before the real draft.',
     badge: 'Anytime',
     accent: 'sage',
     icon: DraftIcon,
     to: '/armchair-gm?tab=mockdraft',
+    ctaLabel: 'Start a mock',
   },
 ];
 
@@ -156,38 +215,34 @@ const REAL_FEATURES: Array<{
   desc: string;
   icon: React.ComponentType<{ className?: string }>;
   accent: AccentName;
-  scene?: string;
 }> = [
   {
     label: 'An expected-goals model',
-    scene: '/mascots/scene-xg-model.webp',
     desc: 'Every shot gets an expected-goal value from a gradient-boosted model trained on shot location, shot type and the passing sequence before the shot. Player projections start there, not at last season\'s point totals.',
     icon: XGModelIcon,
     accent: 'orange',
   },
   {
     label: 'A range, not a number',
-    desc: 'Every projection is run as a simulation, so you see a floor, a middle and a ceiling for each skater each night instead of one average. That is what a start-or-sit call actually needs.',
+    desc: 'Where a simulation is available, the projection view gives you a floor, a middle and a ceiling instead of one average. That is the context a start-or-sit call needs.',
     icon: RangeIcon,
     accent: 'sage',
   },
   {
     label: 'Live scoring on every shift',
-    scene: '/mascots/scene-livescoring.webp',
-    desc: 'Goals, assists, hits and blocks land in your matchup as they happen during the game, not after the box score posts.',
+    desc: 'Goals, assists, hits and blocks update your matchup during the game, rather than waiting for a next-day recap.',
     icon: ShiftIcon,
     accent: 'butter',
   },
   {
     label: 'Stormy, the assistant GM',
-    scene: '/mascots/scene-stormy-ai.webp',
     desc: 'Stormy knows your roster and your scoring settings before you ask, and he quotes the number he is leaning on when he answers.',
     icon: ScoreboardIcon,
     accent: 'peach',
   },
   {
     label: 'The stats the pros look at',
-    desc: 'xGF%, Corsi, power-play unit share, deployment and zone entries are on every player\'s page. None of it is behind an upgrade.',
+    desc: 'Player pages bring together xGF%, Corsi, power-play usage and deployment context when the underlying data is available.',
     icon: XGModelIcon,
     accent: 'sage',
   },
@@ -198,8 +253,6 @@ const REAL_FEATURES: Array<{
     accent: 'orange',
   },
 ];
-
-const MASCOT_ACCENTS: AccentName[] = ['orange', 'butter', 'sage', 'peach'];
 
 const FAQ: FaqEntry[] = [
   {
@@ -258,15 +311,6 @@ export function Homepage() {
           and playoff bracket access. Sits above the dark page. */}
       <Navbar />
 
-      {/* Promo banner below the nav */}
-      <div className="relative z-10 bg-gradient-to-r from-pressbox-orange/15 via-pressbox-orange/25 to-pressbox-orange/15 border-y border-pressbox-orange/30">
-        <div className="max-w-[1280px] mx-auto px-6 py-2 text-center">
-          <span className="font-plex font-semibold text-[11px] tracking-[0.16em] uppercase text-pressbox-orange-soft">
-            Free to play · No card required · {OPENING_NIGHT_LABEL}
-          </span>
-        </div>
-      </div>
-
       <RotatingHero slides={slides} />
 
       {/* Fact strip. Every item is a fact about the product today, none of them a stat. */}
@@ -287,7 +331,7 @@ export function Homepage() {
         />
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6 snap-x snap-mandatory">
           {GAME_MODES.map((g) => (
-            <GameModeCard key={g.label} {...g} ctaLabel="Open" />
+            <GameModeCard key={g.label} {...g} landingCta />
           ))}
         </div>
       </section>
@@ -349,20 +393,6 @@ export function Homepage() {
         </div>
       </section>
 
-      {/* The Squad */}
-      <section className={SECTION}>
-        <SectionHeader
-          eyebrow="Roll call"
-          title="The Citrus Squad."
-          sub="Four characters who show up around the app. Stormy is the assistant GM. Lemon, Kiwi and Pineapple turn up in drafts, matchups and the league chat."
-        />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {MASCOT_LIST.map((m, i) => (
-            <MascotCard key={m.id} id={m.id} accent={MASCOT_ACCENTS[i]} />
-          ))}
-        </div>
-      </section>
-
       {/* FAQ */}
       <section className="relative max-w-[860px] mx-auto px-6 pb-24">
         <SectionHeader eyebrow="FAQ" title="Fair questions." align="center" />
@@ -376,12 +406,12 @@ export function Homepage() {
             Start the league. <span className="text-pressbox-orange">Send the link.</span>
           </>
         }
-        sub={`Free to play. Drafts are open now and the season starts Sep 29.`}
+        sub="Free to play. Set your rules, send the invite, and make the league yours."
         ctaLabel="Create your league"
         ctaHref="/create-league"
       />
 
-      <HockeyFooter />
+      <HockeyFooter showSquad={false} />
     </DarkLayout>
   );
 }

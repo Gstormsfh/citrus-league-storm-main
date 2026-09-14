@@ -111,6 +111,13 @@ describe('HockeyFooter — the app variant keeps what in-app users navigate with
     expect(f.getByText(/Terms/i)).toBeTruthy();
   });
 
+  it('can omit the squad row on a product-led marketing page', () => {
+    const f = renderFooter({ showSquad: false });
+    expect(f.queryByText(/The Squad/i)).toBeNull();
+    expect(f.getByText(/Privacy/i)).toBeTruthy();
+    expect(f.getByText(/Terms/i)).toBeTruthy();
+  });
+
   it('renders no dead links in either variant', () => {
     // 2026-08-18 found four `href="#"` social buttons on the public homepage.
     // Whatever the variant, a footer link goes somewhere real.

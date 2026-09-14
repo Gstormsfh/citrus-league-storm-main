@@ -52,3 +52,44 @@ describe('site claims guard', () => {
     });
   }
 });
+
+describe('homepage visual hierarchy', () => {
+  it('keeps mascot scenes out of the storefront hero and card grids', () => {
+    const homepage = readFileSync(join(SRC, 'components/citrus2/Homepage.tsx'), 'utf8');
+
+    // Mascots have a role in the product (notably Stormy's assistant surface),
+    // but marketing should lead with the league experience rather than repeat
+    // character art in the hero and every card.
+    expect(homepage).not.toMatch(/scene-[a-z-]+\.webp/);
+    expect(homepage).not.toContain('MascotCard');
+    expect(homepage).not.toContain('MASCOT_LIST');
+  });
+
+  it('uses labelled, sized mobile product captures rather than an invented dashboard', () => {
+    const homepage = readFileSync(join(SRC, 'components/citrus2/Homepage.tsx'), 'utf8');
+
+    expect(homepage).toContain('Actual product screens');
+    expect(homepage).toContain('/product-demo/player-dashboard-demo-390.png');
+    expect(homepage).toContain('/product-demo/player-analysis-demo-390.png');
+    expect(homepage).toMatch(/width="390"\s+height="844"/);
+    expect(homepage).toContain('Demo data · mobile layout');
+  });
+
+  it('uses a product-led footer without time-sensitive launch copy', () => {
+    const homepage = prose(readFileSync(join(SRC, 'components/citrus2/Homepage.tsx'), 'utf8'));
+
+    // The squad still belongs on the about surface, but not as a final extra
+    // mascot row on the product-led storefront.
+    expect(homepage).toContain('<HockeyFooter showSquad={false} />');
+    expect(homepage).not.toMatch(/Drafts are open|Puck drops|Sep 29/i);
+  });
+
+  it('gives each game-mode CTA a descriptive link rather than nesting a button in one', () => {
+    const card = readFileSync(join(SRC, 'components/citrus2/GameModeCard.tsx'), 'utf8');
+    const homepage = readFileSync(join(SRC, 'components/citrus2/Homepage.tsx'), 'utf8');
+
+    expect(homepage).toContain('<GameModeCard key={g.label} {...g} landingCta />');
+    expect(card).toContain('landingCta && to');
+    expect(card).toContain('aria-label={`${ctaLabel}: ${label}`}');
+  });
+});

@@ -82,8 +82,8 @@ describe('MobileBottomNav — hidden on every draft route (L4)', () => {
   });
 });
 
-describe('MobileBottomNav — still hidden on the original auth/setup routes', () => {
-  const authPaths = ['/auth', '/profile-setup', '/verify-email', '/reset-password'];
+describe('MobileBottomNav — hidden wherever app chrome would cover a public conversion surface', () => {
+  const authPaths = ['/', '/auth', '/profile-setup', '/verify-email', '/reset-password'];
 
   it.each(authPaths)('renders nothing at %s', (path) => {
     renderAt(path);
@@ -94,7 +94,7 @@ describe('MobileBottomNav — still hidden on the original auth/setup routes', (
 describe('MobileBottomNav — positive controls (the nav CAN render here)', () => {
   // Without these, every assertion above would pass for a component that
   // simply never mounts in this harness.
-  const visiblePaths = ['/', '/news', '/league/league-1', '/nhl/playoffs'];
+  const visiblePaths = ['/news', '/league/league-1', '/nhl/playoffs'];
 
   it.each(visiblePaths)('renders the nav at %s', (path) => {
     renderAt(path);

@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
+import { lazy, Suspense } from 'react';
 import { logger } from '@/utils/logger';
-import { Homepage } from '@/components/citrus2';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeague } from '@/contexts/LeagueContext';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -10,6 +10,16 @@ import { Navigate, useLocation } from 'react-router-dom';
 import LoadingScreen from '@/components/LoadingScreen';
 import { isLeagueVisitFresh, markLeagueVisit } from '@/lib/leagueStickiness';
 import { leagueOpenDestination, getLeagueTypeFromSettings } from '@/utils/leagueTypeHelpers';
+
+// The storefront is a website-only surface. Keep its product captures and
+// marketing code out of a Capacitor build entirely, rather than merely
+// deciding not to render it after it has been bundled into the app.
+const WebHomepage = import.meta.env.VITE_NATIVE === '1'
+  ? null
+  : lazy(async () => {
+      const module = await import('@/components/citrus2/Homepage');
+      return { default: module.Homepage };
+    });
 
 /**
  * Production homepage. Renders the Citrus 2.0 Homepage composition (dark
@@ -104,7 +114,12 @@ const Index = () => {
   }
 
   try {
-    return <Homepage />;
+    if (!WebHomepage) return null;
+    return (
+      <Suspense fallback={<div style={{ minHeight: '100vh', background: '#07110b' }} aria-busy="true" />}>
+        <WebHomepage />
+      </Suspense>
+    );
   } catch (error) {
     logger.error('❌ Error in Index component:', error);
     return (

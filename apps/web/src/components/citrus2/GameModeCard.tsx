@@ -21,6 +21,7 @@ export function GameModeCard({
   to,
   ctaLabel = 'Play Now',
   scene,
+  landingCta = false,
 }: {
   label: string;
   sub: string;
@@ -31,8 +32,11 @@ export function GameModeCard({
   ctaLabel?: string;
   /** Optional path to a hero scene image (under /public). Sleeper-style card. */
   scene?: string;
+  /** Website storefront only; native-accessible feature pages retain existing CTA markup. */
+  landingCta?: boolean;
 }) {
   const a = ACCENT_CLASSES[accent];
+  const ctaClass = 'mt-auto w-full inline-flex items-center justify-center gap-1.5 bg-pressbox-orange text-pressbox-orange-ink px-4 h-11 rounded-md font-condensed font-bold uppercase tracking-[0.06em] text-[15px] hover:bg-pastel-orange-soft transition-all duration-200 active:scale-95 group/btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pastel-orange-soft focus-visible:ring-offset-2 focus-visible:ring-offset-pastel-surface';
   const button = (
     <button className="mt-auto w-full inline-flex items-center justify-center gap-1.5 bg-pressbox-orange text-pressbox-orange-ink px-4 h-11 rounded-md font-condensed font-bold uppercase tracking-[0.06em] text-[15px] hover:bg-pastel-orange-soft transition-all duration-200 active:scale-95 group/btn">
       {ctaLabel} <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" strokeWidth={2.5} />
@@ -86,7 +90,15 @@ export function GameModeCard({
             <p className="font-barlow font-normal text-[14px] text-pressbox-text/70 leading-snug mb-4 flex-grow min-h-[80px] line-clamp-4">
               {sub}
             </p>
-            {to ? <Link to={to} className="contents">{button}</Link> : button}
+            {landingCta && to ? (
+              <Link to={to} className={ctaClass} aria-label={`${ctaLabel}: ${label}`}>
+                {ctaLabel} <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" strokeWidth={2.5} />
+              </Link>
+            ) : landingCta ? (
+              <span className={ctaClass} aria-hidden="true">
+                {ctaLabel} <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+              </span>
+            ) : to ? <Link to={to} className="contents">{button}</Link> : button}
           </div>
         </article>
       </GlowCard>

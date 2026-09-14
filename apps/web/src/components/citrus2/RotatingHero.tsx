@@ -1,11 +1,10 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
-import { LivePulse } from './LivePulse';
 
 export interface HeroSlide {
   id: string;
-  eyebrow: string;
+  eyebrow?: string;
   /** Headline rendered as: lead + accent (orange) + optional tail */
   headline: { lead: string; accent: string; tail?: string };
   sub: string;
@@ -43,18 +42,19 @@ export function RotatingHero({
     <section
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
-      className="relative max-w-[1280px] mx-auto px-4 sm:px-6 pt-8 sm:pt-12 lg:pt-16 pb-12"
+      className="relative max-w-[1280px] mx-auto px-4 sm:px-6 pt-32 sm:pt-12 lg:pt-16 pb-8"
     >
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 lg:gap-16 items-center min-h-[400px] sm:min-h-[480px]">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 lg:gap-16 items-center min-h-[400px] sm:min-h-[480px] lg:min-h-0">
         {/* LEFT — copy. key forces re-mount so animate-fade-in re-fires per slide */}
         <div key={`copy-${active}`} className="relative z-10 animate-fade-in">
-          <div className="inline-flex items-center gap-2 mb-5 sm:mb-7 px-3 py-1.5 rounded-md bg-pressbox-orange/15 ring-1 ring-pressbox-orange/30">
-            <LivePulse size="xs" />
-            <span className="font-plex font-semibold text-[11px] tracking-[0.16em] uppercase text-pressbox-orange-soft leading-none">
-              {slide.eyebrow}
-            </span>
-          </div>
-          <h1 className="font-condensed font-extrabold uppercase text-[3rem] sm:text-[4rem] md:text-[4.75rem] lg:text-[6rem] leading-[0.92] tracking-[-0.01em] text-pressbox-text mb-5 sm:mb-6">
+          {slide.eyebrow && (
+            <div className="inline-flex items-center gap-2 mb-5 sm:mb-7 px-3 py-1.5 rounded-md bg-pressbox-orange/15 ring-1 ring-pressbox-orange/30">
+              <span className="font-plex font-semibold text-[11px] tracking-[0.16em] uppercase text-pressbox-orange-soft leading-none">
+                {slide.eyebrow}
+              </span>
+            </div>
+          )}
+          <h1 className="font-condensed font-extrabold uppercase text-[3rem] sm:text-[4rem] md:text-[4.75rem] lg:text-[4.75rem] leading-[0.92] tracking-[-0.01em] text-pressbox-text mb-5 sm:mb-6">
             {slide.headline.lead}
             <br />
             <span className="font-condensed text-pressbox-orange">{slide.headline.accent}</span>
