@@ -72,7 +72,9 @@ function ProductVisual() {
         <p className="font-plex text-[10px] font-semibold uppercase tracking-[0.16em] text-pressbox-orange-soft">Actual product screens</p>
         <p className="mt-0.5 font-barlow text-xs text-pressbox-text/70">Demo data · mobile layout</p>
       </div>
-      <div className="absolute left-1/2 top-[92px] w-[250px] -translate-x-1/2 overflow-hidden rounded-[25px] border-[5px] border-[#07110b] bg-[#07110b] shadow-[0_24px_36px_-12px_rgba(0,0,0,0.8)] transition-transform duration-300 motion-reduce:transition-none sm:top-[96px] sm:w-[276px]">
+      <div className={`absolute left-1/2 top-[92px] w-[250px] -translate-x-1/2 overflow-hidden rounded-[25px] border-[5px] border-[#07110b] bg-[#07110b] shadow-[0_24px_36px_-12px_rgba(0,0,0,0.8)] transition-transform duration-300 motion-reduce:transition-none sm:top-[96px] sm:w-[276px] ${
+        isOverview ? '' : 'pt-20'
+      }`}>
         <img
           key={activeScreen.src}
           src={activeScreen.src}
