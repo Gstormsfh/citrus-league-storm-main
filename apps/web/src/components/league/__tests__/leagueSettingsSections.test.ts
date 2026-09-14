@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { draftReadiness } from '@/lib/draftReadiness';
 import {
   buildLeagueSettingsSections,
   processTimeLabel,
@@ -19,6 +20,7 @@ const noop = () => undefined;
 const base = (over: Partial<LeagueSettingsInput> = {}): LeagueSettingsInput => ({
   draftCompleted: false,
   teamCount: 12,
+  draftReadiness: draftReadiness({ league_size: 12 }, Array.from({ length: 12 })),
   isCategoryLeague: false,
   waiver: {
     waiver_process_time: '02:00:00',
@@ -115,6 +117,25 @@ describe('buildLeagueSettingsSections', () => {
     expect(section(done, 'rosterslots').saveable).toBe(false);
     expect(section(done, 'rosterslots').callout).toMatch(/locked/);
     expect(section(base(), 'draft').saveable).toBe(true);
+  });
+
+  // ONE OWNER OF TRUTH (2026-09-14): the draft-time help line reads
+  // league_size through draftReadiness, so the commissioner learns the
+  // shortfall while setting the time rather than by notification at the
+  // scheduled minute.
+  it('draft time: the help line carries the shortfall, and says so when the size is unset', () => {
+    const help = (input: LeagueSettingsInput) => {
+      const f = fields(input, 'draft').find((x) => x.key === 'scheduledDraftTime') as { help?: string | null } | undefined;
+      if (!f) throw new Error('no scheduledDraftTime field');
+      return String(f.help);
+    };
+    expect(help(base())).toMatch(/starts itself when the clock gets there/);
+    expect(help(base({ draftReadiness: draftReadiness({ league_size: 12 }, Array.from({ length: 9 })) })))
+      .toMatch(/^9 of 12 teams are in\./);
+    expect(help(base({ draftReadiness: draftReadiness({ league_size: 12 }, Array.from({ length: 9 })) })))
+      .toMatch(/only starts itself if the league is full/);
+    expect(help(base({ draftReadiness: draftReadiness({ league_size: null }, Array.from({ length: 12 })) })))
+      .toMatch(/Set the league size first/);
   });
 
   it('trades: the window and the veto threshold appear only for a league vote, with the votes counted', () => {

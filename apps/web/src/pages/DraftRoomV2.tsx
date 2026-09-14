@@ -1,4 +1,5 @@
 import { rankDraftCandidates } from '@/components/draft/draftDecision';
+import { draftReadiness } from '@/lib/draftReadiness';
 import { projectionSettings } from '@citrus/shared';
 import { useLeagueScoringContext } from '@/hooks/useLeagueScoringContext';
 // Phase 4.5 chunk 11g DR-3 (2026-07-29) — the visual room.
@@ -1053,13 +1054,21 @@ function DraftLobbyV2({ leagueId, teams, teamsError, onRetryTeams }: DraftLobbyV
   // league_size (draft_not_configured otherwise). Enabling Start with
   // fewer teams hands the commissioner a button that can only fail
   // with a raw RPC error — so the gate lives HERE, with words.
-  const leagueSize = league?.league_size ?? null;
-  const roomFull = leagueSize == null ? teams.length >= 2 : teams.length >= leagueSize;
-  const startBlockedReason = !roomFull
-    ? leagueSize != null
-      ? `Waiting for teams: ${teams.length} of ${leagueSize} created. The draft needs all ${leagueSize} before it can start.`
-      : 'Need at least 2 teams to start.'
-    : null;
+  //
+  // ONE OWNER OF TRUTH (2026-09-14): the numbers come from
+  // lib/draftReadiness, the same reading the dashboard uses. The old
+  // `league_size == null ? teams.length >= 2` fallback is gone on purpose:
+  // start_draft_v2 raises draft_not_configured on a null size, so that
+  // fallback enabled a button that could only fail — the exact thing this
+  // gate exists to prevent.
+  const readiness = draftReadiness(league, teams);
+  const leagueSize = readiness.size;
+  const roomFull = readiness.ready;
+  const startBlockedReason = roomFull
+    ? null
+    : readiness.reason === 'size_unset'
+      ? readiness.message
+      : `Waiting for teams: ${readiness.have} of ${readiness.size} created. The draft needs all ${readiness.size} before it can start.`;
 
   // Reuses the EXACT ignition the v1 lobby used, via the same plain
   // building blocks useStartDraftFull calls under the hood —

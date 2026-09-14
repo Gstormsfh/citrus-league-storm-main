@@ -52,6 +52,11 @@ export interface League {
     [key: string]: Record<string, number | undefined> | undefined;
   };
   scheduled_draft_time?: string | null;
+  /** ONE OWNER OF TRUTH (2026-09-14): the seat count the draft engine
+   *  ignites against. The API has always returned it (LEAGUE_COLUMNS);
+   *  the client just never declared it, and read settings.teamsCount
+   *  instead. Read it through lib/draftReadiness, never with a fallback. */
+  league_size?: number | null;
   created_at: string;
   updated_at: string;
 }

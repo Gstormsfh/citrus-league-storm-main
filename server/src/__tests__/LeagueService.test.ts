@@ -491,7 +491,7 @@ describe('LeagueService', () => {
     // Reads, by table: leagues → commissioner check, then settings +
     // draft_status, then the update; teams → the membership row, then the
     // count. Dispatch by table so the order of the two never matters.
-    const drive = (draftStatus: string, teamCount: number) => {
+    const drive = (draftStatus: string, teamCount: number, leagueSize: number | null = 12) => {
       let leagues = 0;
       let teams = 0;
       const update = createChain({ data: null, error: null });
@@ -499,7 +499,12 @@ describe('LeagueService', () => {
         if (table === 'leagues') {
           leagues++;
           if (leagues === 1) return createChain({ data: { commissioner_id: 'user-1' }, error: null });
-          if (leagues === 2) return createChain({ data: { settings: { teamsCount: 12 }, draft_status: draftStatus }, error: null });
+          if (leagues === 2) {
+            return createChain({
+              data: { settings: leagueSize == null ? {} : { teamsCount: leagueSize }, draft_status: draftStatus, league_size: leagueSize },
+              error: null,
+            });
+          }
           return update;
         }
         if (table === 'teams') {
@@ -535,6 +540,50 @@ describe('LeagueService', () => {
       expect(update.update).toHaveBeenCalledWith(
         expect.objectContaining({ league_size: 10, settings: expect.objectContaining({ teamsCount: 10 }) }),
       );
+    });
+
+    // ONE OWNER OF TRUTH (2026-09-14): league_size is the column the
+    // scheduled sweep ignites against. A time on a sizeless league books a
+    // draft that can only fail with invalid_league_size at the scheduled
+    // minute, so it is refused up front. A short roster is still accepted:
+    // the time is also the join deadline, and the sweep declines
+    // roster_incomplete safely when it gets there.
+    it('refuses a draft time when league_size is unset', async () => {
+      const update = drive('not_started', 4, null);
+      const result = await service.updateDraftSettings('league-1', 'user-1', {
+        scheduled_draft_time: '2026-09-27T01:00:00.000Z',
+      });
+      expect(result.success).toBe(false);
+      expect(String(result.error)).toContain('Set the league size before scheduling');
+      expect(update.update).not.toHaveBeenCalled();
+    });
+
+    it('accepts a draft time on a short roster — the time is the join deadline', async () => {
+      const update = drive('not_started', 4, 12);
+      const result = await service.updateDraftSettings('league-1', 'user-1', {
+        scheduled_draft_time: '2026-09-27T01:00:00.000Z',
+      });
+      expect(result.success).toBe(true);
+      expect(update.update).toHaveBeenCalledWith(
+        expect.objectContaining({ scheduled_draft_time: '2026-09-27T01:00:00.000Z' }),
+      );
+    });
+
+    it('accepts a size and a time in the same write when the size makes it valid', async () => {
+      const update = drive('not_started', 4, null);
+      const result = await service.updateDraftSettings('league-1', 'user-1', {
+        teams_count: 10,
+        scheduled_draft_time: '2026-09-27T01:00:00.000Z',
+      });
+      expect(result.success).toBe(true);
+      expect(update.update).toHaveBeenCalledWith(expect.objectContaining({ league_size: 10 }));
+    });
+
+    it('still clears a draft time on a sizeless league — clearing books nothing', async () => {
+      const update = drive('not_started', 4, null);
+      const result = await service.updateDraftSettings('league-1', 'user-1', { scheduled_draft_time: null });
+      expect(result.success).toBe(true);
+      expect(update.update).toHaveBeenCalledWith(expect.objectContaining({ scheduled_draft_time: null }));
     });
   });
 });

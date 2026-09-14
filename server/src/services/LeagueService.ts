@@ -452,9 +452,26 @@ export class LeagueService {
 
     const { data: league } = await this.supabase
       .from('leagues')
-      .select('settings, draft_status')
+      .select('settings, draft_status, league_size')
       .eq('id', leagueId)
       .single();
+
+    // ONE OWNER OF TRUTH (2026-09-14): a scheduled draft ignites through
+    // start_due_scheduled_drafts, which refuses invalid_league_size against
+    // leagues.league_size before it builds an order. Accepting a time on a
+    // league with no size books a draft that cannot start; the commissioner
+    // would learn that from a notification at the scheduled minute. Refuse
+    // here, with the reason, while there is still someone to read it. A
+    // short roster is NOT refused: the time doubles as the join deadline,
+    // and the sweep already declines roster_incomplete safely at fire time.
+    const scheduling = typeof draftSettings.scheduled_draft_time === 'string';
+    const sizeAfterWrite = draftSettings.teams_count ?? (league as { league_size?: number | null } | null)?.league_size ?? null;
+    if (scheduling && !(typeof sizeAfterWrite === 'number' && sizeAfterWrite > 0)) {
+      return {
+        success: false,
+        error: "Set the league size before scheduling the draft — the draft can't start without it.",
+      };
+    }
 
     // SETTINGS PASS-THROUGH (2026-09-05): the league's size and the number
     // of rounds are the draft's geometry. submit_pick_v2 derives every
