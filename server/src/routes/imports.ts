@@ -2,7 +2,13 @@
  * League history import, trophy room, and member claiming.
  *
  *   POST /api/imports/espn/discover                       any signed-in user; public leagues need no credentials
+ *   GET  /api/imports/yahoo/connect                       any signed-in user; where to send the browser
+ *   POST /api/imports/yahoo/callback                      any signed-in user; redeems the code Yahoo sent back
+ *   GET  /api/imports/yahoo/connection                    any signed-in user; connected or not
+ *   DELETE /api/imports/yahoo/connection                  any signed-in user; forget the refresh token
+ *   GET  /api/imports/yahoo/leagues                       any signed-in user with a connection; their NHL leagues, by chain
  *   POST /api/leagues/:leagueId/imports/espn              commissioner; starts a background job
+ *   POST /api/leagues/:leagueId/imports/yahoo             commissioner; starts a background job
  *   GET  /api/leagues/:leagueId/imports/:jobId            member
  *   GET  /api/leagues/:leagueId/history                   member; the trophy room
  *   GET  /api/leagues/:leagueId/history/unclaimed         member; "which one is you?" and whether the caller still needs asking
@@ -19,6 +25,11 @@
  * ESPN credentials, when supplied, arrive in the request body, are handed to
  * the job closure, and are never written to a table or a log. The iOS binary
  * never sends them; only the web import page does.
+ *
+ * Yahoo is OAuth: the browser goes to Yahoo (system browser on iOS, never a
+ * WebView), comes back to the web callback page with a code, and that page
+ * posts the code here with the user's own JWT. The refresh token is sealed
+ * server-side; the client never sees a Yahoo token of any kind.
  */
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -31,13 +42,16 @@ import { AppError } from '../lib/errors';
 import { ok, created, fail, handleError } from '../lib/responses';
 import { AuditService } from '../services/AuditService';
 import { EspnClient, type EspnCredentials } from '../import/espn/client';
-import { NeedsCredentialsError } from '../import/types';
+import { YahooClient } from '../import/yahoo/client';
+import { YahooOAuth } from '../import/yahoo/oauth';
+import { NeedsCredentialsError, SourceThrottledError } from '../import/types';
 import { LeagueImportService } from '../services/import/LeagueImportService';
 import { ScoringTranslationService } from '../services/import/ScoringTranslationService';
 import type { ImportedSettings } from '../import/types';
 import { TrophyService } from '../services/import/TrophyService';
 import { MemberClaimService } from '../services/import/MemberClaimService';
 import { PlayerCrosswalkService } from '../services/import/PlayerCrosswalkService';
+import { YahooConnectionService } from '../services/import/YahooConnectionService';
 
 const espnCredentials = z.object({
   espnS2: z.string().min(20).max(4000),
@@ -54,6 +68,14 @@ const schemas = {
     seasons: z.array(z.number().int().min(1990).max(2100)).max(40).optional(),
     latestEspnSeason: z.number().int().min(1990).max(2100).optional(),
     credentials: espnCredentials,
+  }),
+  yahooCallback: z.object({
+    code: z.string().min(1).max(2000),
+    state: z.string().min(1).max(2000),
+  }),
+  yahooRun: z.object({
+    leagueKey: z.string().regex(/^\d{1,6}\.l\.\d{1,12}$/),
+    seasons: z.array(z.number().int().min(1990).max(2100)).max(40).optional(),
   }),
   claim: z.object({
     memberId: z.string().uuid(),
@@ -109,6 +131,76 @@ importRoutes.post('/espn/discover', validateBody(schemas.espnDiscover), async (c
   }
 });
 
+// ---- Yahoo: connection ---------------------------------------------------------
+
+const YAHOO_NOT_CONFIGURED = 'Yahoo import is not available yet.';
+
+// GET /api/imports/yahoo/connect
+importRoutes.get('/yahoo/connect', async (c) => {
+  const connection = new YahooConnectionService(supabaseAdmin);
+  if (!connection.isConfigured()) return fail(c, AppError.serviceUnavailable(YAHOO_NOT_CONFIGURED));
+  const { url } = new YahooOAuth().authorizeUrl(c.get('userId'));
+  return ok(c, { url });
+});
+
+// POST /api/imports/yahoo/callback
+importRoutes.post('/yahoo/callback', validateBody(schemas.yahooCallback), async (c) => {
+  const userId = c.get('userId');
+  const body = getValidatedBody<z.infer<typeof schemas.yahooCallback>>(c);
+  const connection = new YahooConnectionService(supabaseAdmin);
+  if (!connection.isConfigured()) return fail(c, AppError.serviceUnavailable(YAHOO_NOT_CONFIGURED));
+  if (!new YahooOAuth().verifyState(body.state, userId)) {
+    return fail(c, AppError.badRequest('That Yahoo sign-in has expired or belongs to a different session. Start again.'));
+  }
+  try {
+    const { guid } = await connection.connect(userId, body.code);
+    void new AuditService(createUserClient(c.get('userToken'))).log('OAUTH_CONNECTED', null, { platform: 'yahoo' });
+    return ok(c, { connected: true, guid });
+  } catch (e) {
+    // Never echo the code or Yahoo's error body.
+    return fail(c, AppError.badGateway('Yahoo did not accept the sign-in. Try connecting again.'));
+  }
+});
+
+// GET /api/imports/yahoo/connection
+importRoutes.get('/yahoo/connection', async (c) => {
+  const connection = new YahooConnectionService(supabaseAdmin);
+  try {
+    const status = await connection.status(c.get('userId'));
+    return ok(c, { ...status, configured: connection.isConfigured() });
+  } catch (e) {
+    return handleError(c, e, 'Failed to read Yahoo connection');
+  }
+});
+
+// DELETE /api/imports/yahoo/connection
+importRoutes.delete('/yahoo/connection', async (c) => {
+  const userId = c.get('userId');
+  try {
+    await new YahooConnectionService(supabaseAdmin).disconnect(userId);
+    void new AuditService(createUserClient(c.get('userToken'))).log('OAUTH_DISCONNECTED', null, { platform: 'yahoo' });
+    return ok(c, { connected: false });
+  } catch (e) {
+    return handleError(c, e, 'Failed to disconnect Yahoo');
+  }
+});
+
+// GET /api/imports/yahoo/leagues
+importRoutes.get('/yahoo/leagues', async (c) => {
+  const userId = c.get('userId');
+  const connection = new YahooConnectionService(supabaseAdmin);
+  if (!connection.isConfigured()) return fail(c, AppError.serviceUnavailable(YAHOO_NOT_CONFIGURED));
+  const service = new LeagueImportService(createUserClient(c.get('userToken')), supabaseAdmin);
+  try {
+    const client = new YahooClient(connection.tokenProvider(userId));
+    return ok(c, await service.discoverYahoo(client));
+  } catch (e) {
+    if (e instanceof NeedsCredentialsError) return fail(c, AppError.conflict(e.message));
+    if (e instanceof SourceThrottledError) return fail(c, AppError.serviceUnavailable('Yahoo is rate limiting requests. Try again in a minute.'));
+    return handleError(c, e, 'Could not list your Yahoo leagues');
+  }
+});
+
 export { importRoutes };
 
 // ---- league-scoped routes -----------------------------------------------------
@@ -132,6 +224,30 @@ leagueHistoryRoutes.post('/:leagueId/imports/espn', commissionerMiddleware, vali
     });
     const audit = new AuditService(supabase);
     void audit.log('LEAGUE_HISTORY_IMPORT', leagueId, { platform: 'espn', externalLeagueId: body.externalLeagueId, jobId: job.id, withCredentials: Boolean(body.credentials) });
+    return created(c, job);
+  } catch (e) {
+    return handleError(c, e, 'Failed to start import');
+  }
+});
+
+// POST /api/leagues/:leagueId/imports/yahoo
+leagueHistoryRoutes.post('/:leagueId/imports/yahoo', commissionerMiddleware, validateBody(schemas.yahooRun), async (c) => {
+  const leagueId = c.req.param('leagueId');
+  const userId = c.get('userId');
+  const body = getValidatedBody<z.infer<typeof schemas.yahooRun>>(c);
+  const supabase = createUserClient(c.get('userToken'));
+  const connection = new YahooConnectionService(supabaseAdmin);
+  if (!connection.isConfigured()) return fail(c, AppError.serviceUnavailable(YAHOO_NOT_CONFIGURED));
+  try {
+    const status = await connection.status(userId);
+    if (!status.connected) return fail(c, AppError.conflict('Connect Yahoo before importing a league.'));
+    const service = new LeagueImportService(supabase, supabaseAdmin);
+    const job = await service.startYahoo({
+      leagueId, leagueKey: body.leagueKey, requestedBy: userId,
+      client: new YahooClient(connection.tokenProvider(userId), undefined, 250),
+      importerGuid: status.guid, seasons: body.seasons,
+    });
+    void new AuditService(supabase).log('LEAGUE_HISTORY_IMPORT', leagueId, { platform: 'yahoo', leagueKey: body.leagueKey, jobId: job.id });
     return created(c, job);
   } catch (e) {
     return handleError(c, e, 'Failed to start import');

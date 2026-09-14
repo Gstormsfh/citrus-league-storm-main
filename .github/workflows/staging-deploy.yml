@@ -137,9 +137,13 @@ jobs:
             APPLE_CLIENT_ID=APPLE_CLIENT_ID:latest
             APPLE_CLIENT_SECRET=APPLE_CLIENT_SECRET:latest
             APPLE_TOKEN_ENCRYPTION_KEY=APPLE_TOKEN_ENCRYPTION_KEY:latest
+            YAHOO_CLIENT_ID=YAHOO_CLIENT_ID:latest
+            YAHOO_CLIENT_SECRET=YAHOO_CLIENT_SECRET:latest
+            YAHOO_TOKEN_ENCRYPTION_KEY=YAHOO_TOKEN_ENCRYPTION_KEY:latest
           env_vars: |
             NODE_ENV=production
             DEPLOYMENT_ENV=staging
+            YAHOO_REDIRECT_URI=https://citrus-fantasy-staging.web.app/import/yahoo/callback
           # Staging resource limits (match ops/cloudrun/service-staging.yaml).
           # Smaller than prod: no real users depend on staging warmth.
           flags: >-
