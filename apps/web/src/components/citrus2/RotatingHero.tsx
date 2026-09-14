@@ -42,7 +42,7 @@ export function RotatingHero({
     <section
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
-      className="relative max-w-[1280px] mx-auto px-4 sm:px-6 pt-32 sm:pt-12 lg:pt-16 pb-8"
+      className="relative max-w-[1280px] mx-auto px-4 sm:px-6 pt-36 sm:pt-24 lg:pt-24 pb-8"
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 lg:gap-16 items-center min-h-[400px] sm:min-h-[480px] lg:min-h-0">
         {/* LEFT — copy. key forces re-mount so animate-fade-in re-fires per slide */}
@@ -83,7 +83,7 @@ export function RotatingHero({
         </div>
 
         {/* RIGHT — visual */}
-        <div key={`visual-${active}`} className="relative animate-fade-in">
+        <div key={`visual-${active}`} className="relative animate-fade-in lg:translate-y-6">
           {slide.visual}
         </div>
       </div>

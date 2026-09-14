@@ -50,66 +50,73 @@ import type { AccentName } from './tokens';
 // public NHL identity where available, generated demo values, and no league or
 // account data. They show the product in use, not a fabricated dashboard.
 function ProductVisual() {
-  const [screen, setScreen] = useState<'overview' | 'breakdown'>('overview');
-  const isOverview = screen === 'overview';
-  const activeScreen = isOverview
-    ? {
-        src: '/product-demo/player-dashboard-demo-390.png',
-        alt: 'Citrus player dashboard on mobile, showing a player decision view, expected-goals context, and shot profile.',
-        label: 'Player decision view',
-        detail: 'See the context behind a start-or-sit call.',
-      }
-    : {
-        src: '/product-demo/player-analysis-demo-390.png',
-        alt: 'Citrus player analysis on mobile, showing expected goals, finishing context, and a shot breakdown.',
-        label: 'Shot breakdown',
-        detail: 'Turn a box score into the shots that created it.',
-      };
+  // Both screens deliberately remain in the composition. The controls only
+  // bring one forward: a player decision view beside a real shot-map crop is
+  // the point of this hero, and a tab should not make either proof disappear.
+  const [focus, setFocus] = useState<'player' | 'heatmap'>('player');
+  const playerFocused = focus === 'player';
 
   return (
-    <figure className="relative mx-auto h-[470px] w-full max-w-[520px] overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_75%_12%,rgba(255,107,26,0.25),transparent_38%),linear-gradient(135deg,#101c14,#07110b)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] sm:h-[500px]">
+    <figure className="relative mx-auto h-[490px] w-full max-w-[540px] overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_75%_12%,rgba(255,107,26,0.25),transparent_38%),linear-gradient(135deg,#101c14,#07110b)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] sm:h-[520px]">
       <div className="absolute left-5 top-5 z-10 rounded-md border border-white/10 bg-black/45 px-3 py-2 backdrop-blur-sm">
         <p className="font-plex text-[10px] font-semibold uppercase tracking-[0.16em] text-pressbox-orange-soft">Actual product screens</p>
         <p className="mt-0.5 font-barlow text-xs text-pressbox-text/70">Demo data · mobile layout</p>
       </div>
-      <div className={`absolute left-1/2 top-[92px] w-[250px] -translate-x-1/2 overflow-hidden rounded-[25px] border-[5px] border-[#07110b] bg-[#07110b] shadow-[0_24px_36px_-12px_rgba(0,0,0,0.8)] transition-transform duration-300 motion-reduce:transition-none sm:top-[96px] sm:w-[276px] ${
-        isOverview ? '' : 'pt-20'
-      }`}>
+
+      <div
+        className={`absolute left-[2%] top-[100px] h-[330px] w-[52%] overflow-hidden rounded-[23px] border-[5px] border-[#07110b] bg-[#07110b] shadow-[0_24px_36px_-12px_rgba(0,0,0,0.8)] transition-[transform,filter] duration-300 motion-reduce:transition-none sm:top-[108px] sm:h-[360px] ${
+          playerFocused ? 'z-[3] -rotate-[2deg] scale-100' : 'z-[1] -rotate-[5deg] scale-[0.94] brightness-75'
+        }`}
+      >
         <img
-          key={activeScreen.src}
-          src={activeScreen.src}
-          alt={activeScreen.alt}
+          src="/product-demo/player-dashboard-demo-390.png"
+          alt="Citrus player dashboard on mobile, showing Zach Werenski's player decision view and advanced stats."
           width="390"
           height="844"
-          className="block h-auto w-full object-top animate-fade-in motion-reduce:animate-none"
+          className="block h-auto w-full object-top"
           fetchPriority="high"
         />
       </div>
+
+      <div
+        className={`absolute right-[2%] top-[142px] h-[300px] w-[54%] overflow-hidden rounded-[23px] border-[5px] border-[#07110b] bg-[#07110b] shadow-[0_24px_36px_-12px_rgba(0,0,0,0.8)] transition-[transform,filter] duration-300 motion-reduce:transition-none sm:top-[154px] sm:h-[328px] ${
+          playerFocused ? 'z-[2] rotate-[3deg] scale-[0.95] brightness-90' : 'z-[4] rotate-[2deg] scale-100'
+        }`}
+      >
+        <img
+          src="/product-demo/player-dashboard-demo-390.png"
+          alt="Citrus player dashboard on mobile, cropped to Zach Werenski's real shot heatmap."
+          width="390"
+          height="844"
+          className="block h-auto w-full -translate-y-[55%]"
+        />
+      </div>
+
       <div className="absolute bottom-4 left-1/2 z-10 w-[calc(100%-2.5rem)] -translate-x-1/2 rounded-xl border border-white/10 bg-[#0a150d]/90 p-2.5 backdrop-blur-sm sm:w-[calc(100%-3rem)]">
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-white/[0.06] p-1" role="tablist" aria-label="Explore Citrus player screens">
-          {([
-            ['overview', 'Player view'],
-            ['breakdown', 'Shot breakdown'],
-          ] as const).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={screen === value}
-              aria-controls="product-screen-preview"
-              onClick={() => setScreen(value)}
-              className={`rounded-md px-2 py-2 font-plex text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors motion-reduce:transition-none ${
-                screen === value
-                  ? 'bg-pressbox-orange text-pressbox-orange-ink'
-                  : 'text-pressbox-text/65 hover:bg-white/[0.08] hover:text-pressbox-text'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-white/[0.06] p-1" aria-label="Choose the foreground Citrus product screen">
+          <button
+            type="button"
+            aria-pressed={playerFocused}
+            onClick={() => setFocus('player')}
+            className={`rounded-md px-2 py-2 font-plex text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors motion-reduce:transition-none ${
+              playerFocused ? 'bg-pressbox-orange text-pressbox-orange-ink' : 'text-pressbox-text/65 hover:bg-white/[0.08] hover:text-pressbox-text'
+            }`}
+          >
+            Player view
+          </button>
+          <button
+            type="button"
+            aria-pressed={!playerFocused}
+            onClick={() => setFocus('heatmap')}
+            className={`rounded-md px-2 py-2 font-plex text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors motion-reduce:transition-none ${
+              !playerFocused ? 'bg-pressbox-orange text-pressbox-orange-ink' : 'text-pressbox-text/65 hover:bg-white/[0.08] hover:text-pressbox-text'
+            }`}
+          >
+            Shot heatmap
+          </button>
         </div>
-        <p id="product-screen-preview" className="mt-2 px-1 font-barlow text-xs text-pressbox-text/70">
-          <span className="font-semibold text-pressbox-text">{activeScreen.label}.</span> {activeScreen.detail}{' '}
+        <p className="mt-2 px-1 font-barlow text-xs text-pressbox-text/70">
+          <span className="font-semibold text-pressbox-text">Player context and shot location.</span>{' '}
           <span className="text-pressbox-orange-soft/80">Demo data.</span>
         </p>
       </div>
