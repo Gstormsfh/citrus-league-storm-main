@@ -259,14 +259,21 @@ export class PlayerService {
     }
   }
 
-  /** Refresh publication evidence outside the ordinary stats cache. No eligibility mutation. */
-  private async withAvailability(players: NormalizedPlayer[]): Promise<NormalizedPlayer[]> {
-    let contexts;
+  private async readAvailabilityContexts() {
     try {
-      contexts = await new CanonicalProjectionService(this.supabase).getPublishedContexts(getProjectionsSeason());
+      return await new CanonicalProjectionService(this.supabase).getPublishedContexts(getProjectionsSeason());
     } catch {
       // Unavailable publication is unknown; independently dated reported facts may still apply.
+      return undefined;
     }
+  }
+
+  /** Refresh publication evidence outside the ordinary stats cache. No eligibility mutation. */
+  private async withAvailability(
+    players: NormalizedPlayer[],
+    contextsRead = this.readAvailabilityContexts(),
+  ): Promise<NormalizedPlayer[]> {
+    const contexts = await contextsRead;
     return players.map(player => {
       const availability = resolvePlayerAvailability({ ...player, canonical_context: contexts?.get(String(player.id)) ?? null });
       return { ...player, availability, is_ir_eligible: isFantasyIrEligible(availability) };
@@ -399,6 +406,9 @@ export class PlayerService {
     }
 
     const dirIds = ((directory || []) as unknown as PlayerDirectoryRow[]).map((p) => p.player_id);
+    // Independent of enrichment, but start only after directory success so its
+    // error remains decisive. Reuse this caught outcome even when unavailable.
+    const contextsRead = this.readAvailabilityContexts();
 
     const [{ data: stats }, { data: talents }, { data: gsax }] = await Promise.all([
       // Stats at the metrics season, same rule as getAllPlayers().
@@ -430,7 +440,7 @@ export class PlayerService {
       return buildPlayer(p, stat, talent, goalieGsax, getMetricsSeason());
     });
 
-    return { players: await this.withAvailability(players), error: null };
+    return { players: await this.withAvailability(players, contextsRead), error: null };
   }
 
   /** Search players by name */

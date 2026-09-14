@@ -6,10 +6,22 @@
 
 import { apiClient } from './client';
 import { createApiCache, CACHE_TTL } from './cache';
+import type { PlayerAvailability } from '@citrus/shared';
 
 const c = createApiCache();
 
 export const playerApi = {
+  /** Fresh maintained IR evidence; deliberately bypass player/stat TTL caches. */
+  async getAvailabilityByIds(ids: string[], signal?: AbortSignal) {
+    const selected = [...new Set(ids)].sort();
+    if (!selected.length) return [];
+    const response = await apiClient.get<Array<{ id: string | number; availability?: PlayerAvailability | null }>>(
+      `/api/players/by-ids?ids=${selected.join(',')}`, { signal },
+    );
+    const requested = new Set(selected);
+    return (response.data ?? []).filter(row => requested.has(String(row.id)))
+      .map(row => ({ id: String(row.id), availability: row.availability ?? null }));
+  },
   /** Search/list players */
   searchPlayers(params?: {
     search?: string;
