@@ -64,4 +64,31 @@ describe('homepage visual hierarchy', () => {
     expect(homepage).not.toContain('MascotCard');
     expect(homepage).not.toContain('MASCOT_LIST');
   });
+
+  it('uses labelled, sized mobile product captures rather than an invented dashboard', () => {
+    const homepage = readFileSync(join(SRC, 'components/citrus2/Homepage.tsx'), 'utf8');
+
+    expect(homepage).toContain('Actual product screens');
+    expect(homepage).toContain('/product-demo/player-dashboard-demo-390.png');
+    expect(homepage).toContain('/product-demo/scores-demo-390.png');
+    expect(homepage).toMatch(/width="390"\s+height="844"/);
+    expect(homepage).toContain('Demo data · mobile layout');
+  });
+
+  it('uses a product-led footer without time-sensitive launch copy', () => {
+    const homepage = prose(readFileSync(join(SRC, 'components/citrus2/Homepage.tsx'), 'utf8'));
+
+    // The squad still belongs on the about surface, but not as a final extra
+    // mascot row on the product-led storefront.
+    expect(homepage).toContain('<HockeyFooter showSquad={false} />');
+    expect(homepage).not.toMatch(/Drafts are open|Puck drops|Sep 29/i);
+  });
+
+  it('gives each game-mode CTA a descriptive link rather than nesting a button in one', () => {
+    const card = readFileSync(join(SRC, 'components/citrus2/GameModeCard.tsx'), 'utf8');
+
+    expect(card).not.toContain('className="contents"');
+    expect(card).not.toMatch(/<button\b/);
+    expect(card).toContain('aria-label={`${ctaLabel}: ${label}`}');
+  });
 });

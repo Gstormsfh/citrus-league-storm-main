@@ -39,45 +39,46 @@ import {
   RangeIcon,
 } from './HockeyIcons';
 import type { AccentName } from './tokens';
-import { OPENING_NIGHT_LABEL } from '@/lib/season';
 
 // =============================================================================
 // HERO
 // =============================================================================
 
-// The storefront leads with the product, not a character. Mascots belong in
-// the places where they have a role (for example, Stormy's assistant section
-// below), rather than becoming decoration on every marketing card.
+// The storefront leads with the product, not a character. These are captures
+// of real shipped mobile components running against the local fixture harness:
+// public NHL identity where available, generated demo values, and no league or
+// account data. They show the product in use, not a fabricated dashboard.
 function ProductVisual() {
   return (
-    <div className="relative w-full max-w-[520px] mx-auto rounded-[28px] overflow-hidden border border-white/10 bg-gradient-to-br from-pressbox-surface to-[#101c14] p-4 sm:p-6 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
-      <div className="flex items-center justify-between border-b border-white/10 pb-4">
-        <div>
-          <p className="font-plex text-[10px] font-semibold uppercase tracking-[0.16em] text-pressbox-text/55">Your league</p>
-          <p className="mt-1 font-condensed text-2xl font-extrabold uppercase text-pressbox-text">Draft night</p>
-        </div>
-        <span className="rounded-md bg-pressbox-orange/15 px-2.5 py-1 font-plex text-[10px] font-semibold uppercase tracking-[0.12em] text-pressbox-orange-soft ring-1 ring-pressbox-orange/30">Open</span>
+    <figure className="relative mx-auto h-[500px] w-full max-w-[520px] overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_75%_12%,rgba(255,107,26,0.25),transparent_38%),linear-gradient(135deg,#101c14,#07110b)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] sm:h-[540px]">
+      <div className="absolute left-5 top-5 z-10 rounded-md border border-white/10 bg-black/45 px-3 py-2 backdrop-blur-sm">
+        <p className="font-plex text-[10px] font-semibold uppercase tracking-[0.16em] text-pressbox-orange-soft">Actual product screens</p>
+        <p className="mt-0.5 font-barlow text-xs text-pressbox-text/70">Demo data · mobile layout</p>
       </div>
-      <div className="grid grid-cols-3 gap-3 py-5">
-        {[
-          ['Set up', CrossedSticksIcon],
-          ['Draft', DraftIcon],
-          ['Compete', ScoreboardIcon],
-        ].map(([label, Icon]) => {
-          const CardIcon = Icon as React.ComponentType<{ className?: string }>;
-          return (
-            <div key={label as string} className="rounded-xl border border-white/10 bg-black/15 p-3 sm:p-4">
-              <CardIcon className="h-5 w-5 text-pressbox-orange" />
-              <p className="mt-5 font-condensed text-base font-bold uppercase text-pressbox-text">{label as string}</p>
-            </div>
-          );
-        })}
+      <div className="absolute -left-7 top-[84px] w-[255px] overflow-hidden rounded-[25px] border-[5px] border-[#07110b] bg-[#07110b] shadow-[0_24px_36px_-12px_rgba(0,0,0,0.8)] sm:left-7 sm:w-[280px]">
+        <img
+          src="/product-demo/player-dashboard-demo-390.png"
+          alt="Citrus player dashboard on mobile, showing a player decision view, expected-goals context, and shot profile."
+          width="390"
+          height="844"
+          className="block h-auto w-full"
+          fetchPriority="high"
+        />
       </div>
-      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-        <p className="font-plex text-[10px] font-semibold uppercase tracking-[0.14em] text-pressbox-text/55">Built for the whole season</p>
-        <p className="mt-2 font-barlow text-sm leading-relaxed text-pressbox-text/75">Your draft, your scoring, and a live matchup in one league home.</p>
+      <div className="absolute -right-12 bottom-[-16px] w-[190px] overflow-hidden rounded-[22px] border-4 border-[#07110b] bg-[#07110b] shadow-[0_20px_36px_-12px_rgba(0,0,0,0.8)] sm:right-4 sm:w-[210px]">
+        <img
+          src="/product-demo/scores-demo-390.png"
+          alt="Citrus scores screen on mobile, showing a game slate and player projections."
+          width="390"
+          height="844"
+          className="block h-auto w-full"
+          loading="lazy"
+        />
       </div>
-    </div>
+      <figcaption className="absolute bottom-4 left-5 right-[126px] z-10 font-plex text-[10px] font-semibold uppercase tracking-[0.12em] text-pressbox-text/60 sm:right-[145px]">
+        Decision context, then the slate
+      </figcaption>
+    </figure>
   );
 }
 
@@ -89,15 +90,13 @@ function ProductVisual() {
 // verified (the "31-feature" claim is gone until the model artifact confirms
 // it). Opening night is the first scheduled row in `nhl_games` as of
 // 2026-09-09: 2026-09-29, five games.
-export { OPENING_NIGHT_LABEL };
-
 function getHeroSlides(): HeroSlide[] {
   return [
     {
       id: 'fantasy',
-      eyebrow: `Season-long fantasy hockey · Free · ${OPENING_NIGHT_LABEL}`,
+      eyebrow: 'Season-long fantasy hockey · Free · No card required',
       headline: { lead: 'Fantasy hockey', accent: 'for people who watch hockey.' },
-      sub: 'Season-long leagues with your buddies, live scoring on every shift, and projections from an expected-goals model built for the NHL. There are no entry fees and no payouts. It is just hockey.',
+      sub: 'Set up a season-long league with your friends, make lineup decisions with expected-goals context, and follow the scores as games unfold. There are no entry fees and no payouts. It is just hockey.',
       primary: { label: 'Create a league', to: '/create-league' },
       secondary: { label: 'Try a mock draft first', to: '/armchair-gm?tab=mockdraft' },
       visual: <ProductVisual />,
@@ -109,7 +108,7 @@ function getHeroSlides(): HeroSlide[] {
 // SECTION DATA
 // =============================================================================
 
-const FACT_STRIP = ['Drafts are open', OPENING_NIGHT_LABEL, 'Snake, auction and salary-cap drafts', 'No card, no fees'];
+const FACT_STRIP = ['Snake, auction and salary-cap drafts', 'Custom scoring', 'No card, no fees'];
 
 const GAME_MODES: Array<{
   label: string;
@@ -118,6 +117,7 @@ const GAME_MODES: Array<{
   accent: AccentName;
   icon: React.ComponentType<{ className?: string }>;
   to: string;
+  ctaLabel: string;
 }> = [
   {
     label: 'Fantasy Hockey',
@@ -126,6 +126,7 @@ const GAME_MODES: Array<{
     accent: 'orange',
     icon: CrossedSticksIcon,
     to: '/create-league',
+    ctaLabel: 'Create a league',
   },
   {
     label: 'Daily Pickem',
@@ -134,6 +135,7 @@ const GAME_MODES: Array<{
     accent: 'sage',
     icon: PickemIcon,
     to: '/pool/pickem',
+    ctaLabel: 'Make picks',
   },
   {
     label: 'Survivor Pool',
@@ -142,6 +144,7 @@ const GAME_MODES: Array<{
     accent: 'butter',
     icon: SurvivorIcon,
     to: '/pool/survivor',
+    ctaLabel: 'Start a pool',
   },
   {
     label: 'Confidence Pool',
@@ -150,6 +153,7 @@ const GAME_MODES: Array<{
     accent: 'peach',
     icon: ScoreboardIcon,
     to: '/pool/confidence',
+    ctaLabel: 'Start a pool',
   },
   {
     label: 'Stanley Cup Brackets',
@@ -158,6 +162,7 @@ const GAME_MODES: Array<{
     accent: 'orange',
     icon: CupIcon,
     to: '/nhl/playoffs',
+    ctaLabel: 'Fill a bracket',
   },
   {
     label: 'Mock Draft',
@@ -166,6 +171,7 @@ const GAME_MODES: Array<{
     accent: 'sage',
     icon: DraftIcon,
     to: '/armchair-gm?tab=mockdraft',
+    ctaLabel: 'Start a mock',
   },
 ];
 
@@ -183,13 +189,13 @@ const REAL_FEATURES: Array<{
   },
   {
     label: 'A range, not a number',
-    desc: 'Every projection is run as a simulation, so you see a floor, a middle and a ceiling for each skater each night instead of one average. That is what a start-or-sit call actually needs.',
+    desc: 'Where a simulation is available, the projection view gives you a floor, a middle and a ceiling instead of one average. That is the context a start-or-sit call needs.',
     icon: RangeIcon,
     accent: 'sage',
   },
   {
     label: 'Live scoring on every shift',
-    desc: 'Goals, assists, hits and blocks land in your matchup as they happen during the game, not after the box score posts.',
+    desc: 'Goals, assists, hits and blocks update your matchup during the game, rather than waiting for a next-day recap.',
     icon: ShiftIcon,
     accent: 'butter',
   },
@@ -201,7 +207,7 @@ const REAL_FEATURES: Array<{
   },
   {
     label: 'The stats the pros look at',
-    desc: 'xGF%, Corsi, power-play unit share, deployment and zone entries are on every player\'s page. None of it is behind an upgrade.',
+    desc: 'Player pages bring together xGF%, Corsi, power-play usage and deployment context when the underlying data is available.',
     icon: XGModelIcon,
     accent: 'sage',
   },
@@ -274,7 +280,7 @@ export function Homepage() {
       <div className="relative z-10 bg-gradient-to-r from-pressbox-orange/15 via-pressbox-orange/25 to-pressbox-orange/15 border-y border-pressbox-orange/30">
         <div className="max-w-[1280px] mx-auto px-6 py-2 text-center">
           <span className="font-plex font-semibold text-[11px] tracking-[0.16em] uppercase text-pressbox-orange-soft">
-            Free to play · No card required · {OPENING_NIGHT_LABEL}
+            Free to play · No card required
           </span>
         </div>
       </div>
@@ -299,7 +305,7 @@ export function Homepage() {
         />
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6 snap-x snap-mandatory">
           {GAME_MODES.map((g) => (
-            <GameModeCard key={g.label} {...g} ctaLabel="Open" />
+            <GameModeCard key={g.label} {...g} />
           ))}
         </div>
       </section>
@@ -374,12 +380,12 @@ export function Homepage() {
             Start the league. <span className="text-pressbox-orange">Send the link.</span>
           </>
         }
-        sub={`Free to play. Drafts are open now and the season starts Sep 29.`}
+        sub="Free to play. Set your rules, send the invite, and make the league yours."
         ctaLabel="Create your league"
         ctaHref="/create-league"
       />
 
-      <HockeyFooter />
+      <HockeyFooter showSquad={false} />
     </DarkLayout>
   );
 }

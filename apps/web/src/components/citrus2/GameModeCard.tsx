@@ -33,11 +33,7 @@ export function GameModeCard({
   scene?: string;
 }) {
   const a = ACCENT_CLASSES[accent];
-  const button = (
-    <button className="mt-auto w-full inline-flex items-center justify-center gap-1.5 bg-pressbox-orange text-pressbox-orange-ink px-4 h-11 rounded-md font-condensed font-bold uppercase tracking-[0.06em] text-[15px] hover:bg-pastel-orange-soft transition-all duration-200 active:scale-95 group/btn">
-      {ctaLabel} <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" strokeWidth={2.5} />
-    </button>
-  );
+  const ctaClass = 'mt-auto w-full inline-flex items-center justify-center gap-1.5 bg-pressbox-orange text-pressbox-orange-ink px-4 h-11 rounded-md font-condensed font-bold uppercase tracking-[0.06em] text-[15px] hover:bg-pastel-orange-soft transition-all duration-200 active:scale-95 group/btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pastel-orange-soft focus-visible:ring-offset-2 focus-visible:ring-offset-pastel-surface';
 
   return (
     <div className="flex-shrink-0 w-[240px] sm:w-[260px] snap-start">
@@ -86,7 +82,15 @@ export function GameModeCard({
             <p className="font-barlow font-normal text-[14px] text-pressbox-text/70 leading-snug mb-4 flex-grow min-h-[80px] line-clamp-4">
               {sub}
             </p>
-            {to ? <Link to={to} className="contents">{button}</Link> : button}
+            {to ? (
+              <Link to={to} className={ctaClass} aria-label={`${ctaLabel}: ${label}`}>
+                {ctaLabel} <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" strokeWidth={2.5} />
+              </Link>
+            ) : (
+              <span className={ctaClass} aria-hidden="true">
+                {ctaLabel} <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+              </span>
+            )}
           </div>
         </article>
       </GlowCard>
