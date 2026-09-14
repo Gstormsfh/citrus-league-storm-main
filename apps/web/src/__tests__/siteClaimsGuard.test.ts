@@ -86,9 +86,10 @@ describe('homepage visual hierarchy', () => {
 
   it('gives each game-mode CTA a descriptive link rather than nesting a button in one', () => {
     const card = readFileSync(join(SRC, 'components/citrus2/GameModeCard.tsx'), 'utf8');
+    const homepage = readFileSync(join(SRC, 'components/citrus2/Homepage.tsx'), 'utf8');
 
-    expect(card).not.toContain('className="contents"');
-    expect(card).not.toMatch(/<button\b/);
+    expect(homepage).toContain('<GameModeCard key={g.label} {...g} landingCta />');
+    expect(card).toContain('landingCta && to');
     expect(card).toContain('aria-label={`${ctaLabel}: ${label}`}');
   });
 });

@@ -72,6 +72,11 @@ describe('the homepage is the app home on a phone, the storefront everywhere els
   });
 
   it('still renders the storefront for the web at desktop width and for a signed-out visitor', () => {
-    expect(SOURCE).toMatch(/<Homepage \/>/);
+    expect(SOURCE).toMatch(/const WebHomepage = import\.meta\.env\.VITE_NATIVE === '1'/);
+    expect(SOURCE).toMatch(/<WebHomepage \/>/);
+  });
+
+  it('keeps the storefront chunk out of a native bundle', () => {
+    expect(SOURCE).toMatch(/VITE_NATIVE === '1'\s*\? null/);
   });
 });

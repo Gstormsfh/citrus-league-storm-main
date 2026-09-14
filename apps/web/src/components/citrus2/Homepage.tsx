@@ -5,6 +5,7 @@
  * Edit copy / structure here once and both routes update together.
  */
 
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import Navbar from '@/components/Navbar';
@@ -49,35 +50,66 @@ import type { AccentName } from './tokens';
 // public NHL identity where available, generated demo values, and no league or
 // account data. They show the product in use, not a fabricated dashboard.
 function ProductVisual() {
+  const [screen, setScreen] = useState<'overview' | 'breakdown'>('overview');
+  const isOverview = screen === 'overview';
+  const activeScreen = isOverview
+    ? {
+        src: '/product-demo/player-dashboard-demo-390.png',
+        alt: 'Citrus player dashboard on mobile, showing a player decision view, expected-goals context, and shot profile.',
+        label: 'Player decision view',
+        detail: 'See the context behind a start-or-sit call.',
+      }
+    : {
+        src: '/product-demo/player-analysis-demo-390.png',
+        alt: 'Citrus player analysis on mobile, showing expected goals, finishing context, and a shot breakdown.',
+        label: 'Shot breakdown',
+        detail: 'Turn a box score into the shots that created it.',
+      };
+
   return (
-    <figure className="relative mx-auto h-[500px] w-full max-w-[520px] overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_75%_12%,rgba(255,107,26,0.25),transparent_38%),linear-gradient(135deg,#101c14,#07110b)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] sm:h-[540px]">
+    <figure className="relative mx-auto h-[470px] w-full max-w-[520px] overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_75%_12%,rgba(255,107,26,0.25),transparent_38%),linear-gradient(135deg,#101c14,#07110b)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)] sm:h-[500px]">
       <div className="absolute left-5 top-5 z-10 rounded-md border border-white/10 bg-black/45 px-3 py-2 backdrop-blur-sm">
         <p className="font-plex text-[10px] font-semibold uppercase tracking-[0.16em] text-pressbox-orange-soft">Actual product screens</p>
         <p className="mt-0.5 font-barlow text-xs text-pressbox-text/70">Demo data · mobile layout</p>
       </div>
-      <div className="absolute -left-7 top-[84px] w-[255px] overflow-hidden rounded-[25px] border-[5px] border-[#07110b] bg-[#07110b] shadow-[0_24px_36px_-12px_rgba(0,0,0,0.8)] sm:left-7 sm:w-[280px]">
+      <div className="absolute left-1/2 top-[92px] w-[250px] -translate-x-1/2 overflow-hidden rounded-[25px] border-[5px] border-[#07110b] bg-[#07110b] shadow-[0_24px_36px_-12px_rgba(0,0,0,0.8)] transition-transform duration-300 motion-reduce:transition-none sm:top-[96px] sm:w-[276px]">
         <img
-          src="/product-demo/player-dashboard-demo-390.png"
-          alt="Citrus player dashboard on mobile, showing a player decision view, expected-goals context, and shot profile."
+          key={activeScreen.src}
+          src={activeScreen.src}
+          alt={activeScreen.alt}
           width="390"
           height="844"
-          className="block h-auto w-full"
+          className="block h-auto w-full animate-fade-in motion-reduce:animate-none"
           fetchPriority="high"
         />
       </div>
-      <div className="absolute -right-12 bottom-[-16px] w-[190px] overflow-hidden rounded-[22px] border-4 border-[#07110b] bg-[#07110b] shadow-[0_20px_36px_-12px_rgba(0,0,0,0.8)] sm:right-4 sm:w-[210px]">
-        <img
-          src="/product-demo/player-analysis-demo-390.png"
-          alt="Citrus player analysis on mobile, showing expected goals, finishing context, and a shot breakdown."
-          width="390"
-          height="844"
-          className="block h-auto w-full"
-          loading="lazy"
-        />
+      <div className="absolute bottom-4 left-1/2 z-10 w-[calc(100%-2.5rem)] -translate-x-1/2 rounded-xl border border-white/10 bg-[#0a150d]/90 p-2.5 backdrop-blur-sm sm:w-[calc(100%-3rem)]">
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-white/[0.06] p-1" role="tablist" aria-label="Explore Citrus player screens">
+          {([
+            ['overview', 'Player view'],
+            ['breakdown', 'Shot breakdown'],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={screen === value}
+              aria-controls="product-screen-preview"
+              onClick={() => setScreen(value)}
+              className={`rounded-md px-2 py-2 font-plex text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors motion-reduce:transition-none ${
+                screen === value
+                  ? 'bg-pressbox-orange text-pressbox-orange-ink'
+                  : 'text-pressbox-text/65 hover:bg-white/[0.08] hover:text-pressbox-text'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p id="product-screen-preview" className="mt-2 px-1 font-barlow text-xs text-pressbox-text/70">
+          <span className="font-semibold text-pressbox-text">{activeScreen.label}.</span> {activeScreen.detail}
+        </p>
       </div>
-      <figcaption className="absolute bottom-4 left-5 right-[126px] z-10 font-plex text-[10px] font-semibold uppercase tracking-[0.12em] text-pressbox-text/60 sm:right-[145px]">
-        Decision context, then the slate
-      </figcaption>
     </figure>
   );
 }
@@ -94,7 +126,7 @@ function getHeroSlides(): HeroSlide[] {
   return [
     {
       id: 'fantasy',
-      eyebrow: 'Season-long fantasy hockey · Free · No card required',
+      eyebrow: '',
       headline: { lead: 'Fantasy hockey', accent: 'for people who watch hockey.' },
       sub: 'Set up a season-long league with your friends, make lineup decisions with expected-goals context, and follow the scores as games unfold. There are no entry fees and no payouts. It is just hockey.',
       primary: { label: 'Create a league', to: '/create-league' },
@@ -305,7 +337,7 @@ export function Homepage() {
         />
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-6 px-6 snap-x snap-mandatory">
           {GAME_MODES.map((g) => (
-            <GameModeCard key={g.label} {...g} />
+            <GameModeCard key={g.label} {...g} landingCta />
           ))}
         </div>
       </section>

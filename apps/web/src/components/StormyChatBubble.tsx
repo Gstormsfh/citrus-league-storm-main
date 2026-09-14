@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ChatBar } from '@/components/pressbox/ChatBar';
 import { useVisualViewport } from '@/hooks/useVisualViewport';
 import { stormySheetGeometry } from '@/components/stormy/sheetGeometry';
+import { Capacitor } from '@capacitor/core';
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -343,7 +344,7 @@ const StormyChatBubbleSession = () => {
    */
   if (!isOpen && isMobile) {
     // The Stormy page itself is on the list: a bar there opens a second chat over the first.
-    const navHidden = location.pathname === '/' ||
+    const navHidden = (!Capacitor.isNativePlatform() && location.pathname === '/') ||
       ['/auth', '/profile-setup', '/verify-email', '/reset-password', '/gm-office/stormy'].some((r) =>
         location.pathname.startsWith(r),
       );

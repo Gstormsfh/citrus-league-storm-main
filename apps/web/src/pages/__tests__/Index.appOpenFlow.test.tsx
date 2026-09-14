@@ -27,7 +27,7 @@ vi.mock('@/contexts/LeagueContext', () => ({ useLeague: () => mockLeague() }));
 vi.mock('@/hooks/useIsMobile', () => ({ useIsMobile: () => true }));
 vi.mock('@/hooks/useSeasonStatus', () => ({ useSeasonStatus: () => ({ status: { isDormant: false, phase: 'regular' } }) }));
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => false } }));
-vi.mock('@/components/citrus2', () => ({ Homepage: () => <div data-testid="storefront" /> }));
+vi.mock('@/components/citrus2/Homepage', () => ({ Homepage: () => <div data-testid="storefront" /> }));
 vi.mock('@/components/home/PressBoxHome', () => ({ PressBoxHome: () => <div data-testid="league-list" /> }));
 vi.mock('@/components/LoadingScreen', () => ({ default: () => <div data-testid="loading" /> }));
 vi.mock('@/utils/logger', () => ({ logger: { error: vi.fn() } }));
@@ -124,10 +124,10 @@ describe('the app open flow', () => {
     expect(screen.queryByTestId('storefront')).toBeNull();
   });
 
-  it('keeps the storefront for a signed-out visitor', () => {
+  it('keeps the storefront for a signed-out visitor', async () => {
     mockAuth.mockReturnValue({ user: null, loading: false });
     renderAt('/');
-    expect(screen.getByTestId('storefront')).toBeInTheDocument();
+    expect(await screen.findByTestId('storefront')).toBeInTheDocument();
   });
 
   it('one account\'s stamp does not pin another', () => {

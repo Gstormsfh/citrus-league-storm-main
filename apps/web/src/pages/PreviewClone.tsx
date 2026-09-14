@@ -1,9 +1,14 @@
-// Imported from the module, not from the citrus2 barrel. Homepage.tsx itself
-// imports its siblings through the barrel, so barrel -> Homepage -> barrel is a
-// cycle, and this page is lazy-loaded into its own chunk: Rollup warned that
-// re-exporting Homepage through the cyclic barrel across chunks can break
-// execution order (CYCLIC_CROSS_CHUNK_REEXPORT) and asked for a direct import.
-import { Homepage } from '@/components/citrus2/Homepage';
+import { lazy, Suspense } from 'react';
+
+// This design-canon route is web-only. Its module can remain a development
+// route without causing the public storefront (and its product captures) to
+// be emitted into Capacitor's bundle.
+const WebHomepage = import.meta.env.VITE_NATIVE === '1'
+  ? null
+  : lazy(async () => {
+      const module = await import('@/components/citrus2/Homepage');
+      return { default: module.Homepage };
+    });
 
 /**
  * Design canon for the new dark Citrus 2.0 homepage. Same composition that
@@ -11,5 +16,10 @@ import { Homepage } from '@/components/citrus2/Homepage';
  * iterations can ship here first without touching prod traffic.
  */
 export default function PreviewClone() {
-  return <Homepage />;
+  if (!WebHomepage) return null;
+  return (
+    <Suspense fallback={null}>
+      <WebHomepage />
+    </Suspense>
+  );
 }

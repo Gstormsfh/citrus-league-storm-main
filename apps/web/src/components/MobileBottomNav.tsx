@@ -6,6 +6,7 @@ import { useLeague } from '@/contexts/LeagueContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { isPoolLeague, getPoolRoute } from '@/utils/leagueTypeHelpers';
 import { PressBoxBottomNav } from '@/components/pressbox/PressBoxBottomNav';
+import { Capacitor } from '@capacitor/core';
 
 const MobileBottomNav = () => {
   const location = useLocation();
@@ -161,7 +162,9 @@ const MobileBottomNav = () => {
     '/auth', '/profile-setup', '/verify-email', '/reset-password',
     '/draft', '/draft-v2', '/draft-room',
   ];
-  if (location.pathname === '/' || hideOnRoutes.some(route => location.pathname.startsWith(route))) {
+  // `/` is the public storefront in a browser. In the Capacitor shell it is
+  // the signed-in Press Box home, where this navigation is essential.
+  if ((!Capacitor.isNativePlatform() && location.pathname === '/') || hideOnRoutes.some(route => location.pathname.startsWith(route))) {
     return null;
   }
 

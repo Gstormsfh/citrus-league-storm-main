@@ -359,7 +359,7 @@ const CASES: Record<DashboardCase, CaseSpec> = {
   // A defenceman, so the zone breakdown is dominated by the point and the
   // Shot Breakdown tile has to read correctly when the slot row is thin.
   defence: {
-    player: harnessPlayer('Cale Makar'),
+    player: harnessPlayer('Zach Werenski'),
     build: (p) => {
       const shots = buildShots({
         attempts: p.shots ?? 0,

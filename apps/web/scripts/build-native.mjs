@@ -29,7 +29,7 @@
  * the above defects is refused here rather than discovered by a tester.
  */
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -204,10 +204,25 @@ const run = spawnSync('npx', ['vite', 'build', '--mode', MODE], {
 });
 if (run.status !== 0) process.exit(run.status ?? 1);
 
+// Product captures are website marketing assets. Vite copies `public/`
+// wholesale, so remove this web-only directory from the Capacitor artifact
+// after the web build has emitted it and before any native bundle checks run.
+// No iOS/Android project is synced or touched here.
+const WEB_ONLY_PRODUCT_DEMOS = join(WEB_DIR, 'dist', 'product-demo');
+rmSync(WEB_ONLY_PRODUCT_DEMOS, { recursive: true, force: true });
+
 const assets = join(WEB_DIR, 'dist', 'assets');
 const js = readdirSync(assets).filter((f) => f.endsWith('.js'));
+const nativeAssetNames = readdirSync(assets);
 const blob = js.map((f) => readFileSync(join(assets, f), 'utf8')).join('\n');
 const indexHtml = readFileSync(join(WEB_DIR, 'dist', 'index.html'), 'utf8');
+
+if (
+  existsSync(WEB_ONLY_PRODUCT_DEMOS)
+  || nativeAssetNames.some((file) => /^Homepage-/.test(file))
+  || /(?:product-demo\/|player-(?:dashboard|analysis)-demo-390\.png|Actual product screens|Explore Citrus player screens)/.test(blob)
+)
+  fail('web-only product showcase assets or code reached the native bundle.');
 
 // --- 1. Supabase reached the bundle, and exactly one project did -----------
 const refs = [...new Set([...blob.matchAll(/https:\/\/([a-z0-9]{15,})\.supabase\.co/g)].map((m) => m[1]))];
