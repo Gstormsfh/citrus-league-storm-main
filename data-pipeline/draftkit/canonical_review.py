@@ -369,6 +369,90 @@ def apply_patch(document, patch, *, now=None):
     return result
 
 
+PUBLICATION_GATE = 'ROSTER_ROLE_SCENARIOS_NOT_CONFIRMED'
+
+
+def publication_review(document, *, reason, reviewer, now=None):
+    """The explicit publication review, as a recorded step instead of a hand edit.
+
+    apply_patch leaves every edited document behind the publication gate on
+    purpose: contract.publication_ready is False and the ROSTER_ROLE gate
+    blocker is present, so an offline edit can never activate a run by
+    itself. Clearing that gate used to mean editing the JSON by hand, which
+    left no record and silently invalidated the revision digest. This
+    records who reviewed, why and when in review_history, clears only the
+    gate blocker, and re-digests. Any other blocker — coverage, budget,
+    overlapping scenarios — still refuses, because those are findings, not
+    a gate.
+    """
+    validate(document)
+    if not isinstance(reason, str) or not reason.strip() or not isinstance(reviewer, str) or not reviewer.strip():
+        raise ContractError('Publication review needs a reviewer and a reason')
+    others = [b for b in document['publish_blockers'] if b.get('code') != PUBLICATION_GATE]
+    if others:
+        raise ContractError(f'Publication review refused: unresolved blockers {[b.get("code") for b in others]}')
+    if document['contract'].get('publication_ready') is True and not any(b.get('code') == PUBLICATION_GATE for b in document['publish_blockers']):
+        raise ContractError('Document is already publication-ready')
+    result = deepcopy(document)
+    result['publish_blockers'] = [b for b in result['publish_blockers'] if b.get('code') != PUBLICATION_GATE]
+    result['contract']['publication_ready'] = True
+    result['contract']['reason'] = reason.strip()
+    result.setdefault('review_history', []).append({
+        'base_revision': document['revision'], 'at': now or datetime.now(timezone.utc).isoformat(),
+        'publication_review': {'reviewer': reviewer.strip(), 'reason': reason.strip()}, 'updates': []})
+    result['revision'] = digest(result)
+    validate(result)
+    return result
+
+
+def scope_sync(document, directory_ids, *, reason, reviewer, now=None):
+    """Reconcile scope_player_ids with the live player directory.
+
+    The database validator requires scope_player_ids to equal the current
+    directory exactly, and the directory refreshes on its own schedule: a
+    signing lands between two publications and every later activation fails
+    DIRECTORY_COVERAGE_MISMATCH. When the newly listed player already has a
+    canonical record (imported before the directory caught up, so
+    directory_present was False) this brings him into scope and records it.
+    A directory id with no canonical record is refused — that is a
+    player_additions review with a full record and identity evidence — and
+    so is a scope id the directory no longer carries, because dropping a
+    player from scope is a review, not a sync.
+    """
+    validate(document)
+    if not isinstance(reason, str) or not reason.strip() or not isinstance(reviewer, str) or not reviewer.strip():
+        raise ContractError('Scope sync needs a reviewer and a reason')
+    directory = {str(x) for x in directory_ids}
+    if not directory or any(not x.isdigit() for x in directory):
+        raise ContractError('Directory ids must be a nonempty list of numeric NHL ids')
+    scope = set(document.get('scope_player_ids', []))
+    players = {p['player_id']: p for p in document['players']}
+    missing_records = sorted(directory - scope - set(players), key=int)
+    if missing_records:
+        raise ContractError(f'Directory players without a canonical record need a player_additions review: {missing_records}')
+    dropped = sorted(scope - directory, key=int)
+    if dropped:
+        raise ContractError(f'Scope players no longer in the directory need a review, not a sync: {dropped}')
+    added = sorted(directory - scope, key=int)
+    if not added:
+        raise ContractError('Scope already matches the directory')
+    result = deepcopy(document)
+    history = []
+    for pid in added:
+        record = next(p for p in result['players'] if p['player_id'] == pid)
+        history.append({'player_id': pid, 'before': {'directory_present': record.get('directory_present')}, 'changes': {'directory_present': True}})
+        record['directory_present'] = True
+    result['scope_player_ids'] = sorted(scope | set(added), key=int)
+    result.setdefault('review_history', []).append({'base_revision': document['revision'],
+        'at': now or datetime.now(timezone.utc).isoformat(), 'reason': reason.strip(),
+        'evidence': [f'player_directory season {document["season"]}: {len(directory)} ids'],
+        'scope_sync': {'reviewer': reviewer.strip(), 'added': added}, 'updates': history})
+    rebuild(result)
+    result['revision'] = digest(result)
+    validate(result)
+    return result
+
+
 def write_json(path, document):
     # Exclusive creation keeps previous revisions and source snapshots intact.
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -378,7 +462,10 @@ def write_json(path, document):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['validate', 'review', 'apply', 'export', 'history', 'stage-payload'])
+    parser.add_argument('command', choices=['validate', 'review', 'apply', 'scope-sync', 'publication-review', 'export', 'history', 'stage-payload'])
+    parser.add_argument('--reason')
+    parser.add_argument('--reviewer')
+    parser.add_argument('--directory', type=Path, help='JSON list of current player_directory ids (scope-sync)')
     parser.add_argument('source', type=Path)
     parser.add_argument('--patch', type=Path)
     parser.add_argument('--output', type=Path)
@@ -391,6 +478,14 @@ def main():
         if not args.patch or not args.output or args.output.resolve() == args.source.resolve():
             parser.error('apply requires --patch and a new --output path')
         result = apply_patch(document, json.loads(args.patch.read_text()))
+    elif args.command == 'scope-sync':
+        if not args.directory or not args.reason or not args.reviewer or not args.output or args.output.resolve() == args.source.resolve():
+            parser.error('scope-sync requires --directory, --reason, --reviewer and a new --output path')
+        result = scope_sync(document, json.loads(args.directory.read_text()), reason=args.reason, reviewer=args.reviewer)
+    elif args.command == 'publication-review':
+        if not args.reason or not args.reviewer or not args.output or args.output.resolve() == args.source.resolve():
+            parser.error('publication-review requires --reason, --reviewer and a new --output path')
+        result = publication_review(document, reason=args.reason, reviewer=args.reviewer)
     elif args.command == 'review':
         result = {'revision': document['revision'], 'players': [p for p in document['players']
             if (not args.team or p['team'] == args.team) and (not args.player_id or p['player_id'] == args.player_id)],
