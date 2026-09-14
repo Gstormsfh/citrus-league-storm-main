@@ -43,6 +43,7 @@ import { nhlPlayoffsRoutes } from './routes/nhl-playoffs';
 import { playoffPoolRoutes } from './routes/playoff-pools';
 import { authRoutes } from './routes/auth';
 import { scheduledRoutes } from './routes/scheduled';
+import { importRoutes, leagueHistoryRoutes } from './routes/imports';
 import { standardRateLimit, strictRateLimit, authRateLimit, aiRateLimit } from './middleware/rateLimit';
 import { requestContextMiddleware } from './middleware/requestContext';
 import { metricsMiddleware, metrics } from './middleware/metrics';
@@ -288,6 +289,8 @@ app.post('/api/vitals', async (c) => {
 
 // ── API routes ───────────────────────────────────────────────────────
 app.route('/api/leagues', leagueRoutes);
+app.route('/api/leagues', leagueHistoryRoutes);  // league history import, trophy room, member claims
+app.route('/api/imports', importRoutes);         // platform discovery (ESPN public leagues need no credentials)
 app.route('/api/players', playerRoutes);
 app.route('/api/scores', scoresRoutes);
 app.route('/api/season', seasonRoutes);
