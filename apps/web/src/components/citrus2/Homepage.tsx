@@ -67,8 +67,8 @@ function ProductVisual() {
       </div>
       <div className="absolute -right-12 bottom-[-16px] w-[190px] overflow-hidden rounded-[22px] border-4 border-[#07110b] bg-[#07110b] shadow-[0_20px_36px_-12px_rgba(0,0,0,0.8)] sm:right-4 sm:w-[210px]">
         <img
-          src="/product-demo/scores-demo-390.png"
-          alt="Citrus scores screen on mobile, showing a game slate and player projections."
+          src="/product-demo/player-analysis-demo-390.png"
+          alt="Citrus player analysis on mobile, showing expected goals, finishing context, and a shot breakdown."
           width="390"
           height="844"
           className="block h-auto w-full"
