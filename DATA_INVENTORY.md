@@ -127,6 +127,52 @@ headshot) and `player_season_stats` (points, games played for the banding).
 
 ---
 
+### 1.5 League history and import tables
+
+Two migrations. `20260914110000_league_history_foundation.sql` carries into
+migration history the three tables that were applied to prod by hand on
+2026-08-26 (idempotent: `create table if not exists`, `drop policy if exists`).
+`20260914110100_league_import_platform.sql` is the automated Yahoo / ESPN
+import on top of it. **Written and verified on a Supabase branch database;
+NOT yet applied** to prod or staging as of 2026-09-13.
+
+Design rules the tables encode: an import is a copy, never a link; every raw
+API response is stored before it is parsed; every trophy carries a provenance
+(`imported` | `computed` | `manual`); managers are keyed on the source's stable
+account id (Yahoo guid, ESPN SWID), never on team id or name; category leagues
+never get points-league records; nothing is hard-deleted (`retired_at`,
+`merged_into_member_id`).
+
+| Table | Purpose | Write path | RLS |
+|---|---|---|---|
+| `league_members` | One row per human who has ever been in the league. `owner_id` null = unclaimed placeholder carrying a `claim_token`; `merged_into_member_id` set = folded into another row | seed from team owners; `ExternalIdentityService`; claim / merge functions | Enabled. Members SELECT; commissioner writes; claim and merge go through the SECURITY DEFINER functions |
+| `league_seasons` | One row per season played or imported: champion, runner-up, regular-season winner, `scoring_type`, `is_finished`, `is_verified_by_bracket`, `import_job_id` | `LeagueImportService.writeSeason` (upsert on `league_id, season`) | Enabled. Members SELECT; commissioner writes |
+| `league_season_teams` | Final standings per season per member, incl. `external_team_id`, `playoff_seed`, `category_record` | same (upsert on `league_id, season, member_id`) | Enabled. Members SELECT; commissioner writes |
+| `league_season_matchups` | Every weekly result. Points leagues fill `home_score` / `away_score`; category leagues fill `home_cat_*` and `category_results` and leave scores null | same (upsert on `league_id, season, week, home_member_id`) | Enabled. Members SELECT; commissioner writes |
+| `league_season_drafts` | Every pick with keeper flag and cost, `nhl_player_id` via the crosswalk | same (upsert on `league_id, season, overall_pick`) | Enabled. Members SELECT; commissioner writes |
+| `league_season_transactions` | Adds, drops, trades, FAAB bids where the source exposes them (Yahoo branch) | Yahoo import | Enabled. Members SELECT; commissioner writes |
+| `league_trophies` | The record book: 25 keyed honours plus `custom`. `source` says whether the fact was imported, computed by Citrus, or typed by the commissioner. Recompute retires and reinserts non-manual rows | `TrophyService.recompute` | Enabled. Members SELECT; commissioner writes (presentation columns only in practice) |
+| `league_member_identities` | (`league_id`, `platform`, `external_manager_id`) → `member_id`. What makes the same person one row across ten seasons of changing team names | `ExternalIdentityService` | Enabled. Members SELECT; commissioner writes |
+| `external_league_links` | Which source seasons a Citrus league was built from, each with the season's `settings` as the source stated them (what the commissioner's confirm-scoring screen translates) | `writeSeason` | Enabled. Members SELECT; commissioner writes |
+| `import_jobs` | One row per import run: status machine (`queued` → `discovering` → `importing` → `computing` → `done` \| `partial` \| `failed` \| `needs_credentials`), seasons discovered / imported / needing credentials, progress JSON | `LeagueImportService` | Enabled. Members SELECT; commissioner writes |
+| `import_raw_payloads` | Every source API response, verbatim, with `payload_sha256`. A source renaming a field is fixed by re-parsing, never by re-fetching | `storeRawPayload` | Enabled. Members SELECT; commissioner writes. Grows with every import (three payloads per ESPN season); retention policy needed before scale |
+| `external_player_ids` | (`platform`, `external_player_id`) → `nhl_player_id` with `match_method`, `confidence`, `is_ambiguous`. Shared across every league; resolved once, resolved everywhere | `PlayerCrosswalkService` on the **service role** after the API has verified the caller | Enabled. Any signed-in user SELECTs; **no authenticated write policy on purpose** (one user must not re-map a player for everyone) |
+| `oauth_connections` | One row per user per platform (Yahoo): guid, expiry, scopes, `revoked_at`. No token material; access tokens are never persisted; ESPN credentials are never stored anywhere | API server on the service role after verifying the caller (Yahoo OAuth callback) | Enabled. Users SELECT their own row; **no client write policy** |
+SECURITY DEFINER functions, all `SET search_path = public`:
+`citrus_claim_league_member(uuid, text)` (token path from an invite link, or
+list-pick for a league member; merges into the caller's existing owner-linked
+row so the foundation seed never leaves one person with two rows) and
+`citrus_merge_league_members(uuid, uuid, text)` (commissioner, or the claim
+path; re-points every history row; refuses when both rows have standings in a
+shared season). Views `league_season_results` and `league_member_honours`
+(titles, finals lost, playoff seasons, best finish, career record) are what the
+trophy room and the "which one is you?" list read.
+
+`security_audit_log.event_type` gains `LEAGUE_HISTORY_IMPORT`, `_CLAIM`,
+`_MERGE`, `_LOCK`.
+
+---
+
 
 ## 2. Historical data archives
 
